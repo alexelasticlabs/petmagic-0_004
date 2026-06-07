@@ -1,7 +1,6 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 
 final passwordChangeControllerProvider =
@@ -65,13 +64,11 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
     Object error,
     StackTrace stackTrace,
   ) {
-    developer.Timeline.instantSync(
-      'petmagic.profile.password_change.error',
-      arguments: {'stage': stage},
-    );
-    developer.log(
-      'PasswordChangeController::$stage failed',
-      name: 'PetMagic.Profile.PasswordChange',
+    AppLogger.warn(
+      feature: 'Profile.PasswordChange',
+      operation: stage,
+      message: 'Password change step failed',
+      context: {'stage': stage},
       error: error,
       stackTrace: stackTrace,
     );
@@ -82,6 +79,16 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
   @override
   PasswordChangeState build() {
     return const PasswordChangeState();
+  }
+
+  void _updateStateIfMounted(
+    PasswordChangeState Function(PasswordChangeState current) update,
+  ) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    state = update(state);
   }
 
   void reset({required String email}) {
@@ -109,18 +116,28 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
   }
 
   Future<bool> requestCode() async {
+    if (state.isSaving) {
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.requestCurrentPasswordChangeCode();
-      state = state.copyWith(
-        isSaving: false,
-        codeRequested: true,
-        successMessage: 'auth.password_reset_code_sent',
+      await repository.requestCurrentPasswordChangeCode();
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          codeRequested: true,
+          successMessage: 'auth.password_reset_code_sent',
+        ),
       );
       return true;
     } on AppException catch (error) {
@@ -134,6 +151,10 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
   }
 
   Future<bool> confirmChange() async {
+    if (state.isSaving) {
+      return false;
+    }
+
     if (state.newPassword.length < 8) {
       state = state.copyWith(
         errorMessage: 'auth.password_too_short',
@@ -156,17 +177,23 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.confirmCurrentPasswordChange(
+      await repository.confirmCurrentPasswordChange(
         code: state.code,
         newPassword: state.newPassword,
       );
-      state = state.copyWith(
-        isSaving: false,
-        code: '',
-        newPassword: '',
-        confirmPassword: '',
-        successMessage: 'auth.password_reset_success',
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          code: '',
+          newPassword: '',
+          confirmPassword: '',
+          successMessage: 'auth.password_reset_success',
+        ),
       );
       return true;
     } on AppException catch (error) {
@@ -180,10 +207,12 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
   }
 
   void _setFailure(String message) {
-    state = state.copyWith(
-      isSaving: false,
-      errorMessage: message,
-      clearSuccess: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isSaving: false,
+        errorMessage: message,
+        clearSuccess: true,
+      ),
     );
   }
 }

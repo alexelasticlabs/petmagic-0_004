@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
@@ -68,10 +69,18 @@ class _SubscriptionManagementPageState
   }
 
   Future<void> _openManageTarget(String manageSubscriptionAction) async {
+    if (_isProcessing) {
+      return;
+    }
+
     setState(() => _isProcessing = true);
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
       final url = await service.createManagementUrl(manageSubscriptionAction);
+      if (!mounted) {
+        return;
+      }
+
       final uri = parseSafeExternalUri(
         url,
         allowedHttpsHosts: premiumExternalAllowedHosts(),
@@ -93,6 +102,10 @@ class _SubscriptionManagementPageState
       } catch (_) {
         launched = false;
       }
+      if (!mounted) {
+        return;
+      }
+
       if (!launched) {
         launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
@@ -103,6 +116,9 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.warning,
         );
       }
+    } catch (error, stackTrace) {
+      _logSubscriptionActionFailure('open_manage_target', error, stackTrace);
+      _showSubscriptionActionFailed();
     } finally {
       if (mounted) {
         ref.invalidate(premiumSubscriptionSummaryProvider);
@@ -112,6 +128,10 @@ class _SubscriptionManagementPageState
   }
 
   Future<void> _cancelAtPeriodEnd() async {
+    if (_isProcessing) {
+      return;
+    }
+
     final summary = ref.read(premiumSubscriptionSummaryProvider).value;
     final text = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
@@ -126,12 +146,16 @@ class _SubscriptionManagementPageState
       builder: (_) =>
           _CancelConfirmDialog(text: text, periodEndDateStr: dateStr),
     );
-    if (confirmed != true) return;
+    if (!mounted || confirmed != true) return;
 
     setState(() => _isProcessing = true);
     try {
       final service = ref.read(premiumSubscriptionManagementServiceProvider);
       await service.requestCancelAtPeriodEnd();
+      if (!mounted) {
+        return;
+      }
+
       ref.invalidate(premiumSubscriptionSummaryProvider);
       ref.invalidate(profileControllerProvider);
       ref.invalidate(premiumControllerProvider);
@@ -142,15 +166,26 @@ class _SubscriptionManagementPageState
           tone: PetMagicToastTone.success,
         );
       }
+    } catch (error, stackTrace) {
+      _logSubscriptionActionFailure('cancel_at_period_end', error, stackTrace);
+      _showSubscriptionActionFailed();
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
   Future<void> _restorePurchases() async {
+    if (_isProcessing) {
+      return;
+    }
+
     setState(() => _isProcessing = true);
     try {
       await ref.read(premiumControllerProvider.notifier).restorePurchases();
+      if (!mounted) {
+        return;
+      }
+
       ref.invalidate(premiumSubscriptionSummaryProvider);
       ref.invalidate(profileControllerProvider);
       // Read updated summary to determine snackbar message
@@ -168,9 +203,39 @@ class _SubscriptionManagementPageState
               : PetMagicToastTone.info,
         );
       }
+    } catch (error, stackTrace) {
+      _logSubscriptionActionFailure('restore_purchases', error, stackTrace);
+      _showSubscriptionActionFailed();
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  void _showSubscriptionActionFailed() {
+    if (!mounted) {
+      return;
+    }
+
+    PetMagicToast.show(
+      context,
+      message: AppLocalizations.of(context).premiumManageFailed,
+      tone: PetMagicToastTone.warning,
+    );
+  }
+
+  void _logSubscriptionActionFailure(
+    String action,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    AppLogger.warn(
+      feature: 'Premium.SubscriptionManagement',
+      operation: action,
+      message: 'Subscription management action failed',
+      context: {'action': action},
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }
 

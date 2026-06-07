@@ -5,6 +5,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'device_file_saver.dart';
+import 'file_name_sanitizer.dart';
 import 'temp_media_cleanup.dart';
 
 Future<File> cacheRemoteMediaFile({
@@ -12,11 +13,13 @@ Future<File> cacheRemoteMediaFile({
   required String fileName,
   Duration downloadTimeout = const Duration(seconds: 20),
   CancelToken? cancelToken,
+  int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final bytes = await downloadFileBytes(
     mediaUrl,
     timeout: downloadTimeout,
     cancelToken: cancelToken,
+    maxBytes: maxBytes,
   );
   final safeFileName = sanitizeFileName(
     fileName,
@@ -36,12 +39,14 @@ Future<void> shareRemoteMediaFile({
   String? title,
   Duration downloadTimeout = const Duration(seconds: 20),
   CancelToken? cancelToken,
+  int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
     mediaUrl: mediaUrl,
     fileName: fileName,
     downloadTimeout: downloadTimeout,
     cancelToken: cancelToken,
+    maxBytes: maxBytes,
   );
 
   final shareResult = await SharePlus.instance.share(
@@ -62,12 +67,14 @@ Future<bool> saveRemoteMediaToGallery({
   String? albumName,
   Duration downloadTimeout = const Duration(seconds: 20),
   CancelToken? cancelToken,
+  int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
   final tempFile = await cacheRemoteMediaFile(
     mediaUrl: mediaUrl,
     fileName: fileName,
     downloadTimeout: downloadTimeout,
     cancelToken: cancelToken,
+    maxBytes: maxBytes,
   );
 
   final saveTitle = sanitizeFileName(

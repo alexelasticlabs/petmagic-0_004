@@ -176,12 +176,28 @@ class _PremiumStripeCheckoutPageState extends State<PremiumStripeCheckoutPage> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) {
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
       _result = null;
     });
 
-    final result = await widget.onSubmit();
+    late final PremiumStripeCheckoutSubmitResult result;
+    try {
+      result = await widget.onSubmit();
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      result = const PremiumStripeCheckoutSubmitResult(
+        status: PremiumStripeCheckoutActionStatus.failed,
+      );
+    }
+
     if (!mounted) {
       return;
     }

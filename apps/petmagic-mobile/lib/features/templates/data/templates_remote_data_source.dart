@@ -1,8 +1,8 @@
-import 'dart:developer' as developer;
-
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
@@ -163,25 +163,24 @@ class TemplatesRemoteDataSource {
     }
 
     try {
-      final detail =
-          (error.response?.data as Map<String, dynamic>?)?['detail'] as String?;
-      if (detail != null && detail.isNotEmpty) {
-        return detail;
+      final safePayloadMessage = NetworkErrorMapper.safePayloadMessage(
+        NetworkErrorMapper.parseApiPayload(error),
+      );
+      if (safePayloadMessage != null) {
+        return safePayloadMessage;
       }
     } catch (mappingError, stackTrace) {
-      developer.Timeline.instantSync(
-        'petmagic.templates.error_mapping_failed',
-        arguments: {'stage': 'detail_extract'},
-      );
-      developer.log(
-        'TemplatesRemoteDataSource::extract_error_detail failed',
-        name: 'PetMagic.Templates.Api',
+      AppLogger.warn(
+        feature: 'Templates.Api',
+        operation: 'detail_extract',
+        message: 'API error payload mapping failed',
+        context: {'stage': 'detail_extract'},
         error: mappingError,
         stackTrace: stackTrace,
       );
       // Keep a safe fallback below.
     }
 
-    return error.message ?? 'templates.request_failed';
+    return 'templates.request_failed';
   }
 }

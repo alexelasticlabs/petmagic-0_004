@@ -60,6 +60,60 @@ void main() {
       expect(launchCalls, 0);
     },
   );
+
+  test(
+    'browser callback error is allowlisted before reaching app state',
+    () async {
+      final callbacks = StreamController<Uri>();
+      addTearDown(callbacks.close);
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        uriLinkStream: callbacks.stream,
+        launchUrlDelegate: (Uri uri, LaunchMode mode) async {
+          scheduleMicrotask(() {
+            callbacks.add(
+              Uri.parse(
+                'petmagic://auth/external?error='
+                'Authorization%3A%20Bearer%20raw-token%20'
+                'https%3A%2F%2Fcdn.petmagic.ai%2Ffile.jpg%3Fsignature%3Dsecret',
+              ),
+            );
+          });
+          return true;
+        },
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.apple),
+        throwsA(
+          isA<AppException>()
+              .having(
+                (error) => error.message,
+                'message',
+                'auth.external_invalid',
+              )
+              .having(
+                (error) => error.message,
+                'raw token',
+                isNot(contains('raw-token')),
+              )
+              .having(
+                (error) => error.message,
+                'signed url',
+                isNot(contains('signature=secret')),
+              ),
+        ),
+      );
+    },
+  );
 }
 
 class _InMemoryAuthSessionStorage extends AuthSessionStorage {

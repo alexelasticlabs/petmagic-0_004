@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
 
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationPreferences {
@@ -128,13 +128,11 @@ class NotificationPreferencesStorage {
         fallbackMarketingEmails: fallbackMarketingEmails,
       );
     } catch (error, stackTrace) {
-      developer.Timeline.instantSync(
-        'petmagic.profile.notifications.error',
-        arguments: {'stage': 'read_preferences', 'scope': scope},
-      );
-      developer.log(
-        'NotificationPreferencesStorage::read failed',
-        name: 'PetMagic.Profile.Notifications',
+      AppLogger.warn(
+        feature: 'Profile.Notifications',
+        operation: 'read_preferences',
+        message: 'Notification preferences read failed',
+        context: {'scope': scope},
         error: error,
         stackTrace: stackTrace,
       );

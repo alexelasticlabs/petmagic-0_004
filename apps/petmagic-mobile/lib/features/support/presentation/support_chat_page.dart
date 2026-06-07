@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,9 +18,10 @@ import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_attachment_validation.dart';
+import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
+import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
@@ -38,6 +41,10 @@ part 'widgets/support_chat_message_media.part.dart';
 part 'widgets/support_chat_models.part.dart';
 part 'widgets/support_chat_sections.part.dart';
 part 'widgets/support_chat_states.part.dart';
+
+const int _supportReplyThumbnailCacheWidth = 160;
+const int _supportComposerAttachmentPreviewCacheExtent = 220;
+const int _supportRecentMediaThumbnailCacheExtent = 300;
 
 class SupportChatPage extends ConsumerStatefulWidget {
   const SupportChatPage({super.key});
@@ -62,6 +69,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   late final SupportChatController _controller;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;
+  CancelToken? _activeMediaDownloadCancelToken;
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
@@ -169,6 +177,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     _messageController.removeListener(_handleComposerChanged);
     _messageFocusNode.removeListener(_handleComposerFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
+    _cancelActiveMediaDownload();
     _controller.stop();
     _messageController.dispose();
     _scrollController.dispose();
@@ -269,6 +278,30 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     _applyState(() {
       _replyToMessage = null;
     });
+  }
+
+  CancelToken? _startMediaDownload() {
+    if (_activeMediaDownloadCancelToken != null) {
+      return null;
+    }
+
+    final cancelToken = CancelToken();
+    _activeMediaDownloadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _completeMediaDownload(CancelToken cancelToken) {
+    if (identical(_activeMediaDownloadCancelToken, cancelToken)) {
+      _activeMediaDownloadCancelToken = null;
+    }
+  }
+
+  void _cancelActiveMediaDownload() {
+    final cancelToken = _activeMediaDownloadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_media_download_cancelled');
+    }
+    _activeMediaDownloadCancelToken = null;
   }
 
   GlobalKey _messageItemKeyForId(String messageId) {

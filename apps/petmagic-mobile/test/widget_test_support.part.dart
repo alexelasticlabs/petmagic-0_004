@@ -12,6 +12,7 @@ Future<void> _pumpApp(
   TemplatesRepository? repository,
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
+  AppLaunchController Function()? appLaunchController,
 }) async {
   final view = tester.view;
   view.physicalSize = const Size(1080, 1920);
@@ -50,6 +51,8 @@ Future<void> _pumpApp(
         externalAuthRepositoryProvider.overrideWith(
           (ref) => externalAuthRepository ?? _FakeExternalAuthRepository(),
         ),
+        if (appLaunchController != null)
+          appLaunchControllerProvider.overrideWith(appLaunchController),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
@@ -90,6 +93,29 @@ class _IdleGenerationHistoryController extends GenerationHistoryController {
   @override
   GenerationHistoryState build() {
     return const GenerationHistoryState();
+  }
+}
+
+class _ThrowingGuestLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: false,
+      guestSessionReady: false,
+    );
+  }
+
+  @override
+  Future<void> continueAsGuest() async {
+    throw StateError('guest launch failed');
+  }
+
+  @override
+  Future<void> markOnboardingSeen() async {
+    throw StateError('onboarding save failed');
   }
 }
 
@@ -585,6 +611,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
+    CancelToken? cancelToken,
   }) async {
     openConversationCalls += 1;
     lastOpenedInitialMessage = initialMessage;
@@ -637,6 +664,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    CancelToken? cancelToken,
   }) async {
     if (!_hasConversation) {
       throw const AppException(
@@ -711,6 +739,7 @@ class _ThrowingSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    CancelToken? cancelToken,
   }) async {
     throw Exception('unexpected support failure');
   }
@@ -724,6 +753,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    CancelToken? cancelToken,
   }) async {
     return Completer<SupportChatConversation>().future;
   }

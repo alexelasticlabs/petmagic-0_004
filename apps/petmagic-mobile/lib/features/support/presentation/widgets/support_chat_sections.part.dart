@@ -92,62 +92,11 @@ class _SupportConversationViewport extends StatelessWidget {
       if (state.errorMessage == null && !showLoadingFallback) {
         return RefreshIndicator(
           onRefresh: onRefresh,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 24),
-                    child: _SupportStarterState(
-                      title: text.supportChatWelcomeTitle,
-                      description: text.supportChatWelcomeBody,
-                      quickActions: quickActions,
-                      onQuickActionSelected: onQuickActionSelected,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      }
-
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Center(
-                child: _SupportEmptyState(
-                  icon: Icons.support_agent_rounded,
-                  title: text.supportChatEmptyTitle,
-                  description: state.errorMessage != null
-                      ? _mapSupportError(text, state.errorMessage!)
-                      : (showLoadingFallback
-                            ? _mapSupportError(text, loadingFallbackMessageCode)
-                            : text.supportChatEmptyMessage),
-                  actionLabel: text.retryAction,
-                  onAction: onRetryInitialize,
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    if (messages.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: onRefresh,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            slivers: [
+              SliverFillRemaining(
+                hasScrollBody: false,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 8, bottom: 24),
                   child: _SupportStarterState(
@@ -158,8 +107,53 @@ class _SupportConversationViewport extends StatelessWidget {
                   ),
                 ),
               ),
-            );
-          },
+            ],
+          ),
+        );
+      }
+
+      return CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: _SupportEmptyState(
+                icon: Icons.support_agent_rounded,
+                title: text.supportChatEmptyTitle,
+                description: state.errorMessage != null
+                    ? _mapSupportError(text, state.errorMessage!)
+                    : (showLoadingFallback
+                          ? _mapSupportError(text, loadingFallbackMessageCode)
+                          : text.supportChatEmptyMessage),
+                actionLabel: text.retryAction,
+                onAction: onRetryInitialize,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (messages.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 24),
+                child: _SupportStarterState(
+                  title: text.supportChatWelcomeTitle,
+                  description: text.supportChatWelcomeBody,
+                  quickActions: quickActions,
+                  onQuickActionSelected: onQuickActionSelected,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

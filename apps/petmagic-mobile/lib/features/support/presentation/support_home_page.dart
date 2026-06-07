@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -29,6 +30,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   bool _isLoadingConversation = true;
   String? _conversationError;
   SupportChatConversation? _conversation;
+  CancelToken? _conversationLoadCancelToken;
 
   @override
   void initState() {
@@ -37,6 +39,10 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   }
 
   Future<void> _loadConversation() async {
+    _cancelConversationLoad();
+    final loadCancelToken = CancelToken();
+    _conversationLoadCancelToken = loadCancelToken;
+
     setState(() {
       _isLoadingConversation = true;
       _conversationError = null;
@@ -45,8 +51,8 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     try {
       final conversation = await ref
           .read(supportChatRepositoryProvider)
-          .getConversation();
-      if (!mounted) {
+          .getConversation(cancelToken: loadCancelToken);
+      if (!mounted || loadCancelToken.isCancelled) {
         return;
       }
 
@@ -54,7 +60,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         _conversation = conversation;
       });
     } on AppException catch (error) {
-      if (!mounted) {
+      if (!mounted || loadCancelToken.isCancelled) {
         return;
       }
 
@@ -66,7 +72,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         _conversationError = isNotFound ? null : error.message;
       });
     } on Object {
-      if (!mounted) {
+      if (!mounted || loadCancelToken.isCancelled) {
         return;
       }
 
@@ -76,13 +82,32 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
       });
     }
 
-    if (!mounted) {
+    if (!mounted || loadCancelToken.isCancelled) {
       return;
     }
 
     setState(() {
       _isLoadingConversation = false;
     });
+    if (identical(_conversationLoadCancelToken, loadCancelToken)) {
+      _conversationLoadCancelToken = null;
+    }
+  }
+
+  void _cancelConversationLoad() {
+    final cancelToken = _conversationLoadCancelToken;
+    if (cancelToken == null) {
+      return;
+    }
+
+    cancelToken.cancel('support home disposed or refreshed');
+    _conversationLoadCancelToken = null;
+  }
+
+  @override
+  void dispose() {
+    _cancelConversationLoad();
+    super.dispose();
   }
 
   bool _isArchived(SupportChatConversation conversation) {

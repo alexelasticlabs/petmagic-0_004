@@ -47,7 +47,9 @@ class _TemplateCardState extends State<TemplateCard> {
   bool _hasPreviewSlot = false;
   bool _isPressed = false;
   bool _videoLoadFailed = false;
+  bool _videoControllerInitInFlight = false;
   int _previewRetryToken = 0;
+  int _videoControllerRequestVersion = 0;
 
   @override
   void didUpdateWidget(covariant TemplateCard oldWidget) {
@@ -56,13 +58,15 @@ class _TemplateCardState extends State<TemplateCard> {
     if (oldWidget.template.templateId != widget.template.templateId) {
       _isPreviewActive = false;
       _disposeTimer?.cancel();
-      _disposeVideoController();
+      unawaited(_disposeVideoController());
     }
   }
 
   @override
   void dispose() {
     _disposeTimer?.cancel();
+    _videoControllerRequestVersion++;
+    _videoControllerInitInFlight = false;
     final controller = _videoController;
     _videoController = null;
     unawaited(controller?.dispose());
@@ -294,6 +298,8 @@ class _TemplateCardState extends State<TemplateCard> {
 
   Future<void> _disposeVideoController() async {
     _disposeTimer?.cancel();
+    _videoControllerRequestVersion++;
+    _videoControllerInitInFlight = false;
     final controller = _videoController;
     if (controller == null) {
       if (_hasPreviewSlot) {
@@ -320,29 +326,50 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
+    if (_videoControllerInitInFlight) {
+      return;
+    }
+
     if (!_hasPreviewSlot &&
         !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
       return;
     }
     _hasPreviewSlot = true;
 
+    final templateId = widget.template.templateId;
     final previewUrl =
         _normalizeTemplateMediaUrl(widget.template.previewAsset!.url) ??
         widget.template.previewAsset!.url;
-    final controller = widget.previewControllerFactory != null
-        ? await widget.previewControllerFactory!(previewUrl)
-        : await _createVideoController(previewUrl);
-    _videoController = controller;
-    controller.setLooping(true);
-    controller.setVolume(0);
+    final requestVersion = ++_videoControllerRequestVersion;
+    _videoControllerInitInFlight = true;
+    VideoPlayerController? controller;
 
     try {
-      await controller.initialize();
-      if (!mounted) {
+      controller = widget.previewControllerFactory != null
+          ? await widget.previewControllerFactory!(previewUrl)
+          : await _createVideoController(previewUrl);
+      if (!_isCurrentVideoControllerRequest(
+        requestVersion: requestVersion,
+        templateId: templateId,
+        previewUrl: previewUrl,
+      )) {
         await controller.dispose();
         return;
       }
-      if (_videoController != controller) {
+
+      _videoController = controller;
+      controller.setLooping(true);
+      controller.setVolume(0);
+      await controller.initialize();
+      if (!_isCurrentVideoControllerRequest(
+            requestVersion: requestVersion,
+            templateId: templateId,
+            previewUrl: previewUrl,
+          ) ||
+          _videoController != controller) {
+        if (_videoController == controller) {
+          _videoController = null;
+        }
         await controller.dispose();
         return;
       }
@@ -350,23 +377,33 @@ class _TemplateCardState extends State<TemplateCard> {
       _videoLoadFailed = false;
       await _syncPlaybackState();
     } catch (_) {
-      await controller.dispose();
-      _isPreviewActive = false;
-      if (_hasPreviewSlot) {
-        MediaLifecyclePolicy.releaseVideoPreviewSlot();
-        _hasPreviewSlot = false;
-      }
-      if (mounted) {
+      await controller?.dispose();
+      if (_isCurrentVideoControllerRequest(
+        requestVersion: requestVersion,
+        templateId: templateId,
+        previewUrl: previewUrl,
+      )) {
+        _videoController = null;
+        _isPreviewActive = false;
+        if (_hasPreviewSlot) {
+          MediaLifecyclePolicy.releaseVideoPreviewSlot();
+          _hasPreviewSlot = false;
+        }
         setState(() {
-          _videoController = null;
           _videoLoadFailed = true;
         });
+      }
+    } finally {
+      if (requestVersion == _videoControllerRequestVersion) {
+        _videoControllerInitInFlight = false;
       }
     }
   }
 
   void _retryPreviewLoad() {
     _disposeTimer?.cancel();
+    _videoControllerRequestVersion++;
+    _videoControllerInitInFlight = false;
     _isPreviewActive = false;
     _videoLoadFailed = false;
     _previewRetryToken += 1;
@@ -391,6 +428,23 @@ class _TemplateCardState extends State<TemplateCard> {
     }
 
     return VideoPlayerController.networkUrl(Uri.parse(previewUrl));
+  }
+
+  bool _isCurrentVideoControllerRequest({
+    required int requestVersion,
+    required String templateId,
+    required String previewUrl,
+  }) {
+    if (!mounted ||
+        requestVersion != _videoControllerRequestVersion ||
+        widget.template.templateId != templateId) {
+      return false;
+    }
+
+    final currentPreviewUrl =
+        _normalizeTemplateMediaUrl(widget.template.previewAsset?.url) ??
+        widget.template.previewAsset?.url;
+    return currentPreviewUrl == previewUrl;
   }
 }
 
@@ -556,33 +610,19 @@ class _CoverNetworkImageFill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.network(
-      imageUrl,
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
       fit: BoxFit.cover,
       alignment: Alignment.center,
       width: double.infinity,
       height: double.infinity,
-      cacheWidth: cacheWidth,
+      memCacheWidth: cacheWidth,
+      maxWidthDiskCache: cacheWidth,
       filterQuality: FilterQuality.medium,
-      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-        if (wasSynchronouslyLoaded || frame != null) {
-          return AnimatedOpacity(
-            opacity: 1,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            child: SizedBox.expand(child: child),
-          );
-        }
-        return const _MediaSkeletonPlaceholder();
-      },
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) {
-          return child;
-        }
-
-        return const _MediaSkeletonPlaceholder();
-      },
-      errorBuilder: (context, error, stackTrace) =>
+      placeholder: (context, url) => const _MediaSkeletonPlaceholder(),
+      fadeInDuration: const Duration(milliseconds: 220),
+      fadeOutDuration: const Duration(milliseconds: 100),
+      errorWidget: (context, url, error) =>
           _MediaErrorPlaceholder(isVideo: isVideoTemplate, onRetry: onRetry),
     );
   }

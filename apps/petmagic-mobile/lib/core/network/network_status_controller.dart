@@ -52,6 +52,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
       Future.microtask(_bootstrapSafely);
     }
     ref.onDispose(() {
+      _started = false;
       _subscription?.cancel();
       _subscription = null;
       _offlineProbeTimer?.cancel();
@@ -63,6 +64,10 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   Future<void> _bootstrapSafely() async {
+    if (!ref.mounted) {
+      return;
+    }
+
     try {
       _bootstrap();
     } on MissingPluginException catch (error, stackTrace) {
@@ -86,8 +91,16 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   void _bootstrap() {
+    if (!ref.mounted) {
+      return;
+    }
+
     _subscription = _connectivity.onConnectivityChanged.listen(
       (results) {
+        if (!ref.mounted) {
+          return;
+        }
+
         unawaited(_onConnectivityChanged(results, source: 'stream'));
       },
       onError: (Object error, StackTrace stackTrace) {
@@ -104,8 +117,16 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   Future<void> _refreshFromCurrentConnectivity({required String source}) async {
+    if (!ref.mounted) {
+      return;
+    }
+
     try {
       final results = await _connectivity.checkConnectivity();
+      if (!ref.mounted) {
+        return;
+      }
+
       await _onConnectivityChanged(results, source: source);
     } catch (error, stackTrace) {
       AppLogger.warn(
@@ -122,12 +143,20 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
     List<ConnectivityResult> results, {
     required String source,
   }) async {
+    if (!ref.mounted) {
+      return;
+    }
+
     if (!_hasAnyNetworkRoute(results)) {
       _applyConnectionState(hasInternet: false, source: source);
       return;
     }
 
     final hasInternet = await _probeInternet();
+    if (!ref.mounted) {
+      return;
+    }
+
     _applyConnectionState(hasInternet: hasInternet, source: source);
   }
 
@@ -135,6 +164,10 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
     required bool hasInternet,
     required String source,
   }) {
+    if (!ref.mounted) {
+      return;
+    }
+
     if (hasInternet == _lastKnownInternet) {
       return;
     }
@@ -181,6 +214,10 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   void _startOfflineProbe() {
     _offlineProbeTimer?.cancel();
     _offlineProbeTimer = Timer.periodic(_offlineProbeInterval, (_) {
+      if (!ref.mounted) {
+        return;
+      }
+
       unawaited(_refreshFromCurrentConnectivity(source: 'offline_probe'));
     });
   }
@@ -193,6 +230,10 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   void _scheduleRestoreBannerHide() {
     _restoreBannerTimer?.cancel();
     _restoreBannerTimer = Timer(_recoveredBannerDuration, () {
+      if (!ref.mounted) {
+        return;
+      }
+
       if (!state.hasInternet) {
         return;
       }

@@ -556,7 +556,7 @@ String _mapTemplatesError(AppLocalizations text, String raw) {
     return text.templatesRequestFailedError;
   }
 
-  return raw;
+  return text.templatesRequestFailedError;
 }
 
 String _generationStartErrorText(AppLocalizations text, String raw) {
@@ -584,7 +584,7 @@ String _generationStartErrorText(AppLocalizations text, String raw) {
     return text.templateFlowServerError;
   }
 
-  return raw;
+  return text.templateFlowStartFailedError;
 }
 
 bool _isAuthRequiredError(String? raw) {

@@ -41,6 +41,27 @@ void main() {
     expect(NetworkErrorMapper.isConnectionUnavailable(receiveTimeout), isFalse);
   });
 
+  test('safePayloadMessage accepts only localization keys', () {
+    const payload = ApiErrorPayload(
+      flattened: 'https://signed.example/file.jpg?signature=secret',
+      detail: 'Validation failed for /tmp/petmagic/avatar.jpg',
+      title: 'profile.action_failed',
+    );
+
+    expect(
+      NetworkErrorMapper.safePayloadMessage(payload),
+      'profile.action_failed',
+    );
+    expect(NetworkErrorMapper.isSafeMessageKey('auth.session_expired'), isTrue);
+    expect(NetworkErrorMapper.isSafeMessageKey('Validation failed.'), isFalse);
+    expect(
+      NetworkErrorMapper.isSafeMessageKey(
+        'https://signed.example/file.jpg?signature=secret',
+      ),
+      isFalse,
+    );
+  });
+
   test('fallback keeps status code and can skip cause', () {
     final error = DioException.badResponse(
       statusCode: 503,

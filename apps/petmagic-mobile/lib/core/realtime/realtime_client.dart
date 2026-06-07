@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
+import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 abstract final class RealtimeTopics {
   static const templatesFeedInvalidated = 'templates.feed.invalidated';
@@ -164,6 +165,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   }
 
   Future<bool> _tryConnect(String baseUrl) async {
+    final requestId = RequestIdentity.createRequestId();
+    final correlationId = RequestIdentity.createCorrelationId();
     try {
       final httpClient = _httpClient ??= HttpClient();
       final request = await httpClient.getUrl(
@@ -172,6 +175,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       request.headers.set(HttpHeaders.acceptHeader, 'text/event-stream');
       request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
       request.headers.set('X-PetMagic-Client', 'mobile-flutter');
+      request.headers.set('X-Request-ID', requestId);
+      request.headers.set('X-Correlation-ID', correlationId);
 
       final response = await request.close();
       if (response.statusCode != HttpStatus.ok) {
@@ -188,6 +193,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
         'connect',
         error,
         stackTrace,
+        requestId: requestId,
+        correlationId: correlationId,
         context: {'base_url': baseUrl},
       );
       await _apiBaseUrlResolver.invalidate(baseUrl);
@@ -273,6 +280,8 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     String stage,
     Object error,
     StackTrace stackTrace, {
+    String? requestId,
+    String? correlationId,
     Map<String, Object?> context = const {},
   }) {
     final payload = <String, Object>{'stage': stage};
@@ -283,13 +292,13 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       }
     }
 
-    developer.Timeline.instantSync(
-      'petmagic.realtime.error',
-      arguments: payload,
-    );
-    developer.log(
-      'ServerSentEventsRealtimeClient::$stage failed',
-      name: 'PetMagic.Realtime',
+    AppLogger.warn(
+      feature: 'Realtime',
+      operation: stage,
+      message: 'Realtime client step failed',
+      requestId: requestId,
+      correlationId: correlationId,
+      context: payload,
       error: error,
       stackTrace: stackTrace,
     );

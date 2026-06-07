@@ -5,32 +5,28 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   const AppConfig._();
 
+  static const productionApiBaseUrl = 'https://api.petmagic.app';
+  static const _productionApiHosts = {'api.petmagic.app'};
+
   static const configuredApiBaseUrl = String.fromEnvironment('API_BASE_URL');
   static const appVersion = String.fromEnvironment(
     'PETMAGIC_APP_VERSION',
     defaultValue: '1.0.0',
   );
-  static const enablePerformanceOverlay = bool.fromEnvironment(
+  static const _enablePerformanceOverlay = bool.fromEnvironment(
     'PETMAGIC_PROFILE_OVERLAY',
   );
-  static const enableCheckerboardRasterCacheImages = bool.fromEnvironment(
+  static const _enableCheckerboardRasterCacheImages = bool.fromEnvironment(
     'PETMAGIC_PROFILE_CHECKERBOARD_RASTER_CACHE',
   );
-  static const enableCheckerboardOffscreenLayers = bool.fromEnvironment(
+  static const _enableCheckerboardOffscreenLayers = bool.fromEnvironment(
     'PETMAGIC_PROFILE_CHECKERBOARD_OFFSCREEN_LAYERS',
   );
-  static const enableFrameTelemetry = bool.fromEnvironment(
+  static const _enableFrameTelemetry = bool.fromEnvironment(
     'PETMAGIC_PROFILE_FRAME_LOGS',
-  );
-  static const enableImageCacheTelemetry = bool.fromEnvironment(
-    'PETMAGIC_PROFILE_IMAGE_CACHE_LOGS',
   );
   static const targetFrameBudgetMs = int.fromEnvironment(
     'PETMAGIC_TARGET_FRAME_BUDGET_MS',
-    defaultValue: 8,
-  );
-  static const imageCacheTelemetryIntervalSeconds = int.fromEnvironment(
-    'PETMAGIC_IMAGE_CACHE_LOG_INTERVAL_SECONDS',
     defaultValue: 8,
   );
 
@@ -67,8 +63,33 @@ class AppConfig {
     return mediaCacheMaxBytes;
   }
 
+  static bool get enablePerformanceOverlay {
+    return kDebugMode && _enablePerformanceOverlay;
+  }
+
+  static bool get enableCheckerboardRasterCacheImages {
+    return kDebugMode && _enableCheckerboardRasterCacheImages;
+  }
+
+  static bool get enableCheckerboardOffscreenLayers {
+    return kDebugMode && _enableCheckerboardOffscreenLayers;
+  }
+
+  static bool get enableFrameTelemetry {
+    return kDebugMode && _enableFrameTelemetry;
+  }
+
   static List<String> get apiBaseUrls {
     if (configuredApiBaseUrl.isNotEmpty) {
+      if (!kDebugMode) {
+        final productionBaseUrl = normalizeProductionBaseUrl(
+          configuredApiBaseUrl,
+        );
+        return productionBaseUrl == null
+            ? const [productionApiBaseUrl]
+            : [productionBaseUrl];
+      }
+
       if (kDebugMode &&
           !kIsWeb &&
           Platform.isAndroid &&
@@ -100,7 +121,7 @@ class AppConfig {
       return const ['http://localhost:5000', 'http://127.0.0.1:5000'];
     }
 
-    return const ['https://api.petmagic.app'];
+    return const [productionApiBaseUrl];
   }
 
   static String get apiBaseUrl {
@@ -115,6 +136,39 @@ class AppConfig {
 
     final host = uri.host;
     return host == 'localhost' || host == '127.0.0.1';
+  }
+
+  static bool isProductionSafeBaseUrl(String rawUrl) {
+    return normalizeProductionBaseUrl(rawUrl) != null;
+  }
+
+  static String? normalizeProductionBaseUrl(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl.trim());
+    if (uri == null || !uri.hasAuthority) {
+      return null;
+    }
+
+    if (uri.hasQuery ||
+        uri.hasFragment ||
+        uri.userInfo.isNotEmpty ||
+        (uri.path.isNotEmpty && uri.path != '/')) {
+      return null;
+    }
+
+    if (!uri.isScheme('https')) {
+      return null;
+    }
+
+    if (uri.hasPort && uri.port != 443) {
+      return null;
+    }
+
+    final host = uri.host.toLowerCase();
+    if (!_productionApiHosts.contains(host)) {
+      return null;
+    }
+
+    return 'https://$host';
   }
 
   static List<String> _orderedUniqueUrls(Iterable<String> rawUrls) {

@@ -1367,6 +1367,7 @@ class _NetworkVideoPreview extends StatefulWidget {
 class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
+  int _initializeRequestVersion = 0;
 
   @override
   void initState() {
@@ -1378,41 +1379,63 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
   void didUpdateWidget(covariant _NetworkVideoPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _controller?.dispose();
+      final previous = _controller;
       _controller = null;
+      _failedToLoad = false;
+      unawaited(previous?.dispose());
       _initialize();
     }
   }
 
   @override
   void dispose() {
-    _controller?.dispose();
+    _initializeRequestVersion++;
+    final controller = _controller;
+    _controller = null;
+    unawaited(controller?.dispose());
     super.dispose();
   }
 
   Future<void> _initialize() async {
+    final requestVersion = ++_initializeRequestVersion;
+    final url = widget.url;
     setState(() => _failedToLoad = false);
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
     _controller = controller;
     controller.setVolume(0);
     controller.setLooping(true);
     try {
       await controller.initialize();
-      if (!mounted || _controller != controller) {
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();
         return;
       }
       await controller.play();
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
       setState(() {});
     } catch (_) {
       await controller.dispose();
-      if (mounted) {
+      if (_isCurrentVideoRequest(requestVersion, url, controller)) {
         setState(() {
           _controller = null;
           _failedToLoad = true;
         });
       }
     }
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String url,
+    VideoPlayerController controller,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.url == url &&
+        _controller == controller;
   }
 
   @override

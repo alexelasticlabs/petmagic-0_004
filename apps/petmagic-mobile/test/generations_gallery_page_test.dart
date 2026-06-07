@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -110,6 +113,44 @@ void main() {
     expect(find.text('status:g-ready-1'), findsOneWidget);
   });
 
+  testWidgets('gallery cancels active media share on disposal', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = _DelayedGenerationStatusMediaActions();
+    final harness = _GalleryHarness(
+      items: [
+        _generation(
+          generationId: 'g-ready-video',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Ready Video',
+          templateType: 'video',
+          tokenCost: 60,
+          outputUrl: 'https://cdn.petmagic.test/result.mp4?signature=secret',
+          outputVideoDurationSeconds: 4,
+          updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+        ),
+      ],
+      mediaActions: mediaActions,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await mediaActions.shareStarted.future;
+
+    expect(mediaActions.shareCancelToken?.isCancelled, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(mediaActions.shareCancelToken?.isCancelled, isTrue);
+  });
+
   testWidgets('active card open button marks read and opens details', (
     tester,
   ) async {
@@ -178,8 +219,8 @@ AppLocalizations _text(WidgetTester tester) {
 }
 
 class _GalleryHarness {
-  _GalleryHarness()
-    : controller = _FakeGenerationHistoryController(_sampleItems()),
+  _GalleryHarness({List<TemplateGenerationResult>? items, this.mediaActions})
+    : controller = _FakeGenerationHistoryController(items ?? _sampleItems()),
       router = GoRouter(
         initialLocation: GenerationsGalleryPage.routePath,
         routes: [
@@ -215,6 +256,7 @@ class _GalleryHarness {
 
   final _FakeGenerationHistoryController controller;
   final GoRouter router;
+  final GenerationStatusMediaActions? mediaActions;
 
   Widget app() {
     return ProviderScope(
@@ -227,6 +269,8 @@ class _GalleryHarness {
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
+        if (mediaActions != null)
+          generationStatusMediaActionsProvider.overrideWithValue(mediaActions!),
       ],
       child: MaterialApp.router(
         routerConfig: router,
@@ -362,6 +406,26 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
   }
 }
 
+class _DelayedGenerationStatusMediaActions
+    extends GenerationStatusMediaActions {
+  final shareStarted = Completer<void>();
+  CancelToken? shareCancelToken;
+
+  @override
+  Future<void> share({
+    required String mediaUrl,
+    required String fileName,
+    required String title,
+    required CancelToken cancelToken,
+  }) {
+    shareCancelToken = cancelToken;
+    if (!shareStarted.isCompleted) {
+      shareStarted.complete();
+    }
+    return cancelToken.whenCancel.then((_) {});
+  }
+}
+
 List<TemplateGenerationResult> _sampleItems() {
   final now = DateTime.utc(2026, 5, 25, 14, 30);
 
@@ -454,6 +518,7 @@ TemplateGenerationResult _generation({
   String? stage,
   int? progressPercent,
   String? estimatedDurationLabel,
+  String? outputUrl,
   double? outputVideoDurationSeconds,
   DateTime? refundedAtUtc,
   bool isUnread = false,
@@ -473,6 +538,7 @@ TemplateGenerationResult _generation({
     stage: stage,
     progressPercent: progressPercent,
     estimatedDurationLabel: estimatedDurationLabel,
+    outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,
     refundedAtUtc: refundedAtUtc,
     isUnread: isUnread,

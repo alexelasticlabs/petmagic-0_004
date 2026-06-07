@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as developer;
-import 'dart:io';
 
 import 'package:app_links/app_links.dart';
 import 'package:dio/dio.dart';
@@ -8,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -41,13 +41,11 @@ void _logExternalAuthFailure(
   Object error,
   StackTrace stackTrace,
 ) {
-  developer.Timeline.instantSync(
-    'petmagic.profile.external_auth.error',
-    arguments: {'stage': stage},
-  );
-  developer.log(
-    'ExternalAuth::$stage failed',
-    name: 'PetMagic.Profile.ExternalAuth',
+  AppLogger.warn(
+    feature: 'Profile.ExternalAuth',
+    operation: stage,
+    message: 'External auth step failed',
+    context: {'stage': stage},
     error: error,
     stackTrace: stackTrace,
   );
@@ -75,14 +73,15 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required AppLinks appLinks,
     AuthSessionCoordinator? authSessionCoordinator,
     Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
+    Stream<Uri>? uriLinkStream,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
-       _appLinks = appLinks,
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
        _launchUrl =
-           launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode));
+           launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
+       _uriLinkStream = uriLinkStream ?? appLinks.uriLinkStream;
 
   static final Uri _callbackUri = Uri(
     scheme: 'petmagic',
@@ -92,9 +91,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
-  final AppLinks _appLinks;
   final AuthSessionCoordinator _authSessionCoordinator;
   final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
+  final Stream<Uri> _uriLinkStream;
 
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
@@ -202,7 +201,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     final completer = Completer<Uri>();
     late final StreamSubscription<Uri> subscription;
 
-    subscription = _appLinks.uriLinkStream.listen(
+    subscription = _uriLinkStream.listen(
       (uri) {
         if (_isExpectedCallback(uri) && !completer.isCompleted) {
           completer.complete(uri);
@@ -233,7 +232,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
       final errorCode = callbackUri.queryParameters['error'];
       if (errorCode != null && errorCode.isNotEmpty) {
-        throw AppException(errorCode);
+        throw AppException(_safeExternalCallbackErrorCode(errorCode));
       }
 
       final ticket = callbackUri.queryParameters['ticket'];
@@ -262,11 +261,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     final session = await _readAuthorizedSession();
     final prepareResponse = await _dio.post<Map<String, dynamic>>(
       '/api/auth/me/linked-accounts/${provider.apiValue}/prepare',
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-        },
-      ),
+      options: authenticatedRequestOptions(session.accessToken),
     );
     final ticket =
         prepareResponse.data?['ticket'] as String? ??
@@ -278,7 +273,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     final completer = Completer<Uri>();
     late final StreamSubscription<Uri> subscription;
 
-    subscription = _appLinks.uriLinkStream.listen(
+    subscription = _uriLinkStream.listen(
       (uri) {
         if (_isExpectedCallback(uri) && !completer.isCompleted) {
           completer.complete(uri);
@@ -313,7 +308,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
       final errorCode = callbackUri.queryParameters['error'];
       if (errorCode != null && errorCode.isNotEmpty) {
-        throw AppException(errorCode);
+        throw AppException(_safeExternalCallbackErrorCode(errorCode));
       }
 
       if (callbackUri.queryParameters['linked'] != '1') {
@@ -332,6 +327,21 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     return uri.scheme == _callbackUri.scheme &&
         uri.host == _callbackUri.host &&
         uri.path == _callbackUri.path;
+  }
+
+  String _safeExternalCallbackErrorCode(String rawCode) {
+    final value = rawCode.trim();
+    return switch (value) {
+      _cancelledCode ||
+      _callbackFailedCode ||
+      _launchFailedCode ||
+      _timedOutCode ||
+      _invalidSessionCode ||
+      'auth.external_not_configured' ||
+      'auth.external_token_invalid' ||
+      _genericFailedCode => value,
+      _ => _genericFailedCode,
+    };
   }
 
   Future<bool> _launchAuthUri(Uri authUri) async {
@@ -357,11 +367,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     final session = await _readAuthorizedSession();
     final response = await _dio.get<List<dynamic>>(
       '/api/auth/me/linked-accounts',
-      options: Options(
-        headers: {
-          HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-        },
-      ),
+      options: authenticatedRequestOptions(session.accessToken),
     );
 
     return (response.data ?? const <dynamic>[])
@@ -375,21 +381,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required String fallbackMessage,
   }) {
     final payload = NetworkErrorMapper.parseApiPayload(error);
-    if (payload.flattened != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
-    }
-
-    final title = payload.title;
-    final detail = payload.detail;
-    if (detail != null) {
-      return NetworkErrorMapper.fromMessage(
-        error,
-        title != null && title.startsWith('auth.') ? title : detail,
-      );
-    }
-
-    if (title != null) {
-      return NetworkErrorMapper.fromMessage(error, title);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);

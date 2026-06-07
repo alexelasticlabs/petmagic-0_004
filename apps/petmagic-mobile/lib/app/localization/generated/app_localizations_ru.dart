@@ -3176,10 +3176,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileNotificationsDeviceFiles => 'Файлы';
 
   @override
-  String get profileNotificationsRequestDevicePermissions =>
-      'Запросить разрешения устройства';
-
-  @override
   String get supportChatLoadPreviousMessagesAction =>
       'Загрузить предыдущие сообщения';
 

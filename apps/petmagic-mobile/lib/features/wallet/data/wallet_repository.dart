@@ -8,7 +8,7 @@ import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -44,11 +44,12 @@ class WalletRepository {
   Stream<List<PurchaseDetails>> get purchaseUpdates =>
       _inAppPurchase.purchaseStream;
 
-  Future<WalletStateModel> fetchWallet() async {
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/wallet',
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -58,12 +59,14 @@ class WalletRepository {
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/wallet/ledger',
         queryParameters: {'skip': skip, 'take': take},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -73,11 +76,12 @@ class WalletRepository {
     );
   }
 
-  Future<RewardsSummaryModel> fetchRewards() async {
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/rewards',
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -98,6 +102,7 @@ class WalletRepository {
 
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
     required Locale locale,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -108,10 +113,14 @@ class WalletRepository {
           'country': locale.countryCode ?? '*',
           'locale': locale.toLanguageTag(),
         },
+        cancelToken: cancelToken,
       );
 
       return WalletCheckoutConfigModel.fromJson(response.data ?? const {});
     } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
       throw _mapDioException(error, fallbackMessage: 'wallet.packs_failed');
     }
   }
@@ -119,12 +128,14 @@ class WalletRepository {
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/purchases',
         queryParameters: {'skip': skip, 'take': take},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -134,11 +145,15 @@ class WalletRepository {
     );
   }
 
-  Future<PurchaseHistoryItem> fetchPurchase(String orderId) async {
+  Future<PurchaseHistoryItem> fetchPurchase(
+    String orderId, {
+    CancelToken? cancelToken,
+  }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/purchases/$orderId',
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -161,32 +176,16 @@ class WalletRepository {
       'locale': locale.toLanguageTag(),
     };
 
-    AppLogger.info(
-      feature: 'Wallet.Api',
-      operation: 'create_purchase_started',
-      context: {
-        'pack_id': pack.packId,
-        'provider': paymentMethod.provider,
-        'currency': pack.currencyCode,
-        'country': locale.countryCode ?? '*',
-      },
-    );
-
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/create',
         data: payload,
-        options: _authOptions(
+        options: authenticatedRequestOptions(
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
       ),
-    );
-
-    AppLogger.info(
-      feature: 'Wallet.Api',
-      operation: 'create_purchase_completed',
-      context: {'status': response.statusCode ?? 0},
+      retryTransientFailures: false,
     );
 
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
@@ -273,8 +272,9 @@ class WalletRepository {
           'purchaseId': purchase.purchaseID,
           'transactionDate': purchase.transactionDate,
         },
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
@@ -288,8 +288,9 @@ class WalletRepository {
     await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/wallet/claim-ad',
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return fetchWallet();
@@ -300,8 +301,9 @@ class WalletRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/wallet/redeem',
         data: {'code': code.trim()},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return fetchWallet();
@@ -312,8 +314,9 @@ class WalletRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/referrals/activate',
         data: {'code': code.trim()},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return fetchRewards();
@@ -333,8 +336,9 @@ class WalletRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/purchases/$orderId/verify-stripe',
         data: payload,
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return PurchaseHistoryItem.fromJson(response.data ?? const {});
@@ -355,8 +359,9 @@ class WalletRepository {
           'appVersion': AppConfig.appVersion,
           'locale': locale,
         },
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
   }
 
@@ -365,32 +370,23 @@ class WalletRepository {
       (session) => _dio.delete<Map<String, dynamic>>(
         '/api/economy/notifications/push-token',
         data: {'token': token},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
   }
 
   Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request,
-  ) async {
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'wallet.request_failed',
       sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
     );
-  }
-
-  Options _authOptions(
-    String accessToken, {
-    Map<String, String>? extraHeaders,
-  }) {
-    final headers = <String, String>{
-      HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-      ...?extraHeaders,
-    };
-
-    return Options(headers: headers);
   }
 
   String _platformValue() {
@@ -421,16 +417,9 @@ class WalletRepository {
     }
 
     final payload = NetworkErrorMapper.parseApiPayload(error);
-    if (payload.flattened != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
-    }
-
-    if (payload.detail != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.detail!);
-    }
-
-    if (payload.title != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.title!);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);

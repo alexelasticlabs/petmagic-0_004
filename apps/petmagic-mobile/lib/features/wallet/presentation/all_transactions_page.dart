@@ -31,9 +31,13 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
     super.initState();
     final snapshot = ref.read(walletControllerProvider);
     if (snapshot.wallet == null && snapshot.ledger.isEmpty) {
-      Future.microtask(
-        () => ref.read(walletControllerProvider.notifier).load(),
-      );
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
+
+        ref.read(walletControllerProvider.notifier).load();
+      });
     }
   }
 
@@ -64,95 +68,141 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
             : RefreshIndicator.adaptive(
                 color: colors.accent,
                 onRefresh: () => controller.load(refresh: true),
-                child: ListView(
+                child: ListView.builder(
                   padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset),
                   physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    Row(
-                      children: [
-                        IconButton.filledTonal(
-                          onPressed: () {
-                            if (router.canPop()) {
-                              router.pop();
-                              return;
-                            }
+                  itemCount: _transactionListItemCount(
+                    itemCount: state.ledger.length,
+                    hasError: errorToShow != null,
+                  ),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _AllTransactionsHeader(
+                        title: text.walletViewAllTransactions,
+                        onBack: () {
+                          if (router.canPop()) {
+                            router.pop();
+                            return;
+                          }
 
-                            router.go(WalletPage.routePath);
-                          },
-                          icon: const Icon(Icons.arrow_back_rounded),
-                          tooltip: MaterialLocalizations.of(
-                            context,
-                          ).backButtonTooltip,
+                          router.go(WalletPage.routePath);
+                        },
+                      );
+                    }
+
+                    final contentStartIndex = errorToShow == null ? 1 : 2;
+                    if (errorToShow != null && index == 1) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: ProfileMessageCard(
+                          message: errorToShow,
+                          tone: colors.gold,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            text.walletViewAllTransactions,
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontSize: 25,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+                      );
+                    }
+
+                    if (state.ledger.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: _AllTransactionsEmptyState(
+                          asset: _kAllTransactionsEmptyAsset,
+                          message: text.walletNoActivity,
                         ),
-                      ],
-                    ),
-                    if (errorToShow != null) ...[
-                      const SizedBox(height: 12),
-                      ProfileMessageCard(
-                        message: errorToShow,
-                        tone: colors.gold,
+                      );
+                    }
+
+                    final ledgerIndex = index - contentStartIndex;
+                    return Padding(
+                      padding: EdgeInsets.only(top: ledgerIndex == 0 ? 16 : 8),
+                      child: ProfileGlassCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: _AllTransactionsRow(
+                          item: state.ledger[ledgerIndex],
+                        ),
                       ),
-                    ],
-                    const SizedBox(height: 16),
-                    ProfileGlassCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: state.ledger.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.fromLTRB(6, 10, 6, 12),
-                              child: Column(
-                                children: [
-                                  Image.asset(
-                                    _kAllTransactionsEmptyAsset,
-                                    height: 84,
-                                    fit: BoxFit.contain,
-                                    filterQuality: FilterQuality.medium,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    text.walletNoActivity,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: colors.textSoft),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : Column(
-                              children: [
-                                for (
-                                  var index = 0;
-                                  index < state.ledger.length;
-                                  index++
-                                )
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: index == state.ledger.length - 1
-                                          ? 0
-                                          : 4,
-                                    ),
-                                    child: _AllTransactionsRow(
-                                      item: state.ledger[index],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
+      ),
+    );
+  }
+}
+
+int _transactionListItemCount({
+  required int itemCount,
+  required bool hasError,
+}) {
+  final leadingItems = hasError ? 2 : 1;
+  return leadingItems + (itemCount == 0 ? 1 : itemCount);
+}
+
+class _AllTransactionsHeader extends StatelessWidget {
+  const _AllTransactionsHeader({required this.title, required this.onBack});
+
+  final String title;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Row(
+      children: [
+        IconButton.filledTonal(
+          onPressed: onBack,
+          icon: const Icon(Icons.arrow_back_rounded),
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              color: colors.textStrong,
+              fontSize: 25,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AllTransactionsEmptyState extends StatelessWidget {
+  const _AllTransactionsEmptyState({
+    required this.asset,
+    required this.message,
+  });
+
+  final String asset;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return ProfileGlassCard(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      child: Column(
+        children: [
+          Image.asset(
+            asset,
+            height: 84,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.textSoft),
+          ),
+        ],
       ),
     );
   }
@@ -171,6 +221,7 @@ class _AllTransactionsRow extends StatelessWidget {
     final tone = _ledgerTone(item, colors);
 
     return Padding(
+      key: ValueKey<String>('wallet_transaction_${item.entryId}'),
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         children: [
@@ -236,12 +287,6 @@ class _AllTransactionsRow extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Divider(
-            height: 1,
-            thickness: 0.8,
-            color: colors.border.withValues(alpha: 0.6),
           ),
         ],
       ),

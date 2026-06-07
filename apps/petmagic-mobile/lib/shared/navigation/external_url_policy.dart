@@ -25,10 +25,32 @@ Uri? parseSafeExternalUri(String? rawValue, {Set<String>? allowedHttpsHosts}) {
       : null;
 }
 
+Uri? parseSafeSupportExternalUri(String? rawValue) {
+  return parseSafeExternalUri(
+    rawValue,
+    allowedHttpsHosts: supportExternalAllowedHosts(),
+  );
+}
+
+Uri? parseSafeGenerationMediaUri(String? rawValue) {
+  if (kDebugMode) {
+    return parseSafeExternalUri(rawValue);
+  }
+
+  return parseSafeExternalUri(
+    rawValue,
+    allowedHttpsHosts: generationMediaAllowedHosts(),
+  );
+}
+
 bool isAllowedExternalUri(Uri uri, {Set<String>? allowedHttpsHosts}) {
   final scheme = uri.scheme.toLowerCase();
   final host = uri.host.toLowerCase();
   if (host.isEmpty) {
+    return false;
+  }
+
+  if (uri.userInfo.isNotEmpty) {
     return false;
   }
 
@@ -58,6 +80,38 @@ Set<String> premiumExternalAllowedHosts() {
     'billing.stripe.com',
     'checkout.stripe.com',
     'dashboard.stripe.com',
+  };
+
+  final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+  if (apiBaseUri != null && apiBaseUri.host.isNotEmpty) {
+    result.add(apiBaseUri.host.toLowerCase());
+  }
+
+  return result;
+}
+
+Set<String> supportExternalAllowedHosts() {
+  final result = <String>{
+    'petmagic.app',
+    'www.petmagic.app',
+    'api.petmagic.app',
+    'cdn.petmagic.app',
+    'cdn.petmagic.ai',
+  };
+
+  final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+  if (apiBaseUri != null && apiBaseUri.host.isNotEmpty) {
+    result.add(apiBaseUri.host.toLowerCase());
+  }
+
+  return result;
+}
+
+Set<String> generationMediaAllowedHosts() {
+  final result = <String>{
+    'api.petmagic.app',
+    'cdn.petmagic.app',
+    'cdn.petmagic.ai',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);

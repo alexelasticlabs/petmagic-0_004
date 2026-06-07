@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,7 +20,8 @@ import 'package:petmagic_mobile/features/templates/presentation/mappers/generati
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
-import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
@@ -44,6 +46,8 @@ class GenerationsGalleryPage extends ConsumerStatefulWidget {
 class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     with WidgetsBindingObserver {
   bool _readyExpanded = false;
+  bool _isMediaActionInFlight = false;
+  CancelToken? _activeMediaActionCancelToken;
   late final GenerationHistoryController _historyController;
   late final WalletController _walletController;
 
@@ -98,6 +102,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
   @override
   void deactivate() {
+    _cancelActiveMediaAction();
     _historyController.setScreenVisible(false);
     super.deactivate();
   }
@@ -116,6 +121,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
 
   @override
   void dispose() {
+    _cancelActiveMediaAction();
     _historyController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -466,6 +472,43 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     }
 
     await showAuthRequiredSheet(context, redirectPath: PremiumPage.routePath);
+  }
+
+  CancelToken? _startMediaAction() {
+    if (_activeMediaActionCancelToken != null) {
+      return null;
+    }
+
+    final cancelToken = CancelToken();
+    _activeMediaActionCancelToken = cancelToken;
+    if (mounted) {
+      setState(() => _isMediaActionInFlight = true);
+    } else {
+      _isMediaActionInFlight = true;
+    }
+    return cancelToken;
+  }
+
+  void _completeMediaAction(CancelToken cancelToken) {
+    if (!identical(_activeMediaActionCancelToken, cancelToken)) {
+      return;
+    }
+
+    _activeMediaActionCancelToken = null;
+    if (mounted) {
+      setState(() => _isMediaActionInFlight = false);
+    } else {
+      _isMediaActionInFlight = false;
+    }
+  }
+
+  void _cancelActiveMediaAction() {
+    final cancelToken = _activeMediaActionCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('generations_gallery_media_action_cancelled');
+    }
+    _activeMediaActionCancelToken = null;
+    _isMediaActionInFlight = false;
   }
 
   Widget _sectionHeaderSliver(String title, int count) {

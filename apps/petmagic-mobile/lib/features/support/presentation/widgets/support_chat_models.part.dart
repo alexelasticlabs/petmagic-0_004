@@ -142,7 +142,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.authSessionExpired;
   }
 
-  return raw;
+  return text.supportChatUnavailableError;
 }
 
 enum _SupportAttachmentQuickAction { camera, video, files }

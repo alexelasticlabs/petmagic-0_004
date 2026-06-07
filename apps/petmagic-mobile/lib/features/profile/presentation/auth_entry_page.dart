@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/features/profile/presentation/password_reset_pag
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
@@ -87,6 +88,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       ref
           .read(profileControllerProvider.notifier)
           .initialize(initialEmail: widget.initialEmail?.trim() ?? '');
+      _syncControllers(ref.read(profileControllerProvider));
     });
   }
 
@@ -111,11 +113,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final legalDocumentsAsync = ref.watch(
       currentLegalDocumentsProvider(locale),
     );
-
-    _syncController(_displayNameController, state.displayName);
-    _syncController(_emailController, state.email);
-    _syncController(_passwordController, state.password);
-    _syncController(_confirmPasswordController, state.confirmPassword);
 
     final title = _isSignUp ? text.authRegisterTitle : text.authEntryTitle;
     final subtitle = _isSignUp
@@ -142,6 +139,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       if (!mounted) {
         return;
       }
+
+      _syncControllers(next);
 
       final previousError = previous?.errorMessage;
       if (next.errorMessage != null && next.errorMessage != previousError) {
@@ -179,283 +178,257 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
           children: [
             const AuthBackdrop(),
             SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                children: [
+                  Row(
+                    children: [
+                      IconButton.outlined(
+                        onPressed: () => _handleBack(launchState),
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.arrow_back_rounded),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              IconButton.outlined(
-                                onPressed: () => _handleBack(launchState),
-                                visualDensity: VisualDensity.compact,
-                                icon: const Icon(Icons.arrow_back_rounded),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          AuthHero(
-                            title: title,
-                            subtitle: subtitle,
-                            isDark: isDark,
-                          ),
-                          if (_isSignUp) ...[
-                            const SizedBox(height: 10),
-                            _SignUpHighlights(
-                              secureTitle: text.authSecurePrivateTitle,
-                              secureSubtitle: text.authSecurePrivateSubtitle,
-                              fastTitle: text.authFastEasyTitle,
-                              fastSubtitle: text.authFastEasySubtitle,
-                              lovedTitle: text.authLovedByPetsTitle,
-                              lovedSubtitle: text.authLovedByPetsSubtitle,
-                            ),
-                          ],
-                          const SizedBox(height: 2),
-                          if (_consentErrorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: ErrorCard(
-                                message: _mapErrorMessage(
-                                  _consentErrorMessage!,
-                                  text,
-                                ),
-                              ),
-                            ),
-                          AuthFormCard(
-                            isDark: isDark,
-                            child: Column(
-                              children: [
-                                if (_isSignUp) ...[
-                                  AuthField(
-                                    controller: _displayNameController,
-                                    hintText: text.authDisplayNameLabel,
-                                    prefixIcon: Icons.badge_outlined,
-                                    textInputAction: TextInputAction.next,
-                                    onChanged: controller.updateDisplayName,
-                                    enabled: !state.isSaving,
-                                  ),
-                                  const SizedBox(height: 8),
-                                ],
-                                AuthField(
-                                  controller: _emailController,
-                                  hintText: text.profileEmailLabel,
-                                  prefixIcon: Icons.mail_outline_rounded,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  onChanged: controller.updateEmail,
-                                  enabled: !state.isSaving,
-                                ),
-                                const SizedBox(height: 8),
-                                AuthField(
-                                  controller: _passwordController,
-                                  hintText: text.profilePasswordLabel,
-                                  prefixIcon: Icons.lock_outline_rounded,
-                                  obscureText: _obscurePassword,
-                                  textInputAction: _isSignUp
-                                      ? TextInputAction.next
-                                      : TextInputAction.done,
-                                  onChanged: controller.updatePassword,
-                                  enabled: !state.isSaving,
-                                  trailing: IconButton(
-                                    onPressed: state.isSaving
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _obscurePassword =
-                                                  !_obscurePassword;
-                                            });
-                                          },
-                                    icon: Icon(
-                                      _obscurePassword
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                    ),
-                                  ),
-                                ),
-                                if (_isSignUp) ...[
-                                  const SizedBox(height: 6),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(left: 2),
-                                      child: Text(
-                                        text.authPasswordRulesHint,
-                                        style: TextStyle(
-                                          color: colors.textMuted,
-                                          fontSize: 10.8,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  AuthField(
-                                    controller: _confirmPasswordController,
-                                    hintText: text.authConfirmPasswordLabel,
-                                    prefixIcon: Icons.lock_person_outlined,
-                                    obscureText: _obscureConfirmPassword,
-                                    textInputAction: TextInputAction.done,
-                                    onChanged: controller.updateConfirmPassword,
-                                    enabled: !state.isSaving,
-                                    errorText: confirmPasswordMismatch
-                                        ? text.authPasswordMismatch
-                                        : null,
-                                    trailing: IconButton(
-                                      onPressed: state.isSaving
-                                          ? null
-                                          : () {
-                                              setState(() {
-                                                _obscureConfirmPassword =
-                                                    !_obscureConfirmPassword;
-                                              });
-                                            },
-                                      icon: Icon(
-                                        _obscureConfirmPassword
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          if (_isSignUp) ...[
-                            const SizedBox(height: 12),
-                            _TermsConsentOption(
-                              value: _acceptedTerms,
-                              label: text.authAcceptTermsLabel,
-                              locale: Localizations.localeOf(context),
-                              onOpenTerms: () => _openLegalDocument(
-                                legalDocuments: legalDocumentsAsync.value,
-                                documentSelector: (docs) => docs.termsOfUse,
-                              ),
-                              onOpenPrivacy: () => _openLegalDocument(
-                                legalDocuments: legalDocumentsAsync.value,
-                                documentSelector: (docs) => docs.privacyPolicy,
-                              ),
-                              showError:
-                                  _consentErrorMessage ==
-                                  'auth.accept_terms_required',
-                              onChanged: (value) {
-                                setState(() {
-                                  _acceptedTerms = value ?? false;
-                                  _consentErrorMessage = null;
-                                });
-                              },
-                            ),
-                            if (legalDocumentsAsync.hasError) ...[
-                              const SizedBox(height: 4),
-                              _LegalStateLine(
-                                message: text.authLegalUnavailable,
-                                isError: true,
-                              ),
-                            ] else if (legalDocumentsAsync.isLoading) ...[
-                              const SizedBox(height: 4),
-                              _LegalStateLine(message: text.authLegalLoading),
-                            ],
-                            const SizedBox(height: 4),
-                            _MarketingConsentOption(
-                              value: _receiveUpdates,
-                              title: text.authReceiveUpdatesLabel,
-                              onChanged: (value) {
-                                setState(() {
-                                  _receiveUpdates = value ?? false;
-                                });
-                              },
-                            ),
-                          ],
-                          const SizedBox(height: 12),
-                          _AuthInlineActions(
-                            isSignUp: _isSignUp,
-                            switchPrompt: switchPrompt,
-                            switchAction: switchAction,
-                            forgotPasswordAction: text.authForgotPasswordAction,
-                            onForgotPassword: () {
-                              final email = _emailController.text.trim();
-                              final query = email.isEmpty
-                                  ? ''
-                                  : '?email=${Uri.encodeQueryComponent(email)}';
-                              context.go(
-                                '${PasswordResetPage.routePath}$query',
-                              );
-                            },
-                            onSwitchMode: () {
-                              context.go(
-                                _isSignUp
-                                    ? AuthEntryPage.routePath
-                                    : RegisterEntryPage.routePath,
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 6),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: submitDisabled ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                elevation: 0.6,
-                              ),
-                              child: Text(
-                                state.isSaving
-                                    ? text.profileLoadingAction
-                                    : primaryAction,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          AuthDivider(label: text.authOrContinueWith),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SocialButton(
-                                  icon: SocialGlyph.google(),
-                                  label: text.authGoogleShortLabel,
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () => _submitExternal(
-                                          ExternalAuthProvider.google,
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: SocialButton(
-                                  icon: SocialGlyph.apple(),
-                                  label: text.authAppleShortLabel,
-                                  onPressed: state.isSaving
-                                      ? null
-                                      : () => _submitExternal(
-                                          ExternalAuthProvider.apple,
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          LightPrivacyPanel(
-                            title: text.authPrivacyTitle,
-                            subtitle: text.authPrivacySubtitle,
-                          ),
-                        ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  AuthHero(title: title, subtitle: subtitle, isDark: isDark),
+                  if (_isSignUp) ...[
+                    const SizedBox(height: 10),
+                    _SignUpHighlights(
+                      secureTitle: text.authSecurePrivateTitle,
+                      secureSubtitle: text.authSecurePrivateSubtitle,
+                      fastTitle: text.authFastEasyTitle,
+                      fastSubtitle: text.authFastEasySubtitle,
+                      lovedTitle: text.authLovedByPetsTitle,
+                      lovedSubtitle: text.authLovedByPetsSubtitle,
+                    ),
+                  ],
+                  const SizedBox(height: 2),
+                  if (_consentErrorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: ErrorCard(
+                        message: _mapErrorMessage(_consentErrorMessage!, text),
                       ),
                     ),
-                  );
-                },
+                  AuthFormCard(
+                    isDark: isDark,
+                    child: Column(
+                      children: [
+                        if (_isSignUp) ...[
+                          AuthField(
+                            controller: _displayNameController,
+                            hintText: text.authDisplayNameLabel,
+                            prefixIcon: Icons.badge_outlined,
+                            textInputAction: TextInputAction.next,
+                            onChanged: controller.updateDisplayName,
+                            enabled: !state.isSaving,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        AuthField(
+                          controller: _emailController,
+                          hintText: text.profileEmailLabel,
+                          prefixIcon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onChanged: controller.updateEmail,
+                          enabled: !state.isSaving,
+                        ),
+                        const SizedBox(height: 8),
+                        AuthField(
+                          controller: _passwordController,
+                          hintText: text.profilePasswordLabel,
+                          prefixIcon: Icons.lock_outline_rounded,
+                          obscureText: _obscurePassword,
+                          textInputAction: _isSignUp
+                              ? TextInputAction.next
+                              : TextInputAction.done,
+                          onChanged: controller.updatePassword,
+                          enabled: !state.isSaving,
+                          trailing: IconButton(
+                            onPressed: state.isSaving
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                        if (_isSignUp) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 2),
+                              child: Text(
+                                text.authPasswordRulesHint,
+                                style: TextStyle(
+                                  color: colors.textMuted,
+                                  fontSize: 10.8,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          AuthField(
+                            controller: _confirmPasswordController,
+                            hintText: text.authConfirmPasswordLabel,
+                            prefixIcon: Icons.lock_person_outlined,
+                            obscureText: _obscureConfirmPassword,
+                            textInputAction: TextInputAction.done,
+                            onChanged: controller.updateConfirmPassword,
+                            enabled: !state.isSaving,
+                            errorText: confirmPasswordMismatch
+                                ? text.authPasswordMismatch
+                                : null,
+                            trailing: IconButton(
+                              onPressed: state.isSaving
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _obscureConfirmPassword =
+                                            !_obscureConfirmPassword;
+                                      });
+                                    },
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (_isSignUp) ...[
+                    const SizedBox(height: 12),
+                    _TermsConsentOption(
+                      value: _acceptedTerms,
+                      label: text.authAcceptTermsLabel,
+                      locale: Localizations.localeOf(context),
+                      onOpenTerms: () => _openLegalDocument(
+                        legalDocuments: legalDocumentsAsync.value,
+                        documentSelector: (docs) => docs.termsOfUse,
+                      ),
+                      onOpenPrivacy: () => _openLegalDocument(
+                        legalDocuments: legalDocumentsAsync.value,
+                        documentSelector: (docs) => docs.privacyPolicy,
+                      ),
+                      showError:
+                          _consentErrorMessage == 'auth.accept_terms_required',
+                      onChanged: (value) {
+                        setState(() {
+                          _acceptedTerms = value ?? false;
+                          _consentErrorMessage = null;
+                        });
+                      },
+                    ),
+                    if (legalDocumentsAsync.hasError) ...[
+                      const SizedBox(height: 4),
+                      _LegalStateLine(
+                        message: text.authLegalUnavailable,
+                        isError: true,
+                      ),
+                    ] else if (legalDocumentsAsync.isLoading) ...[
+                      const SizedBox(height: 4),
+                      _LegalStateLine(message: text.authLegalLoading),
+                    ],
+                    const SizedBox(height: 4),
+                    _MarketingConsentOption(
+                      value: _receiveUpdates,
+                      title: text.authReceiveUpdatesLabel,
+                      onChanged: (value) {
+                        setState(() {
+                          _receiveUpdates = value ?? false;
+                        });
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  _AuthInlineActions(
+                    isSignUp: _isSignUp,
+                    switchPrompt: switchPrompt,
+                    switchAction: switchAction,
+                    forgotPasswordAction: text.authForgotPasswordAction,
+                    onForgotPassword: () {
+                      final email = _emailController.text.trim();
+                      final query = email.isEmpty
+                          ? ''
+                          : '?email=${Uri.encodeQueryComponent(email)}';
+                      context.go('${PasswordResetPage.routePath}$query');
+                    },
+                    onSwitchMode: () {
+                      context.go(
+                        _isSignUp
+                            ? AuthEntryPage.routePath
+                            : RegisterEntryPage.routePath,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: submitDisabled ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        elevation: 0.6,
+                      ),
+                      child: Text(
+                        state.isSaving
+                            ? text.profileLoadingAction
+                            : primaryAction,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AuthDivider(label: text.authOrContinueWith),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SocialButton(
+                          icon: SocialGlyph.google(),
+                          label: text.authGoogleShortLabel,
+                          onPressed: state.isSaving
+                              ? null
+                              : () => _submitExternal(
+                                  ExternalAuthProvider.google,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SocialButton(
+                          icon: SocialGlyph.apple(),
+                          label: text.authAppleShortLabel,
+                          onPressed: state.isSaving
+                              ? null
+                              : () =>
+                                    _submitExternal(ExternalAuthProvider.apple),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  LightPrivacyPanel(
+                    title: text.authPrivacyTitle,
+                    subtitle: text.authPrivacySubtitle,
+                  ),
+                ],
               ),
             ),
           ],
@@ -467,7 +440,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   Future<void> _submit() async {
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
-    final initialPassword = _passwordController.text;
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
       final legalDocuments = switch (ref.read(
@@ -513,7 +485,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         final email = nextState.email.trim();
         router.go(
           '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',
-          extra: <String, dynamic>{'initialPassword': initialPassword},
         );
       }
       return;
@@ -556,6 +527,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     );
   }
 
+  void _syncControllers(ProfileState state) {
+    _syncController(_displayNameController, state.displayName);
+    _syncController(_emailController, state.email);
+    _syncController(_passwordController, state.password);
+    _syncController(_confirmPasswordController, state.confirmPassword);
+  }
+
   void _syncController(TextEditingController controller, String value) {
     if (controller.text == value) {
       return;
@@ -591,7 +569,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       case 'auth.registration_pending_verification':
         return null;
       default:
-        return raw;
+        return null;
     }
   }
 
@@ -648,30 +626,10 @@ class _LegalDocumentSheet extends StatelessWidget {
           ),
           const Divider(height: 1),
           Expanded(
-            child: ListView(
+            child: LegalDocumentListView(
+              documents: [document],
+              includeDocumentTitles: false,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                if (document.summary.isNotEmpty) ...[
-                  Text(document.summary, style: theme.textTheme.bodyMedium),
-                  const SizedBox(height: 12),
-                ],
-                for (final section in document.sections) ...[
-                  if (section.heading.isNotEmpty) ...[
-                    Text(
-                      section.heading,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  for (final paragraph in section.paragraphs) ...[
-                    Text(paragraph, style: theme.textTheme.bodyMedium),
-                    const SizedBox(height: 10),
-                  ],
-                  const SizedBox(height: 6),
-                ],
-              ],
             ),
           ),
         ],

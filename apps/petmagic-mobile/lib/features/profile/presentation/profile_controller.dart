@@ -1,11 +1,10 @@
-import 'dart:developer' as developer;
-
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -101,26 +100,59 @@ class ProfileController extends Notifier<ProfileState> {
       }
     }
 
-    developer.Timeline.instantSync(
-      'petmagic.profile.controller.error',
-      arguments: payload,
-    );
-    developer.log(
-      'ProfileController::$stage failed',
-      name: 'PetMagic.Profile.Controller',
+    AppLogger.warn(
+      feature: 'Profile',
+      operation: stage,
+      message: 'Profile controller step failed',
+      context: payload,
       error: error,
       stackTrace: stackTrace,
     );
   }
 
   final ImagePicker _imagePicker = ImagePicker();
-  final ImageCropper _imageCropper = ImageCropper();
+  CancelToken? _activeAvatarUploadCancelToken;
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
   ProfileState build() {
+    ref.onDispose(_cancelActiveAvatarUpload);
     return const ProfileState.initial();
+  }
+
+  void _updateStateIfMounted(
+    ProfileState Function(ProfileState current) update,
+  ) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    state = update(state);
+  }
+
+  CancelToken? _startAvatarUpload() {
+    if (_activeAvatarUploadCancelToken != null) {
+      return null;
+    }
+
+    final cancelToken = CancelToken();
+    _activeAvatarUploadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveAvatarUpload() {
+    final cancelToken = _activeAvatarUploadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('profile_avatar_upload_cancelled');
+    }
+    _activeAvatarUploadCancelToken = null;
+  }
+
+  void _clearActiveAvatarUpload(CancelToken cancelToken) {
+    if (identical(_activeAvatarUploadCancelToken, cancelToken)) {
+      _activeAvatarUploadCancelToken = null;
+    }
   }
 
   Future<void> initialize({String initialEmail = ''}) async {
@@ -130,32 +162,46 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      final session = await _repository.readSession();
+      final session = await repository.readSession();
+      if (!ref.mounted) {
+        return;
+      }
       if (session == null) {
-        state = state.copyWith(
-          isLoading: false,
-          email: initialEmail,
-          clearSession: true,
-          clearProfile: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            email: initialEmail,
+            clearSession: true,
+            clearProfile: true,
+          ),
         );
         return;
       }
 
-      final profile = await _repository.fetchProfile();
+      final profile = await repository.fetchProfile();
+      if (!ref.mounted) {
+        return;
+      }
       final hydratedSession = AuthSession(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
         expiresAtUtc: session.expiresAtUtc,
         user: profile,
       );
-      state = state.copyWith(
-        isLoading: false,
-        session: hydratedSession,
-        profile: profile,
-        email: hydratedSession.user.email,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          session: hydratedSession,
+          profile: profile,
+          email: hydratedSession.user.email,
+          clearError: true,
+        ),
       );
+      if (!ref.mounted) {
+        return;
+      }
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
@@ -163,41 +209,56 @@ class ProfileController extends Notifier<ProfileState> {
                 hydratedSession.user.legalAcceptance.requiresAcceptance,
           );
     } on AppException catch (error) {
-      final storedSession = await _repository.readSession();
+      final storedSession = await repository.readSession();
+      if (!ref.mounted) {
+        return;
+      }
       if (storedSession != null && error.statusCode != 401) {
-        state = state.copyWith(
-          isLoading: false,
-          session: storedSession,
-          profile: storedSession.user,
-          email: storedSession.user.email,
-          errorMessage: error.message,
-          clearSuccess: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            session: storedSession,
+            profile: storedSession.user,
+            email: storedSession.user.email,
+            errorMessage: error.message,
+            clearSuccess: true,
+          ),
         );
         return;
       }
 
       if (error.statusCode == 401) {
+        if (!ref.mounted) {
+          return;
+        }
         ref.read(appLaunchControllerProvider.notifier).markSignedOut();
       }
 
-      state = state.copyWith(
-        isLoading: false,
-        email: initialEmail,
-        errorMessage: error.message,
-        clearSession: true,
-        clearProfile: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          email: initialEmail,
+          errorMessage: error.message,
+          clearSession: true,
+          clearProfile: true,
+        ),
       );
     } catch (error, stackTrace) {
       _logProfileFailure('initialize_unknown', error, stackTrace);
-      final storedSession = await _repository.readSession();
+      final storedSession = await repository.readSession();
+      if (!ref.mounted) {
+        return;
+      }
       if (storedSession != null) {
-        state = state.copyWith(
-          isLoading: false,
-          session: storedSession,
-          profile: storedSession.user,
-          email: storedSession.user.email,
-          errorMessage: _genericActionError,
-          clearSuccess: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            session: storedSession,
+            profile: storedSession.user,
+            email: storedSession.user.email,
+            errorMessage: _genericActionError,
+            clearSuccess: true,
+          ),
         );
         return;
       }
@@ -240,31 +301,47 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> login() async {
+    if (state.isSaving) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      final session = await _repository.login(
+      final session = await repository.login(
         email: state.email,
         password: state.password,
       );
-      final profile = await _repository.fetchProfile();
+      if (!ref.mounted) {
+        return;
+      }
+      final profile = await repository.fetchProfile();
+      if (!ref.mounted) {
+        return;
+      }
       final hydratedSession = AuthSession(
         accessToken: session.accessToken,
         refreshToken: session.refreshToken,
         expiresAtUtc: session.expiresAtUtc,
         user: profile,
       );
-      state = state.copyWith(
-        isSaving: false,
-        session: hydratedSession,
-        profile: profile,
-        password: '',
-        confirmPassword: '',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          session: hydratedSession,
+          profile: profile,
+          password: '',
+          confirmPassword: '',
+        ),
       );
+      if (!ref.mounted) {
+        return;
+      }
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
@@ -285,6 +362,10 @@ class ProfileController extends Notifier<ProfileState> {
     required MobileLegalDocuments legalDocuments,
     required bool marketingEmailsEnabled,
   }) async {
+    if (state.isSaving) {
+      return;
+    }
+
     if (state.password.length < 6) {
       state = state.copyWith(
         errorMessage: 'auth.password_too_short',
@@ -307,8 +388,9 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.register(
+      await repository.register(
         email: state.email,
         password: state.password,
         displayName: state.displayName,
@@ -318,13 +400,15 @@ class ProfileController extends Notifier<ProfileState> {
         privacyPolicyVersion: legalDocuments.privacyPolicy.version,
         marketingEmailsEnabled: marketingEmailsEnabled,
       );
-      state = state.copyWith(
-        isSaving: false,
-        clearSession: true,
-        clearProfile: true,
-        password: '',
-        confirmPassword: '',
-        successMessage: 'auth.registration_pending_verification',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          clearSession: true,
+          clearProfile: true,
+          password: '',
+          confirmPassword: '',
+          successMessage: 'auth.registration_pending_verification',
+        ),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -335,23 +419,34 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> authenticateWithProvider(ExternalAuthProvider provider) async {
+    if (state.isSaving) {
+      return;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
 
+    final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     try {
-      final session = await ref
-          .read(externalAuthRepositoryProvider)
-          .authenticate(provider);
-      state = state.copyWith(
-        isSaving: false,
-        session: session,
-        profile: session.user,
-        password: '',
-        confirmPassword: '',
+      final session = await externalAuthRepository.authenticate(provider);
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          session: session,
+          profile: session.user,
+          password: '',
+          confirmPassword: '',
+        ),
       );
+      if (!ref.mounted) {
+        return;
+      }
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
@@ -373,10 +468,14 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     try {
-      await ref.read(externalAuthRepositoryProvider).link(provider);
+      await externalAuthRepository.link(provider);
+      if (!ref.mounted) {
+        return;
+      }
       ref.invalidate(linkedAccountsProvider);
-      state = state.copyWith(isSaving: false);
+      _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -392,10 +491,14 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.unlinkLinkedAccount(provider.apiValue);
+      await repository.unlinkLinkedAccount(provider.apiValue);
+      if (!ref.mounted) {
+        return;
+      }
       ref.invalidate(linkedAccountsProvider);
-      state = state.copyWith(isSaving: false);
+      _updateStateIfMounted((state) => state.copyWith(isSaving: false));
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
@@ -411,24 +514,35 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
+    final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     try {
-      await _repository.logout();
+      await repository.logout();
+      if (!ref.mounted) {
+        return;
+      }
       try {
-        await ref
-            .read(externalAuthRepositoryProvider)
-            .clearSession(ExternalAuthProvider.google);
+        await externalAuthRepository.clearSession(ExternalAuthProvider.google);
       } catch (error, stackTrace) {
         _logProfileFailure('logout_google_cleanup', error, stackTrace);
         // Logout must still complete even if provider cleanup fails.
       }
-      state = state.copyWith(
-        isSaving: false,
-        clearSession: true,
-        clearProfile: true,
-        password: '',
-        confirmPassword: '',
-        successMessage: 'logout',
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          clearSession: true,
+          clearProfile: true,
+          password: '',
+          confirmPassword: '',
+          successMessage: 'logout',
+        ),
       );
+      if (!ref.mounted) {
+        return;
+      }
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -445,25 +559,36 @@ class ProfileController extends Notifier<ProfileState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
+    final externalAuthRepository = ref.read(externalAuthRepositoryProvider);
     try {
-      await _repository.deleteCurrentAccount();
+      await repository.deleteCurrentAccount();
+      if (!ref.mounted) {
+        return;
+      }
       try {
-        await ref
-            .read(externalAuthRepositoryProvider)
-            .clearSession(ExternalAuthProvider.google);
+        await externalAuthRepository.clearSession(ExternalAuthProvider.google);
       } catch (error, stackTrace) {
         _logProfileFailure('delete_account_google_cleanup', error, stackTrace);
         // Account deletion must still complete even if provider cleanup fails.
       }
 
-      state = state.copyWith(
-        isSaving: false,
-        clearSession: true,
-        clearProfile: true,
-        password: '',
-        confirmPassword: '',
-        successMessage: 'profile.account_deleted',
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          clearSession: true,
+          clearProfile: true,
+          password: '',
+          confirmPassword: '',
+          successMessage: 'profile.account_deleted',
+        ),
       );
+      if (!ref.mounted) {
+        return;
+      }
       ref.read(appLaunchControllerProvider.notifier).markSignedOut();
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -482,75 +607,69 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> uploadAvatarFromPath(String filePath) async {
-    state = state.copyWith(
-      isSaving: true,
-      clearError: true,
-      clearSuccess: true,
+    final uploadCancelToken = _startAvatarUpload();
+    if (uploadCancelToken == null) {
+      return;
+    }
+
+    _updateStateIfMounted(
+      (state) =>
+          state.copyWith(isSaving: true, clearError: true, clearSuccess: true),
     );
 
     try {
       final previousAvatarUrl = state.profile?.avatar?.url;
-      final profile = await _repository.uploadAvatar(filePath);
+      final profile = await _repository.uploadAvatar(
+        filePath,
+        cancelToken: uploadCancelToken,
+      );
+      if (!ref.mounted) {
+        return;
+      }
+
       final nextAvatarUrl = profile.avatar?.url;
 
-      state = state.copyWith(
-        isSaving: false,
-        profile: profile,
-        session: _replaceSessionUser(profile),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          profile: profile,
+          session: _replaceSessionUser(profile),
+        ),
       );
 
       await _evictAvatarCache(previousAvatarUrl);
       await _evictAvatarCache(nextAvatarUrl);
+      if (!ref.mounted) {
+        return;
+      }
 
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
             requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(isSaving: false, clearError: true),
+      );
+    } on DioException catch (error, stackTrace) {
+      if (CancelToken.isCancel(error)) {
+        _updateStateIfMounted(
+          (state) => state.copyWith(isSaving: false, clearError: true),
+        );
+        return;
+      }
+
+      _logProfileFailure('upload_avatar_dio', error, stackTrace);
+      _setFailure(message: _genericActionError);
     } on AppException catch (error) {
       _setFailure(message: error.message);
     } catch (error, stackTrace) {
       _logProfileFailure('upload_avatar_unknown', error, stackTrace);
       _setFailure(message: _genericActionError);
+    } finally {
+      _clearActiveAvatarUpload(uploadCancelToken);
     }
-  }
-
-  Future<void> uploadAvatar() async {
-    final file = await pickAvatarImage();
-    if (file == null) {
-      return;
-    }
-
-    final croppedFile = await _imageCropper.cropImage(
-      sourcePath: file.path,
-      maxWidth: 1200,
-      maxHeight: 1200,
-      compressQuality: 92,
-      compressFormat: ImageCompressFormat.jpg,
-      aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'PetMagic',
-          initAspectRatio: CropAspectRatioPreset.square,
-          lockAspectRatio: true,
-          hideBottomControls: false,
-          cropStyle: CropStyle.circle,
-        ),
-        IOSUiSettings(
-          title: 'PetMagic',
-          aspectRatioLockEnabled: true,
-          aspectRatioPickerButtonHidden: true,
-          resetAspectRatioEnabled: false,
-          rotateButtonsHidden: false,
-          cropStyle: CropStyle.circle,
-        ),
-      ],
-    );
-    if (croppedFile == null) {
-      return;
-    }
-
-    await uploadAvatarFromPath(croppedFile.path);
   }
 
   Future<void> removeAvatar() async {
@@ -561,10 +680,12 @@ class ProfileController extends Notifier<ProfileState> {
     );
     try {
       final profile = await _repository.removeAvatar();
-      state = state.copyWith(
-        isSaving: false,
-        profile: profile,
-        session: _replaceSessionUser(profile),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          profile: profile,
+          session: _replaceSessionUser(profile),
+        ),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -582,11 +703,13 @@ class ProfileController extends Notifier<ProfileState> {
     );
     try {
       final profile = await _repository.updateProfile(displayName: displayName);
-      state = state.copyWith(
-        isSaving: false,
-        profile: profile,
-        session: _replaceSessionUser(profile),
-        displayName: profile.displayName ?? '',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          profile: profile,
+          session: _replaceSessionUser(profile),
+          displayName: profile.displayName ?? '',
+        ),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -609,10 +732,12 @@ class ProfileController extends Notifier<ProfileState> {
       final profile = await _repository.acceptCurrentLegalDocuments(
         documents: legalDocuments,
       );
-      state = state.copyWith(
-        isSaving: false,
-        profile: profile,
-        session: _replaceSessionUser(profile),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          profile: profile,
+          session: _replaceSessionUser(profile),
+        ),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -628,14 +753,16 @@ class ProfileController extends Notifier<ProfileState> {
     bool clearSession = false,
     bool clearProfile = false,
   }) {
-    state = state.copyWith(
-      isLoading: false,
-      isSaving: false,
-      email: email,
-      errorMessage: message,
-      clearSuccess: true,
-      clearSession: clearSession,
-      clearProfile: clearProfile,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: false,
+        isSaving: false,
+        email: email,
+        errorMessage: message,
+        clearSuccess: true,
+        clearSession: clearSession,
+        clearProfile: clearProfile,
+      ),
     );
   }
 
@@ -662,12 +789,7 @@ class ProfileController extends Notifier<ProfileState> {
       await CachedNetworkImage.evictFromCache(imageUrl);
       imageCache.evict(NetworkImage(imageUrl));
     } catch (error, stackTrace) {
-      _logProfileFailure(
-        'avatar_cache_evict_failed',
-        error,
-        stackTrace,
-        context: {'avatar_url': imageUrl},
-      );
+      _logProfileFailure('avatar_cache_evict_failed', error, stackTrace);
     }
   }
 }

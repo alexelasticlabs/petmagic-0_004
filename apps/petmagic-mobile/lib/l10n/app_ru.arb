@@ -1186,7 +1186,6 @@
   "profileNotificationsDeviceCamera": "Камера",
   "profileNotificationsDevicePhotos": "Фото",
   "profileNotificationsDeviceFiles": "Файлы",
-  "profileNotificationsRequestDevicePermissions": "Запросить разрешения устройства",
   "supportChatLoadPreviousMessagesAction": "Загрузить предыдущие сообщения",
   "generationStatusCopyLinkAction": "Скопировать ссылку",
   "generationStatusShareFailedMessage": "Не удалось поделиться результатом. Попробуйте еще раз.",

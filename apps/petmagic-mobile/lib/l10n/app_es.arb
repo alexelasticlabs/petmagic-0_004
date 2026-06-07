@@ -1168,7 +1168,6 @@
   "profileNotificationsDeviceCamera": "Cámara",
   "profileNotificationsDevicePhotos": "Fotos",
   "profileNotificationsDeviceFiles": "Archivos",
-  "profileNotificationsRequestDevicePermissions": "Solicitar permisos del dispositivo",
   "supportChatLoadPreviousMessagesAction": "Cargar mensajes anteriores",
   "generationStatusCopyLinkAction": "Copiar enlace",
   "generationStatusShareFailedMessage": "No se pudo compartir el resultado. Por favor inténtalo de nuevo.",

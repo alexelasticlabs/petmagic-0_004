@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 
 const _bottomNavHeight = 42.0;
@@ -18,6 +19,7 @@ const _bottomNavOuterGap = 10.0;
 const _bottomNavContentInsetExtra = 18.0;
 const _bottomNavBackdropExtra = 28.0;
 const _bottomSheetBottomGap = 14.0;
+const _activeGenerationThumbnailCacheWidth = 96;
 
 const kPetMagicBottomContentInsetRelaxed = _bottomNavContentInsetExtra;
 const kPetMagicBottomContentInsetCompact = _bottomNavOuterGap;
@@ -427,7 +429,9 @@ class _ActiveGenerationBanner extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
-    final previewUrl = generation.sourceImageAsset?.url;
+    final previewUrl = parseSafeGenerationMediaUri(
+      generation.sourceImageAsset?.url,
+    )?.toString();
     final progress = generation.effectiveProgressPercent;
 
     return Align(
@@ -484,6 +488,11 @@ class _ActiveGenerationBanner extends StatelessWidget {
                               : CachedNetworkImage(
                                   imageUrl: previewUrl,
                                   fit: BoxFit.cover,
+                                  memCacheWidth:
+                                      _activeGenerationThumbnailCacheWidth,
+                                  maxWidthDiskCache:
+                                      _activeGenerationThumbnailCacheWidth,
+                                  filterQuality: FilterQuality.medium,
                                   errorWidget: (context, url, error) =>
                                       ColoredBox(
                                         color: colors.surfaceStrong,

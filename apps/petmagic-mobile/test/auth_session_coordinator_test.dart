@@ -117,6 +117,189 @@ void main() {
     expect(refreshCalls, 1);
     expect(storage.clearCalls, 0);
   });
+
+  test(
+    'authorizedRequest can disable transient retry for non-idempotent calls',
+    () async {
+      final storage = _InMemoryAuthSessionStorage(
+        session: _session(
+          accessToken: 'access',
+          expiresAtUtc: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        ),
+      );
+      final coordinator = AuthSessionCoordinator(
+        dio: Dio(),
+        sessionStorage: storage,
+      );
+
+      var attempts = 0;
+      await expectLater(
+        coordinator.authorizedRequest<String>(
+          request: (_) async {
+            attempts++;
+            throw _serverUnavailableDioException();
+          },
+          mapError: _mapDioException,
+          requestFailedMessage: 'request.failed',
+          transientRetryAttempts: 1,
+        ),
+        throwsA(isA<AppException>()),
+      );
+
+      expect(attempts, 1);
+    },
+  );
+
+  test('authorizedRequest preserves request cancellation', () async {
+    final storage = _InMemoryAuthSessionStorage(
+      session: _session(
+        accessToken: 'access',
+        expiresAtUtc: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      ),
+    );
+    final coordinator = AuthSessionCoordinator(
+      dio: Dio(),
+      sessionStorage: storage,
+    );
+
+    await expectLater(
+      coordinator.authorizedRequest<String>(
+        request: (_) async {
+          throw DioException.requestCancelled(
+            requestOptions: RequestOptions(path: '/api/protected'),
+            reason: 'test_cancelled',
+          );
+        },
+        mapError: _mapDioException,
+        requestFailedMessage: 'request.failed',
+      ),
+      throwsA(isA<RequestCancelledException>()),
+    );
+  });
+
+  test('authorizedRequest clears stored session with empty tokens', () async {
+    final storage = _InMemoryAuthSessionStorage(
+      session: _session(
+        accessToken: '',
+        refreshToken: '',
+        expiresAtUtc: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      ),
+    );
+    final coordinator = AuthSessionCoordinator(
+      dio: Dio(),
+      sessionStorage: storage,
+    );
+
+    await expectLater(
+      coordinator.authorizedRequest<String>(
+        request: (_) async => Response<String>(
+          requestOptions: RequestOptions(path: '/api/protected'),
+          statusCode: 200,
+        ),
+        mapError: _mapDioException,
+        requestFailedMessage: 'request.failed',
+      ),
+      throwsA(
+        isA<AppException>().having(
+          (error) => error.statusCode,
+          'statusCode',
+          401,
+        ),
+      ),
+    );
+
+    expect(storage.clearCalls, 1);
+  });
+
+  test(
+    'refresh response with empty tokens clears session and is not saved',
+    () async {
+      var refreshCalls = 0;
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/refresh') {
+            refreshCalls++;
+            return ResponseBody.fromString(
+              jsonEncode(_sessionJson(accessToken: '', refreshToken: '')),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final storage = _InMemoryAuthSessionStorage(
+        session: _session(
+          accessToken: 'expired-access',
+          refreshToken: 'refresh-token',
+          expiresAtUtc: DateTime.now().toUtc().subtract(
+            const Duration(minutes: 1),
+          ),
+        ),
+      );
+      final coordinator = AuthSessionCoordinator(
+        dio: dio,
+        sessionStorage: storage,
+      );
+
+      await expectLater(
+        coordinator.requireValidSession(
+          mapError: _mapDioException,
+          sessionExpiredMessage: 'session.expired',
+        ),
+        throwsA(isA<AppException>()),
+      );
+
+      expect(refreshCalls, 1);
+      expect(storage.savedSessions, isEmpty);
+      expect(storage.clearCalls, 1);
+    },
+  );
+
+  test('refresh cancellation is preserved without clearing session', () async {
+    var refreshCalls = 0;
+    final dio = Dio()
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        if (options.path == '/api/auth/refresh') {
+          refreshCalls++;
+          throw DioException.requestCancelled(
+            requestOptions: options,
+            reason: 'refresh_cancelled',
+          );
+        }
+
+        throw StateError('Unexpected path: ${options.path}');
+      });
+
+    final storage = _InMemoryAuthSessionStorage(
+      session: _session(
+        accessToken: 'expired-access',
+        refreshToken: 'refresh-token',
+        expiresAtUtc: DateTime.now().toUtc().subtract(
+          const Duration(minutes: 1),
+        ),
+      ),
+    );
+    final coordinator = AuthSessionCoordinator(
+      dio: dio,
+      sessionStorage: storage,
+    );
+
+    await expectLater(
+      coordinator.requireValidSession(
+        mapError: _mapDioException,
+        sessionExpiredMessage: 'session.expired',
+      ),
+      throwsA(isA<RequestCancelledException>()),
+    );
+
+    expect(refreshCalls, 1);
+    expect(storage.clearCalls, 0);
+    expect(storage.savedSessions, isEmpty);
+  });
 }
 
 AppException _mapDioException(
@@ -143,10 +326,26 @@ DioException _unauthorizedDioException() {
   );
 }
 
-Map<String, Object?> _sessionJson({required String accessToken}) {
+DioException _serverUnavailableDioException() {
+  final requestOptions = RequestOptions(path: '/api/protected');
+  return DioException.badResponse(
+    statusCode: 503,
+    requestOptions: requestOptions,
+    response: Response<Map<String, Object?>>(
+      requestOptions: requestOptions,
+      statusCode: 503,
+      data: const {'title': 'ServiceUnavailable'},
+    ),
+  );
+}
+
+Map<String, Object?> _sessionJson({
+  required String accessToken,
+  String refreshToken = 'refresh-token',
+}) {
   return {
     'accessToken': accessToken,
-    'refreshToken': 'refresh-token',
+    'refreshToken': refreshToken,
     'expiresAtUtc': DateTime.now()
         .toUtc()
         .add(const Duration(hours: 6))
@@ -179,11 +378,12 @@ Map<String, Object?> _sessionJson({required String accessToken}) {
 
 AuthSession _session({
   required String accessToken,
+  String refreshToken = 'refresh-token',
   required DateTime expiresAtUtc,
 }) {
   return AuthSession(
     accessToken: accessToken,
-    refreshToken: 'refresh-token',
+    refreshToken: refreshToken,
     expiresAtUtc: expiresAtUtc,
     user: const MobileUserProfile(
       userId: 'user-1',

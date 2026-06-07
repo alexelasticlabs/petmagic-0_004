@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +16,8 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
@@ -86,6 +90,99 @@ void main() {
       }),
       findsOneWidget,
     );
+  });
+
+  testWidgets('all transactions renders ledger rows lazily', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final largeLedger = List<WalletLedgerItem>.generate(
+      80,
+      (index) => WalletLedgerItem(
+        entryId: 'entry-$index',
+        userId: 'user-1',
+        delta: index.isEven ? 5 : -3,
+        balanceAfter: 1000 + index,
+        source: index.isEven ? 'ad_reward' : 'generation_spend',
+        reason: 'Ledger entry $index',
+        createdAtUtc: DateTime.utc(2026, 1, 1, 12, index % 60),
+      ),
+      growable: false,
+    );
+
+    await _pumpAllTransactionsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: largeLedger,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-79')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('wallet auto refresh does not reschedule after page disposal', (
+    tester,
+  ) async {
+    final controller = _AutoRefreshProbeWalletController();
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Material(child: WalletPage()),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(() => controller),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(controller.loadCalls, 1);
+
+    controller.delayNextLoad();
+    await tester.pump(const Duration(seconds: 12));
+    expect(controller.loadCalls, 2);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.completeDelayedLoad();
+    await tester.pump();
+
+    await tester.pump(const Duration(seconds: 13));
+    expect(controller.loadCalls, 2);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('rewards tab replaces wallet in bottom navigation', (
@@ -375,6 +472,46 @@ void main() {
     expect(find.text(text.walletPaymentGatewayUnavailableError), findsNothing);
     expect(find.textContaining('wallet.payment_unavailable'), findsNothing);
   });
+
+  testWidgets('rewards history sheet builds long ledger lazily', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final longLedger = List<WalletLedgerItem>.generate(
+      120,
+      (index) => WalletLedgerItem(
+        entryId: 'reward-$index',
+        userId: 'user-1',
+        delta: index.isEven ? 10 : -4,
+        balanceAfter: 200 - index,
+        source: index.isEven ? 'ad_reward' : 'generation_spend',
+        reason: 'Reward history row $index',
+        createdAtUtc: DateTime.utc(2026, 1, 1).add(Duration(days: index)),
+      ),
+    );
+
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: longLedger,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    await tester.tap(find.text(text.rewardsHistoryTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Reward history row 0'), findsOneWidget);
+    expect(find.text('Reward history row 119'), findsNothing);
+  });
 }
 
 class _IdleTemplateGenerationController extends TemplateGenerationController {
@@ -402,6 +539,51 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
       guestSessionReady: true,
     );
   }
+}
+
+Future<void> _pumpAllTransactionsPage(
+  WidgetTester tester, {
+  required WalletRepository repository,
+}) async {
+  addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
+        walletRepositoryProvider.overrideWithValue(repository),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [
+          Locale('ru'),
+          Locale('en'),
+          Locale('de'),
+          Locale('es'),
+          Locale('fr'),
+          Locale('it'),
+          Locale('pl'),
+        ],
+        routerConfig: GoRouter(
+          routes: [
+            GoRoute(
+              path: '/',
+              builder: (context, state) =>
+                  const Material(child: AllTransactionsPage()),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 200));
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 Future<void> _pumpWalletPage(
@@ -492,6 +674,41 @@ Future<void> _pumpRewardsPage(
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+class _AutoRefreshProbeWalletController extends WalletController {
+  int loadCalls = 0;
+  Completer<void>? _delayedLoad;
+
+  @override
+  WalletState build() {
+    return const WalletState(
+      wallet: _walletState,
+      rewards: _rewardsSummary,
+      ledger: _ledgerItems,
+      packs: _packs,
+      paymentMethods: _paymentMethods,
+      purchases: _purchases,
+    );
+  }
+
+  void delayNextLoad() {
+    _delayedLoad = Completer<void>();
+  }
+
+  void completeDelayedLoad() {
+    _delayedLoad?.complete();
+    _delayedLoad = null;
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
+    final delayed = _delayedLoad;
+    if (delayed != null) {
+      return delayed.future;
+    }
+  }
+}
+
 class _FakeWalletRepository extends WalletRepository {
   _FakeWalletRepository({
     required this.wallet,
@@ -514,12 +731,14 @@ class _FakeWalletRepository extends WalletRepository {
   final List<WalletPaymentMethodModel> paymentMethods;
 
   @override
-  Future<WalletStateModel> fetchWallet() async => wallet;
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async =>
+      wallet;
 
   @override
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
     int skip = 0,
     int take = 20,
+    CancelToken? cancelToken,
   }) async {
     if (failLedger) {
       throw Exception('ledger failed');
@@ -539,6 +758,7 @@ class _FakeWalletRepository extends WalletRepository {
   @override
   Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
     required Locale locale,
+    CancelToken? cancelToken,
   }) async {
     return WalletCheckoutConfigModel(
       packs: packs,
@@ -548,12 +768,14 @@ class _FakeWalletRepository extends WalletRepository {
   }
 
   @override
-  Future<RewardsSummaryModel> fetchRewards() async => _rewardsSummary;
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async =>
+      _rewardsSummary;
 
   @override
   Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
     int skip = 0,
     int take = 20,
+    CancelToken? cancelToken,
   }) async {
     if (failPurchases) {
       throw Exception('purchases failed');

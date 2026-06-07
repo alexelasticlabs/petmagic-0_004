@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
@@ -15,22 +13,12 @@ class AppPerformanceMonitor extends StatefulWidget {
 }
 
 class _AppPerformanceMonitorState extends State<AppPerformanceMonitor> {
-  Timer? _imageCacheTimer;
-
   @override
   void initState() {
     super.initState();
 
     if (AppConfig.enableFrameTelemetry) {
       SchedulerBinding.instance.addTimingsCallback(_handleFrameTimings);
-    }
-
-    if (AppConfig.enableImageCacheTelemetry) {
-      _logImageCacheStats();
-      _imageCacheTimer = Timer.periodic(
-        Duration(seconds: AppConfig.imageCacheTelemetryIntervalSeconds),
-        (_) => _logImageCacheStats(),
-      );
     }
   }
 
@@ -40,7 +28,6 @@ class _AppPerformanceMonitorState extends State<AppPerformanceMonitor> {
       SchedulerBinding.instance.removeTimingsCallback(_handleFrameTimings);
     }
 
-    _imageCacheTimer?.cancel();
     super.dispose();
   }
 
@@ -76,28 +63,5 @@ class _AppPerformanceMonitorState extends State<AppPerformanceMonitor> {
         context: payload,
       );
     }
-  }
-
-  void _logImageCacheStats() {
-    final cache = PaintingBinding.instance.imageCache;
-    final currentSizeMb = (cache.currentSizeBytes / (1024 * 1024))
-        .toStringAsFixed(2);
-    final maxSizeMb = (cache.maximumSizeBytes / (1024 * 1024)).toStringAsFixed(
-      2,
-    );
-    final payload = <String, Object>{
-      'entries': cache.currentSize,
-      'live': cache.liveImageCount,
-      'pending': cache.pendingImageCount,
-      'current_mb': currentSizeMb,
-      'max_mb': maxSizeMb,
-    };
-
-    AppLogger.debug(
-      feature: 'Performance.ImageCache',
-      operation: 'snapshot',
-      message: 'Image cache stats',
-      context: payload,
-    );
   }
 }

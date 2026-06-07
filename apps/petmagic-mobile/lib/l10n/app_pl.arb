@@ -1168,7 +1168,6 @@
   "profileNotificationsDeviceCamera": "Kamera",
   "profileNotificationsDevicePhotos": "Zdjęcia",
   "profileNotificationsDeviceFiles": "Akta",
-  "profileNotificationsRequestDevicePermissions": "Poproś o uprawnienia urządzenia",
   "supportChatLoadPreviousMessagesAction": "Załaduj poprzednie wiadomości",
   "generationStatusCopyLinkAction": "Skopiuj link",
   "generationStatusShareFailedMessage": "Nie udało się udostępnić wyniku. Spróbuj ponownie.",

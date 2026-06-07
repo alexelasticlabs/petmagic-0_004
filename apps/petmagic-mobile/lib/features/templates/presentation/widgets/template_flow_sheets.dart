@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -29,6 +30,8 @@ enum TemplateBlockedAction { wallet, premium, chooseAnother }
 
 const _kInsufficientBalanceMascotAsset =
     'assets/rewards/powspark-empty-cat.png';
+const int _selectedPetPhotoPreviewCacheWidth = 288;
+const int _selectedPetPhotoPreviewCacheHeight = 354;
 
 Future<TemplateDetailAction?> showTemplateDetailSheet(
   BuildContext context,
@@ -206,6 +209,9 @@ Future<bool?> showTemplateGenerationConfirmSheet({
                             width: 96,
                             height: 118,
                             fit: BoxFit.cover,
+                            cacheWidth: _selectedPetPhotoPreviewCacheWidth,
+                            cacheHeight: _selectedPetPhotoPreviewCacheHeight,
+                            filterQuality: FilterQuality.medium,
                           ),
                         ),
                       ),
@@ -338,23 +344,26 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
       backgroundColor: Colors.transparent,
       builder: (sheetContext, bottomInset) => SafeArea(
         top: false,
-        child: SingleChildScrollView(
+        child: ListView(
           padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-          child: _InsufficientBalanceBanner(
-            templateCost: template.tokenCost,
-            balance: gate.balance,
-            showPremiumCta: !hasPremiumAccess,
-            onClose: () => Navigator.of(
-              sheetContext,
-            ).pop(TemplateBlockedAction.chooseAnother),
-            onOpenPremium: () =>
-                Navigator.of(sheetContext).pop(TemplateBlockedAction.premium),
-            onBuyPowSpark: () =>
-                Navigator.of(sheetContext).pop(TemplateBlockedAction.wallet),
-            onLater: () => Navigator.of(
-              sheetContext,
-            ).pop(TemplateBlockedAction.chooseAnother),
-          ),
+          shrinkWrap: true,
+          children: [
+            _InsufficientBalanceBanner(
+              templateCost: template.tokenCost,
+              balance: gate.balance,
+              showPremiumCta: !hasPremiumAccess,
+              onClose: () => Navigator.of(
+                sheetContext,
+              ).pop(TemplateBlockedAction.chooseAnother),
+              onOpenPremium: () =>
+                  Navigator.of(sheetContext).pop(TemplateBlockedAction.premium),
+              onBuyPowSpark: () =>
+                  Navigator.of(sheetContext).pop(TemplateBlockedAction.wallet),
+              onLater: () => Navigator.of(
+                sheetContext,
+              ).pop(TemplateBlockedAction.chooseAnother),
+            ),
+          ],
         ),
       ),
     );
@@ -847,7 +856,7 @@ String _generationErrorText(AppLocalizations text, String raw) {
     return text.templateFlowStartFailedError;
   }
 
-  return raw;
+  return text.templateFlowStartFailedError;
 }
 
 bool _isRussian(Locale locale) => locale.languageCode.toLowerCase() == 'ru';

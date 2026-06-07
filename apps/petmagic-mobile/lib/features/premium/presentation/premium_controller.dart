@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -116,13 +117,11 @@ void _logPremiumCheckoutFailure(
   Object error,
   StackTrace stackTrace,
 ) {
-  developer.Timeline.instantSync(
-    'petmagic.premium.checkout.error',
-    arguments: {'stage': stage},
-  );
-  developer.log(
-    'PremiumController::$stage failed',
-    name: 'PetMagic.Premium.Checkout',
+  AppLogger.error(
+    feature: 'Premium',
+    operation: stage,
+    message: 'Premium checkout step failed',
+    context: {'stage': stage},
     error: error,
     stackTrace: stackTrace,
   );
@@ -134,21 +133,11 @@ void _logPremiumLoadFailure(
   StackTrace stackTrace, {
   Map<String, Object?> context = const {},
 }) {
-  final payload = <String, Object>{'stage': stage};
-  for (final entry in context.entries) {
-    final value = entry.value;
-    if (value != null) {
-      payload[entry.key] = value.toString();
-    }
-  }
-
-  developer.Timeline.instantSync(
-    'petmagic.premium.load.error',
-    arguments: payload,
-  );
-  developer.log(
-    'PremiumController::$stage failed',
-    name: 'PetMagic.Premium.Load',
+  AppLogger.warn(
+    feature: 'Premium',
+    operation: stage,
+    message: 'Premium load step failed',
+    context: {'stage': stage, ...context},
     error: error,
     stackTrace: stackTrace,
   );
@@ -390,6 +379,7 @@ class PremiumController extends Notifier<PremiumState> {
   late final PremiumRepository _repository;
   late final PremiumRefreshProfile _refreshProfile;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  CancelToken? _activeLoadCancelToken;
 
   @override
   PremiumState build() {
@@ -400,26 +390,65 @@ class PremiumController extends Notifier<PremiumState> {
       _handlePurchaseUpdates,
     );
     ref.onDispose(() {
+      _cancelActiveLoad();
       unawaited(_purchaseSubscription?.cancel());
     });
     return const PremiumState(isLoading: true);
   }
 
+  CancelToken _startLoadCancelToken() {
+    _cancelActiveLoad();
+    final cancelToken = CancelToken();
+    _activeLoadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveLoad() {
+    final cancelToken = _activeLoadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('premium_load_cancelled');
+    }
+    _activeLoadCancelToken = null;
+  }
+
+  void _clearActiveLoad(CancelToken cancelToken) {
+    if (identical(_activeLoadCancelToken, cancelToken)) {
+      _activeLoadCancelToken = null;
+    }
+  }
+
+  void _updateStateIfMounted(
+    PremiumState Function(PremiumState current) update,
+  ) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    state = update(state);
+  }
+
   Future<void> load({bool refresh = false}) async {
-    state = state.copyWith(
-      isLoading: !refresh,
-      clearError: true,
-      clearExternalUrl: true,
-      clearSuccess: true,
+    final loadCancelToken = _startLoadCancelToken();
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: !refresh,
+        clearError: true,
+        clearExternalUrl: true,
+        clearSuccess: true,
+      ),
     );
 
     try {
       final results = await Future.wait<Object>([
         _repository.fetchPaywallConfig(
           locale: WidgetsBinding.instance.platformDispatcher.locale,
+          cancelToken: loadCancelToken,
         ),
-        _repository.fetchStatus(),
+        _repository.fetchStatus(cancelToken: loadCancelToken),
       ]);
+      if (!ref.mounted) {
+        return;
+      }
 
       final config = results[0] as PremiumPaywallConfigModel;
       final status = results[1] as PremiumStatusModel;
@@ -433,6 +462,9 @@ class PremiumController extends Notifier<PremiumState> {
         plans,
         configuredProviders,
       );
+      if (!ref.mounted) {
+        return;
+      }
 
       final selectedPlanCode = _selectPlanCode(
         plans,
@@ -450,20 +482,41 @@ class PremiumController extends Notifier<PremiumState> {
         selectedPlanCode: selectedPlanCode,
       );
 
-      state = state.copyWith(
-        plans: plans,
-        paymentMethods: config.paymentMethods,
-        status: status,
-        legalTexts: config.legalTexts,
-        selectedPlanCode: selectedPlanCode,
-        selectedProvider: selectedProvider,
-        isStoreAvailable: storeAvailability.isAvailable,
-        availableStoreProductIds: storeAvailability.productIds,
-        isLoading: false,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          plans: plans,
+          paymentMethods: config.paymentMethods,
+          status: status,
+          legalTexts: config.legalTexts,
+          selectedPlanCode: selectedPlanCode,
+          selectedProvider: selectedProvider,
+          isStoreAvailable: storeAvailability.isAvailable,
+          availableStoreProductIds: storeAvailability.productIds,
+          isLoading: false,
+          clearError: true,
+        ),
+      );
+    } on RequestCancelledException {
+      return;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.plans_failed'),
+        ),
       );
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString());
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.plans_failed'),
+        ),
+      );
+    } finally {
+      _clearActiveLoad(loadCancelToken);
     }
   }
 
@@ -492,19 +545,24 @@ class PremiumController extends Notifier<PremiumState> {
     }
 
     if (!state.canStartCheckout) {
-      state = state.copyWith(errorMessage: 'premium.store_product_unavailable');
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(errorMessage: 'premium.store_product_unavailable'),
+      );
       return null;
     }
 
-    state = state.copyWith(
-      isBuying: true,
-      clearError: true,
-      clearExternalUrl: true,
-      clearSuccess: true,
-      checkoutVerificationState: PremiumCheckoutVerificationState.idle,
-      isAwaitingCheckoutVerification: false,
-      clearCheckoutError: true,
-      recentlyActivatedPremium: false,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isBuying: true,
+        clearError: true,
+        clearExternalUrl: true,
+        clearSuccess: true,
+        checkoutVerificationState: PremiumCheckoutVerificationState.idle,
+        isAwaitingCheckoutVerification: false,
+        clearCheckoutError: true,
+        recentlyActivatedPremium: false,
+      ),
     );
 
     try {
@@ -513,97 +571,156 @@ class PremiumController extends Notifier<PremiumState> {
           plan,
           WidgetsBinding.instance.platformDispatcher.locale,
         );
+        if (!ref.mounted) {
+          return null;
+        }
         if (!checkout.usesPaymentSheet) {
           final checkoutUrl = checkout.checkoutUrl.trim();
           if (checkoutUrl.isNotEmpty) {
-            state = state.copyWith(isBuying: false, externalUrl: checkoutUrl);
+            _updateStateIfMounted(
+              (state) =>
+                  state.copyWith(isBuying: false, externalUrl: checkoutUrl),
+            );
             return null;
           }
 
-          state = state.copyWith(
-            isBuying: false,
-            errorMessage: 'premium.checkout_failed',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              errorMessage: 'premium.checkout_failed',
+            ),
           );
           return null;
         }
 
-        state = state.copyWith(isBuying: false);
+        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
         return checkout;
       }
 
       await _repository.startStoreCheckout(plan, state.selectedProvider);
+      if (!ref.mounted) {
+        return null;
+      }
       return null;
     } catch (error) {
-      state = state.copyWith(isBuying: false, errorMessage: error.toString());
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
+        ),
+      );
       return null;
     }
   }
 
   Future<void> manageBilling() async {
-    state = state.copyWith(
-      isManaging: true,
-      clearError: true,
-      clearExternalUrl: true,
-      clearSuccess: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isManaging: true,
+        clearError: true,
+        clearExternalUrl: true,
+        clearSuccess: true,
+      ),
     );
 
     try {
       final status = state.status;
       if (status == null) {
-        state = state.copyWith(
-          isManaging: false,
-          errorMessage: 'premium.manage_failed',
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isManaging: false,
+            errorMessage: 'premium.manage_failed',
+          ),
         );
         return;
       }
 
       final managementUrl = await _repository.createManagementUrl(status);
-      state = state.copyWith(isManaging: false, externalUrl: managementUrl);
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(isManaging: false, externalUrl: managementUrl),
+      );
     } catch (error) {
-      state = state.copyWith(isManaging: false, errorMessage: error.toString());
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isManaging: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.manage_failed'),
+        ),
+      );
     }
   }
 
   Future<void> restorePurchases() async {
     if (state.selectedProvider != PremiumPaymentProvider.stripe) {
-      state = state.copyWith(
-        isRestoring: true,
-        clearError: true,
-        clearSuccess: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isRestoring: true,
+          clearError: true,
+          clearSuccess: true,
+        ),
       );
 
       try {
         await _repository.restoreStorePurchases();
+        if (!ref.mounted) {
+          return;
+        }
         await _refreshProfile();
+        if (!ref.mounted) {
+          return;
+        }
         await load(refresh: true);
+        if (!ref.mounted) {
+          return;
+        }
         ref.invalidate(premiumSubscriptionSummaryProvider);
-        state = state.copyWith(
-          isRestoring: false,
-          successMessage: 'premium.restore_started',
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isRestoring: false,
+            successMessage: 'premium.restore_started',
+          ),
         );
       } catch (error) {
-        state = state.copyWith(
-          isRestoring: false,
-          errorMessage: error.toString(),
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isRestoring: false,
+            errorMessage: _premiumErrorMessage(
+              error,
+              'premium.checkout_failed',
+            ),
+          ),
         );
       }
 
       return;
     }
 
-    state = state.copyWith(
-      isRestoring: true,
-      clearError: true,
-      clearSuccess: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isRestoring: true,
+        clearError: true,
+        clearSuccess: true,
+      ),
     );
 
     await _refreshProfile();
+    if (!ref.mounted) {
+      return;
+    }
     await load(refresh: true);
+    if (!ref.mounted) {
+      return;
+    }
     ref.invalidate(premiumSubscriptionSummaryProvider);
 
-    state = state.copyWith(
-      isRestoring: false,
-      successMessage: 'premium.restore_started',
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isRestoring: false,
+        successMessage: 'premium.restore_started',
+      ),
     );
   }
 
@@ -648,24 +765,38 @@ class PremiumController extends Notifier<PremiumState> {
       }
     }
 
-    state = state.copyWith(
-      checkoutVerificationState: PremiumCheckoutVerificationState.checking,
-      clearCheckoutError: true,
-      recentlyActivatedPremium: false,
+    if (!ref.mounted) {
+      return;
+    }
+
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: PremiumCheckoutVerificationState.checking,
+        clearCheckoutError: true,
+        recentlyActivatedPremium: false,
+      ),
     );
 
     const maxAttempts = 4;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       await _refreshProfile();
+      if (!ref.mounted) {
+        return;
+      }
       await load(refresh: true);
+      if (!ref.mounted) {
+        return;
+      }
 
       final updatedState = state;
       if (updatedState.errorMessage != null) {
-        state = state.copyWith(
-          checkoutVerificationState: PremiumCheckoutVerificationState.error,
-          checkoutErrorMessage: updatedState.errorMessage,
-          isAwaitingCheckoutVerification: false,
-          recentlyActivatedPremium: false,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState: PremiumCheckoutVerificationState.error,
+            checkoutErrorMessage: updatedState.errorMessage,
+            isAwaitingCheckoutVerification: false,
+            recentlyActivatedPremium: false,
+          ),
         );
         return;
       }
@@ -673,25 +804,33 @@ class PremiumController extends Notifier<PremiumState> {
       final recentlyActivated =
           !updatedState.wasPremiumBeforeCheckout && updatedState.isPremium;
       if (recentlyActivated) {
-        state = state.copyWith(
-          checkoutVerificationState: PremiumCheckoutVerificationState.activated,
-          isAwaitingCheckoutVerification: false,
-          recentlyActivatedPremium: true,
-          clearCheckoutError: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState:
+                PremiumCheckoutVerificationState.activated,
+            isAwaitingCheckoutVerification: false,
+            recentlyActivatedPremium: true,
+            clearCheckoutError: true,
+          ),
         );
         return;
       }
 
       if (attempt < maxAttempts - 1) {
         await Future<void>.delayed(const Duration(seconds: 2));
+        if (!ref.mounted) {
+          return;
+        }
       }
     }
 
-    state = state.copyWith(
-      checkoutVerificationState: PremiumCheckoutVerificationState.pending,
-      isAwaitingCheckoutVerification: false,
-      recentlyActivatedPremium: false,
-      clearCheckoutError: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: PremiumCheckoutVerificationState.pending,
+        isAwaitingCheckoutVerification: false,
+        recentlyActivatedPremium: false,
+        clearCheckoutError: true,
+      ),
     );
   }
 
@@ -709,12 +848,18 @@ class PremiumController extends Notifier<PremiumState> {
 
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
+      if (!ref.mounted) {
+        return;
+      }
+
       switch (purchase.status) {
         case PurchaseStatus.pending:
-          state = state.copyWith(
-            isBuying: true,
-            clearError: true,
-            clearSuccess: true,
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: true,
+              clearError: true,
+              clearSuccess: true,
+            ),
           );
           break;
         case PurchaseStatus.purchased:
@@ -724,19 +869,28 @@ class PremiumController extends Notifier<PremiumState> {
         case PurchaseStatus.error:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
+            if (!ref.mounted) {
+              return;
+            }
           }
 
-          state = state.copyWith(
-            isBuying: false,
-            isRestoring: false,
-            errorMessage: purchase.error?.message ?? 'premium.checkout_failed',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              isRestoring: false,
+              errorMessage: _premiumPurchaseErrorMessage(
+                purchase.error?.message,
+              ),
+            ),
           );
           break;
         case PurchaseStatus.canceled:
-          state = state.copyWith(
-            isBuying: false,
-            isRestoring: false,
-            errorMessage: 'premium.purchase_cancelled',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              isRestoring: false,
+              errorMessage: 'premium.purchase_cancelled',
+            ),
           );
           break;
       }
@@ -747,10 +901,12 @@ class PremiumController extends Notifier<PremiumState> {
     final wasPremiumBeforeCheckout = state.isPremium;
     final provider = _platformStoreProvider();
     if (provider == null) {
-      state = state.copyWith(
-        isBuying: false,
-        isRestoring: false,
-        errorMessage: 'premium.store_unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          isRestoring: false,
+          errorMessage: 'premium.store_unavailable',
+        ),
       );
       return;
     }
@@ -766,12 +922,17 @@ class PremiumController extends Notifier<PremiumState> {
     if (matchedPlan == null) {
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
 
-      state = state.copyWith(
-        isBuying: false,
-        isRestoring: false,
-        errorMessage: 'premium.store_product_unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          isRestoring: false,
+          errorMessage: 'premium.store_product_unavailable',
+        ),
       );
       return;
     }
@@ -782,42 +943,63 @@ class PremiumController extends Notifier<PremiumState> {
         provider: provider,
         purchase: purchase,
       );
+      if (!ref.mounted) {
+        return;
+      }
 
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
 
       await _refreshProfile();
+      if (!ref.mounted) {
+        return;
+      }
       await load(refresh: true);
+      if (!ref.mounted) {
+        return;
+      }
 
       if (verified.isActive) {
         final recentlyActivated = !wasPremiumBeforeCheckout && state.isPremium;
-        state = state.copyWith(
-          isBuying: false,
-          isRestoring: false,
-          successMessage: 'premium.purchase_activated',
-          checkoutVerificationState: recentlyActivated
-              ? PremiumCheckoutVerificationState.activated
-              : PremiumCheckoutVerificationState.idle,
-          isAwaitingCheckoutVerification: false,
-          recentlyActivatedPremium: recentlyActivated,
-          clearCheckoutError: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            isRestoring: false,
+            successMessage: 'premium.purchase_activated',
+            checkoutVerificationState: recentlyActivated
+                ? PremiumCheckoutVerificationState.activated
+                : PremiumCheckoutVerificationState.idle,
+            isAwaitingCheckoutVerification: false,
+            recentlyActivatedPremium: recentlyActivated,
+            clearCheckoutError: true,
+          ),
         );
         return;
       }
 
-      state = state.copyWith(isBuying: false, isRestoring: false);
+      _updateStateIfMounted(
+        (state) => state.copyWith(isBuying: false, isRestoring: false),
+      );
       markCheckoutOpened(wasPremiumBeforeCheckout: wasPremiumBeforeCheckout);
       await verifyCheckoutStatus();
     } catch (error) {
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
 
-      state = state.copyWith(
-        isBuying: false,
-        isRestoring: false,
-        errorMessage: error.toString(),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          isRestoring: false,
+          errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
+        ),
       );
     }
   }
@@ -1016,3 +1198,45 @@ class PremiumController extends Notifier<PremiumState> {
 }
 
 enum _BillingPeriod { monthly, yearly, other }
+
+String _premiumErrorMessage(Object error, String fallback) {
+  if (error is AppException) {
+    final message = error.message.trim();
+    if (_isSafePremiumErrorKey(message)) {
+      return message;
+    }
+
+    final statusCode = error.statusCode;
+    if (statusCode == 401) {
+      return 'auth.session_expired';
+    }
+    if (statusCode == 404) {
+      return 'premium.store_product_unavailable';
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return 'premium.store_unavailable';
+    }
+
+    return fallback;
+  }
+
+  return fallback;
+}
+
+String _premiumPurchaseErrorMessage(String? rawMessage) {
+  final message = rawMessage?.trim();
+  return message != null && _isSafePremiumErrorKey(message)
+      ? message
+      : 'premium.checkout_failed';
+}
+
+bool _isSafePremiumErrorKey(String value) {
+  return value == 'auth.session_expired' ||
+      value == 'premium.plans_failed' ||
+      value == 'premium.request_failed' ||
+      value == 'premium.checkout_failed' ||
+      value == 'premium.manage_failed' ||
+      value == 'premium.purchase_cancelled' ||
+      value == 'premium.store_unavailable' ||
+      value == 'premium.store_product_unavailable';
+}

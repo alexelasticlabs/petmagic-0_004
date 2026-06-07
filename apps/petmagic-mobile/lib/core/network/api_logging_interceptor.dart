@@ -2,6 +2,8 @@ import 'dart:math';
 
 import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
+import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 class ApiLoggingInterceptor extends Interceptor {
   ApiLoggingInterceptor({Random? random}) : _random = random ?? Random();
@@ -10,54 +12,33 @@ class ApiLoggingInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final requestId = _createRequestId();
+    final requestId = _resolveOrCreateRequestId(options);
+    final correlationId = _resolveOrCreateCorrelationId(options);
     options.extra['request_id'] = requestId;
+    options.extra['correlation_id'] = correlationId;
     options.extra['request_started_utc_ms'] = DateTime.now()
         .toUtc()
         .millisecondsSinceEpoch;
-    options.headers.putIfAbsent('X-Request-ID', () => requestId);
-
-    AppLogger.debug(
-      feature: 'Network',
-      operation: 'request_started',
-      requestId: requestId,
-      context: {
-        'method': options.method,
-        'path': options.path,
-        'query_keys': options.queryParameters.keys.join(','),
-        'payload_type': _payloadType(options.data),
-        'payload_size': _payloadSize(options.data),
-      },
-    );
+    options.headers['X-Request-ID'] = requestId;
+    options.headers['X-Correlation-ID'] = correlationId;
 
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    final requestId = response.requestOptions.extra['request_id']?.toString();
-    final elapsedMs = _elapsedMs(response.requestOptions);
-    final traceId = _resolveTraceId(response.headers);
-
-    AppLogger.info(
-      feature: 'Network',
-      operation: 'response_completed',
-      requestId: requestId,
-      traceId: traceId,
-      context: {
-        'method': response.requestOptions.method,
-        'path': response.requestOptions.path,
-        'status': response.statusCode ?? 0,
-        'duration_ms': elapsedMs,
-      },
-    );
-
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (CancelToken.isCancel(err)) {
+      handler.next(err);
+      return;
+    }
+
     final requestId = err.requestOptions.extra['request_id']?.toString();
+    final correlationId = _correlationId(err.requestOptions);
     final elapsedMs = _elapsedMs(err.requestOptions);
     final traceId = _resolveTraceId(err.response?.headers);
 
@@ -66,12 +47,13 @@ class ApiLoggingInterceptor extends Interceptor {
       operation: 'request_failed',
       message: 'Network request failed',
       requestId: requestId,
+      correlationId: correlationId,
       traceId: traceId,
-      error: err,
+      error: err.type.name,
       stackTrace: err.stackTrace,
       context: {
         'method': err.requestOptions.method,
-        'path': err.requestOptions.path,
+        'path': _requestPath(err.requestOptions),
         'status': err.response?.statusCode ?? 0,
         'duration_ms': elapsedMs,
         'error_type': err.type.name,
@@ -91,9 +73,63 @@ class ApiLoggingInterceptor extends Interceptor {
   }
 
   String _createRequestId() {
-    final now = DateTime.now().toUtc().microsecondsSinceEpoch;
-    final suffix = _random.nextInt(1 << 20).toRadixString(16).padLeft(5, '0');
-    return 'm-$now-$suffix';
+    return RequestIdentity.createRequestId(random: _random);
+  }
+
+  String _resolveOrCreateRequestId(RequestOptions options) {
+    final existingHeader = options.headers['X-Request-ID'];
+    if (existingHeader is String && existingHeader.trim().isNotEmpty) {
+      return existingHeader.trim();
+    }
+
+    final existingExtra = options.extra['request_id'];
+    if (existingExtra is String && existingExtra.trim().isNotEmpty) {
+      return existingExtra.trim();
+    }
+
+    return _createRequestId();
+  }
+
+  String _resolveOrCreateCorrelationId(RequestOptions options) {
+    final existingHeader = options.headers['X-Correlation-ID'];
+    if (existingHeader is String && existingHeader.trim().isNotEmpty) {
+      return existingHeader.trim();
+    }
+
+    final existingExtra = options.extra['correlation_id'];
+    if (existingExtra is String && existingExtra.trim().isNotEmpty) {
+      return existingExtra.trim();
+    }
+
+    final activeCorrelationId = LogCorrelationContext.currentCorrelationId;
+    if (activeCorrelationId != null) {
+      return activeCorrelationId;
+    }
+
+    return RequestIdentity.createCorrelationId(random: _random);
+  }
+
+  String? _correlationId(RequestOptions options) {
+    final value =
+        options.headers['X-Correlation-ID'] ?? options.extra['correlation_id'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  String _requestPath(RequestOptions options) {
+    if (options.path.isNotEmpty) {
+      return _stripQuery(options.path);
+    }
+
+    return _stripQuery(options.uri.path);
+  }
+
+  String _stripQuery(String value) {
+    final queryIndex = value.indexOf('?');
+    if (queryIndex < 0) {
+      return value;
+    }
+
+    return value.substring(0, queryIndex);
   }
 
   String? _resolveTraceId(Headers? headers) {
@@ -118,31 +154,5 @@ class ApiLoggingInterceptor extends Interceptor {
     }
 
     return parts[1];
-  }
-
-  String _payloadType(Object? payload) {
-    if (payload == null) {
-      return 'none';
-    }
-    if (payload is Map<String, dynamic>) {
-      return 'map';
-    }
-    if (payload is List) {
-      return 'list';
-    }
-    return payload.runtimeType.toString();
-  }
-
-  int _payloadSize(Object? payload) {
-    if (payload == null) {
-      return 0;
-    }
-    if (payload is Map) {
-      return payload.length;
-    }
-    if (payload is List) {
-      return payload.length;
-    }
-    return payload.toString().length;
   }
 }

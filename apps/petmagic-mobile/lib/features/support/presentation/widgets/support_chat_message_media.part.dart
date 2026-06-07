@@ -212,8 +212,12 @@ class _MessageMediaGroupTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final safeUri = parseSafeSupportExternalUri(attachment.fileUrl);
+    final isTrustedRemoteMedia = safeUri != null;
     final canTap =
-        !attachment.isDeleted && (attachment.isImage || attachment.isVideo);
+        !attachment.isDeleted &&
+        isTrustedRemoteMedia &&
+        (attachment.isImage || attachment.isVideo);
     return InkWell(
       onTap: canTap ? onTap : null,
       borderRadius: borderRadius,
@@ -230,12 +234,21 @@ class _MessageMediaGroupTile extends StatelessWidget {
                   isVideo: attachment.isVideo,
                   compact: true,
                 )
+              else if ((attachment.isImage || attachment.isVideo) &&
+                  !isTrustedRemoteMedia)
+                _UnsupportedAttachmentTileBackground(
+                  isVideo: attachment.isVideo,
+                  compact: true,
+                )
               else if (attachment.isImage)
-                Image.network(
-                  attachment.fileUrl,
+                CachedNetworkImage(
+                  imageUrl: safeUri!.toString(),
                   fit: BoxFit.cover,
-                  cacheWidth: 512,
-                  errorBuilder: (context, error, stackTrace) {
+                  memCacheWidth: 512,
+                  placeholder: (context, url) {
+                    return ColoredBox(color: colors.surface);
+                  },
+                  errorWidget: (context, url, error) {
                     return ColoredBox(
                       color: colors.surface,
                       child: Icon(
@@ -363,6 +376,32 @@ class _DeletedAttachmentPlaceholder extends StatelessWidget {
   }
 }
 
+class _UnsupportedAttachmentPlaceholder extends StatelessWidget {
+  const _UnsupportedAttachmentPlaceholder({
+    required this.isVideo,
+    required this.maxBubbleWidth,
+  });
+
+  final bool isVideo;
+  final double maxBubbleWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = _resolveMediaPreviewSize(
+      maxWidth: maxBubbleWidth,
+      aspectRatio: isVideo ? 16 / 9 : 1,
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: _UnsupportedAttachmentTileBackground(isVideo: isVideo),
+      ),
+    );
+  }
+}
+
 class _DeletedAttachmentTileBackground extends StatelessWidget {
   const _DeletedAttachmentTileBackground({
     required this.isVideo,
@@ -412,6 +451,55 @@ class _DeletedAttachmentTileBackground extends StatelessWidget {
   }
 }
 
+class _UnsupportedAttachmentTileBackground extends StatelessWidget {
+  const _UnsupportedAttachmentTileBackground({
+    required this.isVideo,
+    this.compact = false,
+  });
+
+  final bool isVideo;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    return ColoredBox(
+      color: colors.surface,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isVideo
+                    ? Icons.videocam_off_rounded
+                    : Icons.image_not_supported_outlined,
+                size: compact ? 16 : 24,
+                color: colors.textMuted,
+              ),
+              SizedBox(height: compact ? 3 : 6),
+              Text(
+                text.supportChatUnavailableError,
+                textAlign: TextAlign.center,
+                maxLines: compact ? 2 : 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: colors.textMuted,
+                  fontSize: compact ? 9 : 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NetworkImageAttachmentPreview extends StatefulWidget {
   const _NetworkImageAttachmentPreview({
     required this.imageUrl,
@@ -430,13 +518,17 @@ class _NetworkImageAttachmentPreview extends StatefulWidget {
 
 class _NetworkImageAttachmentPreviewState
     extends State<_NetworkImageAttachmentPreview> {
+  static const int _previewCacheWidth = 720;
+
   ImageStream? _imageStream;
   ImageStreamListener? _imageStreamListener;
+  late ImageProvider<Object> _imageProvider;
   double? _aspectRatio;
 
   @override
   void initState() {
     super.initState();
+    _imageProvider = _buildImageProvider(widget.imageUrl);
     _resolveAspectRatio();
   }
 
@@ -446,6 +538,7 @@ class _NetworkImageAttachmentPreviewState
     if (oldWidget.imageUrl != widget.imageUrl) {
       _detachImageListener();
       _aspectRatio = null;
+      _imageProvider = _buildImageProvider(widget.imageUrl);
       _resolveAspectRatio();
     }
   }
@@ -457,8 +550,7 @@ class _NetworkImageAttachmentPreviewState
   }
 
   void _resolveAspectRatio() {
-    final provider = NetworkImage(widget.imageUrl);
-    final stream = provider.resolve(const ImageConfiguration());
+    final stream = _imageProvider.resolve(const ImageConfiguration());
     _imageStream = stream;
     _imageStreamListener = ImageStreamListener((image, _) {
       if (!mounted) {
@@ -488,6 +580,14 @@ class _NetworkImageAttachmentPreviewState
     _imageStreamListener = null;
   }
 
+  ImageProvider<Object> _buildImageProvider(String imageUrl) {
+    return ResizeImage.resizeIfNeeded(
+      _previewCacheWidth,
+      null,
+      CachedNetworkImageProvider(imageUrl, maxWidth: _previewCacheWidth),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
@@ -504,10 +604,10 @@ class _NetworkImageAttachmentPreviewState
         child: SizedBox(
           width: size.width,
           height: size.height,
-          child: Image.network(
-            widget.imageUrl,
+          child: Image(
+            image: _imageProvider,
             fit: BoxFit.cover,
-            cacheWidth: 720,
+            filterQuality: FilterQuality.medium,
             errorBuilder: (context, error, stackTrace) {
               return ColoredBox(
                 color: colors.surface,
@@ -562,6 +662,7 @@ class _NetworkVideoAttachmentPreviewState
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
   bool _hasPreviewSlot = false;
+  int _initializeRequestVersion = 0;
 
   @override
   void initState() {
@@ -584,17 +685,22 @@ class _NetworkVideoAttachmentPreviewState
 
   @override
   void dispose() {
+    _initializeRequestVersion++;
     _releasePreviewSlot();
-    unawaited(_controller?.dispose());
+    final controller = _controller;
+    _controller = null;
+    unawaited(controller?.dispose());
     super.dispose();
   }
 
   void _tryInitializePreview() {
+    final requestVersion = ++_initializeRequestVersion;
+    final videoUrl = widget.videoUrl;
     _hasPreviewSlot = MediaLifecyclePolicy.tryAcquireVideoPreviewSlot();
     if (!_hasPreviewSlot) {
       return;
     }
-    _initialize();
+    unawaited(_initialize(requestVersion, videoUrl));
   }
 
   void _releasePreviewSlot() {
@@ -605,31 +711,39 @@ class _NetworkVideoAttachmentPreviewState
     MediaLifecyclePolicy.releaseVideoPreviewSlot();
   }
 
-  Future<void> _initialize() async {
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
-    );
+  Future<void> _initialize(int requestVersion, String videoUrl) async {
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
     _controller = controller;
     try {
       await controller.initialize();
       await controller.pause();
       await controller.seekTo(Duration.zero);
-      if (!mounted || _controller != controller) {
+      if (!_isCurrentVideoRequest(requestVersion, videoUrl, controller)) {
         await controller.dispose();
         return;
       }
       setState(() {});
     } on Object {
       await controller.dispose();
-      _releasePreviewSlot();
-      if (!mounted) {
-        return;
+      if (_isCurrentVideoRequest(requestVersion, videoUrl, controller)) {
+        _releasePreviewSlot();
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
       }
-      setState(() {
-        _controller = null;
-        _failedToLoad = true;
-      });
     }
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String videoUrl,
+    VideoPlayerController controller,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.videoUrl == videoUrl &&
+        _controller == controller;
   }
 
   @override

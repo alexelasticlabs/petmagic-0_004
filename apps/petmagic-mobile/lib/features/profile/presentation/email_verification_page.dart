@@ -2,22 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 
 class EmailVerificationPage extends ConsumerStatefulWidget {
-  const EmailVerificationPage({
-    super.key,
-    required this.email,
-    this.initialPassword,
-  });
+  const EmailVerificationPage({super.key, required this.email});
 
   static const routePath = '/verify-email';
 
   final String email;
-  final String? initialPassword;
 
   @override
   ConsumerState<EmailVerificationPage> createState() =>
@@ -89,6 +84,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   Future<void> _verify() async {
+    if (_isBusy) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     setState(() {
       _isBusy = true;
@@ -104,23 +103,6 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       );
       if (!mounted) return;
 
-      final password = widget.initialPassword;
-      if (password != null && password.isNotEmpty) {
-        final session = await repository.login(
-          email: widget.email,
-          password: password,
-        );
-        if (!mounted) return;
-        ref
-            .read(appLaunchControllerProvider.notifier)
-            .markSignedInWithLegalStatus(
-              requiresLegalAcceptance:
-                  session.user.legalAcceptance.requiresAcceptance,
-            );
-        context.go(TemplatesPage.routePath);
-        return;
-      }
-
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });
@@ -128,8 +110,9 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         '${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}',
       );
     } catch (error) {
+      if (!mounted) return;
       setState(() {
-        _error = error.toString();
+        _error = _mapVerificationError(error, text);
       });
     } finally {
       if (mounted) {
@@ -141,6 +124,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
   }
 
   Future<void> _resend() async {
+    if (_isBusy) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     setState(() {
       _isBusy = true;
@@ -151,12 +138,14 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
     try {
       final repository = ref.read(profileRepositoryProvider);
       await repository.resendEmailVerificationCode(email: widget.email);
+      if (!mounted) return;
       setState(() {
         _info = text.emailVerificationResentFallbackMessage;
       });
     } catch (error) {
+      if (!mounted) return;
       setState(() {
-        _error = error.toString();
+        _error = _mapVerificationError(error, text);
       });
     } finally {
       if (mounted) {
@@ -165,5 +154,12 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
         });
       }
     }
+  }
+
+  String _mapVerificationError(Object error, AppLocalizations text) {
+    if (error is AppException) {
+      return mapProfileFeedbackMessage(error.message, text);
+    }
+    return text.authRequestFailed;
   }
 }

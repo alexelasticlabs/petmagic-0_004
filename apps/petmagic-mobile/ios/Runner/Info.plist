@@ -51,13 +51,8 @@
 	<string>PetMagic</string>
 	<key>GIDClientID</key>
 	<string>288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>PetMagic needs access to your photo library so you can save generation results.</string>
+	<string>PetMagic needs photo library access so you can choose media for templates and support, and save generation results on request.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>PetMagic saves generated photos and videos to your gallery on request.</string>
 	<key>NSCameraUsageDescription</key>

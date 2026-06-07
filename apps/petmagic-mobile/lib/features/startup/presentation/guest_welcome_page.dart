@@ -6,11 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class GuestWelcomePage extends ConsumerStatefulWidget {
   const GuestWelcomePage({super.key});
@@ -70,155 +72,136 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
           children: [
             const StartupBackdrop(accentRank: 0),
             SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: constraints.maxHeight,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _animatedEntry(
-                            start: 0,
-                            end: 0.28,
-                            offsetY: 0.015,
-                            child: BrandHeader(
-                              actionLabel: resolvedLocale.languageCode
-                                  .toUpperCase(),
-                              onAction: () => _openLanguageSheet(
-                                selectedLocale: resolvedLocale,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _animatedEntry(
-                            start: 0.08,
-                            end: 0.46,
-                            child: _WelcomeHeroCard(
-                              templatesLabel: text.navTemplates,
-                              imageLabel: text.imageLabel,
-                              videoLabel: text.videoLabel,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _animatedEntry(
-                            start: 0.2,
-                            end: 0.6,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  text.startupWelcomeTitle,
-                                  style: titleStyle?.copyWith(
-                                    color: colors.textStrong,
-                                    fontSize: 31,
-                                    height: 1.04,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  text.startupWelcomeSubtitle,
-                                  style: subtitleStyle?.copyWith(
-                                    color: colors.textSoft,
-                                    fontSize: 13.8,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _animatedEntry(
-                            start: 0.34,
-                            end: 0.74,
-                            child: _FeatureMiniCard(
-                              icon: Icons.style_rounded,
-                              iconColor: colors.accent,
-                              title: text.startupWelcomeTemplatesTitle,
-                              subtitle: text.startupWelcomeTemplatesSubtitle,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _animatedEntry(
-                            start: 0.42,
-                            end: 0.82,
-                            child: _FeatureMiniCard(
-                              icon: Icons.add_a_photo_outlined,
-                              iconColor: colors.blue,
-                              title: text.startupWelcomeAiTitle,
-                              subtitle: text.startupWelcomeAiSubtitle,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          _animatedEntry(
-                            start: 0.5,
-                            end: 0.9,
-                            child: _FeatureMiniCard(
-                              icon: Icons.movie_creation_outlined,
-                              iconColor: colors.gold,
-                              title: text.startupWelcomeShareTitle,
-                              subtitle: text.startupWelcomeShareSubtitle,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          _animatedEntry(
-                            start: 0.58,
-                            end: 1,
-                            child: Column(
-                              children: [
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: _MagicSignInButton(
-                                    animation: _ctaPulseController,
-                                    label: text.profileSignInAction,
-                                    onPressed: () =>
-                                        context.go(AuthEntryPage.routePath),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: _isGuestSubmitting
-                                        ? null
-                                        : _continueAsGuest,
-                                    icon: const Icon(
-                                      Icons.pets_rounded,
-                                      size: 18,
-                                    ),
-                                    label: Text(
-                                      text.startupWelcomeContinueGuest,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: Text(
-                                    text.startupWelcomeGuestHint,
-                                    textAlign: TextAlign.center,
-                                    style: Theme.of(context).textTheme.bodySmall
-                                        ?.copyWith(
-                                          color: colors.textMuted,
-                                          fontSize: 11.8,
-                                          height: 1.28,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                children: [
+                  _animatedEntry(
+                    start: 0,
+                    end: 0.28,
+                    offsetY: 0.015,
+                    child: BrandHeader(
+                      actionLabel: resolvedLocale.languageCode.toUpperCase(),
+                      onAction: () =>
+                          _openLanguageSheet(selectedLocale: resolvedLocale),
                     ),
-                  );
-                },
+                  ),
+                  const SizedBox(height: 12),
+                  _animatedEntry(
+                    start: 0.08,
+                    end: 0.46,
+                    child: _WelcomeHeroCard(
+                      templatesLabel: text.navTemplates,
+                      imageLabel: text.imageLabel,
+                      videoLabel: text.videoLabel,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _animatedEntry(
+                    start: 0.2,
+                    end: 0.6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          text.startupWelcomeTitle,
+                          style: titleStyle?.copyWith(
+                            color: colors.textStrong,
+                            fontSize: 31,
+                            height: 1.04,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          text.startupWelcomeSubtitle,
+                          style: subtitleStyle?.copyWith(
+                            color: colors.textSoft,
+                            fontSize: 13.8,
+                            height: 1.3,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _animatedEntry(
+                    start: 0.34,
+                    end: 0.74,
+                    child: _FeatureMiniCard(
+                      icon: Icons.style_rounded,
+                      iconColor: colors.accent,
+                      title: text.startupWelcomeTemplatesTitle,
+                      subtitle: text.startupWelcomeTemplatesSubtitle,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _animatedEntry(
+                    start: 0.42,
+                    end: 0.82,
+                    child: _FeatureMiniCard(
+                      icon: Icons.add_a_photo_outlined,
+                      iconColor: colors.blue,
+                      title: text.startupWelcomeAiTitle,
+                      subtitle: text.startupWelcomeAiSubtitle,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _animatedEntry(
+                    start: 0.5,
+                    end: 0.9,
+                    child: _FeatureMiniCard(
+                      icon: Icons.movie_creation_outlined,
+                      iconColor: colors.gold,
+                      title: text.startupWelcomeShareTitle,
+                      subtitle: text.startupWelcomeShareSubtitle,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _animatedEntry(
+                    start: 0.58,
+                    end: 1,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          width: double.infinity,
+                          child: _MagicSignInButton(
+                            animation: _ctaPulseController,
+                            label: text.profileSignInAction,
+                            onPressed: () =>
+                                context.go(AuthEntryPage.routePath),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _isGuestSubmitting
+                                ? null
+                                : _continueAsGuest,
+                            icon: const Icon(Icons.pets_rounded, size: 18),
+                            label: Text(text.startupWelcomeContinueGuest),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Text(
+                            text.startupWelcomeGuestHint,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: colors.textMuted,
+                                  fontSize: 11.8,
+                                  height: 1.28,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -262,11 +245,39 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
         return;
       }
       context.go(TemplatesPage.routePath);
+    } catch (error, stackTrace) {
+      _handleStartupActionFailure(
+        operation: 'continue_as_guest',
+        error: error,
+        stackTrace: stackTrace,
+      );
     } finally {
       if (mounted) {
         setState(() => _isGuestSubmitting = false);
       }
     }
+  }
+
+  void _handleStartupActionFailure({
+    required String operation,
+    required Object error,
+    required StackTrace stackTrace,
+  }) {
+    AppLogger.warn(
+      feature: 'Startup',
+      operation: operation,
+      message: 'Startup action failed',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    if (!mounted) {
+      return;
+    }
+    PetMagicToast.show(
+      context,
+      message: AppLocalizations.of(context).authRequestFailed,
+      tone: PetMagicToastTone.warning,
+    );
   }
 
   Future<void> _openLanguageSheet({required Locale selectedLocale}) async {

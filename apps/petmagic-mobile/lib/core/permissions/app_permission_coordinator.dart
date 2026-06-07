@@ -1,8 +1,6 @@
-import 'dart:io';
-
 import 'package:permission_handler/permission_handler.dart';
 
-enum AppPermissionType { notifications, camera, photos, files }
+enum AppPermissionType { notifications, camera, microphone, photos, videos }
 
 enum AppPermissionState {
   granted,
@@ -41,8 +39,9 @@ class AppPermissionCoordinator {
     return [
       await check(AppPermissionType.notifications),
       await check(AppPermissionType.camera),
+      await check(AppPermissionType.microphone),
       await check(AppPermissionType.photos),
-      await check(AppPermissionType.files),
+      await check(AppPermissionType.videos),
     ];
   }
 
@@ -52,14 +51,10 @@ class AppPermissionCoordinator {
     return switch (type) {
       AppPermissionType.notifications => Permission.notification,
       AppPermissionType.camera => Permission.camera,
-      AppPermissionType.photos =>
-        Platform.isIOS ? Permission.photos : Permission.photos,
-      AppPermissionType.files => _filesPermission(),
+      AppPermissionType.microphone => Permission.microphone,
+      AppPermissionType.photos => Permission.photos,
+      AppPermissionType.videos => Permission.videos,
     };
-  }
-
-  Permission _filesPermission() {
-    return Permission.storage;
   }
 
   AppPermissionState _mapState(PermissionStatus status) {

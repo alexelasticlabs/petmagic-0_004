@@ -32,10 +32,15 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   void initState() {
     super.initState();
     Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
       final initialEmail = widget.initialEmail?.trim() ?? '';
       ref
           .read(passwordResetControllerProvider.notifier)
           .reset(email: initialEmail);
+      _syncControllers(ref.read(passwordResetControllerProvider));
     });
   }
 
@@ -60,6 +65,8 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
         return;
       }
 
+      _syncControllers(next);
+
       final previousError = previous?.errorMessage;
       if (next.errorMessage != null && next.errorMessage != previousError) {
         PetMagicToast.show(
@@ -72,19 +79,17 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
       final previousSuccess = previous?.successMessage;
       if (next.successMessage != null &&
           next.successMessage != previousSuccess) {
-        PetMagicToast.show(
-          context,
-          message: _mapSuccessMessage(next.successMessage!, text),
-          tone: PetMagicToastTone.success,
-        );
+        final successMessage = _mapSuccessMessage(next.successMessage!, text);
+        if (successMessage != null) {
+          PetMagicToast.show(
+            context,
+            message: successMessage,
+            tone: PetMagicToastTone.success,
+          );
+        }
       }
     });
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    _syncController(_emailController, state.email);
-    _syncController(_codeController, state.code);
-    _syncController(_passwordController, state.newPassword);
-    _syncController(_confirmPasswordController, state.confirmPassword);
 
     final title = state.codeRequested
         ? text.authPasswordResetCodeTitle
@@ -106,144 +111,141 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
           children: [
             const AuthBackdrop(),
             SafeArea(
-              child: SingleChildScrollView(
+              child: ListView(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+                children: [
+                  Row(
+                    children: [
+                      IconButton.outlined(
+                        onPressed: _goToAuth,
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  AuthHero(title: title, subtitle: subtitle, isDark: isDark),
+                  const SizedBox(height: 6),
+                  AuthFormCard(
+                    isDark: isDark,
+                    child: Column(
                       children: [
-                        IconButton.outlined(
-                          onPressed: _goToAuth,
-                          visualDensity: VisualDensity.compact,
-                          icon: const Icon(Icons.arrow_back_rounded),
+                        AuthField(
+                          controller: _emailController,
+                          hintText: text.profileEmailLabel,
+                          prefixIcon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: state.codeRequested
+                              ? TextInputAction.next
+                              : TextInputAction.done,
+                          onChanged: controller.updateEmail,
                         ),
+                        if (state.codeRequested) ...[
+                          const SizedBox(height: 8),
+                          AuthField(
+                            controller: _codeController,
+                            hintText: text.authPasswordResetCodeLabel,
+                            prefixIcon: Icons.mark_email_read_outlined,
+                            textInputAction: TextInputAction.next,
+                            onChanged: controller.updateCode,
+                          ),
+                          const SizedBox(height: 8),
+                          AuthField(
+                            controller: _passwordController,
+                            hintText: text.profilePasswordLabel,
+                            prefixIcon: Icons.lock_outline_rounded,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.next,
+                            onChanged: controller.updateNewPassword,
+                            trailing: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          AuthField(
+                            controller: _confirmPasswordController,
+                            hintText: text.authConfirmPasswordLabel,
+                            prefixIcon: Icons.lock_person_outlined,
+                            obscureText: _obscureConfirmPassword,
+                            textInputAction: TextInputAction.done,
+                            onChanged: controller.updateConfirmPassword,
+                            trailing: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
+                                });
+                              },
+                              icon: Icon(
+                                _obscureConfirmPassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              text.authPasswordRulesHint,
+                              style: TextStyle(
+                                color: colors.textMuted,
+                                fontSize: 10.4,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    AuthHero(title: title, subtitle: subtitle, isDark: isDark),
-                    const SizedBox(height: 6),
-                    AuthFormCard(
-                      isDark: isDark,
-                      child: Column(
-                        children: [
-                          AuthField(
-                            controller: _emailController,
-                            hintText: text.profileEmailLabel,
-                            prefixIcon: Icons.mail_outline_rounded,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: state.codeRequested
-                                ? TextInputAction.next
-                                : TextInputAction.done,
-                            onChanged: controller.updateEmail,
-                          ),
-                          if (state.codeRequested) ...[
-                            const SizedBox(height: 8),
-                            AuthField(
-                              controller: _codeController,
-                              hintText: text.authPasswordResetCodeLabel,
-                              prefixIcon: Icons.mark_email_read_outlined,
-                              textInputAction: TextInputAction.next,
-                              onChanged: controller.updateCode,
-                            ),
-                            const SizedBox(height: 8),
-                            AuthField(
-                              controller: _passwordController,
-                              hintText: text.profilePasswordLabel,
-                              prefixIcon: Icons.lock_outline_rounded,
-                              obscureText: _obscurePassword,
-                              textInputAction: TextInputAction.next,
-                              onChanged: controller.updateNewPassword,
-                              trailing: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            AuthField(
-                              controller: _confirmPasswordController,
-                              hintText: text.authConfirmPasswordLabel,
-                              prefixIcon: Icons.lock_person_outlined,
-                              obscureText: _obscureConfirmPassword,
-                              textInputAction: TextInputAction.done,
-                              onChanged: controller.updateConfirmPassword,
-                              trailing: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureConfirmPassword =
-                                        !_obscureConfirmPassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscureConfirmPassword
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                text.authPasswordRulesHint,
-                                style: TextStyle(
-                                  color: colors.textMuted,
-                                  fontSize: 10.4,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: state.isSaving ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          elevation: 0.6,
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: state.isSaving ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                        child: Text(
-                          state.isSaving
-                              ? text.profileLoadingAction
-                              : state.codeRequested
-                              ? text.authPasswordResetConfirmAction
-                              : text.authPasswordResetRequestAction,
-                        ),
+                        elevation: 0.6,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Center(
-                      child: TextButton(
-                        onPressed: state.isSaving
-                            ? null
+                      child: Text(
+                        state.isSaving
+                            ? text.profileLoadingAction
                             : state.codeRequested
-                            ? () => controller.requestReset()
-                            : _goToAuth,
-                        child: Text(
-                          state.codeRequested
-                              ? text.authPasswordResetResendAction
-                              : text.profileSignInAction,
-                        ),
+                            ? text.authPasswordResetConfirmAction
+                            : text.authPasswordResetRequestAction,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton(
+                      onPressed: state.isSaving
+                          ? null
+                          : state.codeRequested
+                          ? () => controller.requestReset()
+                          : _goToAuth,
+                      child: Text(
+                        state.codeRequested
+                            ? text.authPasswordResetResendAction
+                            : text.profileSignInAction,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -284,6 +286,13 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     context.go('${AuthEntryPage.routePath}$query');
   }
 
+  void _syncControllers(PasswordResetState state) {
+    _syncController(_emailController, state.email);
+    _syncController(_codeController, state.code);
+    _syncController(_passwordController, state.newPassword);
+    _syncController(_confirmPasswordController, state.confirmPassword);
+  }
+
   void _syncController(TextEditingController controller, String value) {
     if (controller.text == value) {
       return;
@@ -299,14 +308,14 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     return mapProfileFeedbackMessage(raw, text);
   }
 
-  String _mapSuccessMessage(String raw, AppLocalizations text) {
+  String? _mapSuccessMessage(String raw, AppLocalizations text) {
     switch (raw) {
       case 'auth.password_reset_code_sent':
         return text.authPasswordResetCodeSent;
       case 'auth.password_reset_success':
         return text.authPasswordResetSuccess;
       default:
-        return raw;
+        return null;
     }
   }
 }

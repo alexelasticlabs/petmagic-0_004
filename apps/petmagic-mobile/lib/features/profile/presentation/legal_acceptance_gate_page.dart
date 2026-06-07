@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
@@ -59,12 +60,8 @@ class _LegalAcceptanceGatePageState
               const SizedBox(height: 12),
               Expanded(
                 child: switch (legalDocumentsAsync) {
-                  AsyncData(:final value) => ListView(
-                    children: [
-                      _LegalDocumentView(document: value.termsOfUse),
-                      const SizedBox(height: 16),
-                      _LegalDocumentView(document: value.privacyPolicy),
-                    ],
+                  AsyncData(:final value) => LegalDocumentListView(
+                    documents: [value.termsOfUse, value.privacyPolicy],
                   ),
                   AsyncError() => Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -159,47 +156,5 @@ class _LegalAcceptanceGatePageState
       return;
     }
     context.go(GuestWelcomePage.routePath);
-  }
-}
-
-class _LegalDocumentView extends StatelessWidget {
-  const _LegalDocumentView({required this.document});
-
-  final MobileLegalDocument document;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          document.title,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (document.summary.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(document.summary, style: theme.textTheme.bodyMedium),
-        ],
-        const SizedBox(height: 12),
-        for (final section in document.sections) ...[
-          if (section.heading.isNotEmpty) ...[
-            Text(
-              section.heading,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 6),
-          ],
-          for (final paragraph in section.paragraphs) ...[
-            Text(paragraph, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ],
-    );
   }
 }

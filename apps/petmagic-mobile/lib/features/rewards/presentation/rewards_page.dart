@@ -211,7 +211,6 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                               ),
                             )
                           : ListView.separated(
-                              shrinkWrap: true,
                               padding: const EdgeInsets.fromLTRB(14, 2, 14, 18),
                               itemCount: items.length,
                               separatorBuilder: (_, separatorIndex) =>
@@ -318,9 +317,13 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   void initState() {
     super.initState();
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
-      Future.microtask(
-        () => ref.read(walletControllerProvider.notifier).load(),
-      );
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
+
+        ref.read(walletControllerProvider.notifier).load();
+      });
     }
   }
 

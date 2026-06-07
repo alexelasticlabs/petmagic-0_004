@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -17,17 +18,6 @@ enum WalletCheckoutVerificationState {
   succeeded,
   pending,
   error,
-}
-
-void _checkoutInfo(
-  String operation, {
-  Map<String, Object?> context = const {},
-}) {
-  AppLogger.info(
-    feature: 'Wallet.Checkout',
-    operation: operation,
-    context: context,
-  );
 }
 
 void _logWalletLoadFailure(String stage, Object error, StackTrace stackTrace) {
@@ -174,14 +164,14 @@ class WalletState {
 
 class WalletController extends Notifier<WalletState>
     with WidgetsBindingObserver {
-  static const _walletSyncInterval = Duration(seconds: 10);
-
   late final WalletRepository _repository;
   bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
   StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
-  Timer? _walletSyncTimer;
+  CancelToken? _activeLoadCancelToken;
+  CancelToken? _activeWalletSyncCancelToken;
   bool _isWalletSyncInFlight = false;
+  bool _walletLifecycleStarted = false;
 
   @override
   WalletState build() {
@@ -189,21 +179,76 @@ class WalletController extends Notifier<WalletState>
       _repository = ref.read(walletRepositoryProvider);
       _repositoryInitialized = true;
     }
+    _ensureWalletLifecycleStarted();
+    return const WalletState(isLoading: true);
+  }
+
+  void _ensureWalletLifecycleStarted() {
+    if (_walletLifecycleStarted) {
+      return;
+    }
+
+    _walletLifecycleStarted = true;
     WidgetsBinding.instance.addObserver(this);
-    _purchaseSubscription?.cancel();
     _purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,
     );
-    _walletSyncTimer?.cancel();
-    _walletSyncTimer = Timer.periodic(_walletSyncInterval, (_) {
-      unawaited(_syncWalletSnapshot());
-    });
     ref.onDispose(() {
       WidgetsBinding.instance.removeObserver(this);
-      _walletSyncTimer?.cancel();
+      _cancelActiveLoad();
+      _cancelActiveWalletSync();
       unawaited(_purchaseSubscription?.cancel());
     });
-    return const WalletState(isLoading: true);
+  }
+
+  CancelToken _startLoadCancelToken() {
+    _cancelActiveLoad();
+    final cancelToken = CancelToken();
+    _activeLoadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveLoad() {
+    final cancelToken = _activeLoadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('wallet_load_cancelled');
+    }
+    _activeLoadCancelToken = null;
+  }
+
+  void _clearActiveLoad(CancelToken cancelToken) {
+    if (identical(_activeLoadCancelToken, cancelToken)) {
+      _activeLoadCancelToken = null;
+    }
+  }
+
+  CancelToken _startWalletSyncCancelToken() {
+    _cancelActiveWalletSync();
+    final cancelToken = CancelToken();
+    _activeWalletSyncCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveWalletSync() {
+    final cancelToken = _activeWalletSyncCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('wallet_sync_cancelled');
+    }
+    _activeWalletSyncCancelToken = null;
+  }
+
+  void _clearActiveWalletSync(CancelToken cancelToken) {
+    if (identical(_activeWalletSyncCancelToken, cancelToken)) {
+      _activeWalletSyncCancelToken = null;
+    }
+  }
+
+  void _updateStateIfMounted(WalletState Function(WalletState current) update) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    state = update(state);
   }
 
   @override
@@ -220,7 +265,11 @@ class WalletController extends Notifier<WalletState>
       return;
     }
 
-    final operation = _performLoad(refresh: refresh);
+    final loadCancelToken = _startLoadCancelToken();
+    final operation = _performLoad(
+      refresh: refresh,
+      cancelToken: loadCancelToken,
+    );
     _loadInFlight = operation;
     try {
       await operation;
@@ -228,19 +277,29 @@ class WalletController extends Notifier<WalletState>
       if (identical(_loadInFlight, operation)) {
         _loadInFlight = null;
       }
+      _clearActiveLoad(loadCancelToken);
     }
   }
 
-  Future<void> _performLoad({required bool refresh}) async {
-    state = state.copyWith(
-      isLoading: !refresh,
-      isRefreshing: refresh,
-      clearError: true,
-      clearCheckoutUrl: true,
+  Future<void> _performLoad({
+    required bool refresh,
+    required CancelToken cancelToken,
+  }) async {
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isLoading: !refresh,
+        isRefreshing: refresh,
+        clearError: true,
+        clearCheckoutUrl: true,
+      ),
     );
 
     try {
-      final wallet = await _repository.fetchWallet();
+      final wallet = await _repository.fetchWallet(cancelToken: cancelToken);
+      if (!ref.mounted) {
+        return;
+      }
+
       var ledger = const <WalletLedgerItem>[];
       RewardsSummaryModel? rewards;
       var packs = const <CurrencyPackModel>[];
@@ -251,16 +310,25 @@ class WalletController extends Notifier<WalletState>
       await Future.wait<void>([
         () async {
           try {
-            ledger = (await _repository.fetchLedger(take: 24)).items;
+            ledger = (await _repository.fetchLedger(
+              take: 24,
+              cancelToken: cancelToken,
+            )).items;
           } catch (error, stackTrace) {
+            if (_isRequestCancelled(error)) {
+              rethrow;
+            }
             softError ??= 'wallet.ledger_failed';
             _logWalletLoadFailure('fetch_ledger', error, stackTrace);
           }
         }(),
         () async {
           try {
-            rewards = await _repository.fetchRewards();
+            rewards = await _repository.fetchRewards(cancelToken: cancelToken);
           } catch (error, stackTrace) {
+            if (_isRequestCancelled(error)) {
+              rethrow;
+            }
             softError ??= 'rewards.summary_failed';
             _logWalletLoadFailure('fetch_rewards', error, stackTrace);
           }
@@ -269,23 +337,37 @@ class WalletController extends Notifier<WalletState>
           try {
             final config = await _repository.fetchCheckoutConfig(
               locale: WidgetsBinding.instance.platformDispatcher.locale,
+              cancelToken: cancelToken,
             );
             packs = config.packs;
             paymentMethods = config.paymentMethods;
           } catch (error, stackTrace) {
+            if (_isRequestCancelled(error)) {
+              rethrow;
+            }
             softError ??= 'wallet.packs_failed';
             _logWalletLoadFailure('fetch_checkout_config', error, stackTrace);
           }
         }(),
         () async {
           try {
-            purchases = (await _repository.fetchPurchases(take: 12)).items;
+            purchases = (await _repository.fetchPurchases(
+              take: 12,
+              cancelToken: cancelToken,
+            )).items;
           } catch (error, stackTrace) {
+            if (_isRequestCancelled(error)) {
+              rethrow;
+            }
             softError ??= 'wallet.purchases_failed';
             _logWalletLoadFailure('fetch_purchases', error, stackTrace);
           }
         }(),
       ]);
+
+      if (!ref.mounted) {
+        return;
+      }
 
       if (packs.isNotEmpty && paymentMethods.isNotEmpty) {
         paymentMethods = await _resolvePaymentMethodsAvailability(
@@ -294,22 +376,29 @@ class WalletController extends Notifier<WalletState>
         );
       }
 
-      state = state.copyWith(
-        wallet: wallet,
-        rewards: rewards,
-        ledger: ledger,
-        packs: packs,
-        paymentMethods: paymentMethods,
-        purchases: purchases,
-        isLoading: false,
-        isRefreshing: false,
-        errorMessage: softError,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          wallet: wallet,
+          rewards: rewards,
+          ledger: ledger,
+          packs: packs,
+          paymentMethods: paymentMethods,
+          purchases: purchases,
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: softError,
+        ),
       );
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        errorMessage: error.toString(),
+      if (_isRequestCancelled(error)) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: _errorMessage(error),
+        ),
       );
     }
   }
@@ -390,11 +479,18 @@ class WalletController extends Notifier<WalletState>
     }
 
     _isWalletSyncInFlight = true;
+    final syncCancelToken = _startWalletSyncCancelToken();
     try {
-      final nextWallet = await _repository.fetchWallet();
+      final nextWallet = await _repository.fetchWallet(
+        cancelToken: syncCancelToken,
+      );
+      if (!ref.mounted) {
+        return;
+      }
+
       final prevWallet = state.wallet;
       if (prevWallet == null) {
-        state = state.copyWith(wallet: nextWallet);
+        _updateStateIfMounted((state) => state.copyWith(wallet: nextWallet));
         return;
       }
 
@@ -412,20 +508,32 @@ class WalletController extends Notifier<WalletState>
 
       List<WalletLedgerItem>? latestLedger;
       try {
-        latestLedger = (await _repository.fetchLedger(take: 24)).items;
+        latestLedger = (await _repository.fetchLedger(
+          take: 24,
+          cancelToken: syncCancelToken,
+        )).items;
       } catch (error, stackTrace) {
+        if (_isRequestCancelled(error)) {
+          return;
+        }
         _logWalletLoadFailure('sync_fetch_ledger', error, stackTrace);
       }
 
-      state = state.copyWith(
-        wallet: nextWallet,
-        ledger: latestLedger ?? state.ledger,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          wallet: nextWallet,
+          ledger: latestLedger ?? state.ledger,
+          clearError: true,
+        ),
       );
     } catch (error, stackTrace) {
+      if (_isRequestCancelled(error)) {
+        return;
+      }
       _logWalletLoadFailure('sync_fetch_wallet', error, stackTrace);
     } finally {
       _isWalletSyncInFlight = false;
+      _clearActiveWalletSync(syncCancelToken);
     }
   }
 
@@ -434,29 +542,23 @@ class WalletController extends Notifier<WalletState>
     WalletPaymentMethodModel paymentMethod,
   ) async {
     if (!paymentMethod.isEnabled) {
-      state = state.copyWith(errorMessage: 'wallet.payment_unavailable');
+      _updateStateIfMounted(
+        (state) => state.copyWith(errorMessage: 'wallet.payment_unavailable'),
+      );
       return null;
     }
 
-    _checkoutInfo(
-      'checkout_started',
-      context: {
-        'pack_code': pack.code,
-        'provider': paymentMethod.provider,
-        'currency': pack.currencyCode,
-        'amount': pack.priceAmount,
-      },
-    );
-
-    state = state.copyWith(
-      isBuying: true,
-      clearError: true,
-      clearCheckoutUrl: true,
-      clearPendingCheckout: true,
-      checkoutVerificationState: WalletCheckoutVerificationState.idle,
-      clearCheckoutGrantedSpark: true,
-      clearCheckoutError: true,
-      clearHighlightedPurchaseOrderId: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isBuying: true,
+        clearError: true,
+        clearCheckoutUrl: true,
+        clearPendingCheckout: true,
+        checkoutVerificationState: WalletCheckoutVerificationState.idle,
+        clearCheckoutGrantedSpark: true,
+        clearCheckoutError: true,
+        clearHighlightedPurchaseOrderId: true,
+      ),
     );
 
     try {
@@ -465,9 +567,11 @@ class WalletController extends Notifier<WalletState>
           paymentMethod.provider,
         );
         if (expectedProductId == null || expectedProductId.isEmpty) {
-          state = state.copyWith(
-            isBuying: false,
-            errorMessage: 'wallet.payment_unavailable',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              errorMessage: 'wallet.payment_unavailable',
+            ),
           );
           return null;
         }
@@ -475,11 +579,16 @@ class WalletController extends Notifier<WalletState>
         final availability = await _repository.fetchStoreAvailability([
           pack,
         ], paymentMethod);
+        if (!ref.mounted) {
+          return null;
+        }
         if (!availability.isAvailable ||
             !availability.productIds.contains(expectedProductId)) {
-          state = state.copyWith(
-            isBuying: false,
-            errorMessage: 'wallet.payment_unavailable',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              errorMessage: 'wallet.payment_unavailable',
+            ),
           );
           return null;
         }
@@ -490,25 +599,21 @@ class WalletController extends Notifier<WalletState>
         paymentMethod,
         WidgetsBinding.instance.platformDispatcher.locale,
       );
-
-      _checkoutInfo(
-        'checkout_created',
-        context: {
-          'order_id': checkout.orderId,
-          'status': checkout.status,
-          'checkout_url_length': checkout.checkoutUrl.length,
-        },
-      );
+      if (!ref.mounted) {
+        return null;
+      }
 
       if (paymentMethod.isStoreNative) {
-        state = state.copyWith(
-          pendingCheckoutOrderId: checkout.orderId,
-          pendingStoreProvider: paymentMethod.provider,
-          isBuying: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            pendingCheckoutOrderId: checkout.orderId,
+            pendingStoreProvider: paymentMethod.provider,
+            isBuying: true,
+          ),
         );
 
         await _repository.startStoreCheckout(pack, paymentMethod);
-        state = state.copyWith(isBuying: false);
+        _updateStateIfMounted((state) => state.copyWith(isBuying: false));
         return null;
       }
 
@@ -529,21 +634,25 @@ class WalletController extends Notifier<WalletState>
           error: 'wallet.checkout_empty_url',
         );
 
-        state = state.copyWith(
-          isBuying: false,
-          clearCheckoutUrl: true,
-          clearPendingCheckout: true,
-          clearPendingStoreProvider: true,
-          errorMessage: 'payment_gateway_failed',
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            clearCheckoutUrl: true,
+            clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
+            errorMessage: 'payment_gateway_failed',
+          ),
         );
         return null;
       }
 
-      state = state.copyWith(
-        isBuying: false,
-        checkoutUrl: checkoutUrl,
-        pendingCheckoutOrderId: checkout.orderId,
-        clearPendingStoreProvider: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          checkoutUrl: checkoutUrl,
+          pendingCheckoutOrderId: checkout.orderId,
+          clearPendingStoreProvider: true,
+        ),
       );
       return checkout;
     } catch (error) {
@@ -554,32 +663,40 @@ class WalletController extends Notifier<WalletState>
         context: {'pack_code': pack.code, 'provider': paymentMethod.provider},
         error: error,
       );
-      state = state.copyWith(
-        isBuying: false,
-        clearPendingCheckout: true,
-        clearPendingStoreProvider: true,
-        errorMessage: error.toString(),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          clearPendingCheckout: true,
+          clearPendingStoreProvider: true,
+          errorMessage: _errorMessage(error),
+        ),
       );
       return null;
     }
   }
 
   Future<void> claimAdReward() async {
-    state = state.copyWith(isClaimingAd: true, clearError: true);
+    _updateStateIfMounted(
+      (state) => state.copyWith(isClaimingAd: true, clearError: true),
+    );
 
     try {
       final wallet = await _repository.claimAdReward();
       final ledger = await _repository.fetchLedger(take: 24);
-      state = state.copyWith(
-        wallet: wallet,
-        ledger: ledger.items,
-        isClaimingAd: false,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          wallet: wallet,
+          ledger: ledger.items,
+          isClaimingAd: false,
+          clearError: true,
+        ),
       );
     } catch (error) {
-      state = state.copyWith(
-        isClaimingAd: false,
-        errorMessage: _errorMessage(error),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isClaimingAd: false,
+          errorMessage: _errorMessage(error),
+        ),
       );
     }
   }
@@ -589,23 +706,29 @@ class WalletController extends Notifier<WalletState>
       return null;
     }
 
-    state = state.copyWith(isRedeeming: true, clearError: true);
+    _updateStateIfMounted(
+      (state) => state.copyWith(isRedeeming: true, clearError: true),
+    );
 
     try {
       final wallet = await _repository.applyRedeemCode(code);
       final ledger = await _repository.fetchLedger(take: 24);
       final rewards = await _repository.fetchRewards();
-      state = state.copyWith(
-        wallet: wallet,
-        rewards: rewards,
-        ledger: ledger.items,
-        isRedeeming: false,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          wallet: wallet,
+          rewards: rewards,
+          ledger: ledger.items,
+          isRedeeming: false,
+          clearError: true,
+        ),
       );
       return null;
     } catch (error) {
       final message = _errorMessage(error);
-      state = state.copyWith(isRedeeming: false, errorMessage: message);
+      _updateStateIfMounted(
+        (state) => state.copyWith(isRedeeming: false, errorMessage: message),
+      );
       return message;
     }
   }
@@ -615,19 +738,26 @@ class WalletController extends Notifier<WalletState>
       return null;
     }
 
-    state = state.copyWith(isApplyingReferral: true, clearError: true);
+    _updateStateIfMounted(
+      (state) => state.copyWith(isApplyingReferral: true, clearError: true),
+    );
 
     try {
       final rewards = await _repository.applyReferralCode(code);
-      state = state.copyWith(
-        rewards: rewards,
-        isApplyingReferral: false,
-        clearError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          rewards: rewards,
+          isApplyingReferral: false,
+          clearError: true,
+        ),
       );
       return null;
     } catch (error) {
       final message = _errorMessage(error);
-      state = state.copyWith(isApplyingReferral: false, errorMessage: message);
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(isApplyingReferral: false, errorMessage: message),
+      );
       return message;
     }
   }
@@ -651,46 +781,64 @@ class WalletController extends Notifier<WalletState>
       return;
     }
 
-    state = state.copyWith(
-      checkoutVerificationState: WalletCheckoutVerificationState.checking,
-      clearCheckoutGrantedSpark: true,
-      clearCheckoutError: true,
-      clearHighlightedPurchaseOrderId: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.checking,
+        clearCheckoutGrantedSpark: true,
+        clearCheckoutError: true,
+        clearHighlightedPurchaseOrderId: true,
+      ),
     );
 
     const maxAttempts = 6;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!ref.mounted) {
+        return;
+      }
+
       try {
         final purchase = await _repository.fetchPurchase(pendingOrderId);
+        if (!ref.mounted) {
+          return;
+        }
         if (purchase.status == 'succeeded') {
           await load(refresh: true);
-          state = state.copyWith(
-            checkoutVerificationState:
-                WalletCheckoutVerificationState.succeeded,
-            checkoutGrantedSpark: purchase.sparkToGrant,
-            highlightedPurchaseOrderId: purchase.orderId,
-            clearPendingCheckout: true,
-            clearPendingStoreProvider: true,
-            clearCheckoutError: true,
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              checkoutVerificationState:
+                  WalletCheckoutVerificationState.succeeded,
+              checkoutGrantedSpark: purchase.sparkToGrant,
+              highlightedPurchaseOrderId: purchase.orderId,
+              clearPendingCheckout: true,
+              clearPendingStoreProvider: true,
+              clearCheckoutError: true,
+            ),
           );
           return;
         }
       } catch (error) {
-        state = state.copyWith(
-          checkoutVerificationState: WalletCheckoutVerificationState.error,
-          checkoutErrorMessage: error.toString(),
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            checkoutVerificationState: WalletCheckoutVerificationState.error,
+            checkoutErrorMessage: _errorMessage(error),
+          ),
         );
         return;
       }
 
       if (attempt < maxAttempts - 1) {
         await Future<void>.delayed(const Duration(seconds: 1));
+        if (!ref.mounted) {
+          return;
+        }
       }
     }
 
-    state = state.copyWith(
-      checkoutVerificationState: WalletCheckoutVerificationState.pending,
-      clearCheckoutError: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.pending,
+        clearCheckoutError: true,
+      ),
     );
   }
 
@@ -700,33 +848,44 @@ class WalletController extends Notifier<WalletState>
       return;
     }
 
-    state = state.copyWith(
-      checkoutVerificationState: WalletCheckoutVerificationState.checking,
-      clearCheckoutGrantedSpark: true,
-      clearCheckoutError: true,
-      clearHighlightedPurchaseOrderId: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        checkoutVerificationState: WalletCheckoutVerificationState.checking,
+        clearCheckoutGrantedSpark: true,
+        clearCheckoutError: true,
+        clearHighlightedPurchaseOrderId: true,
+      ),
     );
 
     const maxAttempts = 5;
     final normalizedReference = stripeReferenceId?.trim();
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!ref.mounted) {
+        return;
+      }
+
       try {
         final purchase = await _repository.verifyStripeCheckoutSession(
           orderId: pendingOrderId,
           stripeReferenceId: normalizedReference,
         );
+        if (!ref.mounted) {
+          return;
+        }
 
         if (purchase.status == 'succeeded') {
           await load(refresh: true);
-          state = state.copyWith(
-            checkoutVerificationState:
-                WalletCheckoutVerificationState.succeeded,
-            checkoutGrantedSpark: purchase.sparkToGrant,
-            highlightedPurchaseOrderId: purchase.orderId,
-            clearPendingCheckout: true,
-            clearPendingStoreProvider: true,
-            clearCheckoutError: true,
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              checkoutVerificationState:
+                  WalletCheckoutVerificationState.succeeded,
+              checkoutGrantedSpark: purchase.sparkToGrant,
+              highlightedPurchaseOrderId: purchase.orderId,
+              clearPendingCheckout: true,
+              clearPendingStoreProvider: true,
+              clearCheckoutError: true,
+            ),
           );
           return;
         }
@@ -738,7 +897,7 @@ class WalletController extends Notifier<WalletState>
           context: {
             'order_id': pendingOrderId,
             'attempt': attempt + 1,
-            'reference': normalizedReference ?? '',
+            'reference_type': _stripeReferenceType(normalizedReference),
           },
           error: error,
         );
@@ -746,16 +905,21 @@ class WalletController extends Notifier<WalletState>
 
       try {
         final purchase = await _repository.fetchPurchase(pendingOrderId);
+        if (!ref.mounted) {
+          return;
+        }
         if (purchase.status == 'succeeded') {
           await load(refresh: true);
-          state = state.copyWith(
-            checkoutVerificationState:
-                WalletCheckoutVerificationState.succeeded,
-            checkoutGrantedSpark: purchase.sparkToGrant,
-            highlightedPurchaseOrderId: purchase.orderId,
-            clearPendingCheckout: true,
-            clearPendingStoreProvider: true,
-            clearCheckoutError: true,
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              checkoutVerificationState:
+                  WalletCheckoutVerificationState.succeeded,
+              checkoutGrantedSpark: purchase.sparkToGrant,
+              highlightedPurchaseOrderId: purchase.orderId,
+              clearPendingCheckout: true,
+              clearPendingStoreProvider: true,
+              clearCheckoutError: true,
+            ),
           );
           return;
         }
@@ -770,6 +934,9 @@ class WalletController extends Notifier<WalletState>
 
       if (attempt < maxAttempts - 1) {
         await Future<void>.delayed(const Duration(seconds: 1));
+        if (!ref.mounted) {
+          return;
+        }
       }
     }
 
@@ -778,9 +945,15 @@ class WalletController extends Notifier<WalletState>
 
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
+      if (!ref.mounted) {
+        return;
+      }
+
       switch (purchase.status) {
         case PurchaseStatus.pending:
-          state = state.copyWith(isBuying: true, clearError: true);
+          _updateStateIfMounted(
+            (state) => state.copyWith(isBuying: true, clearError: true),
+          );
           break;
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
@@ -789,23 +962,33 @@ class WalletController extends Notifier<WalletState>
         case PurchaseStatus.error:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
+            if (!ref.mounted) {
+              return;
+            }
           }
-          state = state.copyWith(
-            isBuying: false,
-            checkoutVerificationState: WalletCheckoutVerificationState.error,
-            checkoutErrorMessage:
-                purchase.error?.message ?? 'wallet.payment_unavailable',
-            errorMessage:
-                purchase.error?.message ?? 'wallet.payment_unavailable',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              checkoutVerificationState: WalletCheckoutVerificationState.error,
+              checkoutErrorMessage: _purchaseErrorMessage(
+                purchase.error?.message,
+              ),
+              errorMessage: _purchaseErrorMessage(purchase.error?.message),
+            ),
           );
           break;
         case PurchaseStatus.canceled:
           if (purchase.pendingCompletePurchase) {
             await _repository.completePurchase(purchase);
+            if (!ref.mounted) {
+              return;
+            }
           }
-          state = state.copyWith(
-            isBuying: false,
-            errorMessage: 'wallet.payment_unavailable',
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isBuying: false,
+              errorMessage: 'wallet.payment_unavailable',
+            ),
           );
           break;
       }
@@ -836,20 +1019,27 @@ class WalletController extends Notifier<WalletState>
     if (paymentMethod == null) {
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
-      state = state.copyWith(
-        isBuying: false,
-        checkoutVerificationState: WalletCheckoutVerificationState.error,
-        checkoutErrorMessage: 'wallet.payment_unavailable',
-        errorMessage: 'wallet.payment_unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.error,
+          checkoutErrorMessage: 'wallet.payment_unavailable',
+          errorMessage: 'wallet.payment_unavailable',
+        ),
       );
       return;
     }
 
     try {
-      state = state.copyWith(
-        checkoutVerificationState: WalletCheckoutVerificationState.checking,
-        clearCheckoutError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          checkoutVerificationState: WalletCheckoutVerificationState.checking,
+          clearCheckoutError: true,
+        ),
       );
 
       final verified = await _repository.verifyStorePurchase(
@@ -857,40 +1047,56 @@ class WalletController extends Notifier<WalletState>
         paymentMethod: paymentMethod,
         purchase: purchase,
       );
+      if (!ref.mounted) {
+        return;
+      }
 
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
 
       if (verified.status == 'succeeded') {
         await load(refresh: true);
-        state = state.copyWith(
-          isBuying: false,
-          checkoutVerificationState: WalletCheckoutVerificationState.succeeded,
-          checkoutGrantedSpark: verified.sparkToGrant,
-          highlightedPurchaseOrderId: verified.orderId,
-          clearPendingCheckout: true,
-          clearPendingStoreProvider: true,
-          clearCheckoutError: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            checkoutVerificationState:
+                WalletCheckoutVerificationState.succeeded,
+            checkoutGrantedSpark: verified.sparkToGrant,
+            highlightedPurchaseOrderId: verified.orderId,
+            clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
+            clearCheckoutError: true,
+          ),
         );
         return;
       }
 
-      state = state.copyWith(
-        isBuying: false,
-        checkoutVerificationState: WalletCheckoutVerificationState.pending,
-        clearCheckoutError: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.pending,
+          clearCheckoutError: true,
+        ),
       );
       await verifyCheckoutStatus();
     } catch (error) {
       if (purchase.pendingCompletePurchase) {
         await _repository.completePurchase(purchase);
+        if (!ref.mounted) {
+          return;
+        }
       }
-      state = state.copyWith(
-        isBuying: false,
-        checkoutVerificationState: WalletCheckoutVerificationState.error,
-        checkoutErrorMessage: error.toString(),
-        errorMessage: error.toString(),
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isBuying: false,
+          checkoutVerificationState: WalletCheckoutVerificationState.error,
+          checkoutErrorMessage: _errorMessage(error),
+          errorMessage: _errorMessage(error),
+        ),
       );
     }
   }
@@ -898,8 +1104,9 @@ class WalletController extends Notifier<WalletState>
 
 String _errorMessage(Object error) {
   if (error is AppException) {
-    if (error.message.trim().isNotEmpty) {
-      return error.message;
+    final message = error.message.trim();
+    if (_isSafeWalletErrorKey(message)) {
+      return message;
     }
 
     return switch (error.statusCode) {
@@ -912,5 +1119,55 @@ String _errorMessage(Object error) {
     };
   }
 
-  return error.toString();
+  return 'wallet.request_failed';
+}
+
+String _purchaseErrorMessage(String? rawMessage) {
+  final message = rawMessage?.trim();
+  return message != null && _isSafeWalletErrorKey(message)
+      ? message
+      : 'wallet.payment_unavailable';
+}
+
+bool _isRequestCancelled(Object error) {
+  return error is RequestCancelledException ||
+      (error is DioException && CancelToken.isCancel(error));
+}
+
+String _stripeReferenceType(String? value) {
+  final trimmed = value?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return 'missing';
+  }
+
+  if (trimmed.startsWith('pi_')) {
+    return 'payment_intent';
+  }
+
+  if (trimmed.startsWith('cs_')) {
+    return 'checkout_session';
+  }
+
+  return 'unknown';
+}
+
+bool _isSafeWalletErrorKey(String value) {
+  return value == 'auth.sign_in_required' ||
+      value == 'auth.session_expired' ||
+      value == 'wallet.ledger_failed' ||
+      value == 'wallet.packs_failed' ||
+      value == 'wallet.purchases_failed' ||
+      value == 'wallet.payment_unavailable' ||
+      value == 'wallet.network_unavailable' ||
+      value == 'wallet.server_unavailable' ||
+      value == 'wallet.request_failed' ||
+      value == 'payment_gateway_failed' ||
+      value == 'economy.pack_not_found' ||
+      value == 'economy.insufficient_balance' ||
+      value == 'redeem_code_not_found' ||
+      value == 'redeem_code_already_used' ||
+      value == 'redeem_code_expired' ||
+      value == 'redeem_code_inactive' ||
+      value == 'redeem_code_exhausted' ||
+      value == 'redeem_code_user_limit_reached';
 }

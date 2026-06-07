@@ -35,6 +35,25 @@ void main() {
       );
     });
 
+    test('rejects urls with userinfo to avoid misleading hosts', () {
+      final allowedHosts = premiumExternalAllowedHosts();
+      expect(
+        parseSafeExternalUri(
+          'https://user@petmagic.app/privacy',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://checkout.stripe.com@evil.example/session',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+      expect(parseSafeExternalUri('https://user@example.com/path'), isNull);
+    });
+
     test('allows debug http only for local/private hosts', () {
       expect(parseSafeExternalUri('http://localhost:5000/health'), isNotNull);
       expect(parseSafeExternalUri('http://127.0.0.1:5000/health'), isNotNull);
@@ -53,6 +72,81 @@ void main() {
       expect(hosts.contains('petmagic.app'), isTrue);
       expect(hosts.contains('api.petmagic.app'), isTrue);
       expect(hosts.contains('checkout.stripe.com'), isTrue);
+    });
+  });
+
+  group('supportExternalAllowedHosts', () {
+    test('allows only trusted support attachment origins', () {
+      final allowedHosts = supportExternalAllowedHosts();
+
+      expect(
+        parseSafeExternalUri(
+          'https://cdn.petmagic.ai/support/file.jpg?signature=secret',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://api.petmagic.app/api/support/attachments/file',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://evil.example/support/file.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://cdn.petmagic.ai@evil.example/support/file.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+    });
+
+    test('parseSafeSupportExternalUri applies the support allowlist', () {
+      expect(
+        parseSafeSupportExternalUri('https://cdn.petmagic.ai/support/file.jpg'),
+        isNotNull,
+      );
+      expect(
+        parseSafeSupportExternalUri('https://evil.example/support/file.jpg'),
+        isNull,
+      );
+    });
+  });
+
+  group('generationMediaAllowedHosts', () {
+    test('contains production generation media origins', () {
+      final hosts = generationMediaAllowedHosts();
+
+      expect(hosts.contains('api.petmagic.app'), isTrue);
+      expect(hosts.contains('cdn.petmagic.app'), isTrue);
+      expect(hosts.contains('cdn.petmagic.ai'), isTrue);
+    });
+
+    test('allowlist rejects arbitrary generation media origins', () {
+      final allowedHosts = generationMediaAllowedHosts();
+
+      expect(
+        parseSafeExternalUri(
+          'https://cdn.petmagic.ai/generations/result.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://evil.example/generations/result.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
     });
   });
 }

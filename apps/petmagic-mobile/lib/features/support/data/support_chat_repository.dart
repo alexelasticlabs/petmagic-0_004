@@ -6,10 +6,12 @@ import 'package:http_parser/http_parser.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
+import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 
 final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
   return SupportChatRepository(
@@ -32,6 +34,10 @@ class SupportChatRepository {
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
 
+  static const _maxAttachmentCount = 5;
+  static const _imageMaxFileSizeBytes = 10 * 1024 * 1024;
+  static const _videoMaxFileSizeBytes = 50 * 1024 * 1024;
+
   Future<SupportChatConversation> openConversation({
     String? initialMessage,
     String source = 'MobileChat',
@@ -39,9 +45,10 @@ class SupportChatRepository {
     String? relatedGenerationId,
     String? relatedPaymentId,
     String? relatedSubscriptionId,
+    CancelToken? cancelToken,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/open',
         data: {
           'initialMessage': initialMessage?.trim().isEmpty ?? true
@@ -61,8 +68,10 @@ class SupportChatRepository {
               ? null
               : {'relatedSubscriptionId': relatedSubscriptionId},
         },
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatConversation.fromJson(response.data ?? const {});
@@ -71,6 +80,7 @@ class SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    CancelToken? cancelToken,
   }) async {
     final query = <String, dynamic>{'take': take};
     if (beforeMessageCreatedAtUtc != null) {
@@ -83,7 +93,8 @@ class SupportChatRepository {
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/support/conversation',
         queryParameters: query,
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -97,7 +108,7 @@ class SupportChatRepository {
     String? replyToMessageId,
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/messages',
         data: {
           'body': body.trim(),
@@ -105,8 +116,9 @@ class SupportChatRepository {
           if (replyToMessageId?.trim().isNotEmpty == true)
             'replyToMessageId': replyToMessageId!.trim(),
         },
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatMessage.fromJson(response.data ?? const {});
@@ -121,27 +133,37 @@ class SupportChatRepository {
     String? body,
     String? replyToMessageId,
     ProgressCallback? onSendProgress,
+    CancelToken? cancelToken,
   }) async {
+    final uploadContentType = await _validateAttachmentForUpload(
+      filePath: filePath,
+      contentType: contentType,
+    );
+    final safeFileName = _safeMultipartFileName(
+      fileName: fileName,
+      filePath: filePath,
+    );
+
     final trimmedBody = body?.trim() ?? '';
     final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/attachments',
         data: FormData.fromMap({
           if (trimmedBody.isNotEmpty) 'body': trimmedBody,
           'locale': localeTag,
           if (replyToMessageId?.trim().isNotEmpty == true)
             'replyToMessageId': replyToMessageId!.trim(),
-          'file': MultipartFile.fromFileSync(
+          'file': await MultipartFile.fromFile(
             filePath,
-            filename: fileName,
-            contentType: MediaType.parse(contentType),
+            filename: safeFileName,
+            contentType: MediaType.parse(uploadContentType),
           ),
         }),
-        options: _authorizedOptions(
-          session,
-        ).copyWith(contentType: 'multipart/form-data'),
+        options: authenticatedMultipartRequestOptions(session.accessToken),
         onSendProgress: onSendProgress,
+        cancelToken: cancelToken,
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatMessage.fromJson(response.data ?? const {});
@@ -154,6 +176,7 @@ class SupportChatRepository {
     String? body,
     String? replyToMessageId,
     ProgressCallback? onSendProgress,
+    CancelToken? cancelToken,
   }) async {
     if (attachments.isEmpty) {
       throw const AppException(
@@ -161,19 +184,38 @@ class SupportChatRepository {
         statusCode: 400,
       );
     }
+    if (attachments.length > _maxAttachmentCount) {
+      throw const AppException('support.attachment_too_many', statusCode: 400);
+    }
 
-    final multipartFiles = attachments
-        .map(
-          (attachment) => MultipartFile.fromFileSync(
-            attachment.filePath,
-            filename: attachment.fileName,
-            contentType: MediaType.parse(attachment.contentType),
+    final validatedAttachments =
+        <({SupportChatUploadAttachment attachment, String contentType})>[];
+    for (final attachment in attachments) {
+      final uploadContentType = await _validateAttachmentForUpload(
+        filePath: attachment.filePath,
+        contentType: attachment.contentType,
+      );
+      validatedAttachments.add((
+        attachment: attachment,
+        contentType: uploadContentType,
+      ));
+    }
+
+    final multipartFiles = await Future.wait(
+      validatedAttachments.map(
+        (entry) => MultipartFile.fromFile(
+          entry.attachment.filePath,
+          filename: _safeMultipartFileName(
+            fileName: entry.attachment.fileName,
+            filePath: entry.attachment.filePath,
           ),
-        )
-        .toList(growable: false);
+          contentType: MediaType.parse(entry.contentType),
+        ),
+      ),
+    );
     final trimmedBody = body?.trim() ?? '';
     final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/messages/attachments',
         data: FormData.fromMap({
           if (trimmedBody.isNotEmpty) 'body': trimmedBody,
@@ -182,11 +224,11 @@ class SupportChatRepository {
             'replyToMessageId': replyToMessageId!.trim(),
           'files': multipartFiles,
         }),
-        options: _authorizedOptions(
-          session,
-        ).copyWith(contentType: 'multipart/form-data'),
+        options: authenticatedMultipartRequestOptions(session.accessToken),
         onSendProgress: onSendProgress,
+        cancelToken: cancelToken,
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatMessage.fromJson(response.data ?? const {});
@@ -198,21 +240,31 @@ class SupportChatRepository {
     required String filePath,
     required String fileName,
     required String contentType,
+    CancelToken? cancelToken,
   }) async {
+    final uploadContentType = await _validateAttachmentForUpload(
+      filePath: filePath,
+      contentType: contentType,
+    );
+    final safeFileName = _safeMultipartFileName(
+      fileName: fileName,
+      filePath: filePath,
+    );
+
     final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/messages/$messageId/attachment/retry',
         data: FormData.fromMap({
-          'file': MultipartFile.fromFileSync(
+          'file': await MultipartFile.fromFile(
             filePath,
-            filename: fileName,
-            contentType: MediaType.parse(contentType),
+            filename: safeFileName,
+            contentType: MediaType.parse(uploadContentType),
           ),
         }),
-        options: _authorizedOptions(
-          session,
-        ).copyWith(contentType: 'multipart/form-data'),
+        options: authenticatedMultipartRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatMessage.fromJson(response.data ?? const {});
@@ -222,8 +274,9 @@ class SupportChatRepository {
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
         '/api/support/conversation/$conversationId/read',
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
   }
 
@@ -233,8 +286,9 @@ class SupportChatRepository {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/resolve',
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatConversation.fromJson(response.data ?? const {});
@@ -246,8 +300,9 @@ class SupportChatRepository {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/reopen',
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatConversation.fromJson(response.data ?? const {});
@@ -259,8 +314,9 @@ class SupportChatRepository {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/support/conversation/$conversationId/close',
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatConversation.fromJson(response.data ?? const {});
@@ -279,8 +335,9 @@ class SupportChatRepository {
           if (comment != null && comment.trim().isNotEmpty)
             'comment': comment.trim(),
         },
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return SupportChatConversation.fromJson(response.data ?? const {});
@@ -304,8 +361,9 @@ class SupportChatRepository {
             'appVersion': appVersion,
           if (locale != null && locale.isNotEmpty) 'locale': locale,
         },
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
   }
 
@@ -314,28 +372,209 @@ class SupportChatRepository {
       (session) => _dio.delete<void>(
         '/api/support/notifications/push-token',
         data: {'token': token},
-        options: _authorizedOptions(session),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
-    );
-  }
-
-  Options _authorizedOptions(AuthSession session) {
-    return Options(
-      headers: {
-        HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-      },
+      retryTransientFailures: false,
     );
   }
 
   Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request,
-  ) async {
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'support.request_failed',
       sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
     );
+  }
+
+  Future<String> _validateAttachmentForUpload({
+    required String filePath,
+    required String contentType,
+  }) async {
+    final normalizedContentType = contentType.trim().toLowerCase();
+    int fileSizeBytes;
+    try {
+      fileSizeBytes = await File(filePath).length();
+    } on FileSystemException {
+      throw const AppException(
+        'support.attachment_invalid_upload',
+        statusCode: 400,
+      );
+    }
+
+    if (fileSizeBytes <= 0) {
+      throw const AppException(
+        'support.attachment_invalid_upload',
+        statusCode: 400,
+      );
+    }
+
+    final declaredValidation = SupportAttachmentValidation.validate(
+      contentType: normalizedContentType,
+      fileSizeBytes: fileSizeBytes,
+      imageMaxBytes: _imageMaxFileSizeBytes,
+      videoMaxBytes: _videoMaxFileSizeBytes,
+      videoMaxDuration: Duration.zero,
+    );
+
+    if (!declaredValidation.isAllowed) {
+      _throwAttachmentValidationError(declaredValidation.error);
+    }
+
+    final detectedContentType = await _detectAttachmentContentType(filePath);
+    if (detectedContentType == null) {
+      throw const AppException(
+        'support.attachment_content_type_not_allowed',
+        statusCode: 400,
+      );
+    }
+
+    final detectedValidation = SupportAttachmentValidation.validate(
+      contentType: detectedContentType,
+      fileSizeBytes: fileSizeBytes,
+      imageMaxBytes: _imageMaxFileSizeBytes,
+      videoMaxBytes: _videoMaxFileSizeBytes,
+      videoMaxDuration: Duration.zero,
+    );
+    if (!detectedValidation.isAllowed) {
+      _throwAttachmentValidationError(detectedValidation.error);
+    }
+
+    return detectedContentType;
+  }
+
+  Never _throwAttachmentValidationError(
+    SupportAttachmentValidationError? error,
+  ) {
+    final message = switch (error) {
+      SupportAttachmentValidationError.unsupportedFormat =>
+        'support.attachment_content_type_not_allowed',
+      SupportAttachmentValidationError.fileTooLarge =>
+        'support.attachment_file_too_large',
+      SupportAttachmentValidationError.videoTooLong =>
+        'support.attachment_video_too_long',
+      null => 'support.attachment_invalid_upload',
+    };
+    throw AppException(message, statusCode: 400);
+  }
+
+  Future<String?> _detectAttachmentContentType(String path) async {
+    final header = await _attachmentHeader(path);
+    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
+      return 'image/jpeg';
+    }
+    if (_startsWith(header, const [
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+    ])) {
+      return 'image/png';
+    }
+    if (header.length >= 12 &&
+        _asciiEquals(header, 0, 'RIFF') &&
+        _asciiEquals(header, 8, 'WEBP')) {
+      return 'image/webp';
+    }
+    if (header.length >= 12 && _asciiEquals(header, 4, 'ftyp')) {
+      final brand = String.fromCharCodes(header.skip(8).take(4)).toLowerCase();
+      const mp4Brands = {
+        'mp41',
+        'mp42',
+        'isom',
+        'iso2',
+        'avc1',
+        'm4v ',
+        'm4a ',
+      };
+      if (brand == 'qt  ') {
+        return 'video/quicktime';
+      }
+      if (mp4Brands.contains(brand)) {
+        return 'video/mp4';
+      }
+    }
+
+    return null;
+  }
+
+  Future<List<int>> _attachmentHeader(String path) async {
+    try {
+      final chunks = await File(path).openRead(0, 32).toList();
+      return [for (final chunk in chunks) ...chunk];
+    } on FileSystemException {
+      throw const AppException(
+        'support.attachment_invalid_upload',
+        statusCode: 400,
+      );
+    }
+  }
+
+  bool _startsWith(List<int> bytes, List<int> prefix) {
+    if (bytes.length < prefix.length) {
+      return false;
+    }
+    for (var index = 0; index < prefix.length; index++) {
+      if (bytes[index] != prefix[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _asciiEquals(List<int> bytes, int offset, String value) {
+    if (bytes.length < offset + value.length) {
+      return false;
+    }
+    for (var index = 0; index < value.length; index++) {
+      if (bytes[offset + index] != value.codeUnitAt(index)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  String _safeMultipartFileName({
+    required String fileName,
+    required String filePath,
+  }) {
+    final preferred = _lastPathSegment(fileName);
+    final fallback = _lastPathSegment(filePath);
+    final sanitized = _sanitizeFileName(preferred);
+    if (sanitized.isNotEmpty) {
+      return sanitized;
+    }
+
+    final sanitizedFallback = _sanitizeFileName(fallback);
+    return sanitizedFallback.isEmpty ? 'attachment' : sanitizedFallback;
+  }
+
+  String _lastPathSegment(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final normalized = trimmed.replaceAll('\\', '/');
+    final slashIndex = normalized.lastIndexOf('/');
+    return slashIndex < 0 ? normalized : normalized.substring(slashIndex + 1);
+  }
+
+  String _sanitizeFileName(String value) {
+    return value
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
   }
 
   AppException _mapDioException(
@@ -343,27 +582,11 @@ class SupportChatRepository {
     required String fallbackMessage,
   }) {
     final payload = NetworkErrorMapper.parseApiPayload(error);
-    if (payload.flattened != null) {
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
       return NetworkErrorMapper.fromMessage(
         error,
-        payload.flattened!,
-        includeCause: false,
-      );
-    }
-
-    if (payload.detail != null || payload.title != null) {
-      final apiCode = payload.title?.trim();
-      if (apiCode != null && apiCode.contains('.')) {
-        return NetworkErrorMapper.fromMessage(
-          error,
-          apiCode,
-          includeCause: false,
-        );
-      }
-
-      return NetworkErrorMapper.fromMessage(
-        error,
-        payload.detail ?? payload.title!,
+        safeMessage,
         includeCause: false,
       );
     }

@@ -230,6 +230,9 @@ class AuthSession {
   final DateTime expiresAtUtc;
   final MobileUserProfile user;
 
+  bool get hasUsableTokens =>
+      accessToken.trim().isNotEmpty && refreshToken.trim().isNotEmpty;
+
   Map<String, dynamic> toJson() {
     return {
       'accessToken': accessToken,
@@ -281,8 +284,8 @@ class AuthSession {
 
   factory AuthSession.fromJson(Map<String, dynamic> json) {
     return AuthSession(
-      accessToken: json['accessToken'] as String? ?? '',
-      refreshToken: json['refreshToken'] as String? ?? '',
+      accessToken: (json['accessToken'] as String? ?? '').trim(),
+      refreshToken: (json['refreshToken'] as String? ?? '').trim(),
       expiresAtUtc:
           DateTime.tryParse(json['expiresAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),

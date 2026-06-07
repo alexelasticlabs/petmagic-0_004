@@ -42,10 +42,24 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!_canAddMoreAttachments()) {
       return;
     }
-    final permission = await _permissionCoordinator.requestOnDemand(
+    final cameraPermission = await _permissionCoordinator.requestOnDemand(
       AppPermissionType.camera,
     );
-    if (!permission.granted) {
+    if (!cameraPermission.granted) {
+      if (mounted) {
+        final text = AppLocalizations.of(context);
+        _showSupportToast(
+          text.supportChatCameraPermissionVideoError,
+          tone: PetMagicToastTone.warning,
+        );
+      }
+      return;
+    }
+
+    final microphonePermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.microphone,
+    );
+    if (!microphonePermission.granted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
         _showSupportToast(
@@ -136,10 +150,8 @@ extension _SupportChatPageActions on _SupportChatPageState {
     if (!_canAddMoreAttachments()) {
       return;
     }
-    final permission = await _permissionCoordinator.requestOnDemand(
-      AppPermissionType.photos,
-    );
-    if (!permission.granted) {
+    final permissionGranted = await _requestMixedMediaGalleryPermission();
+    if (!permissionGranted) {
       if (mounted) {
         final text = AppLocalizations.of(context);
         _showSupportToast(
@@ -190,6 +202,24 @@ extension _SupportChatPageActions on _SupportChatPageState {
     _applyState(() {
       _pendingAttachments = [..._pendingAttachments, ...nextAttachments];
     });
+  }
+
+  Future<bool> _requestMixedMediaGalleryPermission() async {
+    final photosPermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.photos,
+    );
+    if (!mounted || !photosPermission.granted) {
+      return false;
+    }
+
+    if (!Platform.isAndroid) {
+      return true;
+    }
+
+    final videosPermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.videos,
+    );
+    return mounted && videosPermission.granted;
   }
 
   bool _canAddMoreAttachments() {
@@ -531,17 +561,31 @@ extension _SupportChatPageActions on _SupportChatPageState {
     required String imageUrl,
     String? fileName,
   }) async {
+    final safeUri = parseSafeSupportExternalUri(imageUrl);
+    if (safeUri == null) {
+      if (mounted) {
+        _showSupportToast(
+          AppLocalizations.of(context).supportChatUnavailableError,
+          tone: PetMagicToastTone.warning,
+        );
+      }
+      return;
+    }
+
+    final safeImageUrl = safeUri.toString();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return _SupportImagePreviewDialog(
-          imageUrl: imageUrl,
+          imageUrl: safeImageUrl,
           fileName: fileName,
-          onSaveImage: () =>
-              _saveImageToDeviceImpl(imageUrl: imageUrl, fileName: fileName),
+          onSaveImage: () => _saveImageToDeviceImpl(
+            imageUrl: safeImageUrl,
+            fileName: fileName,
+          ),
           onShareImage: () =>
-              _shareImageImpl(imageUrl: imageUrl, fileName: fileName),
-          onOpenOriginal: () => _openAttachmentExternallyImpl(imageUrl),
+              _shareImageImpl(imageUrl: safeImageUrl, fileName: fileName),
+          onOpenOriginal: () => _openAttachmentExternallyImpl(safeImageUrl),
         );
       },
     );
@@ -551,13 +595,25 @@ extension _SupportChatPageActions on _SupportChatPageState {
     required String videoUrl,
     String? fileName,
   }) async {
+    final safeUri = parseSafeSupportExternalUri(videoUrl);
+    if (safeUri == null) {
+      if (mounted) {
+        _showSupportToast(
+          AppLocalizations.of(context).supportChatUnavailableError,
+          tone: PetMagicToastTone.warning,
+        );
+      }
+      return;
+    }
+
+    final safeVideoUrl = safeUri.toString();
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return _SupportVideoPreviewDialog(
-          videoUrl: videoUrl,
+          videoUrl: safeVideoUrl,
           fileName: fileName,
-          onOpenOriginal: () => _openAttachmentExternallyImpl(videoUrl),
+          onOpenOriginal: () => _openAttachmentExternallyImpl(safeVideoUrl),
         );
       },
     );
@@ -616,6 +672,7 @@ class _SupportAttachmentPickerSheetState
   bool _isLoadingMore = false;
   bool _hasMore = true;
   bool _isSendingSelection = false;
+  bool _assetLoadFailed = false;
 
   @override
   void initState() {
@@ -647,13 +704,13 @@ class _SupportAttachmentPickerSheetState
   }
 
   Future<void> _initializeAssets() async {
-    final galleryPermission = await _permissionCoordinator.requestOnDemand(
-      AppPermissionType.photos,
-    );
+    _assetLoadFailed = false;
+    final galleryPermissionGranted =
+        await _requestMixedMediaGalleryPermission();
     if (!mounted) {
       return;
     }
-    if (!galleryPermission.granted) {
+    if (!galleryPermissionGranted) {
       setState(() {
         _permissionState = null;
         _isInitialLoading = false;
@@ -663,7 +720,13 @@ class _SupportAttachmentPickerSheetState
       return;
     }
 
-    final permission = await PhotoManager.requestPermissionExtend();
+    late final PermissionState permission;
+    try {
+      permission = await PhotoManager.requestPermissionExtend();
+    } on Object {
+      _markAssetLoadFailed(clearAssets: true);
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -678,15 +741,21 @@ class _SupportAttachmentPickerSheetState
       return;
     }
 
-    final paths = await PhotoManager.getAssetPathList(
-      type: RequestType.common,
-      onlyAll: true,
-      filterOption: FilterOptionGroup(
-        orders: const [
-          OrderOption(type: OrderOptionType.createDate, asc: false),
-        ],
-      ),
-    );
+    late final List<AssetPathEntity> paths;
+    try {
+      paths = await PhotoManager.getAssetPathList(
+        type: RequestType.common,
+        onlyAll: true,
+        filterOption: FilterOptionGroup(
+          orders: const [
+            OrderOption(type: OrderOptionType.createDate, asc: false),
+          ],
+        ),
+      );
+    } on Object {
+      _markAssetLoadFailed(clearAssets: true);
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -698,6 +767,7 @@ class _SupportAttachmentPickerSheetState
       _assets = const [];
       _nextPage = 0;
       _hasMore = paths.isNotEmpty;
+      _assetLoadFailed = false;
     });
 
     if (_recentAlbum == null) {
@@ -705,6 +775,24 @@ class _SupportAttachmentPickerSheetState
     }
 
     await _loadNextPage(reset: true);
+  }
+
+  Future<bool> _requestMixedMediaGalleryPermission() async {
+    final photosPermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.photos,
+    );
+    if (!mounted || !photosPermission.granted) {
+      return false;
+    }
+
+    if (!Platform.isAndroid) {
+      return true;
+    }
+
+    final videosPermission = await _permissionCoordinator.requestOnDemand(
+      AppPermissionType.videos,
+    );
+    return mounted && videosPermission.granted;
   }
 
   Future<void> _loadNextPage({bool reset = false}) async {
@@ -722,10 +810,27 @@ class _SupportAttachmentPickerSheetState
     });
 
     final currentPage = _nextPage;
-    final fetched = await _recentAlbum!.getAssetListPaged(
-      page: currentPage,
-      size: _supportAttachmentRecentAssetCount,
-    );
+    late final List<AssetEntity> fetched;
+    try {
+      fetched = await _recentAlbum!.getAssetListPaged(
+        page: currentPage,
+        size: _supportAttachmentRecentAssetCount,
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        if (reset) {
+          _assets = const [];
+        }
+        _isInitialLoading = false;
+        _isLoadingMore = false;
+        _hasMore = false;
+        _assetLoadFailed = _assets.isEmpty;
+      });
+      return;
+    }
     final nextAssets = fetched
         .where(
           (asset) =>
@@ -753,7 +858,45 @@ class _SupportAttachmentPickerSheetState
       _nextPage = currentPage + 1;
       _hasMore = nextAssets.length == _supportAttachmentRecentAssetCount;
       _isLoadingMore = false;
+      _assetLoadFailed = false;
     });
+  }
+
+  void _markAssetLoadFailed({required bool clearAssets}) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _permissionState = null;
+      _recentAlbum = null;
+      if (clearAssets) {
+        _assets = const [];
+      }
+      _nextPage = 0;
+      _isInitialLoading = false;
+      _isLoadingMore = false;
+      _hasMore = false;
+      _assetLoadFailed = true;
+    });
+  }
+
+  void _retryInitializeAssets() {
+    if (_isInitialLoading || _isLoadingMore) {
+      return;
+    }
+
+    setState(() {
+      _permissionState = null;
+      _recentAlbum = null;
+      _assets = const [];
+      _nextPage = 0;
+      _isInitialLoading = true;
+      _isLoadingMore = false;
+      _hasMore = true;
+      _assetLoadFailed = false;
+    });
+    unawaited(_initializeAssets());
   }
 
   void _toggleAsset(AssetEntity asset) {
@@ -907,6 +1050,31 @@ class _SupportAttachmentPickerSheetState
           Expanded(
             child: _isInitialLoading
                 ? const Center(child: CircularProgressIndicator())
+                : _assetLoadFailed
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            text.supportChatUnavailableError,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: colors.textMuted,
+                              fontSize: 13,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed: _retryInitializeAssets,
+                            child: Text(text.retryAction),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : !hasAccess
                 ? Center(
                     child: Padding(
@@ -1176,7 +1344,13 @@ class _SupportRecentAssetTileState extends State<_SupportRecentAssetTile> {
                         ),
                       );
                     }
-                    return Image.memory(bytes, fit: BoxFit.cover);
+                    return Image.memory(
+                      bytes,
+                      fit: BoxFit.cover,
+                      cacheWidth: _supportRecentMediaThumbnailCacheExtent,
+                      cacheHeight: _supportRecentMediaThumbnailCacheExtent,
+                      filterQuality: FilterQuality.medium,
+                    );
                   },
                 ),
                 if (isVideo)

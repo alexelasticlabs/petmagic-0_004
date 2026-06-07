@@ -1,11 +1,10 @@
-import 'dart:developer' as developer;
-
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
@@ -47,19 +46,18 @@ class _ProfileNotificationsSettingsSectionState
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isRequestingPermission = false;
+  bool _isOpeningSettings = false;
 
   void _logNotificationsFailure(
     String stage,
     Object error,
     StackTrace stackTrace,
   ) {
-    developer.Timeline.instantSync(
-      'petmagic.profile.notifications.settings.error',
-      arguments: {'stage': stage},
-    );
-    developer.log(
-      'ProfileNotificationsSettings::$stage failed',
-      name: 'PetMagic.Profile.Notifications.Settings',
+    AppLogger.warn(
+      feature: 'Profile.Notifications.Settings',
+      operation: stage,
+      message: 'Notification settings step failed',
+      context: {'stage': stage},
       error: error,
       stackTrace: stackTrace,
     );
@@ -113,16 +111,30 @@ class _ProfileNotificationsSettingsSectionState
   }
 
   Future<void> _refreshDevicePermissions() async {
-    final statuses = await _permissionCoordinator.readStatuses();
-    if (!mounted) {
-      return;
+    try {
+      final statuses = await _permissionCoordinator.readStatuses();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _devicePermissions = statuses;
+      });
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('refresh_device_permissions', error, stackTrace);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _devicePermissions = const [];
+      });
     }
-    setState(() {
-      _devicePermissions = statuses;
-    });
   }
 
   Future<void> _update(NotificationPreferences next) async {
+    if (_isSaving) {
+      return;
+    }
+
     final previous = _preferences;
 
     setState(() {
@@ -151,6 +163,10 @@ class _ProfileNotificationsSettingsSectionState
   }
 
   Future<void> _refreshPushPermissionStatus() async {
+    if (_isRequestingPermission) {
+      return;
+    }
+
     try {
       final settings = await FirebaseMessaging.instance
           .getNotificationSettings();
@@ -175,6 +191,10 @@ class _ProfileNotificationsSettingsSectionState
   }
 
   Future<void> _requestPushPermission() async {
+    if (_isRequestingPermission) {
+      return;
+    }
+
     setState(() {
       _isRequestingPermission = true;
     });
@@ -206,6 +226,29 @@ class _ProfileNotificationsSettingsSectionState
     }
   }
 
+  Future<void> _openDeviceSettings() async {
+    if (_isOpeningSettings) {
+      return;
+    }
+
+    setState(() {
+      _isOpeningSettings = true;
+    });
+
+    try {
+      await _permissionCoordinator.openSettings();
+      await _refreshDevicePermissions();
+    } catch (error, stackTrace) {
+      _logNotificationsFailure('open_device_settings', error, stackTrace);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningSettings = false;
+        });
+      }
+    }
+  }
+
   String _pushPermissionLabel(AppLocalizations text) {
     return switch (_pushAuthorizationStatus) {
       AuthorizationStatus.authorized =>
@@ -218,25 +261,6 @@ class _ProfileNotificationsSettingsSectionState
         text.profileNotificationsPushPermissionProvisional,
       _ => text.profileNotificationsPushPermissionUnknown,
     };
-  }
-
-  Future<void> _requestCorePermissions() async {
-    setState(() {
-      _isRequestingPermission = true;
-    });
-    try {
-      await _permissionCoordinator.requestOnDemand(AppPermissionType.camera);
-      await _permissionCoordinator.requestOnDemand(AppPermissionType.photos);
-      await _permissionCoordinator.requestOnDemand(AppPermissionType.files);
-      await _refreshPushPermissionStatus();
-      await _refreshDevicePermissions();
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRequestingPermission = false;
-        });
-      }
-    }
   }
 
   String _devicePermissionStateLabel(
@@ -260,8 +284,9 @@ class _ProfileNotificationsSettingsSectionState
       AppPermissionType.notifications =>
         text.profileNotificationsDeviceNotifications,
       AppPermissionType.camera => text.profileNotificationsDeviceCamera,
+      AppPermissionType.microphone => 'Microphone',
       AppPermissionType.photos => text.profileNotificationsDevicePhotos,
-      AppPermissionType.files => text.profileNotificationsDeviceFiles,
+      AppPermissionType.videos => text.videoLabel,
     };
   }
 
@@ -489,19 +514,10 @@ class _ProfileNotificationsSettingsSectionState
                           ),
                         ),
                         FilledButton.tonal(
-                          onPressed: _isRequestingPermission
+                          onPressed:
+                              _isRequestingPermission || _isOpeningSettings
                               ? null
-                              : _requestCorePermissions,
-                          child: Text(
-                            _isRequestingPermission
-                                ? text.profileLoadingAction
-                                : text.profileNotificationsRequestDevicePermissions,
-                          ),
-                        ),
-                        FilledButton.tonal(
-                          onPressed: _isRequestingPermission
-                              ? null
-                              : () => _permissionCoordinator.openSettings(),
+                              : _openDeviceSettings,
                           child: Text(text.supportChatOpenSettingsAction),
                         ),
                       ],

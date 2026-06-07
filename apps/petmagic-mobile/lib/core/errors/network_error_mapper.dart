@@ -13,6 +13,10 @@ class ApiErrorPayload {
 class NetworkErrorMapper {
   const NetworkErrorMapper._();
 
+  static final RegExp _safeMessageKeyPattern = RegExp(
+    r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$',
+  );
+
   static bool isConnectivityIssue(DioException error) {
     return error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout ||
@@ -42,6 +46,20 @@ class NetworkErrorMapper {
     final title = _clean(data['title'] as String?);
 
     return ApiErrorPayload(flattened: flattened, detail: detail, title: title);
+  }
+
+  static String? safePayloadMessage(ApiErrorPayload payload) {
+    for (final value in [payload.title, payload.detail, payload.flattened]) {
+      if (value != null && isSafeMessageKey(value)) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  static bool isSafeMessageKey(String value) {
+    final trimmed = value.trim();
+    return trimmed.length <= 96 && _safeMessageKeyPattern.hasMatch(trimmed);
   }
 
   static AppException fromMessage(

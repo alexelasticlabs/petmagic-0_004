@@ -343,6 +343,9 @@ Future<void> _showReadyCardActions(
   TemplateGenerationResult generation,
 ) async {
   final colors = context.petMagicColors;
+  final galleryState = context
+      .findAncestorStateOfType<_GenerationsGalleryPageState>();
+  final isMediaActionInFlight = galleryState?._isMediaActionInFlight ?? false;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -382,20 +385,36 @@ Future<void> _showReadyCardActions(
                 ListTile(
                   leading: const Icon(Icons.download_rounded),
                   title: Text(text.generationStatusSaveAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(
-                      _saveGenerationToGallery(context, text, generation),
-                    );
-                  },
+                  onTap: isMediaActionInFlight
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(
+                            _saveGenerationToGallery(
+                              context,
+                              text,
+                              ref,
+                              generation,
+                            ),
+                          );
+                        },
                 ),
                 ListTile(
                   leading: const Icon(Icons.share_rounded),
                   title: Text(text.supportChatShareAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(_shareGenerationFile(context, text, generation));
-                  },
+                  onTap: isMediaActionInFlight
+                      ? null
+                      : () {
+                          Navigator.of(sheetContext).pop();
+                          unawaited(
+                            _shareGenerationFile(
+                              context,
+                              text,
+                              ref,
+                              generation,
+                            ),
+                          );
+                        },
                 ),
                 ListTile(
                   leading: const Icon(Icons.link_rounded),
@@ -502,22 +521,34 @@ Future<void> _showFailedCardActions(
 Future<void> _saveGenerationToGallery(
   BuildContext context,
   AppLocalizations text,
+  WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
+  final galleryState = context
+      .findAncestorStateOfType<_GenerationsGalleryPageState>();
+  final mediaActionCancelToken = galleryState?._startMediaAction();
+  if (galleryState == null || mediaActionCancelToken == null) {
+    return;
+  }
+
   final outputUrl = generation.outputUrl;
   if (outputUrl == null || outputUrl.isEmpty) {
     _notifySoon(context, text.generationStatusResultUnavailableForSave);
+    galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
 
   final fileName = _buildGenerationFileName(generation, outputUrl);
   try {
-    final wasSaved = await saveRemoteMediaToGallery(
-      mediaUrl: outputUrl,
-      fileName: fileName,
-      isVideo: isVideoGeneration(generation),
-      albumName: 'PetMagic',
-    );
+    final wasSaved = await ref
+        .read(generationStatusMediaActionsProvider)
+        .saveToGallery(
+          mediaUrl: outputUrl,
+          fileName: fileName,
+          isVideo: isVideoGeneration(generation),
+          albumName: 'PetMagic',
+          cancelToken: mediaActionCancelToken,
+        );
 
     if (!context.mounted) {
       return;
@@ -529,38 +560,66 @@ Future<void> _saveGenerationToGallery(
     }
 
     _notifySoon(context, text.generationStatusSavedToGalleryMessage);
+  } on DioException catch (error) {
+    if (!context.mounted || CancelToken.isCancel(error)) {
+      return;
+    }
+
+    _notifySoon(context, text.generationStatusFileSaveFailedMessage);
   } on Object {
     if (!context.mounted) {
       return;
     }
 
     _notifySoon(context, text.generationStatusFileSaveFailedMessage);
+  } finally {
+    galleryState._completeMediaAction(mediaActionCancelToken);
   }
 }
 
 Future<void> _shareGenerationFile(
   BuildContext context,
   AppLocalizations text,
+  WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
+  final galleryState = context
+      .findAncestorStateOfType<_GenerationsGalleryPageState>();
+  final mediaActionCancelToken = galleryState?._startMediaAction();
+  if (galleryState == null || mediaActionCancelToken == null) {
+    return;
+  }
+
   final outputUrl = generation.outputUrl;
   if (outputUrl == null || outputUrl.isEmpty) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
 
   try {
-    await shareRemoteMediaFile(
-      mediaUrl: outputUrl,
-      fileName: _buildGenerationFileName(generation, outputUrl),
-      title: generation.templateTitle ?? text.generationStatusResultTitle,
-    );
+    await ref
+        .read(generationStatusMediaActionsProvider)
+        .share(
+          mediaUrl: outputUrl,
+          fileName: _buildGenerationFileName(generation, outputUrl),
+          title: generation.templateTitle ?? text.generationStatusResultTitle,
+          cancelToken: mediaActionCancelToken,
+        );
+  } on DioException catch (error) {
+    if (!context.mounted || CancelToken.isCancel(error)) {
+      return;
+    }
+
+    _notifySoon(context, text.generationStatusShareFailedMessage);
   } on Object {
     if (!context.mounted) {
       return;
     }
 
     _notifySoon(context, text.generationStatusShareFailedMessage);
+  } finally {
+    galleryState._completeMediaAction(mediaActionCancelToken);
   }
 }
 
@@ -575,7 +634,13 @@ Future<void> _copyGenerationLink(
     return;
   }
 
-  await Clipboard.setData(ClipboardData(text: outputUrl));
+  final safeUri = parseSafeGenerationMediaUri(outputUrl);
+  if (safeUri == null) {
+    _notifySoon(context, text.generationStatusResultUnavailableForShare);
+    return;
+  }
+
+  await Clipboard.setData(ClipboardData(text: safeUri.toString()));
   if (!context.mounted) {
     return;
   }

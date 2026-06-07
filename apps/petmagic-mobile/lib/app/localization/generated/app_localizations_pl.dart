@@ -3191,10 +3191,6 @@ class AppLocalizationsPl extends AppLocalizations {
   String get profileNotificationsDeviceFiles => 'Akta';
 
   @override
-  String get profileNotificationsRequestDevicePermissions =>
-      'Poproś o uprawnienia urządzenia';
-
-  @override
   String get supportChatLoadPreviousMessagesAction =>
       'Załaduj poprzednie wiadomości';
 

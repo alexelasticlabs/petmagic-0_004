@@ -24,6 +24,19 @@ class NotificationCoordinator {
   final SupportChatRepository _supportRepository;
   final WalletRepository _walletRepository;
   final void Function(String route) _onRouteRequested;
+  static const _allowedNotificationRoutes = <String>{
+    '/templates',
+    '/creations',
+    '/rewards',
+    '/profile',
+    '/profile/support',
+    '/profile/support/chat',
+    '/profile/wallet',
+    '/profile/premium',
+    '/profile/subscription/manage',
+  };
+  static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
+  static final RegExp _safeGenerationId = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
@@ -34,6 +47,7 @@ class NotificationCoordinator {
   bool _initialized = false;
   bool _initializing = false;
   bool _authenticatedReady = false;
+  int _registrationEpoch = 0;
 
   Future<void> initializeForAuthenticatedUser() async {
     if (_isDisposed ||
@@ -74,14 +88,19 @@ class NotificationCoordinator {
         return;
       }
 
-      await _registerTokenWithRetry(token);
+      final epoch = _registrationEpoch;
       _lastRegisteredToken = token;
+      final registered = await _registerTokenWithRetry(token, epoch: epoch);
+      if (registered && _canContinueRegistration(epoch)) {
+        _lastRegisteredToken = token;
+      }
     } catch (error, stackTrace) {
       _logNotificationFailure('register_current_token', error, stackTrace);
     }
   }
 
   Future<void> unregisterCurrentTokenOnSignOut() async {
+    _registrationEpoch++;
     final token = _lastRegisteredToken;
     _authenticatedReady = false;
     if (token == null || token.isEmpty) {
@@ -137,6 +156,7 @@ class NotificationCoordinator {
 
   Future<void> dispose() async {
     _isDisposed = true;
+    _registrationEpoch++;
     await _tokenRefreshSubscription?.cancel();
     await _messageOpenedSubscription?.cancel();
     await _foregroundMessageSubscription?.cancel();
@@ -150,7 +170,7 @@ class NotificationCoordinator {
     }
 
     final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(alert: true, badge: true, sound: true);
+    await messaging.getNotificationSettings();
     await messaging.setForegroundNotificationPresentationOptions(
       alert: false,
       badge: false,
@@ -161,8 +181,9 @@ class NotificationCoordinator {
       if (token.isEmpty) {
         return;
       }
-      unawaited(_registerTokenWithRetry(token));
+      final epoch = _registrationEpoch;
       _lastRegisteredToken = token;
+      unawaited(_registerTokenWithRetry(token, epoch: epoch));
     });
 
     _messageOpenedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
@@ -174,29 +195,46 @@ class NotificationCoordinator {
     _initialized = true;
   }
 
-  Future<void> _registerTokenWithRetry(String token) async {
+  Future<bool> _registerTokenWithRetry(
+    String token, {
+    required int epoch,
+  }) async {
     const maxAttempts = 4;
     const backoffs = [400, 900, 1800, 3600];
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!_canContinueRegistration(epoch)) {
+        return false;
+      }
+
       try {
         await _templateRepository.registerPushToken(
           token: token,
           platform: Platform.operatingSystem,
           locale: Platform.localeName,
         );
+        if (!_canContinueRegistration(epoch)) {
+          return false;
+        }
         await _supportRepository.registerPushToken(
           token: token,
           platform: Platform.operatingSystem,
           locale: Platform.localeName,
         );
+        if (!_canContinueRegistration(epoch)) {
+          return false;
+        }
         await _walletRepository.registerPushToken(
           token: token,
           platform: Platform.operatingSystem,
           locale: Platform.localeName,
         );
-        return;
+        return _canContinueRegistration(epoch);
       } catch (error, stackTrace) {
+        if (!_canContinueRegistration(epoch)) {
+          return false;
+        }
+
         _logNotificationFailure(
           'register_token_attempt_failed',
           error,
@@ -209,6 +247,12 @@ class NotificationCoordinator {
         await Future<void>.delayed(Duration(milliseconds: backoffs[attempt]));
       }
     }
+
+    return false;
+  }
+
+  bool _canContinueRegistration(int epoch) {
+    return !_isDisposed && epoch == _registrationEpoch;
   }
 
   void _handleRemoteMessageRoute(RemoteMessage message) {
@@ -220,13 +264,17 @@ class NotificationCoordinator {
 
   String? _routeFromMap(Map<String, dynamic> payload) {
     final route = payload['route'];
-    if (route is String && route.isNotEmpty) {
-      return route;
+    if (route is String) {
+      final safeRoute = _safeInternalRoute(route);
+      if (safeRoute != null) {
+        return safeRoute;
+      }
     }
 
     final generationId = payload['generationId'];
-    if (generationId is String && generationId.isNotEmpty) {
-      return '/generations/$generationId';
+    final generationRoute = _generationRoute(generationId);
+    if (generationRoute != null) {
+      return generationRoute;
     }
 
     final type = payload['type'];
@@ -240,6 +288,54 @@ class NotificationCoordinator {
     }
 
     return null;
+  }
+
+  String? _safeInternalRoute(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty ||
+        value.length > 160 ||
+        _routeControlCharacters.hasMatch(value) ||
+        !value.startsWith('/') ||
+        value.startsWith('//') ||
+        value.contains(r'\')) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        uri.hasScheme ||
+        uri.hasAuthority ||
+        uri.fragment.isNotEmpty ||
+        uri.query.isNotEmpty) {
+      return null;
+    }
+
+    final path = uri.path;
+    if (_allowedNotificationRoutes.contains(path)) {
+      return path;
+    }
+
+    if (path.startsWith('/generations/')) {
+      final generationId = path.substring('/generations/'.length);
+      if (_safeGenerationId.hasMatch(generationId)) {
+        return path;
+      }
+    }
+
+    return null;
+  }
+
+  String? _generationRoute(Object? rawGenerationId) {
+    if (rawGenerationId is! String) {
+      return null;
+    }
+
+    final generationId = rawGenerationId.trim();
+    if (!_safeGenerationId.hasMatch(generationId)) {
+      return null;
+    }
+
+    return '/generations/$generationId';
   }
 
   bool _shouldDisplayForeground(RemoteMessage message) {

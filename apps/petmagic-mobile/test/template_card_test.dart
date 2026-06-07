@@ -79,6 +79,93 @@ void main() {
     expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('TemplateCard ignores duplicate and stale video preview init', (
+    tester,
+  ) async {
+    final firstTemplate = _videoTemplate(
+      id: 'video-template-first',
+      previewUrl: 'https://cdn.example.com/templates/first-preview.mp4',
+    );
+    final secondTemplate = _videoTemplate(
+      id: 'video-template-second',
+      previewUrl: 'https://cdn.example.com/templates/second-preview.mp4',
+    );
+    final firstController = Completer<VideoPlayerController>();
+    final secondController = Completer<VideoPlayerController>();
+    final requestedUrls = <String>[];
+
+    await tester.pumpWidget(
+      _buildHost(
+        firstTemplate,
+        previewControllerFactory: (previewUrl) {
+          requestedUrls.add(previewUrl);
+          return firstController.future;
+        },
+      ),
+    );
+    await tester.pump();
+
+    _showTemplateCard(tester);
+    _showTemplateCard(tester);
+
+    expect(requestedUrls, [firstTemplate.previewAsset!.url]);
+
+    await tester.pumpWidget(
+      _buildHost(
+        secondTemplate,
+        previewControllerFactory: (previewUrl) {
+          requestedUrls.add(previewUrl);
+          return secondController.future;
+        },
+      ),
+    );
+    await tester.pump();
+    _showTemplateCard(tester);
+
+    expect(requestedUrls, [
+      firstTemplate.previewAsset!.url,
+      secondTemplate.previewAsset!.url,
+    ]);
+
+    firstController.complete(
+      VideoPlayerController.networkUrl(
+        Uri.parse(firstTemplate.previewAsset!.url),
+      ),
+    );
+    await tester.pump();
+
+    expect(fakePlatform.createCalls, equals(0));
+
+    secondController.complete(
+      VideoPlayerController.networkUrl(
+        Uri.parse(secondTemplate.previewAsset!.url),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(fakePlatform.createCalls, equals(1));
+    expect(fakePlatform.createdUris, [secondTemplate.previewAsset!.url]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
+    expect(tester.takeException(), isNull);
+  });
+}
+
+void _showTemplateCard(WidgetTester tester) {
+  final detector = tester.widget<VisibilityDetector>(
+    find.byType(VisibilityDetector),
+  );
+
+  detector.onVisibilityChanged?.call(
+    VisibilityInfo(
+      key: detector.key!,
+      size: const Size(320, 240),
+      visibleBounds: const Rect.fromLTWH(0, 0, 320, 240),
+    ),
+  );
 }
 
 Widget _buildHost(
@@ -106,19 +193,22 @@ Widget _buildHost(
   );
 }
 
-TemplateItem _videoTemplate() {
-  return const TemplateItem(
-    templateId: 'video-template-test',
+TemplateItem _videoTemplate({
+  String id = 'video-template-test',
+  String previewUrl = 'https://cdn.example.com/templates/test-preview.mp4',
+}) {
+  return TemplateItem(
+    templateId: id,
     templateType: TemplateType.video,
     title: 'Video Template',
     shortDescription: 'Template card viewport lifecycle test',
-    petPhotoRequirements: <String>['Clear pet photo'],
+    petPhotoRequirements: const <String>['Clear pet photo'],
     category: 'test',
-    tags: <String>['viewport', 'video'],
+    tags: const <String>['viewport', 'video'],
     isPremium: false,
     tokenCost: 5,
     previewAsset: TemplateAsset(
-      url: 'https://cdn.example.com/templates/test-preview.mp4',
+      url: previewUrl,
       fileName: 'test-preview.mp4',
       contentType: 'video/mp4',
       durationSeconds: 6,
@@ -136,6 +226,7 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   int playCalls = 0;
   int pauseCalls = 0;
   int disposeCalls = 0;
+  final List<String?> createdUris = <String?>[];
 
   @override
   Future<void> init() async {}
@@ -143,6 +234,7 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<int?> create(DataSource dataSource) async {
     createCalls += 1;
+    createdUris.add(dataSource.uri);
     final playerId = _nextPlayerId++;
     final events = StreamController<VideoEvent>.broadcast();
     _eventsByPlayerId[playerId] = events;

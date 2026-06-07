@@ -51,6 +51,6 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
     case 'profile.action_failed':
       return text.profileActionFailed;
     default:
-      return raw;
+      return text.authRequestFailed;
   }
 }

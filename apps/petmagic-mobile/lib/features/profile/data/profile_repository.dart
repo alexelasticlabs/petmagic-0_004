@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -44,6 +45,8 @@ class ProfileRepository {
   final Dio _dio;
   final AuthSessionStorage _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
+
+  static const _maxAvatarBytes = 8 * 1024 * 1024;
 
   Future<AuthSession?> readSession() => _sessionStorage.read();
 
@@ -142,12 +145,9 @@ class ProfileRepository {
       await _authorizedRequest<void>(
         (session) => _dio.post<void>(
           '/api/auth/me/password-change/request',
-          options: Options(
-            headers: {
-              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-            },
-          ),
+          options: authenticatedRequestOptions(session.accessToken),
         ),
+        retryTransientFailures: false,
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -170,12 +170,9 @@ class ProfileRepository {
             'newPassword': newPassword,
             'refreshToken': session.refreshToken,
           },
-          options: Options(
-            headers: {
-              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-            },
-          ),
+          options: authenticatedRequestOptions(session.accessToken),
         ),
+        retryTransientFailures: false,
       );
     } on DioException catch (error) {
       throw _mapDioException(
@@ -228,20 +225,14 @@ class ProfileRepository {
       await _dio.post<void>(
         '/api/auth/logout',
         data: {'refreshToken': session.refreshToken},
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       );
     } catch (error, stackTrace) {
-      developer.Timeline.instantSync(
-        'petmagic.profile.logout.error',
-        arguments: {'stage': 'remote_logout'},
-      );
-      developer.log(
-        'ProfileRepository::remote logout failed',
-        name: 'PetMagic.Profile.Auth',
+      AppLogger.warn(
+        feature: 'Profile.Auth',
+        operation: 'remote_logout',
+        message: 'Remote logout failed after local session clear',
+        context: {'stage': 'remote_logout'},
         error: error,
         stackTrace: stackTrace,
       );
@@ -254,12 +245,9 @@ class ProfileRepository {
       await _authorizedRequest<void>(
         (session) => _dio.delete<void>(
           '/api/auth/me',
-          options: Options(
-            headers: {
-              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-            },
-          ),
+          options: authenticatedRequestOptions(session.accessToken),
         ),
+        retryTransientFailures: false,
       );
 
       await _sessionStorage.clear();
@@ -272,11 +260,7 @@ class ProfileRepository {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/auth/me',
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
     );
 
@@ -297,12 +281,9 @@ class ProfileRepository {
                 ? null
                 : displayName!.trim(),
           },
-          options: Options(
-            headers: {
-              HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-            },
-          ),
+          options: authenticatedRequestOptions(session.accessToken),
         ),
+        retryTransientFailures: false,
       );
 
       final profile = MobileUserProfile.fromJson(response.data ?? const {});
@@ -317,11 +298,7 @@ class ProfileRepository {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
         '/api/auth/me/linked-accounts',
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
     );
 
@@ -359,12 +336,9 @@ class ProfileRepository {
           'termsOfUseVersion': documents.termsOfUse.version,
           'privacyPolicyVersion': documents.privacyPolicy.version,
         },
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     final profile = MobileUserProfile.fromJson(response.data ?? const {});
@@ -372,9 +346,13 @@ class ProfileRepository {
     return profile;
   }
 
-  Future<MobileUserProfile> uploadAvatar(String filePath) async {
+  Future<MobileUserProfile> uploadAvatar(
+    String filePath, {
+    CancelToken? cancelToken,
+  }) async {
     final fileName = filePath.split(Platform.pathSeparator).last;
     final mediaType = _resolveMediaType(fileName);
+    await _validateAvatarForUpload(filePath: filePath, mediaType: mediaType);
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.put<Map<String, dynamic>>(
@@ -386,12 +364,10 @@ class ProfileRepository {
             contentType: mediaType,
           ),
         }),
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        cancelToken: cancelToken,
+        options: authenticatedMultipartRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     final profile = MobileUserProfile.fromJson(response.data ?? const {});
@@ -403,12 +379,9 @@ class ProfileRepository {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.delete<Map<String, dynamic>>(
         '/api/auth/me/avatar',
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     final profile = MobileUserProfile.fromJson(response.data ?? const {});
@@ -420,12 +393,9 @@ class ProfileRepository {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.delete<List<dynamic>>(
         '/api/auth/me/linked-accounts/${Uri.encodeComponent(provider)}',
-        options: Options(
-          headers: {
-            HttpHeaders.authorizationHeader: 'Bearer ${session.accessToken}',
-          },
-        ),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return (response.data ?? const <dynamic>[])
@@ -435,13 +405,15 @@ class ProfileRepository {
   }
 
   Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request,
-  ) async {
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'auth.request_failed',
       sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
     );
   }
 
@@ -480,28 +452,52 @@ class ProfileRepository {
       );
     }
 
-    if (payload.flattened != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
-    }
-
-    if (payload.detail != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.detail!);
-    }
-
-    if (payload.title != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.title!);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 
+  Future<void> _validateAvatarForUpload({
+    required String filePath,
+    required MediaType mediaType,
+  }) async {
+    if (!_isAllowedAvatarMediaType(mediaType)) {
+      throw const AppException('profile.action_failed', statusCode: 400);
+    }
+
+    int fileSizeBytes;
+    try {
+      fileSizeBytes = await File(filePath).length();
+    } on FileSystemException catch (error) {
+      throw AppException(
+        'profile.action_failed',
+        statusCode: 400,
+        cause: error,
+      );
+    }
+
+    if (fileSizeBytes <= 0 || fileSizeBytes > _maxAvatarBytes) {
+      throw const AppException('profile.action_failed', statusCode: 400);
+    }
+  }
+
+  bool _isAllowedAvatarMediaType(MediaType mediaType) {
+    return mediaType.type == 'image' &&
+        (mediaType.subtype == 'jpeg' ||
+            mediaType.subtype == 'png' ||
+            mediaType.subtype == 'webp');
+  }
+
   MediaType _resolveMediaType(String fileName) {
     final extension = fileName.split('.').last.toLowerCase();
     return switch (extension) {
+      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
       'png' => MediaType('image', 'png'),
       'webp' => MediaType('image', 'webp'),
-      'gif' => MediaType('image', 'gif'),
-      _ => MediaType('image', 'jpeg'),
+      _ => throw const AppException('profile.action_failed', statusCode: 400),
     };
   }
 }

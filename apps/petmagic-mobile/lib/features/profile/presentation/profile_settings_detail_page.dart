@@ -62,6 +62,12 @@ class _ProfileAccountInfoPageState
   bool _isEditingDisplayName = false;
 
   @override
+  void initState() {
+    super.initState();
+    _syncDisplayNameController(ref.read(profileControllerProvider));
+  }
+
+  @override
   void dispose() {
     _displayNameController.dispose();
     super.dispose();
@@ -73,9 +79,6 @@ class _ProfileAccountInfoPageState
     final colors = context.petMagicColors;
     final state = ref.watch(profileControllerProvider);
     final profile = state.profile;
-    if (!_isEditingDisplayName) {
-      _displayNameController.text = profile?.displayName ?? '';
-    }
     final bottomInset = petMagicBottomNavInset(
       context,
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
@@ -85,6 +88,8 @@ class _ProfileAccountInfoPageState
       if (!mounted) {
         return;
       }
+
+      _syncDisplayNameController(next);
 
       final previousError = previous?.errorMessage;
       if (next.errorMessage != null && next.errorMessage != previousError) {
@@ -138,6 +143,23 @@ class _ProfileAccountInfoPageState
           ],
         ),
       ),
+    );
+  }
+
+  void _syncDisplayNameController(ProfileState state) {
+    if (_isEditingDisplayName) {
+      return;
+    }
+
+    final displayName = state.profile?.displayName ?? '';
+    if (_displayNameController.text == displayName) {
+      return;
+    }
+
+    _displayNameController.value = _displayNameController.value.copyWith(
+      text: displayName,
+      selection: TextSelection.collapsed(offset: displayName.length),
+      composing: TextRange.empty,
     );
   }
 

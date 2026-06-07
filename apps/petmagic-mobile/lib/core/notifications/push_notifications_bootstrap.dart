@@ -36,9 +36,9 @@ class _PushNotificationsBootstrapState
   static const _initialLinkTimeout = Duration(seconds: 3);
   final AppLinks _appLinks = AppLinks();
   NotificationCoordinator? _coordinator;
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
   bool _wasAuthenticated = false;
-  bool _initialLinkHandled = false;
 
   @override
   void initState() {
@@ -49,35 +49,63 @@ class _PushNotificationsBootstrapState
       walletRepository: ref.read(walletRepositoryProvider),
       onRouteRequested: _openRoute,
     );
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
+    _deepLinkSubscription = _appLinks.uriLinkStream.listen(_openDeepLink);
+    Future.microtask(_handleInitialLinkOnce);
   }
 
   @override
   void dispose() {
-    unawaited(_coordinator?.dispose());
+    _launchSubscription?.close();
+    final coordinator = _coordinator;
+    _coordinator = null;
+    unawaited(coordinator?.dispose());
     unawaited(_deepLinkSubscription?.cancel());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final launchState = ref.watch(appLaunchControllerProvider);
+    return widget.child;
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
     if (launchState.isAuthenticated && !_wasAuthenticated) {
       _wasAuthenticated = true;
-      Future.microtask(() => _coordinator?.initializeForAuthenticatedUser());
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
+
+        final coordinator = _coordinator;
+        if (coordinator == null) {
+          return;
+        }
+
+        unawaited(coordinator.initializeForAuthenticatedUser());
+      });
+      return;
     }
 
     if (!launchState.isAuthenticated && _wasAuthenticated) {
       _wasAuthenticated = false;
-      Future.microtask(() => _coordinator?.unregisterCurrentTokenOnSignOut());
-    }
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
 
-    _deepLinkSubscription ??= _appLinks.uriLinkStream.listen(_openDeepLink);
-    if (!_initialLinkHandled) {
-      _initialLinkHandled = true;
-      Future.microtask(_handleInitialLinkOnce);
-    }
+        final coordinator = _coordinator;
+        if (coordinator == null) {
+          return;
+        }
 
-    return widget.child;
+        unawaited(coordinator.unregisterCurrentTokenOnSignOut());
+      });
+    }
   }
 
   Future<void> _handleInitialLinkOnce() async {
@@ -89,7 +117,7 @@ class _PushNotificationsBootstrapState
       final initialLink = await _appLinks.getInitialLink().timeout(
         _initialLinkTimeout,
       );
-      if (initialLink != null) {
+      if (mounted && initialLink != null) {
         _openDeepLink(initialLink);
       }
     } on TimeoutException catch (error, stackTrace) {
@@ -115,6 +143,10 @@ class _PushNotificationsBootstrapState
   }
 
   void _openRoute(String route) {
+    if (!mounted) {
+      return;
+    }
+
     if (_isGenerationRoute(route) ||
         _isSupportRoute(route) ||
         _isWalletRoute(route) ||
@@ -125,6 +157,10 @@ class _PushNotificationsBootstrapState
   }
 
   void _openDeepLink(Uri uri) {
+    if (!mounted) {
+      return;
+    }
+
     if (uri.scheme != 'petmagic') {
       return;
     }
@@ -140,17 +176,29 @@ class _PushNotificationsBootstrapState
       if (path == 'success') {
         final sessionId = uri.queryParameters['session_id'];
         if (sessionId != null && sessionId.isNotEmpty) {
-          Future.microtask(
-            () => ref
-                .read(walletControllerProvider.notifier)
-                .verifyStripeCheckout(sessionId),
-          );
+          Future.microtask(() {
+            if (!mounted) {
+              return;
+            }
+
+            unawaited(
+              ref
+                  .read(walletControllerProvider.notifier)
+                  .verifyStripeCheckout(sessionId),
+            );
+          });
         } else {
-          Future.microtask(
-            () => ref
-                .read(walletControllerProvider.notifier)
-                .verifyCheckoutStatus(),
-          );
+          Future.microtask(() {
+            if (!mounted) {
+              return;
+            }
+
+            unawaited(
+              ref
+                  .read(walletControllerProvider.notifier)
+                  .verifyCheckoutStatus(),
+            );
+          });
         }
       }
       return;

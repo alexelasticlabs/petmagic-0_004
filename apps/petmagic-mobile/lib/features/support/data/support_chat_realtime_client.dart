@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
+import 'package:petmagic_mobile/core/network/request_identity.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
+import 'package:signalr_netcore/ihub_protocol.dart';
 
 final supportChatRealtimeClientProvider = Provider<SupportChatRealtimeClient>((
   ref,
@@ -135,13 +137,27 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
     final connection = HubConnectionBuilder()
         .withUrl(
           '$baseUrl/hubs/support-chat',
-          options: HttpConnectionOptions(accessTokenFactory: _readAccessToken),
+          options: HttpConnectionOptions(
+            accessTokenFactory: _readAccessToken,
+            headers: _buildConnectionHeaders(),
+          ),
         )
         .withAutomaticReconnect()
         .build();
 
     connection.on(_conversationUpdatedEvent, _handleConversationUpdated);
     return connection;
+  }
+
+  MessageHeaders _buildConnectionHeaders() {
+    final headers = MessageHeaders();
+    headers.setHeaderValue('X-PetMagic-Client', 'mobile-flutter');
+    headers.setHeaderValue('X-Request-ID', RequestIdentity.createRequestId());
+    headers.setHeaderValue(
+      'X-Correlation-ID',
+      RequestIdentity.createCorrelationId(),
+    );
+    return headers;
   }
 
   Future<String> _readAccessToken() async {

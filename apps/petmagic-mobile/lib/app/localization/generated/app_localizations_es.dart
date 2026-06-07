@@ -3213,10 +3213,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileNotificationsDeviceFiles => 'Archivos';
 
   @override
-  String get profileNotificationsRequestDevicePermissions =>
-      'Solicitar permisos del dispositivo';
-
-  @override
   String get supportChatLoadPreviousMessagesAction =>
       'Cargar mensajes anteriores';
 

@@ -129,10 +129,13 @@ class _SupportImagePreviewDialogState
                   minScale: 0.8,
                   maxScale: 4,
                   child: Center(
-                    child: Image.network(
-                      widget.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrl,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
+                      placeholder: (context, url) {
+                        return const SizedBox.shrink();
+                      },
+                      errorWidget: (context, url, error) {
                         return const Padding(
                           padding: EdgeInsets.all(24),
                           child: Icon(
@@ -174,6 +177,7 @@ class _SupportVideoPreviewDialogState
     extends State<_SupportVideoPreviewDialog> {
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
+  int _initializeRequestVersion = 0;
 
   @override
   void initState() {
@@ -183,33 +187,46 @@ class _SupportVideoPreviewDialogState
 
   @override
   void dispose() {
-    unawaited(_controller?.dispose());
+    _initializeRequestVersion++;
+    final controller = _controller;
+    _controller = null;
+    unawaited(controller?.dispose());
     super.dispose();
   }
 
   Future<void> _initialize() async {
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.videoUrl),
-    );
+    final requestVersion = ++_initializeRequestVersion;
+    final videoUrl = widget.videoUrl;
+    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
     _controller = controller;
     try {
       await controller.initialize();
       await controller.seekTo(Duration.zero);
-      if (!mounted || _controller != controller) {
+      if (!_isCurrentVideoRequest(requestVersion, videoUrl, controller)) {
         await controller.dispose();
         return;
       }
       setState(() {});
     } on Object {
       await controller.dispose();
-      if (!mounted) {
-        return;
+      if (_isCurrentVideoRequest(requestVersion, videoUrl, controller)) {
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
       }
-      setState(() {
-        _controller = null;
-        _failedToLoad = true;
-      });
     }
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String videoUrl,
+    VideoPlayerController controller,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.videoUrl == videoUrl &&
+        _controller == controller;
   }
 
   String _formatDuration(Duration value) {

@@ -10,7 +10,10 @@ class _ActiveCard extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewImageUrl = previewUrl(generation);
-    final canRenderPreview = canRenderImagePreview(previewImageUrl);
+    final safePreviewImageUrl = parseSafeGenerationMediaUri(
+      previewImageUrl,
+    )?.toString();
+    final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
 
     void openGeneration() {
       if (generation.isUnread) {
@@ -61,7 +64,7 @@ class _ActiveCard extends ConsumerWidget {
                             child: !canRenderPreview
                                 ? _ThumbnailPlaceholder(generation: generation)
                                 : CachedNetworkImage(
-                                    imageUrl: previewImageUrl!,
+                                    imageUrl: safePreviewImageUrl!,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 320,
                                     errorWidget: (context, url, error) =>
@@ -194,7 +197,10 @@ class _ReadyGridCard extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewImageUrl = previewUrl(generation);
-    final canRenderPreview = canRenderImagePreview(previewImageUrl);
+    final safePreviewImageUrl = parseSafeGenerationMediaUri(
+      previewImageUrl,
+    )?.toString();
+    final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
 
     Future<void> openGeneration() async {
       if (generation.isUnread) {
@@ -242,7 +248,7 @@ class _ReadyGridCard extends ConsumerWidget {
                           child: !canRenderPreview
                               ? _ThumbnailPlaceholder(generation: generation)
                               : CachedNetworkImage(
-                                  imageUrl: previewImageUrl!,
+                                  imageUrl: safePreviewImageUrl!,
                                   fit: BoxFit.cover,
                                   memCacheWidth: 320,
                                   errorWidget: (context, url, error) =>
@@ -350,7 +356,10 @@ class _FailedCard extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final previewImageUrl = previewUrl(generation);
-    final canRenderPreview = canRenderImagePreview(previewImageUrl);
+    final safePreviewImageUrl = parseSafeGenerationMediaUri(
+      previewImageUrl,
+    )?.toString();
+    final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
     final failureReason = failureReasonMessage(text, generation);
 
     void openGeneration() {
@@ -408,7 +417,7 @@ class _FailedCard extends ConsumerWidget {
                                       generation: generation,
                                     )
                                   : CachedNetworkImage(
-                                      imageUrl: previewImageUrl!,
+                                      imageUrl: safePreviewImageUrl!,
                                       fit: BoxFit.cover,
                                       memCacheWidth: 320,
                                       errorWidget: (context, url, error) =>

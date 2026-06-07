@@ -5703,12 +5703,6 @@ abstract class AppLocalizations {
   /// **'Files'**
   String get profileNotificationsDeviceFiles;
 
-  /// No description provided for @profileNotificationsRequestDevicePermissions.
-  ///
-  /// In en, this message translates to:
-  /// **'Request device permissions'**
-  String get profileNotificationsRequestDevicePermissions;
-
   /// No description provided for @supportChatLoadPreviousMessagesAction.
   ///
   /// In en, this message translates to:

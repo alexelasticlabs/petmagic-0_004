@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
@@ -23,7 +24,13 @@ class _StripePaymentSheetSmokeTestPageState
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(premiumControllerProvider.notifier).load());
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
+      ref.read(premiumControllerProvider.notifier).load();
+    });
   }
 
   @override
@@ -62,6 +69,10 @@ class _StripePaymentSheetSmokeTestPageState
   }
 
   Future<void> _openPaymentSheet() async {
+    if (_isLaunching) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     final controller = ref.read(premiumControllerProvider.notifier);
     var state = ref.read(premiumControllerProvider);
@@ -112,11 +123,21 @@ class _StripePaymentSheetSmokeTestPageState
         return;
       }
 
+      final clientSecret = checkout.paymentIntentClientSecret;
+      final publishableKey = checkout.publishableKey;
+      if (clientSecret == null ||
+          clientSecret.isEmpty ||
+          publishableKey == null ||
+          publishableKey.isEmpty) {
+        _showMessage(text.debugStripeSmokeTestPrepareFailed);
+        return;
+      }
+
       final result = await StripePaymentSheetCoordinator.present(
         context,
         request: StripePaymentSheetRequest(
-          paymentIntentClientSecret: checkout.paymentIntentClientSecret!,
-          publishableKey: checkout.publishableKey!,
+          paymentIntentClientSecret: clientSecret,
+          publishableKey: publishableKey,
           customerId: checkout.customerId,
           customerEphemeralKeySecret: checkout.customerEphemeralKeySecret,
         ),
@@ -129,9 +150,18 @@ class _StripePaymentSheetSmokeTestPageState
       if (result.completed) {
         _showMessage(text.debugStripeSmokeTestOpenedSuccess);
       } else {
-        _showMessage(
-          result.errorMessage ?? text.debugStripeSmokeTestDismissedOrFailed,
-        );
+        _showMessage(text.debugStripeSmokeTestDismissedOrFailed);
+      }
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Premium.DebugPaymentSheet',
+        operation: 'open_payment_sheet',
+        message: 'Stripe PaymentSheet smoke test failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        _showMessage(text.debugStripeSmokeTestPrepareFailed);
       }
     } finally {
       if (mounted) {
@@ -145,9 +175,7 @@ class _StripePaymentSheetSmokeTestPageState
     if (state.checkoutVerificationState ==
             PremiumCheckoutVerificationState.error &&
         mounted) {
-      _showMessage(
-        state.checkoutErrorMessage ?? text.debugStripeSmokeTestVerifyFailed,
-      );
+      _showMessage(text.debugStripeSmokeTestVerifyFailed);
     }
   }
 

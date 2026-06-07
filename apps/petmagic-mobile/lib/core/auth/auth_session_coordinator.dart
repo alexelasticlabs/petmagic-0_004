@@ -41,18 +41,25 @@ class AuthSessionCoordinator {
     required String requestFailedMessage,
     String unauthorizedMessage = 'auth.sign_in_required',
     String sessionExpiredMessage = 'auth.session_expired',
+    int transientRetryAttempts = _requestTransientRetryAttempts,
   }) async {
     final initialSession = await _sessionStorage.read();
-    if (initialSession == null) {
+    if (initialSession == null || !initialSession.hasUsableTokens) {
+      if (initialSession != null) {
+        await _sessionStorage.clear();
+      }
       throw AppException(unauthorizedMessage, statusCode: 401);
     }
 
     try {
       return await _executeWithTransientRetry(
         operation: () => request(initialSession),
-        maxAttempts: _requestTransientRetryAttempts,
+        maxAttempts: transientRetryAttempts,
       );
     } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
       if (error.response?.statusCode != 401) {
         throw mapError(error, fallbackMessage: requestFailedMessage);
       }
@@ -67,9 +74,12 @@ class AuthSessionCoordinator {
     try {
       return await _executeWithTransientRetry(
         operation: () => request(refreshedSession),
-        maxAttempts: _requestTransientRetryAttempts,
+        maxAttempts: transientRetryAttempts,
       );
     } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
       throw mapError(error, fallbackMessage: requestFailedMessage);
     }
   }
@@ -80,7 +90,10 @@ class AuthSessionCoordinator {
     String sessionExpiredMessage = 'auth.session_expired',
   }) async {
     final session = await _sessionStorage.read();
-    if (session == null) {
+    if (session == null || !session.hasUsableTokens) {
+      if (session != null) {
+        await _sessionStorage.clear();
+      }
       throw AppException(unauthorizedMessage, statusCode: 401);
     }
 
@@ -107,6 +120,7 @@ class AuthSessionCoordinator {
 
     final completer = Completer<AuthSession>();
     _refreshInFlight = completer;
+    completer.future.ignore();
 
     try {
       final response = await _executeWithTransientRetry(
@@ -118,10 +132,19 @@ class AuthSessionCoordinator {
       );
 
       final refreshed = AuthSession.fromJson(response.data ?? const {});
+      if (!refreshed.hasUsableTokens) {
+        throw AppException(sessionExpiredMessage, statusCode: 401);
+      }
       await _sessionStorage.save(refreshed);
       completer.complete(refreshed);
       return refreshed;
     } on DioException catch (error, stackTrace) {
+      if (CancelToken.isCancel(error)) {
+        const cancelled = RequestCancelledException();
+        completer.completeError(cancelled, stackTrace);
+        throw cancelled;
+      }
+
       if (_shouldInvalidateSessionForRefreshError(error)) {
         await _sessionStorage.clear();
       }
@@ -129,6 +152,7 @@ class AuthSessionCoordinator {
       completer.completeError(mapped, stackTrace);
       throw mapped;
     } catch (error, stackTrace) {
+      await _sessionStorage.clear();
       final mapped = AppException(sessionExpiredMessage, cause: error);
       completer.completeError(mapped, stackTrace);
       throw mapped;
@@ -152,17 +176,18 @@ class AuthSessionCoordinator {
     required Future<T> Function() operation,
     required int maxAttempts,
   }) async {
+    final effectiveMaxAttempts = maxAttempts.clamp(1, 4);
     var attempt = 0;
     DioException? lastError;
 
-    while (attempt < maxAttempts) {
+    while (attempt < effectiveMaxAttempts) {
       try {
         return await operation();
       } on DioException catch (error) {
         lastError = error;
         attempt += 1;
 
-        if (!_isTransientDioFailure(error) || attempt >= maxAttempts) {
+        if (!_isTransientDioFailure(error) || attempt >= effectiveMaxAttempts) {
           rethrow;
         }
 

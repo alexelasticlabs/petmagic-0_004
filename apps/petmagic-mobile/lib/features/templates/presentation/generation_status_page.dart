@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -15,7 +17,9 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
+import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
@@ -24,6 +28,55 @@ import 'package:video_player/video_player.dart';
 
 part 'generation_status_page_common_sections.dart';
 part 'generation_status_page_sections.dart';
+
+final generationStatusMediaActionsProvider =
+    Provider<GenerationStatusMediaActions>((ref) {
+      return const GenerationStatusMediaActions();
+    });
+
+class GenerationStatusMediaActions {
+  const GenerationStatusMediaActions();
+
+  Future<bool> saveToGallery({
+    required String mediaUrl,
+    required String fileName,
+    required bool isVideo,
+    required String albumName,
+    required CancelToken cancelToken,
+  }) {
+    final safeUri = parseSafeGenerationMediaUri(mediaUrl);
+    if (safeUri == null) {
+      throw const AppException('generation.media_url_untrusted');
+    }
+
+    return saveRemoteMediaToGallery(
+      mediaUrl: safeUri.toString(),
+      fileName: fileName,
+      isVideo: isVideo,
+      albumName: albumName,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<void> share({
+    required String mediaUrl,
+    required String fileName,
+    required String title,
+    required CancelToken cancelToken,
+  }) {
+    final safeUri = parseSafeGenerationMediaUri(mediaUrl);
+    if (safeUri == null) {
+      throw const AppException('generation.media_url_untrusted');
+    }
+
+    return shareRemoteMediaFile(
+      mediaUrl: safeUri.toString(),
+      fileName: fileName,
+      title: title,
+      cancelToken: cancelToken,
+    );
+  }
+}
 
 class GenerationStatusPage extends ConsumerStatefulWidget {
   const GenerationStatusPage({required this.generationId, super.key});
@@ -44,8 +97,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isLoading = true;
   bool _isSubmittingFeedback = false;
   bool _isDeleting = false;
+  bool _isMediaActionInFlight = false;
   String? _errorMessage;
   bool _isPollInFlight = false;
+  CancelToken? _activeLoadCancelToken;
+  CancelToken? _activeMediaActionCancelToken;
 
   @override
   void initState() {
@@ -70,12 +126,16 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopPolling();
+    _cancelActiveLoad();
+    _cancelActiveMediaAction();
     super.dispose();
   }
 
   @override
   void deactivate() {
     _stopPolling();
+    _cancelActiveLoad();
+    _cancelActiveMediaAction();
     super.deactivate();
   }
 
@@ -192,7 +252,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                 if (_isLoading && generation == null)
                   const _LoadingCard()
                 else if (_errorMessage != null && generation == null)
-                  _ErrorCard(message: _errorMessage!, onRetry: () => _load())
+                  _ErrorCard(
+                    message: _statusLoadErrorText(text, _errorMessage!),
+                    onRetry: () => _load(),
+                  )
                 else if (generation != null) ...[
                   _StatusHero(generation: generation),
                   const SizedBox(height: 14),
@@ -203,8 +266,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                     ),
                     const SizedBox(height: 10),
                     _ReadyActionsRow(
-                      onSave: () => unawaited(_saveToGallery(generation)),
-                      onShare: () => unawaited(_shareResult(generation)),
+                      onSave: _isMediaActionInFlight
+                          ? null
+                          : () => unawaited(_saveToGallery(generation)),
+                      onShare: _isMediaActionInFlight
+                          ? null
+                          : () => unawaited(_shareResult(generation)),
                     ),
                     const SizedBox(height: 10),
                     _DetailsCard(
@@ -431,22 +498,31 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   }
 
   Future<void> _saveToGallery(TemplateGenerationResult generation) async {
+    final mediaActionCancelToken = _startMediaAction();
+    if (mediaActionCancelToken == null) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
       _showInfo(text.generationStatusResultUnavailableForSave);
+      _completeMediaAction(mediaActionCancelToken);
       return;
     }
 
     final fileName = _buildOutputFileName(generation, outputUrl);
 
     try {
-      final wasSaved = await saveRemoteMediaToGallery(
-        mediaUrl: outputUrl,
-        fileName: fileName,
-        isVideo: isVideoGeneration(generation),
-        albumName: 'PetMagic',
-      );
+      final wasSaved = await ref
+          .read(generationStatusMediaActionsProvider)
+          .saveToGallery(
+            mediaUrl: outputUrl,
+            fileName: fileName,
+            isVideo: isVideoGeneration(generation),
+            albumName: 'PetMagic',
+            cancelToken: mediaActionCancelToken,
+          );
 
       if (!mounted) {
         return;
@@ -458,12 +534,20 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       }
 
       _showInfo(text.generationStatusSavedToGalleryMessage);
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      _showInfo(text.generationStatusFileSaveFailedMessage);
     } on Object {
       if (!mounted) {
         return;
       }
 
       _showInfo(text.generationStatusFileSaveFailedMessage);
+    } finally {
+      _completeMediaAction(mediaActionCancelToken);
     }
   }
 
@@ -509,26 +593,101 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   }
 
   Future<void> _shareResult(TemplateGenerationResult generation) async {
+    final mediaActionCancelToken = _startMediaAction();
+    if (mediaActionCancelToken == null) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
       _showInfo(text.generationStatusResultUnavailableForShare);
+      _completeMediaAction(mediaActionCancelToken);
       return;
     }
 
     try {
-      await shareRemoteMediaFile(
-        mediaUrl: outputUrl,
-        fileName: _buildOutputFileName(generation, outputUrl),
-        title: generation.templateTitle ?? text.generationStatusResultTitle,
-      );
+      await ref
+          .read(generationStatusMediaActionsProvider)
+          .share(
+            mediaUrl: outputUrl,
+            fileName: _buildOutputFileName(generation, outputUrl),
+            title: generation.templateTitle ?? text.generationStatusResultTitle,
+            cancelToken: mediaActionCancelToken,
+          );
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      _showInfo(text.generationStatusShareFailedMessage);
     } on Object {
       if (!mounted) {
         return;
       }
 
       _showInfo(text.generationStatusShareFailedMessage);
+    } finally {
+      _completeMediaAction(mediaActionCancelToken);
     }
+  }
+
+  CancelToken? _startMediaAction() {
+    if (_activeMediaActionCancelToken != null) {
+      return null;
+    }
+
+    final cancelToken = CancelToken();
+    _activeMediaActionCancelToken = cancelToken;
+    if (mounted) {
+      setState(() => _isMediaActionInFlight = true);
+    } else {
+      _isMediaActionInFlight = true;
+    }
+    return cancelToken;
+  }
+
+  void _completeMediaAction(CancelToken cancelToken) {
+    if (!identical(_activeMediaActionCancelToken, cancelToken)) {
+      return;
+    }
+
+    _activeMediaActionCancelToken = null;
+    if (mounted) {
+      setState(() => _isMediaActionInFlight = false);
+    } else {
+      _isMediaActionInFlight = false;
+    }
+  }
+
+  void _cancelActiveMediaAction() {
+    final cancelToken = _activeMediaActionCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('generation_status_media_action_cancelled');
+    }
+    _activeMediaActionCancelToken = null;
+    _isMediaActionInFlight = false;
+  }
+
+  CancelToken _startLoadRequest() {
+    _cancelActiveLoad();
+    final cancelToken = CancelToken();
+    _activeLoadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _completeLoadRequest(CancelToken cancelToken) {
+    if (identical(_activeLoadCancelToken, cancelToken)) {
+      _activeLoadCancelToken = null;
+    }
+  }
+
+  void _cancelActiveLoad() {
+    final cancelToken = _activeLoadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('generation_status_load_cancelled');
+    }
+    _activeLoadCancelToken = null;
   }
 
   Future<void> _copyResultLink(TemplateGenerationResult generation) async {
@@ -539,7 +698,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       return;
     }
 
-    await Clipboard.setData(ClipboardData(text: outputUrl));
+    final safeUri = parseSafeGenerationMediaUri(outputUrl);
+    if (safeUri == null) {
+      _showInfo(text.generationStatusResultUnavailableForShare);
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: safeUri.toString()));
     if (!mounted) {
       return;
     }
@@ -556,17 +721,27 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       return;
     }
 
+    final safeUri = parseSafeGenerationMediaUri(outputUrl);
+    if (safeUri == null) {
+      _showInfo(AppLocalizations.of(context).templateFlowResultUnavailable);
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _FullscreenResultViewer(
           generation: generation,
-          mediaUrl: outputUrl,
+          mediaUrl: safeUri.toString(),
         ),
       ),
     );
   }
 
   void _showInfo(String message) {
+    if (!mounted) {
+      return;
+    }
+
     PetMagicToast.show(context, message: message, tone: PetMagicToastTone.info);
   }
 
@@ -598,10 +773,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     }
 
     final repository = ref.read(templateGenerationRepositoryProvider);
+    final loadCancelToken = _startLoadRequest();
 
     try {
       final previousGeneration = _generation;
-      final generation = await repository.fetchGeneration(widget.generationId);
+      final generation = await repository.fetchGeneration(
+        widget.generationId,
+        cancelToken: loadCancelToken,
+      );
       if (!mounted) {
         return;
       }
@@ -630,29 +809,44 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
           unawaited(PetMagicHaptics.heavy());
         }
       }
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        return;
+      }
+
+      await _showCachedOrMappedLoadError(repository, error);
     } catch (error) {
-      final cachedGeneration = await repository.readCachedGeneration(
-        widget.generationId,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      if (cachedGeneration != null) {
-        setState(() {
-          _generation = cachedGeneration;
-          _isLoading = false;
-          _errorMessage = null;
-        });
-        return;
-      }
-
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.toString();
-      });
+      await _showCachedOrMappedLoadError(repository, error);
+    } finally {
+      _completeLoadRequest(loadCancelToken);
     }
+  }
+
+  Future<void> _showCachedOrMappedLoadError(
+    TemplateGenerationRepository repository,
+    Object error,
+  ) async {
+    final cachedGeneration = await repository.readCachedGeneration(
+      widget.generationId,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (cachedGeneration != null) {
+      setState(() {
+        _generation = cachedGeneration;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = false;
+      _errorMessage = _mapStatusLoadError(error);
+    });
   }
 
   Future<void> _handleRatingSelected(int rating) async {
@@ -677,7 +871,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       ),
     );
 
-    if (result == null) {
+    if (!mounted || result == null) {
       return;
     }
 
@@ -690,6 +884,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     List<String> reasons,
     String? comment,
   ) async {
+    if (!mounted) {
+      return;
+    }
+
     setState(() => _isSubmittingFeedback = true);
     try {
       await ref
@@ -717,6 +915,39 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       }
     }
   }
+}
+
+String _mapStatusLoadError(Object error) {
+  if (error is AppException) {
+    if (error.statusCode == 401) {
+      return 'auth.sign_in_required';
+    }
+    if (error.statusCode == 402) {
+      return 'templates.insufficient_balance';
+    }
+
+    final message = error.message.trim();
+    if (message == 'templates.connection_timeout' ||
+        message == 'templates.server_timeout' ||
+        message == 'templates.request_failed' ||
+        message == 'templates.generation_failed') {
+      return message;
+    }
+  }
+
+  return 'templates.generation_failed';
+}
+
+String _statusLoadErrorText(AppLocalizations text, String raw) {
+  return switch (raw) {
+    'auth.sign_in_required' => text.authSignInRequired,
+    'templates.insufficient_balance' =>
+      text.templateFlowInsufficientBalanceTitle,
+    'templates.connection_timeout' => text.templateFlowNetworkError,
+    'templates.server_timeout' => text.templateFlowServerError,
+    'templates.request_failed' => text.templatesRequestFailedError,
+    _ => text.templateFlowStartFailedError,
+  };
 }
 
 class _StatusSheetActionTile extends StatelessWidget {

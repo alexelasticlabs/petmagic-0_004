@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
@@ -166,22 +167,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: EmailVerificationPage.routePath,
-        pageBuilder: (context, state) {
-          final extra = state.extra is Map<String, dynamic>
-              ? state.extra! as Map<String, dynamic>
-              : null;
-          final initialPassword = extra == null
-              ? null
-              : extra['initialPassword'] as String?;
-
-          return _buildFadeSlidePage(
-            state: state,
-            child: EmailVerificationPage(
-              email: state.uri.queryParameters['email'] ?? '',
-              initialPassword: initialPassword,
-            ),
-          );
-        },
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: EmailVerificationPage(
+            email: state.uri.queryParameters['email'] ?? '',
+          ),
+        ),
       ),
       GoRoute(
         path: LegalAcceptanceGatePage.routePath,
@@ -190,13 +181,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: const LegalAcceptanceGatePage(),
         ),
       ),
-      GoRoute(
-        path: StripePaymentSheetSmokeTestPage.routePath,
-        pageBuilder: (context, state) => _buildFadeSlidePage(
-          state: state,
-          child: const StripePaymentSheetSmokeTestPage(),
+      if (kDebugMode)
+        GoRoute(
+          path: StripePaymentSheetSmokeTestPage.routePath,
+          pageBuilder: (context, state) => _buildFadeSlidePage(
+            state: state,
+            child: const StripePaymentSheetSmokeTestPage(),
+          ),
         ),
-      ),
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state, navigationShell) => PetMagicShell(

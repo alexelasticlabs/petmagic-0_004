@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -45,6 +46,7 @@ class PremiumRepository {
 
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
     required Locale locale,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -55,10 +57,14 @@ class PremiumRepository {
           'country': locale.countryCode ?? '*',
           'locale': locale.toLanguageTag(),
         },
+        cancelToken: cancelToken,
       );
 
       return PremiumPaywallConfigModel.fromJson(response.data ?? const {});
     } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
       throw _mapDioException(error, fallbackMessage: 'premium.plans_failed');
     }
   }
@@ -79,11 +85,12 @@ class PremiumRepository {
     }
   }
 
-  Future<PremiumStatusModel> fetchStatus() async {
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/economy/me/subscription',
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -108,11 +115,12 @@ class PremiumRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/checkout',
         data: payload,
-        options: _authOptions(
+        options: authenticatedRequestOptions(
           session.accessToken,
           extraHeaders: {'X-PetMagic-Platform': platform},
         ),
       ),
+      retryTransientFailures: false,
     );
 
     final checkout = PremiumCheckoutModel.fromJson(response.data ?? const {});
@@ -132,8 +140,9 @@ class PremiumRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/manage',
         data: {'paymentProvider': PremiumPaymentProvider.stripe.value},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return PremiumBillingPortalModel.fromJson(response.data ?? const {});
@@ -146,8 +155,9 @@ class PremiumRepository {
       (session) => _dio.post<Map<String, dynamic>>(
         '/api/economy/premium/cancel',
         data: {'paymentProvider': provider.value},
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return PremiumStatusModel.fromJson(response.data ?? const {});
@@ -250,8 +260,9 @@ class PremiumRepository {
           'purchaseId': purchase.purchaseID,
           'transactionDate': purchase.transactionDate,
         },
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
 
     return PremiumStoreVerificationModel.fromJson(response.data ?? const {});
@@ -268,8 +279,9 @@ class PremiumRepository {
           'planCode': planCode,
           'externalSubscriptionId': externalSubscriptionId,
         },
-        options: _authOptions(session.accessToken),
+        options: authenticatedRequestOptions(session.accessToken),
       ),
+      retryTransientFailures: false,
     );
   }
 
@@ -294,26 +306,16 @@ class PremiumRepository {
   }
 
   Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(AuthSession session) request,
-  ) async {
+    Future<Response<T>> Function(AuthSession session) request, {
+    bool retryTransientFailures = true,
+  }) async {
     return _authSessionCoordinator.authorizedRequest(
       request: request,
       mapError: _mapDioException,
       requestFailedMessage: 'premium.request_failed',
       sessionExpiredMessage: 'auth.session_expired',
+      transientRetryAttempts: retryTransientFailures ? 2 : 1,
     );
-  }
-
-  Options _authOptions(
-    String accessToken, {
-    Map<String, String>? extraHeaders,
-  }) {
-    final headers = <String, String>{
-      HttpHeaders.authorizationHeader: 'Bearer $accessToken',
-      ...?extraHeaders,
-    };
-
-    return Options(headers: headers);
   }
 
   AppException _mapDioException(
@@ -321,22 +323,9 @@ class PremiumRepository {
     required String fallbackMessage,
   }) {
     final payload = NetworkErrorMapper.parseApiPayload(error);
-    if (payload.flattened != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.flattened!);
-    }
-
-    final title = payload.title;
-    if (title != null &&
-        (title.startsWith('economy.') || title.startsWith('premium.'))) {
-      return NetworkErrorMapper.fromMessage(error, title);
-    }
-
-    if (payload.detail != null) {
-      return NetworkErrorMapper.fromMessage(error, payload.detail!);
-    }
-
-    if (title != null) {
-      return NetworkErrorMapper.fromMessage(error, title);
+    final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
+    if (safeMessage != null) {
+      return NetworkErrorMapper.fromMessage(error, safeMessage);
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);

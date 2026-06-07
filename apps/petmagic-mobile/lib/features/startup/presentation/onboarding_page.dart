@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/features/startup/presentation/widgets/startup_chrome.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
@@ -128,41 +130,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                           : text.startupOnboardingActionNext,
                       secondaryLabel: text.startupOnboardingActionContinueGuest,
                       isBusy: _isSubmitting,
-                      onPrimaryPressed: () async {
-                        if (_isSubmitting) {
-                          return;
-                        }
-
-                        if (!isLastPage) {
-                          await _pageController.nextPage(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOut,
-                          );
-                          return;
-                        }
-
-                        setState(() => _isSubmitting = true);
-                        await ref
-                            .read(appLaunchControllerProvider.notifier)
-                            .continueAsGuest();
-                        if (!context.mounted) {
-                          return;
-                        }
-                        context.go(TemplatesPage.routePath);
-                      },
-                      onSecondaryPressed: () async {
-                        if (_isSubmitting) {
-                          return;
-                        }
-                        setState(() => _isSubmitting = true);
-                        await ref
-                            .read(appLaunchControllerProvider.notifier)
-                            .continueAsGuest();
-                        if (!context.mounted) {
-                          return;
-                        }
-                        context.go(TemplatesPage.routePath);
-                      },
+                      onPrimaryPressed: isLastPage
+                          ? _continueAsGuest
+                          : _advancePage,
+                      onSecondaryPressed: _continueAsGuest,
                     ),
                   ],
                 ),
@@ -181,12 +152,81 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
     final router = GoRouter.of(context);
     setState(() => _isSubmitting = true);
-    await ref.read(appLaunchControllerProvider.notifier).markOnboardingSeen();
-    if (!context.mounted) {
+    try {
+      await ref.read(appLaunchControllerProvider.notifier).markOnboardingSeen();
+      if (!mounted) {
+        return;
+      }
+      router.go(AuthEntryPage.routePath);
+    } catch (error, stackTrace) {
+      _handleStartupActionFailure(
+        operation: 'mark_onboarding_seen',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _advancePage() async {
+    if (_isSubmitting || !mounted) {
       return;
     }
-    setState(() => _isSubmitting = false);
-    router.go(AuthEntryPage.routePath);
+
+    await _pageController.nextPage(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _continueAsGuest() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(appLaunchControllerProvider.notifier).continueAsGuest();
+      if (!mounted) {
+        return;
+      }
+      context.go(TemplatesPage.routePath);
+    } catch (error, stackTrace) {
+      _handleStartupActionFailure(
+        operation: 'continue_as_guest',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  void _handleStartupActionFailure({
+    required String operation,
+    required Object error,
+    required StackTrace stackTrace,
+  }) {
+    AppLogger.warn(
+      feature: 'Startup',
+      operation: operation,
+      message: 'Startup action failed',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    if (!mounted) {
+      return;
+    }
+    PetMagicToast.show(
+      context,
+      message: AppLocalizations.of(context).authRequestFailed,
+      tone: PetMagicToastTone.warning,
+    );
   }
 }
 
@@ -230,128 +270,118 @@ class _OnboardingHero extends StatelessWidget {
       _ => colors.gold,
     };
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 10),
-                Center(
-                  child: Container(
-                    width: 280,
-                    height: 280,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          accent.withValues(alpha: 0.24),
-                          accent.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                        stops: const [0, 0.52, 1],
-                      ),
-                      border: Border.all(
-                        color: accent.withValues(alpha: 0.22),
-                        width: 1.2,
-                      ),
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 12),
+      children: [
+        const SizedBox(height: 10),
+        Center(
+          child: Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  accent.withValues(alpha: 0.24),
+                  accent.withValues(alpha: 0.08),
+                  Colors.transparent,
+                ],
+                stops: const [0, 0.52, 1],
+              ),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.22),
+                width: 1.2,
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: 156,
+                height: 156,
+                decoration: BoxDecoration(
+                  color: colors.surfaceGlass,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.16),
+                      blurRadius: 32,
+                      offset: const Offset(0, 16),
                     ),
-                    child: Center(
-                      child: Container(
-                        width: 156,
-                        height: 156,
-                        decoration: BoxDecoration(
-                          color: colors.surfaceGlass,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colors.border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accent.withValues(alpha: 0.16),
-                              blurRadius: 32,
-                              offset: const Offset(0, 16),
-                            ),
-                          ],
-                        ),
-                        child: Icon(content.icon, color: accent, size: 74),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  content.title,
-                  style: titleStyle?.copyWith(
-                    color: colors.textStrong,
-                    fontSize: 31,
-                    height: 1.02,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  content.subtitle,
-                  style: subtitleStyle?.copyWith(
-                    color: colors.textSoft,
-                    fontSize: 14.5,
-                    height: 1.34,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    for (final highlight in content.highlights)
-                      _HighlightChip(label: highlight, accent: accent),
                   ],
                 ),
-                const SizedBox(height: 24),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: colors.surfaceGlass,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: colors.border),
-                      ),
-                      child: Row(
-                        children: [
-                          _MiniFeature(
-                            icon: Icons.rocket_launch_outlined,
-                            label: fastStartLabel,
-                            accent: accent,
-                          ),
-                          const SizedBox(width: 12),
-                          _MiniFeature(
-                            icon: Icons.favorite_outline_rounded,
-                            label: petFirstLabel,
-                            accent: colors.purple,
-                          ),
-                          const SizedBox(width: 12),
-                          _MiniFeature(
-                            icon: null,
-                            leading: const PremiumCrownIcon(size: 22),
-                            label: upgradeLaterLabel,
-                            accent: colors.gold,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                child: Icon(content.icon, color: accent, size: 74),
+              ),
             ),
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 24),
+        Text(
+          content.title,
+          style: titleStyle?.copyWith(
+            color: colors.textStrong,
+            fontSize: 31,
+            height: 1.02,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          content.subtitle,
+          style: subtitleStyle?.copyWith(
+            color: colors.textSoft,
+            fontSize: 14.5,
+            height: 1.34,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final highlight in content.highlights)
+              _HighlightChip(label: highlight, accent: accent),
+          ],
+        ),
+        const SizedBox(height: 24),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: colors.surfaceGlass,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: colors.border),
+              ),
+              child: Row(
+                children: [
+                  _MiniFeature(
+                    icon: Icons.rocket_launch_outlined,
+                    label: fastStartLabel,
+                    accent: accent,
+                  ),
+                  const SizedBox(width: 12),
+                  _MiniFeature(
+                    icon: Icons.favorite_outline_rounded,
+                    label: petFirstLabel,
+                    accent: colors.purple,
+                  ),
+                  const SizedBox(width: 12),
+                  _MiniFeature(
+                    icon: null,
+                    leading: const PremiumCrownIcon(size: 22),
+                    label: upgradeLaterLabel,
+                    accent: colors.gold,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final apiBaseUrlResolverProvider = Provider<ApiBaseUrlResolver>((ref) {
@@ -90,7 +90,7 @@ class ApiBaseUrlResolver {
       return completer.future;
     } catch (error, stackTrace) {
       completer.completeError(error, stackTrace);
-      rethrow;
+      return completer.future;
     } finally {
       if (identical(_resolveInFlight, completer)) {
         _resolveInFlight = null;
@@ -105,9 +105,14 @@ class ApiBaseUrlResolver {
 
     _backgroundRefreshInFlight = true;
     unawaited(
-      _resolveWithProbe().whenComplete(() {
-        _backgroundRefreshInFlight = false;
-      }),
+      _resolveWithProbe()
+          .catchError((Object error, StackTrace stackTrace) {
+            _logResolverFailure('background_refresh', error, stackTrace);
+            return _activeBaseUrl ?? AppConfig.apiBaseUrl;
+          })
+          .whenComplete(() {
+            _backgroundRefreshInFlight = false;
+          }),
     );
   }
 
@@ -328,13 +333,11 @@ class ApiBaseUrlResolver {
       }
     }
 
-    developer.Timeline.instantSync(
-      'petmagic.api_base_url_resolver.error',
-      arguments: payload,
-    );
-    developer.log(
-      'ApiBaseUrlResolver::$stage failed',
-      name: 'PetMagic.Network.BaseUrlResolver',
+    AppLogger.warn(
+      feature: 'Network.BaseUrlResolver',
+      operation: stage,
+      message: 'API base URL resolver step failed',
+      context: payload,
       error: error,
       stackTrace: stackTrace,
     );
@@ -424,7 +427,14 @@ class ApiBaseUrlResolver {
 
   Future<String?> _readPersistedBaseUrl() async {
     final persisted = await _preferences.getString(_persistedBaseUrlKey);
-    return _normalizeBaseUrl(persisted);
+    final normalized = _normalizeBaseUrl(persisted);
+    if (persisted != null &&
+        persisted.trim().isNotEmpty &&
+        normalized == null) {
+      await _preferences.remove(_persistedBaseUrlKey);
+    }
+
+    return normalized;
   }
 
   String? _normalizeBaseUrl(String? raw) {
@@ -447,7 +457,12 @@ class ApiBaseUrlResolver {
       return null;
     }
 
+    if (!kDebugMode) {
+      return AppConfig.normalizeProductionBaseUrl(trimmed);
+    }
+
     final authority = uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
-    return '$scheme://$authority';
+    final normalized = '$scheme://$authority';
+    return normalized;
   }
 }

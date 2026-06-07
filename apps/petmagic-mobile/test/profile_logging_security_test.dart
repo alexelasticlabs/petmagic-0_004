@@ -1,0 +1,44 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('profile failure logs do not include raw avatar media urls', () {
+    final source = File(
+      'lib/features/profile/presentation/profile_controller.dart',
+    ).readAsStringSync();
+    final evictBody = _methodBody(source, 'Future<void> _evictAvatarCache');
+
+    expect(evictBody, contains("'avatar_cache_evict_failed'"));
+    expect(evictBody, isNot(contains('avatar_url')));
+    expect(evictBody, isNot(contains('imageUrl}')));
+    expect(evictBody, isNot(contains('imageUrl,')));
+  });
+}
+
+String _methodBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  if (start < 0) {
+    throw StateError('Could not find $signature');
+  }
+
+  final openBrace = source.indexOf('{', start);
+  if (openBrace < 0) {
+    throw StateError('Could not find body for $signature');
+  }
+
+  var depth = 0;
+  for (var i = openBrace; i < source.length; i++) {
+    final char = source[i];
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(openBrace, i + 1);
+      }
+    }
+  }
+
+  throw StateError('Could not parse body for $signature');
+}

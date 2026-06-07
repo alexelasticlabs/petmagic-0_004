@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
@@ -15,6 +19,23 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 
 void main() {
+  test('profile page keeps unauthenticated redirect out of build', () {
+    final source = File(
+      'lib/features/profile/presentation/profile_page.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('ref.listenManual<ProfileState>'));
+    expect(source, contains('_redirectUnauthenticated(next)'));
+    expect(
+      source,
+      contains('void _redirectUnauthenticated(ProfileState state)'),
+    );
+    expect(
+      source,
+      isNot(contains('WidgetsBinding.instance.addPostFrameCallback')),
+    );
+  });
+
   testWidgets('profile legal shortcut opens legal detail route', (
     tester,
   ) async {
@@ -96,9 +117,98 @@ void main() {
     expect(find.text('Legal detail route'), findsOneWidget);
     expect(find.text('Settings route'), findsNothing);
   });
+
+  testWidgets('subscription action returns safely after profile disposal', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final profileController = _FakeProfileController();
+    final router = GoRouter(
+      initialLocation: ProfilePage.routePath,
+      routes: [
+        GoRoute(
+          path: ProfilePage.routePath,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ProfilePage()),
+        ),
+        GoRoute(
+          path: PremiumPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Premium route')),
+          ),
+        ),
+        GoRoute(
+          path: SubscriptionManagementPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Subscription route')),
+          ),
+        ),
+        GoRoute(
+          path: '/away',
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: Scaffold(body: Text('Away route'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileControllerProvider.overrideWith(() => profileController),
+          walletControllerProvider.overrideWith(_FakeWalletController.new),
+          premiumSubscriptionSummaryProvider.overrideWith(
+            (ref) async => const PremiumSubscriptionSummaryView(
+              isPremium: true,
+              canManageSubscription: true,
+              status: 'active',
+              manageSubscriptionAction: 'manage',
+              provider: PremiumSubscriptionProviderView.stripe,
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    final initialInitializeCalls = profileController.initializeCalls;
+    final profileContext = tester.element(find.byType(ProfilePage));
+    final text = AppLocalizations.of(profileContext);
+
+    await tester.tap(find.text(text.premiumManageAction));
+    await tester.pumpAndSettle();
+    expect(find.text('Subscription route'), findsOneWidget);
+
+    router.go('/away');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Away route'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    expect(profileController.initializeCalls, initialInitializeCalls);
+  });
 }
 
 class _FakeProfileController extends ProfileController {
+  int initializeCalls = 0;
+
   @override
   ProfileState build() {
     final profile = _profile;
@@ -120,7 +230,9 @@ class _FakeProfileController extends ProfileController {
   }
 
   @override
-  Future<void> initialize({String initialEmail = ''}) async {}
+  Future<void> initialize({String initialEmail = ''}) async {
+    initializeCalls++;
+  }
 
   @override
   Future<void> logout() async {}

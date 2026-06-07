@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
@@ -26,7 +26,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   final TransformationController _transformationController =
       TransformationController();
 
-  img.Image? _decodedImage;
+  Uint8List? _sourceImageBytes;
   Uint8List? _displayImageBytes;
   bool _isPreparing = true;
   bool _isSaving = false;
@@ -50,28 +50,27 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   Future<void> _loadSourceImage() async {
     try {
       final bytes = await File(widget.sourceImagePath).readAsBytes();
-      final decodedSource = img.decodeImage(bytes);
+      final prepared = await compute(_prepareAvatarPreview, bytes);
       if (!mounted) {
         return;
       }
 
-      if (decodedSource == null) {
+      if (prepared == null) {
         setState(() {
-          _decodedImage = null;
+          _sourceImageBytes = null;
           _displayImageBytes = null;
           _isPreparing = false;
         });
         return;
       }
 
-      final decoded = img.bakeOrientation(decodedSource);
-      final previewBytes = Uint8List.fromList(
-        img.encodeJpg(decoded, quality: 95),
-      );
-
       setState(() {
-        _decodedImage = decoded;
-        _displayImageBytes = previewBytes;
+        _sourceImageBytes = bytes;
+        _displayImageBytes = prepared['previewBytes']! as Uint8List;
+        _imageSize = Size(
+          (prepared['width']! as int).toDouble(),
+          (prepared['height']! as int).toDouble(),
+        );
         _isPreparing = false;
       });
     } catch (_) {
@@ -80,7 +79,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       }
 
       setState(() {
-        _decodedImage = null;
+        _sourceImageBytes = null;
         _displayImageBytes = null;
         _isPreparing = false;
       });
@@ -88,19 +87,18 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
   }
 
   void _configureBaseTransformIfNeeded(double cropSize) {
-    if (_decodedImage == null) {
+    if (_displayImageBytes == null || _imageSize == Size.zero) {
       return;
     }
 
-    if ((_cropSize - cropSize).abs() < 0.5 && _imageSize != Size.zero) {
+    if ((_cropSize - cropSize).abs() < 0.5) {
       return;
     }
 
     _cropSize = cropSize;
 
-    final imageWidth = _decodedImage!.width.toDouble();
-    final imageHeight = _decodedImage!.height.toDouble();
-    _imageSize = Size(imageWidth, imageHeight);
+    final imageWidth = _imageSize.width;
+    final imageHeight = _imageSize.height;
     _baseScale = math.max(cropSize / imageWidth, cropSize / imageHeight);
 
     final displayWidth = imageWidth * _baseScale;
@@ -236,8 +234,8 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
   Future<void> _saveCrop() async {
     final text = AppLocalizations.of(context);
-    final decoded = _decodedImage;
-    if (decoded == null || _cropSize <= 0 || _imageSize == Size.zero) {
+    final sourceImageBytes = _sourceImageBytes;
+    if (sourceImageBytes == null || _cropSize <= 0 || _imageSize == Size.zero) {
       _showError(text.profileAvatarCropError);
       return;
     }
@@ -257,30 +255,27 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       final topPx = ((-ty) / scale).round();
       final sizePx = (_cropSize / scale).round();
 
-      final clampedLeft = leftPx.clamp(0, decoded.width - 1);
-      final clampedTop = topPx.clamp(0, decoded.height - 1);
+      final imageWidth = _imageSize.width.round();
+      final imageHeight = _imageSize.height.round();
+      final clampedLeft = leftPx.clamp(0, imageWidth - 1);
+      final clampedTop = topPx.clamp(0, imageHeight - 1);
 
-      final maxWidth = decoded.width - clampedLeft;
-      final maxHeight = decoded.height - clampedTop;
+      final maxWidth = imageWidth - clampedLeft;
+      final maxHeight = imageHeight - clampedTop;
       final cropSizePx = math.max(
         1,
         math.min(sizePx, math.min(maxWidth, maxHeight)),
       );
 
-      final cropped = img.copyCrop(
-        decoded,
-        x: clampedLeft,
-        y: clampedTop,
-        width: cropSizePx,
-        height: cropSizePx,
-      );
-      final resized = img.copyResize(
-        cropped,
-        width: 1200,
-        height: 1200,
-        interpolation: img.Interpolation.cubic,
-      );
-      final jpgBytes = img.encodeJpg(resized, quality: 92);
+      final jpgBytes = await compute(_cropAvatarImage, <String, Object>{
+        'bytes': sourceImageBytes,
+        'x': clampedLeft,
+        'y': clampedTop,
+        'size': cropSizePx,
+      });
+      if (jpgBytes == null) {
+        throw StateError('Avatar crop failed.');
+      }
 
       final outputPath =
           '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_avatar_${DateTime.now().microsecondsSinceEpoch}.jpg';
@@ -329,7 +324,8 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
           ),
           actions: [
             TextButton(
-              onPressed: (_isSaving || _isPreparing || _decodedImage == null)
+              onPressed:
+                  (_isSaving || _isPreparing || _displayImageBytes == null)
                   ? null
                   : _saveCrop,
               child: Text(text.profileAvatarCropSaveAction),
@@ -353,7 +349,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                     ],
                   ),
                 )
-              : _decodedImage == null
+              : _displayImageBytes == null
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -518,4 +514,55 @@ class _AvatarCropOverlayPainter extends CustomPainter {
   bool shouldRepaint(covariant _AvatarCropOverlayPainter oldDelegate) {
     return oldDelegate.overlayColor != overlayColor;
   }
+}
+
+Map<String, Object>? _prepareAvatarPreview(Uint8List sourceBytes) {
+  final decodedSource = img.decodeImage(sourceBytes);
+  if (decodedSource == null) {
+    return null;
+  }
+
+  final decoded = img.bakeOrientation(decodedSource);
+  return {
+    'width': decoded.width,
+    'height': decoded.height,
+    'previewBytes': Uint8List.fromList(img.encodeJpg(decoded, quality: 95)),
+  };
+}
+
+Uint8List? _cropAvatarImage(Map<String, Object> request) {
+  final sourceBytes = request['bytes'];
+  final x = request['x'];
+  final y = request['y'];
+  final size = request['size'];
+  if (sourceBytes is! Uint8List || x is! int || y is! int || size is! int) {
+    return null;
+  }
+
+  final decodedSource = img.decodeImage(sourceBytes);
+  if (decodedSource == null) {
+    return null;
+  }
+
+  final decoded = img.bakeOrientation(decodedSource);
+  final clampedX = x.clamp(0, decoded.width - 1);
+  final clampedY = y.clamp(0, decoded.height - 1);
+  final maxWidth = decoded.width - clampedX;
+  final maxHeight = decoded.height - clampedY;
+  final cropSize = math.max(1, math.min(size, math.min(maxWidth, maxHeight)));
+  final cropped = img.copyCrop(
+    decoded,
+    x: clampedX,
+    y: clampedY,
+    width: cropSize,
+    height: cropSize,
+  );
+  final resized = img.copyResize(
+    cropped,
+    width: 1200,
+    height: 1200,
+    interpolation: img.Interpolation.cubic,
+  );
+
+  return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
 }

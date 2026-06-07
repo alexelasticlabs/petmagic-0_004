@@ -39,11 +39,17 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
+  ProviderSubscription<ProfileState>? _profileSubscription;
   bool _isOpeningSubscription = false;
 
   @override
   void initState() {
     super.initState();
+    _profileSubscription = ref.listenManual<ProfileState>(
+      profileControllerProvider,
+      (_, next) => _redirectUnauthenticated(next),
+      fireImmediately: true,
+    );
     Future.microtask(() {
       if (!mounted) {
         return;
@@ -53,6 +59,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
       ref.read(profileControllerProvider.notifier).initialize();
       ref.read(walletControllerProvider.notifier).load();
     });
+  }
+
+  @override
+  void dispose() {
+    _profileSubscription?.close();
+    super.dispose();
   }
 
   @override
@@ -73,12 +85,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final bottomNavInset = petMagicScrollableBottomInset(context);
 
     if (!state.isLoading && !state.isAuthenticated) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.go(AuthEntryPage.routePath);
-        }
-      });
-
       return const SizedBox.expand(
         child: Center(child: CircularProgressIndicator.adaptive()),
       );
@@ -281,6 +287,10 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Future<void> _handleSubscriptionAction(
     PremiumSubscriptionSummaryView? summary,
   ) async {
+    if (_isOpeningSubscription) {
+      return;
+    }
+
     if (summary == null || !summary.canManageSubscription) {
       if (mounted) {
         context.push(PremiumPage.routePath);
@@ -291,11 +301,23 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
     setState(() => _isOpeningSubscription = true);
     await context.push(SubscriptionManagementPage.routePath);
+    if (!mounted) {
+      return;
+    }
+
     ref.invalidate(premiumSubscriptionSummaryProvider);
     await ref.read(profileControllerProvider.notifier).initialize();
     if (mounted) {
       setState(() => _isOpeningSubscription = false);
     }
+  }
+
+  void _redirectUnauthenticated(ProfileState state) {
+    if (!mounted || state.isLoading || state.isAuthenticated) {
+      return;
+    }
+
+    context.go(AuthEntryPage.routePath);
   }
 }
 
@@ -1046,54 +1068,61 @@ class _CompactPremiumAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: isLoading ? null : onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colors.gold,
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: colors.gold.withValues(alpha: 0.22),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (isLoading)
-                  SizedBox.square(
-                    dimension: 14,
-                    child: CircularProgressIndicator.adaptive(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        colors.backgroundBottom,
-                      ),
-                    ),
-                  )
-                else
-                  Icon(
-                    Icons.open_in_new_rounded,
-                    color: colors.backgroundBottom,
-                    size: 14,
-                  ),
-                const SizedBox(width: 6),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: colors.backgroundBottom,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
-                  ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 126),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: colors.gold,
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.gold.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isLoading)
+                    SizedBox.square(
+                      dimension: 14,
+                      child: CircularProgressIndicator.adaptive(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colors.backgroundBottom,
+                        ),
+                      ),
+                    )
+                  else
+                    Icon(
+                      Icons.open_in_new_rounded,
+                      color: colors.backgroundBottom,
+                      size: 14,
+                    ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.backgroundBottom,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

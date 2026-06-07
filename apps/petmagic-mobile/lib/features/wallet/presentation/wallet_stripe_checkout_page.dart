@@ -165,12 +165,28 @@ class _WalletStripeCheckoutPageState extends State<WalletStripeCheckoutPage> {
   }
 
   Future<void> _submit(String price) async {
+    if (_isSubmitting) {
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
       _result = null;
     });
 
-    final result = await widget.onSubmit();
+    late final WalletStripeCheckoutSubmitResult result;
+    try {
+      result = await widget.onSubmit();
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      result = const WalletStripeCheckoutSubmitResult(
+        status: WalletStripeCheckoutActionStatus.failed,
+      );
+    }
+
     if (!mounted) {
       return;
     }

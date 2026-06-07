@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_attachment_validation.dart';
+import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 
 void main() {
   group('SupportAttachmentValidation', () {

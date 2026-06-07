@@ -53,6 +53,7 @@ class ApiBaseUrlFailoverInterceptor extends Interceptor {
   ) async {
     final requestOptions = err.requestOptions;
     if (_shouldSkipFailover(requestOptions) ||
+        !_isReplaySafeMethod(requestOptions.method) ||
         !_isConnectionFailure(err) ||
         CancelToken.isCancel(err)) {
       handler.next(err);
@@ -108,6 +109,11 @@ class ApiBaseUrlFailoverInterceptor extends Interceptor {
 
   bool _shouldSkipFailover(RequestOptions options) {
     return options.extra[_skipFailoverKey] == true;
+  }
+
+  bool _isReplaySafeMethod(String method) {
+    final normalized = method.toUpperCase();
+    return normalized == 'GET' || normalized == 'HEAD';
   }
 
   Set<String> _readAttemptedBaseUrls(RequestOptions options) {

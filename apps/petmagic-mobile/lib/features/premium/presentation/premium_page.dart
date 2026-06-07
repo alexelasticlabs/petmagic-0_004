@@ -59,7 +59,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() => ref.read(premiumControllerProvider.notifier).load());
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
+      ref.read(premiumControllerProvider.notifier).load();
+    });
   }
 
   void _closeAfterSuccessfulActivation() {
@@ -274,17 +280,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       ),
     );
     if (!result.completed || !mounted) {
-      final failureMessage = result.errorMessage?.trim();
-      final resolved = result.cancelled
-          ? text.premiumPurchaseCancelled
-          : (failureMessage == null || failureMessage.isEmpty)
-          ? text.premiumCheckoutFailed
-          : failureMessage;
       return PremiumStripeCheckoutSubmitResult(
         status: result.cancelled
             ? PremiumStripeCheckoutActionStatus.cancelled
             : PremiumStripeCheckoutActionStatus.failed,
-        message: resolved,
+        message: result.cancelled
+            ? text.premiumPurchaseCancelled
+            : text.premiumCheckoutFailed,
       );
     }
 
@@ -348,7 +350,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     if (normalized.isEmpty) {
       return text.premiumCheckoutFailed;
     }
-    return value;
+    return text.premiumCheckoutFailed;
   }
 
   List<PaymentMethodSheetOption> _buildPaymentMethodOptions(

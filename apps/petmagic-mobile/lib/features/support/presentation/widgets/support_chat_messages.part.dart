@@ -457,7 +457,7 @@ class _MessageBubble extends StatelessWidget {
   }
 
   Future<void> _openAttachment(String? value) async {
-    final uri = parseSafeExternalUri(value);
+    final uri = parseSafeSupportExternalUri(value);
     if (uri == null) {
       return;
     }
@@ -602,8 +602,16 @@ class _SingleMediaBubble extends StatelessWidget {
     }
 
     if (attachment.isImage) {
+      final safeUri = parseSafeSupportExternalUri(attachment.fileUrl);
+      if (safeUri == null) {
+        return _UnsupportedAttachmentPlaceholder(
+          isVideo: false,
+          maxBubbleWidth: maxBubbleWidth,
+        );
+      }
+
       return _NetworkImageAttachmentPreview(
-        imageUrl: attachment.fileUrl,
+        imageUrl: safeUri.toString(),
         maxBubbleWidth: maxBubbleWidth,
         onTap: onOpenImage == null
             ? null
@@ -614,8 +622,16 @@ class _SingleMediaBubble extends StatelessWidget {
       );
     }
 
+    final safeUri = parseSafeSupportExternalUri(attachment.fileUrl);
+    if (safeUri == null) {
+      return _UnsupportedAttachmentPlaceholder(
+        isVideo: true,
+        maxBubbleWidth: maxBubbleWidth,
+      );
+    }
+
     return _NetworkVideoAttachmentPreview(
-      videoUrl: attachment.fileUrl,
+      videoUrl: safeUri.toString(),
       maxBubbleWidth: maxBubbleWidth,
       onTap: onOpenVideo == null
           ? null
@@ -758,11 +774,15 @@ class _MessageReplyAttachmentThumbnail extends StatelessWidget {
         width: 40,
         height: 40,
         child: canShowImage
-            ? Image.network(
-                attachment.fileUrl,
+            ? CachedNetworkImage(
+                imageUrl: attachment.fileUrl,
                 fit: BoxFit.cover,
-                cacheWidth: 720,
-                errorBuilder: (context, error, stackTrace) {
+                memCacheWidth: _supportReplyThumbnailCacheWidth,
+                filterQuality: FilterQuality.medium,
+                placeholder: (context, url) {
+                  return ColoredBox(color: colors.surface);
+                },
+                errorWidget: (context, url, error) {
                   return ColoredBox(
                     color: colors.surface,
                     child: Icon(

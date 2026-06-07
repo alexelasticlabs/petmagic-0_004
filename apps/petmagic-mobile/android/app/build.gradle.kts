@@ -66,6 +66,9 @@ android {
 
     buildTypes {
         release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+
             if (isReleaseTaskRequested &&
                 !hasReleaseSigningConfig &&
                 !allowInsecureReleaseSigning

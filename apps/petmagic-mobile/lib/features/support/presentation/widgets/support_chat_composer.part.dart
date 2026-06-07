@@ -161,15 +161,21 @@ class _ReplyAttachmentLeading extends StatelessWidget {
         width: 40,
         height: 40,
         child: showImageThumb
-            ? Image.network(
-                attachment.fileUrl,
+            ? CachedNetworkImage(
+                imageUrl: attachment.fileUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return _ReplyAttachmentLeadingFallback(
-                    icon: Icons.broken_image_outlined,
-                    label: fallbackLabel,
-                  );
-                },
+                memCacheWidth: _supportReplyThumbnailCacheWidth,
+                maxWidthDiskCache: _supportReplyThumbnailCacheWidth,
+                filterQuality: FilterQuality.medium,
+                placeholder: (context, url) => _ReplyAttachmentLeadingFallback(
+                  icon: Icons.image_outlined,
+                  label: fallbackLabel,
+                ),
+                errorWidget: (context, url, error) =>
+                    _ReplyAttachmentLeadingFallback(
+                      icon: Icons.broken_image_outlined,
+                      label: fallbackLabel,
+                    ),
               )
             : _ReplyAttachmentLeadingFallback(
                 icon: attachment.isVideo
@@ -276,6 +282,11 @@ class _PendingAttachmentPreviewList extends StatelessWidget {
                             : Image.file(
                                 File(attachment.filePath),
                                 fit: BoxFit.cover,
+                                cacheWidth:
+                                    _supportComposerAttachmentPreviewCacheExtent,
+                                cacheHeight:
+                                    _supportComposerAttachmentPreviewCacheExtent,
+                                filterQuality: FilterQuality.medium,
                                 errorBuilder: (context, error, stackTrace) {
                                   return ColoredBox(
                                     color: colors.surface,

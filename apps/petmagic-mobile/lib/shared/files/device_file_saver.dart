@@ -2,14 +2,22 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:share_plus/share_plus.dart';
+
+const defaultRemoteFileDownloadMaxBytes = 128 * 1024 * 1024;
 
 Future<List<int>> downloadFileBytes(
   String fileUrl, {
   Dio? client,
   Duration timeout = const Duration(seconds: 20),
   CancelToken? cancelToken,
+  int maxBytes = defaultRemoteFileDownloadMaxBytes,
 }) async {
+  if (maxBytes <= 0) {
+    throw ArgumentError.value(maxBytes, 'maxBytes', 'Must be positive.');
+  }
+
   final ownsClient = client == null;
   final httpClient =
       client ??
@@ -22,26 +30,118 @@ Future<List<int>> downloadFileBytes(
       );
 
   try {
-    final response = await httpClient.get<List<int>>(
+    _throwIfDownloadCancelled(cancelToken);
+    final response = await httpClient.get<ResponseBody>(
       fileUrl,
       cancelToken: cancelToken,
       options: Options(
-        responseType: ResponseType.bytes,
+        responseType: ResponseType.stream,
         receiveTimeout: timeout,
         sendTimeout: timeout,
       ),
     );
-    final bytes = response.data;
-    if (bytes == null || bytes.isEmpty) {
+    final body = response.data;
+    if (body == null) {
+      throw StateError('Empty download payload.');
+    }
+    _throwIfDownloadCancelled(cancelToken);
+
+    final contentLength = _contentLengthFromHeaders(response.headers);
+    if (contentLength != null && contentLength > maxBytes) {
+      throw StateError('Remote file exceeds maximum allowed size.');
+    }
+
+    final chunks = <Uint8List>[];
+    var receivedBytes = 0;
+    await for (final chunk in body.stream) {
+      _throwIfDownloadCancelled(cancelToken);
+      if (chunk.isEmpty) {
+        continue;
+      }
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxBytes) {
+        throw StateError('Remote file exceeds maximum allowed size.');
+      }
+      chunks.add(chunk);
+    }
+
+    if (receivedBytes == 0) {
       throw StateError('Empty download payload.');
     }
 
+    final bytes = Uint8List(receivedBytes);
+    var offset = 0;
+    for (final chunk in chunks) {
+      bytes.setRange(offset, offset + chunk.length, chunk);
+      offset += chunk.length;
+    }
     return bytes;
+  } on DioException catch (error) {
+    if (CancelToken.isCancel(error)) {
+      throw _downloadCancelledException();
+    }
+
+    throw _sanitizeDownloadException(error, fileUrl);
   } finally {
     if (ownsClient) {
       httpClient.close(force: true);
     }
   }
+}
+
+void _throwIfDownloadCancelled(CancelToken? cancelToken) {
+  if (cancelToken?.isCancelled != true) {
+    return;
+  }
+
+  throw _downloadCancelledException();
+}
+
+DioException _downloadCancelledException() {
+  return DioException.requestCancelled(
+    requestOptions: RequestOptions(path: ''),
+    reason: 'download_cancelled',
+  );
+}
+
+DioException _sanitizeDownloadException(DioException error, String fileUrl) {
+  final safeRequestOptions = RequestOptions(
+    path: _safeDownloadPath(fileUrl),
+    method: error.requestOptions.method,
+  );
+  final response = error.response == null
+      ? null
+      : Response<dynamic>(
+          requestOptions: safeRequestOptions,
+          statusCode: error.response?.statusCode,
+          statusMessage: error.response?.statusMessage,
+        );
+
+  return DioException(
+    requestOptions: safeRequestOptions,
+    response: response,
+    type: error.type,
+    message: 'download_failed',
+  );
+}
+
+String _safeDownloadPath(String fileUrl) {
+  final uri = Uri.tryParse(fileUrl);
+  if (uri == null) {
+    return '';
+  }
+
+  return uri.replace(query: '', fragment: '').toString();
+}
+
+int? _contentLengthFromHeaders(Headers headers) {
+  final raw = headers.value(Headers.contentLengthHeader);
+  if (raw == null || raw.trim().isEmpty) {
+    return null;
+  }
+
+  final parsed = int.tryParse(raw.trim());
+  return parsed != null && parsed >= 0 ? parsed : null;
 }
 
 Future<bool> saveBytesToDevice({
@@ -86,21 +186,6 @@ Future<bool> saveBytesToDevice({
       await tempFile.delete();
     }
   }
-}
-
-String sanitizeFileName(String? value, {required String fallback}) {
-  final candidate = value?.trim();
-  if (candidate == null || candidate.isEmpty) {
-    return fallback;
-  }
-
-  final normalized = candidate
-      .replaceAll(RegExp(r'\s+'), '_')
-      .replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_')
-      .replaceAll(RegExp(r'_+'), '_')
-      .replaceAll(RegExp(r'^_+|_+$'), '');
-
-  return normalized.isEmpty ? fallback : normalized;
 }
 
 String extensionFromUrl(String value) {

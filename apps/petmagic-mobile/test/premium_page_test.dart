@@ -130,10 +130,12 @@ class _FakePremiumRepository extends PremiumRepository {
   @override
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
     required Locale locale,
+    CancelToken? cancelToken,
   }) async => config;
 
   @override
-  Future<PremiumStatusModel> fetchStatus() async => status;
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async =>
+      status;
 
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(

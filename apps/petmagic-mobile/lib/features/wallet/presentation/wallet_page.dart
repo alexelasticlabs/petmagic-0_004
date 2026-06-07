@@ -14,7 +14,6 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_stripe_checkout_page.dart';
-import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
@@ -57,7 +56,13 @@ class _WalletPageState extends ConsumerState<WalletPage>
     WidgetsBinding.instance.addObserver(this);
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
       _startAutoRefresh();
-      Future.microtask(() => _walletController.load());
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
+
+        _walletController.load();
+      });
     }
   }
 
@@ -133,6 +138,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
   }
 
   void _scheduleNextAutoRefresh() {
+    if (!mounted) {
+      return;
+    }
+
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
       if (!mounted) {
@@ -399,20 +408,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
     PurchaseCheckoutModel checkout,
   ) async {
     final text = AppLocalizations.of(context);
-    AppLogger.info(
-      feature: 'Wallet.Checkout',
-      operation: 'checkout_dispatch',
-      context: {
-        'order_id': checkout.orderId,
-        'uses_payment_sheet': checkout.usesPaymentSheet,
-        'provider': checkout.paymentProvider,
-        'url_length': checkout.checkoutUrl.length,
-        'has_client_secret':
-            checkout.paymentIntentClientSecret?.isNotEmpty ?? false,
-        'has_publishable_key': checkout.publishableKey?.isNotEmpty ?? false,
-      },
-    );
-
     if (!checkout.usesPaymentSheet) {
       final checkoutUrl = checkout.checkoutUrl.trim();
       final uri = parseSafeExternalUri(
@@ -455,11 +450,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
       );
     }
 
-    AppLogger.info(
-      feature: 'Wallet.Checkout',
-      operation: 'paymentsheet_init',
-      context: {'order_id': checkout.orderId},
-    );
     _shouldReloadOnResume = true;
     final sheetResult = await StripePaymentSheetCoordinator.present(
       context,
@@ -640,11 +630,10 @@ Future<void> _showPackDetailSheet(
       return;
     }
 
-    final message = result.errorMessage?.trim();
-    if (message != null && message.isNotEmpty) {
+    if (!result.cancelled) {
       PetMagicToast.show(
         context,
-        message: message,
+        message: text.walletPaymentGatewayUnavailableError,
         tone: PetMagicToastTone.warning,
       );
     }
@@ -658,11 +647,6 @@ Future<void> _showPackDetailSheet(
         paymentMethodLabel: _walletProviderLabel(text, selectedMethod),
         onChooseAnotherMethod: () {},
         onSubmit: () async {
-          AppLogger.info(
-            feature: 'Wallet.Checkout',
-            operation: 'buy_tapped',
-            context: {'pack_code': selectedPack.code},
-          );
           final checkout = await onBuy(selectedPack, selectedMethod);
           if (checkout == null) {
             return WalletStripeCheckoutSubmitResult(
@@ -685,12 +669,9 @@ Future<void> _showPackDetailSheet(
             );
           }
 
-          final failureMessage = paymentResult.errorMessage?.trim();
           return WalletStripeCheckoutSubmitResult(
             status: WalletStripeCheckoutActionStatus.failed,
-            message: (failureMessage == null || failureMessage.isEmpty)
-                ? text.walletPaymentGatewayUnavailableError
-                : failureMessage,
+            message: text.walletPaymentGatewayUnavailableError,
           );
         },
       ),
@@ -907,7 +888,7 @@ String _friendlyError(AppLocalizations text, String value) {
     return text.walletRedeemServerError;
   }
 
-  return value;
+  return text.walletDataUnavailableFallback;
 }
 
 bool _isWalletPartialError(String value) {

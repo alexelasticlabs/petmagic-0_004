@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -114,6 +115,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     ref.watch(realtimeClientProvider);
     _startAutoRefresh();
     ref.onDispose(() {
+      _isScreenVisible = false;
       _offlineBannerTimer?.cancel();
       _offlineBannerTimer = null;
       _autoRefreshTimer?.cancel();
@@ -121,7 +123,15 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       _pauseRealtime();
     });
     Future.microtask(() async {
+      if (!ref.mounted) {
+        return;
+      }
+
       final cachedUnread = await _repository.readCachedUnreadGenerationCount();
+      if (!ref.mounted) {
+        return;
+      }
+
       if (cachedUnread != null) {
         state = state.copyWith(unreadCount: cachedUnread);
       }
@@ -157,6 +167,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     _isLoadInFlight = true;
     try {
       await _resumeRealtimeIfNeeded();
+      if (!ref.mounted) {
+        return;
+      }
 
       final nextFilter = filter ?? state.filter;
       if (state.isLoading && !refresh && nextFilter == state.filter) {
@@ -179,6 +192,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         persistedItems = await _repository.readCachedGenerations(
           status: nextFilter.apiStatus,
         );
+        if (!ref.mounted) {
+          return;
+        }
       }
 
       final seedItems = refresh
@@ -208,6 +224,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           take: 50,
         );
         final unreadCount = await _repository.fetchUnreadGenerationCount();
+        if (!ref.mounted) {
+          return;
+        }
+
         final updatedCache =
             Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
               state.cachedItemsByFilter,
@@ -247,7 +267,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         _offlineBannerTimer = null;
         state = state.copyWith(
           isLoading: false,
-          errorMessage: error.toString(),
+          errorMessage: _historyLoadErrorMessage(error),
         );
       }
     } finally {
@@ -266,11 +286,15 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
   void _scheduleNextAutoRefresh() {
     _autoRefreshTimer?.cancel();
-    if (!_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible) {
       return;
     }
 
     _autoRefreshTimer = Timer(_currentAutoRefreshInterval(), () {
+      if (!ref.mounted) {
+        return;
+      }
+
       if (!_isScreenVisible || _isLoadInFlight) {
         _scheduleNextAutoRefresh();
         return;
@@ -289,6 +313,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   void _registerAutoRefreshSuccess() {
+    if (!ref.mounted) {
+      return;
+    }
+
     if (_autoRefreshFailureStreak == 0) {
       return;
     }
@@ -298,6 +326,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   void _registerAutoRefreshFailure() {
+    if (!ref.mounted) {
+      return;
+    }
+
     final next = _autoRefreshFailureStreak + 1;
     _autoRefreshFailureStreak = next > 3 ? 3 : next;
     _scheduleNextAutoRefresh();
@@ -306,6 +338,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   void _scheduleOfflineBannerHide() {
     _offlineBannerTimer?.cancel();
     _offlineBannerTimer = Timer(const Duration(seconds: 3), () {
+      if (!ref.mounted) {
+        return;
+      }
+
       state = state.copyWith(
         showOfflineBanner: false,
         isConnectionRecovered: false,
@@ -316,12 +352,20 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   Future<void> refreshUnreadCount() async {
     try {
       final unreadCount = await _repository.fetchUnreadGenerationCount();
+      if (!ref.mounted) {
+        return;
+      }
+
       state = state.copyWith(unreadCount: unreadCount);
     } catch (_) {}
   }
 
   Future<void> markRead(String generationId) async {
     await _repository.markGenerationRead(generationId);
+    if (!ref.mounted) {
+      return;
+    }
+
     final updated = _markReadInList(state.items, generationId);
     final updatedCache = _markReadInCaches(
       state.cachedItemsByFilter,
@@ -336,6 +380,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
   Future<void> deleteGeneration(String generationId) async {
     await _repository.deleteGeneration(generationId);
+    if (!ref.mounted) {
+      return;
+    }
 
     final wasUnread = state.items.any(
       (item) => item.generationId == generationId && item.isUnread,
@@ -372,7 +419,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   void _handleRealtimeEvent(RealtimeEvent event) {
-    if (!_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible) {
       return;
     }
 
@@ -391,7 +438,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   Future<void> _resumeRealtimeIfNeeded() async {
-    if (!_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible) {
       return;
     }
 
@@ -404,6 +451,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
     try {
       await _realtimeClient.connect();
+      if (!ref.mounted) {
+        return;
+      }
+
       _isRealtimeConnected = true;
     } on Object {
       // Realtime is best-effort; gallery remains available via manual refresh.
@@ -567,4 +618,34 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       GenerationHistoryFilter.failed => generation.isFailed,
     };
   }
+}
+
+String _historyLoadErrorMessage(Object error) {
+  if (error is AppException) {
+    final message = error.message.trim();
+    if (_isSafeHistoryErrorKey(message)) {
+      return message;
+    }
+
+    final statusCode = error.statusCode;
+    if (statusCode == 401) {
+      return 'auth.session_expired';
+    }
+    if (statusCode == 408) {
+      return 'templates.connection_timeout';
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return 'templates.server_timeout';
+    }
+
+    return 'templates.request_failed';
+  }
+
+  return 'templates.request_failed';
+}
+
+bool _isSafeHistoryErrorKey(String value) {
+  return value == 'templates.connection_timeout' ||
+      value == 'templates.server_timeout' ||
+      value == 'templates.request_failed';
 }

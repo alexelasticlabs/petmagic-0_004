@@ -182,8 +182,7 @@ class PetMagicApp extends ConsumerWidget {
             ],
           ),
         );
-        if (!AppConfig.enableFrameTelemetry &&
-            !AppConfig.enableImageCacheTelemetry) {
+        if (!AppConfig.enableFrameTelemetry) {
           return hostedChild;
         }
 

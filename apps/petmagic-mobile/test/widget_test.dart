@@ -54,6 +54,31 @@ void main() {
     expect(find.text('Continue as guest'), findsOneWidget);
   });
 
+  testWidgets('onboarding guest action resets after startup failure', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      appLaunchController: _ThrowingGuestLaunchController.new,
+    );
+
+    final guestButton = find.widgetWithText(
+      OutlinedButton,
+      'Continue as guest',
+    );
+    expect(tester.widget<OutlinedButton>(guestButton).onPressed, isNotNull);
+
+    await tester.tap(guestButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(tester.widget<OutlinedButton>(guestButton).onPressed, isNotNull);
+
+    await PetMagicNotificationCenter.instance.clearQueue();
+    await tester.pump();
+  });
+
   testWidgets('shows short welcome for returning guest', (tester) async {
     await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
 
@@ -478,6 +503,33 @@ void main() {
     await tester.pump();
 
     expect(find.text('Try template'), findsOneWidget);
+  });
+
+  testWidgets('welcome guest action resets after startup failure', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      appLaunchController: _ThrowingGuestLaunchController.new,
+    );
+
+    final guestButton = find.widgetWithText(
+      OutlinedButton,
+      'Continue as guest',
+    );
+    expect(tester.widget<OutlinedButton>(guestButton).onPressed, isNotNull);
+
+    await tester.tap(guestButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Magic Studio'), findsNothing);
+    expect(tester.widget<OutlinedButton>(guestButton).onPressed, isNotNull);
+
+    await PetMagicNotificationCenter.instance.clearQueue();
+    await tester.pump();
   });
 
   testWidgets('profile tab sends guest to auth flow', (tester) async {

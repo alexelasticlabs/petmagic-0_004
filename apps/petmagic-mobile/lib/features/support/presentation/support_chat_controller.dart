@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -85,6 +86,7 @@ class SupportChatController extends Notifier<SupportChatState> {
   late final SupportChatRealtimeClient _realtimeClient;
   StreamSubscription<SupportChatRealtimeUpdate>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
+  CancelToken? _activeUploadCancelToken;
   bool _hasPendingRealtimeRefresh = false;
   bool _started = false;
   bool _isScreenVisible = true;
@@ -93,10 +95,23 @@ class SupportChatController extends Notifier<SupportChatState> {
   SupportChatState build() {
     _repository = ref.watch(supportChatRepositoryProvider);
     _realtimeClient = ref.watch(supportChatRealtimeClientProvider);
+    ref.onDispose(stop);
     return const SupportChatState.initial();
   }
 
+  bool _updateStateIfMounted(
+    SupportChatState Function(SupportChatState current) update,
+  ) {
+    if (!ref.mounted) {
+      return false;
+    }
+
+    state = update(state);
+    return true;
+  }
+
   void stop() {
+    _cancelActiveUpload();
     _realtimeRefreshTimer?.cancel();
     _realtimeRefreshTimer = null;
     unawaited(_realtimeSubscription?.cancel());
@@ -105,6 +120,27 @@ class SupportChatController extends Notifier<SupportChatState> {
     _started = false;
     _hasPendingRealtimeRefresh = false;
     _isScreenVisible = false;
+  }
+
+  CancelToken _newActiveUploadCancelToken() {
+    _cancelActiveUpload();
+    final cancelToken = CancelToken();
+    _activeUploadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveUpload() {
+    final cancelToken = _activeUploadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_upload_cancelled');
+    }
+    _activeUploadCancelToken = null;
+  }
+
+  void _clearActiveUpload(CancelToken cancelToken) {
+    if (identical(_activeUploadCancelToken, cancelToken)) {
+      _activeUploadCancelToken = null;
+    }
   }
 
   void setScreenVisible(bool visible) {
@@ -129,6 +165,10 @@ class SupportChatController extends Notifier<SupportChatState> {
 
     _started = true;
     await initialize();
+    if (!ref.mounted) {
+      return;
+    }
+
     _realtimeSubscription ??= _realtimeClient.events.listen(
       _handleRealtimeUpdate,
     );
@@ -144,29 +184,44 @@ class SupportChatController extends Notifier<SupportChatState> {
 
     try {
       final conversation = await _repository.getConversation();
-      state = state.copyWith(
-        isLoading: false,
-        conversation: conversation,
-        clearError: true,
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          conversation: conversation,
+          clearError: true,
+        ),
       );
-      state = state.copyWith(isLoadingOlder: false);
+      _updateStateIfMounted((state) => state.copyWith(isLoadingOlder: false));
       await _markReadIfNeeded(conversation);
+      if (!ref.mounted) {
+        return;
+      }
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
       if (_isConversationNotFound(error.message)) {
-        state = state.copyWith(
-          isLoading: false,
-          clearConversation: true,
-          clearError: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            clearConversation: true,
+            clearError: true,
+          ),
         );
         _resumePendingRealtimeRefreshIfNeeded();
       } else {
-        state = state.copyWith(isLoading: false, errorMessage: error.message);
+        _updateStateIfMounted(
+          (state) =>
+              state.copyWith(isLoading: false, errorMessage: error.message),
+        );
       }
     } on Object {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'support.unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          errorMessage: 'support.unavailable',
+        ),
       );
     }
   }
@@ -202,13 +257,21 @@ class SupportChatController extends Notifier<SupportChatState> {
           initialMessage: body,
           source: 'MobileChat',
         );
-        state = state.copyWith(
-          isSending: false,
-          conversation: createdConversation,
-          clearError: true,
-          clearSendProgress: true,
+        if (!ref.mounted) {
+          return false;
+        }
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isSending: false,
+            conversation: createdConversation,
+            clearError: true,
+            clearSendProgress: true,
+          ),
         );
         await _markReadIfNeeded(createdConversation);
+        if (!ref.mounted) {
+          return false;
+        }
       } else {
         final message = await _repository.sendMessage(
           conversationId: conversation.conversationId,
@@ -217,20 +280,36 @@ class SupportChatController extends Notifier<SupportChatState> {
           replyToMessageId: replyToMessageId,
         );
 
-        state = state.copyWith(
-          isSending: false,
-          conversation: _appendOutgoingMessage(conversation, message),
-          clearError: true,
-          clearSendProgress: true,
+        if (!ref.mounted) {
+          return false;
+        }
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isSending: false,
+            conversation: _appendOutgoingMessage(conversation, message),
+            clearError: true,
+            clearSendProgress: true,
+          ),
         );
       }
       _resumePendingRealtimeRefreshIfNeeded();
       return true;
     } on AppException catch (error) {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: error.message,
-        clearSendProgress: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: error.message,
+          clearSendProgress: true,
+        ),
+      );
+      return false;
+    } on Object {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: 'support.unavailable',
+          clearSendProgress: true,
+        ),
       );
       return false;
     }
@@ -277,53 +356,82 @@ class SupportChatController extends Notifier<SupportChatState> {
       sendingAttachmentTotal: attachments.length,
     );
 
+    CancelToken? uploadCancelToken;
     try {
       if (conversation == null) {
         conversation = await _repository.openConversation(source: 'MobileChat');
-        state = state.copyWith(conversation: conversation);
+        if (!ref.mounted) {
+          return false;
+        }
+        _updateStateIfMounted(
+          (state) => state.copyWith(conversation: conversation),
+        );
       }
 
+      uploadCancelToken = _newActiveUploadCancelToken();
       final message = await _repository.sendAttachments(
         conversationId: conversation.conversationId,
         attachments: attachments,
         localeTag: localeTag,
         body: body,
         replyToMessageId: replyToMessageId,
+        cancelToken: uploadCancelToken,
         onSendProgress: (sent, total) {
           if (total <= 0) {
             return;
           }
 
-          state = state.copyWith(
-            sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+            ),
           );
         },
       );
 
       final attachmentFailure = _messageFromAttachmentFailure(message);
-      state = state.copyWith(
-        isSending: false,
-        conversation: _appendOutgoingMessage(conversation, message),
-        errorMessage: attachmentFailure,
-        clearError: attachmentFailure == null,
-        clearSendProgress: true,
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          conversation: _appendOutgoingMessage(conversation!, message),
+          errorMessage: attachmentFailure,
+          clearError: attachmentFailure == null,
+          clearSendProgress: true,
+        ),
       );
       _resumePendingRealtimeRefreshIfNeeded();
       return attachmentFailure == null;
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(isSending: false, clearSendProgress: true),
+      );
+      return false;
     } on AppException catch (error) {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: error.message,
-        clearSendProgress: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: error.message,
+          clearSendProgress: true,
+        ),
       );
       return false;
     } on Object {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: 'support.attachment_unavailable',
-        clearSendProgress: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: 'support.attachment_unavailable',
+          clearSendProgress: true,
+        ),
       );
       return false;
+    } finally {
+      final cancelToken = uploadCancelToken;
+      if (cancelToken != null) {
+        _clearActiveUpload(cancelToken);
+      }
     }
   }
 
@@ -354,12 +462,19 @@ class SupportChatController extends Notifier<SupportChatState> {
       sendingAttachmentTotal: attachmentBatchTotal,
     );
 
+    CancelToken? uploadCancelToken;
     try {
       if (conversation == null) {
         conversation = await _repository.openConversation(source: 'MobileChat');
-        state = state.copyWith(conversation: conversation);
+        if (!ref.mounted) {
+          return false;
+        }
+        _updateStateIfMounted(
+          (state) => state.copyWith(conversation: conversation),
+        );
       }
 
+      uploadCancelToken = _newActiveUploadCancelToken();
       final message = await _repository.sendAttachment(
         conversationId: conversation.conversationId,
         filePath: filePath,
@@ -368,42 +483,64 @@ class SupportChatController extends Notifier<SupportChatState> {
         localeTag: localeTag,
         body: body,
         replyToMessageId: replyToMessageId,
+        cancelToken: uploadCancelToken,
         onSendProgress: (sent, total) {
           if (total <= 0) {
             return;
           }
 
-          state = state.copyWith(
-            sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              sendProgress: (sent / total).clamp(0.0, 1.0).toDouble(),
+            ),
           );
         },
       );
 
       final attachmentFailure = _messageFromAttachmentFailure(message);
 
-      state = state.copyWith(
-        isSending: false,
-        conversation: _appendOutgoingMessage(conversation, message),
-        errorMessage: attachmentFailure,
-        clearError: attachmentFailure == null,
-        clearSendProgress: true,
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          conversation: _appendOutgoingMessage(conversation!, message),
+          errorMessage: attachmentFailure,
+          clearError: attachmentFailure == null,
+          clearSendProgress: true,
+        ),
       );
       _resumePendingRealtimeRefreshIfNeeded();
       return message.isAttachmentUploaded;
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(isSending: false, clearSendProgress: true),
+      );
+      return false;
     } on AppException catch (error) {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: error.message,
-        clearSendProgress: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: error.message,
+          clearSendProgress: true,
+        ),
       );
       return false;
     } on Object {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: 'support.attachment_unavailable',
-        clearSendProgress: true,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: 'support.attachment_unavailable',
+          clearSendProgress: true,
+        ),
       );
       return false;
+    } finally {
+      final cancelToken = uploadCancelToken;
+      if (cancelToken != null) {
+        _clearActiveUpload(cancelToken);
+      }
     }
   }
 
@@ -420,33 +557,56 @@ class SupportChatController extends Notifier<SupportChatState> {
 
     state = state.copyWith(isSending: true, clearError: true);
 
+    CancelToken? uploadCancelToken;
     try {
+      uploadCancelToken = _newActiveUploadCancelToken();
       final message = await _repository.retryAttachment(
         conversationId: conversation.conversationId,
         messageId: messageId,
         filePath: filePath,
         fileName: fileName,
         contentType: contentType,
+        cancelToken: uploadCancelToken,
       );
 
       final attachmentFailure = _messageFromAttachmentFailure(message);
-      state = state.copyWith(
-        isSending: false,
-        conversation: _upsertMessage(conversation, message),
-        errorMessage: attachmentFailure,
-        clearError: attachmentFailure == null,
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          conversation: _upsertMessage(conversation, message),
+          errorMessage: attachmentFailure,
+          clearError: attachmentFailure == null,
+        ),
       );
       _resumePendingRealtimeRefreshIfNeeded();
       return message.isAttachmentUploaded;
-    } on AppException catch (error) {
-      state = state.copyWith(isSending: false, errorMessage: error.message);
-      return false;
-    } on Object {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: 'support.attachment_unavailable',
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(isSending: false, clearSendProgress: true),
       );
       return false;
+    } on AppException catch (error) {
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(isSending: false, errorMessage: error.message),
+      );
+      return false;
+    } on Object {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: 'support.attachment_unavailable',
+        ),
+      );
+      return false;
+    } finally {
+      final cancelToken = uploadCancelToken;
+      if (cancelToken != null) {
+        _clearActiveUpload(cancelToken);
+      }
     }
   }
 
@@ -529,18 +689,28 @@ class SupportChatController extends Notifier<SupportChatState> {
     state = state.copyWith(isSending: true, clearError: true);
     try {
       final updatedConversation = await action(conversation);
-      state = state.copyWith(
-        isSending: false,
-        conversation: updatedConversation,
-        clearError: true,
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          conversation: updatedConversation,
+          clearError: true,
+        ),
       );
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
-      state = state.copyWith(isSending: false, errorMessage: error.message);
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(isSending: false, errorMessage: error.message),
+      );
     } on Object {
-      state = state.copyWith(
-        isSending: false,
-        errorMessage: 'support.unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSending: false,
+          errorMessage: 'support.unavailable',
+        ),
       );
     }
   }
@@ -579,32 +749,52 @@ class SupportChatController extends Notifier<SupportChatState> {
 
     try {
       final conversation = await _repository.getConversation();
-      state = state.copyWith(
-        isLoading: false,
-        isRefreshing: false,
-        conversation: conversation,
-        clearError: true,
+      if (!ref.mounted) {
+        return;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          conversation: conversation,
+          clearError: true,
+        ),
       );
 
       if (conversation.userUnreadCount > 0) {
         await _markReadIfNeeded(conversation);
       }
+      if (!ref.mounted) {
+        return;
+      }
       _resumePendingRealtimeRefreshIfNeeded();
     } on AppException catch (error) {
       if (_isConversationNotFound(error.message)) {
-        state = state.copyWith(
-          isLoading: false,
-          isRefreshing: false,
-          clearConversation: true,
-          clearError: true,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            isRefreshing: false,
+            clearConversation: true,
+            clearError: true,
+          ),
         );
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          isRefreshing: false,
-          errorMessage: error.message,
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            isRefreshing: false,
+            errorMessage: error.message,
+          ),
         );
       }
+    } on Object {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          errorMessage: 'support.unavailable',
+        ),
+      );
     }
   }
 
@@ -632,6 +822,9 @@ class SupportChatController extends Notifier<SupportChatState> {
       final chunk = await _repository.getConversation(
         beforeMessageCreatedAtUtc: before,
       );
+      if (!ref.mounted) {
+        return;
+      }
 
       final existingById = {
         for (final message in conversation.messages) message.messageId: message,
@@ -643,24 +836,28 @@ class SupportChatController extends Notifier<SupportChatState> {
         ...conversation.messages,
       ]..sort((a, b) => a.createdAtUtc.compareTo(b.createdAtUtc));
 
-      state = state.copyWith(
-        isLoadingOlder: false,
-        conversation: conversation.copyWith(
-          hasOlderMessages: chunk.hasOlderMessages,
-          oldestLoadedMessageCreatedAtUtc:
-              chunk.oldestLoadedMessageCreatedAtUtc,
-          messages: merged,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoadingOlder: false,
+          conversation: conversation.copyWith(
+            hasOlderMessages: chunk.hasOlderMessages,
+            oldestLoadedMessageCreatedAtUtc:
+                chunk.oldestLoadedMessageCreatedAtUtc,
+            messages: merged,
+          ),
         ),
       );
     } on AppException catch (error) {
-      state = state.copyWith(
-        isLoadingOlder: false,
-        errorMessage: error.message,
+      _updateStateIfMounted(
+        (state) =>
+            state.copyWith(isLoadingOlder: false, errorMessage: error.message),
       );
     } on Object {
-      state = state.copyWith(
-        isLoadingOlder: false,
-        errorMessage: 'support.unavailable',
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoadingOlder: false,
+          errorMessage: 'support.unavailable',
+        ),
       );
     }
   }
@@ -688,12 +885,20 @@ class SupportChatController extends Notifier<SupportChatState> {
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
+    if (!ref.mounted) {
+      return;
+    }
+
     if (_isScreenVisible && _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
     }
   }
 
   Future<void> _markReadIfNeeded(SupportChatConversation conversation) async {
+    if (!ref.mounted) {
+      return;
+    }
+
     if (conversation.userUnreadCount <= 0) {
       return;
     }
@@ -710,6 +915,9 @@ class SupportChatController extends Notifier<SupportChatState> {
     final now = DateTime.now().toUtc();
     try {
       await _repository.markConversationRead(conversation.conversationId);
+      if (!ref.mounted) {
+        return;
+      }
       final updatedMessages = conversation.messages
           .map(
             (message) => message.isFromAdmin && !message.isRead
@@ -718,10 +926,12 @@ class SupportChatController extends Notifier<SupportChatState> {
           )
           .toList(growable: false);
 
-      state = state.copyWith(
-        conversation: conversation.copyWith(
-          userUnreadCount: 0,
-          messages: updatedMessages,
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          conversation: conversation.copyWith(
+            userUnreadCount: 0,
+            messages: updatedMessages,
+          ),
         ),
       );
     } on AppException {

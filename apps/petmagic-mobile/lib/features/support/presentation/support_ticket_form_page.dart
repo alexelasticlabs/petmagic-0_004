@@ -1,12 +1,14 @@
-import 'dart:developer' as developer;
+import 'dart:async';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
@@ -19,11 +21,16 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class SupportTicketFormPage extends ConsumerStatefulWidget {
-  const SupportTicketFormPage({required this.scenario, super.key});
+  const SupportTicketFormPage({
+    required this.scenario,
+    @visibleForTesting this.initialAttachments = const [],
+    super.key,
+  });
 
   static const routePath = '/profile/support/ticket';
 
   final String scenario;
+  final List<XFile> initialAttachments;
 
   @override
   ConsumerState<SupportTicketFormPage> createState() =>
@@ -48,6 +55,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
+  CancelToken? _submitCancelToken;
 
   void _logSupportTicketFailure(
     String stage,
@@ -63,13 +71,11 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       }
     }
 
-    developer.Timeline.instantSync(
-      'petmagic.support.ticket.error',
-      arguments: payload,
-    );
-    developer.log(
-      'SupportTicketForm::$stage failed',
-      name: 'PetMagic.Support.TicketForm',
+    AppLogger.warn(
+      feature: 'Support.TicketForm',
+      operation: stage,
+      message: 'Support ticket step failed',
+      context: payload,
       error: error,
       stackTrace: stackTrace,
     );
@@ -78,15 +84,20 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
-      await ref.read(generationHistoryControllerProvider.notifier).load();
-      await ref.read(walletControllerProvider.notifier).load();
-      await ref.read(premiumControllerProvider.notifier).load();
-    });
+    _attachments = List<XFile>.unmodifiable(widget.initialAttachments);
+    unawaited(
+      Future.microtask(() async {
+        if (!mounted) {
+          return;
+        }
+        await _preloadSupportContext();
+      }),
+    );
   }
 
   @override
   void dispose() {
+    _cancelSubmit();
     _descriptionController.dispose();
     super.dispose();
   }
@@ -120,131 +131,128 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
           title: Text(text.supportTicketFormTitle),
         ),
         body: SafeArea(
-          child: SingleChildScrollView(
+          child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            children: [
+              _ContextCard(
+                label: text.supportTicketFormTopicLabel,
+                value: scenarioData.topicLabel,
+              ),
+              if (generationId != null)
                 _ContextCard(
-                  label: text.supportTicketFormTopicLabel,
-                  value: scenarioData.topicLabel,
+                  label: text.supportTicketFormRelatedGenerationLabel,
+                  value: generationId,
                 ),
-                if (generationId != null)
-                  _ContextCard(
-                    label: text.supportTicketFormRelatedGenerationLabel,
-                    value: generationId,
-                  ),
-                if (paymentId != null)
-                  _ContextCard(
-                    label: text.supportTicketFormRelatedPaymentLabel,
-                    value: paymentId,
-                  ),
-                if (subscriptionLabel != null)
-                  _ContextCard(
-                    label: text.supportTicketFormRelatedSubscriptionLabel,
-                    value: subscriptionLabel,
-                  ),
-                const SizedBox(height: 10),
-                Text(
-                  text.supportTicketFormDescriptionLabel,
-                  style: TextStyle(
-                    color: colors.textStrong,
-                    fontWeight: FontWeight.w700,
-                  ),
+              if (paymentId != null)
+                _ContextCard(
+                  label: text.supportTicketFormRelatedPaymentLabel,
+                  value: paymentId,
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _descriptionController,
-                  maxLines: 5,
-                  minLines: 4,
-                  style: TextStyle(color: colors.textStrong),
-                  decoration: InputDecoration(
-                    hintText: text.supportTicketFormDescriptionHint,
-                    hintStyle: TextStyle(color: colors.textMuted),
-                    filled: true,
-                    fillColor: colors.surfaceStrong.withValues(alpha: 0.7),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colors.accent),
-                    ),
+              if (subscriptionLabel != null)
+                _ContextCard(
+                  label: text.supportTicketFormRelatedSubscriptionLabel,
+                  value: subscriptionLabel,
+                ),
+              const SizedBox(height: 10),
+              Text(
+                text.supportTicketFormDescriptionLabel,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _descriptionController,
+                maxLines: 5,
+                minLines: 4,
+                style: TextStyle(color: colors.textStrong),
+                decoration: InputDecoration(
+                  hintText: text.supportTicketFormDescriptionHint,
+                  hintStyle: TextStyle(color: colors.textMuted),
+                  filled: true,
+                  fillColor: colors.surfaceStrong.withValues(alpha: 0.7),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: colors.accent),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Row(
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text(
+                    text.supportTicketFormAttachmentsLabel,
+                    style: TextStyle(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _isSubmitting ? null : _showAttachmentOptions,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: Text(text.supportTicketFormAddScreenshotAction),
+                  ),
+                ],
+              ),
+              if (_attachments.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    Text(
-                      text.supportTicketFormAttachmentsLabel,
-                      style: TextStyle(
-                        color: colors.textStrong,
-                        fontWeight: FontWeight.w700,
+                    for (var i = 0; i < _attachments.length; i++)
+                      _AttachmentChip(
+                        file: _attachments[i],
+                        onRemove: _isSubmitting
+                            ? null
+                            : () {
+                                setState(() {
+                                  _attachments = [
+                                    ..._attachments.take(i),
+                                    ..._attachments.skip(i + 1),
+                                  ];
+                                });
+                              },
                       ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _isSubmitting ? null : _showAttachmentOptions,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
-                      label: Text(text.supportTicketFormAddScreenshotAction),
-                    ),
                   ],
                 ),
-                if (_attachments.isNotEmpty) ...[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (var i = 0; i < _attachments.length; i++)
-                        _AttachmentChip(
-                          file: _attachments[i],
-                          onRemove: _isSubmitting
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _attachments = [
-                                      ..._attachments.take(i),
-                                      ..._attachments.skip(i + 1),
-                                    ];
-                                  });
-                                },
+                const SizedBox(height: 20),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _isSubmitting
+                      ? null
+                      : () => _submit(
+                          scenario: scenarioData.key,
+                          relatedGenerationId: _asGuidOrNull(generationId),
+                          relatedPaymentId: _asGuidOrNull(paymentId),
                         ),
-                    ],
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colors.accent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                ],
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _isSubmitting
-                        ? null
-                        : () => _submit(
-                            scenario: scenarioData.key,
-                            relatedGenerationId: _asGuidOrNull(generationId),
-                            relatedPaymentId: _asGuidOrNull(paymentId),
-                          ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colors.accent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      _isSubmitting
-                          ? text.supportTicketFormSubmittingLabel
-                          : text.supportTicketFormSubmitAction,
-                    ),
+                  child: Text(
+                    _isSubmitting
+                        ? text.supportTicketFormSubmittingLabel
+                        : text.supportTicketFormSubmitAction,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -475,6 +483,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     String? relatedGenerationId,
     String? relatedPaymentId,
   }) async {
+    if (_isSubmitting) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     final description = _descriptionController.text.trim();
     if (description.isEmpty) {
@@ -489,7 +501,11 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       _isSubmitting = true;
     });
 
+    final submitCancelToken = CancelToken();
+    _submitCancelToken = submitCancelToken;
+
     try {
+      final attachments = List<XFile>.unmodifiable(_attachments);
       final repository = ref.read(supportChatRepositoryProvider);
       final localeTag = Localizations.localeOf(context).toLanguageTag();
       final conversation = await repository.openConversation(
@@ -498,16 +514,30 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         assistantScenario: scenario,
         relatedGenerationId: relatedGenerationId,
         relatedPaymentId: relatedPaymentId,
+        cancelToken: submitCancelToken,
       );
 
-      for (final file in _attachments) {
+      if (!mounted) {
+        return;
+      }
+
+      for (final file in attachments) {
+        if (!mounted) {
+          return;
+        }
+
         await repository.sendAttachment(
           conversationId: conversation.conversationId,
           filePath: file.path,
           fileName: file.name,
           contentType: _resolveContentTypeForUpload(file.path),
           localeTag: localeTag,
+          cancelToken: submitCancelToken,
         );
+
+        if (!mounted) {
+          return;
+        }
       }
 
       if (!mounted) {
@@ -520,6 +550,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       );
       context.go(SupportChatPage.routePath);
     } catch (error, stackTrace) {
+      if (!mounted) {
+        return;
+      }
+
       _logSupportTicketFailure(
         'submit_ticket',
         error,
@@ -537,12 +571,23 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         tone: PetMagicToastTone.warning,
       );
     } finally {
+      if (identical(_submitCancelToken, submitCancelToken)) {
+        _submitCancelToken = null;
+      }
       if (mounted) {
         setState(() {
           _isSubmitting = false;
         });
       }
     }
+  }
+
+  void _cancelSubmit() {
+    final cancelToken = _submitCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_ticket_disposed');
+    }
+    _submitCancelToken = null;
   }
 
   String _resolveContentTypeForUpload(String path) {
@@ -577,6 +622,45 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return text.supportChatAttachmentUnavailableError;
     }
     return text.supportChatUnavailableError;
+  }
+
+  Future<void> _preloadSupportContext() async {
+    if (!mounted) {
+      return;
+    }
+
+    await Future.wait<void>([
+      _preloadContextStep(
+        'preload_generation_context',
+        () => ref.read(generationHistoryControllerProvider.notifier).load(),
+      ),
+      _preloadContextStep(
+        'preload_wallet_context',
+        () => ref.read(walletControllerProvider.notifier).load(),
+      ),
+      _preloadContextStep(
+        'preload_premium_context',
+        () => ref.read(premiumControllerProvider.notifier).load(),
+      ),
+    ]);
+  }
+
+  Future<void> _preloadContextStep(
+    String stage,
+    Future<void> Function() load,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+
+    try {
+      await load();
+    } catch (error, stackTrace) {
+      if (!mounted) {
+        return;
+      }
+      _logSupportTicketFailure(stage, error, stackTrace);
+    }
   }
 }
 

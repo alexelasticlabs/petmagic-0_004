@@ -1,7 +1,6 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 
 final passwordResetControllerProvider =
@@ -65,13 +64,11 @@ class PasswordResetController extends Notifier<PasswordResetState> {
     Object error,
     StackTrace stackTrace,
   ) {
-    developer.Timeline.instantSync(
-      'petmagic.profile.password_reset.error',
-      arguments: {'stage': stage},
-    );
-    developer.log(
-      'PasswordResetController::$stage failed',
-      name: 'PetMagic.Profile.PasswordReset',
+    AppLogger.warn(
+      feature: 'Profile.PasswordReset',
+      operation: stage,
+      message: 'Password reset step failed',
+      context: {'stage': stage},
       error: error,
       stackTrace: stackTrace,
     );
@@ -82,6 +79,16 @@ class PasswordResetController extends Notifier<PasswordResetState> {
   @override
   PasswordResetState build() {
     return const PasswordResetState();
+  }
+
+  void _updateStateIfMounted(
+    PasswordResetState Function(PasswordResetState current) update,
+  ) {
+    if (!ref.mounted) {
+      return;
+    }
+
+    state = update(state);
   }
 
   void reset({String email = ''}) {
@@ -122,18 +129,28 @@ class PasswordResetController extends Notifier<PasswordResetState> {
   }
 
   Future<bool> requestReset() async {
+    if (state.isSaving) {
+      return false;
+    }
+
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.requestPasswordReset(email: state.email);
-      state = state.copyWith(
-        isSaving: false,
-        codeRequested: true,
-        successMessage: 'auth.password_reset_code_sent',
+      await repository.requestPasswordReset(email: state.email);
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          codeRequested: true,
+          successMessage: 'auth.password_reset_code_sent',
+        ),
       );
       return true;
     } on AppException catch (error) {
@@ -147,6 +164,10 @@ class PasswordResetController extends Notifier<PasswordResetState> {
   }
 
   Future<bool> confirmReset() async {
+    if (state.isSaving) {
+      return false;
+    }
+
     if (state.newPassword.length < 6) {
       state = state.copyWith(
         errorMessage: 'auth.password_too_short',
@@ -169,18 +190,24 @@ class PasswordResetController extends Notifier<PasswordResetState> {
       clearSuccess: true,
     );
 
+    final repository = _repository;
     try {
-      await _repository.confirmPasswordReset(
+      await repository.confirmPasswordReset(
         email: state.email,
         code: state.code,
         newPassword: state.newPassword,
       );
-      state = state.copyWith(
-        isSaving: false,
-        code: '',
-        newPassword: '',
-        confirmPassword: '',
-        successMessage: 'auth.password_reset_success',
+      if (!ref.mounted) {
+        return false;
+      }
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isSaving: false,
+          code: '',
+          newPassword: '',
+          confirmPassword: '',
+          successMessage: 'auth.password_reset_success',
+        ),
       );
       return true;
     } on AppException catch (error) {
@@ -194,10 +221,12 @@ class PasswordResetController extends Notifier<PasswordResetState> {
   }
 
   void _setFailure(String message) {
-    state = state.copyWith(
-      isSaving: false,
-      errorMessage: message,
-      clearSuccess: true,
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        isSaving: false,
+        errorMessage: message,
+        clearSuccess: true,
+      ),
     );
   }
 }

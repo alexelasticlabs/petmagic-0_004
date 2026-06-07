@@ -4,7 +4,7 @@ const _supportMediaDownloadTimeout = Duration(seconds: 20);
 
 extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
   Future<void> _openAttachmentExternallyImpl(String value) async {
-    final uri = parseSafeExternalUri(value);
+    final uri = parseSafeSupportExternalUri(value);
     if (uri == null) {
       if (!mounted) {
         return;
@@ -25,9 +25,17 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
     required String imageUrl,
     String? fileName,
   }) async {
+    final cancelToken = _startMediaDownload();
+    if (cancelToken == null) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     try {
-      final bytes = await _downloadImageBytesImpl(imageUrl);
+      final bytes = await _downloadImageBytesImpl(
+        imageUrl,
+        cancelToken: cancelToken,
+      );
       final safeFileName = _safeImageFileNameImpl(fileName);
       final wasSaved = await saveBytesToDevice(
         bytes: bytes,
@@ -48,6 +56,15 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         text.supportChatImageSavedMessage,
         tone: PetMagicToastTone.success,
       );
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      _showSupportToast(
+        text.supportChatSaveImageFailedError,
+        tone: PetMagicToastTone.warning,
+      );
     } on Object {
       if (!mounted) {
         return;
@@ -57,6 +74,8 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         text.supportChatSaveImageFailedError,
         tone: PetMagicToastTone.warning,
       );
+    } finally {
+      _completeMediaDownload(cancelToken);
     }
   }
 
@@ -64,9 +83,14 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
     required String imageUrl,
     String? fileName,
   }) async {
+    final cancelToken = _startMediaDownload();
+    if (cancelToken == null) {
+      return;
+    }
+
     final text = AppLocalizations.of(context);
     try {
-      final safeUri = parseSafeExternalUri(imageUrl);
+      final safeUri = parseSafeSupportExternalUri(imageUrl);
       if (safeUri == null) {
         throw const FormatException('unsupported_external_uri');
       }
@@ -76,6 +100,16 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         fileName: _safeImageFileNameImpl(fileName),
         title: fileName ?? text.supportChatImageLabel,
         downloadTimeout: _supportMediaDownloadTimeout,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      _showSupportToast(
+        text.supportChatShareImageFailedError,
+        tone: PetMagicToastTone.warning,
       );
     } on Object {
       if (!mounted) {
@@ -86,11 +120,16 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
         text.supportChatShareImageFailedError,
         tone: PetMagicToastTone.warning,
       );
+    } finally {
+      _completeMediaDownload(cancelToken);
     }
   }
 
-  Future<List<int>> _downloadImageBytesImpl(String imageUrl) async {
-    final safeUri = parseSafeExternalUri(imageUrl);
+  Future<List<int>> _downloadImageBytesImpl(
+    String imageUrl, {
+    CancelToken? cancelToken,
+  }) async {
+    final safeUri = parseSafeSupportExternalUri(imageUrl);
     if (safeUri == null) {
       throw const FormatException('unsupported_external_uri');
     }
@@ -98,6 +137,7 @@ extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
     return downloadFileBytes(
       safeUri.toString(),
       timeout: _supportMediaDownloadTimeout,
+      cancelToken: cancelToken,
     );
   }
 

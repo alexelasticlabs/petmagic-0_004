@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
@@ -56,17 +55,18 @@ class AppLaunchState {
 class AppLaunchController extends Notifier<AppLaunchState> {
   late final GuestLaunchStorage _guestLaunchStorage;
   static const _onboardingReadTimeout = Duration(seconds: 3);
+  static final Object _disposedReadSentinel = Object();
+  final Completer<void> _disposed = Completer<void>();
+  Timer? _onboardingReadTimeoutTimer;
   bool _didScheduleInitialize = false;
   bool _isInitializing = false;
 
   void _logAppLaunchFailure(String stage, Object error, StackTrace stackTrace) {
-    developer.Timeline.instantSync(
-      'petmagic.app_launch.error',
-      arguments: {'stage': stage},
-    );
-    developer.log(
-      'AppLaunchController::$stage failed',
-      name: 'PetMagic.Startup.AppLaunch',
+    AppLogger.warn(
+      feature: 'Startup',
+      operation: stage,
+      message: 'App launch step failed',
+      context: {'stage': stage},
       error: error,
       stackTrace: stackTrace,
     );
@@ -75,6 +75,13 @@ class AppLaunchController extends Notifier<AppLaunchState> {
   @override
   AppLaunchState build() {
     _guestLaunchStorage = ref.watch(guestLaunchStorageProvider);
+    ref.onDispose(() {
+      _onboardingReadTimeoutTimer?.cancel();
+      _onboardingReadTimeoutTimer = null;
+      if (!_disposed.isCompleted) {
+        _disposed.complete();
+      }
+    });
     if (!_didScheduleInitialize) {
       _didScheduleInitialize = true;
       Future.microtask(initialize);
@@ -83,6 +90,14 @@ class AppLaunchController extends Notifier<AppLaunchState> {
   }
 
   Future<void> initialize() async {
+    if (!ref.mounted) {
+      return;
+    }
+
+    if (!state.isLoading) {
+      return;
+    }
+
     if (_isInitializing) {
       return;
     }
@@ -111,9 +126,11 @@ class AppLaunchController extends Notifier<AppLaunchState> {
       }
 
       try {
-        hasSeenOnboarding = await _guestLaunchStorage
-            .readOnboardingSeen()
-            .timeout(_onboardingReadTimeout);
+        final onboardingSeen = await _readOnboardingSeenWithTimeout();
+        if (onboardingSeen == null) {
+          return;
+        }
+        hasSeenOnboarding = onboardingSeen;
       } on TimeoutException catch (error, stackTrace) {
         _logAppLaunchFailure('read_onboarding_timeout', error, stackTrace);
       } catch (error, stackTrace) {
@@ -133,6 +150,37 @@ class AppLaunchController extends Notifier<AppLaunchState> {
       );
     } finally {
       _isInitializing = false;
+    }
+  }
+
+  Future<bool?> _readOnboardingSeenWithTimeout() async {
+    final timeout = Completer<Never>();
+    _onboardingReadTimeoutTimer?.cancel();
+    _onboardingReadTimeoutTimer = Timer(_onboardingReadTimeout, () {
+      if (!timeout.isCompleted) {
+        timeout.completeError(
+          TimeoutException(
+            'Timed out reading onboarding flag.',
+            _onboardingReadTimeout,
+          ),
+        );
+      }
+    });
+
+    try {
+      final result = await Future.any<Object?>([
+        _guestLaunchStorage.readOnboardingSeen(),
+        timeout.future,
+        _disposed.future.then((_) => _disposedReadSentinel),
+      ]);
+      if (identical(result, _disposedReadSentinel)) {
+        return null;
+      }
+
+      return result as bool;
+    } finally {
+      _onboardingReadTimeoutTimer?.cancel();
+      _onboardingReadTimeoutTimer = null;
     }
   }
 
@@ -160,6 +208,10 @@ class AppLaunchController extends Notifier<AppLaunchState> {
 
   Future<void> markOnboardingSeen() async {
     await _guestLaunchStorage.saveOnboardingSeen(true);
+    if (!ref.mounted) {
+      return;
+    }
+
     state = state.copyWith(hasSeenOnboarding: true);
   }
 

@@ -290,6 +290,10 @@ class _ResultCard extends StatefulWidget {
 }
 
 class _ResultCardState extends State<_ResultCard> {
+  static const int _aspectRatioProbeCacheWidth = 720;
+
+  ImageStream? _aspectRatioStream;
+  ImageStreamListener? _aspectRatioListener;
   double? _aspectRatio;
 
   @override
@@ -300,19 +304,55 @@ class _ResultCardState extends State<_ResultCard> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant _ResultCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasVideo = isVideoGeneration(oldWidget.generation);
+    final isVideo = isVideoGeneration(widget.generation);
+    if (oldWidget.generation.outputUrl != widget.generation.outputUrl ||
+        wasVideo != isVideo) {
+      _detachAspectRatioListener();
+      _aspectRatio = null;
+      if (!isVideo) {
+        _resolveImageAspectRatio();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _detachAspectRatioListener();
+    super.dispose();
+  }
+
   void _resolveImageAspectRatio() {
     final url = widget.generation.outputUrl ?? '';
     if (url.isEmpty) return;
-    NetworkImage(url)
-        .resolve(const ImageConfiguration())
-        .addListener(
-          ImageStreamListener((info, _) {
-            if (!mounted) return;
-            final w = info.image.width.toDouble();
-            final h = info.image.height.toDouble();
-            if (h > 0) setState(() => _aspectRatio = w / h);
-          }, onError: (error, stackTrace) {}),
-        );
+    final safeUri = parseSafeGenerationMediaUri(url);
+    if (safeUri == null) return;
+
+    final stream = CachedNetworkImageProvider(
+      safeUri.toString(),
+      maxWidth: _aspectRatioProbeCacheWidth,
+    ).resolve(const ImageConfiguration());
+    _aspectRatioStream = stream;
+    _aspectRatioListener = ImageStreamListener((info, _) {
+      if (!mounted) return;
+      final w = info.image.width.toDouble();
+      final h = info.image.height.toDouble();
+      if (h > 0) setState(() => _aspectRatio = w / h);
+    }, onError: (error, stackTrace) {});
+    stream.addListener(_aspectRatioListener!);
+  }
+
+  void _detachAspectRatioListener() {
+    final listener = _aspectRatioListener;
+    final stream = _aspectRatioStream;
+    if (listener != null && stream != null) {
+      stream.removeListener(listener);
+    }
+    _aspectRatioStream = null;
+    _aspectRatioListener = null;
   }
 
   @override
@@ -320,6 +360,8 @@ class _ResultCardState extends State<_ResultCard> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final outputUrl = widget.generation.outputUrl ?? '';
+    final safeMediaUri = parseSafeGenerationMediaUri(outputUrl);
+    final safeMediaUrl = safeMediaUri?.toString() ?? '';
     final isVideo = isVideoGeneration(widget.generation);
     final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 3.0 / 4.0);
     final borderRadius = BorderRadius.circular(22);
@@ -338,10 +380,10 @@ class _ResultCardState extends State<_ResultCard> {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: borderRadius,
-              onTap: outputUrl.isEmpty ? null : widget.onOpenViewer,
+              onTap: safeMediaUrl.isEmpty ? null : widget.onOpenViewer,
               child: AspectRatio(
                 aspectRatio: aspectRatio,
-                child: outputUrl.isEmpty
+                child: safeMediaUrl.isEmpty
                     ? _MediaPlaceholder(
                         label: text.templateFlowResultUnavailable,
                       )
@@ -352,7 +394,7 @@ class _ResultCardState extends State<_ResultCard> {
                             color: colors.surfaceStrong,
                             child: isVideo
                                 ? _InlineVideoPreview(
-                                    url: outputUrl,
+                                    url: safeMediaUrl,
                                     onAspectRatioResolved: (ar) {
                                       if (mounted) {
                                         setState(() => _aspectRatio = ar);
@@ -360,7 +402,7 @@ class _ResultCardState extends State<_ResultCard> {
                                     },
                                   )
                                 : CachedNetworkImage(
-                                    imageUrl: outputUrl,
+                                    imageUrl: safeMediaUrl,
                                     fit: BoxFit.cover,
                                     memCacheWidth: 1080,
                                     errorWidget: (context, url, error) =>
@@ -520,8 +562,8 @@ class _BackgroundHintCard extends StatelessWidget {
 class _ReadyActionsRow extends StatelessWidget {
   const _ReadyActionsRow({required this.onSave, required this.onShare});
 
-  final VoidCallback onSave;
-  final VoidCallback onShare;
+  final VoidCallback? onSave;
+  final VoidCallback? onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -620,50 +662,53 @@ class _DetailsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return _Panel(
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: EdgeInsets.zero,
-          childrenPadding: const EdgeInsets.only(top: 4),
-          initiallyExpanded: false,
-          iconColor: colors.textSoft,
-          collapsedIconColor: colors.textMuted,
-          title: Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: colors.textStrong,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          children: [
-            for (final row in rows)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 5),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        row.$1,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.textMuted,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        row.$2,
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.textStrong,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+      child: Material(
+        color: Colors.transparent,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(top: 4),
+            initiallyExpanded: false,
+            iconColor: colors.textSoft,
+            collapsedIconColor: colors.textMuted,
+            title: Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w800,
               ),
-          ],
+            ),
+            children: [
+              for (final row in rows)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          row.$1,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.textMuted),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          row.$2,
+                          textAlign: TextAlign.right,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: colors.textStrong,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -684,6 +729,7 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
   bool _hasPreviewSlot = false;
+  int _initializeRequestVersion = 0;
 
   @override
   void initState() {
@@ -695,27 +741,34 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   void didUpdateWidget(covariant _InlineVideoPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.url != widget.url) {
-      _controller?.dispose();
+      final previous = _controller;
       _controller = null;
+      _failedToLoad = false;
       _releasePreviewSlot();
+      unawaited(previous?.dispose());
       _tryInitialize();
     }
   }
 
   @override
   void dispose() {
+    _initializeRequestVersion++;
     _releasePreviewSlot();
-    _controller?.dispose();
+    final controller = _controller;
+    _controller = null;
+    unawaited(controller?.dispose());
     super.dispose();
   }
 
   void _tryInitialize() {
+    final requestVersion = ++_initializeRequestVersion;
+    final url = widget.url;
     _hasPreviewSlot = MediaLifecyclePolicy.tryAcquireVideoPreviewSlot();
     if (!_hasPreviewSlot) {
       _failedToLoad = false;
       return;
     }
-    unawaited(_initialize());
+    unawaited(_initialize(requestVersion, url));
   }
 
   void _releasePreviewSlot() {
@@ -726,16 +779,28 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
     MediaLifecyclePolicy.releaseVideoPreviewSlot();
   }
 
-  Future<void> _initialize() async {
+  Future<void> _initialize(int requestVersion, String url) async {
     setState(() => _failedToLoad = false);
-    final controller = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    final safeUri = parseSafeGenerationMediaUri(url);
+    if (safeUri == null) {
+      _releasePreviewSlot();
+      if (mounted && requestVersion == _initializeRequestVersion) {
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
+      }
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(safeUri);
     _controller = controller;
     controller.setLooping(true);
     controller.setVolume(0);
 
     try {
       await controller.initialize();
-      if (!mounted || _controller != controller) {
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();
         return;
       }
@@ -746,17 +811,32 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
       }
 
       await controller.play();
+      if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
+        await controller.dispose();
+        return;
+      }
       setState(() {});
     } catch (_) {
       await controller.dispose();
-      _releasePreviewSlot();
-      if (mounted) {
+      if (_isCurrentVideoRequest(requestVersion, url, controller)) {
+        _releasePreviewSlot();
         setState(() {
           _controller = null;
           _failedToLoad = true;
         });
       }
     }
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String url,
+    VideoPlayerController controller,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.url == url &&
+        _controller == controller;
   }
 
   @override
@@ -816,6 +896,7 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
   bool _showControls = true;
   bool _isMuted = false;
   Timer? _controlsTimer;
+  int _videoInitializeRequestVersion = 0;
 
   bool get _isVideo => isVideoGeneration(widget.generation);
 
@@ -830,36 +911,63 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
 
   @override
   void dispose() {
+    _videoInitializeRequestVersion++;
     _controlsTimer?.cancel();
-    _videoController?.dispose();
+    final controller = _videoController;
+    _videoController = null;
+    unawaited(controller?.dispose());
     super.dispose();
   }
 
   Future<void> _initializeVideo() async {
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(widget.mediaUrl),
-    );
+    final requestVersion = ++_videoInitializeRequestVersion;
+    final mediaUrl = widget.mediaUrl;
+    final safeUri = parseSafeGenerationMediaUri(mediaUrl);
+    if (safeUri == null) {
+      setState(() {
+        _videoController = null;
+        _videoFailed = true;
+      });
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(safeUri);
     _videoController = controller;
     controller.setLooping(true);
 
     try {
       await controller.initialize();
-      if (!mounted || _videoController != controller) {
+      if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
         await controller.dispose();
         return;
       }
 
       await controller.play();
+      if (!_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
+        await controller.dispose();
+        return;
+      }
       setState(() {});
     } catch (_) {
       await controller.dispose();
-      if (mounted) {
+      if (_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
         setState(() {
           _videoController = null;
           _videoFailed = true;
         });
       }
     }
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String mediaUrl,
+    VideoPlayerController controller,
+  ) {
+    return mounted &&
+        requestVersion == _videoInitializeRequestVersion &&
+        widget.mediaUrl == mediaUrl &&
+        _videoController == controller;
   }
 
   void _toggleControls() {
@@ -892,6 +1000,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
     final controller = _videoController;
+    final safeMediaUrl = parseSafeGenerationMediaUri(
+      widget.mediaUrl,
+    )?.toString();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -903,11 +1014,13 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
             Center(
               child: _isVideo
                   ? _buildVideoMedia(text, controller)
+                  : safeMediaUrl == null
+                  ? _MediaPlaceholder(label: text.templateFlowResultLoadFailed)
                   : InteractiveViewer(
                       minScale: 1,
                       maxScale: 4,
                       child: CachedNetworkImage(
-                        imageUrl: widget.mediaUrl,
+                        imageUrl: safeMediaUrl,
                         fit: BoxFit.contain,
                         memCacheWidth: 1440,
                         errorWidget: (context, url, error) => _MediaPlaceholder(
