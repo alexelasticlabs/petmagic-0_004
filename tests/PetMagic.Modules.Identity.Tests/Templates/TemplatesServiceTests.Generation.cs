@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Observability;
@@ -425,6 +427,154 @@ public sealed partial class TemplatesServiceTests
         Assert.True(started.IsSuccess);
         Assert.Equal(2, started.Value.QueuePosition);
         Assert.Equal(40, started.Value.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldFilterPaginateAndOmitSensitiveFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Jobs Portrait", "Portrait", ["admin-jobs"]);
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var matchingJobId = Guid.NewGuid();
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = matchingJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Failed,
+                TokenCost = 20,
+                SourceImageUrl = "https://signed.example.com/source.jpg?sig=secret",
+                SourceImageFileName = "source.jpg",
+                SourceImageContentType = "image/jpeg",
+                ResultUrl = "https://signed.example.com/output.jpg?sig=secret",
+                IdempotencyKey = "idempotency-secret",
+                RequestHash = "request-hash-secret",
+                UsedPreprocessingModel = "openai/gpt-image-2/edit",
+                UsedKlingModel = "fal-ai/kling-video/v3/pro/motion-control",
+                PreprocessingProviderRequestId = "provider-request-secret",
+                MotionProviderRequestId = "motion-request-secret",
+                MotionProviderCostUsd = 0.1234m,
+                AttemptCount = 2,
+                LastErrorCode = "templates.ai_provider_failed",
+                LastErrorMessage = new string('x', 300),
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                StartedAtUtc = now.AddMinutes(-4),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                CompletedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = otherUserId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/other-source.jpg",
+                SourceImageFileName = "other-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                UsedPreprocessingModel = "openai/gpt-image-2/edit",
+                AttemptCount = 1,
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                CompletedAtUtc = now.AddMinutes(-1)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery(
+                "failed",
+                "fal",
+                userId.ToString(),
+                matchingJobId.ToString()[..12],
+                0,
+                10),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess);
+        Assert.Equal(1, page.Value.TotalCount);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Equal(matchingJobId, item.GenerationId);
+        Assert.Equal(userId, item.UserId);
+        Assert.Equal("Admin Jobs Portrait", item.TemplateTitle);
+        Assert.Equal("Failed", item.Status);
+        Assert.Equal("fal-ai", item.Provider);
+        Assert.Equal("fal-ai/kling-video/v3/pro/motion-control", item.Model);
+        Assert.Equal(0.1234m, item.ProviderCostUsd);
+        Assert.Equal("templates.ai_provider_failed", item.FailureCode);
+        Assert.True(item.FailureMessage?.Length <= 243);
+
+        var serialized = JsonSerializer.Serialize(item);
+        Assert.DoesNotContain("SourceImage", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ResultUrl", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ProviderRequestId", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("RequestHash", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("IdempotencyKey", serialized, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("signed.example.com", serialized, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldSupportCancelledAndRetryingStatusFilters()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Retry Portrait", "Portrait", ["admin-jobs"]);
+        var now = DateTime.UtcNow;
+        var cancelledJobId = Guid.NewGuid();
+        var retryingJobId = Guid.NewGuid();
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = cancelledJobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Cancelled,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/cancelled-source.jpg",
+                SourceImageFileName = "cancelled-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                AttemptCount = 1,
+                CreatedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = now.AddMinutes(-4),
+                UpdatedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationJob
+            {
+                Id = retryingJobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Retrying,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/retrying-source.jpg",
+                SourceImageFileName = "retrying-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                AttemptCount = 2,
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                UpdatedAtUtc = now.AddMinutes(-1)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var cancelled = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("canceled", null, null, null, 0, 10),
+            CancellationToken.None);
+        var retrying = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery("retrying", null, null, null, 0, 10),
+            CancellationToken.None);
+
+        Assert.True(cancelled.IsSuccess);
+        Assert.True(retrying.IsSuccess);
+        Assert.Equal(cancelledJobId, Assert.Single(cancelled.Value.Items).GenerationId);
+        Assert.Equal("Cancelled", cancelled.Value.Items[0].Status);
+        Assert.Equal(retryingJobId, Assert.Single(retrying.Value.Items).GenerationId);
+        Assert.Equal("Retrying", retrying.Value.Items[0].Status);
     }
 
     [Fact]

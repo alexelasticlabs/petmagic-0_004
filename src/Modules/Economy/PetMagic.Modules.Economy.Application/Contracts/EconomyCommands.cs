@@ -34,6 +34,8 @@ public sealed record CancelPremiumSubscriptionCommand(Guid UserId, string Paymen
 
 public sealed record AdminRevokePremiumSubscriptionCommand(Guid UserId, string PaymentProvider);
 
+public sealed record AdminRefundPurchaseCommand(Guid OrderId, string? Reason = null);
+
 public sealed record VerifyPremiumStorePurchaseCommand(
     Guid UserId,
     string PlanCode,

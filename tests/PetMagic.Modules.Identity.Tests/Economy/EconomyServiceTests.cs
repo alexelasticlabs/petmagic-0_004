@@ -179,6 +179,11 @@ public sealed partial class EconomyServiceTests
         {
             return Task.FromResult(Result.Success(new PaymentCreateResponse($"pi_{request.OrderId:N}", string.Empty)));
         }
+
+        public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
+        }
     }
 
     private sealed class FakeStoreSubscriptionVerifier : IStoreSubscriptionVerifier
@@ -261,7 +266,7 @@ public sealed partial class EconomyServiceTests
         public Task<Result<UserProfileResponse>> UpdateCurrentUserProfileAsync(Guid userId, UpdateCurrentUserProfileCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
-        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
+        public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
         public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();

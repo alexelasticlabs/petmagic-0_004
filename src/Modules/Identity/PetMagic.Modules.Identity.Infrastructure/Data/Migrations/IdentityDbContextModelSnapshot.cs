@@ -308,8 +308,34 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)");
 
+                    b.Property<string>("ActorRole")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Details")
                         .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("OldValue")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
@@ -319,7 +345,25 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<Guid?>("SubjectUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("TargetId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("TargetType")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId", "CreatedAtUtc");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("OccurredAtUtc");
 

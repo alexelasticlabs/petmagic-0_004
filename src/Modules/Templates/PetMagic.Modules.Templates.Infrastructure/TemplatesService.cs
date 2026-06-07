@@ -1,3 +1,4 @@
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -11,7 +12,8 @@ internal sealed partial class TemplatesService(
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService,
     ITemplateFeedRealtimeService templateFeedRealtimeService,
-    IHttpClientFactory httpClientFactory) : ITemplatesService
+    IHttpClientFactory httpClientFactory,
+    IAdminAuditLog? adminAuditLog = null) : ITemplatesService
 {
     private readonly TemplateCategoryAdminService _templateCategoryAdminService =
         new(dbContext, templateFeedRealtimeService);

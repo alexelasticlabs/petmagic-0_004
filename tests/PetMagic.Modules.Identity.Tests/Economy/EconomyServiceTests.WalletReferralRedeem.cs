@@ -434,14 +434,151 @@ public sealed partial class EconomyServiceTests
             new CreatePackPurchaseCommand(secondUserId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
             CancellationToken.None);
 
-        var allPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, null, CancellationToken.None);
-        var filteredPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, firstUserId, CancellationToken.None);
+        var allPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, null, null, null, CancellationToken.None);
+        var filteredPurchases = await service.GetAdminPurchaseHistoryAsync(0, 10, null, null, null, firstUserId, CancellationToken.None);
 
         Assert.True(allPurchases.IsSuccess);
         Assert.True(filteredPurchases.IsSuccess);
         Assert.Equal(2, allPurchases.Value.Items.Count);
         var filtered = Assert.Single(filteredPurchases.Value.Items);
         Assert.Equal(firstUserId, filtered.UserId);
+    }
+
+    [Fact]
+    public async Task GetAdminPurchaseHistoryAsync_ShouldFilterByProviderAndSearch()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "starter",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        dbContext.PurchaseOrders.AddRange(
+            new PurchaseOrder
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                PackId = packId,
+                PaymentProvider = "stripe",
+                Status = "succeeded",
+                PriceAmount = 4.99m,
+                CurrencyCode = "USD",
+                SparkToGrant = 120,
+                ExternalPaymentId = "pi_secret_should_not_be_needed",
+                CreatedAtUtc = now.AddMinutes(-1),
+                ConfirmedAtUtc = now
+            },
+            new PurchaseOrder
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                PackId = packId,
+                PaymentProvider = "app_store",
+                Status = "succeeded",
+                PriceAmount = 4.99m,
+                CurrencyCode = "USD",
+                SparkToGrant = 120,
+                CreatedAtUtc = now.AddMinutes(-2),
+                ConfirmedAtUtc = now.AddMinutes(-2)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetAdminPurchaseHistoryAsync(
+            0,
+            10,
+            "succeeded",
+            "stripe",
+            "starter",
+            null,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value.Items);
+        Assert.Equal(userId, item.UserId);
+        Assert.Equal("stripe", item.PaymentProvider);
+        Assert.Equal("starter", item.PackCode);
+        Assert.Null(item.ExternalPaymentId);
+        Assert.True(item.CanRefund);
+    }
+
+    [Fact]
+    public async Task RefundAdminPurchaseAsync_ShouldMarkSucceededStripePurchaseAsRefunded()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = userId,
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Succeeded,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_refundable",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            ConfirmedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, "support refund"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(PurchaseOrderStatus.Refunded, result.Value.Status);
+        Assert.Null(result.Value.ExternalPaymentId);
+        Assert.False(result.Value.CanRefund);
+        Assert.Equal(PurchaseOrderStatus.Refunded, await dbContext.PurchaseOrders
+            .Where(x => x.Id == orderId)
+            .Select(x => x.Status)
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task RefundAdminPurchaseAsync_ShouldRejectPendingPurchase()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var packId = AddStarterPack(dbContext);
+        var orderId = Guid.NewGuid();
+        dbContext.PurchaseOrders.Add(new PurchaseOrder
+        {
+            Id = orderId,
+            UserId = Guid.NewGuid(),
+            PackId = packId,
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = 4.99m,
+            CurrencyCode = "USD",
+            SparkToGrant = 120,
+            ExternalPaymentId = "pi_pending",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, "not refundable"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("economy.purchase_not_refundable", result.Error.Code);
     }
 
     [Fact]

@@ -88,6 +88,18 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<Guid?>("GenerationId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ModeratedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ModerationComment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ModerationStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -100,6 +112,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ModerationStatus", "CreatedAtUtc");
 
                     b.HasIndex("TemplateId", "CountryCode");
 

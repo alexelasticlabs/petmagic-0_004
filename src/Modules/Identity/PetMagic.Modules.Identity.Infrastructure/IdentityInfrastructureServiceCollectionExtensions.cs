@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
@@ -129,6 +130,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
+        services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
         services.AddScoped<EmailDispatchProcessor>();
         services.AddHostedService<EmailDispatchWorker>();

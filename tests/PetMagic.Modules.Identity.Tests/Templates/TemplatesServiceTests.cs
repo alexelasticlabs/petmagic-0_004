@@ -2,6 +2,7 @@ using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -17,7 +18,8 @@ public sealed partial class TemplatesServiceTests
     private static TemplatesService CreateService(
         TemplatesDbContext dbContext,
         IMediaStorage? mediaStorage = null,
-        ITemplateFeedRealtimeService? realtimeService = null)
+        ITemplateFeedRealtimeService? realtimeService = null,
+        IAdminAuditLog? adminAuditLog = null)
     {
         var options = new TemplatesOptions
         {
@@ -51,7 +53,8 @@ public sealed partial class TemplatesServiceTests
             mediaStorage ?? new RecordingMediaStorage(),
             lifecycleService,
             realtimeService ?? new RecordingTemplateFeedRealtimeService(),
-            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())));
+            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())),
+            adminAuditLog);
     }
 
     private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
@@ -165,6 +168,17 @@ public sealed partial class TemplatesServiceTests
         public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
         {
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingAdminAuditLog : IAdminAuditLog
+    {
+        public List<AdminAuditEntry> Entries { get; } = [];
+
+        public Task WriteAsync(AdminAuditEntry entry, CancellationToken cancellationToken)
+        {
+            Entries.Add(entry);
+            return Task.CompletedTask;
         }
     }
 

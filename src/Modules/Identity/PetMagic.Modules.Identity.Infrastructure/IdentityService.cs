@@ -8,9 +8,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -36,7 +38,8 @@ public sealed partial class IdentityService(
     IAvatarStorage avatarStorage,
     EmailOptions emailOptions,
     AvatarStorageOptions avatarStorageOptions,
-    IOptions<JwtOptions> jwtOptions) : IIdentityService
+    IOptions<JwtOptions> jwtOptions,
+    ILogger<IdentityService>? logger = null) : IIdentityService
 {
     private const int MaxCodeAttempts = 5;
     private const int MaxCodesPerHourPerEmail = 5;
@@ -282,18 +285,102 @@ public sealed partial class IdentityService(
         return Result.Success();
     }
 
-    private async Task WriteAuditAsync(Guid? subjectUserId, string action, string details, CancellationToken cancellationToken)
+    private async Task WriteAuditAsync(
+        Guid? subjectUserId,
+        string action,
+        string details,
+        CancellationToken cancellationToken,
+        string? targetType = null,
+        string? targetId = null,
+        string? oldValue = null,
+        string? newValue = null)
     {
+        var now = DateTime.UtcNow;
+        var httpContext = httpContextAccessor.HttpContext;
+        var actorUserId = ResolveActorUserId(httpContext);
+        var actorRole = ResolveActorRole(httpContext);
+        var correlationId = CorrelationContext.ResolveOrCreate();
+
         dbContext.AuditEvents.Add(new AuditEvent
         {
             Id = Guid.NewGuid(),
             SubjectUserId = subjectUserId,
+            ActorUserId = actorUserId,
+            ActorRole = actorRole,
             Action = action,
+            TargetType = targetType ?? (subjectUserId.HasValue ? "user" : null),
+            TargetId = targetId ?? subjectUserId?.ToString("D"),
+            OldValue = oldValue,
+            NewValue = newValue,
+            IpAddress = ResolveClientIpAddress(httpContext),
+            UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
+            CorrelationId = correlationId,
             Details = details,
-            OccurredAtUtc = DateTime.UtcNow
+            CreatedAtUtc = now,
+            OccurredAtUtc = now
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private void LogAuthInformation(string operation, Guid userId, string result)
+    {
+        logger?.LogInformation(
+            "Identity authentication business event. Operation={Operation} UserId={UserId} Result={Result} CorrelationId={CorrelationId}",
+            operation,
+            userId,
+            result,
+            CorrelationContext.ResolveOrCreate());
+    }
+
+    private void LogAuthWarning(string operation, Guid? userId, string reason)
+    {
+        logger?.LogWarning(
+            "Identity authentication recoverable event. Operation={Operation} UserId={UserId} Reason={Reason} CorrelationId={CorrelationId}",
+            operation,
+            userId,
+            reason,
+            CorrelationContext.ResolveOrCreate());
+    }
+
+    private static Guid? ResolveActorUserId(HttpContext? httpContext)
+    {
+        var value = httpContext?.User.FindFirst("sub")?.Value
+            ?? httpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext?.User.FindFirst("userId")?.Value;
+
+        return Guid.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private static string? ResolveActorRole(HttpContext? httpContext)
+    {
+        var roles = httpContext?.User.FindAll(ClaimTypes.Role)
+            .Select(claim => claim.Value)
+            .Where(role => !string.IsNullOrWhiteSpace(role))
+            .OrderBy(role => role, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return roles is { Length: > 0 } ? string.Join(",", roles) : null;
+    }
+
+    private static string? ResolveClientIpAddress(HttpContext? httpContext)
+    {
+        if (httpContext is null)
+        {
+            return null;
+        }
+
+        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            var firstAddress = forwardedFor.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(firstAddress))
+            {
+                return firstAddress;
+            }
+        }
+
+        return httpContext.Connection.RemoteIpAddress?.ToString();
     }
 
     private async Task QueueEmailCodeAsync(AppUser user, EmailCodePurpose purpose, CancellationToken cancellationToken)

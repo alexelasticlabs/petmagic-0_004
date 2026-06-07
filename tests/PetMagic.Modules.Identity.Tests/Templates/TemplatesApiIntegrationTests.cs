@@ -210,6 +210,11 @@ public sealed partial class TemplatesApiIntegrationTests
                     policy.RequireAuthenticatedUser();
                     policy.RequireRole("Admin", "Moderator");
                 });
+                options.AddPolicy("AdminOnly", policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireRole("Admin");
+                });
             });
 
             builder.Services.AddProblemDetails();

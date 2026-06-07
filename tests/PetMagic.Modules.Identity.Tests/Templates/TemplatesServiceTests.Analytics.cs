@@ -377,6 +377,70 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task AdminModerationQueue_ShouldListAndDecideItemsWithAudit()
+    {
+        await using var dbContext = CreateDbContext();
+        var auditLog = new RecordingAdminAuditLog();
+        var service = CreateService(dbContext, adminAuditLog: auditLog);
+
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Moderated Template",
+                "Template with moderation events",
+                "Dance",
+                ["moderation"],
+                false,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset(),
+                CreateReferenceAsset(12.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "dance",
+                true),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var userId = Guid.NewGuid();
+        await service.RecordAnalyticsEventAsync(
+            new RecordTemplateAnalyticsEventCommand(
+                created.Value.TemplateId,
+                "complaint",
+                "profile",
+                "web",
+                "us",
+                userId,
+                null,
+                "Unsafe result"),
+            CancellationToken.None);
+
+        var queue = await service.GetAdminModerationQueueAsync(
+            new AdminModerationQueueQuery("pending", "unsafe", 0, 10),
+            CancellationToken.None);
+
+        Assert.True(queue.IsSuccess);
+        var item = Assert.Single(queue.Value.Items);
+        Assert.Equal("pending", item.Status);
+        Assert.Equal("Unsafe result", item.Message);
+
+        var decided = await service.DecideAdminModerationItemAsync(
+            new AdminModerationDecisionCommand(item.EventId, "reject", "Policy violation"),
+            CancellationToken.None);
+
+        Assert.True(decided.IsSuccess);
+        Assert.Equal("rejected", decided.Value.Status);
+        Assert.Equal("Policy violation", decided.Value.ModerationComment);
+        var audit = Assert.Single(auditLog.Entries, entry => entry.Action == "admin.content.rejected");
+        Assert.Equal("admin.content.rejected", audit.Action);
+        Assert.Equal("template_analytics_event", audit.TargetType);
+        Assert.Equal(item.EventId.ToString("D"), audit.TargetId);
+        Assert.Equal(userId, audit.SubjectUserId);
+    }
+
+    [Fact]
     public async Task GetAdminTemplatesAnalyticsAsync_ShouldAggregateTemplatesJobsEventsAndCosts()
     {
         await using var dbContext = CreateDbContext();

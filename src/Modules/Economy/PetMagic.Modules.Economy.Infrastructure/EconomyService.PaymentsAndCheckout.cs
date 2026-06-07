@@ -464,6 +464,7 @@ public sealed partial class EconomyService
 
             if (savedPaymentResult.IsFailure)
             {
+                LogPaymentFailed(order, savedPaymentResult.Error, "saved_method.create");
                 return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
             }
 
@@ -519,12 +520,15 @@ public sealed partial class EconomyService
 
         if (paymentResult.IsFailure)
         {
+            LogPaymentFailed(order, paymentResult.Error, "payment.create");
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
         if (usePaymentSheet
             && string.IsNullOrWhiteSpace(paymentResult.Value.PaymentIntentClientSecret))
         {
+            order.ExternalPaymentId = paymentResult.Value.ExternalPaymentId;
+            LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "payment_sheet.missing_client_secret");
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
@@ -534,12 +538,13 @@ public sealed partial class EconomyService
             EconomyMetrics.RecordEmptyCheckoutUrl(provider, command.Platform, order.CurrencyCode);
 
             logger?.LogWarning(
-                "Payment gateway returned empty checkout URL for wallet top-up. OrderId={OrderId} UserId={UserId} PackId={PackId} Provider={Provider} ExternalPaymentId={ExternalPaymentId}",
+                "Payment gateway returned empty checkout URL for wallet top-up. OrderId={OrderId} UserId={UserId} PackId={PackId} Provider={Provider} HasExternalPaymentId={HasExternalPaymentId} CorrelationId={CorrelationId}",
                 order.Id,
                 order.UserId,
                 order.PackId,
                 provider,
-                paymentResult.Value.ExternalPaymentId);
+                !string.IsNullOrWhiteSpace(paymentResult.Value.ExternalPaymentId),
+                CurrentCorrelationId);
         }
 
         order.ExternalPaymentId = paymentResult.Value.ExternalPaymentId;

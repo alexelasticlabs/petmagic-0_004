@@ -100,7 +100,8 @@ public sealed record UserListPageResponse(
     IReadOnlyList<UserListItemResponse> Items,
     int Skip,
     int Take,
-    bool HasMore);
+    bool HasMore,
+    int TotalCount);
 
 public sealed record SendBulkEmailCommand(
     string Audience,

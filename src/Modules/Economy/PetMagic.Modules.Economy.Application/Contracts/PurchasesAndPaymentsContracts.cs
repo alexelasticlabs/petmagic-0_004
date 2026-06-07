@@ -44,7 +44,8 @@ public sealed record PurchaseHistoryItemResponse(
     int SparkToGrant,
     string? ExternalPaymentId,
     DateTime CreatedAtUtc,
-    DateTime? ConfirmedAtUtc);
+    DateTime? ConfirmedAtUtc,
+    bool CanRefund = false);
 
 public sealed record PaymentMethodResponse(
     Guid PaymentMethodId,

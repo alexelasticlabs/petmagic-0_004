@@ -55,7 +55,14 @@ public interface IIdentityService
 
     Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken);
 
-    Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, CancellationToken cancellationToken);
+    Task<Result<UserListPageResponse>> ListUsersAsync(
+        int skip,
+        int take,
+        string? search,
+        string? role,
+        string? status,
+        bool? isPremium,
+        CancellationToken cancellationToken);
 
     Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken);
 

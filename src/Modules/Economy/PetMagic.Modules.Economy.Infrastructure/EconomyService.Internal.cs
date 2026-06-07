@@ -327,6 +327,7 @@ public sealed partial class EconomyService
         if (string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal)
             || !string.Equals(order.Status, PurchaseOrderStatus.Pending, StringComparison.Ordinal))
         {
+            LogPaymentFailed(order, EconomyErrors.PurchaseAlreadyProcessed, "purchase.confirm");
             return Result.Failure<PurchaseOrder>(EconomyErrors.PurchaseAlreadyProcessed);
         }
 
@@ -348,6 +349,7 @@ public sealed partial class EconomyService
                 OrderId: order.Id,
                 SparkDelta: order.SparkToGrant),
             cancellationToken);
+        LogPaymentSucceeded(order, "purchase.confirm");
         return Result.Success(order);
     }
 

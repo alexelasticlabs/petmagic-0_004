@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -433,9 +434,16 @@ internal sealed partial class TemplatesService
             }
         }
 
+        var previousStatus = template.Status;
         template.Status = status;
         await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteTemplateAuditAsync(
+            ResolveTemplateStatusAuditAction(status),
+            template.Id,
+            previousStatus.ToString(),
+            status.ToString(),
+            cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success(MapAdminResponse(template));
@@ -461,11 +469,50 @@ internal sealed partial class TemplatesService
             return cleanupResult;
         }
 
+        var previousStatus = template.Status;
         template.Status = TemplateStatus.Archived;
         await StampCatalogDeleteAsync(template, DateTime.UtcNow, cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteTemplateAuditAsync(
+            "admin.content.deleted",
+            template.Id,
+            previousStatus.ToString(),
+            TemplateStatus.Archived.ToString(),
+            cancellationToken);
         await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    private async Task WriteTemplateAuditAsync(
+        string action,
+        Guid templateId,
+        string? oldValue,
+        string? newValue,
+        CancellationToken cancellationToken)
+    {
+        if (adminAuditLog is null)
+        {
+            return;
+        }
+
+        await adminAuditLog.WriteAsync(
+            new AdminAuditEntry(
+                action,
+                "template",
+                templateId.ToString("D"),
+                oldValue,
+                newValue),
+            cancellationToken);
+    }
+
+    private static string ResolveTemplateStatusAuditAction(TemplateStatus status)
+    {
+        return status switch
+        {
+            TemplateStatus.Active => "admin.content.approved",
+            TemplateStatus.Archived => "admin.content.rejected",
+            _ => "admin.content.status_changed"
+        };
     }
 }

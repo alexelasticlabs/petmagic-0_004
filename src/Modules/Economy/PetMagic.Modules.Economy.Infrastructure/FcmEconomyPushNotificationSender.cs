@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 using PetMagic.Modules.Economy.Infrastructure.Options;
@@ -153,10 +154,11 @@ internal sealed class FcmEconomyPushNotificationSender(
         }
 
         logger.LogWarning(
-            "FCM send failed for economy token {TokenId}: {StatusCode} {Body}",
+            "FCM send failed for economy notification. TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
             token.Id,
             response.StatusCode,
-            responseBody);
+            ResolveFcmErrorReason(responseBody),
+            CorrelationContext.ResolveOrCreate());
 
         if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound
             && (responseBody.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase)
@@ -166,6 +168,21 @@ internal sealed class FcmEconomyPushNotificationSender(
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static string ResolveFcmErrorReason(string body)
+    {
+        if (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase))
+        {
+            return "unregistered";
+        }
+
+        if (body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
+        {
+            return "invalid_argument";
+        }
+
+        return "fcm_send_failed";
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)

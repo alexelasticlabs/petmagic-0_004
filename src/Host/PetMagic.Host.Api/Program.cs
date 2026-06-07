@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using System.Security.Claims;
 using System.Diagnostics;
 using System.Threading.RateLimiting;
 
@@ -28,379 +27,357 @@ using Serilog.Events;
 
 LoadDotEnvFileIfPresent();
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.WithProperty("ApplicationName", "PetMagic.Host.Api")
+    .WriteTo.Console()
+    .CreateLogger();
 
-TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
-    builder.Configuration,
-    builder.Environment,
-    "PetMagic.Host.Api",
-    expectedEnabled: false);
-
-builder.Host.UseSerilog((context, loggerConfiguration) =>
+try
 {
-    loggerConfiguration
-        .ReadFrom.Configuration(context.Configuration)
-        .Enrich.FromLogContext();
-});
+    var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
-builder.Services.AddProblemDetails(SafeProblemDetailsOptions.Configure);
-builder.Services.AddMemoryCache();
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
-builder.Services.ConfigureAll<HttpClientFactoryOptions>(CorrelationIdHttpClientFactoryOptions.AddCorrelationIdHandler);
+    TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+        builder.Configuration,
+        builder.Environment,
+        "PetMagic.Host.Api",
+        expectedEnabled: false);
 
-var dataProtectionKeysPath = Path.Combine(
-    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-    ".aspnet",
-    "DataProtection-Keys");
-var dataProtectionBuilder = builder.Services.AddDataProtection()
-    .SetApplicationName("PetMagic.Host.Api")
-    .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
-
-if (builder.Environment.IsDevelopment())
-{
-    var dataProtectionCertificatePath = Path.Combine(dataProtectionKeysPath, "petmagic-data-protection-dev.pfx");
-    var dataProtectionCertificatePassword = builder.Configuration["DataProtection:CertificatePassword"];
-    if (string.IsNullOrWhiteSpace(dataProtectionCertificatePassword))
+    builder.Host.UseSerilog((context, loggerConfiguration) =>
     {
-        throw new InvalidOperationException(
-            "Development DataProtection certificate password is not configured. Set DataProtection:CertificatePassword in development config or environment.");
+        loggerConfiguration
+            .ReadFrom.Configuration(context.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("ApplicationName", "PetMagic.Host.Api")
+            .Enrich.WithProperty("Environment", context.HostingEnvironment.EnvironmentName);
+    });
+
+    builder.Services.AddOpenApi();
+    builder.Services.AddProblemDetails(SafeProblemDetailsOptions.Configure);
+    builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection(LoggingOptions.SectionName));
+    builder.Services.AddMemoryCache();
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
+    builder.Services.ConfigureAll<HttpClientFactoryOptions>(CorrelationIdHttpClientFactoryOptions.AddCorrelationIdHandler);
+
+    var dataProtectionKeysPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".aspnet",
+        "DataProtection-Keys");
+    var dataProtectionBuilder = builder.Services.AddDataProtection()
+        .SetApplicationName("PetMagic.Host.Api")
+        .PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeysPath));
+
+    if (builder.Environment.IsDevelopment())
+    {
+        var dataProtectionCertificatePath = Path.Combine(dataProtectionKeysPath, "petmagic-data-protection-dev.pfx");
+        var dataProtectionCertificatePassword = builder.Configuration["DataProtection:CertificatePassword"];
+        if (string.IsNullOrWhiteSpace(dataProtectionCertificatePassword))
+        {
+            throw new InvalidOperationException(
+                "Development DataProtection certificate password is not configured. Set DataProtection:CertificatePassword in development config or environment.");
+        }
+
+        var dataProtectionCertificate = LoadOrCreateDataProtectionCertificate(
+            dataProtectionCertificatePath,
+            dataProtectionCertificatePassword,
+            builder.Environment.ApplicationName);
+
+        dataProtectionBuilder.ProtectKeysWithCertificate(dataProtectionCertificate);
     }
 
-    var dataProtectionCertificate = LoadOrCreateDataProtectionCertificate(
-        dataProtectionCertificatePath,
-        dataProtectionCertificatePassword,
-        builder.Environment.ApplicationName);
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
+    HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
 
-    dataProtectionBuilder.ProtectKeysWithCertificate(dataProtectionCertificate);
-}
-
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
-HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
-
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AdminWeb", policy =>
+    builder.Services.AddCors(options =>
     {
-        if (allowedOrigins.Length == 0)
+        options.AddPolicy("AdminWeb", policy =>
         {
-            if (allowAnyCorsInDevelopment)
+            if (allowedOrigins.Length == 0)
             {
-                policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                if (allowAnyCorsInDevelopment)
+                {
+                    policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+                    return;
+                }
+
+                throw new InvalidOperationException(
+                    "Cors:AllowedOrigins must be configured for non-development environments.");
+            }
+
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+        });
+    });
+
+    var rateLimitSection = builder.Configuration.GetSection("RateLimiting");
+    int RateLimitPermit(string policyName, int defaultPermitLimit) =>
+        Math.Max(1, rateLimitSection.GetSection(policyName).GetValue<int?>("PermitLimit") ?? defaultPermitLimit);
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.OnRejected = RateLimitProblemResponse.WriteAsync;
+
+        options.AddPolicy("auth", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("Auth", 30),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("economy", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("Economy", 60),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("templates", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("Templates", 90),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("generation-create", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("GenerationCreate", 12),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("generation-status", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("GenerationStatus", 180),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("support-chat", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("SupportChat", 60),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("admin", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("Admin", 120),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("webhooks", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("Webhooks", 120),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("auth-register", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("AuthRegister", 8),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("auth-password-reset", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("AuthPasswordReset", 10),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+    });
+
+    builder.Services
+        .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
+        .AddEconomyApiModule()
+        .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
+        .AddIdentityApiModule()
+        .AddSupportChatInfrastructure(builder.Configuration)
+        .AddSupportChatApiModule()
+        .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
+        .AddTemplatesApiModule();
+
+    builder.Services
+        .AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService("PetMagic.Host.Api"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddMeter("PetMagic.Host.Api")
+            .AddMeter("PetMagic.Modules.Economy")
+            .AddMeter("PetMagic.Modules.Templates")
+            .AddOtlpExporter());
+
+    var app = builder.Build();
+
+    Directory.CreateDirectory(dataProtectionKeysPath);
+    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot"));
+    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "support-attachments"));
+    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
+    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
+
+    app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseMiddleware<GlobalExceptionMiddleware>();
+    app.UseMiddleware<StructuredRequestLoggingMiddleware>();
+    app.UseMiddleware<RequestMetricsMiddleware>();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+        app.UseHttpsRedirection();
+    }
+
+    app.Use(async (context, next) =>
+    {
+        context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
+        context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
+        await next();
+    });
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+    }
+
+    app.UseCors("AdminWeb");
+    if (!app.Environment.IsDevelopment())
+    {
+        app.Use(async (context, next) =>
+        {
+            var requestPath = context.Request.Path.Value ?? string.Empty;
+            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
             }
 
-            throw new InvalidOperationException(
-                "Cors:AllowedOrigins must be configured for non-development environments.");
-        }
-
-        policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
-    });
-});
-
-var rateLimitSection = builder.Configuration.GetSection("RateLimiting");
-int RateLimitPermit(string policyName, int defaultPermitLimit) =>
-    Math.Max(1, rateLimitSection.GetSection(policyName).GetValue<int?>("PermitLimit") ?? defaultPermitLimit);
-
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.OnRejected = RateLimitProblemResponse.WriteAsync;
-
-    options.AddPolicy("auth", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("Auth", 30),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("economy", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("Economy", 60),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("templates", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("Templates", 90),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("generation-create", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("GenerationCreate", 12),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("generation-status", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("GenerationStatus", 180),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("support-chat", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("SupportChat", 60),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("admin", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("Admin", 120),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("webhooks", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("Webhooks", 120),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("auth-register", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("AuthRegister", 8),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-
-    options.AddPolicy("auth-password-reset", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: RateLimitPartitionKeys.Ip(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = RateLimitPermit("AuthPasswordReset", 10),
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
-            }));
-});
-
-builder.Services
-    .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
-    .AddEconomyApiModule()
-    .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
-    .AddIdentityApiModule()
-    .AddSupportChatInfrastructure(builder.Configuration)
-    .AddSupportChatApiModule()
-    .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
-    .AddTemplatesApiModule();
-
-builder.Services
-    .AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("PetMagic.Host.Api"))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter())
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddMeter("PetMagic.Host.Api")
-        .AddMeter("PetMagic.Modules.Economy")
-        .AddMeter("PetMagic.Modules.Templates")
-        .AddOtlpExporter());
-
-var app = builder.Build();
-
-Directory.CreateDirectory(dataProtectionKeysPath);
-Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot"));
-Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "support-attachments"));
-Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
-Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
-
-app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseSerilogRequestLogging(options =>
-{
-    options.GetLevel = (httpContext, elapsed, exception) =>
-    {
-        if (exception is not null || httpContext.Response.StatusCode >= 500)
-        {
-            return LogEventLevel.Error;
-        }
-
-        var path = httpContext.Request.Path.Value ?? string.Empty;
-        var isNoisePath = path.StartsWith("/health", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("/negotiate", StringComparison.OrdinalIgnoreCase);
-        var isOptions = HttpMethods.IsOptions(httpContext.Request.Method);
-        var isWebSocketUpgrade = httpContext.Response.StatusCode == StatusCodes.Status101SwitchingProtocols;
-        if (isNoisePath || isOptions || isWebSocketUpgrade)
-        {
-            return LogEventLevel.Debug;
-        }
-
-        return LogEventLevel.Information;
-    };
-
-    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-    {
-        var path = httpContext.Request.Path.Value ?? string.Empty;
-        var routeTemplate = httpContext.GetEndpoint()?.DisplayName ?? path;
-        var userId = httpContext.User.FindFirst("sub")?.Value
-            ?? httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? httpContext.User.FindFirst("userId")?.Value;
-        var traceId = Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier;
-        diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
-        diagnosticContext.Set("TraceId", traceId);
-        diagnosticContext.Set(
-            "CorrelationId",
-            httpContext.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var correlationId)
-                ? correlationId
-                : "unknown");
-        diagnosticContext.Set("UserId", userId ?? "anonymous");
-        diagnosticContext.Set("Route", routeTemplate);
-        diagnosticContext.Set("StatusCode", httpContext.Response.StatusCode);
-    };
-    options.MessageTemplate =
-        "HTTP {RequestMethod} {RequestPath} -> {StatusCode} in {Elapsed:0.0000} ms [rid:{RequestId} cid:{CorrelationId} tid:{TraceId} uid:{UserId}]";
-});
-app.UseExceptionHandler();
-app.UseMiddleware<RequestMetricsMiddleware>();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-    app.UseHttpsRedirection();
-}
-
-app.Use(async (context, next) =>
-{
-    context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
-    context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
-    context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
-    await next();
-});
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
-app.UseCors("AdminWeb");
-if (!app.Environment.IsDevelopment())
-{
-    app.Use(async (context, next) =>
-    {
-        var requestPath = context.Request.Path.Value ?? string.Empty;
-        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
-        {
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
-            return;
-        }
-
-        await next();
-    });
-}
-
-app.UseStaticFiles(new StaticFileOptions
-{
-    OnPrepareResponse = static staticFileContext =>
-    {
-        staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
-
-        var requestPath = staticFileContext.Context.Request.Path.Value ?? string.Empty;
-        var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
-        var isManagedMediaPath = requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
-            || requestPath.StartsWith("/user-avatars", StringComparison.OrdinalIgnoreCase)
-            || requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase);
-
-        if (!isManagedMediaPath)
-        {
-            return;
-        }
-
-        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
-        {
-            staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
-        }
-        else
-        {
-            staticFileContext.Context.Response.Headers.CacheControl = "no-store";
-            staticFileContext.Context.Response.Headers.Pragma = "no-cache";
-        }
-
-        var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
-        var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-
-        if (requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
-            && !isImage)
-        {
-            staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
-            return;
-        }
-
-        if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase)
-            && !isImage
-            && !isVideo)
-        {
-            staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
-        }
+            await next();
+        });
     }
-});
-app.UseRateLimiter();
-app.UseAuthentication();
-app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
-app.UseAuthorization();
 
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-    .AllowAnonymous();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = static staticFileContext =>
+        {
+            staticFileContext.Context.Response.Headers.XContentTypeOptions = "nosniff";
 
-app.MapEconomyApiModule();
-app.MapIdentityApiModule();
-app.MapSupportChatApiModule();
-app.MapTemplatesApiModule();
+            var requestPath = staticFileContext.Context.Request.Path.Value ?? string.Empty;
+            var contentType = staticFileContext.Context.Response.ContentType ?? string.Empty;
+            var isManagedMediaPath = requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
+                || requestPath.StartsWith("/user-avatars", StringComparison.OrdinalIgnoreCase)
+                || requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase);
 
-await app.Services.EnsureEconomySeedDataAsync();
-await app.Services.EnsureIdentitySeedDataAsync();
-await app.Services.EnsureSupportChatSeedDataAsync();
-await app.Services.EnsureTemplatesSeedDataAsync();
+            if (!isManagedMediaPath)
+            {
+                return;
+            }
 
-app.Run();
+            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase))
+            {
+                staticFileContext.Context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+            }
+            else
+            {
+                staticFileContext.Context.Response.Headers.CacheControl = "no-store";
+                staticFileContext.Context.Response.Headers.Pragma = "no-cache";
+            }
+
+            var isImage = contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+            var isVideo = contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
+
+            if (requestPath.StartsWith("/support-attachments", StringComparison.OrdinalIgnoreCase)
+                && !isImage)
+            {
+                staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
+                return;
+            }
+
+            if (requestPath.StartsWith("/templates-media", StringComparison.OrdinalIgnoreCase)
+                && !isImage
+                && !isVideo)
+            {
+                staticFileContext.Context.Response.Headers.ContentDisposition = "attachment";
+            }
+        }
+    });
+    app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
+    app.UseAuthorization();
+
+    app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+        .AllowAnonymous();
+
+    app.MapEconomyApiModule();
+    app.MapIdentityApiModule();
+    app.MapSupportChatApiModule();
+    app.MapTemplatesApiModule();
+
+    await app.Services.EnsureEconomySeedDataAsync();
+    await app.Services.EnsureIdentitySeedDataAsync();
+    await app.Services.EnsureSupportChatSeedDataAsync();
+    await app.Services.EnsureTemplatesSeedDataAsync();
+
+    app.Run();
+}
+catch (Exception exception)
+{
+    Log.Fatal(exception, "PetMagic.Host.Api stopped during startup or runtime.");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 static X509Certificate2 LoadOrCreateDataProtectionCertificate(
     string certificatePath,

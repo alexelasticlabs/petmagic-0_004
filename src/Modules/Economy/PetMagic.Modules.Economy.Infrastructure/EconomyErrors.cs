@@ -20,6 +20,8 @@ public static class EconomyErrors
 
     public static readonly Error PurchaseAlreadyProcessed = new("economy.purchase_already_processed", "Purchase order is already processed.");
 
+    public static readonly Error PurchaseNotRefundable = new("economy.purchase_not_refundable", "Purchase order cannot be refunded.");
+
     public static readonly Error UnsupportedPaymentProvider = new("economy.payment_provider_unsupported", "Payment provider is not supported.");
 
     public static readonly Error PaymentProviderUnavailable = new("economy.payment_provider_unavailable", "Payment provider is not available for this platform, region, or app version.");

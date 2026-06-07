@@ -20,6 +20,12 @@ public sealed class TemplateAnalyticsEvent
 
     public string? FeedbackMessage { get; set; }
 
+    public string ModerationStatus { get; set; } = "pending";
+
+    public string? ModerationComment { get; set; }
+
+    public DateTime? ModeratedAtUtc { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 
     public TemplateItem Template { get; set; } = null!;

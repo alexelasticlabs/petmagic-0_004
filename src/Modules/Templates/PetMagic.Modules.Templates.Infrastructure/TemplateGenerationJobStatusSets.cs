@@ -7,7 +7,8 @@ internal static class TemplateGenerationJobStatusSets
     public static readonly TemplateGenerationStatus[] Active =
     [
         TemplateGenerationStatus.Queued,
-        TemplateGenerationStatus.Processing
+        TemplateGenerationStatus.Processing,
+        TemplateGenerationStatus.Retrying
     ];
 
     public static readonly TemplateGenerationStatus[] Processing =

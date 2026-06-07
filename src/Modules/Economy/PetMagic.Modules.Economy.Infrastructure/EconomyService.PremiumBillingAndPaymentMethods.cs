@@ -3,6 +3,7 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -182,8 +183,9 @@ public sealed partial class EconomyService
         {
             logger?.LogWarning(
                 ex,
-                "Failed to request cancel_at_period_end for Stripe subscription {SubscriptionId}.",
-                subscription.ExternalSubscriptionId);
+                "Failed to request cancel_at_period_end for Stripe subscription {SubscriptionId}. CorrelationId={CorrelationId}",
+                subscription.ExternalSubscriptionId,
+                CurrentCorrelationId);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -254,8 +256,9 @@ public sealed partial class EconomyService
             {
                 logger?.LogWarning(
                     ex,
-                    "Failed to immediately cancel Stripe subscription {SubscriptionId} for admin premium revoke.",
-                    subscription.ExternalSubscriptionId);
+                    "Failed to immediately cancel Stripe subscription {SubscriptionId} for admin premium revoke. CorrelationId={CorrelationId}",
+                    subscription.ExternalSubscriptionId,
+                    CurrentCorrelationId);
 
                 return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
             }
@@ -280,6 +283,19 @@ public sealed partial class EconomyService
                 subscription.ExternalSubscriptionId,
                 null,
                 cancellationToken);
+
+            if (adminAuditLog is not null)
+            {
+                await adminAuditLog.WriteAsync(
+                    new AdminAuditEntry(
+                        "admin.subscription.cancelled",
+                        "subscription",
+                        subscription.Id.ToString("D"),
+                        "active",
+                        subscription.Status,
+                        SubjectUserId: command.UserId),
+                    cancellationToken);
+            }
         }
 
         var premiumResult = await identityService.SetPremiumStatusAsync(
@@ -437,9 +453,10 @@ public sealed partial class EconomyService
         {
             logger?.LogWarning(
                 ex,
-                "Failed to verify Stripe subscription {SubscriptionId} for user {UserId}.",
+                "Failed to verify Stripe subscription {SubscriptionId} for user {UserId}. CorrelationId={CorrelationId}",
                 normalizedSubscriptionId,
-                command.UserId);
+                command.UserId,
+                CurrentCorrelationId);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }
@@ -447,11 +464,12 @@ public sealed partial class EconomyService
         if (!string.Equals(stripeSubscription.CustomerId, customer.ExternalCustomerId, StringComparison.Ordinal))
         {
             logger?.LogWarning(
-                "Stripe subscription {SubscriptionId} belongs to customer {CustomerId}, but user {UserId} is linked to {ExpectedCustomerId}.",
+                "Stripe subscription {SubscriptionId} belongs to customer {CustomerId}, but user {UserId} is linked to {ExpectedCustomerId}. CorrelationId={CorrelationId}",
                 normalizedSubscriptionId,
                 stripeSubscription.CustomerId,
                 command.UserId,
-                customer.ExternalCustomerId);
+                customer.ExternalCustomerId,
+                CurrentCorrelationId);
 
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PaymentGatewayFailed);
         }

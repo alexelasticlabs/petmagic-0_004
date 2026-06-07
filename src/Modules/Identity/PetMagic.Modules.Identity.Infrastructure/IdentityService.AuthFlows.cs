@@ -52,6 +52,7 @@ public sealed partial class IdentityService
             user = existing;
             await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
             await WriteAuditAsync(user.Id, "user.registered.pending.reissue", "Pending registration reissued verification code.", cancellationToken);
+            LogAuthInformation("registration", user.Id, "pending_reissued");
             var existingRoles = await userManager.GetRolesAsync(user);
             return Result.Success(ToUserProfileResponse(user, existingRoles.Count == 0 ? [SystemRoles.User] : existingRoles));
         }
@@ -93,6 +94,7 @@ public sealed partial class IdentityService
 
         await QueueEmailCodeAsync(user, EmailCodePurpose.EmailConfirmation, cancellationToken);
         await WriteAuditAsync(user.Id, "user.registered.pending", "User self-registration completed and email verification required.", cancellationToken);
+        LogAuthInformation("registration", user.Id, "pending_email_verification");
 
         return Result.Success(ToUserProfileResponse(user, [SystemRoles.User]));
     }
@@ -112,8 +114,15 @@ public sealed partial class IdentityService
         var user = await userManager.Users
             .FirstOrDefaultAsync(x => x.NormalizedEmail == command.Email.Trim().ToUpperInvariant(), cancellationToken);
 
-        if (user is null || !user.IsActive)
+        if (user is null)
         {
+            LogAuthWarning("login", null, "invalid_credentials");
+            return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
+        }
+
+        if (!user.IsActive)
+        {
+            LogAuthWarning("login", user.Id, "inactive_account");
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
         }
 
@@ -126,6 +135,7 @@ public sealed partial class IdentityService
         if (await userManager.IsLockedOutAsync(user))
         {
             await WriteAuditAsync(user.Id, "auth.login.locked", "Login denied: account is temporarily locked.", cancellationToken);
+            LogAuthWarning("login", user.Id, "account_locked");
             return Result.Failure<TokenPairResponse>(IdentityErrors.AccountLocked);
         }
 
@@ -134,6 +144,7 @@ public sealed partial class IdentityService
         {
             await RegisterPasswordFailureAsync(user);
             await WriteAuditAsync(user.Id, "auth.login.failed", "Invalid password.", cancellationToken);
+            LogAuthWarning("login", user.Id, "invalid_password");
             return await userManager.IsLockedOutAsync(user)
                 ? Result.Failure<TokenPairResponse>(IdentityErrors.AccountLocked)
                 : Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
@@ -142,6 +153,7 @@ public sealed partial class IdentityService
         if (!user.EmailConfirmed)
         {
             await WriteAuditAsync(user.Id, "auth.login.denied", "Login denied: email is not confirmed.", cancellationToken);
+            LogAuthWarning("login", user.Id, "email_not_confirmed");
             return Result.Failure<TokenPairResponse>(IdentityErrors.EmailNotConfirmed);
         }
 
@@ -159,6 +171,7 @@ public sealed partial class IdentityService
         }
 
         await WriteAuditAsync(user.Id, "auth.login.succeeded", "User logged in.", cancellationToken);
+        LogAuthInformation("login", user.Id, "succeeded");
 
         return Result.Success(tokenPair);
     }
@@ -499,6 +512,7 @@ public sealed partial class IdentityService
 
         var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
         await WriteAuditAsync(user.Id, "auth.external_login.succeeded", $"External provider: {command.Provider}", cancellationToken);
+        LogAuthInformation("external_login", user.Id, "succeeded");
 
         return Result.Success(tokenPair);
     }

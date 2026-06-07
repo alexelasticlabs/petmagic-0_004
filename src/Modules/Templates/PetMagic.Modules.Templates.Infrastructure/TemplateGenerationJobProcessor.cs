@@ -52,6 +52,13 @@ internal sealed class TemplateGenerationJobProcessor(
             return recoveredStaleJob;
         }
 
+        var correlationId = ResolveJobCorrelationId(job);
+        using (CorrelationContext.Push(correlationId))
+        using (BeginJobScope(job, correlationId))
+        {
+            logger.LogInformation("Template generation job claimed. ElapsedMs={ElapsedMs}", 0);
+        }
+
         TemplateGenerationMetrics.RecordJobClaimed(job);
         await ProcessAsync(job, cancellationToken);
         return true;
@@ -90,11 +97,22 @@ internal sealed class TemplateGenerationJobProcessor(
         {
             await dbContext.SaveChangesAsync(cancellationToken);
             TemplateGenerationMetrics.RecordJobRequeued(staleJob);
+            var correlationId = ResolveJobCorrelationId(staleJob);
+            using (CorrelationContext.Push(correlationId))
+            using (BeginJobScope(staleJob, correlationId))
+            {
+                logger.LogWarning("Stale template generation job recovered for retry. ElapsedMs={ElapsedMs}", 0);
+            }
+
             dbContext.ChangeTracker.Clear();
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            logger.LogWarning(exception, "Stale template generation job {GenerationId} recovery was skipped because its lock changed.", staleJob.Id);
+            using var staleJobScope = BeginJobScope(staleJob, ResolveJobCorrelationId(staleJob));
+            logger.LogWarning(
+                exception,
+                "Stale template generation job recovery was skipped because its lock changed. ElapsedMs={ElapsedMs}",
+                0);
             dbContext.ChangeTracker.Clear();
         }
 
@@ -234,6 +252,7 @@ internal sealed class TemplateGenerationJobProcessor(
         var now = DateTime.UtcNow;
         var retryThreshold = now.AddMilliseconds(-options.RefundRetryDelayMilliseconds);
         var job = await dbContext.TemplateGenerationJobs
+            .Include(x => x.Template)
             .Where(x => x.Status == TemplateGenerationStatus.Failed
                 && x.ChargedAtUtc != null
                 && x.RefundedAtUtc == null
@@ -305,13 +324,14 @@ internal sealed class TemplateGenerationJobProcessor(
 
     private async Task ProcessAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var correlationId = ResolveJobCorrelationId(job);
         using var correlationScope = CorrelationContext.Push(correlationId);
-        using var loggingScope = logger.BeginScope(new Dictionary<string, object?>
-        {
-            ["CorrelationId"] = correlationId,
-            ["GenerationId"] = job.Id
-        });
+        using var jobScope = BeginJobScope(job, correlationId);
+
+        logger.LogInformation(
+            "Template generation job started. ElapsedMs={ElapsedMs}",
+            0);
 
         try
         {
@@ -338,7 +358,10 @@ internal sealed class TemplateGenerationJobProcessor(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Template generation job {GenerationId} failed.", job.Id);
+            logger.LogError(
+                exception,
+                "Template generation job failed with unhandled exception. ElapsedMs={ElapsedMs}",
+                ElapsedMsSince(startedAt));
             await MarkFailedAsync(job, TemplatesErrors.AiProviderFailed, CancellationToken.None);
         }
     }
@@ -413,8 +436,14 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
+        logger.LogInformation(
+            "Template generation result uploaded. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
         await PublishStatusChangedAsync(job, cancellationToken);
+        logger.LogInformation(
+            "Template generation job completed. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
     }
 
     private async Task ProcessVideoAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -506,7 +535,9 @@ internal sealed class TemplateGenerationJobProcessor(
         var durationResult = await mediaMetadataReader.GetVideoDurationSecondsAsync(storedOutput.Value, cancellationToken);
         if (durationResult.IsFailure)
         {
-            logger.LogWarning("Generated template media duration could not be determined for job {GenerationId}.", job.Id);
+            logger.LogWarning(
+                "Generated template media duration could not be determined. GenerationId={GenerationId}",
+                job.Id);
         }
         else
         {
@@ -524,8 +555,14 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
+        logger.LogInformation(
+            "Template generation result uploaded. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
         await PublishStatusChangedAsync(job, cancellationToken);
+        logger.LogInformation(
+            "Template generation job completed. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
     }
 
     private async Task<bool> PublishProcessingStageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -548,10 +585,14 @@ internal sealed class TemplateGenerationJobProcessor(
         CancellationToken cancellationToken,
         bool requireClaim = true)
     {
+        using var jobScope = BeginJobScope(job, ResolveJobCorrelationId(job));
+
         var hasClaim = !string.IsNullOrWhiteSpace(job.LockedBy);
         if (requireClaim && !hasClaim)
         {
-            logger.LogWarning("Template generation job {GenerationId} failure was ignored because it is no longer claimed.", job.Id);
+            logger.LogWarning(
+                "Template generation job failure was ignored because it is no longer claimed. GenerationId={GenerationId}",
+                job.Id);
             return false;
         }
 
@@ -567,6 +608,10 @@ internal sealed class TemplateGenerationJobProcessor(
         }
 
         TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, error.Code);
+        logger.LogError(
+            "Template generation job failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
+            error.Code,
+            ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
 
         if (job.ChargedAtUtc is not null && job.RefundedAtUtc is null)
         {
@@ -602,7 +647,9 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         if (string.IsNullOrWhiteSpace(job.LockedBy))
         {
-            logger.LogWarning("Template generation job {GenerationId} update was ignored because it is no longer claimed.", job.Id);
+            logger.LogWarning(
+                "Template generation job update was ignored because it is no longer claimed. GenerationId={GenerationId}",
+                job.Id);
             return Task.FromResult(false);
         }
 
@@ -631,7 +678,10 @@ internal sealed class TemplateGenerationJobProcessor(
         }
         catch (DbUpdateConcurrencyException exception)
         {
-            logger.LogWarning(exception, "Template generation job {GenerationId} update was skipped because its lock changed.", job.Id);
+            logger.LogWarning(
+                exception,
+                "Template generation job update was skipped because its lock changed. GenerationId={GenerationId}",
+                job.Id);
             dbContext.ChangeTracker.Clear();
             return false;
         }
@@ -695,6 +745,10 @@ internal sealed class TemplateGenerationJobProcessor(
 
     private async Task<bool> TryRefundAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        var correlationId = ResolveJobCorrelationId(job);
+        using var correlationScope = CorrelationContext.Push(correlationId);
+        using var jobScope = BeginJobScope(job, correlationId);
         var attemptedAt = DateTime.UtcNow;
         job.RefundAttemptCount++;
         job.RefundLastAttemptedAtUtc = attemptedAt;
@@ -708,14 +762,66 @@ internal sealed class TemplateGenerationJobProcessor(
         }
 
         job.RefundLastErrorCode = refund.Error.Code;
-        logger.LogWarning("Template generation refund failed for job {GenerationId}: {ErrorCode}", job.Id, refund.Error.Code);
+        logger.LogWarning(
+            "Template generation refund failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
+            refund.Error.Code,
+            ElapsedMsSince(startedAt));
 
         if (job.RefundAttemptCount >= options.MaxRefundAttempts)
         {
-            logger.LogError("Template generation refund exhausted {RefundAttemptCount} attempts for job {GenerationId}.", job.RefundAttemptCount, job.Id);
+            logger.LogError(
+                "Template generation refund failed after all retries. RefundAttemptCount={RefundAttemptCount} ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
+                job.RefundAttemptCount,
+                refund.Error.Code,
+                ElapsedMsSince(startedAt));
         }
 
         return false;
+    }
+
+    private IDisposable? BeginJobScope(TemplateGenerationJob job, string correlationId)
+    {
+        return logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["JobId"] = job.Id,
+            ["GenerationId"] = job.Id,
+            ["UserId"] = job.UserId,
+            ["Provider"] = ResolveProvider(job),
+            ["Attempt"] = job.AttemptCount,
+            ["MaxAttempts"] = options.MaxGenerationAttempts,
+            ["TraceId"] = System.Diagnostics.Activity.Current?.TraceId.ToString(),
+            ["CorrelationId"] = correlationId
+        });
+    }
+
+    private static string ResolveProvider(TemplateGenerationJob job)
+    {
+        var model = job.Template.TemplateType == TemplateType.Image
+            ? job.UsedPreprocessingModel ?? job.Template.ImageModel
+            : job.UsedKlingModel ?? job.Template.KlingModel ?? job.UsedPreprocessingModel ?? job.Template.PreprocessingModel;
+
+        if (string.IsNullOrWhiteSpace(model))
+        {
+            return "unknown";
+        }
+
+        var separatorIndex = model.IndexOf('/');
+        return separatorIndex <= 0 ? model : model[..separatorIndex];
+    }
+
+    private static int ElapsedMsSince(long startedAt)
+    {
+        return (int)Math.Min(int.MaxValue, System.Diagnostics.Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+    }
+
+    private static int ElapsedMsBetween(DateTime? startedAtUtc, DateTime? completedAtUtc)
+    {
+        if (startedAtUtc is null || completedAtUtc is null || completedAtUtc < startedAtUtc)
+        {
+            return 0;
+        }
+
+        return (int)Math.Min(int.MaxValue, (completedAtUtc.Value - startedAtUtc.Value).TotalMilliseconds);
     }
 
     private sealed class GlobalConcurrencyLease : IAsyncDisposable

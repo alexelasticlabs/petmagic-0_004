@@ -26,25 +26,36 @@ public static class AdminUserEndpoints
         group.MapGet("/", ListUsersAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
-        group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync);
+        group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync).RequireAuthorization("AdminOnly");
         group.MapPost("/emails", SendBulkEmailAsync).RequireAuthorization("AdminOnly");
         group.MapPut("/{userId:guid}/role", AssignRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}/role", RevokeRoleAsync).RequireAuthorization("AdminOnly");
         group.MapDelete("/{userId:guid}", DeleteUserAsync).RequireAuthorization("AdminOnly");
-        group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync);
-        group.MapPut("/{userId:guid}/active", SetActiveStatusAsync);
+        group.MapPut("/{userId:guid}/premium", SetPremiumStatusAsync).RequireAuthorization("AdminOnly");
+        group.MapPut("/{userId:guid}/active", SetActiveStatusAsync).RequireAuthorization("AdminOnly");
 
         return endpoints;
     }
 
-    private static async Task<Results<Ok<IReadOnlyList<UserListItemResponse>>, ProblemHttpResult>> ListUsersAsync(
+    private static async Task<Results<Ok<UserListPageResponse>, ProblemHttpResult>> ListUsersAsync(
         [FromQuery] int skip,
         [FromQuery] int take,
+        [FromQuery] string? search,
+        [FromQuery] string? role,
+        [FromQuery] string? status,
+        [FromQuery] bool? isPremium,
         HttpContext httpContext,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.ListUsersAsync(skip, take, cancellationToken);
+        var result = await service.ListUsersAsync(
+            skip,
+            take,
+            search,
+            role,
+            status,
+            isPremium,
+            cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -54,7 +65,7 @@ public static class AdminUserEndpoints
         httpContext.Response.Headers["X-Pagination-Take"] = result.Value.Take.ToString(CultureInfo.InvariantCulture);
         httpContext.Response.Headers["X-Pagination-Has-More"] = result.Value.HasMore ? "true" : "false";
 
-        return TypedResults.Ok(result.Value.Items);
+        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<AdminUserWalletOperationResponse>, ValidationProblem, ProblemHttpResult>> AdjustWalletAsync(

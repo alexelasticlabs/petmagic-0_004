@@ -21,10 +21,14 @@ public static class AdminTemplateCategoryEndpoints
             .RequireRateLimiting("admin");
 
         group.MapGet("/", ListAsync);
-        group.MapPost("/", CreateAsync);
-        group.MapPut("/{categoryId:guid}", UpdateAsync);
-        group.MapPut("/{categoryId:guid}/archive", ChangeArchiveStateAsync);
-        group.MapDelete("/{categoryId:guid}", DeleteAsync);
+        group.MapPost("/", CreateAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/{categoryId:guid}", UpdateAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/{categoryId:guid}/archive", ChangeArchiveStateAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapDelete("/{categoryId:guid}", DeleteAsync)
+            .RequireAuthorization("AdminOnly");
 
         return endpoints;
     }

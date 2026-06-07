@@ -68,6 +68,41 @@ public sealed class TemplatesApiStartupSmokeTests
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
     }
 
+    [Theory]
+    [InlineData("POST", "/api/admin/templates/image")]
+    [InlineData("PUT", "/api/admin/templates/image/{templateId:guid}")]
+    [InlineData("POST", "/api/admin/templates/video")]
+    [InlineData("PUT", "/api/admin/templates/video/{templateId:guid}")]
+    [InlineData("PUT", "/api/admin/templates/{templateId:guid}/status")]
+    [InlineData("DELETE", "/api/admin/templates/{templateId:guid}")]
+    [InlineData("POST", "/api/admin/templates/{templateId:guid}/test")]
+    [InlineData("POST", "/api/admin/templates/media/upload")]
+    [InlineData("POST", "/api/admin/templates/categories/")]
+    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}")]
+    [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive")]
+    [InlineData("DELETE", "/api/admin/templates/categories/{categoryId:guid}")]
+    public async Task TemplatesAdminMutationEndpoints_ShouldRequireAdminOnlyPolicy(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Contains("AdminOnly", app.GetAuthorizationPolicies(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/admin/templates/categories/")]
+    [InlineData("GET", "/api/admin/templates/moderation")]
+    [InlineData("POST", "/api/admin/templates/moderation/{eventId:guid}/decision")]
+    public async Task TemplatesModeratorReadAndModerationEndpoints_ShouldKeepModeratorPolicy(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Contains("ModeratorOrAdmin", app.GetAuthorizationPolicies(method, routePattern));
+    }
+
     private sealed class TemplatesApiStartupTestApplication : IAsyncDisposable
     {
         private readonly WebApplication app;
@@ -104,6 +139,11 @@ public sealed class TemplatesApiStartupSmokeTests
                 {
                     policy.RequireAuthenticatedUser();
                     policy.RequireRole("Admin", "Moderator");
+                });
+                options.AddPolicy("AdminOnly", policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireRole("Admin");
                 });
             });
 
@@ -193,6 +233,27 @@ public sealed class TemplatesApiStartupSmokeTests
                     .Any(metadata => metadata.Policy is "AdminOnly" or "ModeratorOrAdmin"))
                 .Select(endpoint => endpoint.RoutePattern.RawText!)
                 .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetAuthorizationPolicies(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata
+                .GetOrderedMetadata<IAuthorizeData>()
+                .Select(metadata => metadata.Policy)
+                .Where(policy => !string.IsNullOrWhiteSpace(policy))
+                .Cast<string>()
                 .ToArray();
         }
 

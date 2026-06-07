@@ -577,6 +577,8 @@ internal sealed class TemplateGenerationService(
             "active" or "in_progress" or "processing" => query.Where(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)),
             "ready" or "succeeded" or "completed" => query.Where(x => x.Status == TemplateGenerationStatus.Completed),
             "error" or "failed" => query.Where(x => x.Status == TemplateGenerationStatus.Failed),
+            "cancelled" or "canceled" => query.Where(x => x.Status == TemplateGenerationStatus.Cancelled),
+            "retrying" => query.Where(x => x.Status == TemplateGenerationStatus.Retrying),
             "queued" => query.Where(x => x.Status == TemplateGenerationStatus.Queued),
             "preprocessing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
                 && x.StartedAtUtc != null
@@ -648,6 +650,16 @@ internal sealed class TemplateGenerationService(
         if (job.Status == TemplateGenerationStatus.Failed)
         {
             return "failed";
+        }
+
+        if (job.Status == TemplateGenerationStatus.Cancelled)
+        {
+            return "cancelled";
+        }
+
+        if (job.Status == TemplateGenerationStatus.Retrying)
+        {
+            return "retrying";
         }
 
         if (job.Status == TemplateGenerationStatus.Completed)

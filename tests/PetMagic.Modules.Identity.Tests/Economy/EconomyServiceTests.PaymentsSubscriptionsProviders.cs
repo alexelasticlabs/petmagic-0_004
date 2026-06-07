@@ -218,6 +218,95 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetAdminSubscriptionsAsync_ShouldFilterByProviderStatusAndSearch()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.SubscriptionPlans.AddRange(
+            new SubscriptionPlan
+            {
+                Id = "monthly",
+                Name = "PetMagic Premium Monthly",
+                BillingPeriod = "monthly",
+                PriceAmount = 14.99m,
+                CurrencyCode = "USD",
+                MonthlyTokenLimit = 500,
+                IsRecommended = true,
+                IsActive = true,
+                DisplayOrder = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+            new SubscriptionPlan
+            {
+                Id = "yearly",
+                Name = "PetMagic Premium Yearly",
+                BillingPeriod = "yearly",
+                PriceAmount = 99.99m,
+                CurrencyCode = "USD",
+                MonthlyTokenLimit = 700,
+                IsRecommended = false,
+                IsActive = true,
+                DisplayOrder = 2,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            });
+        dbContext.UserSubscriptions.AddRange(
+            new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Provider = "stripe",
+                PurchaseChannel = "web",
+                Region = "US",
+                PlanId = "monthly",
+                Status = "active",
+                ExternalSubscriptionId = "sub_secret_should_not_be_searched",
+                CurrentPeriodStartUtc = now.AddDays(-3),
+                CurrentPeriodEndUtc = now.AddDays(27),
+                MonthlyTokenLimit = 500,
+                MonthlyTokensGranted = 40,
+                CreatedAtUtc = now.AddDays(-3),
+                UpdatedAtUtc = now,
+            },
+            new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                Provider = "google_play",
+                PurchaseChannel = "in_app",
+                Region = "US",
+                PlanId = "yearly",
+                Status = "active",
+                CurrentPeriodStartUtc = now.AddDays(-7),
+                CurrentPeriodEndUtc = now.AddDays(358),
+                MonthlyTokenLimit = 700,
+                MonthlyTokensGranted = 40,
+                CreatedAtUtc = now.AddDays(-7),
+                UpdatedAtUtc = now.AddMinutes(-1),
+            });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetAdminSubscriptionsAsync(
+            0,
+            10,
+            "active",
+            "stripe",
+            "monthly",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value.Items);
+        Assert.Equal(userId, item.UserId);
+        Assert.Equal("stripe", item.Provider);
+        Assert.Equal("monthly", item.PlanId);
+        Assert.Equal("PetMagic Premium Monthly", item.PlanName);
+    }
+
+    [Fact]
     public async Task HandleAppStoreServerNotificationAsync_ShouldUpdateExistingSubscription()
     {
         await using var dbContext = CreateDbContext();

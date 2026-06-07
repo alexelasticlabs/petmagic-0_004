@@ -92,17 +92,19 @@ public sealed partial class EconomyService
             && !string.Equals(order.ExternalPaymentId, normalizedRequestedReference, StringComparison.Ordinal))
         {
             logger?.LogWarning(
-                "Stripe reference mismatch for order verification. OrderId={OrderId} UserId={UserId} RequestedReference={RequestedReference} StoredReference={StoredReference}",
+                "Stripe reference mismatch for order verification. OrderId={OrderId} UserId={UserId} RequestedReferenceType={RequestedReferenceType} StoredReferenceType={StoredReferenceType} CorrelationId={CorrelationId}",
                 order.Id,
                 order.UserId,
-                normalizedRequestedReference,
-                order.ExternalPaymentId);
+                ClassifyStripeReference(normalizedRequestedReference),
+                ClassifyStripeReference(order.ExternalPaymentId),
+                CurrentCorrelationId);
 
             stripeReferenceId = order.ExternalPaymentId;
         }
 
         if (string.IsNullOrWhiteSpace(stripeReferenceId))
         {
+            LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.missing_reference");
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
@@ -114,6 +116,7 @@ public sealed partial class EconomyService
         var apiKey = ResolveStripeApiKey();
         if (string.IsNullOrWhiteSpace(apiKey))
         {
+            LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.configuration");
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
@@ -144,12 +147,20 @@ public sealed partial class EconomyService
             }
             else
             {
+                LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.unsupported_reference");
                 return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
             }
         }
         catch (Exception ex)
         {
-            logger?.LogWarning(ex, "Stripe payment verification failed for reference {StripeReferenceId}", stripeReferenceId);
+            logger?.LogWarning(
+                ex,
+                "Stripe payment verification failed. OrderId={OrderId} UserId={UserId} ReferenceType={ReferenceType} CorrelationId={CorrelationId}",
+                order.Id,
+                order.UserId,
+                ClassifyStripeReference(stripeReferenceId),
+                CurrentCorrelationId);
+            LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.provider");
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
@@ -292,5 +303,25 @@ public sealed partial class EconomyService
         };
 
         return $"{bundleId}.tokens.{normalizedProvider}.{code.ToLowerInvariant()}";
+    }
+
+    private static string ClassifyStripeReference(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "missing";
+        }
+
+        if (value.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
+        {
+            return "payment_intent";
+        }
+
+        if (value.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+        {
+            return "checkout_session";
+        }
+
+        return "unknown";
     }
 }

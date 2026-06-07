@@ -34,7 +34,15 @@ public interface ITemplatesService
 
     Task<Result<IReadOnlyList<AdminTemplateFeedbackItemResponse>>> GetAdminFeedbackAsync(Guid templateId, AdminTemplateFeedbackQuery query, CancellationToken cancellationToken);
 
+    Task<Result<AdminModerationQueuePageResponse>> GetAdminModerationQueueAsync(AdminModerationQueueQuery query, CancellationToken cancellationToken);
+
+    Task<Result<AdminModerationQueueItemResponse>> DecideAdminModerationItemAsync(AdminModerationDecisionCommand command, CancellationToken cancellationToken);
+
     Task<Result<AdminTemplatesAnalyticsOverviewResponse>> GetAdminTemplatesAnalyticsAsync(AdminTemplatesAnalyticsQuery query, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateGenerationDashboardMetricsResponse>> GetAdminGenerationDashboardMetricsAsync(CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateGenerationListPageResponse>> ListAdminGenerationsAsync(AdminTemplateGenerationsQuery query, CancellationToken cancellationToken);
 
     Task<Result> RecordAnalyticsEventAsync(RecordTemplateAnalyticsEventCommand command, CancellationToken cancellationToken);
 

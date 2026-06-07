@@ -46,7 +46,10 @@ internal sealed class TemplateMediaCleanupProcessor(
             record.FailureCode = deleteResult.Error.Code;
             record.FailureMessage = deleteResult.Error.Message;
             await dbContext.SaveChangesAsync(cancellationToken);
-            logger.LogWarning("Temporary upload cleanup failed for media record {MediaRecordId}: {ErrorCode}", record.Id, deleteResult.Error.Code);
+            logger.LogWarning(
+                "Temporary upload cleanup failed. MediaRecordId={MediaRecordId} ErrorCode={ErrorCode}",
+                record.Id,
+                deleteResult.Error.Code);
             return true;
         }
 
@@ -104,7 +107,10 @@ internal sealed class TemplateMediaCleanupProcessor(
                 job.LastUserMediaCleanupAttemptAtUtc = now;
                 job.UserMediaCleanupFailureCode = deleteResult.Error.Code;
                 await dbContext.SaveChangesAsync(cancellationToken);
-                logger.LogWarning("Generation media cleanup failed for job {GenerationId}: {ErrorCode}", job.Id, deleteResult.Error.Code);
+                logger.LogWarning(
+                    "Generation media cleanup failed. GenerationId={GenerationId} ErrorCode={ErrorCode}",
+                    job.Id,
+                    deleteResult.Error.Code);
                 return true;
             }
         }

@@ -46,6 +46,8 @@ public static class IdentityErrors
 
     public static readonly Error CannotRevokeBaseRole = new("users.cannot_revoke_base_role", "User role cannot be removed.");
 
+    public static readonly Error CannotRemoveLastAdmin = new("users.cannot_remove_last_admin", "At least one Admin must remain active.");
+
     public static readonly Error InvalidAvatarUpload = new("users.avatar_invalid_upload", "Avatar upload is invalid.");
 
     public static readonly Error AvatarContentTypeNotAllowed = new("users.avatar_content_type_not_allowed", "Avatar content type is not allowed.");

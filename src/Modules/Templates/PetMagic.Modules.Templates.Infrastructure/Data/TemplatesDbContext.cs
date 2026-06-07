@@ -197,8 +197,11 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.DeviceClass).HasMaxLength(32).IsRequired();
             entity.Property(x => x.CountryCode).HasMaxLength(8).IsRequired();
             entity.Property(x => x.FeedbackMessage).HasMaxLength(2000);
+            entity.Property(x => x.ModerationStatus).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ModerationComment).HasMaxLength(500);
             entity.HasIndex(x => new { x.TemplateId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.EventType, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.ModerationStatus, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.TemplateId, x.Source });
             entity.HasIndex(x => new { x.TemplateId, x.DeviceClass });
             entity.HasIndex(x => new { x.TemplateId, x.CountryCode });

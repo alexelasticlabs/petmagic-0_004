@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+
 using Npgsql;
 
 using PetMagic.BuildingBlocks.Results;
@@ -56,7 +57,8 @@ public sealed partial class EconomyService
         {
             logger?.LogWarning(
                 ex,
-                "Stripe SDK signature verification failed. Falling back to manual signature validation.");
+                "Stripe SDK signature verification failed. Falling back to manual signature validation. CorrelationId={CorrelationId}",
+                CurrentCorrelationId);
 
             var isSignatureValid = stripeWebhookSecrets.Any(
                 webhookSecret => EconomyWebhookParser.VerifyStripeSignatureFallback(command.RawBody, command.StripeSignature, webhookSecret));
@@ -87,9 +89,24 @@ public sealed partial class EconomyService
             return StripeWebhookFailure(EconomyErrors.InvalidWebhookPayload, "event.parse", eventType);
         }
 
+        LogPaymentWebhookReceived(
+            "stripe",
+            eventId,
+            eventType,
+            parsedEvent.UserId,
+            parsedEvent.ObjectId,
+            parsedEvent.CustomerId);
+
         if (!dbContext.Database.IsRelational()
             && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "stripe" && x.EventId == eventId, cancellationToken))
         {
+            LogDuplicatePaymentWebhook(
+                "stripe",
+                eventId,
+                eventType,
+                parsedEvent.UserId,
+                parsedEvent.ObjectId,
+                parsedEvent.CustomerId);
             return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
         }
 
@@ -164,13 +181,16 @@ public sealed partial class EconomyService
                         }
 
                         logger?.LogInformation(
-                            "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status}.",
+                            "Premium entitlement updated from Stripe webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Activated={Activated} Status={Status} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
                             "stripe",
                             parsedEvent.UserId.Value,
                             eventId,
                             eventType,
                             shouldActivatePremium,
-                            parsedEvent.Status);
+                            parsedEvent.Status,
+                            parsedEvent.ObjectId,
+                            parsedEvent.CustomerId,
+                            CurrentCorrelationId);
 
                         await _pushNotificationSender.NotifyPremiumUpdateAsync(
                             parsedEvent.UserId.Value,
@@ -227,6 +247,23 @@ public sealed partial class EconomyService
                             parsedEvent.CancelAtPeriodEnd,
                             monthlyTokenLimit,
                             cancellationToken);
+
+                        if (shouldActivatePremium || isInvoiceFailed || isSubscriptionDeleted)
+                        {
+                            LogSubscriptionUpdated(
+                                "stripe",
+                                eventId,
+                                eventType,
+                                parsedEvent.UserId.Value,
+                                subscription.Status,
+                                shouldActivatePremium
+                                    ? "activated"
+                                    : isInvoiceFailed
+                                        ? "payment_failed"
+                                        : "cancelled",
+                                parsedEvent.ObjectId,
+                                parsedEvent.CustomerId);
+                        }
 
                         await AppendSubscriptionEventAsync(
                             parsedEvent.UserId.Value,
@@ -285,11 +322,25 @@ public sealed partial class EconomyService
                 await transaction.CommitAsync(cancellationToken);
             }
 
+            LogPaymentWebhookProcessed(
+                "stripe",
+                eventId,
+                eventType,
+                parsedEvent.UserId,
+                parsedEvent.ObjectId,
+                parsedEvent.CustomerId);
             return Result.Success(new StripeWebhookResultResponse(eventId, true, "processed"));
         }
         catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
             dbContext.ChangeTracker.Clear();
+            LogDuplicatePaymentWebhook(
+                "stripe",
+                eventId,
+                eventType,
+                parsedEvent.UserId,
+                parsedEvent.ObjectId,
+                parsedEvent.CustomerId);
             return Result.Success(new StripeWebhookResultResponse(eventId, false, "ignored_duplicate"));
         }
     }
@@ -299,9 +350,10 @@ public sealed partial class EconomyService
         return exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
     }
 
-    private static Result<StripeWebhookResultResponse> StripeWebhookFailure(Error error, string stage, string? eventType = null)
+    private Result<StripeWebhookResultResponse> StripeWebhookFailure(Error error, string stage, string? eventType = null)
     {
         EconomyMetrics.RecordStripeWebhookFailure(error.Code, stage, eventType);
+        LogPaymentWebhookFailed(error, stage, eventType);
         return Result.Failure<StripeWebhookResultResponse>(error);
     }
 
@@ -315,11 +367,15 @@ public sealed partial class EconomyService
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
         }
 
+        var appStoreEventType = parsed.NotificationType ?? "unknown";
+        LogStoreWebhookReceived("app_store", parsed.EventId, appStoreEventType);
+
         var alreadyProcessed = await dbContext.ProcessedWebhookEvents
             .AnyAsync(x => x.Provider == "app_store" && x.EventId == parsed.EventId, cancellationToken);
 
         if (alreadyProcessed)
         {
+            LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
             return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
         }
 
@@ -328,7 +384,7 @@ public sealed partial class EconomyService
             Id = Guid.NewGuid(),
             Provider = "app_store",
             EventId = parsed.EventId,
-            EventType = parsed.NotificationType ?? "unknown",
+            EventType = appStoreEventType,
             ProcessedAtUtc = DateTime.UtcNow
         });
 
@@ -374,6 +430,12 @@ public sealed partial class EconomyService
         if (existingSubscription is null)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            LogStoreWebhookProcessed(
+                "app_store",
+                parsed.EventId,
+                appStoreEventType,
+                null,
+                processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found");
             return Result.Success(new StoreWebhookResultResponse(
                 "app_store",
                 parsed.EventId,
@@ -405,13 +467,14 @@ public sealed partial class EconomyService
         }
 
         logger?.LogInformation(
-            "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} NotificationType={NotificationType} Status={Status} IsPremium={IsPremium}.",
+            "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
             "app_store",
             existingSubscription.UserId,
             parsed.EventId,
-            parsed.NotificationType,
+            appStoreEventType,
             status,
-            isPremium);
+            isPremium,
+            CurrentCorrelationId);
 
         await _pushNotificationSender.NotifyPremiumUpdateAsync(
             existingSubscription.UserId,
@@ -448,6 +511,14 @@ public sealed partial class EconomyService
             command.SignedPayload,
             cancellationToken);
 
+        LogSubscriptionUpdated(
+            "app_store",
+            parsed.EventId,
+            appStoreEventType,
+            existingSubscription.UserId,
+            subscription.Status,
+            isPremium ? "activated" : "cancelled");
+
         if (isPremium)
         {
             await GrantPremiumSubscriptionAllowanceIfDueAsync(
@@ -456,6 +527,7 @@ public sealed partial class EconomyService
                 cancellationToken);
         }
 
+        LogStoreWebhookProcessed("app_store", parsed.EventId, appStoreEventType, existingSubscription.UserId, "processed");
         return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));
     }
 
@@ -469,11 +541,15 @@ public sealed partial class EconomyService
             return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.InvalidWebhookPayload);
         }
 
+        var googlePlayEventType = $"notification_{parsed.NotificationType}";
+        LogStoreWebhookReceived("google_play", parsed.EventId, googlePlayEventType);
+
         var alreadyProcessed = await dbContext.ProcessedWebhookEvents
             .AnyAsync(x => x.Provider == "google_play" && x.EventId == parsed.EventId, cancellationToken);
 
         if (alreadyProcessed)
         {
+            LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
         }
 
@@ -482,7 +558,7 @@ public sealed partial class EconomyService
             Id = Guid.NewGuid(),
             Provider = "google_play",
             EventId = parsed.EventId,
-            EventType = $"notification_{parsed.NotificationType}",
+            EventType = googlePlayEventType,
             ProcessedAtUtc = DateTime.UtcNow
         });
 
@@ -508,6 +584,7 @@ public sealed partial class EconomyService
                 || !string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
+                LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
                 return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
             }
 
@@ -519,12 +596,14 @@ public sealed partial class EconomyService
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
+            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, pendingOrder.order.UserId, "processed_token_purchase");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed_token_purchase"));
         }
 
         if (!parsed.IsSubscriptionNotification)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_unknown_notification");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_unknown_notification"));
         }
 
@@ -538,6 +617,7 @@ public sealed partial class EconomyService
         if (existingSubscription is null)
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
         }
 
@@ -583,13 +663,14 @@ public sealed partial class EconomyService
         }
 
         logger?.LogInformation(
-            "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} NotificationType={NotificationType} Status={Status} IsPremium={IsPremium}.",
+            "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
             "google_play",
             existingSubscription.UserId,
             parsed.EventId,
-            parsed.NotificationType,
+            googlePlayEventType,
             status,
-            isPremium);
+            isPremium,
+            CurrentCorrelationId);
 
         await _pushNotificationSender.NotifyPremiumUpdateAsync(
             existingSubscription.UserId,
@@ -626,6 +707,14 @@ public sealed partial class EconomyService
             command.MessageData,
             cancellationToken);
 
+        LogSubscriptionUpdated(
+            "google_play",
+            parsed.EventId,
+            googlePlayEventType,
+            existingSubscription.UserId,
+            subscription.Status,
+            isPremium ? "activated" : "cancelled");
+
         if (isPremium)
         {
             await GrantPremiumSubscriptionAllowanceIfDueAsync(
@@ -634,6 +723,7 @@ public sealed partial class EconomyService
                 cancellationToken);
         }
 
+        LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
         return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
     }
 }

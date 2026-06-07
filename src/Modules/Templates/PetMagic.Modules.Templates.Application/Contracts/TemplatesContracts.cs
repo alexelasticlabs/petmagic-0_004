@@ -309,6 +309,41 @@ public sealed record AdminTemplateFeedbackItemResponse(
     Guid? GenerationId,
     DateTime CreatedAtUtc);
 
+public sealed record AdminModerationQueueQuery(
+    string? Status,
+    string? Search,
+    int? Skip,
+    int? Take);
+
+public sealed record AdminModerationQueueItemResponse(
+    Guid EventId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string EventType,
+    string Status,
+    string? Message,
+    string Source,
+    string DeviceClass,
+    string CountryCode,
+    Guid? UserId,
+    Guid? GenerationId,
+    string? ModerationComment,
+    DateTime CreatedAtUtc,
+    DateTime? ModeratedAtUtc);
+
+public sealed record AdminModerationQueuePageResponse(
+    IReadOnlyList<AdminModerationQueueItemResponse> Items,
+    int Skip,
+    int Take,
+    bool HasMore,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminModerationDecisionCommand(
+    Guid EventId,
+    string Action,
+    string Reason);
+
 public sealed record AdminUserTemplateGenerationResponse(
     Guid GenerationId,
     Guid TemplateId,
@@ -461,6 +496,53 @@ public sealed record AdminTemplatesAnalyticsOverviewResponse(
     AdminTemplatesAnalyticsFunnelResponse ConversionFunnel,
     IReadOnlyList<AdminTemplatesAnalyticsTemplateRowResponse> Templates,
     string[] AvailableCategories,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminTemplateGenerationDashboardMetricsResponse(
+    int GenerationsToday,
+    int GenerationsThisWeek,
+    int GenerationsThisMonth,
+    int FailedGenerationsToday,
+    int FailedGenerationsThisWeek,
+    int FailedGenerationsThisMonth,
+    int PendingJobs,
+    int RunningJobs,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminTemplateGenerationsQuery(
+    string? Status,
+    string? Provider,
+    string? User,
+    string? Search,
+    int? Skip,
+    int? Take);
+
+public sealed record AdminTemplateGenerationListItemResponse(
+    Guid GenerationId,
+    Guid UserId,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string Status,
+    string? Provider,
+    string? Model,
+    int TokenCost,
+    int AttemptCount,
+    decimal? ProviderCostUsd,
+    string? FailureCode,
+    string? FailureMessage,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    DateTime? StartedAtUtc,
+    DateTime? CompletedAtUtc,
+    DateTime? RefundedAtUtc);
+
+public sealed record AdminTemplateGenerationListPageResponse(
+    IReadOnlyList<AdminTemplateGenerationListItemResponse> Items,
+    int TotalCount,
+    int Skip,
+    int Take,
+    bool HasMore,
     DateTime GeneratedAtUtc);
 
 public sealed record PublicTemplateListItemResponse(

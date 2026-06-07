@@ -18,10 +18,12 @@ public static class AdminEconomyEndpoints
         var group = endpoints.MapGroup("/api/admin/economy")
             .WithTags("Admin.Economy")
             .RequireRateLimiting("admin")
-            .RequireAuthorization("ModeratorOrAdmin");
+            .RequireAuthorization("AdminOnly");
 
         group.MapGet("/ledger", GetWalletLedgerAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
+        group.MapPost("/purchases/{orderId:guid}/refund", RefundPurchaseAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/users/{userId:guid}/subscription-summary", GetUserSubscriptionSummaryAsync);
         group.MapPut("/users/{userId:guid}/premium/revoke", AdminRevokePremiumSubscriptionAsync)
             .RequireAuthorization("AdminOnly");
@@ -75,14 +77,42 @@ public static class AdminEconomyEndpoints
         [FromQuery] int skip,
         [FromQuery] int take,
         [FromQuery] string? status,
+        [FromQuery] string? provider,
+        [FromQuery] string? search,
         [FromQuery] Guid? userId,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminPurchaseHistoryAsync(skip, take, status, userId, cancellationToken);
+        var result = await service.GetAdminPurchaseHistoryAsync(skip, take, status, provider, search, userId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PurchaseHistoryItemResponse>, ProblemHttpResult>> RefundPurchaseAsync(
+        [FromRoute] Guid orderId,
+        [FromBody] AdminRefundPurchaseRequest? request,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.RefundAdminPurchaseAsync(
+            new AdminRefundPurchaseCommand(orderId, request?.Reason),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            var statusCode = result.Error.Code switch
+            {
+                "economy.purchase_not_found" => StatusCodes.Status404NotFound,
+                "economy.purchase_not_refundable" => StatusCodes.Status409Conflict,
+                "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,
+                _ => StatusCodes.Status400BadRequest,
+            };
+
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
         }
 
         return TypedResults.Ok(result.Value);
@@ -154,10 +184,11 @@ public static class AdminEconomyEndpoints
         [FromQuery] int take,
         [FromQuery] string? status,
         [FromQuery] string? provider,
+        [FromQuery] string? search,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminSubscriptionsAsync(skip, take, status, provider, cancellationToken);
+        var result = await service.GetAdminSubscriptionsAsync(skip, take, status, provider, search, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -643,4 +674,6 @@ public static class AdminEconomyEndpoints
         string? CreatedBy = null);
 
     public sealed record AdminRevokePremiumRequest(string? PaymentProvider);
+
+    public sealed record AdminRefundPurchaseRequest(string? Reason);
 }

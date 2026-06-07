@@ -61,9 +61,21 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
         {
             entity.ToTable("audit_events");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActorRole).HasMaxLength(80);
             entity.Property(x => x.Action).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.TargetType).HasMaxLength(80);
+            entity.Property(x => x.TargetId).HasMaxLength(160);
+            entity.Property(x => x.OldValue).HasMaxLength(2000);
+            entity.Property(x => x.NewValue).HasMaxLength(2000);
+            entity.Property(x => x.IpAddress).HasMaxLength(64);
+            entity.Property(x => x.UserAgent).HasMaxLength(512);
+            entity.Property(x => x.CorrelationId).HasMaxLength(128);
             entity.Property(x => x.Details).HasMaxLength(2000);
+            entity.Property(x => x.CreatedAtUtc);
             entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => x.CreatedAtUtc);
+            entity.HasIndex(x => x.CorrelationId);
+            entity.HasIndex(x => new { x.ActorUserId, x.CreatedAtUtc });
             entity.HasIndex(x => new { x.SubjectUserId, x.OccurredAtUtc });
         });
 

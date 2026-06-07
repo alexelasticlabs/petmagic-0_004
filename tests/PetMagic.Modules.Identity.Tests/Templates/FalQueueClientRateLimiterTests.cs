@@ -33,6 +33,7 @@ public sealed class FalQueueClientRateLimiterTests
     public async Task RunAsync_ShouldWaitForNextPermitBeforeSecondSubmit()
     {
         ResetLocalRateLimiterState();
+        await WaitUntilCurrentMinuteHasAtLeastAsync(TimeSpan.FromSeconds(2));
         await using var dbContext = CreateDbContext();
         var handler = new RecordingFalHandler();
         var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
@@ -100,6 +101,22 @@ public sealed class FalQueueClientRateLimiterTests
             BindingFlags.NonPublic | BindingFlags.Static);
         var state = field?.GetValue(null);
         state?.GetType().GetMethod("Clear")?.Invoke(state, null);
+    }
+
+    private static async Task WaitUntilCurrentMinuteHasAtLeastAsync(TimeSpan remaining)
+    {
+        while (true)
+        {
+            var now = DateTime.UtcNow;
+            var nextMinute = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, DateTimeKind.Utc)
+                .AddMinutes(1);
+            if (nextMinute - now >= remaining)
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
     }
 
     private sealed class FixedHttpClientFactory(HttpClient client) : IHttpClientFactory

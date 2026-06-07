@@ -11,58 +11,79 @@ using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure;
 
 using Serilog;
+using Serilog.Events;
 
 LoadDotEnvFileIfPresent();
 
-var builder = Host.CreateApplicationBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .Enrich.WithProperty("ApplicationName", "PetMagic.Host.GenerationWorker")
+    .WriteTo.Console()
+    .CreateLogger();
 
-TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
-    builder.Configuration,
-    builder.Environment,
-    "PetMagic.Host.GenerationWorker",
-    expectedEnabled: true);
-
-builder.Services.AddSerilog((_, loggerConfiguration) =>
+try
 {
-    loggerConfiguration
-        .ReadFrom.Configuration(builder.Configuration)
-        .Enrich.FromLogContext();
-});
+    var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.AddMemoryCache();
-builder.Services.AddTransient<WorkerCorrelationIdDelegatingHandler>();
-builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
-{
-    options.HttpMessageHandlerBuilderActions.Add(httpMessageHandlerBuilder =>
+    TemplateGenerationHostModeValidator.RequireGenerationWorkerMode(
+        builder.Configuration,
+        builder.Environment,
+        "PetMagic.Host.GenerationWorker",
+        expectedEnabled: true);
+
+    builder.Services.AddSerilog((_, loggerConfiguration) =>
     {
-        httpMessageHandlerBuilder.AdditionalHandlers.Add(
-            httpMessageHandlerBuilder.Services.GetRequiredService<WorkerCorrelationIdDelegatingHandler>());
+        loggerConfiguration
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("ApplicationName", "PetMagic.Host.GenerationWorker")
+            .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
     });
-});
 
-builder.Services
-    .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
-    .AddTemplatesInfrastructure(builder.Configuration, builder.Environment);
+    builder.Services.AddMemoryCache();
+    builder.Services.AddTransient<WorkerCorrelationIdDelegatingHandler>();
+    builder.Services.ConfigureAll<HttpClientFactoryOptions>(options =>
+    {
+        options.HttpMessageHandlerBuilderActions.Add(httpMessageHandlerBuilder =>
+        {
+            httpMessageHandlerBuilder.AdditionalHandlers.Add(
+                httpMessageHandlerBuilder.Services.GetRequiredService<WorkerCorrelationIdDelegatingHandler>());
+        });
+    });
 
-builder.Services
-    .AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("PetMagic.Host.GenerationWorker"))
-    .WithTracing(tracing => tracing
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter())
-    .WithMetrics(metrics => metrics
-        .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddMeter("PetMagic.Modules.Economy")
-        .AddMeter("PetMagic.Modules.Templates")
-        .AddOtlpExporter());
+    builder.Services
+        .AddEconomyInfrastructure(builder.Configuration, builder.Environment.IsProduction())
+        .AddTemplatesInfrastructure(builder.Configuration, builder.Environment);
 
-var host = builder.Build();
+    builder.Services
+        .AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService("PetMagic.Host.GenerationWorker"))
+        .WithTracing(tracing => tracing
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter())
+        .WithMetrics(metrics => metrics
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddMeter("PetMagic.Modules.Economy")
+            .AddMeter("PetMagic.Modules.Templates")
+            .AddOtlpExporter());
 
-Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot"));
-Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot", "templates-media"));
+    var host = builder.Build();
 
-await host.RunAsync();
+    Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot"));
+    Directory.CreateDirectory(Path.Combine(host.Services.GetRequiredService<IHostEnvironment>().ContentRootPath, "wwwroot", "templates-media"));
+
+    await host.RunAsync();
+}
+catch (Exception exception)
+{
+    Log.Fatal(exception, "PetMagic.Host.GenerationWorker stopped during startup or runtime.");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}
 
 static void LoadDotEnvFileIfPresent()
 {

@@ -73,10 +73,14 @@ public interface IEconomyService
         int skip,
         int take,
         string? status,
+        string? provider,
+        string? search,
         Guid? userId,
         CancellationToken cancellationToken);
 
-    Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(int skip, int take, string? status, string? provider, CancellationToken cancellationToken);
+    Task<Result<PurchaseHistoryItemResponse>> RefundAdminPurchaseAsync(AdminRefundPurchaseCommand command, CancellationToken cancellationToken);
+
+    Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(int skip, int take, string? status, string? provider, string? search, CancellationToken cancellationToken);
 
     Task<Result<IReadOnlyList<AdminCurrencyPackResponse>>> ListAdminCurrencyPacksAsync(CancellationToken cancellationToken);
 

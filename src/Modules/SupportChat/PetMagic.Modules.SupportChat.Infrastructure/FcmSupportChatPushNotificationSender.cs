@@ -9,6 +9,7 @@ using Google.Apis.Auth.OAuth2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
 using PetMagic.Modules.SupportChat.Infrastructure.Entities;
@@ -90,19 +91,21 @@ internal sealed class FcmSupportChatPushNotificationSender(
         if (response.IsSuccessStatusCode)
         {
             logger.LogInformation(
-                "FCM send succeeded for support event {EventId} token {TokenId}: {Body}",
+                "FCM send succeeded for support event. EventId={EventId} TokenId={TokenId} MessageName={MessageName} CorrelationId={CorrelationId}",
                 eventId,
                 token.Id,
-                responseBody);
+                TryReadFcmMessageName(responseBody),
+                CorrelationContext.ResolveOrCreate());
             return;
         }
 
         logger.LogWarning(
-            "FCM send failed for support event {EventId} token {TokenId}: {StatusCode} {Body}",
+            "FCM send failed for support event. EventId={EventId} TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
             eventId,
             token.Id,
             response.StatusCode,
-            responseBody);
+            ResolveFcmErrorReason(responseBody),
+            CorrelationContext.ResolveOrCreate());
 
         if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound
             && (responseBody.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase)
@@ -112,6 +115,41 @@ internal sealed class FcmSupportChatPushNotificationSender(
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static string? TryReadFcmMessageName(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
+                ? name.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string ResolveFcmErrorReason(string body)
+    {
+        if (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase))
+        {
+            return "unregistered";
+        }
+
+        if (body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
+        {
+            return "invalid_argument";
+        }
+
+        return "fcm_send_failed";
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)

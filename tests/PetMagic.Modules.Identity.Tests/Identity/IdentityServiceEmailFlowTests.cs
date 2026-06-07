@@ -6,9 +6,11 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure;
@@ -66,6 +68,66 @@ public sealed class IdentityServiceEmailFlowTests
             CancellationToken.None);
 
         Assert.True(loginResult.IsFailure);
+    }
+
+    [Fact]
+    public async Task AuthFlows_ShouldWriteStructuredBusinessLogsWithoutCredentials()
+    {
+        await using var dbContext = CreateDbContext();
+        var logger = new CapturingLogger<IdentityService>();
+        var service = await CreateServiceAsync(dbContext, logger: logger);
+
+        using var correlationScope = CorrelationContext.Push("auth-business-correlation");
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("logs.user@petmagic.app", "StrongPassword123", "Logs User", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        user.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+
+        var loginResult = await service.LoginAsync(
+            new LoginCommand("logs.user@petmagic.app", "StrongPassword123"),
+            CancellationToken.None);
+
+        Assert.True(loginResult.IsSuccess);
+
+        var invalidLoginResult = await service.LoginAsync(
+            new LoginCommand("missing.user@petmagic.app", "WrongPassword123"),
+            CancellationToken.None);
+
+        Assert.True(invalidLoginResult.IsFailure);
+
+        Assert.Contains(logger.Entries, entry =>
+            entry.Level == LogLevel.Information
+            && entry.Properties.TryGetValue("Operation", out var operation)
+            && Equals(operation, "registration")
+            && entry.Properties.TryGetValue("Result", out var result)
+            && Equals(result, "pending_email_verification")
+            && entry.Properties.TryGetValue("CorrelationId", out var correlationId)
+            && Equals(correlationId, "auth-business-correlation"));
+
+        Assert.Contains(logger.Entries, entry =>
+            entry.Level == LogLevel.Information
+            && entry.Properties.TryGetValue("Operation", out var operation)
+            && Equals(operation, "login")
+            && entry.Properties.TryGetValue("Result", out var result)
+            && Equals(result, "succeeded"));
+
+        Assert.Contains(logger.Entries, entry =>
+            entry.Level == LogLevel.Warning
+            && entry.Properties.TryGetValue("Operation", out var operation)
+            && Equals(operation, "login")
+            && entry.Properties.TryGetValue("Reason", out var reason)
+            && Equals(reason, "invalid_credentials"));
+
+        var serializedLogs = string.Join('\n', logger.Entries.Select(entry => entry.Message));
+        Assert.DoesNotContain("logs.user@petmagic.app", serializedLogs);
+        Assert.DoesNotContain("missing.user@petmagic.app", serializedLogs);
+        Assert.DoesNotContain("StrongPassword123", serializedLogs);
+        Assert.DoesNotContain("WrongPassword123", serializedLogs);
     }
 
     [Fact]
@@ -338,7 +400,8 @@ public sealed class IdentityServiceEmailFlowTests
     private static async Task<IdentityService> CreateServiceAsync(
         IdentityModuleDbContext dbContext,
         string? acceptLanguage = null,
-        IIdentityEmailTemplateRenderer? emailTemplateRenderer = null)
+        IIdentityEmailTemplateRenderer? emailTemplateRenderer = null,
+        ILogger<IdentityService>? logger = null)
     {
         await dbContext.Database.EnsureCreatedAsync();
         var economyDbContext = CreateEconomyDbContext();
@@ -412,7 +475,8 @@ public sealed class IdentityServiceEmailFlowTests
                 PasswordResetCodeTtlMinutes = 10
             },
             new AvatarStorageOptions(),
-            Options.Create(new JwtOptions()));
+            Options.Create(new JwtOptions()),
+            logger);
     }
 
     private static IIdentityEmailTemplateRenderer CreateRealEmailTemplateRenderer()
@@ -432,6 +496,49 @@ public sealed class IdentityServiceEmailFlowTests
     {
         public HttpContext? HttpContext { get; set; } = context;
     }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), properties));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties);
 
     private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog
     {
@@ -575,6 +682,11 @@ public sealed class IdentityServiceEmailFlowTests
         public Task<Result<PaymentCreateResponse>> CreatePaymentWithSavedMethodAsync(PaymentSavedMethodCreateRequest request, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new PaymentCreateResponse($"pi_{request.OrderId:N}", string.Empty)));
+        }
+
+        public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
         }
     }
 

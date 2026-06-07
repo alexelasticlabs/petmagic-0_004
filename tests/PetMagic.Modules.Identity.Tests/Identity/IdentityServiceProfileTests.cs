@@ -442,6 +442,11 @@ public sealed partial class IdentityServiceProfileTests
         {
             return Task.FromResult(Result.Success(new PaymentCreateResponse($"pi_{request.OrderId:N}", string.Empty)));
         }
+
+        public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
+        }
     }
 
     private sealed class FakeStoreSubscriptionVerifier : IStoreSubscriptionVerifier

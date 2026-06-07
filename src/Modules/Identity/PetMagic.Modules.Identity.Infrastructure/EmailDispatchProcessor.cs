@@ -149,13 +149,19 @@ internal sealed class EmailDispatchProcessor(
         {
             job.Status = EmailDispatchStatus.Failed;
             job.NextAttemptAtUtc = null;
-            logger.LogWarning("Email dispatch exhausted attempts for job {EmailJobId}: {ErrorCode}", job.Id, errorCode);
+            logger.LogWarning(
+                "Email dispatch exhausted attempts. EmailJobId={EmailJobId} ErrorCode={ErrorCode}",
+                job.Id,
+                errorCode);
         }
         else
         {
             job.Status = EmailDispatchStatus.Queued;
             job.NextAttemptAtUtc = now.AddSeconds(options.RetryDelaySeconds);
-            logger.LogWarning("Email dispatch failed for job {EmailJobId}: {ErrorCode}", job.Id, errorCode);
+            logger.LogWarning(
+                "Email dispatch failed. EmailJobId={EmailJobId} ErrorCode={ErrorCode}",
+                job.Id,
+                errorCode);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

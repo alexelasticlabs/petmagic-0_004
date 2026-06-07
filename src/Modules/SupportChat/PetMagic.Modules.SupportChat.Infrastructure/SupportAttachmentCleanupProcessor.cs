@@ -32,7 +32,7 @@ internal sealed class SupportAttachmentCleanupProcessor(
             if (deleteResult.IsFailure)
             {
                 logger.LogWarning(
-                    "Support attachment cleanup failed for attachment {AttachmentId}: {ErrorCode}",
+                    "Support attachment cleanup failed. AttachmentId={AttachmentId} ErrorCode={ErrorCode}",
                     attachment.Id,
                     deleteResult.Error.Code);
                 continue;

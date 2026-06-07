@@ -6,5 +6,7 @@ public enum TemplateGenerationStatus
     Processing = 2,
     Succeeded = 3,
     Completed = Succeeded,
-    Failed = 4
+    Failed = 4,
+    Cancelled = 5,
+    Retrying = 6
 }

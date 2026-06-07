@@ -27,6 +27,11 @@ public static class AdminTemplateEndpoints
 
         group.MapGet("/", ListAsync);
         group.MapGet("/analytics", GetAnalyticsOverviewAsync);
+        group.MapGet("/moderation", GetModerationQueueAsync);
+        group.MapPost("/moderation/{eventId:guid}/decision", DecideModerationItemAsync);
+        group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync);
+        group.MapGet("/generations", ListGenerationsAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
         group.MapGet("/{templateId:guid}/statistics/trends", GetTrendAsync);
@@ -36,15 +41,23 @@ public static class AdminTemplateEndpoints
         group.MapGet("/{templateId:guid}/statistics/events", GetEventAnalyticsAsync);
         group.MapGet("/{templateId:guid}/statistics/feedback", GetFeedbackAsync);
         group.MapPost("/{templateId:guid}/test", StartAdminTestAsync)
+            .RequireAuthorization("AdminOnly")
             .DisableAntiforgery();
         group.MapGet("/tests/{generationId:guid}", GetAdminTestAsync);
-        group.MapPost("/image", CreateImageAsync);
-        group.MapPut("/image/{templateId:guid}", UpdateImageAsync);
-        group.MapPost("/video", CreateVideoAsync);
-        group.MapPut("/video/{templateId:guid}", UpdateVideoAsync);
-        group.MapPut("/{templateId:guid}/status", ChangeStatusAsync);
-        group.MapDelete("/{templateId:guid}", DeleteAsync);
+        group.MapPost("/image", CreateImageAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/image/{templateId:guid}", UpdateImageAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/video", CreateVideoAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/video/{templateId:guid}", UpdateVideoAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/{templateId:guid}/status", ChangeStatusAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapDelete("/{templateId:guid}", DeleteAsync)
+            .RequireAuthorization("AdminOnly");
         group.MapPost("/media/upload", UploadMediaAsync)
+            .RequireAuthorization("AdminOnly")
             .DisableAntiforgery();
 
         return endpoints;
@@ -76,6 +89,67 @@ public static class AdminTemplateEndpoints
     {
         var result = await service.GetAdminTemplatesAnalyticsAsync(
             new AdminTemplatesAnalyticsQuery(periodDays, templateType, category, status, access, sort, take),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminTemplateGenerationDashboardMetricsResponse>> GetGenerationDashboardMetricsAsync(
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminGenerationDashboardMetricsAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminModerationQueuePageResponse>> GetModerationQueueAsync(
+        [FromQuery] string? status,
+        [FromQuery] string? search,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminModerationQueueAsync(
+            new AdminModerationQueueQuery(status, search, skip, take),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminModerationQueueItemResponse>, ProblemHttpResult>> DecideModerationItemAsync(
+        Guid eventId,
+        [FromBody] AdminModerationDecisionRequest? request,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.DecideAdminModerationItemAsync(
+            new AdminModerationDecisionCommand(eventId, request?.Action ?? string.Empty, request?.Reason ?? string.Empty),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            var statusCode = string.Equals(result.Error.Code, "templates.not_found", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status400BadRequest;
+            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminTemplateGenerationListPageResponse>> ListGenerationsAsync(
+        [FromQuery] string? status,
+        [FromQuery] string? provider,
+        [FromQuery] string? user,
+        [FromQuery] string? search,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery(status, provider, user, search, skip, take),
             cancellationToken);
 
         return TypedResults.Ok(result.Value);
@@ -731,4 +805,6 @@ public static class AdminTemplateEndpoints
         IReadOnlyList<string>? PetPhotoRequirements = null);
 
     public sealed record ChangeTemplateStatusRequest(string Status);
+
+    public sealed record AdminModerationDecisionRequest(string Action, string Reason);
 }

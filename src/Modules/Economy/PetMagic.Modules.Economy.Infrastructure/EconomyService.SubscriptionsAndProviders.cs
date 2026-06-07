@@ -212,14 +212,15 @@ public sealed partial class EconomyService
             && subscription.LastTokenGrantAtUtc.Value >= periodStartUtc)
         {
             logger?.LogInformation(
-                "Premium activation grant skipped (already_granted_for_period). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} LastTokenGrantAtUtc={LastTokenGrantAtUtc}.",
+                "Premium activation grant skipped (already_granted_for_period). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} LastTokenGrantAtUtc={LastTokenGrantAtUtc} CorrelationId={CorrelationId}.",
                 providerContext,
                 subscription.UserId,
                 subscription.Id,
                 subscription.PlanId,
                 subscription.CurrentPeriodStartUtc,
                 subscription.CurrentPeriodEndUtc,
-                subscription.LastTokenGrantAtUtc);
+                subscription.LastTokenGrantAtUtc,
+                CurrentCorrelationId);
             return;
         }
 
@@ -227,7 +228,7 @@ public sealed partial class EconomyService
             || subscription.MonthlyTokensGranted >= subscription.MonthlyTokenLimit)
         {
             logger?.LogInformation(
-                "Premium allowance skipped ({Reason}). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted}.",
+                "Premium allowance skipped ({Reason}). Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted} CorrelationId={CorrelationId}.",
                 subscription.MonthlyTokenLimit <= 0 ? "limit_not_configured" : "allowance_already_granted",
                 providerContext,
                 subscription.UserId,
@@ -236,7 +237,8 @@ public sealed partial class EconomyService
                 subscription.CurrentPeriodStartUtc,
                 subscription.CurrentPeriodEndUtc,
                 subscription.MonthlyTokenLimit,
-                subscription.MonthlyTokensGranted);
+                subscription.MonthlyTokensGranted,
+                CurrentCorrelationId);
             return;
         }
 
@@ -263,7 +265,7 @@ public sealed partial class EconomyService
         subscription.UpdatedAtUtc = now;
 
         logger?.LogInformation(
-            "Premium allowance granted. Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} Granted={Granted} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted}.",
+            "Premium allowance granted. Provider={Provider} UserId={UserId} SubscriptionId={SubscriptionId} PlanId={PlanId} PeriodStartUtc={PeriodStartUtc} PeriodEndUtc={PeriodEndUtc} Granted={Granted} MonthlyTokenLimit={MonthlyTokenLimit} MonthlyTokensGranted={MonthlyTokensGranted} CorrelationId={CorrelationId}.",
             providerContext,
             subscription.UserId,
             subscription.Id,
@@ -272,7 +274,8 @@ public sealed partial class EconomyService
             subscription.CurrentPeriodEndUtc,
             allowanceToGrant,
             subscription.MonthlyTokenLimit,
-            subscription.MonthlyTokensGranted);
+            subscription.MonthlyTokensGranted,
+            CurrentCorrelationId);
 
         await dbContext.SaveChangesAsync(cancellationToken);
         if (transaction is not null)

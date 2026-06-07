@@ -122,7 +122,10 @@ internal sealed class HttpGeneratedMediaImporter(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Generated template media import failed for generation {GenerationId}.", generationId);
+            logger.LogWarning(
+                exception,
+                "Generated template media import failed. GenerationId={GenerationId}",
+                generationId);
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
     }

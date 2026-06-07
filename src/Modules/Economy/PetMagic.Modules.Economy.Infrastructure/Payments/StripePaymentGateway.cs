@@ -19,6 +19,68 @@ public sealed class StripePaymentGateway(
     private const string Provider = "stripe";
     private const string MobileEphemeralKeyStripeVersion = "2020-03-02";
 
+    public async Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsStripe(request.Provider))
+        {
+            return Result.Failure<PaymentRefundResponse>(EconomyErrors.UnsupportedPaymentProvider);
+        }
+
+        var apiKey = ResolveApiKey(request.ApiSecretKey);
+        if (!EnsureConfigured(apiKey) || string.IsNullOrWhiteSpace(request.ExternalPaymentId))
+        {
+            return Result.Failure<PaymentRefundResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+
+        ConfigureStripe(apiKey);
+
+        var amountInMinorUnits = (long)decimal.Round(request.Amount * 100m, 0, MidpointRounding.AwayFromZero);
+        try
+        {
+            var paymentIntentId = request.ExternalPaymentId;
+            if (paymentIntentId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
+            {
+                var session = await new SessionService().GetAsync(
+                    paymentIntentId,
+                    new SessionGetOptions { Expand = ["payment_intent"] },
+                    cancellationToken: cancellationToken);
+
+                paymentIntentId = session.PaymentIntentId ?? session.PaymentIntent?.Id ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(paymentIntentId))
+                {
+                    return Result.Failure<PaymentRefundResponse>(EconomyErrors.PaymentGatewayFailed);
+                }
+            }
+
+            var refund = await new RefundService().CreateAsync(
+                new RefundCreateOptions
+                {
+                    PaymentIntent = paymentIntentId,
+                    Amount = amountInMinorUnits,
+                    Metadata = new Dictionary<string, string>
+                    {
+                        ["order_id"] = request.OrderId.ToString("D"),
+                        ["reason"] = request.Reason ?? string.Empty
+                    }
+                },
+                new RequestOptions
+                {
+                    IdempotencyKey = $"economy-order-refund-{request.OrderId:D}"
+                },
+                cancellationToken);
+
+            return Result.Success(new PaymentRefundResponse(refund.Id, refund.Status));
+        }
+        catch (StripeException)
+        {
+            return Result.Failure<PaymentRefundResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+        catch
+        {
+            return Result.Failure<PaymentRefundResponse>(EconomyErrors.PaymentGatewayFailed);
+        }
+    }
+
     public async Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
     {
         if (!IsStripe(request.Provider))

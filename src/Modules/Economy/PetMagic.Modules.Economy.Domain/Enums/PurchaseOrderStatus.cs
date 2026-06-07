@@ -7,4 +7,6 @@ public static class PurchaseOrderStatus
     public const string Succeeded = "succeeded";
 
     public const string Failed = "failed";
+
+    public const string Refunded = "refunded";
 }

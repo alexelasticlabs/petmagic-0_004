@@ -1,8 +1,10 @@
 using System.Data;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -23,7 +25,8 @@ public sealed partial class EconomyService(
     IEconomyPushTokenService? pushTokenService = null,
     IEconomyPushNotificationSender? pushNotificationSender = null,
     IIdentityService? identityService = null,
-    ILogger<EconomyService>? logger = null) : IEconomyService
+    ILogger<EconomyService>? logger = null,
+    IAdminAuditLog? adminAuditLog = null) : IEconomyService
 {
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(dbContext, options);

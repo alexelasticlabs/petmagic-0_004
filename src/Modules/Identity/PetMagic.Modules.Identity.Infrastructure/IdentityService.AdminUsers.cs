@@ -13,12 +13,71 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 
 public sealed partial class IdentityService
 {
-    public async Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, CancellationToken cancellationToken)
+    public async Task<Result<UserListPageResponse>> ListUsersAsync(
+        int skip,
+        int take,
+        string? search,
+        string? role,
+        string? status,
+        bool? isPremium,
+        CancellationToken cancellationToken)
     {
         var normalizedSkip = Math.Max(0, skip);
         var normalizedTake = NormalizeTake(take, 100, 200);
-        var users = await userManager.Users
-            .AsNoTracking()
+        var query = userManager.Users.AsNoTracking();
+        var normalizedSearch = search?.Trim();
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            var loweredSearch = normalizedSearch.ToLowerInvariant();
+            var matchesUserId = Guid.TryParse(normalizedSearch, out var searchedUserId);
+
+            query = query.Where(user =>
+                (matchesUserId && user.Id == searchedUserId)
+                || (user.Email != null && user.Email.ToLower().Contains(loweredSearch))
+                || (user.DisplayName != null && user.DisplayName.ToLower().Contains(loweredSearch)));
+        }
+
+        var normalizedRole = role?.Trim();
+        if (!string.IsNullOrWhiteSpace(normalizedRole) && !string.Equals(normalizedRole, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!SystemRoles.All.Contains(normalizedRole))
+            {
+                return Result.Success(new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false, TotalCount: 0));
+            }
+
+            var roleEntity = await roleManager.FindByNameAsync(normalizedRole);
+            if (roleEntity is null)
+            {
+                return Result.Success(new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false, TotalCount: 0));
+            }
+
+            var roleUserIds = dbContext.UserRoles
+                .AsNoTracking()
+                .Where(userRole => userRole.RoleId == roleEntity.Id)
+                .Select(userRole => userRole.UserId);
+
+            query = query.Where(user => roleUserIds.Contains(user.Id));
+        }
+
+        if (isPremium.HasValue)
+        {
+            query = query.Where(user => user.IsPremium == isPremium.Value);
+        }
+
+        var normalizedStatus = status?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(normalizedStatus) && normalizedStatus != "all")
+        {
+            query = normalizedStatus switch
+            {
+                "active" => query.Where(user => user.IsActive && user.EmailConfirmed),
+                "blocked" => query.Where(user => !user.IsActive),
+                "unconfirmed" => query.Where(user => user.IsActive && !user.EmailConfirmed),
+                _ => query.Where(_ => false)
+            };
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var users = await query
             .OrderByDescending(x => x.CreatedAtUtc)
             .ThenByDescending(x => x.Id)
             .Skip(normalizedSkip)
@@ -27,7 +86,7 @@ public sealed partial class IdentityService
 
         if (users.Count == 0)
         {
-            return Result.Success(new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false));
+            return Result.Success(new UserListPageResponse([], normalizedSkip, normalizedTake, HasMore: false, totalCount));
         }
 
         var hasMore = users.Count > normalizedTake;
@@ -77,7 +136,7 @@ public sealed partial class IdentityService
                 ToAvatarResponse(user)))
             .ToArray();
 
-        return Result.Success(new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore));
+        return Result.Success(new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore, totalCount));
     }
 
     public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -138,7 +197,10 @@ public sealed partial class IdentityService
             command.UserId,
             normalizedOperation == "credit" ? "admin.user.wallet.credited" : "admin.user.wallet.debited",
             $"{command.Amount} tokens. Reason: {reason}",
-            cancellationToken);
+            cancellationToken,
+            targetType: "user",
+            targetId: command.UserId.ToString("D"),
+            newValue: $"{source}:{command.Amount}:{reason}");
 
         return Result.Success(new AdminUserWalletOperationResponse(
             command.UserId,
@@ -223,7 +285,15 @@ public sealed partial class IdentityService
             return Result.Failure(IdentityErrors.OperationFailed);
         }
 
-        await WriteAuditAsync(user.Id, "user.role.assigned", $"Assigned role '{command.Role}'.", cancellationToken);
+        await WriteAuditAsync(
+            user.Id,
+            "user.role.assigned",
+            $"Assigned role '{command.Role}'.",
+            cancellationToken,
+            targetType: "user",
+            targetId: user.Id.ToString("D"),
+            oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
+            newValue: string.Join(",", currentRoles.Append(command.Role).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
         return Result.Success();
     }
 
@@ -246,13 +316,27 @@ public sealed partial class IdentityService
             return Result.Success();
         }
 
+        if (string.Equals(command.Role, SystemRoles.Admin, StringComparison.Ordinal)
+            && await IsLastAdminAsync(user.Id, cancellationToken))
+        {
+            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
+        }
+
         var removeResult = await userManager.RemoveFromRoleAsync(user, command.Role);
         if (!removeResult.Succeeded)
         {
             return Result.Failure(IdentityErrors.OperationFailed);
         }
 
-        await WriteAuditAsync(user.Id, "user.role.revoked", $"Revoked role '{command.Role}'.", cancellationToken);
+        await WriteAuditAsync(
+            user.Id,
+            "user.role.revoked",
+            $"Revoked role '{command.Role}'.",
+            cancellationToken,
+            targetType: "user",
+            targetId: user.Id.ToString("D"),
+            oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
+            newValue: string.Join(",", currentRoles.Where(role => !string.Equals(role, command.Role, StringComparison.Ordinal)).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
         return Result.Success();
     }
 
@@ -264,6 +348,7 @@ public sealed partial class IdentityService
             return Result.Failure(IdentityErrors.UserNotFound);
         }
 
+        var oldValue = user.IsPremium.ToString();
         user.IsPremium = command.IsPremium;
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
@@ -271,7 +356,15 @@ public sealed partial class IdentityService
             return Result.Failure(IdentityErrors.OperationFailed);
         }
 
-        await WriteAuditAsync(user.Id, "user.premium.updated", $"Premium status changed to '{command.IsPremium}'.", cancellationToken);
+        await WriteAuditAsync(
+            user.Id,
+            "user.premium.updated",
+            $"Premium status changed to '{command.IsPremium}'.",
+            cancellationToken,
+            targetType: "user",
+            targetId: user.Id.ToString("D"),
+            oldValue: oldValue,
+            newValue: command.IsPremium.ToString());
         return Result.Success();
     }
 
@@ -283,6 +376,15 @@ public sealed partial class IdentityService
             return Result.Failure(IdentityErrors.UserNotFound);
         }
 
+        var oldValue = user.IsActive.ToString();
+        var roles = await userManager.GetRolesAsync(user);
+        if (!command.IsActive
+            && roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
+            && await IsLastAdminAsync(user.Id, cancellationToken))
+        {
+            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
+        }
+
         user.IsActive = command.IsActive;
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
@@ -290,7 +392,15 @@ public sealed partial class IdentityService
             return Result.Failure(IdentityErrors.OperationFailed);
         }
 
-        await WriteAuditAsync(user.Id, "user.active.updated", $"Active status changed to '{command.IsActive}'.", cancellationToken);
+        await WriteAuditAsync(
+            user.Id,
+            command.IsActive ? "user.unblocked" : "user.blocked",
+            $"Active status changed to '{command.IsActive}'.",
+            cancellationToken,
+            targetType: "user",
+            targetId: user.Id.ToString("D"),
+            oldValue: oldValue,
+            newValue: command.IsActive.ToString());
         return Result.Success();
     }
 
@@ -304,6 +414,13 @@ public sealed partial class IdentityService
         if (user is null)
         {
             return Result.Failure(IdentityErrors.UserNotFound);
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+        if (roles.Contains(SystemRoles.Admin, StringComparer.Ordinal)
+            && await IsLastAdminAsync(user.Id, cancellationToken))
+        {
+            return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
         }
 
         var avatarUrl = user.AvatarUrl;
@@ -342,9 +459,34 @@ public sealed partial class IdentityService
 
         await dbContext.SaveChangesAsync(cancellationToken);
         await avatarStorage.DeleteAsync(avatarUrl, CancellationToken.None);
-        await WriteAuditAsync(userId, auditAction, auditDetails, cancellationToken);
+        await WriteAuditAsync(
+            userId,
+            auditAction,
+            auditDetails,
+            cancellationToken,
+            targetType: "user",
+            targetId: userId.ToString("D"));
 
         return Result.Success();
+    }
+
+    private async Task<bool> IsLastAdminAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var adminRole = await roleManager.FindByNameAsync(SystemRoles.Admin);
+        if (adminRole is null)
+        {
+            return true;
+        }
+
+        return !await dbContext.UserRoles
+            .AsNoTracking()
+            .Where(x => x.RoleId == adminRole.Id && x.UserId != userId)
+            .Join(
+                userManager.Users.AsNoTracking().Where(user => user.IsActive),
+                userRole => userRole.UserId,
+                user => user.Id,
+                (_, _) => true)
+            .AnyAsync(cancellationToken);
     }
 
     private static int NormalizeTake(int take, int fallback, int max)

@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 
@@ -129,8 +130,10 @@ public sealed class StoreSubscriptionVerifier(
         {
             logger?.LogWarning(
                 ex,
-                "Google Play subscription verification failed for product {ProductId}.",
-                request.ProductId);
+                "Google Play subscription verification failed for product {ProductId}. Provider={Provider} CorrelationId={CorrelationId}",
+                request.ProductId,
+                "google_play",
+                CorrelationContext.ResolveOrCreate());
 
             return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
@@ -230,8 +233,10 @@ public sealed class StoreSubscriptionVerifier(
         {
             logger?.LogWarning(
                 ex,
-                "Google Play product verification failed for product {ProductId}.",
-                request.ProductId);
+                "Google Play product verification failed for product {ProductId}. Provider={Provider} CorrelationId={CorrelationId}",
+                request.ProductId,
+                "google_play",
+                CorrelationContext.ResolveOrCreate());
 
             return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable);
         }
@@ -361,9 +366,11 @@ public sealed class StoreSubscriptionVerifier(
         {
             logger?.LogWarning(
                 ex,
-                "App Store receipt verification failed for endpoint {Endpoint} and product {ProductId}.",
-                url,
-                productId);
+                "App Store receipt verification failed for endpoint {Endpoint} and product {ProductId}. Provider={Provider} CorrelationId={CorrelationId}",
+                ResolveAppStoreEndpointName(url),
+                productId,
+                "app_store",
+                CorrelationContext.ResolveOrCreate());
 
             return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
@@ -443,12 +450,21 @@ public sealed class StoreSubscriptionVerifier(
         {
             logger?.LogWarning(
                 ex,
-                "App Store product verification failed for endpoint {Endpoint} and product {ProductId}.",
-                url,
-                request.ProductId);
+                "App Store product verification failed for endpoint {Endpoint} and product {ProductId}. Provider={Provider} CorrelationId={CorrelationId}",
+                ResolveAppStoreEndpointName(url),
+                request.ProductId,
+                "app_store",
+                CorrelationContext.ResolveOrCreate());
 
             return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StoreVerificationUnavailable), false);
         }
+    }
+
+    private static string ResolveAppStoreEndpointName(string url)
+    {
+        return url.Contains("sandbox", StringComparison.OrdinalIgnoreCase)
+            ? "sandbox"
+            : "production";
     }
 
     private static bool TryMatchAppStoreProductTransaction(
