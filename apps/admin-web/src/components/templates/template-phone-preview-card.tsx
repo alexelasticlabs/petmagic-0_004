@@ -1,10 +1,10 @@
-import Image from "next/image";
-
 import { formatDuration, formatPromoBadge } from "@/components/templates/template-editor-model";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import styles from "@/components/templates/template-phone-preview-card.module.css";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { type TemplatePromoBadgeMode } from "@/lib/api-client";
 import { joinClassNames } from "@/lib/join-class-names";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplatePreviewCardProps = {
   title: string;
@@ -41,13 +41,15 @@ export function TemplatePreviewCard({
   musicDescription,
   className,
 }: TemplatePreviewCardProps) {
-  const normalizedTitle = title.trim();
-  const normalizedDescription = shortDescription.trim();
-  const normalizedCategory = category.trim();
-  const normalizedMusicDescription = musicDescription?.trim();
+  const normalizedTitle = sanitizeSensitiveText(title, 96);
+  const normalizedDescription = sanitizeSensitiveText(shortDescription, 180);
+  const normalizedCategory = sanitizeSensitiveText(category, 64);
+  const normalizedMusicDescription = musicDescription
+    ? sanitizeSensitiveText(musicDescription, 160)
+    : "";
   const normalizedTags = (tags ?? [])
-    .map((tag) => tag.trim())
-    .filter(Boolean)
+    .map((tag) => sanitizeSensitiveText(tag, 40))
+    .filter((tag) => tag !== "—")
     .slice(0, 4);
   const resolvedTemplateKind =
     templateKind ??
@@ -207,28 +209,30 @@ function renderPhonePreviewMedia(
 
   if (inferTemplateMediaKind(contentType?.trim() ?? "", trimmedUrl) === "video") {
     return (
-      <video
-        src={trimmedUrl}
+      <TemplateSecureMedia
+        url={trimmedUrl}
+        kind="video"
         className={styles.phoneMediaAsset}
         muted
         autoPlay
         loop
         playsInline
         preload="metadata"
-        aria-label={alt}
+        ariaLabel={alt}
+        logContext={{ contentType, surface: "phone_preview" }}
       />
     );
   }
 
   return (
-    <Image
-      src={trimmedUrl}
+    <TemplateSecureMedia
+      url={trimmedUrl}
+      kind="image"
       alt={alt}
       width={320}
       height={568}
-      sizes="(max-width: 760px) 100vw, 18rem"
-      unoptimized
       className={styles.phoneMediaAsset}
+      logContext={{ contentType, surface: "phone_preview" }}
     />
   );
 }

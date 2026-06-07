@@ -16,6 +16,7 @@ import {
   AdminStatusBadge,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-detail-page.module.css";
@@ -23,6 +24,7 @@ import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { useAuthSession } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { getAdminUserDisplayName, maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type UserDetailPageProps = {
   locale: Locale;
@@ -37,7 +39,9 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
-  const { analytics, hasError, isLoading, refresh, user } = useAdminUserProfile({ userId });
+  const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
+    userId,
+  });
 
   useEffect(() => {
     if (!session) {
@@ -93,20 +97,34 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           tone="danger"
           title={text.userAnalyticsLoadError}
           action={
-            <Link href={`/${locale}/users`} className={styles.backLink}>
-              {text.navUsers}
-            </Link>
+            <div className={styles.errorActions}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  void refresh().catch(() => undefined);
+                }}
+                disabled={isFetching}
+              >
+                {text.supportRetryAction}
+              </Button>
+              <Link href={`/${locale}/users`} className={styles.backLink}>
+                {text.navUsers}
+              </Link>
+            </div>
           }
         />
       </AdminPage>
     );
   }
 
+  const safeUserName = sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
+
   return (
     <AdminPage className={styles.page}>
       <AdminPageHero
         eyebrow={text.userDetailsEyebrow}
-        title={user.displayName?.trim() || user.email}
+        title={safeUserName}
         description={text.userDetailsDescription}
         actions={
           <Link href={`/${locale}/users`} className={styles.backLink}>
@@ -120,16 +138,16 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         <div className={styles.profileHeader}>
           <UserAvatarView
             avatar={user.avatar}
-            label={`${text.avatarLabel}: ${user.displayName ?? user.email}`}
-            fallbackLabel={user.displayName ?? user.email}
+            label={`${text.avatarLabel}: ${safeUserName}`}
+            fallbackLabel={safeUserName}
             size="lg"
           />
           <div className={styles.profileCopy}>
-            <h2 className={styles.profileTitle}>{user.displayName?.trim() || user.email}</h2>
-            <p className={styles.profileEmail}>{user.email}</p>
+            <h2 className={styles.profileTitle}>{safeUserName}</h2>
+            <p className={styles.profileEmail}>{maskEmail(user.email)}</p>
             <div className={styles.profileBadges}>
               <AdminBadge tone={user.isActive ? "success" : "danger"}>
-                {user.isActive ? text.activeLabel : text.deactivate}
+                {user.isActive ? text.activeLabel : text.blockedLabel}
               </AdminBadge>
               <AdminBadge tone={user.isPremium ? "warning" : "neutral"}>
                 {user.isPremium ? text.premiumLabel : text.freeLabel}
@@ -138,7 +156,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                 {user.emailConfirmed ? text.emailConfirmedLabel : text.noLabel}
               </AdminBadge>
               {user.roles.map((role) => (
-                <AdminBadge key={role}>{role}</AdminBadge>
+                <AdminBadge key={role}>{sanitizeSensitiveText(role, 32)}</AdminBadge>
               ))}
             </div>
           </div>
@@ -199,6 +217,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         locale={locale}
         userId={user.userId}
         analytics={analytics}
+        canAdjustWallet={session?.user.roles.includes("Admin") ?? false}
         onUpdated={async () => {
           await refresh();
         }}
@@ -213,10 +232,10 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                 className={styles.timelineItem}
               >
                 <div className={styles.timelineHeader}>
-                  <strong>{item.title}</strong>
+                  <strong>{sanitizeSensitiveText(item.title, 120)}</strong>
                   <span>{formatDateTime(item.occurredAtUtc, locale)}</span>
                 </div>
-                {item.details ? <p>{item.details}</p> : null}
+                {item.details ? <p>{sanitizeSensitiveText(item.details, 220)}</p> : null}
               </article>
             ))}
           </div>
@@ -234,11 +253,12 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                 <div className={styles.dataHeader}>
                   <strong>{purchase.sparkToGrant} spark</strong>
                   <AdminStatusBadge color={purchase.status === "succeeded" ? "#2dd4bf" : "#f59e0b"}>
-                    {purchase.status}
+                    {sanitizeSensitiveText(purchase.status, 48)}
                   </AdminStatusBadge>
                 </div>
                 <p>
-                  {purchase.priceAmount} {purchase.currencyCode} • {purchase.paymentProvider}
+                  {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)} •{" "}
+                  {sanitizeSensitiveText(purchase.paymentProvider, 48)}
                 </p>
                 <span>
                   {formatDateTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}
@@ -254,7 +274,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
             items={analytics.recentGenerations.slice(0, RECENT_ITEMS_LIMIT).map((generation) => (
               <article key={generation.generationId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
-                  <strong>{generation.templateTitle}</strong>
+                  <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
                   <AdminStatusBadge
                     color={
                       generation.status === "Completed"
@@ -264,11 +284,11 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                           : "#8da1ba"
                     }
                   >
-                    {generation.status}
+                    {sanitizeSensitiveText(generation.status, 48)}
                   </AdminStatusBadge>
                 </div>
                 <p>
-                  {generation.templateType} • {generation.tokenCost} PawSpark
+                  {sanitizeSensitiveText(generation.templateType, 48)} • {generation.tokenCost} PawSpark
                 </p>
                 <span>
                   {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
@@ -286,13 +306,17 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
             items={analytics.recentTemplateEvents.slice(0, RECENT_ITEMS_LIMIT).map((event) => (
               <article key={event.eventId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
-                  <strong>{event.eventType}</strong>
-                  <span>{event.templateTitle}</span>
+                  <strong>{sanitizeSensitiveText(event.eventType, 80)}</strong>
+                  <span>{sanitizeSensitiveText(event.templateTitle, 120)}</span>
                 </div>
                 <p>
-                  {event.source} • {event.deviceClass} • {event.countryCode}
+                  {sanitizeSensitiveText(event.source, 80)} •{" "}
+                  {sanitizeSensitiveText(event.deviceClass, 48)} •{" "}
+                  {sanitizeSensitiveText(event.countryCode, 16)}
                 </p>
-                {event.feedbackMessage ? <p>{event.feedbackMessage}</p> : null}
+                {event.feedbackMessage ? (
+                  <p>{sanitizeSensitiveText(event.feedbackMessage, 220)}</p>
+                ) : null}
                 <span>{formatDateTime(event.createdAtUtc, locale)}</span>
               </article>
             ))}
@@ -303,7 +327,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           {analytics.failureBreakdown.length ? (
             <AdminMetricStrip
               items={analytics.failureBreakdown.map((item) => ({
-                label: item.failureCode,
+                label: sanitizeSensitiveText(item.failureCode, 120),
                 value: `${item.count} • ${formatDateTime(item.lastOccurredAtUtc, locale)}`,
               }))}
             />
@@ -319,10 +343,10 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
           items={analytics.recentAuditEvents.slice(0, AUDIT_ITEMS_LIMIT).map((event) => (
             <article key={event.auditEventId} className={styles.dataCard}>
               <div className={styles.dataHeader}>
-                <strong>{event.action}</strong>
+                <strong>{sanitizeSensitiveText(event.action, 120)}</strong>
                 <span>{formatDateTime(event.occurredAtUtc, locale)}</span>
               </div>
-              <p>{event.details}</p>
+              <p>{sanitizeSensitiveText(event.details, 220)}</p>
             </article>
           ))}
         />

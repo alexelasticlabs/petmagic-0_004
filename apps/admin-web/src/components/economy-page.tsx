@@ -16,6 +16,7 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { EconomyPageProviderConfigsSection } from "@/components/economy-page-provider-configs-section";
 import { EconomyPageSubscriptionPlansSection } from "@/components/economy-page-subscription-plans-section";
 import { EconomyPageSubscriptionsSection } from "@/components/economy-page-subscriptions-section";
@@ -23,10 +24,19 @@ import {
   getEconomyText,
   ledgerSourceOptions,
   purchaseStatusOptions,
+  subscriptionProviderOptions,
 } from "@/components/economy-page.content";
 import {
+  ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH,
+  ECONOMY_PACK_INTEGER_MAX_LENGTH,
+  ECONOMY_PACK_PRICE_MAX_LENGTH,
+  canCancelSubscription,
+  canRefundPurchase,
   createDefaultProviderConfigDraft,
+  normalizeEconomyIntegerInput,
+  normalizeEconomyPriceInput,
   toDraft,
+  toCurrencyPackPayload,
   toProviderConfigCreatePayload,
   toProviderConfigDraft,
   toProviderConfigMatchPayload,
@@ -43,19 +53,26 @@ import {
 import styles from "@/components/economy-page.module.css";
 import { Button } from "@/components/ui/button";
 import { useEconomyPageController } from "@/components/use-economy-page-controller";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
+  adminCancelPremiumSubscription,
   cloneAdminPaymentProviderConfig,
   createAdminPaymentProviderConfig,
   deleteAdminPaymentProviderConfig,
+  refundAdminEconomyPurchase,
   testAdminPaymentProviderConfigMatch,
   updateAdminCurrencyPack,
   updateAdminPaymentProviderConfig,
   updateAdminSubscriptionPlan,
+  useAuthSession,
+  type AdminEconomyPurchase,
   type AdminPaymentProviderConfigurationMatch,
+  type AdminEconomySubscription,
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type EconomyPageProps = {
   locale: Locale;
@@ -78,10 +95,14 @@ function TableOrEmpty({ hasItems, emptyTitle, children }: TableOrEmptyProps) {
 export function EconomyPage({ locale }: EconomyPageProps) {
   const text = getEconomyText(locale);
   const queryClient = useQueryClient();
+  const session = useAuthSession();
+  const canManageEconomy = session?.user.roles.includes("Admin") ?? false;
   const {
     eventProvider,
     eventStatus,
+    refetchAll,
     hasError,
+    isFetching,
     isLoading,
     ledgerItems,
     ledgerSource,
@@ -89,16 +110,30 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     packs,
     providerConfigs,
     purchaseItems,
+    purchasePage,
+    purchaseProvider,
+    purchaseSearch,
     purchaseStatus,
+    purchasesIsFetching,
     premiumMetrics,
+    purchasesHasMore,
     setEventProvider,
     setEventStatus,
     setLedgerSource,
+    setPurchasePage,
+    setPurchaseProvider,
+    setPurchaseSearch,
     setPurchaseStatus,
+    setSubscriptionPage,
     setSubscriptionProvider,
+    setSubscriptionSearch,
     setSubscriptionStatus,
     subscriptionEvents,
+    subscriptionPage,
     subscriptionItems,
+    subscriptionsIsFetching,
+    subscriptionSearch,
+    subscriptionsHasMore,
     subscriptionPlans,
     subscriptionProvider,
     subscriptionStatus,
@@ -124,6 +159,8 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
     null
   );
+  const [cancelTarget, setCancelTarget] = useState<AdminEconomySubscription | null>(null);
+  const [refundTarget, setRefundTarget] = useState<AdminEconomyPurchase | null>(null);
 
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "economy",
@@ -141,35 +178,43 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     return () => window.clearTimeout(timer);
   }, [feedback]);
 
+  function assertCanManageEconomy() {
+    if (!canManageEconomy) {
+      throw new Error(text.financialActionsAdminOnly);
+    }
+  }
+
+  function reportEconomyAccessDenied(error: unknown) {
+    setFeedback({
+      tone: "danger",
+      message: getAdminErrorMessage(error, text.financialActionsAdminOnly),
+    });
+  }
+
   const savePackMutation = useMutation({
     mutationFn: async (packId: string) => {
+      assertCanManageEconomy();
       const pack = packs.find((item) => item.packId === packId);
       const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
       if (!draft) {
-        throw new Error("Missing draft");
+        throw new Error(text.packMissingDraft);
       }
 
-      return updateAdminCurrencyPack(packId, {
-        displayName: draft.displayName.trim(),
-        priceAmount: Number(draft.priceAmount),
-        grantedSpark: Number(draft.grantedSpark),
-        bonusSpark: Number(draft.bonusSpark),
-        isActive: draft.isActive,
-        sortOrder: Number(draft.sortOrder),
-      });
+      return updateAdminCurrencyPack(packId, toCurrencyPackPayload(draft, text));
     },
     onSuccess: async (pack) => {
       setFeedback({ tone: "success", message: text.packSaved });
       setDrafts((current) => ({ ...current, [pack.packId]: toDraft(pack) }));
       await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPacks });
     },
-    onError: () => {
-      setFeedback({ tone: "danger", message: text.packSaveError });
+    onError: (error) => {
+      setFeedback({ tone: "danger", message: getAdminErrorMessage(error, text.packSaveError) });
     },
   });
 
   const savePlanMutation = useMutation({
     mutationFn: async (planId: string) => {
+      assertCanManageEconomy();
       const plan = subscriptionPlans.find((item) => item.planId === planId);
       const draft = planDrafts[planId] ?? (plan ? toSubscriptionPlanDraft(plan) : null);
       if (!draft) {
@@ -186,13 +231,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.planSaveError,
+        message: getAdminErrorMessage(error, text.planSaveError),
       });
     },
   });
 
   const saveProviderConfigMutation = useMutation({
     mutationFn: async (configurationId: string) => {
+      assertCanManageEconomy();
       const config = providerConfigs.find((item) => item.configurationId === configurationId);
       const draft =
         providerConfigDrafts[configurationId] ?? (config ? toProviderConfigDraft(config) : null);
@@ -218,14 +264,18 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.providerConfigSaveError,
+        message: getAdminErrorMessage(error, text.providerConfigSaveError),
       });
     },
   });
 
   const createProviderConfigMutation = useMutation({
-    mutationFn: async () =>
-      createAdminPaymentProviderConfig(toProviderConfigCreatePayload(createProviderDraft, text)),
+    mutationFn: async () => {
+      assertCanManageEconomy();
+      return createAdminPaymentProviderConfig(
+        toProviderConfigCreatePayload(createProviderDraft, text)
+      );
+    },
     onSuccess: async () => {
       setFeedback({ tone: "success", message: text.providerConfigCreated });
       setCreateProviderDraft(createDefaultProviderConfigDraft());
@@ -236,13 +286,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.providerConfigCreateError,
+        message: getAdminErrorMessage(error, text.providerConfigCreateError),
       });
     },
   });
 
   const cloneProviderConfigMutation = useMutation({
     mutationFn: async (payload: { configurationId: string; region: string }) => {
+      assertCanManageEconomy();
       return cloneAdminPaymentProviderConfig(payload.configurationId, { region: payload.region });
     },
     onSuccess: async (_, variables) => {
@@ -255,13 +306,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.providerConfigCloneError,
+        message: getAdminErrorMessage(error, text.providerConfigCloneError),
       });
     },
   });
 
   const deleteProviderConfigMutation = useMutation({
     mutationFn: async (configurationId: string) => {
+      assertCanManageEconomy();
       await deleteAdminPaymentProviderConfig(configurationId);
     },
     onSuccess: async () => {
@@ -273,13 +325,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.providerConfigDeleteError,
+        message: getAdminErrorMessage(error, text.providerConfigDeleteError),
       });
     },
   });
 
   const testProviderConfigMutation = useMutation({
     mutationFn: async () => {
+      assertCanManageEconomy();
       const payload = toProviderConfigMatchPayload(matchDraft, text);
       return testAdminPaymentProviderConfigMatch(payload);
     },
@@ -290,10 +343,102 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       setMatchResult(null);
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.providerConfigTestError,
+        message: getAdminErrorMessage(error, text.providerConfigTestError),
       });
     },
   });
+
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async (subscription: AdminEconomySubscription) => {
+      assertCanManageEconomy();
+      if (!canCancelSubscription(subscription)) {
+        throw new Error(text.cancelSubscriptionError);
+      }
+
+      await adminCancelPremiumSubscription(subscription.userId, subscription.provider);
+    },
+    onSuccess: async (_, subscription) => {
+      setFeedback({ tone: "success", message: text.cancelSubscriptionSuccess });
+      setCancelTarget(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscription-events"] }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyUserSubscriptionSummary(subscription.userId),
+        }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subscription.userId) }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.userAnalytics(subscription.userId),
+        }),
+      ]);
+    },
+    onError: (error) => {
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(error, text.cancelSubscriptionError),
+      });
+    },
+  });
+
+  const refundPurchaseMutation = useMutation({
+    mutationFn: async (purchase: AdminEconomyPurchase) => {
+      assertCanManageEconomy();
+      if (!canRefundPurchase(purchase)) {
+        throw new Error(text.refundPurchaseError);
+      }
+
+      await refundAdminEconomyPurchase(purchase.orderId, "admin refund");
+    },
+    onSuccess: async (_, purchase) => {
+      setFeedback({ tone: "success", message: text.refundPurchaseSuccess });
+      setRefundTarget(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "purchases"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(purchase.userId) }),
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.userAnalytics(purchase.userId),
+        }),
+      ]);
+    },
+    onError: (error) => {
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(error, text.refundPurchaseError),
+      });
+    },
+  });
+
+  function requestCancelSubscription(subscription: AdminEconomySubscription) {
+    try {
+      assertCanManageEconomy();
+    } catch (error) {
+      reportEconomyAccessDenied(error);
+      return;
+    }
+
+    if (cancelSubscriptionMutation.isPending || !canCancelSubscription(subscription)) {
+      return;
+    }
+
+    setCancelTarget(subscription);
+  }
+
+  function requestRefundPurchase(purchase: AdminEconomyPurchase) {
+    try {
+      assertCanManageEconomy();
+    } catch (error) {
+      reportEconomyAccessDenied(error);
+      return;
+    }
+
+    if (refundPurchaseMutation.isPending || !canRefundPurchase(purchase)) {
+      return;
+    }
+
+    setRefundTarget(purchase);
+  }
 
   if (isLoading) {
     return (
@@ -312,7 +457,23 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     return (
       <AdminPage className={styles.page}>
         <AdminPageHero eyebrow={text.eyebrow} title={text.title} description={text.description} />
-        <AdminStateCard tone="danger" title={text.errorTitle} description={text.errorDescription} />
+        <AdminStateCard
+          tone="danger"
+          title={text.errorTitle}
+          description={text.errorDescription}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isFetching}
+              onClick={() => {
+                void refetchAll().catch(() => undefined);
+              }}
+            >
+              {locale === "ru" ? "Повторить" : "Retry"}
+            </Button>
+          }
+        />
       </AdminPage>
     );
   }
@@ -413,6 +574,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           onChange={(event) =>
                             updateDraft(setDrafts, pack.packId, { displayName: event.target.value })
                           }
+                          maxLength={ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH}
                           className={styles.input}
                         />
                       </td>
@@ -420,8 +582,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         <input
                           value={draft.priceAmount}
                           onChange={(event) =>
-                            updateDraft(setDrafts, pack.packId, { priceAmount: event.target.value })
+                            updateDraft(setDrafts, pack.packId, {
+                              priceAmount: normalizeEconomyPriceInput(event.target.value),
+                            })
                           }
+                          maxLength={ECONOMY_PACK_PRICE_MAX_LENGTH}
                           inputMode="decimal"
                           className={styles.input}
                         />
@@ -431,9 +596,10 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           value={draft.grantedSpark}
                           onChange={(event) =>
                             updateDraft(setDrafts, pack.packId, {
-                              grantedSpark: event.target.value,
+                              grantedSpark: normalizeEconomyIntegerInput(event.target.value),
                             })
                           }
+                          maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
                         />
@@ -442,8 +608,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         <input
                           value={draft.bonusSpark}
                           onChange={(event) =>
-                            updateDraft(setDrafts, pack.packId, { bonusSpark: event.target.value })
+                            updateDraft(setDrafts, pack.packId, {
+                              bonusSpark: normalizeEconomyIntegerInput(event.target.value),
+                            })
                           }
+                          maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
                         />
@@ -452,8 +621,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                         <input
                           value={draft.sortOrder}
                           onChange={(event) =>
-                            updateDraft(setDrafts, pack.packId, { sortOrder: event.target.value })
+                            updateDraft(setDrafts, pack.packId, {
+                              sortOrder: normalizeEconomyIntegerInput(event.target.value),
+                            })
                           }
+                          maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
                         />
@@ -529,7 +701,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                       </td>
                       <td>{item.balanceAfter}</td>
                       <td>{humanizeSource(item.source, locale)}</td>
-                      <td>{item.reason}</td>
+                      <td>{safeText(item.reason)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -542,13 +714,32 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           title={text.purchasesTitle}
           description={text.purchasesDescription}
           action={
-            <AdminSelectField
-              label={text.purchaseFilterLabel}
-              value={purchaseStatus}
-              onChange={setPurchaseStatus}
-              options={purchaseStatusOptions[locale]}
-              className={styles.compactSelect}
-            />
+            <div className={styles.filterRow}>
+              <AdminSelectField
+                label={text.purchaseFilterLabel}
+                value={purchaseStatus}
+                onChange={setPurchaseStatus}
+                options={purchaseStatusOptions[locale]}
+                className={styles.compactSelect}
+              />
+              <AdminSelectField
+                label={text.purchaseProviderFilterLabel}
+                value={purchaseProvider}
+                onChange={setPurchaseProvider}
+                options={subscriptionProviderOptions[locale]}
+                className={styles.compactSelect}
+              />
+              <label className={styles.filterField}>
+                <span>{text.searchFilterLabel}</span>
+                <input
+                  className={styles.input}
+                  value={purchaseSearch}
+                  onChange={(event) => setPurchaseSearch(event.target.value)}
+                  maxLength={100}
+                  placeholder={text.purchaseSearchPlaceholder}
+                />
+              </label>
+            </div>
           }
         >
           <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
@@ -559,33 +750,73 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                     <th>{text.timeColumn}</th>
                     <th>{text.userColumn}</th>
                     <th>{text.packColumn}</th>
+                    <th>{text.providerColumn}</th>
                     <th>{text.amountColumn}</th>
                     <th>{text.statusColumn}</th>
+                    <th>{text.actionsColumn}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {purchaseItems.map((item) => (
-                    <tr key={item.orderId}>
-                      <td>{formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}</td>
-                      <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                      <td>
-                        <div className={styles.packMeta}>
-                          <strong>{item.packDisplayName}</strong>
-                          <span>
-                            {item.sparkToGrant} {text.tokensShort}
-                          </span>
-                        </div>
-                      </td>
-                      <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
-                      <td>
-                        <AdminStatusBadge color={statusColor(item.status)}>
-                          {humanizeStatus(item.status, locale)}
-                        </AdminStatusBadge>
-                      </td>
-                    </tr>
-                  ))}
+                  {purchaseItems.map((item) => {
+                    const canRefund = canRefundPurchase(item);
+
+                    return (
+                      <tr key={item.orderId}>
+                        <td>{formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}</td>
+                        <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                        <td>
+                          <div className={styles.packMeta}>
+                            <strong>{safeText(item.packDisplayName)}</strong>
+                            <span>
+                              {item.sparkToGrant} {text.tokensShort}
+                            </span>
+                          </div>
+                        </td>
+                        <td>{humanizeProvider(item.paymentProvider, locale)}</td>
+                        <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
+                        <td>
+                          <AdminStatusBadge color={statusColor(item.status)}>
+                            {humanizeStatus(item.status, locale)}
+                          </AdminStatusBadge>
+                        </td>
+                        <td>
+                          {canRefund ? (
+	                            <Button
+	                              type="button"
+	                              size="sm"
+	                              variant="danger"
+	                              disabled={refundPurchaseMutation.isPending}
+	                              onClick={() => requestRefundPurchase(item)}
+	                            >
+                              {text.refundPurchaseAction}
+                            </Button>
+                          ) : (
+                            <span className={styles.mutedText}>-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+            <div className={styles.pager}>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={purchasePage === 0 || purchasesIsFetching}
+                onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
+              >
+                {text.previousPage}
+              </button>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={!purchasesHasMore || purchasesIsFetching}
+                onClick={() => setPurchasePage((current) => current + 1)}
+              >
+                {text.nextPage}
+              </button>
             </div>
           </TableOrEmpty>
         </AdminCard>
@@ -631,9 +862,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           onCreateProviderConfig={() => createProviderConfigMutation.mutate()}
           onTestProviderConfig={() => testProviderConfigMutation.mutate()}
           onCloneProviderConfig={(payload) => cloneProviderConfigMutation.mutate(payload)}
-          onDeleteProviderConfig={(configurationId) =>
-            deleteProviderConfigMutation.mutate(configurationId)
-          }
+          onDeleteProviderConfig={async (configurationId) => {
+            try {
+              await deleteProviderConfigMutation.mutateAsync(configurationId);
+              return true;
+            } catch {
+              return false;
+            }
+          }}
           humanizeProvider={humanizeProvider}
         />
       </AdminPageGrid>
@@ -646,24 +882,98 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           subscriptionStatus={subscriptionStatus}
           eventProvider={eventProvider}
           eventStatus={eventStatus}
+          subscriptionSearch={subscriptionSearch}
+          subscriptionPage={subscriptionPage}
+          subscriptionsHasMore={subscriptionsHasMore}
           subscriptionItems={subscriptionItems}
+          subscriptionsIsFetching={subscriptionsIsFetching}
           subscriptionEvents={subscriptionEvents}
           setSubscriptionProvider={setSubscriptionProvider}
           setSubscriptionStatus={setSubscriptionStatus}
+          setSubscriptionSearch={setSubscriptionSearch}
+          setSubscriptionPage={setSubscriptionPage}
           setEventProvider={setEventProvider}
           setEventStatus={setEventStatus}
+	          onCancelSubscription={requestCancelSubscription}
           shortGuid={shortGuid}
           humanizeProvider={humanizeProvider}
           humanizeStatus={humanizeStatus}
           statusColor={statusColor}
         />
       </AdminPageGrid>
+
+      <ConfirmationDialog
+        open={Boolean(cancelTarget)}
+        title={text.cancelSubscriptionTitle}
+        description={
+          cancelTarget
+            ? `${text.cancelSubscriptionDescription} ${shortGuid(cancelTarget.userId)} / ${safeText(
+                cancelTarget.planName ?? cancelTarget.planId,
+                120
+              )}`
+            : text.cancelSubscriptionDescription
+        }
+        confirmLabel={text.cancelSubscriptionAction}
+        cancelLabel={text.confirmationCancel}
+        tone="danger"
+        isSubmitting={cancelSubscriptionMutation.isPending}
+        onCancel={() => {
+          if (!cancelSubscriptionMutation.isPending) {
+            setCancelTarget(null);
+          }
+        }}
+        onConfirm={() => {
+          if (cancelSubscriptionMutation.isPending) {
+            return;
+          }
+
+          if (cancelTarget && canCancelSubscription(cancelTarget)) {
+            cancelSubscriptionMutation.mutate(cancelTarget);
+          }
+        }}
+      />
+      <ConfirmationDialog
+        open={Boolean(refundTarget)}
+        title={text.refundPurchaseTitle}
+        description={
+          refundTarget
+            ? `${text.refundPurchaseDescription} ${shortGuid(refundTarget.orderId)} / ${formatCurrency(
+                refundTarget.priceAmount,
+                locale,
+                refundTarget.currencyCode
+              )}`
+            : text.refundPurchaseDescription
+        }
+        confirmLabel={text.refundPurchaseAction}
+        cancelLabel={text.confirmationCancel}
+        tone="danger"
+        isSubmitting={refundPurchaseMutation.isPending}
+        onCancel={() => {
+          if (!refundPurchaseMutation.isPending) {
+            setRefundTarget(null);
+          }
+        }}
+        onConfirm={() => {
+          if (refundPurchaseMutation.isPending) {
+            return;
+          }
+
+          if (refundTarget && canRefundPurchase(refundTarget)) {
+            refundPurchaseMutation.mutate(refundTarget);
+          }
+        }}
+      />
     </AdminPage>
   );
 }
 
 function shortGuid(value: string) {
-  return value.slice(0, 8);
+  return safeText(value, 32).slice(0, 8);
+}
+
+function safeText(value: string | null | undefined, maxLength = 120) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
 }
 
 function formatTokens(value: number, locale: Locale) {
@@ -671,11 +981,23 @@ function formatTokens(value: number, locale: Locale) {
 }
 
 function formatCurrency(value: number, locale: Locale, currencyCode: string) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    style: "currency",
-    currency: currencyCode,
+  const amount = Number.isFinite(value) ? value : 0;
+  const safeCurrencyCode = safeText(currencyCode.toUpperCase(), 12);
+  if (/^[A-Z]{3}$/.test(safeCurrencyCode)) {
+    try {
+      return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+        style: "currency",
+        currency: safeCurrencyCode,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      // Fall through to a non-throwing display for unexpected backend currency codes.
+    }
+  }
+
+  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(amount)} ${safeCurrencyCode}`;
 }
 
 function humanizeSource(value: string, locale: Locale) {
@@ -691,7 +1013,7 @@ function humanizeSource(value: string, locale: Locale) {
     admin_debit: { ru: "Ручное списание", en: "Manual debit" },
   };
 
-  return labels[value]?.[locale] ?? value;
+  return labels[value]?.[locale] ?? safeText(value, 80);
 }
 
 function humanizeProvider(value: string, locale: Locale) {
@@ -701,7 +1023,7 @@ function humanizeProvider(value: string, locale: Locale) {
     stripe: { ru: "Stripe", en: "Stripe" },
   };
 
-  return labels[value]?.[locale] ?? value;
+  return labels[value]?.[locale] ?? safeText(value, 80);
 }
 
 function humanizeBillingPeriod(value: string, locale: Locale) {
@@ -710,7 +1032,7 @@ function humanizeBillingPeriod(value: string, locale: Locale) {
     yearly: { ru: "Год", en: "Yearly" },
   };
 
-  return labels[value]?.[locale] ?? value;
+  return labels[value]?.[locale] ?? safeText(value, 48);
 }
 
 function humanizeStatus(value: string, locale: Locale) {
@@ -718,6 +1040,7 @@ function humanizeStatus(value: string, locale: Locale) {
     pending: { ru: "Ожидает", en: "Pending" },
     succeeded: { ru: "Успешно", en: "Succeeded" },
     failed: { ru: "Ошибка", en: "Failed" },
+    refunded: { ru: "Возврат", en: "Refunded" },
     active: { ru: "Активна", en: "Active" },
     trialing: { ru: "Пробный период", en: "Trialing" },
     past_due: { ru: "Просрочка", en: "Past due" },
@@ -742,6 +1065,7 @@ function statusColor(value: string) {
       return "#f87171";
     case "canceled":
     case "expired":
+    case "refunded":
       return "#64748b";
     default:
       return "#f59e0b";

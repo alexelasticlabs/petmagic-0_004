@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 
 import {
   CalendarIcon,
@@ -27,6 +27,12 @@ import {
   TemplateAnalyticsRecentRunsSection,
 } from "@/components/templates/template-analytics-detail-sections";
 import {
+  sanitizeEventAnalyticsForExport,
+  sanitizeFailureBreakdownForExport,
+  sanitizeRecentRunsForExport,
+  sanitizeTemplateForAnalyticsExport,
+} from "@/components/templates/template-analytics-export";
+import {
   TemplateAnalyticsInsightGridSection,
   TemplateAnalyticsOverviewSection,
   TemplateAnalyticsSnapshotSection,
@@ -47,6 +53,7 @@ import {
 } from "@/components/templates/template-analytics-utils";
 import { useAdminTemplateAnalyticsOverview } from "@/components/templates/use-admin-template-analytics-overview";
 import { useAdminTemplateFeedback } from "@/components/templates/use-admin-template-feedback";
+import { Button } from "@/components/ui/button";
 import {
   fetchAdminTemplateRecentGenerations,
   useAuthSession,
@@ -55,6 +62,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateAnalyticsPageProps = {
   locale: Locale;
@@ -90,9 +98,11 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     failureBreakdown,
     hasError,
     hasSecondaryError,
+    isFetching,
     isLoading,
     isSecondaryLoading,
     recentRunsPreview,
+    refresh,
     statistics,
     template,
     trendPoints,
@@ -105,6 +115,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const [recentRunsMode, setRecentRunsMode] = useState<RecentRunsMode>("latest");
   const [isRecentRunsLoading, setIsRecentRunsLoading] = useState(false);
   const [recentRunsError, setRecentRunsError] = useState<string | null>(null);
+  const recentRunsAbortControllerRef = useRef<AbortController | null>(null);
   const [feedbackFilter, setFeedbackFilter] = useState<FeedbackFilterKey>("all");
   const [feedbackSearchInput, setFeedbackSearchInput] = useState("");
   const [feedbackSearch, setFeedbackSearch] = useState("");
@@ -141,9 +152,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     }
 
     if (recentRunsMode === "failed") {
-      return allRuns.filter(
-        (run) => run.status === "Failed" || Boolean(run.failureCode) || Boolean(run.failureMessage)
-      );
+      return allRuns.filter((run) => run.status === "Failed" || Boolean(run.failureCode));
     }
 
     return recentRunsPreview;
@@ -165,6 +174,13 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     }
   }, [locale, router, session]);
 
+  useEffect(
+    () => () => {
+      recentRunsAbortControllerRef.current?.abort();
+    },
+    []
+  );
+
   if (isLoading) {
     return (
       <AdminPage className={styles.page}>
@@ -176,7 +192,20 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   if (error || !template || !statistics) {
     return (
       <AdminPage className={styles.page}>
-        <AdminStateCard tone="danger" title={error ?? text.loadError} />
+        <AdminStateCard
+          tone="danger"
+          title={error ?? text.loadError}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isFetching}
+              onClick={() => void refresh().catch(() => undefined)}
+            >
+              {text.retryAction}
+            </Button>
+          }
+        />
       </AdminPage>
     );
   }
@@ -184,6 +213,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const templateSlug = template.templateType === "Video" ? "video" : "image";
   const catalogPath = `/${locale}/templates/${templateSlug}`;
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
+  const templateTitle = sanitizeSensitiveText(template.title, 120);
   const breadcrumbsRoot =
     template.templateType === "Video"
       ? isRu
@@ -217,6 +247,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     setRecentRunsError(null);
 
     if (mode === "latest") {
+      recentRunsAbortControllerRef.current?.abort();
+      recentRunsAbortControllerRef.current = null;
+      setIsRecentRunsLoading(false);
       setRecentRunsMode("latest");
       return;
     }
@@ -226,11 +259,27 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       return;
     }
 
+    recentRunsAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    recentRunsAbortControllerRef.current = controller;
+
     try {
       setIsRecentRunsLoading(true);
-      const response = await fetchAdminTemplateRecentGenerations(templateId);
+      const response = await fetchAdminTemplateRecentGenerations(
+        templateId,
+        undefined,
+        controller.signal
+      );
+      if (controller.signal.aborted) {
+        return;
+      }
+
       setAllRecentRuns(response);
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
       clientLogger.warn("templates.analytics_recent_runs_load_failed", {
         templateId,
         mode,
@@ -239,7 +288,10 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       setRecentRunsMode("latest");
       setRecentRunsError(text.recentRunsExpandError);
     } finally {
-      setIsRecentRunsLoading(false);
+      if (recentRunsAbortControllerRef.current === controller) {
+        recentRunsAbortControllerRef.current = null;
+        setIsRecentRunsLoading(false);
+      }
     }
   }
   const kpiCards = [
@@ -317,13 +369,13 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     const payload = {
       exportedAtUtc: new Date().toISOString(),
       period,
-      template,
+      template: sanitizeTemplateForAnalyticsExport(template),
       statistics,
       selectedTotals,
       trendPoints: chartPoints,
-      recentRuns: visibleRecentRuns,
-      failureBreakdown,
-      eventAnalytics: events,
+      recentRuns: sanitizeRecentRunsForExport(visibleRecentRuns),
+      failureBreakdown: sanitizeFailureBreakdownForExport(failureBreakdown),
+      eventAnalytics: sanitizeEventAnalyticsForExport(events),
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -340,7 +392,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         <div className={styles.breadcrumbs}>
           <Link href={catalogPath}>{breadcrumbsRoot}</Link>
           <span aria-hidden="true">/</span>
-          <Link href={editorPath}>{template.title}</Link>
+          <Link href={editorPath}>{templateTitle}</Link>
           <span aria-hidden="true">/</span>
           <span>{text.pageTitle}</span>
         </div>

@@ -155,27 +155,28 @@
 .previewStat {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 4px;
 }
 
 .previewStatLabel {
-  font-size: 0.58rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
+  width: 52%;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
 }
 
 .previewStatValue {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--text-strong);
+  width: 80%;
+  height: 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-strong) 24%, transparent);
 }
 
 .previewStatDelta {
-  font-size: 0.57rem;
-  font-weight: 600;
-  color: var(--accent);
+  width: 38%;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .right {

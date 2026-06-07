@@ -4,6 +4,7 @@ import {
   type AdminUserDetail,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type PromoDictionary = ReturnType<typeof getDictionary>;
 
@@ -42,6 +43,8 @@ type PromoStatusModel = {
   label: string;
   color: string;
 };
+
+export const PROMO_NUMERIC_FIELD_MAX_LENGTH = 8;
 
 export function createDefaultPromoForm(): PromoForm {
   return {
@@ -85,11 +88,11 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
     description: form.description.trim(),
     campaignName: form.campaignName.trim() || null,
     campaignChannel: form.campaignChannel.trim() || null,
-    minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases),
+    minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     rewardKind: form.rewardKind,
-    rewardValue: Number(form.rewardValue),
-    maxRedemptions: Number(form.maxRedemptions),
-    maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser),
+    rewardValue: Number(form.rewardValue.trim()),
+    maxRedemptions: Number(form.maxRedemptions.trim()),
+    maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser.trim()),
     isActive: form.isActive,
     startsAtUtc: toIsoOrNull(form.startsAtUtc),
     expiresAtUtc: toIsoOrNull(form.expiresAtUtc),
@@ -103,12 +106,12 @@ export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: Pr
     description: form.description.trim(),
     campaignName: form.campaignName.trim() || null,
     campaignChannel: form.campaignChannel.trim() || null,
-    minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases),
+    minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     createdBy: code.createdBy?.trim() || null,
     rewardKind: form.rewardKind,
-    rewardValue: Number(form.rewardValue),
-    maxRedemptions: Number(form.maxRedemptions),
-    maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser),
+    rewardValue: Number(form.rewardValue.trim()),
+    maxRedemptions: Number(form.maxRedemptions.trim()),
+    maxRedemptionsPerUser: Number(form.maxRedemptionsPerUser.trim()),
     isActive: form.isActive,
     startsAtUtc: toIsoOrNull(form.startsAtUtc),
     expiresAtUtc: toIsoOrNull(form.expiresAtUtc),
@@ -122,10 +125,13 @@ function validatePromoForm(
   text: PromoDictionary
 ) {
   const normalizedCode = form.code.trim();
-  const rewardValue = Number(form.rewardValue);
-  const maxRedemptions = Number(form.maxRedemptions);
-  const maxRedemptionsPerUser = Number(form.maxRedemptionsPerUser);
-  const minimumSuccessfulPurchases = Number(form.minimumSuccessfulPurchases);
+  const rewardValue = parsePromoIntegerInput(form.rewardValue, false);
+  const maxRedemptions = parsePromoIntegerInput(form.maxRedemptions, false);
+  const maxRedemptionsPerUser = parsePromoIntegerInput(form.maxRedemptionsPerUser, false);
+  const minimumSuccessfulPurchases = parsePromoIntegerInput(
+    form.minimumSuccessfulPurchases,
+    true
+  );
 
   if (!normalizedCode || normalizedCode.length < 4 || normalizedCode.length > 48) {
     throw new Error(text.promoCodesInvalidCode);
@@ -136,15 +142,10 @@ function validatePromoForm(
   }
 
   if (
-    !Number.isFinite(rewardValue) ||
-    rewardValue <= 0 ||
-    !Number.isFinite(maxRedemptions) ||
-    maxRedemptions <= 0 ||
-    !Number.isFinite(maxRedemptionsPerUser) ||
-    maxRedemptionsPerUser <= 0 ||
-    !Number.isFinite(minimumSuccessfulPurchases) ||
-    minimumSuccessfulPurchases < 0 ||
-    !Number.isInteger(minimumSuccessfulPurchases)
+    rewardValue === null ||
+    maxRedemptions === null ||
+    maxRedemptionsPerUser === null ||
+    minimumSuccessfulPurchases === null
   ) {
     throw new Error(text.promoCodesInvalidNumbers);
   }
@@ -164,6 +165,28 @@ function validatePromoForm(
   ) {
     throw new Error(text.promoCodesInvalidWindow);
   }
+}
+
+export function normalizePromoIntegerInput(value: string): string {
+  return value.replace(/\D+/g, "").slice(0, PROMO_NUMERIC_FIELD_MAX_LENGTH);
+}
+
+export function isPromoIntegerInput(value: string, allowZero: boolean): boolean {
+  return parsePromoIntegerInput(value, allowZero) !== null;
+}
+
+function parsePromoIntegerInput(value: string, allowZero: boolean): number | null {
+  const trimmed = value.trim();
+  if (!new RegExp(`^\\d{1,${PROMO_NUMERIC_FIELD_MAX_LENGTH}}$`).test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed) || parsed < 0 || (!allowZero && parsed === 0)) {
+    return null;
+  }
+
+  return parsed;
 }
 
 export function getPromoStatus(
@@ -268,11 +291,16 @@ export function getRewardKindLabel(kind: AdminRedeemRewardKind, text: PromoDicti
 }
 
 export function formatCampaignMeta(code: AdminRedeemCode) {
-  const parts = [code.campaignName?.trim(), code.campaignChannel?.trim()].filter(
-    (value): value is string => Boolean(value)
-  );
+  const parts = [code.campaignName, code.campaignChannel]
+    .map((value) => formatPromoDisplayText(value, 80))
+    .filter((value) => value !== "-");
 
   return parts.join(" · ");
+}
+
+export function formatPromoDisplayText(value: string | null | undefined, maxLength = 120) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
 }
 
 export function formatRewardValue(
@@ -398,20 +426,20 @@ export function getUserLabels(userId: string, user?: AdminUserDetail) {
   if (!user) {
     return {
       primary: shortGuid(userId),
-      secondary: userId,
+      secondary: shortGuid(userId),
     };
   }
 
   if (user.displayName?.trim()) {
     return {
-      primary: user.displayName.trim(),
-      secondary: user.email,
+      primary: sanitizeSensitiveText(user.displayName, 72),
+      secondary: maskEmail(user.email),
     };
   }
 
   return {
-    primary: user.email,
-    secondary: userId,
+    primary: maskEmail(user.email),
+    secondary: shortGuid(userId),
   };
 }
 
@@ -435,7 +463,8 @@ export async function copyTextToClipboard(value: string) {
 export function buildPromoCodesCsv(
   codes: AdminRedeemCode[],
   locale: Locale,
-  text: PromoDictionary
+  text: PromoDictionary,
+  now = Date.now()
 ) {
   const rows = [
     [
@@ -450,19 +479,22 @@ export function buildPromoCodesCsv(
       code.code,
       formatRewardValue(code.rewardValue, code.rewardKind, text),
       `${code.redeemedCount}/${code.maxRedemptions}`,
-      getPromoStatus(code, text, Number.MAX_SAFE_INTEGER).label,
+      getPromoStatus(code, text, now).label,
       formatWindow(code, locale, text),
       formatDateTime(code.updatedAtUtc, locale),
     ]),
   ];
 
-  return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
+  return `\uFEFF${rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n")}`;
 }
 
 function escapeCsvCell(value: string) {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replaceAll('"', '""')}"`;
+  const sanitizedValue = sanitizeSensitiveText(value, 240);
+  const safeValue = /^[=+\-@\t\r]/.test(sanitizedValue) ? `'${sanitizedValue}` : sanitizedValue;
+
+  if (safeValue.includes(",") || safeValue.includes('"') || safeValue.includes("\n")) {
+    return `"${safeValue.replaceAll('"', '""')}"`;
   }
 
-  return value;
+  return safeValue;
 }

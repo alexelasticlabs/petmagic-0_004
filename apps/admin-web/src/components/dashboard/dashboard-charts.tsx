@@ -171,18 +171,51 @@ export function DonutChart({
 }
 
 function formatCompactCurrency(value: number, currencyCode: string) {
+  const amount = Number.isFinite(value) ? value : 0;
+  const safeCurrencyCode = normalizeChartCurrencyCode(currencyCode);
   if (value <= 0) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currencyCode,
-      maximumFractionDigits: 0,
-    }).format(0);
+    return formatChartCurrencyAmount(0, safeCurrencyCode, "standard", 0);
   }
 
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currencyCode,
-    notation: value >= 1000 ? "compact" : "standard",
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-  }).format(value);
+  return formatChartCurrencyAmount(
+    amount,
+    safeCurrencyCode,
+    amount >= 1000 ? "compact" : "standard",
+    amount >= 1000 ? 1 : 0
+  );
+}
+
+function formatChartCurrencyAmount(
+  value: number,
+  safeCurrencyCode: string,
+  notation: "compact" | "standard",
+  maximumFractionDigits: number
+) {
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: safeCurrencyCode,
+      notation,
+      maximumFractionDigits,
+    }).format(value);
+  } catch {
+    return `${new Intl.NumberFormat("en-US", {
+      notation,
+      maximumFractionDigits,
+    }).format(value)} ${safeCurrencyCode}`;
+  }
+}
+
+function normalizeChartCurrencyCode(value: string) {
+  const normalized = value.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(normalized)) {
+    return "USD";
+  }
+
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: normalized }).format(0);
+    return normalized;
+  } catch {
+    return "USD";
+  }
 }

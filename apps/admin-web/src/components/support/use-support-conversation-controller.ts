@@ -9,13 +9,16 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import {
   buildActivityTimeline,
   buildConversationTimeline,
+  formatSafeSupportDisplay,
   formatAccountAgeFact,
   formatCountFact,
   getConversationSla,
   sortSupportQueueItems,
   type SupportTimelineItem,
 } from "@/components/support/support-conversation-helpers";
+import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { getAvailableStatusActions } from "@/components/support/support-status-helpers";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   assignSupportConversation,
@@ -45,11 +48,13 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { maskEmail } from "@/lib/sensitive-display";
 import { useSupportRealtime } from "@/lib/support-realtime";
 
 type UseSupportConversationControllerParams = {
   locale: Locale;
   conversationId: string;
+  queueStatusFilter?: "all" | SupportConversationStatus;
 };
 
 type SendOptimisticContext = {
@@ -64,6 +69,8 @@ export type ToastState = {
 };
 
 export type SupportQueueFilter = "all" | SupportConversationStatus | "mine" | "unassigned";
+
+const SUPPORT_INBOX_PAGE_SIZE = 50;
 
 function resolveQueueFilter(filter: SupportQueueFilter): {
   status?: SupportConversationStatus;
@@ -81,20 +88,28 @@ function resolveQueueFilter(filter: SupportQueueFilter): {
   return { status: filter, assignment: "all" };
 }
 
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
+}
+
 function buildSupportRealtimeToastMessage(
   event: { lastMessagePreview?: string | null },
   locale: Locale
 ): string {
   const fallback = locale === "ru" ? "Новое сообщение в поддержке" : "New support message";
-  const preview = event.lastMessagePreview?.trim();
+  const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
   if (!preview) {
     return fallback;
   }
 
-  const safePreview = preview.length > 96 ? `${preview.slice(0, 93)}...` : preview;
-  return locale === "ru"
-    ? `Новое сообщение: ${safePreview}`
-    : `New support message: ${safePreview}`;
+  return locale === "ru" ? `Новое сообщение: ${preview}` : `New support message: ${preview}`;
 }
 
 function isUserSupportMessageEvent(event: {
@@ -166,14 +181,24 @@ function mergeSupportConversationMessages(
 export function useSupportConversationController({
   locale,
   conversationId,
+  queueStatusFilter = "all",
 }: UseSupportConversationControllerParams) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
   const { addNotification } = useAdminNotifications();
+  const sessionUserRoles = session?.user.roles ?? [];
+  const canManageSupportWorkspace =
+    sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");
+  const supportActionsForbidden =
+    locale === "ru"
+      ? "Действия поддержки доступны только Admin или Moderator."
+      : "Support actions are available only to Admin or Moderator.";
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [queuePage, setQueuePage] = useState(1);
+  const [searchQuery, setRawSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 350);
   const [reply, setReply] = useState("");
   const [replyToMessageId, setReplyToMessageId] = useState<string | null>(null);
   const [replyToPreview, setReplyToPreview] = useState<string | null>(null);
@@ -189,6 +214,7 @@ export function useSupportConversationController({
   const lastRealtimeToastRef = useRef<string | null>(null);
   const messagesViewportVisibleRef = useRef(false);
   const lastConversationRealtimeFetchRef = useRef(0);
+  const loadOlderAbortControllerRef = useRef<AbortController | null>(null);
   const optimisticAttachmentObjectUrlsRef = useRef(new Map<string, string>());
   const optimisticMessageCounterRef = useRef(0);
 
@@ -222,6 +248,42 @@ export function useSupportConversationController({
     [addNotification, conversationId, locale]
   );
 
+  const pushSupportError = useCallback(
+    (error: unknown) => {
+      const message = getAdminErrorMessage(error, text.supportLoadError);
+      setToast({ type: "error", message });
+      pushSupportNotification("error", message);
+    },
+    [pushSupportNotification, text.supportLoadError]
+  );
+
+  const assertCanManageSupportWorkspace = useCallback(() => {
+    if (canManageSupportWorkspace) {
+      return true;
+    }
+
+    setToast({ type: "error", message: supportActionsForbidden });
+    pushSupportNotification("error", supportActionsForbidden);
+    return false;
+  }, [canManageSupportWorkspace, pushSupportNotification, supportActionsForbidden]);
+
+  const setSupportSearchQuery = useCallback((value: string) => {
+    setQueuePage(1);
+    setRawSearchQuery(value);
+  }, []);
+
+  const setSupportQueueFilter = useCallback((filter: SupportQueueFilter) => {
+    setQueuePage(1);
+    setQueueFilter(filter);
+  }, []);
+
+  const setSupportQueuePage = useCallback((value: number | ((currentPage: number) => number)) => {
+    setQueuePage((currentPage) => {
+      const nextPage = typeof value === "function" ? value(currentPage) : value;
+      return Math.max(1, nextPage);
+    });
+  }, []);
+
   useEffect(() => {
     if (!session) {
       ensureAdminSession(locale, router);
@@ -245,53 +307,76 @@ export function useSupportConversationController({
     return URL.createObjectURL(selectedAttachment);
   }, [selectedAttachment]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    return () => {
       if (attachmentPreviewUrl) {
         URL.revokeObjectURL(attachmentPreviewUrl);
       }
+    };
+  }, [attachmentPreviewUrl]);
 
+  useEffect(
+    () => () => {
+      if (markReadDebounceRef.current) {
+        clearTimeout(markReadDebounceRef.current);
+        markReadDebounceRef.current = null;
+      }
+      loadOlderAbortControllerRef.current?.abort();
       for (const url of optimisticAttachmentObjectUrlsRef.current.values()) {
         URL.revokeObjectURL(url);
       }
       optimisticAttachmentObjectUrlsRef.current.clear();
     },
-    [attachmentPreviewUrl]
+    []
   );
 
   const conversationQuery = useQuery<AdminSupportConversation>({
     queryKey: adminQueryKeys.supportConversation(conversationId),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchSupportConversation(conversationId, {
         take: supportConversationMessagesTake,
+        signal,
       }),
-    enabled: Boolean(session),
+    enabled: Boolean(session && canManageSupportWorkspace),
     refetchInterval: false,
     refetchIntervalInBackground: false,
   });
 
+  const resolvedQueueFilter = resolveQueueFilter(queueFilter);
+  const effectiveQueueStatus =
+    queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
     queryKey: adminQueryKeys.supportInbox(
-      resolveQueueFilter(queueFilter).status ?? "all",
-      resolveQueueFilter(queueFilter).assignment
+      effectiveQueueStatus ?? "all",
+      resolvedQueueFilter.assignment,
+      {
+        search: debouncedSearchQuery,
+        page: queuePage,
+        pageSize: SUPPORT_INBOX_PAGE_SIZE,
+      }
     ),
-    queryFn: () => {
-      const { status, assignment } = resolveQueueFilter(queueFilter);
-      return fetchSupportInbox(status, assignment);
+    queryFn: ({ signal }) => {
+      return fetchSupportInbox(effectiveQueueStatus, resolvedQueueFilter.assignment, {
+        search: debouncedSearchQuery,
+        page: queuePage,
+        pageSize: SUPPORT_INBOX_PAGE_SIZE,
+        signal,
+      });
     },
-    enabled: Boolean(session),
-    refetchInterval: session ? supportPollingIntervalMs : false,
+    enabled: Boolean(session && canManageSupportWorkspace),
+    refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
     refetchIntervalInBackground: false,
   });
 
   const conversation = conversationQuery.data;
   const sessionUserId = session?.user.userId ?? null;
+  const canViewSubjectUserContext = sessionUserRoles.includes("Admin");
   const isAssignedToCurrentAdmin = Boolean(
     sessionUserId && conversation?.assignedAdminId === sessionUserId
   );
   const subjectUserId = conversation?.initiatorUserId ?? null;
 
-  useSupportRealtime(session?.accessToken, (event) => {
+  useSupportRealtime(canManageSupportWorkspace ? session?.accessToken : undefined, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
     if (event.conversationId === conversationId) {
       const now = Date.now();
@@ -303,9 +388,10 @@ export function useSupportConversationController({
       void queryClient
         .fetchQuery({
           queryKey: adminQueryKeys.supportConversation(conversationId),
-          queryFn: () =>
+          queryFn: ({ signal }) =>
             fetchSupportConversation(conversationId, {
               take: supportConversationMessagesTake,
+              signal,
             }),
         })
         .then((latestConversation) => {
@@ -341,6 +427,7 @@ export function useSupportConversationController({
 
   const attemptMarkRead = useCallback(() => {
     if (
+      !canManageSupportWorkspace ||
       !conversationQuery.data ||
       conversationQuery.data.adminUnreadCount <= 0 ||
       markReadRequestRef.current
@@ -374,7 +461,7 @@ export function useSupportConversationController({
       .finally(() => {
         markReadRequestRef.current = null;
       });
-  }, [conversationId, conversationQuery.data, refreshConversationData]);
+  }, [canManageSupportWorkspace, conversationId, conversationQuery.data, refreshConversationData]);
 
   const scheduleMarkRead = useCallback(() => {
     if (markReadDebounceRef.current) {
@@ -399,6 +486,10 @@ export function useSupportConversationController({
   );
 
   const loadOlderMessages = useCallback(async () => {
+    if (!canManageSupportWorkspace) {
+      return;
+    }
+
     const currentConversation = queryClient.getQueryData<AdminSupportConversation>(
       adminQueryKeys.supportConversation(conversationId)
     );
@@ -411,10 +502,28 @@ export function useSupportConversationController({
       return;
     }
 
-    const olderConversation = await fetchSupportConversation(conversationId, {
-      take: supportConversationMessagesTake,
-      beforeMessageCreatedAtUtc,
-    });
+    loadOlderAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    loadOlderAbortControllerRef.current = abortController;
+
+    let olderConversation: AdminSupportConversation;
+    try {
+      olderConversation = await fetchSupportConversation(conversationId, {
+        take: supportConversationMessagesTake,
+        beforeMessageCreatedAtUtc,
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      throw error;
+    } finally {
+      if (loadOlderAbortControllerRef.current === abortController) {
+        loadOlderAbortControllerRef.current = null;
+      }
+    }
 
     queryClient.setQueryData<AdminSupportConversation>(
       adminQueryKeys.supportConversation(conversationId),
@@ -426,7 +535,7 @@ export function useSupportConversationController({
         return mergeSupportConversationMessages(latestConversation, olderConversation);
       }
     );
-  }, [conversationId, queryClient]);
+  }, [canManageSupportWorkspace, conversationId, queryClient]);
 
   useEffect(() => {
     if (!conversationQuery.data || conversationQuery.data.adminUnreadCount <= 0) {
@@ -458,11 +567,20 @@ export function useSupportConversationController({
   }, [scheduleMarkRead]);
 
   const sendMutation = useMutation({
-    mutationFn: async () =>
-      selectedAttachment
+    mutationFn: async () => {
+      if (!assertCanManageSupportWorkspace()) {
+        throw new Error(supportActionsForbidden);
+      }
+
+      return selectedAttachment
         ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim(), replyToMessageId)
-        : sendSupportMessage(conversationId, reply.trim(), replyToMessageId),
+        : sendSupportMessage(conversationId, reply.trim(), replyToMessageId);
+    },
     onMutate: async (): Promise<SendOptimisticContext> => {
+      if (!canManageSupportWorkspace) {
+        return {};
+      }
+
       const trimmedReply = reply.trim();
       const hasAttachment = Boolean(selectedAttachment);
       const canApplyOptimisticMessage = hasAttachment || trimmedReply.length > 0;
@@ -496,7 +614,7 @@ export function useSupportConversationController({
         senderUserId: session?.user.userId ?? "admin",
         senderDisplayName:
           session?.user.displayName?.trim() ||
-          session?.user.email ||
+          (session?.user.email ? maskEmail(session.user.email) : null) ||
           (locale === "ru" ? "Оператор" : "Operator"),
         isFromAdmin: true,
         senderType: "Admin",
@@ -586,7 +704,7 @@ export function useSupportConversationController({
       pushSupportNotification("success", text.supportReplySent);
       await refreshConversationData();
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       if (context?.optimisticMessageId) {
         const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
           context.optimisticMessageId
@@ -604,56 +722,67 @@ export function useSupportConversationController({
         );
       }
 
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+      pushSupportError(error);
     },
   });
 
   const statusMutation = useMutation({
-    mutationFn: async (status: SupportConversationStatus) =>
-      updateSupportConversationStatus(conversationId, status),
+    mutationFn: async (status: SupportConversationStatus) => {
+      if (!assertCanManageSupportWorkspace()) {
+        throw new Error(supportActionsForbidden);
+      }
+
+      return updateSupportConversationStatus(conversationId, status);
+    },
     onSuccess: async () => {
       setToast({ type: "success", message: text.supportStatusSaved });
       pushSupportNotification("success", text.supportStatusSaved);
       await refreshConversationData();
     },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+    onError: (error) => {
+      pushSupportError(error);
     },
   });
 
   const assignmentMutation = useMutation({
-    mutationFn: async (assignedAdminId?: string | null) =>
-      assignSupportConversation(conversationId, assignedAdminId),
+    mutationFn: async (assignedAdminId?: string | null) => {
+      if (!assertCanManageSupportWorkspace()) {
+        throw new Error(supportActionsForbidden);
+      }
+
+      return assignSupportConversation(conversationId, assignedAdminId);
+    },
     onSuccess: async () => {
       setToast({ type: "success", message: text.supportAssignmentSaved });
       pushSupportNotification("success", text.supportAssignmentSaved);
       await refreshConversationData();
     },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+    onError: (error) => {
+      pushSupportError(error);
     },
   });
 
   const metadataMutation = useMutation({
-    mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) =>
-      updateSupportConversationMetadata(conversationId, payload),
+    mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) => {
+      if (!assertCanManageSupportWorkspace()) {
+        throw new Error(supportActionsForbidden);
+      }
+
+      return updateSupportConversationMetadata(conversationId, payload);
+    },
     onSuccess: async () => {
       setToast({ type: "success", message: text.supportStatusSaved });
       pushSupportNotification("success", text.supportStatusSaved);
       await refreshConversationData();
     },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+    onError: (error) => {
+      pushSupportError(error);
     },
   });
 
   const setUserActiveMutation = useMutation({
     mutationFn: async (isActive: boolean) => {
-      if (!subjectUserId) {
+      if (!subjectUserId || !canViewSubjectUserContext) {
         throw new Error("support.subject_user_missing");
       }
 
@@ -676,21 +805,21 @@ export function useSupportConversationController({
       pushSupportNotification("success", message);
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
         queryClient.invalidateQueries({
           queryKey: adminQueryKeys.supportConversation(conversationId),
         }),
       ]);
     },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+    onError: (error) => {
+      pushSupportError(error);
     },
   });
 
   const setUserPremiumMutation = useMutation({
     mutationFn: async (isPremium: boolean) => {
-      if (!subjectUserId) {
+      if (!subjectUserId || !canViewSubjectUserContext) {
         throw new Error("support.subject_user_missing");
       }
 
@@ -713,6 +842,7 @@ export function useSupportConversationController({
       pushSupportNotification("success", message);
 
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(subjectUserId!) }),
         queryClient.invalidateQueries({
@@ -720,9 +850,8 @@ export function useSupportConversationController({
         }),
       ]);
     },
-    onError: () => {
-      setToast({ type: "error", message: text.supportLoadError });
-      pushSupportNotification("error", text.supportLoadError);
+    onError: (error) => {
+      pushSupportError(error);
     },
   });
 
@@ -730,8 +859,8 @@ export function useSupportConversationController({
     queryKey: subjectUserId
       ? adminQueryKeys.userDetail(subjectUserId)
       : adminQueryKeys.userDetailDisabled,
-    queryFn: () => fetchAdminUser(subjectUserId!),
-    enabled: Boolean(session && subjectUserId),
+    queryFn: ({ signal }) => fetchAdminUser(subjectUserId!, signal),
+    enabled: Boolean(session && subjectUserId && canViewSubjectUserContext),
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
@@ -743,23 +872,30 @@ export function useSupportConversationController({
     queryKey: subjectUserId
       ? adminQueryKeys.userAnalytics(subjectUserId)
       : adminQueryKeys.userAnalyticsDisabled,
-    queryFn: () => fetchAdminUserAnalytics(subjectUserId!),
-    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    queryFn: ({ signal }) => fetchAdminUserAnalytics(subjectUserId!, signal),
+    enabled: Boolean(
+      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
   const purchasesQuery = useQuery<AdminEconomyPurchase[]>({
     queryKey: ["admin", "support", "conversation", subjectUserId ?? "none", "purchases"],
-    queryFn: async () => {
-      const response = await fetchAdminEconomyPurchases({
-        skip: 0,
-        take: 8,
-        userId: subjectUserId!,
-      });
+    queryFn: async ({ signal }) => {
+      const response = await fetchAdminEconomyPurchases(
+        {
+          skip: 0,
+          take: 8,
+          userId: subjectUserId!,
+        },
+        signal
+      );
 
       return response.items;
     },
-    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    enabled: Boolean(
+      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
@@ -767,46 +903,34 @@ export function useSupportConversationController({
     queryKey: subjectUserId
       ? adminQueryKeys.economyUserSubscriptionSummary(subjectUserId)
       : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
-    queryFn: () => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!),
-    enabled: Boolean(session && subjectUserId && !isSubjectUserDeleted),
+    queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!, signal),
+    enabled: Boolean(
+      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
+    ),
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
-  const inboxItems = useMemo(() => sortSupportQueueItems(inboxQuery.data ?? []), [inboxQuery.data]);
-
-  const filteredInboxItems = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return inboxItems;
-    }
-
-    return inboxItems.filter((item) => {
-      const haystacks = [
-        item.userDisplayName,
-        item.userEmail,
-        item.lastMessagePreview,
-        item.assignedAdminDisplayName,
-        item.tags?.join(" "),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystacks.includes(normalizedQuery);
-    });
-  }, [inboxItems, searchQuery]);
+  const filteredInboxItems = useMemo(
+    () => sortSupportQueueItems(inboxQuery.data ?? []),
+    [inboxQuery.data]
+  );
+  const canGoToPreviousQueuePage = queuePage > 1;
+  const canGoToNextQueuePage = (inboxQuery.data?.length ?? 0) >= SUPPORT_INBOX_PAGE_SIZE;
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
   const deletedUserNameFallback = locale === "ru" ? "Удаленный пользователь" : "Deleted user";
   const deletedUserEmailFallback = locale === "ru" ? "Пользователь удален" : "User deleted";
-  const userEmailDisplay =
-    conversation?.userEmail?.trim() || (isSubjectUserDeleted ? deletedUserEmailFallback : "");
-  const userDisplayName =
-    conversation?.userDisplayName?.trim() ||
-    userEmailDisplay ||
-    (isSubjectUserDeleted ? deletedUserNameFallback : "") ||
-    text.supportConversationTitle;
+  const userEmailDisplay = conversation?.userEmail?.trim()
+    ? maskEmail(conversation.userEmail)
+    : isSubjectUserDeleted
+      ? deletedUserEmailFallback
+      : "";
+  const userDisplayName = conversation?.userDisplayName?.trim()
+    ? formatSafeSupportDisplay(conversation.userDisplayName, text.supportConversationTitle, 72)
+    : userEmailDisplay ||
+      (isSubjectUserDeleted ? deletedUserNameFallback : "") ||
+      text.supportConversationTitle;
   const hasComposerAttachment = selectedAttachment !== null;
   const replyToMessage = useMemo(
     () =>
@@ -830,19 +954,19 @@ export function useSupportConversationController({
 
   const setOperatorPriority = useCallback(
     (priority: SupportConversationPriority) => {
-      if (!conversation || metadataMutation.isPending) {
+      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
         return;
       }
 
       const currentTags = conversation.tags ?? [];
       metadataMutation.mutate({ priority, tags: currentTags });
     },
-    [conversation, metadataMutation]
+    [canManageSupportWorkspace, conversation, metadataMutation]
   );
 
   const addOperatorTag = useCallback(
     (rawTag: string) => {
-      if (!conversation || metadataMutation.isPending) {
+      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
         return false;
       }
 
@@ -864,12 +988,12 @@ export function useSupportConversationController({
 
       return true;
     },
-    [conversation, metadataMutation]
+    [canManageSupportWorkspace, conversation, metadataMutation]
   );
 
   const removeOperatorTag = useCallback(
     (tagToRemove: string) => {
-      if (!conversation || metadataMutation.isPending) {
+      if (!conversation || !canManageSupportWorkspace || metadataMutation.isPending) {
         return;
       }
 
@@ -884,7 +1008,7 @@ export function useSupportConversationController({
         tags: nextTags,
       });
     },
-    [conversation, metadataMutation]
+    [canManageSupportWorkspace, conversation, metadataMutation]
   );
 
   const sidePanelTabs: ReadonlyArray<{ value: SidePanelTab; label: string }> = [
@@ -924,7 +1048,9 @@ export function useSupportConversationController({
     conversation?.adminUnreadCount ?? 0
   );
   const recentUserPurchases = purchasesQuery.data ?? [];
-  const totalPurchases = analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length;
+  const totalPurchases = canViewSubjectUserContext
+    ? (analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length)
+    : 0;
   const lastUserPurchaseAtUtc =
     recentUserPurchases[0]?.confirmedAtUtc ?? recentUserPurchases[0]?.createdAtUtc ?? null;
   const lastActivityAtUtc =
@@ -940,14 +1066,20 @@ export function useSupportConversationController({
   const recentFailures = analyticsQuery.data?.failureBreakdown.slice(0, 4) ?? [];
 
   const chatFacts = [
-    userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel,
+    ...(canViewSubjectUserContext
+      ? [userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel]
+      : []),
     formatAccountAgeFact(accountCreatedAt, locale),
     formatCountFact(conversation?.messages.length ?? 0, locale, "messages"),
-    formatCountFact(
-      analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length,
-      locale,
-      "purchases"
-    ),
+    ...(canViewSubjectUserContext
+      ? [
+          formatCountFact(
+            analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length,
+            locale,
+            "purchases"
+          ),
+        ]
+      : []),
   ];
 
   const activityTimeline: SupportTimelineItem[] = buildActivityTimeline(analyticsQuery.data);
@@ -990,6 +1122,10 @@ export function useSupportConversationController({
     destructiveStatusAction,
     failedGenerations,
     filteredInboxItems,
+    canViewSubjectUserContext,
+    canManageSupportWorkspace,
+    canGoToNextQueuePage,
+    canGoToPreviousQueuePage,
     hasComposerAttachment,
     inboxQuery,
     isAssignedToCurrentAdmin,
@@ -1009,6 +1145,7 @@ export function useSupportConversationController({
     secondaryStatusActions,
     sendMutation,
     sessionUserId,
+    sessionUserRoles,
     setUserActiveMutation,
     setUserPremiumMutation,
     setActiveSidePanelTab,
@@ -1016,8 +1153,9 @@ export function useSupportConversationController({
     setReply,
     setReplyToMessageId,
     setReplyToPreview,
-    setSearchQuery,
-    setQueueFilter,
+    setSearchQuery: setSupportSearchQuery,
+    setQueueFilter: setSupportQueueFilter,
+    setQueuePage: setSupportQueuePage,
     setSelectedAttachment,
     setMessagesViewportVisible,
     loadOlderMessages,
@@ -1030,6 +1168,7 @@ export function useSupportConversationController({
     addOperatorTag,
     removeOperatorTag,
     queueFilter,
+    queuePage,
     isSubjectUserDeleted,
     subscriptionQuery,
     statusMutation,

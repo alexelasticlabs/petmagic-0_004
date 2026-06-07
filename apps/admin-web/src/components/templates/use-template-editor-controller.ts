@@ -17,6 +17,7 @@ import {
 import { type TemplateFormState } from "@/components/templates/types";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { useAdminTemplateOptions } from "@/components/templates/use-admin-template-options";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminTemplate,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateEditorControllerOptions = {
   initialTemplateId?: string;
@@ -52,6 +54,7 @@ export function useTemplateEditorController({
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
+  const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
   const { categories } = useAdminTemplateCategories({
     enabled: Boolean(session),
     includeArchived: false,
@@ -73,6 +76,10 @@ export function useTemplateEditorController({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [editorStatus, setEditorStatus] = useState<EditorVisibilityStatus>("Draft");
   const isVideo = templateType === "Video";
+  const templateEditorActionsAdminOnly =
+    locale === "ru"
+      ? "Управление шаблонами доступно только Admin."
+      : "Template management actions are available to Admin only.";
 
   useSyncToastToAdminNotifications(toast, {
     category: "templates",
@@ -165,6 +172,7 @@ export function useTemplateEditorController({
 
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
     async function initialize() {
       setIsInitializing(true);
@@ -174,7 +182,7 @@ export function useTemplateEditorController({
         }
 
         if (initialTemplateId) {
-          const templateResponse = await fetchAdminTemplate(initialTemplateId);
+          const templateResponse = await fetchAdminTemplate(initialTemplateId, controller.signal);
           if (isCancelled) {
             return;
           }
@@ -188,6 +196,10 @@ export function useTemplateEditorController({
           setIsInitializing(false);
         }
       } catch (error) {
+        if (controller.signal.aborted || isCancelled) {
+          return;
+        }
+
         clientLogger.error("templates.editor_initialize_failed", {
           initialTemplateId,
           templateType,
@@ -207,6 +219,7 @@ export function useTemplateEditorController({
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, [initialTemplateId, locale, router, templateType, text.errorLoadingTemplates]);
 
@@ -218,7 +231,24 @@ export function useTemplateEditorController({
     setReferenceFile(null);
   }
 
+  function assertCanManageTemplateEditor(): boolean {
+    if (canManageTemplates) {
+      return true;
+    }
+
+    setToast({ type: "error", message: templateEditorActionsAdminOnly });
+    return false;
+  }
+
   async function handleSave(targetStatus: EditorVisibilityStatus) {
+    if (!assertCanManageTemplateEditor()) {
+      return;
+    }
+
+    if (saveTemplateMutation.isPending) {
+      return;
+    }
+
     const catalogPath = getTemplateCatalogPath(locale, templateType);
 
     try {
@@ -252,6 +282,14 @@ export function useTemplateEditorController({
   }
 
   async function handleUpload(assetKind: TemplateAssetKind) {
+    if (!assertCanManageTemplateEditor()) {
+      return;
+    }
+
+    if (uploadTemplateMediaMutation.isPending || uploadingKind !== null) {
+      return;
+    }
+
     const file = assetKind === "Preview" ? previewFile : referenceFile;
     if (!file) {
       return;
@@ -269,7 +307,7 @@ export function useTemplateEditorController({
       setToast({ type: "error", message });
       clientLogger.warn("templates.media_upload_failed", {
         assetKind,
-        fileName: file.name,
+        fileName: sanitizeSensitiveText(file.name, 120),
         contentType: file.type,
         error,
       });
@@ -333,22 +371,7 @@ export function useTemplateEditorController({
 }
 
 function resolveUploadErrorMessage(error: unknown, fallback: string): string {
-  if (error && typeof error === "object" && "validationErrors" in error) {
-    const validationErrors = (error as { validationErrors?: string[] }).validationErrors ?? [];
-    if (validationErrors.length > 0) {
-      return validationErrors.join(" ");
-    }
-  }
-
-  if (
-    error instanceof Error &&
-    error.message &&
-    !/^API request failed with status \d+$/i.test(error.message)
-  ) {
-    return error.message;
-  }
-
-  return fallback;
+  return getAdminErrorMessage(error, fallback);
 }
 
 async function readVideoDurationSeconds(file: File): Promise<number | undefined> {
@@ -411,22 +434,10 @@ function getTemplateSaveErrorMessage(
   text: Dictionary,
   targetStatus: EditorVisibilityStatus
 ): string {
-  if (error && typeof error === "object" && "validationErrors" in error) {
-    const validationErrors = (error as { validationErrors?: string[] }).validationErrors ?? [];
-    if (validationErrors.length > 0) {
-      return validationErrors.join(" ");
-    }
-  }
-
-  if (
-    error instanceof Error &&
-    error.message &&
-    !/^API request failed with status \d+$/i.test(error.message)
-  ) {
-    return error.message;
-  }
-
-  return targetStatus === "Active" ? text.errorActivatingTemplate : text.errorSavingTemplate;
+  return getAdminErrorMessage(
+    error,
+    targetStatus === "Active" ? text.errorActivatingTemplate : text.errorSavingTemplate
+  );
 }
 
 function getActivationReadinessError(

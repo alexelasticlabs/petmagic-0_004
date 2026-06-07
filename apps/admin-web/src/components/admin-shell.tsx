@@ -2,18 +2,33 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { buildLocaleSwitchPath, getAdminPageMeta, stripLocalePrefix } from "@/lib/admin-navigation";
 import { shouldCreateSupportRealtimeNotification } from "@/lib/admin-notification-policy";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { fetchSupportInbox, logout, useAuthSession } from "@/lib/api-client";
+import {
+  canAccessAdminPath,
+  getAdminPanelRole,
+  getDefaultAdminPath,
+  hasAdminPanelAccess,
+} from "@/lib/admin-rbac";
+import {
+  fetchSupportInbox,
+  isAuthSessionExpired,
+  logout,
+  restoreSession,
+  useAuthSession,
+} from "@/lib/api-client";
 import { type Locale, getDictionary } from "@/lib/i18n";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 import { useSupportRealtime } from "@/lib/support-realtime";
 import {
   type AdminTheme,
@@ -38,17 +53,24 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const isLoginPage = currentPath === "/";
   const authSession = useAuthSession();
   const session = isLoginPage ? null : authSession;
+  const sessionRoles = useMemo(() => session?.user.roles ?? [], [session?.user.roles]);
+  const hasPanelAccess = hasAdminPanelAccess(sessionRoles);
+  const needsSessionRestore =
+    Boolean(session) && hasPanelAccess && (!session?.accessToken || isAuthSessionExpired(session));
+  const hasFreshAccessToken =
+    Boolean(session?.accessToken) && Boolean(session) && !isAuthSessionExpired(session);
+  const isRestoringSessionRef = useRef(false);
 
   /* Support unread count for nav badge */
   const queryClient = useQueryClient();
   const inboxQuery = useQuery({
-    queryKey: adminQueryKeys.supportInbox("all", "all"),
-    queryFn: () => fetchSupportInbox(undefined, "all"),
-    enabled: Boolean(session) && !isLoginPage,
+    queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
+    queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
+    enabled: hasFreshAccessToken && hasPanelAccess && !isLoginPage,
     staleTime: 30_000,
     refetchInterval: 120_000,
   });
-  useSupportRealtime(session?.accessToken, (event) => {
+  useSupportRealtime(hasFreshAccessToken ? session?.accessToken : undefined, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
 
     const isUserMessage =
@@ -70,12 +92,12 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       return;
     }
 
-    const preview = event.lastMessagePreview?.trim();
+    const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
     const message =
-      preview && preview.length > 0
+      preview
         ? locale === "ru"
-          ? `Новое сообщение в поддержке: ${preview.length > 96 ? `${preview.slice(0, 93)}...` : preview}`
-          : `New support message: ${preview.length > 96 ? `${preview.slice(0, 93)}...` : preview}`
+          ? `Новое сообщение в поддержке: ${preview}`
+          : `New support message: ${preview}`
         : locale === "ru"
           ? "В поддержке появилось новое сообщение"
           : "A new support message arrived";
@@ -97,6 +119,30 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    if (!needsSessionRestore || isRestoringSessionRef.current) {
+      return;
+    }
+
+    isRestoringSessionRef.current = true;
+    void restoreSession()
+      .then((restored) => {
+        if (!restored) {
+          void logout();
+          router.replace(`/${locale}`);
+        }
+      })
+      .catch(() => {
+        void logout();
+        router.replace(`/${locale}`);
+      })
+      .finally(() => {
+        isRestoringSessionRef.current = false;
+      });
+  }, [locale, needsSessionRestore, router]);
   const [theme, setTheme] = useState<AdminTheme>(() => {
     if (typeof window === "undefined") {
       return "dark";
@@ -116,6 +162,31 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     }
   }, [isLoginPage, locale, router, session]);
 
+  useEffect(() => {
+    if (isLoginPage || session == null || needsSessionRestore) {
+      return;
+    }
+
+    if (!hasPanelAccess) {
+      void logout();
+      router.replace(`/${locale}`);
+      return;
+    }
+
+    if (!canAccessAdminPath(sessionRoles, currentPath)) {
+      router.replace(getDefaultAdminPath(locale, sessionRoles));
+    }
+  }, [
+    currentPath,
+    hasPanelAccess,
+    isLoginPage,
+    locale,
+    needsSessionRestore,
+    router,
+    session,
+    sessionRoles,
+  ]);
+
   /* Keyboard: close sidebar on Escape */
   useEffect(() => {
     if (!sidebarOpen) return;
@@ -126,9 +197,24 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
-  function handleLogout() {
-    void logout();
-    router.replace(`/${locale}`);
+  function handleLogoutRequest() {
+    setSidebarOpen(false);
+    setLogoutDialogOpen(true);
+  }
+
+  async function handleConfirmLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setLogoutDialogOpen(false);
+      router.replace(`/${locale}`);
+    } finally {
+      setIsLoggingOut(false);
+    }
   }
 
   function handleToggleTheme() {
@@ -143,13 +229,19 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   /* ── Login screen ───────────────────────────────────────────── */
   if (isLoginPage) {
     return (
-      <AdminLoginScreen locale={locale} theme={theme} onToggleTheme={handleToggleTheme}>
+      <AdminLoginScreen locale={locale} onToggleTheme={handleToggleTheme}>
         {children}
       </AdminLoginScreen>
     );
   }
 
-  if (session == null) {
+  if (
+    session == null ||
+    needsSessionRestore ||
+    !hasFreshAccessToken ||
+    !hasPanelAccess ||
+    !canAccessAdminPath(sessionRoles, currentPath)
+  ) {
     return (
       <div className={styles.authGate} aria-busy="true" aria-live="polite">
         <div className={styles.authGateCard}>
@@ -161,14 +253,22 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   }
 
   /* ── Admin panel layout ────────────────────────────────────── */
-  const userName = session?.user?.displayName || session?.user?.email?.split("@")[0] || "";
+  const maskedSessionEmail = session?.user?.email ? maskEmail(session.user.email) : "";
+  const safeSessionDisplayName = session?.user?.displayName?.trim()
+    ? sanitizeSensitiveText(session.user.displayName, 96)
+    : "";
+  const userName = safeSessionDisplayName || maskedSessionEmail;
+  const userPanelRole = getAdminPanelRole(sessionRoles);
   const userRole =
-    session?.user?.roles?.[0] || (locale === "ru" ? "Администратор" : "Administrator");
-  const userInitial = (session?.user?.displayName || session?.user?.email || "A")[0].toUpperCase();
-  const userBadgeName =
-    session?.user?.displayName ||
-    session?.user?.email ||
-    (locale === "ru" ? "Администратор" : "Administrator");
+    userPanelRole === "Moderator"
+      ? locale === "ru"
+        ? "Модератор"
+        : "Moderator"
+      : locale === "ru"
+        ? "Администратор"
+        : "Administrator";
+  const userInitial = (userName || "A")[0].toUpperCase();
+  const userBadgeName = userName || (locale === "ru" ? "Администратор" : "Administrator");
   const pageMeta = getAdminPageMeta(locale, currentPath, userName);
   const ruPath = buildLocaleSwitchPath("ru", pathname);
   const enPath = buildLocaleSwitchPath("en", pathname);
@@ -184,9 +284,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         currentPath={currentPath}
         isOpen={sidebarOpen}
         onNavigate={() => setSidebarOpen(false)}
-        onLogout={() => void handleLogout()}
+        onLogout={handleLogoutRequest}
         logoutLabel={text.navLogout}
         supportUnreadCount={supportUnreadCount}
+        roles={sessionRoles}
       />
 
       <div className={styles.main}>
@@ -208,6 +309,26 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
         <main className={styles.content}>{children}</main>
       </div>
+
+      <ConfirmationDialog
+        open={logoutDialogOpen}
+        title={locale === "ru" ? "Выйти из админ-панели?" : "Log out of admin panel?"}
+        description={
+          locale === "ru"
+            ? "Текущая сессия будет очищена, и для возврата потребуется повторный вход."
+            : "The current session will be cleared and signing in again will be required."
+        }
+        confirmLabel={text.navLogout}
+        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        tone="danger"
+        isSubmitting={isLoggingOut}
+        onCancel={() => {
+          if (!isLoggingOut) {
+            setLogoutDialogOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmLogout}
+      />
     </div>
   );
 }

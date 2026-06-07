@@ -16,13 +16,14 @@ export function useAdminTemplateCategories({
 }: UseAdminTemplateCategoriesOptions = {}) {
   const categoriesQuery = useQuery<AdminTemplateCategory[]>({
     queryKey: adminQueryKeys.templateCategories(includeArchived),
-    queryFn: () => fetchAdminTemplateCategories(includeArchived),
+    queryFn: ({ signal }) => fetchAdminTemplateCategories(includeArchived, signal),
     enabled,
   });
 
   return {
     categories: categoriesQuery.data ?? [],
     hasError: categoriesQuery.isError,
+    isFetching: categoriesQuery.isFetching,
     isLoading: categoriesQuery.isLoading || categoriesQuery.isFetching,
     refresh: categoriesQuery.refetch,
   };

@@ -19,6 +19,7 @@ type SelectProps = {
   onChange: (value: string) => void;
   ariaLabel?: string;
   showSelectedDescription?: boolean;
+  disabled?: boolean;
 };
 
 export function Select({
@@ -27,6 +28,7 @@ export function Select({
   onChange,
   ariaLabel,
   showSelectedDescription = true,
+  disabled = false,
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -39,9 +41,10 @@ export function Select({
     0,
     options.findIndex((option) => option.value === selectedOption?.value)
   );
+  const isMenuOpen = isOpen && !disabled;
 
   useEffect(() => {
-    if (!isOpen) {
+    if (!isMenuOpen) {
       return;
     }
 
@@ -63,13 +66,13 @@ export function Select({
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen]);
+  }, [isMenuOpen]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isMenuOpen) {
       optionRefs.current[focusedIndex]?.focus();
     }
-  }, [focusedIndex, isOpen]);
+  }, [focusedIndex, isMenuOpen]);
 
   function getBadgeToneClassName(tone?: SelectOption["tone"]) {
     switch (tone) {
@@ -85,6 +88,10 @@ export function Select({
   }
 
   function openMenu(index = selectedIndex) {
+    if (disabled) {
+      return;
+    }
+
     setFocusedIndex(index);
     setIsOpen(true);
   }
@@ -99,6 +106,10 @@ export function Select({
   }
 
   function selectValue(nextValue: string) {
+    if (disabled) {
+      return;
+    }
+
     onChange(nextValue);
     closeMenu(true);
   }
@@ -111,7 +122,7 @@ export function Select({
   return (
     <div
       ref={rootRef}
-      className={`${styles.root} ${isOpen ? styles.rootOpen : ""}`.trim()}
+      className={`${styles.root} ${isMenuOpen ? styles.rootOpen : ""}`.trim()}
       onBlur={(event) => {
         if (!rootRef.current?.contains(event.relatedTarget as Node | null)) {
           setIsOpen(false);
@@ -121,13 +132,18 @@ export function Select({
       <button
         ref={triggerRef}
         type="button"
-        className={`${styles.trigger} ${isOpen ? styles.triggerOpen : ""}`.trim()}
+        className={`${styles.trigger} ${isMenuOpen ? styles.triggerOpen : ""}`.trim()}
         aria-haspopup="listbox"
-        aria-expanded={isOpen}
+        aria-expanded={isMenuOpen}
         aria-controls={listboxId}
         aria-label={ariaLabel}
+        disabled={disabled}
         onClick={() => {
-          if (isOpen) {
+          if (disabled) {
+            return;
+          }
+
+          if (isMenuOpen) {
             closeMenu();
             return;
           }
@@ -135,6 +151,10 @@ export function Select({
           openMenu();
         }}
         onKeyDown={(event) => {
+          if (disabled) {
+            return;
+          }
+
           switch (event.key) {
             case "ArrowDown":
             case "ArrowUp":
@@ -171,7 +191,7 @@ export function Select({
         <span className={styles.chevron} aria-hidden="true" />
       </button>
 
-      {isOpen ? (
+      {isMenuOpen ? (
         <div id={listboxId} className={styles.menu} role="listbox" aria-label={ariaLabel}>
           {options.map((option, index) => {
             const isSelected = option.value === value;

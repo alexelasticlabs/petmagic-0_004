@@ -17,7 +17,7 @@ type UseAdminTemplateOptions = {
 export function useAdminTemplateOptions({ enabled = true, templateType }: UseAdminTemplateOptions) {
   const templatesQuery = useQuery<AdminTemplateListItem[]>({
     queryKey: adminQueryKeys.templateCatalog(templateType),
-    queryFn: () => fetchAdminTemplates(templateType),
+    queryFn: ({ signal }) => fetchAdminTemplates(templateType, signal),
     enabled,
   });
 

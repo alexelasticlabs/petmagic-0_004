@@ -1,3 +1,4 @@
+import { canAccessAdminSection } from "@/lib/admin-rbac";
 import { type Locale, getDictionary } from "@/lib/i18n";
 
 export type AdminSectionKey =
@@ -5,7 +6,10 @@ export type AdminSectionKey =
   | "economy"
   | "promo-codes"
   | "support"
+  | "moderation"
   | "users"
+  | "generations"
+  | "role-management"
   | "templates"
   | "image-templates"
   | "video-templates"
@@ -52,15 +56,18 @@ export function matchesAdminPath(currentPath: string, targetPath: string) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
+export function getAdminNavItems(locale: Locale, roles?: readonly string[] | null): AdminNavEntry[] {
   const text = getDictionary(locale);
 
-  return [
+  const allItems: AdminNavEntry[] = [
     { type: "link", key: "dashboard", href: `/${locale}/dashboard`, label: text.navDashboard },
     { type: "link", key: "economy", href: `/${locale}/economy`, label: text.navEconomy },
     { type: "link", key: "promo-codes", href: `/${locale}/promo-codes`, label: text.navPromoCodes },
     { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
+    { type: "link", key: "moderation", href: `/${locale}/moderation`, label: text.navModeration },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
+    { type: "link", key: "generations", href: `/${locale}/generations`, label: text.navGenerations },
+    { type: "link", key: "role-management", href: `/${locale}/roles`, label: text.navRoleManagement },
     {
       type: "group",
       key: "templates",
@@ -94,6 +101,21 @@ export function getAdminNavItems(locale: Locale): AdminNavEntry[] {
       ],
     },
   ];
+
+  const effectiveRoles = roles ?? [];
+  return allItems
+    .map((entry) => {
+      if (entry.type === "link") {
+        return canAccessAdminSection(effectiveRoles, entry.key) ? entry : null;
+      }
+
+      const items = entry.items.filter((item) => canAccessAdminSection(effectiveRoles, item.key));
+
+      return items.length > 0 && canAccessAdminSection(effectiveRoles, entry.key)
+        ? { ...entry, items }
+        : null;
+    })
+    .filter((entry): entry is AdminNavEntry => entry !== null);
 }
 
 function matchesAnyAdminPath(currentPath: string, ...targetPaths: string[]) {
@@ -151,6 +173,26 @@ export function getAdminPageMeta(
     };
   }
 
+  if (matchesAdminPath(currentPath, "/generations")) {
+    return {
+      title: locale === "ru" ? "Генерации" : "Generations",
+      description:
+        locale === "ru"
+          ? "Очередь и история генераций с фильтрами по статусу, provider, пользователю и job id."
+          : "Generation queue and history with status, provider, user, and job id filters.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/roles")) {
+    return {
+      title: locale === "ru" ? "Управление ролями" : "Role Management",
+      description:
+        locale === "ru"
+          ? "Список Admin и Moderator, назначение и снятие Moderator с backend audit log."
+          : "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
+    };
+  }
+
   if (matchesAdminPath(currentPath, "/support")) {
     return {
       title: locale === "ru" ? "Поддержка" : "Support",
@@ -158,6 +200,16 @@ export function getAdminPageMeta(
         locale === "ru"
           ? "Очередь диалогов поддержки с пользователями и быстрые ответы команды."
           : "Support conversation inbox with fast team replies.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/moderation")) {
+    return {
+      title: locale === "ru" ? "Модерация" : "Moderation",
+      description:
+        locale === "ru"
+          ? "Очередь жалоб и обратной связи по шаблонам с approve/reject решением."
+          : "Complaint and feedback queue for templates with approve/reject decisions.",
     };
   }
 

@@ -32,16 +32,22 @@ import {
 } from "@/components/admin/admin-primitives";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
 import styles from "@/components/dashboard-view.module.css";
+import { Button } from "@/components/ui/button";
 import {
   fetchAdminEconomyPurchases,
+  fetchAdminEconomySubscriptions,
+  fetchAdminModerationQueue,
+  fetchAdminTemplateGenerationMetrics,
   fetchSupportInbox,
   fetchUsers,
   useAuthSession,
   type AdminEconomyPurchase,
+  type AdminTemplateGenerationDashboardMetrics,
   type AdminSupportConversationSummary,
   type UserListItem,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
+import { getAdminUserDisplayName, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type DashboardViewProps = { locale: Locale };
 type DashboardActivityType = "new" | "update" | "register" | "cancel";
@@ -55,7 +61,7 @@ type DashboardStatItem = {
   subtext: string;
   accentColor: string;
   icon: DashboardStatIcon;
-  isPositiveTrend: boolean;
+  isPositiveTrend?: boolean;
 };
 
 type DashboardOrderItem = {
@@ -151,7 +157,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
   const session = useAuthSession();
   const dashboardQuery = useQuery<DashboardViewModel>({
     queryKey: ["admin", "dashboard", locale],
-    queryFn: () => loadDashboardViewModel(locale),
+    queryFn: ({ signal }) => loadDashboardViewModel(locale, signal),
     enabled: Boolean(session),
     staleTime: 60_000,
   });
@@ -194,6 +200,19 @@ export function DashboardView({ locale }: DashboardViewProps) {
                 : "Gathering live metrics from users, economy, and support modules."
           }
           tone={dashboardQuery.isError ? "danger" : "info"}
+          action={
+            dashboardQuery.isError ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  void dashboardQuery.refetch().catch(() => undefined);
+                }}
+                disabled={dashboardQuery.isFetching}
+              >
+                {locale === "ru" ? "Повторить" : "Retry"}
+              </Button>
+            ) : undefined
+          }
         />
       </AdminPage>
     );
@@ -273,32 +292,44 @@ export function DashboardView({ locale }: DashboardViewProps) {
             </Link>
           }
         >
-          <div className={adminTableStyles.tableWrap}>
-            <table className={adminTableStyles.table}>
-              <thead>
-                <tr>
-                  <th>{viewModel.ordersSection.headers.order}</th>
-                  <th>{viewModel.ordersSection.headers.user}</th>
-                  <th>{viewModel.ordersSection.headers.amount}</th>
-                  <th>{viewModel.ordersSection.headers.status}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {viewModel.orders.map((order) => (
-                  <tr key={order.id}>
-                    <td className={adminTableStyles.mono}>{order.id}</td>
-                    <td>{order.user}</td>
-                    <td className={adminTableStyles.numeric}>{order.amount}</td>
-                    <td>
-                      <AdminStatusBadge color={statusColors[order.statusType]}>
-                        {order.status}
-                      </AdminStatusBadge>
-                    </td>
+          {viewModel.orders.length > 0 ? (
+            <div className={adminTableStyles.tableWrap}>
+              <table className={adminTableStyles.table}>
+                <thead>
+                  <tr>
+                    <th>{viewModel.ordersSection.headers.order}</th>
+                    <th>{viewModel.ordersSection.headers.user}</th>
+                    <th>{viewModel.ordersSection.headers.amount}</th>
+                    <th>{viewModel.ordersSection.headers.status}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {viewModel.orders.map((order) => (
+                    <tr key={order.id}>
+                      <td className={adminTableStyles.mono}>{order.id}</td>
+                      <td>{order.user}</td>
+                      <td className={adminTableStyles.numeric}>{order.amount}</td>
+                      <td>
+                        <AdminStatusBadge color={statusColors[order.statusType]}>
+                          {order.status}
+                        </AdminStatusBadge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <AdminStateCard
+              tone="info"
+              title={locale === "ru" ? "Платежей пока нет" : "No payments yet"}
+              description={
+                locale === "ru"
+                  ? "Когда backend вернет покупки, последние платежи появятся здесь."
+                  : "Recent payments will appear here when the backend returns purchases."
+              }
+            />
+          )}
         </AdminCard>
       </div>
 
@@ -342,50 +373,147 @@ export function DashboardView({ locale }: DashboardViewProps) {
           }
           description={viewModel.activitySection.description}
         >
-          <ul className={styles.activityList}>
-            {viewModel.activities.map((activity) => (
-              <li key={activity.id} className={styles.activityItem}>
-                <ActivityIcon type={activity.type} />
-                <div className={styles.activityBody}>
-                  <p className={styles.activityText}>{activity.text}</p>
-                  <p className={styles.activityTime}>{activity.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {viewModel.activities.length > 0 ? (
+            <ul className={styles.activityList}>
+              {viewModel.activities.map((activity) => (
+                <li key={activity.id} className={styles.activityItem}>
+                  <ActivityIcon type={activity.type} />
+                  <div className={styles.activityBody}>
+                    <p className={styles.activityText}>{activity.text}</p>
+                    <p className={styles.activityTime}>{activity.time}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <AdminStateCard
+              tone="info"
+              title={locale === "ru" ? "Активности пока нет" : "No recent activity"}
+              description={
+                locale === "ru"
+                  ? "События появятся после регистрации пользователей, платежей или обновлений поддержки."
+                  : "Events will appear after users register, payments update, or support tickets change."
+              }
+            />
+          )}
         </AdminCard>
       </div>
     </AdminPage>
   );
 }
 
-async function loadDashboardViewModel(locale: Locale): Promise<DashboardViewModel> {
-  const [usersResult, purchasesResult, supportResult] = await Promise.allSettled([
-    fetchUsers(),
-    fetchDashboardPurchases(),
-    fetchSupportInbox(undefined, "all"),
+async function loadDashboardViewModel(locale: Locale, signal?: AbortSignal): Promise<DashboardViewModel> {
+  const [
+    usersResult,
+    purchases,
+    supportConversations,
+    moderationQueueCount,
+    activeSubscriptionCount,
+    generationMetrics,
+  ] = await Promise.all([
+    fetchDashboardUsers(signal),
+    fetchDashboardPurchases(signal),
+    fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
+    fetchPendingModerationQueueCount(signal),
+    fetchActiveSubscriptionCount(signal),
+    fetchAdminTemplateGenerationMetrics(signal),
   ]);
 
-  const users = usersResult.status === "fulfilled" ? usersResult.value : [];
-  const purchases = purchasesResult.status === "fulfilled" ? purchasesResult.value : [];
-  const supportConversations = supportResult.status === "fulfilled" ? supportResult.value : [];
+  throwIfAborted(signal);
 
-  return buildDashboardFromData(locale, users, purchases, supportConversations);
+  const users = usersResult.items;
+  const totalUserCount = usersResult.totalCount;
+  const premiumUserCount = usersResult.premiumCount;
+
+  return buildDashboardFromData(
+    locale,
+    users,
+    totalUserCount,
+    premiumUserCount,
+    activeSubscriptionCount,
+    generationMetrics,
+    purchases,
+    supportConversations,
+    moderationQueueCount
+  );
 }
 
-async function fetchDashboardPurchases(): Promise<AdminEconomyPurchase[]> {
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  throw new DOMException("Dashboard request was aborted.", "AbortError");
+}
+
+async function fetchDashboardUsers(signal?: AbortSignal): Promise<{
+  items: UserListItem[];
+  totalCount: number;
+  premiumCount: number;
+}> {
+  const take = 200;
+  const maxPages = 5;
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const items: UserListItem[] = [];
+  let totalCount = 0;
+  const premiumPage = await fetchUsers({ skip: 0, take: 1, isPremium: true }, signal);
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetchUsers({ skip: page * take, take }, signal);
+    items.push(...response.items);
+    totalCount = response.totalCount;
+
+    if (!response.hasMore) {
+      break;
+    }
+
+    const oldestItem = response.items[response.items.length - 1];
+    const oldestTimestamp = parseTimestamp(oldestItem?.createdAtUtc);
+    if (oldestTimestamp !== null && oldestTimestamp < cutoff) {
+      break;
+    }
+  }
+
+  return { items, totalCount, premiumCount: premiumPage.totalCount };
+}
+
+async function fetchActiveSubscriptionCount(signal?: AbortSignal): Promise<number> {
+  const take = 200;
+  const maxPages = 20;
+  let count = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetchAdminEconomySubscriptions(
+      {
+        skip: page * take,
+        take,
+        status: "Active",
+      },
+      signal
+    );
+    const totalCount = getOptionalTotalCount(response);
+    if (totalCount !== null) {
+      return totalCount;
+    }
+
+    count += response.items.length;
+
+    if (!response.hasMore) {
+      break;
+    }
+  }
+
+  return count;
+}
+
+async function fetchDashboardPurchases(signal?: AbortSignal): Promise<AdminEconomyPurchase[]> {
   const take = 200;
   const maxPages = 3;
   const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
   const items: AdminEconomyPurchase[] = [];
 
-  const pageResponses = await Promise.all(
-    Array.from({ length: maxPages }, (_, page) =>
-      fetchAdminEconomyPurchases({ skip: page * take, take })
-    )
-  );
-
-  for (const response of pageResponses) {
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetchAdminEconomyPurchases({ skip: page * take, take }, signal);
     items.push(...response.items);
 
     if (!response.hasMore) {
@@ -402,11 +530,54 @@ async function fetchDashboardPurchases(): Promise<AdminEconomyPurchase[]> {
   return items;
 }
 
+async function fetchPendingModerationQueueCount(signal?: AbortSignal): Promise<number> {
+  const take = 100;
+  const maxPages = 20;
+  let count = 0;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const response = await fetchAdminModerationQueue(
+      {
+        status: "pending",
+        skip: page * take,
+        take,
+      },
+      signal
+    );
+    const totalCount = getOptionalTotalCount(response);
+    if (totalCount !== null) {
+      return totalCount;
+    }
+
+    count += response.items.length;
+
+    if (!response.hasMore) {
+      break;
+    }
+  }
+
+  return count;
+}
+
+function getOptionalTotalCount(response: unknown): number | null {
+  if (!response || typeof response !== "object" || !("totalCount" in response)) {
+    return null;
+  }
+
+  const totalCount = (response as { totalCount?: unknown }).totalCount;
+  return typeof totalCount === "number" && Number.isFinite(totalCount) ? totalCount : null;
+}
+
 function buildDashboardFromData(
   locale: Locale,
   users: UserListItem[],
+  totalUserCount: number,
+  premiumUserCount: number,
+  activeSubscriptionCount: number,
+  generationMetrics: AdminTemplateGenerationDashboardMetrics,
   purchases: AdminEconomyPurchase[],
-  supportConversations: AdminSupportConversationSummary[]
+  supportConversations: AdminSupportConversationSummary[],
+  moderationQueueCount: number
 ): DashboardViewModel {
   const copy = getDashboardCopy(locale);
   const now = Date.now();
@@ -440,6 +611,9 @@ function buildDashboardFromData(
 
   const currentSucceeded = currentPurchases.filter((item) => item.status === "succeeded");
   const previousSucceeded = previousPurchases.filter((item) => item.status === "succeeded");
+  const currentFailedPayments = currentPurchases.filter(
+    (item) => mapPurchaseStatus(item.status) === "cancelled"
+  ).length;
   const revenueCurrency = detectMainCurrency(currentSucceeded, purchasesSorted);
 
   const currentRevenue = currentSucceeded
@@ -460,7 +634,7 @@ function buildDashboardFromData(
   const stats: DashboardStatItem[] = [
     {
       label: copy.stats.users,
-      value: formatNumber(users.length, locale),
+      value: formatNumber(totalUserCount, locale),
       delta: formatSignedPercentDelta(currentUsers, previousUsers, locale),
       subtext: copy.stats.usersSubtext,
       icon: "people",
@@ -494,6 +668,62 @@ function buildDashboardFromData(
       accentColor: "#f472b6",
       isPositiveTrend: currentConversion >= previousConversion,
     },
+    {
+      label: copy.stats.premiumUsers,
+      value: formatNumber(premiumUserCount, locale),
+      delta: copy.stats.live,
+      subtext: copy.stats.premiumUsersSubtext,
+      icon: "people",
+      accentColor: "#a78bfa",
+    },
+    {
+      label: copy.stats.activeSubscriptions,
+      value: formatNumber(activeSubscriptionCount, locale),
+      delta: copy.stats.live,
+      subtext: copy.stats.activeSubscriptionsSubtext,
+      icon: "dollar",
+      accentColor: "#34d399",
+    },
+    {
+      label: copy.stats.generationsToday,
+      value: formatNumber(generationMetrics.generationsToday, locale),
+      delta: `${formatNumber(generationMetrics.generationsThisWeek, locale)} ${copy.stats.weekShort}`,
+      subtext: `${formatNumber(generationMetrics.generationsThisMonth, locale)} ${copy.stats.monthShort}`,
+      icon: "trendUp",
+      accentColor: "#38bdf8",
+    },
+    {
+      label: copy.stats.failedGenerations,
+      value: formatNumber(generationMetrics.failedGenerationsThisWeek, locale),
+      delta: `${formatNumber(generationMetrics.failedGenerationsToday, locale)} ${copy.stats.todayShort}`,
+      subtext: `${formatNumber(generationMetrics.failedGenerationsThisMonth, locale)} ${copy.stats.monthShort}`,
+      icon: "trendUp",
+      accentColor: "#f87171",
+    },
+    {
+      label: copy.stats.pendingJobs,
+      value: formatNumber(generationMetrics.pendingJobs, locale),
+      delta: `${formatNumber(generationMetrics.runningJobs, locale)} ${copy.stats.runningShort}`,
+      subtext: copy.stats.pendingJobsSubtext,
+      icon: "cart",
+      accentColor: "#facc15",
+    },
+    {
+      label: copy.stats.paymentSuccessFailure,
+      value: `${formatNumber(currentSucceeded.length, locale)} / ${formatNumber(currentFailedPayments, locale)}`,
+      delta: copy.stats.currentWeek,
+      subtext: copy.stats.paymentSuccessFailureSubtext,
+      icon: "dollar",
+      accentColor: "#fb7185",
+    },
+    {
+      label: copy.stats.moderationQueue,
+      value: formatNumber(moderationQueueCount, locale),
+      delta: copy.stats.live,
+      subtext: copy.stats.moderationQueueSubtext,
+      icon: "people",
+      accentColor: "#f472b6",
+    },
   ];
 
   const orders = purchasesSorted.slice(0, 5).map((item) => {
@@ -501,7 +731,7 @@ function buildDashboardFromData(
     const statusType = mapPurchaseStatus(item.status);
     return {
       id: shortOrderId(item.orderId),
-      user: user?.displayName || user?.email || shortUserId(item.userId),
+      user: user ? formatDashboardUserLabel(user) : shortUserId(item.userId),
       amount: formatCurrency(item.priceAmount, locale, normalizeCurrencyCode(item.currencyCode)),
       status: getOrderStatusLabel(statusType, locale),
       statusType,
@@ -525,7 +755,7 @@ function buildDashboardFromData(
     ordersSection: copy.ordersSection,
     distributionSection: {
       ...copy.distributionSection,
-      totalValue: formatNumber(users.length, locale),
+      totalValue: formatNumber(totalUserCount, locale),
     },
     activitySection: copy.activitySection,
     stats,
@@ -546,15 +776,15 @@ function buildActivities(
     .map((item) => ({
       id: `user:${item.userId}`,
       at: parseTimestamp(item.createdAtUtc),
-      item: {
-        id: `user:${item.userId}`,
-        type: "register" as const,
-        text:
-          locale === "ru"
-            ? `${item.displayName || item.email} зарегистрировался в системе`
-            : `${item.displayName || item.email} registered in the system`,
-        time: formatRelativeTime(item.createdAtUtc, locale),
-      },
+        item: {
+          id: `user:${item.userId}`,
+          type: "register" as const,
+          text:
+            locale === "ru"
+              ? `${formatDashboardUserLabel(item)} зарегистрировался в системе`
+              : `${formatDashboardUserLabel(item)} registered in the system`,
+          time: formatRelativeTime(item.createdAtUtc, locale),
+        },
     }))
     .filter((event) => event.at !== null);
 
@@ -563,7 +793,7 @@ function buildActivities(
     .map((item) => {
       const timestamp = item.confirmedAtUtc ?? item.createdAtUtc;
       const user = userMap.get(item.userId);
-      const userLabel = user?.displayName || user?.email || shortUserId(item.userId);
+      const userLabel = user ? formatDashboardUserLabel(user) : shortUserId(item.userId);
       const statusType = mapPurchaseStatus(item.status);
       return {
         id: `purchase:${item.orderId}`,
@@ -591,8 +821,8 @@ function buildActivities(
         type: "update" as const,
         text:
           locale === "ru"
-            ? `Обновлён тикет ${shortConversationId(item.conversationId)}: ${item.status}`
-            : `Updated ticket ${shortConversationId(item.conversationId)}: ${item.status}`,
+            ? `Обновлён тикет ${shortConversationId(item.conversationId)}: ${formatDashboardLabel(item.status, 48)}`
+            : `Updated ticket ${shortConversationId(item.conversationId)}: ${formatDashboardLabel(item.status, 48)}`,
         time: formatRelativeTime(item.updatedAtUtc, locale),
       },
     }))
@@ -692,7 +922,20 @@ function parseTimestamp(value: string | null | undefined): number | null {
 
 function normalizeCurrencyCode(value: string | null | undefined): string {
   const normalized = value?.trim().toUpperCase();
-  return normalized && /^[A-Z]{3}$/.test(normalized) ? normalized : "USD";
+  if (!normalized || !/^[A-Z]{3}$/.test(normalized)) {
+    return "USD";
+  }
+
+  return isSupportedCurrencyCode(normalized) ? normalized : "USD";
+}
+
+function isSupportedCurrencyCode(currencyCode: string): boolean {
+  try {
+    new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function detectMainCurrency(
@@ -729,11 +972,17 @@ function formatNumber(value: number, locale: Locale, maximumFractionDigits = 0):
 }
 
 function formatCurrency(value: number, locale: Locale, currencyCode: string): string {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    style: "currency",
-    currency: currencyCode,
-    maximumFractionDigits: 2,
-  }).format(value);
+  const amount = Number.isFinite(value) ? value : 0;
+  const safeCurrencyCode = normalizeCurrencyCode(currencyCode);
+  try {
+    return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+      style: "currency",
+      currency: safeCurrencyCode,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${formatNumber(amount, locale, 2)} ${sanitizeSensitiveText(safeCurrencyCode, 12)}`;
+  }
 }
 
 function formatSignedPercentDelta(current: number, previous: number, locale: Locale): string {
@@ -786,17 +1035,25 @@ function getOrderStatusLabel(status: DashboardOrderStatusType, locale: Locale): 
   return "Failed";
 }
 
+function formatDashboardUserLabel(user: Pick<UserListItem, "displayName" | "email" | "userId">): string {
+  return formatDashboardLabel(getAdminUserDisplayName(user), 96);
+}
+
+function formatDashboardLabel(value: string | null | undefined, maxLength = 80): string {
+  return sanitizeSensitiveText(value, maxLength);
+}
+
 function shortOrderId(orderId: string): string {
-  const compact = orderId.replace(/-/g, "");
+  const compact = formatDashboardLabel(orderId, 64).replace(/-/g, "");
   return `#${compact.slice(0, 8).toUpperCase()}`;
 }
 
 function shortUserId(userId: string): string {
-  return userId.slice(0, 8);
+  return formatDashboardLabel(userId, 32).slice(0, 8);
 }
 
 function shortConversationId(conversationId: string): string {
-  return `#${conversationId.slice(0, 6).toUpperCase()}`;
+  return `#${formatDashboardLabel(conversationId, 32).slice(0, 6).toUpperCase()}`;
 }
 
 function formatRelativeTime(value: string | null | undefined, locale: Locale): string {
@@ -877,15 +1134,33 @@ function getDashboardCopy(locale: Locale) {
     },
     stats: {
       users: isRu ? "Пользователи" : "Users",
+      premiumUsers: isRu ? "Premium пользователи" : "Premium users",
+      activeSubscriptions: isRu ? "Активные подписки" : "Active subscriptions",
+      generationsToday: isRu ? "Генерации сегодня" : "Generations today",
+      failedGenerations: isRu ? "Ошибки генераций" : "Failed generations",
+      pendingJobs: isRu ? "Очередь генераций" : "Pending jobs",
+      paymentSuccessFailure: isRu ? "Платежи успех/ошибка" : "Payments success/fail",
+      moderationQueue: isRu ? "Очередь модерации" : "Moderation queue",
       orders: isRu ? "Заказы" : "Orders",
       revenue: isRu ? "Выручка" : "Revenue",
       conversion: isRu ? "Конверсия" : "Conversion",
       usersSubtext: isRu ? "новые за 7 дней к предыдущим 7" : "new in 7d vs previous 7d",
+      premiumUsersSubtext: isRu ? "по backend-фильтру premium" : "from backend premium filter",
+      activeSubscriptionsSubtext: isRu ? "статус Active" : "status Active",
+      pendingJobsSubtext: isRu ? "ожидают обработки" : "waiting for processing",
+      paymentSuccessFailureSubtext: isRu ? "за текущие 7 дней" : "current 7-day window",
+      moderationQueueSubtext: isRu ? "pending элементы модерации" : "pending moderation items",
       ordersSubtext: isRu ? "заказы за 7 дней к предыдущим 7" : "orders in 7d vs previous 7d",
       revenueSubtext: isRu ? "выручка за 7 дней к предыдущим 7" : "revenue in 7d vs previous 7d",
       conversionSubtext: isRu
         ? "доля успешных заказов за 7 дней"
         : "successful orders ratio in last 7d",
+      live: isRu ? "live" : "live",
+      todayShort: isRu ? "сегодня" : "today",
+      weekShort: isRu ? "за неделю" : "week",
+      monthShort: isRu ? "за 30 дней" : "30d",
+      runningShort: isRu ? "в работе" : "running",
+      currentWeek: isRu ? "текущая неделя" : "current week",
       pp: isRu ? " п.п." : "pp",
     },
   };

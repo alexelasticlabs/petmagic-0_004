@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartIcon, TableIcon, VideoIcon } from "@/components/admin/admin-icons";
+import { ChartIcon, TableIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/templates/template-analytics-page.module.css";
 import {
   formatAnalyticsValue,
@@ -19,6 +19,7 @@ import type {
   AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type RecentRunsMode = "latest" | "all" | "failed";
 type FeedbackFilterKey = "all" | "complaint" | "feedback";
@@ -43,6 +44,7 @@ type RecentRunsText = {
   failureCodeHeader: string;
   failureReasonHeader: string;
   openOutput: string;
+  outputAvailable: string;
   noOutput: string;
   failedRunsEmpty: string;
   recentRunsEmpty: string;
@@ -257,7 +259,7 @@ function RecentRunsTable({
 }) {
   const isRu = locale === "ru";
   const hasFailureDetails = items.some(
-    (item) => item.status === "Failed" || Boolean(item.failureCode) || Boolean(item.failureMessage)
+    (item) => item.status === "Failed" || Boolean(item.failureCode)
   );
 
   if (!items.length) {
@@ -281,7 +283,6 @@ function RecentRunsTable({
             <th>{text.recentDuration}</th>
             <th>{text.recentModels}</th>
             {hasFailureDetails ? <th>{text.failureCodeHeader}</th> : null}
-            {hasFailureDetails ? <th>{text.failureReasonHeader}</th> : null}
             <th>{text.recentOutput}</th>
           </tr>
         </thead>
@@ -316,26 +317,9 @@ function RecentRunsTable({
                   )}
                 </td>
               ) : null}
-              {hasFailureDetails ? (
-                <td>
-                  {item.failureMessage ? (
-                    <span className={styles.failureReasonCell}>{item.failureMessage}</span>
-                  ) : (
-                    <span className={styles.mutedCell}>-</span>
-                  )}
-                </td>
-              ) : null}
               <td>
                 {item.outputUrl ? (
-                  <a
-                    href={item.outputUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={styles.inlineLink}
-                  >
-                    <VideoIcon className={styles.inlineIcon} />
-                    <span>{text.openOutput}</span>
-                  </a>
+                  <span className={styles.mutedCell}>{text.outputAvailable}</span>
                 ) : (
                   <span className={styles.mutedCell}>{text.noOutput}</span>
                 )}
@@ -418,7 +402,9 @@ function FeedbackList({
             <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
           </div>
           <p className={styles.feedbackMessage}>
-            {item.feedbackMessage?.trim() || text.feedbackMessageMissing}
+            {item.feedbackMessage?.trim()
+              ? sanitizeSensitiveText(item.feedbackMessage, 240)
+              : text.feedbackMessageMissing}
           </p>
           <div className={styles.feedbackMeta}>
             <span>

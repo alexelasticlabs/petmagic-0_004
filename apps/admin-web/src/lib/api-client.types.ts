@@ -57,7 +57,7 @@ export type UserAvatar = {
 };
 
 export type AuthSession = {
-  accessToken: string;
+  accessToken?: string;
   refreshToken?: string;
   expiresAtUtc: string;
   user: UserProfile;
@@ -73,6 +73,10 @@ export type UserListItem = {
   roles: string[];
   createdAtUtc: string;
   avatar?: UserAvatar | null;
+};
+
+export type UserListPage = OffsetPagedResponse<UserListItem> & {
+  totalCount: number;
 };
 
 export type AdminUserDetail = {
@@ -227,7 +231,7 @@ export type AdminEconomyPurchase = {
   priceAmount: number;
   currencyCode: string;
   sparkToGrant: number;
-  externalPaymentId?: string | null;
+  canRefund?: boolean;
   createdAtUtc: string;
   confirmedAtUtc?: string | null;
 };
@@ -522,7 +526,20 @@ export type TemplateType = "Image" | "Video";
 
 export type TemplateStatus = "Draft" | "Active" | "Archived";
 
-export type TemplateGenerationJobStatus = "Queued" | "Processing" | "Completed" | "Failed";
+export type TemplateGenerationJobStatus =
+  | "Queued"
+  | "Processing"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Retrying";
+export type AdminGenerationStatus =
+  | "Pending"
+  | "Running"
+  | "Completed"
+  | "Failed"
+  | "Cancelled"
+  | "Retrying";
 
 export type TemplatePromoBadgeMode = "Auto" | "New" | "Trending" | "Popular" | "Funny";
 
@@ -693,6 +710,41 @@ export type AdminTemplateFeedbackItem = {
   createdAtUtc: string;
 };
 
+export type AdminModerationStatus = "pending" | "approved" | "rejected";
+
+export type AdminModerationQueueItem = {
+  eventId: string;
+  templateId: string;
+  templateTitle: string;
+  templateType: TemplateType;
+  eventType: "complaint" | "feedback" | string;
+  status: AdminModerationStatus;
+  message?: string | null;
+  source: string;
+  deviceClass: string;
+  countryCode: string;
+  userId?: string | null;
+  generationId?: string | null;
+  moderationComment?: string | null;
+  createdAtUtc: string;
+  moderatedAtUtc?: string | null;
+};
+
+export type AdminModerationQueuePage = {
+  items: AdminModerationQueueItem[];
+  skip: number;
+  take: number;
+  hasMore: boolean;
+  generatedAtUtc: string;
+};
+
+export type AdminModerationQueueQuery = {
+  status?: AdminModerationStatus | "all";
+  search?: string;
+  skip?: number;
+  take?: number;
+};
+
 export type AdminTemplateFeedbackQuery = {
   take?: number;
   type?: "complaint" | "feedback";
@@ -803,6 +855,57 @@ export type AdminTemplatesAnalyticsOverview = {
   conversionFunnel: AdminTemplatesAnalyticsFunnel;
   templates: AdminTemplatesAnalyticsTemplateRow[];
   availableCategories: string[];
+  generatedAtUtc: string;
+};
+
+export type AdminTemplateGenerationDashboardMetrics = {
+  generationsToday: number;
+  generationsThisWeek: number;
+  generationsThisMonth: number;
+  failedGenerationsToday: number;
+  failedGenerationsThisWeek: number;
+  failedGenerationsThisMonth: number;
+  pendingJobs: number;
+  runningJobs: number;
+  generatedAtUtc: string;
+};
+
+export type AdminTemplateGenerationListItem = {
+  generationId: string;
+  userId: string;
+  templateId: string;
+  templateTitle: string;
+  templateType: TemplateType;
+  status: AdminGenerationStatus;
+  provider?: string | null;
+  model?: string | null;
+  tokenCost: number;
+  attemptCount: number;
+  providerCostUsd?: number | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  startedAtUtc?: string | null;
+  completedAtUtc?: string | null;
+  refundedAtUtc?: string | null;
+};
+
+export type AdminTemplateGenerationsQuery = {
+  status?: AdminGenerationStatus | "All";
+  provider?: string;
+  user?: string;
+  search?: string;
+  skip?: number;
+  take?: number;
+};
+
+export type AdminTemplateGenerationsPage = {
+  items: AdminTemplateGenerationListItem[];
+  totalCount: number;
+  skip: number;
+  take: number;
+  hasMore: boolean;
   generatedAtUtc: string;
 };
 

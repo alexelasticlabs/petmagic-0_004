@@ -1,8 +1,16 @@
-import { type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
 
 import { AdminCard, AdminStateCard, adminTableStyles } from "@/components/admin/admin-primitives";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { type EconomyPageText } from "@/components/economy-page.content";
 import {
+  ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH,
+  ECONOMY_PROVIDER_CODE_MAX_LENGTH,
+  ECONOMY_PROVIDER_LABEL_MAX_LENGTH,
+  ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH,
+  ECONOMY_PROVIDER_REGION_MAX_LENGTH,
+  ECONOMY_PROVIDER_VERSION_MAX_LENGTH,
+  normalizeEconomyPercentInput,
   toProviderConfigDraft,
   updateProviderConfigDraft,
   type ProviderConfigCreateDraft,
@@ -16,6 +24,7 @@ import {
   type AdminPaymentProviderConfigurationMatch,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type EconomyPageProviderConfigsSectionProps = {
   locale: Locale;
@@ -42,7 +51,7 @@ type EconomyPageProviderConfigsSectionProps = {
   onCreateProviderConfig: () => void;
   onTestProviderConfig: () => void;
   onCloneProviderConfig: (payload: { configurationId: string; region: string }) => void;
-  onDeleteProviderConfig: (configurationId: string) => void;
+  onDeleteProviderConfig: (configurationId: string) => Promise<boolean>;
   humanizeProvider: (value: string, locale: Locale) => string;
 };
 
@@ -90,6 +99,13 @@ export function EconomyPageProviderConfigsSection({
   onDeleteProviderConfig,
   humanizeProvider,
 }: EconomyPageProviderConfigsSectionProps) {
+  const [configurationPendingDeleteId, setConfigurationPendingDeleteId] = useState<string | null>(
+    null
+  );
+  const configurationPendingDelete = configurationPendingDeleteId
+    ? providerConfigs.find((config) => config.configurationId === configurationPendingDeleteId)
+    : null;
+
   return (
     <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
       <div className={styles.redeemGrid}>
@@ -108,6 +124,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="stripe"
+                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -122,6 +139,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="web"
+                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -136,6 +154,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="US"
+                maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -149,7 +168,8 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="test"
+                placeholder="live"
+                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
           </div>
@@ -166,22 +186,24 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
+                maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
               <span>{text.bonusPercentLabel}</span>
               <input
-                type="number"
-                min="0"
-                max="100"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={createProviderDraft.bonusTokensPercent}
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    bonusTokensPercent: event.target.value,
+                    bonusTokensPercent: normalizeEconomyPercentInput(event.target.value),
                   }))
                 }
                 className={styles.input}
+                maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
               />
             </label>
           </div>
@@ -261,6 +283,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="stripe"
+                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -275,6 +298,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="ios"
+                maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -289,6 +313,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="DE"
+                maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
               />
             </label>
             <label className={styles.field}>
@@ -300,6 +325,7 @@ export function EconomyPageProviderConfigsSection({
                 }
                 className={styles.input}
                 placeholder="1.0.0"
+                maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
               />
             </label>
           </div>
@@ -311,10 +337,10 @@ export function EconomyPageProviderConfigsSection({
           {matchResult ? (
             <AdminStateCard
               tone={matchResult.allowedForCheckout ? "success" : "warning"}
-              title={`${matchResult.decisionCode}: ${matchResult.decisionMessage}`}
+              title={`${safeText(matchResult.decisionCode, 80)}: ${safeText(matchResult.decisionMessage, 180)}`}
               description={
                 matchResult.matchedConfiguration
-                  ? `${text.providerConfigMatchLabel}: ${matchResult.matchedConfiguration.provider}/${matchResult.matchedConfiguration.platform}/${matchResult.matchedConfiguration.region} (${matchResult.matchedConfiguration.mode})`
+                  ? `${text.providerConfigMatchLabel}: ${humanizeProvider(matchResult.matchedConfiguration.provider, locale)}/${safeText(matchResult.matchedConfiguration.platform, 48)}/${safeText(matchResult.matchedConfiguration.region, 48)} (${safeText(matchResult.matchedConfiguration.mode, 48)})`
                   : text.providerConfigNoMatchLabel
               }
             />
@@ -346,7 +372,7 @@ export function EconomyPageProviderConfigsSection({
                 return (
                   <tr key={config.configurationId}>
                     <td>{humanizeProvider(config.provider, locale)}</td>
-                    <td>{config.platform}</td>
+                    <td>{safeText(config.platform, 48)}</td>
                     <td>
                       <input
                         value={draft.region}
@@ -360,6 +386,7 @@ export function EconomyPageProviderConfigsSection({
                           )
                         }
                         className={styles.input}
+                        maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
                       />
                     </td>
                     <td>
@@ -468,25 +495,29 @@ export function EconomyPageProviderConfigsSection({
                               )
                             }
                             className={styles.input}
+                            maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
                           <span>{text.bonusPercentLabel}</span>
                           <input
-                            type="number"
-                            min="0"
-                            max="100"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={draft.bonusTokensPercent}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  bonusTokensPercent: event.target.value,
+                                  bonusTokensPercent: normalizeEconomyPercentInput(
+                                    event.target.value
+                                  ),
                                 }
                               )
                             }
                             className={styles.input}
+                            maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
                           />
                         </label>
                       </div>
@@ -507,6 +538,7 @@ export function EconomyPageProviderConfigsSection({
                               )
                             }
                             className={styles.input}
+                            maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
@@ -524,6 +556,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             placeholder={humanizeProvider(config.provider, locale)}
+                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
@@ -541,6 +574,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             placeholder={text.noDescription}
+                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
@@ -558,6 +592,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             placeholder={text.noDescription}
+                            maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
@@ -575,6 +610,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             placeholder={text.noDescription}
+                            maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
                           />
                         </label>
                         <label className={styles.field}>
@@ -592,6 +628,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             placeholder={text.noDescription}
+                            maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
                           />
                         </label>
                       </div>
@@ -615,6 +652,7 @@ export function EconomyPageProviderConfigsSection({
                           }
                           className={styles.input}
                           placeholder={text.cloneRegionPlaceholder}
+                          maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
                         />
 
                         <Button
@@ -636,13 +674,7 @@ export function EconomyPageProviderConfigsSection({
                         </Button>
 
                         <Button
-                          onClick={() => {
-                            if (!window.confirm(text.providerConfigDeleteConfirm)) {
-                              return;
-                            }
-
-                            onDeleteProviderConfig(config.configurationId);
-                          }}
+                          onClick={() => setConfigurationPendingDeleteId(config.configurationId)}
                           disabled={deleteProviderConfigPending}
                           variant="danger"
                         >
@@ -660,6 +692,45 @@ export function EconomyPageProviderConfigsSection({
           </table>
         </div>
       </TableOrEmpty>
+      <ConfirmationDialog
+        open={configurationPendingDeleteId !== null}
+        title={text.deleteAction}
+        description={
+          configurationPendingDelete
+            ? `${humanizeProvider(configurationPendingDelete.provider, locale)} / ${safeText(configurationPendingDelete.region, 48)}: ${text.providerConfigDeleteConfirm}`
+            : text.providerConfigDeleteConfirm
+        }
+        confirmLabel={text.deleteAction}
+        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        isSubmitting={Boolean(
+          configurationPendingDeleteId && deleteProviderConfigId === configurationPendingDeleteId
+        )}
+        onCancel={() => {
+          if (!deleteProviderConfigPending) {
+            setConfigurationPendingDeleteId(null);
+          }
+        }}
+        onConfirm={() => {
+          if (deleteProviderConfigPending) {
+            return;
+          }
+
+          if (!configurationPendingDeleteId) {
+            return;
+          }
+
+          void onDeleteProviderConfig(configurationPendingDeleteId).then((succeeded) => {
+            if (succeeded) {
+              setConfigurationPendingDeleteId(null);
+            }
+          });
+        }}
+      />
     </AdminCard>
   );
+}
+
+function safeText(value: string | null | undefined, maxLength = 120) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
 }

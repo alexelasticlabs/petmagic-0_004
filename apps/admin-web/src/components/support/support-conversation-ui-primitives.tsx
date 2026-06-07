@@ -22,6 +22,7 @@ type SidePanelAsyncStateProps = {
   hasContent: boolean;
   loadingTitle: string;
   errorTitle: string;
+  isRetrying?: boolean;
   retryLabel?: string;
   onRetry?: () => void;
   emptyTitle: string;
@@ -58,6 +59,7 @@ export function SidePanelAsyncState({
   hasContent,
   loadingTitle,
   errorTitle,
+  isRetrying = false,
   retryLabel,
   onRetry,
   emptyTitle,
@@ -74,7 +76,7 @@ export function SidePanelAsyncState({
         title={errorTitle}
         action={
           onRetry && retryLabel ? (
-            <Button variant="secondary" size="sm" onClick={onRetry}>
+            <Button variant="secondary" size="sm" onClick={onRetry} disabled={isRetrying}>
               {retryLabel}
             </Button>
           ) : null

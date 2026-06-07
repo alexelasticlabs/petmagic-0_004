@@ -9,11 +9,12 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import { sortSupportQueueItems } from "@/components/support/support-conversation-helpers";
 import { SupportConversationPage } from "@/components/support/support-conversation-page";
 import styles from "@/components/support/support-page.module.css";
+import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-    fetchSupportInbox,
-    useAuthSession,
-    type AdminSupportConversationSummary,
+  fetchSupportInbox,
+  useAuthSession,
+  type AdminSupportConversationSummary,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -34,8 +35,8 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   }, [locale, router, session]);
 
   const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
-    queryKey: adminQueryKeys.supportInbox("all", "all"),
-    queryFn: () => fetchSupportInbox(undefined, "all"),
+    queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
+    queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
     enabled: Boolean(session),
   });
 
@@ -49,10 +50,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
       return null;
     }
 
-    if (
-      selectedConversationId &&
-      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)
-    ) {
+    if (selectedConversationId) {
       return selectedConversationId;
     }
 
@@ -78,6 +76,15 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
           tone="danger"
           title={text.supportLoadError}
           description={text.supportDescription}
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => void inboxQuery.refetch().catch(() => undefined)}
+              disabled={inboxQuery.isFetching}
+            >
+              {text.adminRetryAction}
+            </Button>
+          }
         />
       </AdminPage>
     );
@@ -86,13 +93,17 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   if (sortedConversations.length === 0 || !activeConversationId) {
     return (
       <AdminPage className={styles.page}>
-        <AdminStateCard tone="info" title={text.supportEmpty} description={text.supportDescription} />
+        <AdminStateCard
+          tone="info"
+          title={text.supportEmpty}
+          description={text.supportDescription}
+        />
       </AdminPage>
     );
   }
 
   return (
-      <SupportConversationPage
+    <SupportConversationPage
       key={activeConversationId}
       locale={locale}
       conversationId={activeConversationId}

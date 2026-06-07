@@ -11,6 +11,7 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     loadError: isRu
       ? "Не удалось загрузить аналитику шаблона."
       : "Failed to load template analytics.",
+    retryAction: isRu ? "Повторить" : "Retry",
     rangeLabel: isRu ? "Период аналитики" : "Analytics period",
     range7: isRu ? "7 дней" : "7 days",
     range30: isRu ? "30 дней" : "30 days",
@@ -166,6 +167,7 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     failureReasonHeader: isRu ? "Причина" : "Reason",
     recentOutput: isRu ? "Выход" : "Output",
     openOutput: isRu ? "Открыть" : "Open",
+    outputAvailable: isRu ? "Есть результат" : "Available",
     noOutput: isRu ? "Нет" : "None",
     failureBreakdownTitle: isRu ? "Breakdown ошибок" : "Failure breakdown",
     failureBreakdownHint: isRu

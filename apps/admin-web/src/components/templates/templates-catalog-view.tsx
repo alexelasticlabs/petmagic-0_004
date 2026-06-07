@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useState, type ReactElement } from "react";
@@ -26,6 +25,7 @@ import {
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import {
   getCharacterOrientationLabel,
   getTemplateAccessLabel,
@@ -33,10 +33,12 @@ import {
   getTemplateTypeLabel,
 } from "@/components/templates/template-admin-shared";
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { useAdminTemplateCatalog } from "@/components/templates/use-admin-template-catalog";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {
   changeTemplateStatus,
   deleteTemplate,
@@ -48,6 +50,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplatesCatalogViewProps = {
   locale: Locale;
@@ -146,7 +149,9 @@ export function TemplatesCatalogView({
   const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
   const session = useAuthSession();
-  const { getAnalyticsRow, hasError, isLoading, refresh, templates } = useAdminTemplateCatalog({
+  const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
+  const { getAnalyticsRow, hasError, isFetching, isLoading, refresh, templates } =
+    useAdminTemplateCatalog({
     enabled: Boolean(session),
     templateType,
   });
@@ -159,6 +164,8 @@ export function TemplatesCatalogView({
   const [accessFilter, setAccessFilter] = useState<AccessFilter>("all");
   const [statusFilter, setStatusFilter] = useState<TemplateStatus | "all">("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
+  const [templatePendingArchiveId, setTemplatePendingArchiveId] = useState<string | null>(null);
+  const [templatePendingDeleteId, setTemplatePendingDeleteId] = useState<string | null>(null);
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
 
   useEffect(() => {
@@ -167,29 +174,82 @@ export function TemplatesCatalogView({
     }
   }, [locale, router, session]);
 
-  async function handleStatusChange(templateId: string, status: TemplateStatus) {
+  function assertCanManageTemplates(): boolean {
+    if (canManageTemplates) {
+      return true;
+    }
+
+    setActionError(copy.templateActionsAdminOnly);
+    setTemplatePendingArchiveId(null);
+    setTemplatePendingDeleteId(null);
+    return false;
+  }
+
+  async function handleStatusChange(templateId: string, status: TemplateStatus): Promise<boolean> {
+    if (!assertCanManageTemplates()) {
+      return false;
+    }
+
+    if (busyTemplateId === templateId) {
+      return false;
+    }
+
     setBusyTemplateId(templateId);
     setActionError(null);
 
     try {
       await changeTemplateStatus(templateId, status);
       await refresh();
+      return true;
     } catch (error) {
       clientLogger.error("templates.catalog_status_change_failed", {
         templateId,
         status,
         error,
       });
-      setActionError(text.errorSavingTemplate);
+      setActionError(getAdminErrorMessage(error, text.errorSavingTemplate));
+      return false;
     } finally {
       setBusyTemplateId(null);
     }
   }
 
-  async function handleDelete(templateId: string) {
-    const confirmed = window.confirm(text.confirmDeleteTemplate);
-    if (!confirmed) {
+  function requestStatusChange(templateId: string, status: TemplateStatus) {
+    if (!assertCanManageTemplates()) {
       return;
+    }
+
+    if (busyTemplateId === templateId) {
+      return;
+    }
+
+    if (status === "Archived") {
+      setTemplatePendingArchiveId(templateId);
+      return;
+    }
+
+    void handleStatusChange(templateId, status);
+  }
+
+  function requestDeleteTemplate(templateId: string) {
+    if (!assertCanManageTemplates()) {
+      return;
+    }
+
+    if (busyTemplateId === templateId) {
+      return;
+    }
+
+    setTemplatePendingDeleteId(templateId);
+  }
+
+  async function handleDelete(templateId: string): Promise<boolean> {
+    if (!assertCanManageTemplates()) {
+      return false;
+    }
+
+    if (busyTemplateId === templateId) {
+      return false;
     }
 
     setBusyTemplateId(templateId);
@@ -198,12 +258,14 @@ export function TemplatesCatalogView({
     try {
       await deleteTemplate(templateId);
       await refresh();
+      return true;
     } catch (error) {
       clientLogger.error("templates.catalog_delete_failed", {
         templateId,
         error,
       });
-      setActionError(text.errorDeletingTemplate);
+      setActionError(getAdminErrorMessage(error, text.errorDeletingTemplate));
+      return false;
     } finally {
       setBusyTemplateId(null);
     }
@@ -315,9 +377,11 @@ export function TemplatesCatalogView({
         <Link href={categoriesPath} className={styles.secondaryLink}>
           {copy.manageCategories}
         </Link>
-        <Link href={editorBasePath} className={styles.primaryLink}>
-          {copy.createTemplate}
-        </Link>
+        {canManageTemplates ? (
+          <Link href={editorBasePath} className={styles.primaryLink}>
+            {copy.createTemplate}
+          </Link>
+        ) : null}
       </AdminToolbar>
 
       <div className={styles.tabRow} role="tablist" aria-label={copy.archiveTabsLabel}>
@@ -337,7 +401,25 @@ export function TemplatesCatalogView({
         </button>
       </div>
 
-      {error ? <AdminStateCard tone="danger" className={styles.error} title={error} /> : null}
+      {error ? (
+        <AdminStateCard
+          tone="danger"
+          className={styles.error}
+          title={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isFetching}
+              onClick={() => {
+                void refresh().catch(() => undefined);
+              }}
+            >
+              {isRu ? "Повторить" : "Retry"}
+            </Button>
+          }
+        />
+      ) : null}
 
       <div className={styles.catalogShell}>
         <div className={styles.catalogMain}>
@@ -445,8 +527,9 @@ export function TemplatesCatalogView({
                   analyticsBasePath={analyticsBasePath}
                   testBasePath={testBasePath}
                   busyTemplateId={busyTemplateId}
-                  onStatusChange={handleStatusChange}
-                  onDeleteTemplate={handleDelete}
+                  canManageTemplates={canManageTemplates}
+                  onStatusChange={requestStatusChange}
+                  onDeleteTemplate={requestDeleteTemplate}
                 />
               ))}
             </div>
@@ -474,6 +557,12 @@ export function TemplatesCatalogView({
                     {filteredTemplates.map((template) => {
                       const isBusy = busyTemplateId === template.templateId;
                       const analytics = getAnalyticsRow(template.templateId);
+                      const safeTemplateTitle = sanitizeSensitiveText(template.title, 96);
+                      const safeTemplateDescription = sanitizeSensitiveText(
+                        template.shortDescription,
+                        180
+                      );
+                      const safeTemplateCategory = sanitizeSensitiveText(template.category, 64);
 
                       return (
                         <tr key={template.templateId}>
@@ -485,23 +574,36 @@ export function TemplatesCatalogView({
                               >
                                 {template.previewAsset?.url ? (
                                   template.previewAsset.contentType?.startsWith("video/") ? (
-                                    <video
+                                    <TemplateSecureMedia
                                       className={styles.listTemplateMedia}
-                                      src={template.previewAsset.url}
+                                      url={template.previewAsset.url}
+                                      kind="video"
                                       muted
                                       playsInline
                                       autoPlay
                                       loop
                                       preload="metadata"
+                                      ariaHidden
+                                      logContext={{
+                                        templateId: template.templateId,
+                                        contentType: template.previewAsset.contentType,
+                                        surface: "catalog_list",
+                                      }}
                                     />
                                   ) : (
-                                    <Image
+                                    <TemplateSecureMedia
                                       className={styles.listTemplateMedia}
-                                      src={template.previewAsset.url}
+                                      url={template.previewAsset.url}
+                                      kind="image"
                                       alt=""
                                       width={56}
                                       height={56}
-                                      unoptimized
+                                      ariaHidden
+                                      logContext={{
+                                        templateId: template.templateId,
+                                        contentType: template.previewAsset.contentType,
+                                        surface: "catalog_list",
+                                      }}
                                     />
                                   )
                                 ) : template.templateType === "Video" ? (
@@ -510,11 +612,11 @@ export function TemplatesCatalogView({
                                   <ImageIcon className={styles.listTemplateThumbIcon} />
                                 )}
                               </div>
-                              <div className={styles.titleCell} title={template.shortDescription}>
-                                <strong>{template.title}</strong>
-                                <span>{template.shortDescription}</span>
+                              <div className={styles.titleCell} title={safeTemplateDescription}>
+                                <strong>{safeTemplateTitle}</strong>
+                                <span>{safeTemplateDescription}</span>
                                 <small className={styles.templateMetaId}>
-                                  ID: {template.templateId.slice(0, 12)}
+                                  ID: {formatTemplateId(template.templateId, 12)}
                                 </small>
                               </div>
                             </div>
@@ -539,7 +641,7 @@ export function TemplatesCatalogView({
                               </span>
                             </div>
                           </td>
-                          <td data-label={text.categoryLabel}>{template.category}</td>
+                          <td data-label={text.categoryLabel}>{safeTemplateCategory}</td>
                           <td data-label={copy.accessLabel}>
                             <span
                               className={template.isPremium ? styles.premiumPill : styles.freePill}
@@ -594,14 +696,6 @@ export function TemplatesCatalogView({
                           <td data-label={text.actionsLabel} className={styles.tableActionsCell}>
                             <div className={styles.tableActions}>
                               <Link
-                                href={`${editorBasePath}?templateId=${template.templateId}`}
-                                className={styles.cardActionIconButton}
-                                aria-label={text.editTemplate}
-                                title={text.editTemplate}
-                              >
-                                <PencilIcon className={styles.actionIcon} />
-                              </Link>
-                              <Link
                                 href={`${analyticsBasePath}/${template.templateId}`}
                                 className={styles.cardActionIconButton}
                                 aria-label={copy.analyticsAction}
@@ -609,55 +703,67 @@ export function TemplatesCatalogView({
                               >
                                 <ChartIcon className={styles.actionIcon} />
                               </Link>
-                              <Link
-                                href={`${testBasePath}/${template.templateId}`}
-                                className={styles.cardActionIconButton}
-                                aria-label={copy.testAction}
-                                title={copy.testAction}
-                              >
-                                <PlayCircleIcon className={styles.actionIcon} />
-                              </Link>
-                              {template.status !== "Active" ? (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className={styles.cardActionIconButton}
-                                  disabled={isBusy}
-                                  aria-label={text.activate}
-                                  title={text.activate}
-                                  onClick={() =>
-                                    void handleStatusChange(template.templateId, "Active")
-                                  }
-                                >
-                                  <RefreshIcon className={styles.actionIcon} />
-                                </Button>
+                              {canManageTemplates ? (
+                                <>
+                                  <Link
+                                    href={`${editorBasePath}?templateId=${template.templateId}`}
+                                    className={styles.cardActionIconButton}
+                                    aria-label={text.editTemplate}
+                                    title={text.editTemplate}
+                                  >
+                                    <PencilIcon className={styles.actionIcon} />
+                                  </Link>
+                                  <Link
+                                    href={`${testBasePath}/${template.templateId}`}
+                                    className={styles.cardActionIconButton}
+                                    aria-label={copy.testAction}
+                                    title={copy.testAction}
+                                  >
+                                    <PlayCircleIcon className={styles.actionIcon} />
+                                  </Link>
+                                  {template.status !== "Active" ? (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className={styles.cardActionIconButton}
+                                      disabled={isBusy}
+                                      aria-label={text.activate}
+                                      title={text.activate}
+                                      onClick={() =>
+                                        void handleStatusChange(template.templateId, "Active")
+                                      }
+                                    >
+                                      <RefreshIcon className={styles.actionIcon} />
+                                    </Button>
+                                  ) : null}
+                                  {template.status !== "Archived" ? (
+                                    <Button
+                                      size="sm"
+                                      variant="danger"
+                                      className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                                      disabled={isBusy}
+                                      aria-label={text.archive}
+                                      title={text.archive}
+                                      onClick={() =>
+                                        requestStatusChange(template.templateId, "Archived")
+                                      }
+                                    >
+                                      <RefreshIcon className={styles.actionIcon} />
+                                    </Button>
+                                  ) : null}
+                                  <Button
+                                    size="sm"
+                                    variant="danger"
+                                    className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                                    disabled={isBusy}
+                                    aria-label={text.deleteTemplate}
+                                    title={text.deleteTemplate}
+                                    onClick={() => requestDeleteTemplate(template.templateId)}
+                                  >
+                                    <CancelCircleIcon className={styles.actionIcon} />
+                                  </Button>
+                                </>
                               ) : null}
-                              {template.status !== "Archived" ? (
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-                                  disabled={isBusy}
-                                  aria-label={text.archive}
-                                  title={text.archive}
-                                  onClick={() =>
-                                    void handleStatusChange(template.templateId, "Archived")
-                                  }
-                                >
-                                  <RefreshIcon className={styles.actionIcon} />
-                                </Button>
-                              ) : null}
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-                                disabled={isBusy}
-                                aria-label={text.deleteTemplate}
-                                title={text.deleteTemplate}
-                                onClick={() => void handleDelete(template.templateId)}
-                              >
-                                <CancelCircleIcon className={styles.actionIcon} />
-                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -670,8 +776,78 @@ export function TemplatesCatalogView({
           )}
         </div>
       </div>
+      <ConfirmationDialog
+        open={templatePendingArchiveId !== null}
+        title={text.archive}
+        description={
+          templatePendingArchiveId
+            ? `${formatTemplateActionLabel(templates, templatePendingArchiveId)}: ${
+                isRu
+                  ? "шаблон будет скрыт из активного каталога."
+                  : "the template will be hidden from the active catalog."
+              }`
+            : ""
+        }
+        confirmLabel={text.archive}
+        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        tone="danger"
+        isSubmitting={templatePendingArchiveId === busyTemplateId}
+        onCancel={() => {
+          if (busyTemplateId === null) {
+            setTemplatePendingArchiveId(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!templatePendingArchiveId) {
+            return;
+          }
+
+          void handleStatusChange(templatePendingArchiveId, "Archived").then((succeeded) => {
+            if (succeeded) {
+              setTemplatePendingArchiveId(null);
+            }
+          });
+        }}
+      />
+      <ConfirmationDialog
+        open={templatePendingDeleteId !== null}
+        title={text.deleteTemplate}
+        description={
+          templatePendingDeleteId
+            ? `${formatTemplateActionLabel(templates, templatePendingDeleteId)}: ${text.confirmDeleteTemplate}`
+            : ""
+        }
+        confirmLabel={text.deleteTemplate}
+        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        isSubmitting={templatePendingDeleteId === busyTemplateId}
+        onCancel={() => {
+          if (busyTemplateId === null) {
+            setTemplatePendingDeleteId(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!templatePendingDeleteId) {
+            return;
+          }
+
+          void handleDelete(templatePendingDeleteId).then((succeeded) => {
+            if (succeeded) {
+              setTemplatePendingDeleteId(null);
+            }
+          });
+        }}
+      />
     </AdminPage>
   );
+}
+
+function formatTemplateActionLabel(templates: AdminTemplateListItem[], templateId: string): string {
+  const template = templates.find((item) => item.templateId === templateId);
+  return sanitizeSensitiveText(template?.title ?? templateId, 96);
+}
+
+function formatTemplateId(templateId: string, maxLength: number): string {
+  return sanitizeSensitiveText(templateId, Math.max(maxLength, 1)).slice(0, maxLength);
 }
 
 type TemplateCatalogCardProps = {
@@ -682,6 +858,7 @@ type TemplateCatalogCardProps = {
   analyticsBasePath: string;
   testBasePath: string;
   busyTemplateId: string | null;
+  canManageTemplates: boolean;
   onStatusChange: (templateId: string, status: TemplateStatus) => void;
   onDeleteTemplate: (templateId: string) => void;
 };
@@ -694,6 +871,7 @@ function TemplateCatalogCard({
   analyticsBasePath,
   testBasePath,
   busyTemplateId,
+  canManageTemplates,
   onStatusChange,
   onDeleteTemplate,
 }: TemplateCatalogCardProps) {
@@ -747,14 +925,6 @@ function TemplateCatalogCard({
         </div>
         <div className={styles.cardActions}>
           <Link
-            href={`${editorBasePath}?templateId=${template.templateId}`}
-            className={styles.cardActionIconButton}
-            aria-label={text.editTemplate}
-            title={text.editTemplate}
-          >
-            <PencilIcon className={styles.actionIcon} />
-          </Link>
-          <Link
             href={`${analyticsBasePath}/${template.templateId}`}
             className={styles.cardActionIconButton}
             aria-label={copy.analyticsAction}
@@ -762,50 +932,62 @@ function TemplateCatalogCard({
           >
             <ChartIcon className={styles.actionIcon} />
           </Link>
-          <Link
-            href={`${testBasePath}/${template.templateId}`}
-            className={styles.cardActionIconButton}
-            aria-label={copy.testAction}
-            title={copy.testAction}
-          >
-            <PlayCircleIcon className={styles.actionIcon} />
-          </Link>
-          {template.status !== "Active" ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className={styles.cardActionIconButton}
-              disabled={isBusy}
-              aria-label={text.activate}
-              title={text.activate}
-              onClick={() => onStatusChange(template.templateId, "Active")}
-            >
-              <RefreshIcon className={styles.actionIcon} />
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-              disabled={isBusy}
-              aria-label={text.archive}
-              title={text.archive}
-              onClick={() => onStatusChange(template.templateId, "Archived")}
-            >
-              <RefreshIcon className={styles.actionIcon} />
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="danger"
-            className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
-            disabled={isBusy}
-            aria-label={text.deleteTemplate}
-            title={text.deleteTemplate}
-            onClick={() => onDeleteTemplate(template.templateId)}
-          >
-            <CancelCircleIcon className={styles.actionIcon} />
-          </Button>
+          {canManageTemplates ? (
+            <>
+              <Link
+                href={`${editorBasePath}?templateId=${template.templateId}`}
+                className={styles.cardActionIconButton}
+                aria-label={text.editTemplate}
+                title={text.editTemplate}
+              >
+                <PencilIcon className={styles.actionIcon} />
+              </Link>
+              <Link
+                href={`${testBasePath}/${template.templateId}`}
+                className={styles.cardActionIconButton}
+                aria-label={copy.testAction}
+                title={copy.testAction}
+              >
+                <PlayCircleIcon className={styles.actionIcon} />
+              </Link>
+              {template.status !== "Active" ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={styles.cardActionIconButton}
+                  disabled={isBusy}
+                  aria-label={text.activate}
+                  title={text.activate}
+                  onClick={() => onStatusChange(template.templateId, "Active")}
+                >
+                  <RefreshIcon className={styles.actionIcon} />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                  disabled={isBusy}
+                  aria-label={text.archive}
+                  title={text.archive}
+                  onClick={() => onStatusChange(template.templateId, "Archived")}
+                >
+                  <RefreshIcon className={styles.actionIcon} />
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="danger"
+                className={`${styles.cardActionIconButton} ${styles.cardActionDanger}`}
+                disabled={isBusy}
+                aria-label={text.deleteTemplate}
+                title={text.deleteTemplate}
+                onClick={() => onDeleteTemplate(template.templateId)}
+              >
+                <CancelCircleIcon className={styles.actionIcon} />
+              </Button>
+            </>
+          ) : null}
         </div>
       </div>
     </article>
@@ -1015,6 +1197,9 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
         : "Create image template",
     manageCategories: isRu ? "Управление категориями" : "Manage categories",
     analyticsAction: isRu ? "Аналитика" : "Analytics",
+    templateActionsAdminOnly: isRu
+      ? "Управление шаблонами доступно только Admin."
+      : "Template management actions are available to Admin only.",
     archiveTabsLabel: isRu ? "Фильтр архива" : "Archive filter",
     allTemplates: isRu ? "Все шаблоны" : "All templates",
     archivedTemplates: isRu ? "Архив" : "Archive",

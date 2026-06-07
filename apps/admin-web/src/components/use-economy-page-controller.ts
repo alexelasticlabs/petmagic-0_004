@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -14,6 +14,8 @@ import {
   fetchAdminPaymentProviderConfigs,
   fetchAdminSubscriptionEvents,
   fetchAdminSubscriptionPlans,
+  normalizeAdminEconomyPurchasesQuery,
+  normalizeAdminEconomySubscriptionsQuery,
   useAuthSession,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
@@ -22,15 +24,35 @@ type UseEconomyPageControllerParams = {
   locale: Locale;
 };
 
+const ECONOMY_PAGE_SIZE = 20;
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
+}
+
 export function useEconomyPageController({ locale }: UseEconomyPageControllerParams) {
   const router = useRouter();
   const session = useAuthSession();
   const [ledgerSource, setLedgerSource] = useState("");
   const [purchaseStatus, setPurchaseStatus] = useState("");
+  const [purchaseProvider, setPurchaseProvider] = useState("");
+  const [purchaseSearch, setPurchaseSearch] = useState("");
+  const [purchasePage, setPurchasePage] = useState(0);
   const [subscriptionStatus, setSubscriptionStatus] = useState("");
   const [subscriptionProvider, setSubscriptionProvider] = useState("");
+  const [subscriptionSearch, setSubscriptionSearch] = useState("");
+  const [subscriptionPage, setSubscriptionPage] = useState(0);
   const [eventStatus, setEventStatus] = useState("");
   const [eventProvider, setEventProvider] = useState("");
+  const debouncedPurchaseSearch = useDebouncedValue(purchaseSearch, 350);
+  const debouncedSubscriptionSearch = useDebouncedValue(subscriptionSearch, 350);
 
   useEffect(() => {
     if (!session) {
@@ -38,37 +60,86 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     }
   }, [locale, router, session]);
 
+  const updatePurchaseStatus = useCallback((value: string) => {
+    setPurchaseStatus(value);
+    setPurchasePage(0);
+  }, []);
+
+  const updatePurchaseProvider = useCallback((value: string) => {
+    setPurchaseProvider(value);
+    setPurchasePage(0);
+  }, []);
+
+  const updatePurchaseSearch = useCallback((value: string) => {
+    setPurchaseSearch(value);
+    setPurchasePage(0);
+  }, []);
+
+  const updateSubscriptionStatus = useCallback((value: string) => {
+    setSubscriptionStatus(value);
+    setSubscriptionPage(0);
+  }, []);
+
+  const updateSubscriptionProvider = useCallback((value: string) => {
+    setSubscriptionProvider(value);
+    setSubscriptionPage(0);
+  }, []);
+
+  const updateSubscriptionSearch = useCallback((value: string) => {
+    setSubscriptionSearch(value);
+    setSubscriptionPage(0);
+  }, []);
+
   const ledgerQuery = useQuery({
     queryKey: adminQueryKeys.economyLedger(ledgerSource || "all", "all"),
-    queryFn: () => fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }),
+    queryFn: ({ signal }) =>
+      fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }, signal),
   });
+
+  const purchasesQueryParams = useMemo(
+    () =>
+      normalizeAdminEconomyPurchasesQuery({
+        skip: purchasePage * ECONOMY_PAGE_SIZE,
+        take: ECONOMY_PAGE_SIZE,
+        status: purchaseStatus,
+        provider: purchaseProvider,
+        search: debouncedPurchaseSearch,
+      }),
+    [debouncedPurchaseSearch, purchasePage, purchaseProvider, purchaseStatus]
+  );
 
   const purchasesQuery = useQuery({
-    queryKey: adminQueryKeys.economyPurchases(purchaseStatus || "all"),
-    queryFn: () => fetchAdminEconomyPurchases({ take: 20, status: purchaseStatus || undefined }),
+    queryKey: adminQueryKeys.economyPurchases(purchasesQueryParams),
+    queryFn: ({ signal }) => fetchAdminEconomyPurchases(purchasesQueryParams, signal),
+    placeholderData: keepPreviousData,
   });
 
-  const subscriptionsQuery = useQuery({
-    queryKey: adminQueryKeys.economySubscriptions(
-      subscriptionStatus || "all",
-      subscriptionProvider || "all"
-    ),
-    queryFn: () =>
-      fetchAdminEconomySubscriptions({
-        take: 20,
-        status: subscriptionStatus || undefined,
-        provider: subscriptionProvider || undefined,
+  const subscriptionsQueryParams = useMemo(
+    () =>
+      normalizeAdminEconomySubscriptionsQuery({
+        skip: subscriptionPage * ECONOMY_PAGE_SIZE,
+        take: ECONOMY_PAGE_SIZE,
+        status: subscriptionStatus,
+        provider: subscriptionProvider,
+        search: debouncedSubscriptionSearch,
       }),
+    [debouncedSubscriptionSearch, subscriptionPage, subscriptionProvider, subscriptionStatus]
+  );
+
+  const subscriptionsQuery = useQuery({
+    queryKey: adminQueryKeys.economySubscriptions(subscriptionsQueryParams),
+    queryFn: ({ signal }) => fetchAdminEconomySubscriptions(subscriptionsQueryParams, signal),
+    placeholderData: keepPreviousData,
   });
 
   const subscriptionPlansQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptionPlans,
-    queryFn: fetchAdminSubscriptionPlans,
+    queryFn: ({ signal }) => fetchAdminSubscriptionPlans(signal),
   });
 
   const providerConfigsQuery = useQuery({
     queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-    queryFn: fetchAdminPaymentProviderConfigs,
+    queryFn: ({ signal }) => fetchAdminPaymentProviderConfigs(signal),
   });
 
   const subscriptionEventsQuery = useQuery({
@@ -76,17 +147,17 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       eventProvider || "all",
       eventStatus || "all"
     ),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchAdminSubscriptionEvents({
         take: 20,
         provider: eventProvider || undefined,
         status: eventStatus || undefined,
-      }),
+      }, signal),
   });
 
   const packsQuery = useQuery({
     queryKey: adminQueryKeys.economyPacks,
-    queryFn: fetchAdminCurrencyPacks,
+    queryFn: ({ signal }) => fetchAdminCurrencyPacks(signal),
   });
 
   const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
@@ -105,6 +176,26 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     [subscriptionEventsQuery.data?.items]
   );
   const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
+
+  const refetchAll = useCallback(async () => {
+    await Promise.all([
+      ledgerQuery.refetch(),
+      purchasesQuery.refetch(),
+      subscriptionsQuery.refetch(),
+      subscriptionPlansQuery.refetch(),
+      providerConfigsQuery.refetch(),
+      subscriptionEventsQuery.refetch(),
+      packsQuery.refetch(),
+    ]);
+  }, [
+    ledgerQuery,
+    packsQuery,
+    providerConfigsQuery,
+    purchasesQuery,
+    subscriptionEventsQuery,
+    subscriptionPlansQuery,
+    subscriptionsQuery,
+  ]);
 
   const metrics = useMemo(() => {
     const credited = ledgerItems
@@ -143,10 +234,20 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionEventsQuery.isError ||
     packsQuery.isError;
 
+  const isFetching =
+    ledgerQuery.isFetching ||
+    purchasesQuery.isFetching ||
+    subscriptionsQuery.isFetching ||
+    subscriptionPlansQuery.isFetching ||
+    providerConfigsQuery.isFetching ||
+    subscriptionEventsQuery.isFetching ||
+    packsQuery.isFetching;
+
   return {
     eventProvider,
     eventStatus,
     hasError,
+    isFetching,
     isLoading,
     ledgerItems,
     ledgerSource,
@@ -154,18 +255,33 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     packs,
     providerConfigs,
     purchaseItems,
+    purchasePage,
+    purchaseProvider,
+    purchaseSearch,
     purchaseStatus,
+    purchasesIsFetching: purchasesQuery.isFetching,
     premiumMetrics,
     setEventProvider,
     setEventStatus,
     setLedgerSource,
-    setPurchaseStatus,
-    setSubscriptionProvider,
-    setSubscriptionStatus,
+    setPurchasePage,
+    setPurchaseProvider: updatePurchaseProvider,
+    setPurchaseSearch: updatePurchaseSearch,
+    setPurchaseStatus: updatePurchaseStatus,
+    setSubscriptionPage,
+    setSubscriptionProvider: updateSubscriptionProvider,
+    setSubscriptionSearch: updateSubscriptionSearch,
+    setSubscriptionStatus: updateSubscriptionStatus,
     subscriptionEvents,
     subscriptionItems,
+    subscriptionPage,
+    subscriptionSearch,
+    subscriptionsHasMore: subscriptionsQuery.data?.hasMore ?? false,
+    subscriptionsIsFetching: subscriptionsQuery.isFetching,
     subscriptionPlans,
     subscriptionProvider,
     subscriptionStatus,
+    purchasesHasMore: purchasesQuery.data?.hasMore ?? false,
+    refetchAll,
   };
 }

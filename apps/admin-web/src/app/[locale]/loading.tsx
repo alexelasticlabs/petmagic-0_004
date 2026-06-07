@@ -13,8 +13,8 @@ export default function Loading() {
 
   return (
     <AdminPage>
-      <AdminPageHero title="PetMagic Admin" description={text.loading} />
-      <AdminStateCard tone="info" title={text.loading} description={text.navDashboard} />
+      <AdminPageHero title="PetMagic Admin" description={text.adminLoadingDescription} />
+      <AdminStateCard tone="info" title={text.loading} description={text.adminLoadingDescription} />
     </AdminPage>
   );
 }

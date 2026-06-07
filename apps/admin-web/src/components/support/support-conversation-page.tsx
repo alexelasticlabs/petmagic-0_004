@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -14,6 +13,8 @@ import {
   formatClockTime,
   formatDateTime,
   formatFileSize,
+  formatSafeSupportDownloadName,
+  formatSafeSupportDisplay,
   formatRelativeTime,
   getConversationSla,
   getMessageAttachments,
@@ -23,7 +24,9 @@ import {
   shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
 import { SupportInfoPanel } from "@/components/support/support-info-panel";
+import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import styles from "@/components/support/support-page.module.css";
+import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import {
   sourceLabel,
   statusHint,
@@ -34,13 +37,11 @@ import { useSupportConversationController } from "@/components/support/use-suppo
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Toast } from "@/components/ui/toast";
-import type {
-  AdminSupportConversation,
-  SupportConversationPriority,
-  SupportConversationStatus,
-} from "@/lib/api-client";
+import type { AdminSupportConversation, SupportConversationStatus } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { type Locale } from "@/lib/i18n";
+import { maskEmail } from "@/lib/sensitive-display";
 
 type SupportConversationPageProps = {
   locale: Locale;
@@ -51,7 +52,7 @@ type SupportConversationPageProps = {
 
 type FullscreenImage = {
   mediaType?: "image" | "video";
-  url: string;
+  attachmentFileUrl: string;
   fileName?: string | null;
   messageId?: string;
   senderDisplayName?: string | null;
@@ -76,14 +77,20 @@ export function SupportConversationPage({
   const [queueStatusFilter, setQueueStatusFilter] = useState<"all" | SupportConversationStatus>(
     "all"
   );
-  const [queuePriorityFilter, setQueuePriorityFilter] = useState<
-    "all" | SupportConversationPriority
-  >("all");
-  const [queueSortBy, setQueueSortBy] = useState<"recent" | "status" | "priority">("recent");
+  const [pendingAttachmentActionKey, setPendingAttachmentActionKey] = useState<string | null>(null);
+  const [pendingFullscreenAction, setPendingFullscreenAction] = useState<
+    "download" | "share" | "open" | null
+  >(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messageHighlightTimerRef = useRef<number | null>(null);
-  const controller = useSupportConversationController({ locale, conversationId });
+  const fullscreenActionAbortControllerRef = useRef<AbortController | null>(null);
+  const attachmentActionAbortControllerRef = useRef<AbortController | null>(null);
+  const controller = useSupportConversationController({
+    locale,
+    conversationId,
+    queueStatusFilter,
+  });
   const {
     attachmentInputRef,
     attachmentPreviewUrl,
@@ -93,6 +100,9 @@ export function SupportConversationPage({
     conversationQuery,
     conversationSla,
     filteredInboxItems,
+    canManageSupportWorkspace,
+    canGoToNextQueuePage,
+    canGoToPreviousQueuePage,
     hasComposerAttachment,
     inboxQuery,
     isSidePanelOpen,
@@ -101,6 +111,7 @@ export function SupportConversationPage({
     reply,
     replyToMessage,
     replyToPreview,
+    queuePage,
     resetSelectedAttachment,
     searchQuery,
     secondaryStatusActions,
@@ -109,6 +120,8 @@ export function SupportConversationPage({
     sendMutation,
     setMessagesViewportVisible,
     setReply,
+    setQueueFilter,
+    setQueuePage,
     setSearchQuery,
     setSelectedAttachment,
     statusMutation,
@@ -119,7 +132,21 @@ export function SupportConversationPage({
   } = controller;
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
+  const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace;
   const isConversationClosed = conversation?.status === "Closed";
+  const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {
+    setSubFilter(value);
+    setQueueStatusFilter("all");
+    if (value === "archive") {
+      setQueueFilter("Closed");
+      return;
+    }
+    if (value === "unassigned") {
+      setQueueFilter("unassigned");
+      return;
+    }
+    setQueueFilter("all");
+  };
 
   const waitingCount = filteredInboxItems.filter(
     (item) => item.status === "New" || item.status === "WaitingForUser"
@@ -148,37 +175,8 @@ export function SupportConversationPage({
       }
       return true;
     })
-    .filter((item) => (queueStatusFilter === "all" ? true : item.status === queueStatusFilter))
-    .filter((item) =>
-      queuePriorityFilter === "all" ? true : item.priority === queuePriorityFilter
-    )
     .slice()
     .sort((left, right) => {
-      if (queueSortBy === "status") {
-        const statusOrder: Record<SupportConversationStatus, number> = {
-          New: 0,
-          InProgress: 1,
-          WaitingForUser: 2,
-          Closed: 3,
-        };
-        const byStatus = statusOrder[left.status] - statusOrder[right.status];
-        if (byStatus !== 0) {
-          return byStatus;
-        }
-      }
-
-      if (queueSortBy === "priority") {
-        const priorityOrder: Record<SupportConversationPriority, number> = {
-          High: 0,
-          Normal: 1,
-          Low: 2,
-        };
-        const byPriority = priorityOrder[left.priority] - priorityOrder[right.priority];
-        if (byPriority !== 0) {
-          return byPriority;
-        }
-      }
-
       const leftTs = left.lastMessageAtUtc ?? left.updatedAtUtc ?? left.createdAtUtc;
       const rightTs = right.lastMessageAtUtc ?? right.updatedAtUtc ?? right.createdAtUtc;
       return rightTs.localeCompare(leftTs);
@@ -279,6 +277,15 @@ export function SupportConversationPage({
   }, [conversationId, selectReplyToMessage]);
 
   const submitReply = () => {
+    if (
+      isConversationReadOnly ||
+      !canManageSupportWorkspace ||
+      sendMutation.isPending ||
+      (!reply.trim() && !hasComposerAttachment)
+    ) {
+      return;
+    }
+
     sendMutation.mutate();
   };
 
@@ -298,6 +305,9 @@ export function SupportConversationPage({
   };
 
   const closeFullscreenImage = () => {
+    fullscreenActionAbortControllerRef.current?.abort();
+    fullscreenActionAbortControllerRef.current = null;
+    setPendingFullscreenAction(null);
     setFullscreenImage(null);
   };
 
@@ -330,7 +340,7 @@ export function SupportConversationPage({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setFullscreenImage(null);
+        closeFullscreenImage();
       }
     };
 
@@ -346,45 +356,93 @@ export function SupportConversationPage({
       if (messageHighlightTimerRef.current !== null) {
         window.clearTimeout(messageHighlightTimerRef.current);
       }
+      fullscreenActionAbortControllerRef.current?.abort();
+      attachmentActionAbortControllerRef.current?.abort();
     },
     []
   );
 
+  async function fetchFullscreenAttachmentBlob(
+    image: FullscreenImage,
+    action: "download" | "share" | "open",
+    signal: AbortSignal
+  ): Promise<Blob | null> {
+    try {
+      const response = await fetchWithTimeout(image.attachmentFileUrl, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) {
+        clientLogger.warn(`support.fullscreen_${action}_failed`, {
+          messageId: image.messageId,
+          status: response.status,
+          mediaType: image.mediaType,
+        });
+        return null;
+      }
+
+      return response.blob();
+    } catch (error) {
+      if (signal.aborted) {
+        return null;
+      }
+
+      clientLogger.warn(`support.fullscreen_${action}_failed`, {
+        messageId: image.messageId,
+        mediaType: image.mediaType,
+        error,
+      });
+      return null;
+    }
+  }
+
   const saveFullscreenImage = async () => {
-    if (!fullscreenImage) {
+    if (!fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
 
+    fullscreenActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    fullscreenActionAbortControllerRef.current = controller;
+    setPendingFullscreenAction("download");
+
     try {
-      const response = await fetch(fullscreenImage.url, { credentials: "include" });
-      if (!response.ok) {
+      const blob = await fetchFullscreenAttachmentBlob(
+        fullscreenImage,
+        "download",
+        controller.signal
+      );
+      if (!blob || controller.signal.aborted) {
         return;
       }
 
-      const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
       const defaultFileName =
         fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
-      link.download = fullscreenImage.fileName?.trim() || defaultFileName;
+      link.download = formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName);
       document.body.append(link);
       link.click();
       link.remove();
       URL.revokeObjectURL(objectUrl);
-    } catch (error) {
-      clientLogger.warn("support.fullscreen_download_failed", {
-        messageId: fullscreenImage.messageId,
-        url: fullscreenImage.url,
-        error,
-      });
+    } finally {
+      if (fullscreenActionAbortControllerRef.current === controller) {
+        fullscreenActionAbortControllerRef.current = null;
+        setPendingFullscreenAction(null);
+      }
     }
   };
 
   const shareFullscreenImage = async () => {
-    if (!fullscreenImage) {
+    if (!fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
+
+    fullscreenActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    fullscreenActionAbortControllerRef.current = controller;
+    setPendingFullscreenAction("share");
 
     try {
       if (typeof window === "undefined") {
@@ -393,35 +451,153 @@ export function SupportConversationPage({
 
       const browserNavigator = window.navigator as Navigator & {
         share?: (data: ShareData) => Promise<void>;
-        clipboard?: Clipboard;
+        canShare?: (data: ShareData) => boolean;
       };
 
-      if (browserNavigator.share) {
-        await browserNavigator.share({
-          title: fullscreenImage.fileName ?? "Support attachment",
-          url: fullscreenImage.url,
+      if (!browserNavigator.share) {
+        clientLogger.warn("support.fullscreen_share_unsupported", {
+          messageId: fullscreenImage.messageId,
+          reason: "navigator_share_missing",
         });
         return;
       }
 
-      if (browserNavigator.clipboard) {
-        await browserNavigator.clipboard.writeText(fullscreenImage.url);
+      const blob = await fetchFullscreenAttachmentBlob(fullscreenImage, "share", controller.signal);
+      if (!blob || controller.signal.aborted) {
+        return;
       }
+
+      const defaultFileName =
+        fullscreenImage.mediaType === "video" ? "support-video" : "support-image";
+      const safeFileName = formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName);
+      const file = new File([blob], safeFileName, {
+        type: blob.type || (fullscreenImage.mediaType === "video" ? "video/mp4" : "image/jpeg"),
+      });
+      const shareData: ShareData = {
+        title: formatSafeSupportDisplay(fullscreenImage.fileName, "Support attachment", 120),
+        files: [file],
+      };
+
+      if (!browserNavigator.canShare || browserNavigator.canShare(shareData)) {
+        await browserNavigator.share({
+          title: shareData.title,
+          files: shareData.files,
+        });
+        return;
+      }
+
+      clientLogger.warn("support.fullscreen_share_unsupported", {
+        messageId: fullscreenImage.messageId,
+        reason: "file_share_unsupported",
+      });
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
       clientLogger.warn("support.fullscreen_share_failed", {
         messageId: fullscreenImage.messageId,
-        url: fullscreenImage.url,
         error,
       });
+    } finally {
+      if (fullscreenActionAbortControllerRef.current === controller) {
+        fullscreenActionAbortControllerRef.current = null;
+        setPendingFullscreenAction(null);
+      }
     }
   };
 
-  const openFullscreenImageInNewTab = () => {
-    if (!fullscreenImage) {
+  const openFullscreenImageInNewTab = async () => {
+    if (!fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
 
-    window.open(fullscreenImage.url, "_blank", "noopener,noreferrer");
+    fullscreenActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    fullscreenActionAbortControllerRef.current = controller;
+    setPendingFullscreenAction("open");
+
+    try {
+      const blob = await fetchFullscreenAttachmentBlob(fullscreenImage, "open", controller.signal);
+      if (!blob || controller.signal.aborted) {
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } finally {
+      if (fullscreenActionAbortControllerRef.current === controller) {
+        fullscreenActionAbortControllerRef.current = null;
+        setPendingFullscreenAction(null);
+      }
+    }
+  };
+
+  const getAttachmentActionKey = (
+    message: SupportMessage,
+    attachment: SupportMessageAttachment,
+    attachmentIndex: number
+  ) => `${message.messageId}:${attachment.fileName}:${attachment.sizeBytes}:${attachmentIndex}`;
+
+  const downloadAttachmentFile = async (
+    message: SupportMessage,
+    attachment: SupportMessageAttachment,
+    attachmentIndex: number
+  ) => {
+    const actionKey = getAttachmentActionKey(message, attachment, attachmentIndex);
+    if (pendingAttachmentActionKey !== null) {
+      return;
+    }
+
+    setPendingAttachmentActionKey(actionKey);
+    attachmentActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    attachmentActionAbortControllerRef.current = controller;
+    try {
+      const response = await fetchWithTimeout(attachment.fileUrl, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        clientLogger.warn("support.attachment_download_failed", {
+          messageId: message.messageId,
+          status: response.status,
+          mimeType: attachment.mimeType,
+        });
+        return;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = formatSafeSupportDownloadName(attachment.fileName);
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      clientLogger.warn("support.attachment_download_failed", {
+        messageId: message.messageId,
+        mimeType: attachment.mimeType,
+        error,
+      });
+    } finally {
+      if (attachmentActionAbortControllerRef.current === controller) {
+        attachmentActionAbortControllerRef.current = null;
+        setPendingAttachmentActionKey(null);
+      }
+    }
   };
 
   const highlightMessage = (messageId: string) => {
@@ -471,7 +647,7 @@ export function SupportConversationPage({
   ) => {
     const body = message.body.trim();
     if (body && shouldRenderMessageBody(message)) {
-      return body;
+      return formatSafeSupportDisplay(body, text.supportReplyOriginalUnavailable, 160);
     }
 
     const attachments = getMessageAttachments(message);
@@ -494,7 +670,11 @@ export function SupportConversationPage({
       return locale === "ru" ? "Видео" : "Video";
     }
 
-    return primaryAttachment.fileName || (locale === "ru" ? "Файл" : "File");
+    return formatSafeSupportDisplay(
+      primaryAttachment.fileName,
+      locale === "ru" ? "Файл" : "File",
+      120
+    );
   };
 
   const startReplyToMessage = (message: AdminSupportConversation["messages"][number]) => {
@@ -521,15 +701,15 @@ export function SupportConversationPage({
 
     if (attachment.mimeType.startsWith("image/")) {
       return (
-        <Image
-          src={attachment.fileUrl}
+        <SupportSecureMedia
+          url={attachment.fileUrl}
+          kind="image"
           alt=""
           width={34}
           height={34}
-          sizes="34px"
           className={styles.replyThumbImage}
           loading="lazy"
-          unoptimized
+          ariaHidden
         />
       );
     }
@@ -561,6 +741,11 @@ export function SupportConversationPage({
 
     const isImage = attachment.mimeType.startsWith("image/");
     const isVideo = attachment.mimeType.startsWith("video/");
+    const safeAttachmentName = formatSafeSupportDisplay(
+      attachment.fileName,
+      locale === "ru" ? "Файл" : "File",
+      120
+    );
 
     if (isImage) {
       return (
@@ -570,7 +755,7 @@ export function SupportConversationPage({
           onClick={() =>
             setFullscreenImage({
               mediaType: "image",
-              url: attachment.fileUrl,
+              attachmentFileUrl: attachment.fileUrl,
               fileName: attachment.fileName,
               messageId: message.messageId,
               senderDisplayName: message.senderDisplayName,
@@ -581,15 +766,19 @@ export function SupportConversationPage({
           className={`${styles.messageImageButton} ${tileClassName}`}
           aria-label={locale === "ru" ? "Открыть фото" : "Open photo"}
         >
-          <Image
-            src={attachment.fileUrl}
-            alt={attachment.fileName || message.body || "Support attachment"}
+          <SupportSecureMedia
+            url={attachment.fileUrl}
+            kind="image"
+            alt={formatSafeSupportDisplay(
+              attachment.fileName || message.body,
+              "Support attachment",
+              120
+            )}
             width={options?.single ? 360 : 180}
             height={options?.single ? 260 : 140}
-            sizes="(max-width: 860px) 100vw, 360px"
             className={styles.messageImage}
             loading="lazy"
-            unoptimized
+            logContext={{ messageId: message.messageId, mimeType: attachment.mimeType }}
           />
           {overlayCount > 0 ? (
             <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
@@ -606,7 +795,7 @@ export function SupportConversationPage({
           onClick={() =>
             setFullscreenImage({
               mediaType: "video",
-              url: attachment.fileUrl,
+              attachmentFileUrl: attachment.fileUrl,
               fileName: attachment.fileName,
               messageId: message.messageId,
               senderDisplayName: message.senderDisplayName,
@@ -618,7 +807,14 @@ export function SupportConversationPage({
           className={`${styles.messageVideoButton} ${tileClassName}`}
           aria-label={locale === "ru" ? "Открыть видео" : "Open video"}
         >
-          <video preload="metadata" src={attachment.fileUrl} className={styles.messageVideo} />
+          <SupportSecureMedia
+            url={attachment.fileUrl}
+            kind="video"
+            preload="metadata"
+            className={styles.messageVideo}
+            ariaHidden
+            logContext={{ messageId: message.messageId, mimeType: attachment.mimeType }}
+          />
           <span className={styles.messageVideoDurationBadge}>
             ▶ {formatAttachmentDuration(attachment.durationSeconds)}
           </span>
@@ -630,23 +826,25 @@ export function SupportConversationPage({
     }
 
     return (
-      <a
+      <button
         key={key}
-        href={attachment.fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        download={attachment.fileName || "attachment"}
+        type="button"
+        onClick={() => void downloadAttachmentFile(message, attachment, attachmentIndex)}
+        disabled={
+          pendingAttachmentActionKey ===
+          getAttachmentActionKey(message, attachment, attachmentIndex)
+        }
         className={`${styles.messageAttachmentCard} ${styles.messageMediaFileTile}`}
       >
         <div className={styles.messageAttachmentIcon}>FILE</div>
         <div className={styles.messageAttachmentMeta}>
-          <strong>{attachment.fileName || (locale === "ru" ? "Файл" : "File")}</strong>
+          <strong>{safeAttachmentName}</strong>
           <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
         </div>
         {overlayCount > 0 ? (
           <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
         ) : null}
-      </a>
+      </button>
     );
   };
   return (
@@ -664,12 +862,21 @@ export function SupportConversationPage({
           tone="danger"
           title={text.supportLoadError}
           action={
-            <Link
-              href={`/${locale}/support`}
-              className="ui-button ui-button--secondary ui-button--md"
-            >
-              {text.supportBackToInbox}
-            </Link>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <Button
+                variant="secondary"
+                onClick={() => void conversationQuery.refetch().catch(() => undefined)}
+                disabled={conversationQuery.isFetching}
+              >
+                {text.supportRetryAction}
+              </Button>
+              <Link
+                href={`/${locale}/support`}
+                className="ui-button ui-button--secondary ui-button--md"
+              >
+                {text.supportBackToInbox}
+              </Link>
+            </div>
           }
         />
       ) : (
@@ -737,7 +944,7 @@ export function SupportConversationPage({
                   className={
                     subFilter === "all" ? styles.queueSubFilterActive : styles.queueSubFilter
                   }
-                  onClick={() => setSubFilter("all")}
+                  onClick={() => setQueueSubFilter("all")}
                 >
                   {locale === "ru" ? "Активные" : "Active"} {activeCount}
                 </button>
@@ -746,7 +953,7 @@ export function SupportConversationPage({
                   className={
                     subFilter === "waiting" ? styles.queueSubFilterActive : styles.queueSubFilter
                   }
-                  onClick={() => setSubFilter("waiting")}
+                  onClick={() => setQueueSubFilter("waiting")}
                 >
                   {locale === "ru" ? "Ожидают" : "Waiting"} {waitingCount}
                 </button>
@@ -755,7 +962,7 @@ export function SupportConversationPage({
                   className={
                     subFilter === "unassigned" ? styles.queueSubFilterActive : styles.queueSubFilter
                   }
-                  onClick={() => setSubFilter("unassigned")}
+                  onClick={() => setQueueSubFilter("unassigned")}
                 >
                   {locale === "ru" ? "Без ответств." : "Unassigned"} {unassignedCount}
                 </button>
@@ -764,7 +971,7 @@ export function SupportConversationPage({
                   className={
                     subFilter === "archive" ? styles.queueSubFilterActive : styles.queueSubFilter
                   }
-                  onClick={() => setSubFilter("archive")}
+                  onClick={() => setQueueSubFilter("archive")}
                 >
                   {locale === "ru" ? "Архив" : "Archive"} {archiveCount}
                 </button>
@@ -775,9 +982,10 @@ export function SupportConversationPage({
                   <span>{locale === "ru" ? "Статус" : "Status"}</span>
                   <Select
                     value={queueStatusFilter}
-                    onChange={(value) =>
-                      setQueueStatusFilter(value as "all" | SupportConversationStatus)
-                    }
+                    onChange={(value) => {
+                      setQueueStatusFilter(value as "all" | SupportConversationStatus);
+                      setQueuePage(1);
+                    }}
                     showSelectedDescription={false}
                     options={[
                       { value: "all", label: locale === "ru" ? "Все" : "All" },
@@ -788,46 +996,27 @@ export function SupportConversationPage({
                     ]}
                   />
                 </label>
-
-                <label className={styles.queueToolField}>
-                  <span>{locale === "ru" ? "Приоритет" : "Priority"}</span>
-                  <Select
-                    value={queuePriorityFilter}
-                    onChange={(value) =>
-                      setQueuePriorityFilter(value as "all" | SupportConversationPriority)
-                    }
-                    showSelectedDescription={false}
-                    options={[
-                      { value: "all", label: locale === "ru" ? "Все" : "All" },
-                      { value: "High", label: text.supportPriorityHigh },
-                      { value: "Normal", label: text.supportPriorityNormal },
-                      { value: "Low", label: text.supportPriorityLow },
-                    ]}
-                  />
-                </label>
-
-                <label className={styles.queueToolField}>
-                  <span>{locale === "ru" ? "Сортировка" : "Sort"}</span>
-                  <Select
-                    value={queueSortBy}
-                    onChange={(value) => setQueueSortBy(value as "recent" | "status" | "priority")}
-                    showSelectedDescription={false}
-                    options={[
-                      { value: "recent", label: locale === "ru" ? "Сначала новые" : "Newest" },
-                      { value: "status", label: locale === "ru" ? "По статусу" : "By status" },
-                      {
-                        value: "priority",
-                        label: locale === "ru" ? "По приоритету" : "By priority",
-                      },
-                    ]}
-                  />
-                </label>
               </div>
 
               {inboxQuery.isLoading ? (
                 <AdminStateCard tone="info" title={text.loading} />
               ) : inboxQuery.isError ? (
-                <AdminStateCard tone="danger" title={text.supportLoadError} />
+                <AdminStateCard
+                  tone="danger"
+                  title={text.supportLoadError}
+                  action={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        void inboxQuery.refetch().catch(() => undefined);
+                      }}
+                      disabled={inboxQuery.isFetching}
+                    >
+                      {text.supportRetryAction}
+                    </Button>
+                  }
+                />
               ) : displayedInboxItems.length === 0 ? (
                 <AdminStateCard tone="info" title={text.supportEmpty} />
               ) : (
@@ -839,10 +1028,10 @@ export function SupportConversationPage({
                       item.adminUnreadCount
                     );
                     const hasUnread = item.adminUnreadCount > 0;
-                    const queueUserLabel =
-                      item.userDisplayName?.trim() ||
-                      item.userEmail?.trim() ||
-                      (locale === "ru" ? "Удаленный пользователь" : "Deleted user");
+                    const queueUserLabel = item.userDisplayName?.trim()
+                      ? formatSafeSupportDisplay(item.userDisplayName, "", 72)
+                      : (item.userEmail?.trim() ? maskEmail(item.userEmail) : "") ||
+                        (locale === "ru" ? "Удаленный пользователь" : "Deleted user");
 
                     const queueItemClassName = `${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`;
                     const queueItemContent = (
@@ -867,7 +1056,12 @@ export function SupportConversationPage({
                                 ) : null}
                               </div>
                               <div className={styles.rowPreview}>
-                                <span>{item.lastMessagePreview || text.supportNoMessages}</span>
+                                <span>
+                                  {formatSupportMessagePreview(
+                                    item.lastMessagePreview,
+                                    text.supportNoMessages
+                                  )}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -929,7 +1123,11 @@ export function SupportConversationPage({
                           </span>
                           <span className={styles.queueMetaChipMuted}>
                             {item.assignedAdminDisplayName?.trim()
-                              ? `${locale === "ru" ? "Оператор" : "Operator"}: ${item.assignedAdminDisplayName}`
+                              ? `${locale === "ru" ? "Оператор" : "Operator"}: ${formatSafeSupportDisplay(
+                                  item.assignedAdminDisplayName,
+                                  "",
+                                  72
+                                )}`
                               : locale === "ru"
                                 ? "Без оператора"
                                 : "Unassigned"}
@@ -967,13 +1165,33 @@ export function SupportConversationPage({
                   })}
                 </div>
               )}
-              {!inboxQuery.isLoading && !inboxQuery.isError && displayedInboxItems.length > 0 ? (
+              {!inboxQuery.isLoading &&
+              !inboxQuery.isError &&
+              (filteredInboxItems.length > 0 || queuePage > 1) ? (
                 <div className={styles.queueFooter}>
                   <span className={styles.queueFooterCount}>
                     {locale === "ru"
-                      ? `Показано ${displayedInboxItems.length} из ${filteredInboxItems.length}`
-                      : `Showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`}
+                      ? `Страница ${queuePage}: показано ${displayedInboxItems.length} из ${filteredInboxItems.length}`
+                      : `Page ${queuePage}: showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`}
                   </span>
+                  <div className={styles.queuePagerActions}>
+                    <button
+                      type="button"
+                      className={styles.queuePagerButton}
+                      disabled={!canGoToPreviousQueuePage || inboxQuery.isFetching}
+                      onClick={() => setQueuePage((currentPage) => Math.max(1, currentPage - 1))}
+                    >
+                      {locale === "ru" ? "Назад" : "Previous"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.queuePagerButton}
+                      disabled={!canGoToNextQueuePage || inboxQuery.isFetching}
+                      onClick={() => setQueuePage((currentPage) => currentPage + 1)}
+                    >
+                      {locale === "ru" ? "Вперёд" : "Next"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -982,11 +1200,11 @@ export function SupportConversationPage({
               className={styles.chatPane}
               onDragOver={(event) => {
                 event.preventDefault();
-                if (!isConversationReadOnly) setIsDragging(true);
+                if (!isComposerDisabled) setIsDragging(true);
               }}
               onDragEnter={(event) => {
                 event.preventDefault();
-                if (!isConversationReadOnly) setIsDragging(true);
+                if (!isComposerDisabled) setIsDragging(true);
               }}
               onDragLeave={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) {
@@ -996,7 +1214,7 @@ export function SupportConversationPage({
               onDrop={(event) => {
                 event.preventDefault();
                 setIsDragging(false);
-                if (isConversationReadOnly) return;
+                if (isComposerDisabled) return;
                 const droppedFile = event.dataTransfer.files[0];
                 if (droppedFile) {
                   setSelectedAttachment(droppedFile);
@@ -1192,10 +1410,11 @@ export function SupportConversationPage({
                                           {locale === "ru" ? "Ответ на" : "Reply to"}
                                         </span>
                                         <span className={styles.messageReplyBlockPreview}>
-                                          {(
-                                            message.replyToPreview?.trim() ||
-                                            text.supportReplyOriginalUnavailable
-                                          ).trim()}
+                                          {formatSafeSupportDisplay(
+                                            message.replyToPreview,
+                                            text.supportReplyOriginalUnavailable,
+                                            160
+                                          )}
                                         </span>
                                       </span>
                                     </button>
@@ -1232,7 +1451,9 @@ export function SupportConversationPage({
                                     ) : null
                                   ) : null}
                                   {shouldShowBody ? (
-                                    <div className={styles.messageBody}>{message.body}</div>
+                                    <div className={styles.messageBody}>
+                                      {formatSafeSupportDisplay(message.body, "", 2000)}
+                                    </div>
                                   ) : null}
                                   {shouldShowAttachmentFailure ? (
                                     <div className={styles.messageAttachmentStatusRow}>
@@ -1297,7 +1518,7 @@ export function SupportConversationPage({
                           <Button
                             variant="primary"
                             onClick={() => statusMutation.mutate(reopenStatusAction.status)}
-                            disabled={statusMutation.isPending}
+                            disabled={!canManageSupportWorkspace || statusMutation.isPending}
                           >
                             {text.supportReopenConversationAction}
                           </Button>
@@ -1312,6 +1533,11 @@ export function SupportConversationPage({
                         className={styles.hiddenFileInput}
                         accept="image/jpeg,image/png,image/webp"
                         onChange={(event) => {
+                          if (isComposerDisabled) {
+                            event.currentTarget.value = "";
+                            return;
+                          }
+
                           const nextFile = event.target.files?.[0] ?? null;
                           setSelectedAttachment(nextFile);
                         }}
@@ -1361,20 +1587,23 @@ export function SupportConversationPage({
                               className={styles.attachmentPreviewImageButton}
                               onClick={() =>
                                 setFullscreenImage({
-                                  url: attachmentPreviewUrl,
+                                  attachmentFileUrl: attachmentPreviewUrl,
                                   fileName: selectedAttachment.name,
                                   fileSizeBytes: selectedAttachment.size,
                                 })
                               }
                             >
-                              <Image
-                                src={attachmentPreviewUrl}
-                                alt={selectedAttachment.name}
+                              <SupportSecureMedia
+                                url={attachmentPreviewUrl}
+                                kind="image"
+                                alt={formatSafeSupportDisplay(
+                                  selectedAttachment.name,
+                                  locale === "ru" ? "Файл" : "File",
+                                  120
+                                )}
                                 width={72}
                                 height={72}
-                                sizes="72px"
                                 className={styles.attachmentPreviewImage}
-                                unoptimized
                               />
                             </button>
                           ) : (
@@ -1382,7 +1611,13 @@ export function SupportConversationPage({
                           )}
                           <div className={styles.attachmentPreviewMeta}>
                             <span className={styles.subtle}>{text.selectedFileLabel}</span>
-                            <strong>{selectedAttachment.name}</strong>
+                            <strong>
+                              {formatSafeSupportDisplay(
+                                selectedAttachment.name,
+                                locale === "ru" ? "Файл" : "File",
+                                120
+                              )}
+                            </strong>
                             <span className={styles.subtle}>
                               {formatFileSize(selectedAttachment.size, locale)}
                             </span>
@@ -1394,7 +1629,7 @@ export function SupportConversationPage({
                                 className={styles.attachmentActionButton}
                                 onClick={() =>
                                   setFullscreenImage({
-                                    url: attachmentPreviewUrl,
+                                    attachmentFileUrl: attachmentPreviewUrl,
                                     fileName: selectedAttachment.name,
                                     fileSizeBytes: selectedAttachment.size,
                                   })
@@ -1415,7 +1650,7 @@ export function SupportConversationPage({
                           type="button"
                           className={styles.composerIconBtn}
                           onClick={() => attachmentInputRef.current?.click()}
-                          disabled={isConversationReadOnly || sendMutation.isPending}
+                          disabled={isComposerDisabled || sendMutation.isPending}
                           aria-label={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                           title={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                         >
@@ -1429,7 +1664,7 @@ export function SupportConversationPage({
                             if (
                               event.key === "Enter" &&
                               !event.shiftKey &&
-                              !isConversationReadOnly &&
+                              !isComposerDisabled &&
                               !sendMutation.isPending &&
                               (reply.trim() || hasComposerAttachment)
                             ) {
@@ -1438,7 +1673,7 @@ export function SupportConversationPage({
                             }
                           }}
                           placeholder={composerPlaceholder}
-                          disabled={isConversationReadOnly || sendMutation.isPending}
+                          disabled={isComposerDisabled || sendMutation.isPending}
                           rows={1}
                         />
                         <div className={styles.composerSendGroup}>
@@ -1448,7 +1683,7 @@ export function SupportConversationPage({
                             onClick={submitReply}
                             className={styles.composerSendPrimary}
                             disabled={
-                              isConversationReadOnly ||
+                              isComposerDisabled ||
                               sendMutation.isPending ||
                               (!reply.trim() && !hasComposerAttachment)
                             }
@@ -1476,17 +1711,21 @@ export function SupportConversationPage({
               className={styles.imageViewerOverlay}
               role="dialog"
               aria-modal="true"
-              aria-label={
-                fullscreenImage.fileName?.trim() ||
-                (fullscreenImage.mediaType === "video" ? "Video preview" : "Image preview")
-              }
+              aria-label={formatSafeSupportDisplay(
+                fullscreenImage.fileName,
+                fullscreenImage.mediaType === "video" ? "Video preview" : "Image preview",
+                120
+              )}
               onClick={closeFullscreenImage}
             >
               <div className={styles.imageViewerPanel} onClick={(event) => event.stopPropagation()}>
                 <div className={styles.imageViewerHeader}>
                   <strong>
-                    {fullscreenImage.fileName?.trim() ||
-                      (fullscreenImage.mediaType === "video" ? "Video" : "Image")}
+                    {formatSafeSupportDisplay(
+                      fullscreenImage.fileName,
+                      fullscreenImage.mediaType === "video" ? "Video" : "Image",
+                      120
+                    )}
                   </strong>
                   <Button variant="ghost" size="sm" onClick={closeFullscreenImage}>
                     {imageViewerLabels.close}
@@ -1494,22 +1733,24 @@ export function SupportConversationPage({
                 </div>
                 <div className={styles.imageViewerBody}>
                   {fullscreenImage.mediaType === "video" ? (
-                    <video
-                      src={fullscreenImage.url}
+                    <SupportSecureMedia
+                      url={fullscreenImage.attachmentFileUrl}
+                      kind="video"
                       className={styles.imageViewerVideo}
                       controls
                       preload="metadata"
                       playsInline
+                      logContext={{ messageId: fullscreenImage.messageId, mimeType: "video" }}
                     />
                   ) : (
-                    <Image
-                      src={fullscreenImage.url}
-                      alt={fullscreenImage.fileName ?? "Support image"}
+                    <SupportSecureMedia
+                      url={fullscreenImage.attachmentFileUrl}
+                      kind="image"
+                      alt={formatSafeSupportDisplay(fullscreenImage.fileName, "Support image", 120)}
                       width={1720}
                       height={980}
-                      sizes="100vw"
                       className={styles.imageViewerImage}
-                      unoptimized
+                      logContext={{ messageId: fullscreenImage.messageId, mimeType: "image" }}
                     />
                   )}
                 </div>
@@ -1517,7 +1758,9 @@ export function SupportConversationPage({
                   {fullscreenImage.senderDisplayName ? (
                     <div>
                       <span>{imageViewerLabels.author}</span>
-                      <strong>{fullscreenImage.senderDisplayName}</strong>
+                      <strong>
+                        {formatSafeSupportDisplay(fullscreenImage.senderDisplayName, "", 72)}
+                      </strong>
                     </div>
                   ) : null}
                   {fullscreenImage.createdAtUtc ? (
@@ -1538,10 +1781,20 @@ export function SupportConversationPage({
                   ) : null}
                 </div>
                 <div className={styles.imageViewerActions}>
-                  <Button variant="secondary" size="sm" onClick={saveFullscreenImage}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void saveFullscreenImage()}
+                    disabled={pendingFullscreenAction !== null}
+                  >
                     {imageViewerLabels.download}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={shareFullscreenImage}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void shareFullscreenImage()}
+                    disabled={pendingFullscreenAction !== null}
+                  >
                     {imageViewerLabels.share}
                   </Button>
                   {fullscreenImage.messageId ? (
@@ -1557,7 +1810,12 @@ export function SupportConversationPage({
                       {imageViewerLabels.jump}
                     </Button>
                   ) : null}
-                  <Button variant="secondary" size="sm" onClick={openFullscreenImageInNewTab}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void openFullscreenImageInNewTab()}
+                    disabled={pendingFullscreenAction !== null}
+                  >
                     {imageViewerLabels.openOriginal}
                   </Button>
                   <Button variant="primary" size="sm" onClick={closeFullscreenImage}>

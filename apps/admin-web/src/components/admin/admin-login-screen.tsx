@@ -4,22 +4,18 @@ import { BrandMark } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import styles from "@/components/admin/admin-login-screen.module.css";
 import { type Locale } from "@/lib/i18n";
-import { type AdminTheme } from "@/lib/theme";
 
 type AdminLoginScreenProps = {
   locale: Locale;
-  theme: AdminTheme;
   onToggleTheme: () => void;
   children: ReactNode;
 };
 
 export function AdminLoginScreen({
   locale,
-  theme: _theme,
   onToggleTheme,
   children,
 }: AdminLoginScreenProps) {
-  void _theme;
   const welcomeTitle = locale === "ru" ? "Добро пожаловать!" : "Welcome!";
   const welcomeSubtitle =
     locale === "ru"
@@ -38,7 +34,7 @@ export function AdminLoginScreen({
         <BrandMark className={styles.brandMark} />
         <h2 className={styles.welcome}>{welcomeTitle}</h2>
         <p className={styles.tagline}>{welcomeSubtitle}</p>
-        <LoginDashboardPreview locale={locale} />
+        <LoginDashboardPreview />
       </div>
 
       <div className={styles.right}>
@@ -61,9 +57,7 @@ export function AdminLoginScreen({
   );
 }
 
-function LoginDashboardPreview({ locale }: { locale: Locale }) {
-  const isRu = locale === "ru";
-
+function LoginDashboardPreview() {
   return (
     <div className={styles.preview} aria-hidden="true">
       <div className={styles.previewTitlebar}>
@@ -113,9 +107,9 @@ function LoginDashboardPreview({ locale }: { locale: Locale }) {
           </div>
 
           <div className={styles.previewStats}>
-            <PreviewStat label={isRu ? "Польз." : "Users"} value="1 256" delta="▲ 12.5%" />
-            <PreviewStat label={isRu ? "Заказы" : "Orders"} value="3 846" delta="▲ 8.1%" />
-            <PreviewStat label={isRu ? "Шаблоны" : "Templ."} value="74%" delta="▲ 4.3%" />
+            <PreviewStatSkeleton />
+            <PreviewStatSkeleton />
+            <PreviewStatSkeleton />
           </div>
         </div>
       </div>
@@ -123,12 +117,12 @@ function LoginDashboardPreview({ locale }: { locale: Locale }) {
   );
 }
 
-function PreviewStat({ label, value, delta }: { label: string; value: string; delta: string }) {
+function PreviewStatSkeleton() {
   return (
     <div className={styles.previewStat}>
-      <span className={styles.previewStatLabel}>{label}</span>
-      <span className={styles.previewStatValue}>{value}</span>
-      <span className={styles.previewStatDelta}>{delta}</span>
+      <span className={styles.previewStatLabel} />
+      <span className={styles.previewStatValue} />
+      <span className={styles.previewStatDelta} />
     </div>
   );
 }

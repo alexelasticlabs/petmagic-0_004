@@ -13,6 +13,7 @@ import {
 
 import { isActionableAdminNotification } from "@/lib/admin-notification-policy";
 import { clientLogger } from "@/lib/client-logger";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type AdminNotificationCategory =
   | "support"
@@ -87,6 +88,8 @@ const MAX_ADMIN_NOTIFICATIONS = 24;
 const DEDUPE_WINDOW_MS = 4000;
 const ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_NOTIFICATION_TITLE_LENGTH = 120;
+const MAX_NOTIFICATION_MESSAGE_LENGTH = 280;
 
 const notificationCategories = new Set<AdminNotificationCategory>([
   "support",
@@ -113,7 +116,25 @@ function sanitizeNotificationHref(href: unknown): string | undefined {
     return undefined;
   }
 
-  return trimmed;
+  return trimmed.split(/[?#]/, 1)[0] || undefined;
+}
+
+export function sanitizeAdminNotificationText(value: string, maxLength: number): string {
+  return sanitizeSensitiveText(value, maxLength);
+}
+
+export function buildAdminNotificationDedupeKey(
+  source: string,
+  type: string,
+  message: string,
+  href?: string
+): string {
+  return [
+    source,
+    type,
+    sanitizeAdminNotificationText(message, MAX_NOTIFICATION_MESSAGE_LENGTH),
+    sanitizeNotificationHref(href) ?? "",
+  ].join(":");
 }
 
 function toHydratedNotificationItem(
@@ -125,8 +146,14 @@ function toHydratedNotificationItem(
   }
 
   const id = typeof rawValue.id === "string" ? rawValue.id : "";
-  const title = typeof rawValue.title === "string" ? rawValue.title : "";
-  const message = typeof rawValue.message === "string" ? rawValue.message : "";
+  const title =
+    typeof rawValue.title === "string"
+      ? sanitizeAdminNotificationText(rawValue.title, MAX_NOTIFICATION_TITLE_LENGTH)
+      : "";
+  const message =
+    typeof rawValue.message === "string"
+      ? sanitizeAdminNotificationText(rawValue.message, MAX_NOTIFICATION_MESSAGE_LENGTH)
+      : "";
   const source = typeof rawValue.source === "string" ? rawValue.source : "";
   const createdAt = typeof rawValue.createdAt === "string" ? rawValue.createdAt : "";
   const read = typeof rawValue.read === "boolean" ? rawValue.read : false;
@@ -237,9 +264,14 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     }
 
     const now = Date.now();
+    const sanitizedTitle = sanitizeAdminNotificationText(input.title, MAX_NOTIFICATION_TITLE_LENGTH);
+    const sanitizedMessage = sanitizeAdminNotificationText(
+      input.message,
+      MAX_NOTIFICATION_MESSAGE_LENGTH
+    );
     const dedupeKey =
       input.dedupeKey ??
-      [input.source, input.category, tone, input.title, input.message, safeHref]
+      [input.source, input.category, tone, sanitizedTitle, sanitizedMessage, safeHref]
         .filter(Boolean)
         .join("::");
     const previousTimestamp = dedupeMapRef.current.get(dedupeKey);
@@ -252,8 +284,8 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
     const notification: AdminNotificationItem = {
       id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-      title: input.title,
-      message: input.message,
+      title: sanitizedTitle,
+      message: sanitizedMessage,
       category: input.category,
       tone,
       priority: input.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
@@ -349,7 +381,7 @@ export function useSyncToastToAdminNotifications(
       tone: toast.type === "success" ? "success" : "error",
       priority: toast.type === "error" ? "critical" : "normal",
       href,
-      dedupeKey: `${source}:${toast.type}:${toast.message}:${href ?? ""}`,
+      dedupeKey: buildAdminNotificationDedupeKey(source, toast.type, toast.message, href),
     });
   }, [addNotification, category, href, source, title, toast]);
 }
@@ -373,7 +405,12 @@ export function useSyncFeedbackToAdminNotifications(
       tone: feedback.tone === "success" ? "success" : feedback.tone === "danger" ? "error" : "info",
       priority: feedback.tone === "danger" ? "critical" : "normal",
       href,
-      dedupeKey: `${source}:${feedback.tone}:${feedback.message}:${href ?? ""}`,
+      dedupeKey: buildAdminNotificationDedupeKey(
+        source,
+        feedback.tone,
+        feedback.message,
+        href
+      ),
     });
   }, [addNotification, category, feedback, href, source, title]);
 }

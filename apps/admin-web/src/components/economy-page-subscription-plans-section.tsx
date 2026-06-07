@@ -8,6 +8,13 @@ import {
 } from "@/components/admin/admin-primitives";
 import { type EconomyPageText } from "@/components/economy-page.content";
 import {
+  ECONOMY_PACK_INTEGER_MAX_LENGTH,
+  ECONOMY_PACK_PRICE_MAX_LENGTH,
+  ECONOMY_PLAN_NAME_MAX_LENGTH,
+  ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH,
+  normalizeEconomyCurrencyInput,
+  normalizeEconomyIntegerInput,
+  normalizeEconomyPriceInput,
   toSubscriptionPlanDraft,
   updateSubscriptionPlanDraft,
   type SubscriptionPlanDraft,
@@ -16,6 +23,7 @@ import styles from "@/components/economy-page.module.css";
 import { Button } from "@/components/ui/button";
 import { type AdminSubscriptionPlan } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type EconomyPageSubscriptionPlansSectionProps = {
   locale: Locale;
@@ -45,6 +53,11 @@ function TableOrEmpty({
   return <>{children}</>;
 }
 
+function safeText(value: string | null | undefined, maxLength = 120) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
+}
+
 export function EconomyPageSubscriptionPlansSection({
   locale,
   text,
@@ -60,7 +73,7 @@ export function EconomyPageSubscriptionPlansSection({
     <AdminCard title={text.subscriptionPlansTitle} description={text.subscriptionPlansDescription}>
       <AdminMetricStrip
         items={subscriptionPlans.slice(0, 4).map((plan) => ({
-          label: `${plan.name} • ${humanizeBillingPeriod(plan.billingPeriod, locale)}`,
+          label: `${safeText(plan.name, 80)} • ${humanizeBillingPeriod(plan.billingPeriod, locale)}`,
           value: `${plan.monthlyTokenLimit} ${text.tokensShort}`,
         }))}
         className={styles.metricStrip}
@@ -89,7 +102,7 @@ export function EconomyPageSubscriptionPlansSection({
                   <tr key={plan.planId}>
                     <td>
                       <div className={styles.packMeta}>
-                        <strong>{plan.planId}</strong>
+                        <strong>{safeText(plan.planId, 80)}</strong>
                         <span>{humanizeBillingPeriod(plan.billingPeriod, locale)}</span>
                       </div>
                       <input
@@ -99,6 +112,7 @@ export function EconomyPageSubscriptionPlansSection({
                             name: event.target.value,
                           })
                         }
+                        maxLength={ECONOMY_PLAN_NAME_MAX_LENGTH}
                         className={styles.input}
                       />
                     </td>
@@ -108,9 +122,10 @@ export function EconomyPageSubscriptionPlansSection({
                           value={draft.priceAmount}
                           onChange={(event) =>
                             updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                              priceAmount: event.target.value,
+                              priceAmount: normalizeEconomyPriceInput(event.target.value),
                             })
                           }
+                          maxLength={ECONOMY_PACK_PRICE_MAX_LENGTH}
                           inputMode="decimal"
                           className={styles.input}
                         />
@@ -118,7 +133,7 @@ export function EconomyPageSubscriptionPlansSection({
                           value={draft.currencyCode}
                           onChange={(event) =>
                             updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                              currencyCode: event.target.value.toUpperCase(),
+                              currencyCode: normalizeEconomyCurrencyInput(event.target.value),
                             })
                           }
                           className={styles.input}
@@ -135,9 +150,10 @@ export function EconomyPageSubscriptionPlansSection({
                             value={draft.displayOrder}
                             onChange={(event) =>
                               updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                                displayOrder: event.target.value,
+                                displayOrder: normalizeEconomyIntegerInput(event.target.value),
                               })
                             }
+                            maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                             inputMode="numeric"
                             className={styles.input}
                           />
@@ -149,9 +165,10 @@ export function EconomyPageSubscriptionPlansSection({
                         value={draft.monthlyTokenLimit}
                         onChange={(event) =>
                           updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                            monthlyTokenLimit: event.target.value,
+                            monthlyTokenLimit: normalizeEconomyIntegerInput(event.target.value),
                           })
                         }
+                        maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                         inputMode="numeric"
                         className={styles.input}
                       />
@@ -167,6 +184,7 @@ export function EconomyPageSubscriptionPlansSection({
                                 appleProductId: event.target.value,
                               })
                             }
+                            maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
                           />
                         </label>
@@ -179,6 +197,7 @@ export function EconomyPageSubscriptionPlansSection({
                                 googleProductId: event.target.value,
                               })
                             }
+                            maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
                           />
                         </label>
@@ -191,6 +210,7 @@ export function EconomyPageSubscriptionPlansSection({
                                 stripePriceId: event.target.value,
                               })
                             }
+                            maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
                           />
                         </label>

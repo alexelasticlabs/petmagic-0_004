@@ -25,6 +25,10 @@
   font-size: 0.82rem;
 }
 
+.mutedText {
+  color: var(--text-muted);
+}
+
 .input {
   width: 100%;
   min-width: 7.5rem;
@@ -143,9 +147,58 @@
 
 .filterRow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: 0.75rem;
   align-items: start;
+}
+
+.filterField {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.filterField span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.pager {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.8rem;
+}
+
+.pagerButton,
+.dangerButton {
+  min-height: 2rem;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 0.68rem;
+  background: rgba(26, 39, 56, 0.55);
+  color: var(--text-soft);
+  padding: 0.4rem 0.68rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.pagerButton:hover:not(:disabled),
+.dangerButton:hover:not(:disabled) {
+  border-color: var(--border-accent);
+  color: var(--text-strong);
+}
+
+.dangerButton {
+  border-color: color-mix(in srgb, var(--danger) 28%, rgba(148, 163, 184, 0.22));
+  color: var(--danger);
+}
+
+.pagerButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .flagList {

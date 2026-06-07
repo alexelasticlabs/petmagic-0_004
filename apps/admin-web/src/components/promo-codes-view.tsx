@@ -13,6 +13,7 @@ import {
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import { AdminKpiCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
 import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
 import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
@@ -23,6 +24,7 @@ import {
   copyTextToClipboard,
   createDefaultPromoForm,
   createGeneratedPromoCode,
+  formatPromoDisplayText,
   formatNumber,
   formatSevenDayDelta,
   getPromoStatus,
@@ -39,6 +41,7 @@ import styles from "@/components/promo-codes-view.module.css";
 import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
 import { Button } from "@/components/ui/button";
 import { usePromoActionsMenu } from "@/components/use-promo-actions-menu";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   createAdminRedeemCode,
@@ -65,10 +68,16 @@ const PROMO_ACTIONS_MENU_MIN_WIDTH_PX = 220;
 
 export function PromoCodesView({ locale }: { locale: Locale }) {
   const text = getDictionary(locale);
+  const archiveActionLabel = locale === "ru" ? "Архивировать" : "Archive";
   const tokenUnit = "PawSpark";
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
+  const canManagePromoCodes = session?.user.roles.includes("Admin") ?? false;
+  const promoCodesAdminOnlyMessage =
+    locale === "ru"
+      ? "Управление промокодами доступно только Admin."
+      : "Promo code management is available to Admin only.";
 
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
@@ -85,8 +94,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const [busyCodeId, setBusyCodeId] = useState<string | null>(null);
   const [showAllActivations, setShowAllActivations] = useState(false);
   const [activationsPage, setActivationsPage] = useState(1);
+  const [codePendingArchive, setCodePendingArchive] = useState<AdminRedeemCode | null>(null);
+  const [fallbackNowMs] = useState(() => Date.now());
   const { actionsMenuCodeId, actionsMenuPosition, closeActionsMenu, handleToggleActionsMenu } =
     usePromoActionsMenu();
+  const hasActivePromoFilters =
+    search.trim().length > 0 || statusFilter !== "all" || rewardFilter !== "all";
 
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "promo",
@@ -130,15 +143,16 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
   const promoCodesQuery = useQuery({
     queryKey: adminQueryKeys.economyRedeemCodes,
-    queryFn: fetchAdminRedeemCodes,
+    queryFn: ({ signal }) => fetchAdminRedeemCodes(signal),
     staleTime: PROMO_CODES_AUTO_REFRESH_MS,
-    refetchInterval: PROMO_CODES_AUTO_REFRESH_MS,
+    refetchInterval:
+      hasActivePromoFilters || isEditorOpen ? false : PROMO_CODES_AUTO_REFRESH_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
 
   const promoCodes = promoCodesQuery.data ?? EMPTY_PROMO_CODES;
-  const nowMs = promoCodesQuery.dataUpdatedAt || 0;
+  const nowMs = promoCodesQuery.dataUpdatedAt || fallbackNowMs;
   const selectedCode = useMemo(
     () => promoCodes.find((code) => code.redeemCodeId === selectedCodeId) ?? null,
     [promoCodes, selectedCodeId]
@@ -155,11 +169,11 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       activationsSkip,
       activationsTake
     ),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchAdminRedeemCodeActivations(selectedCodeId!, {
         skip: activationsSkip,
         take: activationsTake,
-      }),
+      }, signal),
     enabled: Boolean(selectedCodeId),
     staleTime: 20_000,
   });
@@ -168,32 +182,13 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     () => activationsQuery.data?.items ?? EMPTY_REDEMPTIONS,
     [activationsQuery.data?.items]
   );
-  const localRedemptions = useMemo(() => {
-    if (!selectedCode) {
-      return EMPTY_REDEMPTIONS;
-    }
-
-    return [...selectedCode.redemptions].sort(
-      (firstItem, secondItem) =>
-        new Date(secondItem.redeemedAtUtc).getTime() - new Date(firstItem.redeemedAtUtc).getTime()
-    );
-  }, [selectedCode]);
-  const fallbackRedemptions = useMemo(() => {
-    if (!activationsQuery.isError) {
-      return EMPTY_REDEMPTIONS;
-    }
-
-    return localRedemptions.slice(activationsSkip, activationsSkip + activationsTake);
-  }, [activationsQuery.isError, activationsSkip, activationsTake, localRedemptions]);
-  const redemptionsForView = activationsQuery.isError ? fallbackRedemptions : visibleRedemptions;
+  const redemptionsForView = activationsQuery.isError ? EMPTY_REDEMPTIONS : visibleRedemptions;
   const hasMoreRedemptions = Boolean(activationsQuery.data?.hasMore);
   const hasAnyRedemptions = (selectedCode?.redeemedCount ?? 0) > 0;
   const canExpandActivations =
     !showAllActivations && (selectedCode?.redeemedCount ?? 0) > ACTIVATIONS_PREVIEW_LIMIT;
   const canGoToPreviousActivationsPage = showAllActivations && activationsPage > 1;
-  const canGoToNextActivationsPage = activationsQuery.isError
-    ? localRedemptions.length > activationsSkip + activationsTake
-    : hasMoreRedemptions;
+  const canGoToNextActivationsPage = !activationsQuery.isError && hasMoreRedemptions;
 
   const selectedUserIds = useMemo(
     () => [...new Set(redemptionsForView.map((item) => item.userId))],
@@ -203,7 +198,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   const selectedUsersQueries = useQueries({
     queries: selectedUserIds.map((userId) => ({
       queryKey: adminQueryKeys.userDetail(userId),
-      queryFn: () => fetchAdminUser(userId),
+      queryFn: ({ signal }) => fetchAdminUser(userId, signal),
       staleTime: 60_000,
     })),
   });
@@ -236,7 +231,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesCreateError,
+        message: getAdminErrorMessage(error, text.promoCodesCreateError),
       });
     },
   });
@@ -262,7 +257,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesUpdateError,
+        message: getAdminErrorMessage(error, text.promoCodesUpdateError),
       });
     },
   });
@@ -298,7 +293,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           : variables.payload.isActive
             ? text.promoCodesResumeError
             : text.promoCodesPauseError;
-      setFeedback({ tone: "danger", message: error instanceof Error ? error.message : fallback });
+      setFeedback({ tone: "danger", message: getAdminErrorMessage(error, fallback) });
     },
     onSettled: () => {
       setBusyCodeId(null);
@@ -323,7 +318,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesArchiveError,
+        message: getAdminErrorMessage(error, text.promoCodesArchiveError),
       });
     },
     onSettled: () => {
@@ -459,7 +454,23 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     setForm(createDefaultPromoForm());
   }
 
+  function assertCanManagePromoCodes(): boolean {
+    if (canManagePromoCodes) {
+      return true;
+    }
+
+    setBusyCodeId(null);
+    setCodePendingArchive(null);
+    setFeedback({ tone: "danger", message: promoCodesAdminOnlyMessage });
+    closeActionsMenu();
+    return false;
+  }
+
   function handleOpenCreatePanel() {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
     setPanelMode("create");
     setIsEditorOpen(true);
     setSelectedCodeId(null);
@@ -476,6 +487,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   function handleOpenEditPanel(code: AdminRedeemCode) {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
     setPanelMode("edit");
     setIsEditorOpen(true);
     setSelectedCodeId(code.redeemCodeId);
@@ -500,6 +515,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   async function handleCopyCode(code: string) {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
     try {
       await copyTextToClipboard(code);
       setFeedback({ tone: "info", message: text.promoCodesCopied });
@@ -511,15 +530,23 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   function handleGenerateCode() {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
     setForm((current) => ({ ...current, code: createGeneratedPromoCode() }));
   }
 
   function handleExport() {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
     if (!filteredCodes.length) {
       return;
     }
 
-    const csv = buildPromoCodesCsv(filteredCodes, locale, text);
+    const csv = buildPromoCodesCsv(filteredCodes, locale, text, nowMs);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -530,7 +557,28 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     setFeedback({ tone: "info", message: text.promoCodesExported });
   }
 
+  function requestArchiveCode(code: AdminRedeemCode) {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
+    if (isMutating || busyCodeId === code.redeemCodeId || !code.isActive) {
+      return;
+    }
+
+    closeActionsMenu();
+    setCodePendingArchive(code);
+  }
+
   function handleToggleCodeState(code: AdminRedeemCode) {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
+    if (isMutating) {
+      return;
+    }
+
     try {
       const status = getPromoStatus(code, text, nowMs);
       const nextIsActive = !code.isActive;
@@ -551,14 +599,18 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     } catch (error) {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesUpdateError,
+        message: getAdminErrorMessage(error, text.promoCodesUpdateError),
       });
     }
   }
 
-  function handleArchive(code: AdminRedeemCode) {
-    if (!window.confirm(text.promoCodesArchiveConfirm)) {
-      return;
+  async function handleArchive(code: AdminRedeemCode): Promise<boolean> {
+    if (!assertCanManagePromoCodes()) {
+      return false;
+    }
+
+    if (isMutating) {
+      return false;
     }
 
     try {
@@ -575,16 +627,26 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       );
       setBusyCodeId(code.redeemCodeId);
       closeActionsMenu();
-      archiveMutation.mutate({ redeemCodeId: code.redeemCodeId, payload });
+      await archiveMutation.mutateAsync({ redeemCodeId: code.redeemCodeId, payload });
+      return true;
     } catch (error) {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesArchiveError,
+        message: getAdminErrorMessage(error, text.promoCodesArchiveError),
       });
+      return false;
     }
   }
 
   function handleRestore(code: AdminRedeemCode) {
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
+    if (isMutating) {
+      return;
+    }
+
     try {
       const status = getPromoStatus(code, text, nowMs);
       const nextForm = toPromoForm(code);
@@ -604,13 +666,21 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     } catch (error) {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesRestoreError,
+        message: getAdminErrorMessage(error, text.promoCodesRestoreError),
       });
     }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!assertCanManagePromoCodes()) {
+      return;
+    }
+
+    if (isMutating) {
+      return;
+    }
+
     setFeedback(null);
 
     try {
@@ -630,7 +700,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     } catch (error) {
       setFeedback({
         tone: "danger",
-        message: error instanceof Error ? error.message : text.promoCodesCreateError,
+        message: getAdminErrorMessage(error, text.promoCodesCreateError),
       });
     }
   }
@@ -664,7 +734,11 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           title={text.navPromoCodes}
           description={text.promoCodesErrorDescription}
           action={
-            <Button variant="secondary" onClick={() => void promoCodesQuery.refetch()}>
+            <Button
+              variant="secondary"
+              disabled={promoCodesQuery.isFetching}
+              onClick={() => void promoCodesQuery.refetch().catch(() => undefined)}
+            >
               {text.promoCodesRefreshAction}
             </Button>
           }
@@ -747,6 +821,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           pageSizeOptions={pageSizeOptions}
           hasCodes={hasCodes}
           hasFilteredCodes={hasFilteredCodes}
+          canManagePromoCodes={canManagePromoCodes}
           promoCodesQueryIsFetching={promoCodesQuery.isFetching}
           autoRefreshMs={PROMO_CODES_AUTO_REFRESH_MS}
           dataUpdatedAt={promoCodesQuery.dataUpdatedAt}
@@ -792,7 +867,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             setPage(1);
           }}
           onExport={handleExport}
-          onRefresh={() => void promoCodesQuery.refetch()}
+          onRefresh={() => void promoCodesQuery.refetch().catch(() => undefined)}
           onOpenCreatePanel={handleOpenCreatePanel}
           onFocusUsage={handleFocusUsage}
           onToggleActionsMenu={handleToggleActionsMenu}
@@ -844,7 +919,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         onCopyCode={handleCopyCode}
         onEdit={handleOpenEditPanel}
         onToggleState={handleToggleCodeState}
-        onArchive={handleArchive}
+        onArchive={requestArchiveCode}
       />
 
       <PromoCodesEditorDrawer
@@ -861,6 +936,38 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         onReset={handleResetPanel}
         onGenerateCode={handleGenerateCode}
         onToggleCodeState={handleToggleCodeState}
+      />
+
+      <ConfirmationDialog
+        open={codePendingArchive !== null}
+        title={archiveActionLabel}
+        description={
+          codePendingArchive
+            ? `${formatPromoDisplayText(
+                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,
+                80
+              )}: ${text.promoCodesArchiveConfirm}`
+            : ""
+        }
+        confirmLabel={archiveActionLabel}
+        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        isSubmitting={Boolean(codePendingArchive && busyCodeId === codePendingArchive.redeemCodeId)}
+        onCancel={() => {
+          if (!isMutating) {
+            setCodePendingArchive(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!codePendingArchive) {
+            return;
+          }
+
+          void handleArchive(codePendingArchive).then((succeeded) => {
+            if (succeeded) {
+              setCodePendingArchive(null);
+            }
+          });
+        }}
       />
     </AdminPage>
   );

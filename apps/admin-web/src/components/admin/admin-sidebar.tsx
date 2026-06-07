@@ -31,6 +31,7 @@ type AdminSidebarProps = {
   onLogout: () => void;
   logoutLabel: string;
   supportUnreadCount?: number;
+  roles?: readonly string[] | null;
 };
 
 const iconMap = {
@@ -38,7 +39,10 @@ const iconMap = {
   economy: DollarIcon,
   "promo-codes": PromoCodeIcon,
   support: SupportIcon,
+  moderation: ChartIcon,
   users: UsersIcon,
+  generations: ChartIcon,
+  "role-management": UsersIcon,
   templates: TemplatesIcon,
   "image-templates": ImageIcon,
   "template-analytics": ChartIcon,
@@ -65,7 +69,11 @@ function buildNavSections(navItems: AdminNavEntry[], locale: Locale): NavSection
     { key: "overview", label: text.navSectionOverview, itemKeys: ["dashboard", "economy"] },
     { key: "growth", label: text.navSectionGrowth, itemKeys: ["promo-codes"] },
     { key: "content", label: text.navSectionContent, itemKeys: ["templates"] },
-    { key: "users", label: text.navSectionUsers, itemKeys: ["users", "support"] },
+    {
+      key: "users",
+      label: text.navSectionUsers,
+      itemKeys: ["users", "role-management", "generations", "support", "moderation"],
+    },
   ];
 
   return sections
@@ -87,8 +95,9 @@ export function AdminSidebar({
   onLogout,
   logoutLabel,
   supportUnreadCount = 0,
+  roles,
 }: AdminSidebarProps) {
-  const navItems = getAdminNavItems(locale);
+  const navItems = getAdminNavItems(locale, roles);
   const navSections = buildNavSections(navItems, locale);
   const brandCaption = locale === "ru" ? "Операционная админ-зона" : "Operational admin workspace";
 

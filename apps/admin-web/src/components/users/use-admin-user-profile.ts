@@ -17,13 +17,13 @@ type UseAdminUserProfileOptions = {
 export function useAdminUserProfile({ userId }: UseAdminUserProfileOptions) {
   const userQuery = useQuery<AdminUserDetail>({
     queryKey: userId ? adminQueryKeys.userDetail(userId) : adminQueryKeys.userDetailDisabled,
-    queryFn: () => fetchAdminUser(userId!),
+    queryFn: ({ signal }) => fetchAdminUser(userId!, signal),
     enabled: Boolean(userId),
   });
 
   const analyticsQuery = useQuery<AdminUserAnalytics>({
     queryKey: userId ? adminQueryKeys.userAnalytics(userId) : adminQueryKeys.userAnalyticsDisabled,
-    queryFn: () => fetchAdminUserAnalytics(userId!),
+    queryFn: ({ signal }) => fetchAdminUserAnalytics(userId!, signal),
     enabled: Boolean(userId),
   });
 
@@ -56,6 +56,7 @@ export function useAdminUserProfile({ userId }: UseAdminUserProfileOptions) {
   return {
     analytics,
     hasError,
+    isFetching: userQuery.isFetching || analyticsQuery.isFetching,
     isLoading,
     refresh,
     user,

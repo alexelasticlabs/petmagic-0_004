@@ -2,6 +2,8 @@ import { type Dispatch, type SetStateAction } from "react";
 
 import {
   type AdminCurrencyPack,
+  type AdminEconomyPurchase,
+  type AdminEconomySubscription,
   type AdminPaymentProviderConfiguration,
   type AdminSubscriptionPlan,
 } from "@/lib/api-client";
@@ -59,11 +61,37 @@ export type ProviderConfigMatchDraft = {
 };
 
 export type EconomyValidationText = {
+  invalidPackNumbers: string;
   invalidPlanNumbers: string;
   invalidProviderConfigCreate: string;
   invalidProviderConfigMatch: string;
   invalidProviderConfig: string;
 };
+
+export const ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH = 80;
+export const ECONOMY_PACK_PRICE_MAX_LENGTH = 10;
+export const ECONOMY_PACK_INTEGER_MAX_LENGTH = 9;
+export const ECONOMY_PLAN_NAME_MAX_LENGTH = 80;
+export const ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH = 160;
+export const ECONOMY_PROVIDER_CODE_MAX_LENGTH = 48;
+export const ECONOMY_PROVIDER_REGION_MAX_LENGTH = 32;
+export const ECONOMY_PROVIDER_VERSION_MAX_LENGTH = 32;
+export const ECONOMY_PROVIDER_LABEL_MAX_LENGTH = 120;
+export const ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH = 240;
+export const ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH = 3;
+
+export function canRefundPurchase(purchase: AdminEconomyPurchase): boolean {
+  return purchase.canRefund === true;
+}
+
+export function canCancelSubscription(subscription: AdminEconomySubscription): boolean {
+  const status = subscription.status.toLowerCase();
+  return (
+    subscription.provider.toLowerCase() === "stripe" &&
+    (status === "active" || status === "trialing") &&
+    !subscription.cancelAtPeriodEnd
+  );
+}
 
 export function toDraft(pack: AdminCurrencyPack): PackDraft {
   return {
@@ -95,6 +123,33 @@ export function updateDraft(
       ...patch,
     },
   }));
+}
+
+export function toCurrencyPackPayload(draft: PackDraft, text: EconomyValidationText) {
+  const displayName = draft.displayName.trim();
+  const priceAmount = parsePackDecimal(draft.priceAmount);
+  const grantedSpark = parsePackInteger(draft.grantedSpark, 1);
+  const bonusSpark = parsePackInteger(draft.bonusSpark, 0);
+  const sortOrder = parsePackInteger(draft.sortOrder, 0);
+
+  if (
+    !isBoundedRequiredText(displayName, ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH) ||
+    priceAmount === null ||
+    grantedSpark === null ||
+    bonusSpark === null ||
+    sortOrder === null
+  ) {
+    throw new Error(text.invalidPackNumbers);
+  }
+
+  return {
+    displayName,
+    priceAmount,
+    grantedSpark,
+    bonusSpark,
+    isActive: draft.isActive,
+    sortOrder,
+  };
 }
 
 export function toSubscriptionPlanDraft(plan: AdminSubscriptionPlan): SubscriptionPlanDraft {
@@ -141,19 +196,17 @@ export function toSubscriptionPlanPayload(
   draft: SubscriptionPlanDraft,
   text: EconomyValidationText
 ) {
-  const priceAmount = Number(draft.priceAmount);
-  const monthlyTokenLimit = Number(draft.monthlyTokenLimit);
-  const displayOrder = Number(draft.displayOrder);
+  const name = draft.name.trim();
+  const priceAmount = parsePackDecimal(draft.priceAmount);
+  const monthlyTokenLimit = parsePackInteger(draft.monthlyTokenLimit, 1);
+  const displayOrder = parsePackInteger(draft.displayOrder, 0);
   const currencyCode = draft.currencyCode.trim().toUpperCase();
 
   if (
-    !draft.name.trim() ||
-    !Number.isFinite(priceAmount) ||
-    priceAmount <= 0 ||
-    !Number.isFinite(monthlyTokenLimit) ||
-    monthlyTokenLimit <= 0 ||
-    !Number.isFinite(displayOrder) ||
-    displayOrder < 0 ||
+    !isBoundedRequiredText(name, ECONOMY_PLAN_NAME_MAX_LENGTH) ||
+    priceAmount === null ||
+    monthlyTokenLimit === null ||
+    displayOrder === null ||
     currencyCode.length !== 3
   ) {
     throw new Error(text.invalidPlanNumbers);
@@ -167,15 +220,15 @@ export function toSubscriptionPlanPayload(
   }
 
   return {
-    name: draft.name.trim(),
+    name,
     priceAmount,
     currencyCode,
     monthlyTokenLimit,
     isRecommended: draft.isRecommended,
     isActive: draft.isActive,
-    appleProductId: optionalText(draft.appleProductId),
-    googleProductId: optionalText(draft.googleProductId),
-    stripePriceId: optionalText(draft.stripePriceId),
+    appleProductId: optionalBoundedPlanText(draft.appleProductId, text),
+    googleProductId: optionalBoundedPlanText(draft.googleProductId, text),
+    stripePriceId: optionalBoundedPlanText(draft.stripePriceId, text),
     displayOrder,
   };
 }
@@ -197,7 +250,7 @@ export function createDefaultProviderConfigDraft(): ProviderConfigCreateDraft {
     displaySubtitle: "",
     warningTitle: "",
     warningMessage: "",
-    mode: "test",
+    mode: "live",
     notes: "",
   };
 }
@@ -231,7 +284,10 @@ export function toProviderConfigCreatePayload(
   const provider = draft.provider.trim().toLowerCase();
   const platform = draft.platform.trim().toLowerCase();
 
-  if (!provider || !platform) {
+  if (
+    !isBoundedRequiredText(provider, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
+    !isBoundedRequiredText(platform, ECONOMY_PROVIDER_CODE_MAX_LENGTH)
+  ) {
     throw new Error(text.invalidProviderConfigCreate);
   }
 
@@ -251,7 +307,12 @@ export function toProviderConfigMatchPayload(
   const country = draft.country.trim().toUpperCase();
   const appVersion = draft.appVersion.trim();
 
-  if (!provider || !platform || !country || !appVersion) {
+  if (
+    !isBoundedRequiredText(provider, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
+    !isBoundedRequiredText(platform, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
+    !isBoundedRequiredText(country, ECONOMY_PROVIDER_REGION_MAX_LENGTH) ||
+    !isBoundedRequiredText(appVersion, ECONOMY_PROVIDER_VERSION_MAX_LENGTH)
+  ) {
     throw new Error(text.invalidProviderConfigMatch);
   }
 
@@ -285,7 +346,7 @@ export function updateProviderConfigDraft(
         displaySubtitle: "",
         warningTitle: "",
         warningMessage: "",
-        mode: "test",
+        mode: "live",
         notes: "",
       }),
       ...patch,
@@ -297,15 +358,13 @@ export function toProviderConfigPayload(draft: ProviderConfigDraft, text: Econom
   const region = draft.region.trim().toUpperCase();
   const allowedFromAppVersion = draft.allowedFromAppVersion.trim();
   const mode = draft.mode.trim().toLowerCase();
-  const bonusTokensPercent = Number(draft.bonusTokensPercent);
+  const bonusTokensPercent = parseBonusTokensPercent(draft.bonusTokensPercent);
 
   if (
-    !region ||
-    !allowedFromAppVersion ||
-    !mode ||
-    !Number.isFinite(bonusTokensPercent) ||
-    bonusTokensPercent < 0 ||
-    bonusTokensPercent > 100
+    !isBoundedRequiredText(region, ECONOMY_PROVIDER_REGION_MAX_LENGTH) ||
+    !isBoundedRequiredText(allowedFromAppVersion, ECONOMY_PROVIDER_VERSION_MAX_LENGTH) ||
+    !isBoundedRequiredText(mode, ECONOMY_PROVIDER_CODE_MAX_LENGTH) ||
+    bonusTokensPercent === null
   ) {
     throw new Error(text.invalidProviderConfig);
   }
@@ -320,16 +379,118 @@ export function toProviderConfigPayload(draft: ProviderConfigDraft, text: Econom
     allowedFromAppVersion,
     externalCheckoutAllowed: draft.externalCheckoutAllowed,
     bonusTokensPercent,
-    displayLabel: optionalText(draft.displayLabel),
-    displaySubtitle: optionalText(draft.displaySubtitle),
-    warningTitle: optionalText(draft.warningTitle),
-    warningMessage: optionalText(draft.warningMessage),
+    displayLabel: optionalBoundedText(draft.displayLabel, ECONOMY_PROVIDER_LABEL_MAX_LENGTH, text),
+    displaySubtitle: optionalBoundedText(
+      draft.displaySubtitle,
+      ECONOMY_PROVIDER_LABEL_MAX_LENGTH,
+      text
+    ),
+    warningTitle: optionalBoundedText(draft.warningTitle, ECONOMY_PROVIDER_LABEL_MAX_LENGTH, text),
+    warningMessage: optionalBoundedText(
+      draft.warningMessage,
+      ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH,
+      text
+    ),
     mode,
-    notes: optionalText(draft.notes),
+    notes: optionalBoundedText(draft.notes, ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH, text),
   };
 }
 
-function optionalText(value: string) {
+export function normalizeEconomyPercentInput(value: string): string {
+  return value.replace(/\D+/g, "").slice(0, ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH);
+}
+
+export function normalizeEconomyIntegerInput(value: string): string {
+  return value.replace(/\D+/g, "").slice(0, ECONOMY_PACK_INTEGER_MAX_LENGTH);
+}
+
+export function normalizeEconomyPriceInput(value: string): string {
+  let hasDecimal = false;
+  const normalized = Array.from(value)
+    .filter((character) => {
+      if (/\d/.test(character)) {
+        return true;
+      }
+
+      if (character === "." && !hasDecimal) {
+        hasDecimal = true;
+        return true;
+      }
+
+      return false;
+    })
+    .join("");
+
+  return normalized.slice(0, ECONOMY_PACK_PRICE_MAX_LENGTH);
+}
+
+export function normalizeEconomyCurrencyInput(value: string): string {
+  return value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 3);
+}
+
+function parseBonusTokensPercent(value: string): number | null {
+  const trimmed = value.trim();
+  if (!new RegExp(`^\\d{1,${ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}}$`).test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+}
+
+function parsePackDecimal(value: string): number | null {
+  const trimmed = value.trim();
+  if (
+    !new RegExp(`^\\d{1,${ECONOMY_PACK_PRICE_MAX_LENGTH - 3}}(?:\\.\\d{1,2})?$`).test(trimmed)
+  ) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function parsePackInteger(value: string, minValue: number): number | null {
+  const trimmed = value.trim();
+  if (!new RegExp(`^\\d{1,${ECONOMY_PACK_INTEGER_MAX_LENGTH}}$`).test(trimmed)) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed >= minValue ? parsed : null;
+}
+
+function isBoundedRequiredText(value: string, maxLength: number): boolean {
   const normalized = value.trim();
-  return normalized ? normalized : null;
+  return normalized.length > 0 && normalized.length <= maxLength;
+}
+
+function optionalBoundedText(
+  value: string,
+  maxLength: number,
+  text: EconomyValidationText
+): string | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.length > maxLength) {
+    throw new Error(text.invalidProviderConfig);
+  }
+
+  return normalized;
+}
+
+function optionalBoundedPlanText(value: string, text: EconomyValidationText): string | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.length > ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH) {
+    throw new Error(text.invalidPlanNumbers);
+  }
+
+  return normalized;
 }

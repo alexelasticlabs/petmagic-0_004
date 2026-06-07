@@ -43,6 +43,9 @@ export const KLING_MODELS = [
   "fal-ai/kling-video/v3/standard/motion-control",
 ] as const;
 
+export const TEMPLATE_TOKEN_COST_MAX_LENGTH = 6;
+const TEMPLATE_ASSET_DURATION_MAX_SECONDS = 60 * 60;
+
 export function createInitialTemplateForm(templateType: TemplateType): TemplateFormState {
   return {
     title: "",
@@ -180,17 +183,25 @@ export async function saveVideoTemplateFromForm(
 }
 
 export function parseNumber(raw: string): number {
-  const value = Number.parseInt(normalizeIntegerString(raw), 10);
-  return Number.isNaN(value) ? 0 : value;
+  const normalized = raw.trim();
+  if (!new RegExp(`^\\d{1,${TEMPLATE_TOKEN_COST_MAX_LENGTH}}$`).test(normalized)) {
+    return 0;
+  }
+
+  const value = Number.parseInt(normalized, 10);
+  return Number.isSafeInteger(value) ? value : 0;
 }
 
 export function parseOptionalDecimal(raw?: string): number | undefined {
-  if (!raw) {
+  const normalized = raw?.trim();
+  if (!normalized || !/^\d+(?:\.\d{1,3})?$/.test(normalized)) {
     return undefined;
   }
 
-  const value = Number.parseFloat(raw);
-  return Number.isNaN(value) ? undefined : value;
+  const value = Number.parseFloat(normalized);
+  return Number.isFinite(value) && value > 0 && value <= TEMPLATE_ASSET_DURATION_MAX_SECONDS
+    ? value
+    : undefined;
 }
 
 function buildAsset(
@@ -232,12 +243,17 @@ function normalizeRequirements(raw: string): string[] {
 }
 
 function parseOptionalNumber(raw: string): number | undefined {
-  const value = Number.parseInt(normalizeIntegerString(raw), 10);
-  return Number.isNaN(value) ? undefined : value;
+  const normalized = normalizeIntegerString(raw);
+  const value = Number.parseInt(normalized, 10);
+  return normalized && Number.isSafeInteger(value) ? value : undefined;
+}
+
+export function normalizeTemplateIntegerInput(raw: string): string {
+  return raw.replace(/\D+/g, "").slice(0, TEMPLATE_TOKEN_COST_MAX_LENGTH);
 }
 
 function normalizeIntegerString(raw: string): string {
-  return raw.replace(/\D+/g, "");
+  return normalizeTemplateIntegerInput(raw);
 }
 
 function inferFileName(url: string): string {

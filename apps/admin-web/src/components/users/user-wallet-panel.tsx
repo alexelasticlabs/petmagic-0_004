@@ -8,36 +8,76 @@ import {
   AdminMetricStrip,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/users/user-wallet-panel.module.css";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adjustAdminUserWallet, type AdminUserAnalytics } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type UserWalletPanelProps = {
   locale: Locale;
   userId: string;
   analytics: AdminUserAnalytics;
+  canAdjustWallet: boolean;
   onUpdated?: () => Promise<void> | void;
 };
 
 const LEDGER_ITEMS_LIMIT = 20;
 
-export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWalletPanelProps) {
+type PendingWalletAdjustment = {
+  operation: "credit" | "debit";
+  amount: number;
+  reason: string;
+};
+
+export function UserWalletPanel({
+  locale,
+  userId,
+  analytics,
+  canAdjustWallet,
+  onUpdated,
+}: UserWalletPanelProps) {
   const text = getDictionary(locale);
   const [operation, setOperation] = useState<"credit" | "debit">("credit");
   const [amount, setAmount] = useState("50");
   const [reason, setReason] = useState("");
+  const [pendingAdjustment, setPendingAdjustment] = useState<PendingWalletAdjustment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; message: string } | null>(
     null
   );
+  const parsedAmount = Number(amount);
+  const normalizedReason = reason.trim();
+  const canSubmit =
+    canAdjustWallet &&
+    Number.isInteger(parsedAmount) &&
+    parsedAmount > 0 &&
+    normalizedReason.length > 0 &&
+    !isSubmitting;
 
-  async function handleSubmit() {
-    const parsedAmount = Number(amount);
-    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0 || !reason.trim()) {
+  function handleSubmit() {
+    if (!canAdjustWallet || isSubmitting) {
+      return;
+    }
+
+    if (!Number.isInteger(parsedAmount) || parsedAmount <= 0 || normalizedReason.length === 0) {
       setFeedback({ tone: "danger", message: text.walletOperationError });
+      return;
+    }
+
+    setPendingAdjustment({
+      operation,
+      amount: parsedAmount,
+      reason: normalizedReason,
+    });
+  }
+
+  async function confirmWalletAdjustment() {
+    if (!canAdjustWallet || !pendingAdjustment || isSubmitting) {
       return;
     }
 
@@ -45,22 +85,42 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
     setFeedback(null);
 
     try {
-      await adjustAdminUserWallet(userId, operation, parsedAmount, reason.trim());
+      await adjustAdminUserWallet(
+        userId,
+        pendingAdjustment.operation,
+        pendingAdjustment.amount,
+        pendingAdjustment.reason
+      );
+      setPendingAdjustment(null);
       setReason("");
       setFeedback({ tone: "success", message: text.walletOperationSaved });
       await onUpdated?.();
     } catch (error) {
       clientLogger.error("users.wallet_adjust_failed", {
         userId,
-        operation,
-        amount: parsedAmount,
+        operation: pendingAdjustment.operation,
+        amount: pendingAdjustment.amount,
         error,
       });
-      setFeedback({ tone: "danger", message: text.walletOperationError });
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(error, text.walletOperationError),
+      });
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  const pendingOperationLabel =
+    pendingAdjustment?.operation === "debit"
+      ? text.walletOperationDebit
+      : text.walletOperationCredit;
+  const pendingDescription = pendingAdjustment
+    ? text.walletConfirmDescription
+        .replace("{operation}", pendingOperationLabel)
+        .replace("{amount}", String(pendingAdjustment.amount))
+        .replace("{reason}", sanitizeSensitiveText(pendingAdjustment.reason, 120))
+    : "";
 
   return (
     <AdminCard title={text.userWalletTitle} description={text.userWalletDescription}>
@@ -109,61 +169,70 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
       />
 
       <div className={styles.grid}>
-        <section className={styles.controls}>
-          <div className={styles.sectionHeader}>
-            <h4>{text.walletAdjustmentTitle}</h4>
-            <p>{text.walletAdjustmentHint}</p>
-          </div>
+        {canAdjustWallet ? (
+          <section className={styles.controls}>
+            <div className={styles.sectionHeader}>
+              <h4>{text.walletAdjustmentTitle}</h4>
+              <p>{text.walletAdjustmentHint}</p>
+            </div>
 
-          <div className={styles.formGrid}>
-            <label className={styles.field}>
-              <span>{text.walletOperationLabel}</span>
-              <select
-                value={operation}
-                onChange={(event) => setOperation(event.target.value as "credit" | "debit")}
-                className={styles.select}
-              >
-                <option value="credit">{text.walletOperationCredit}</option>
-                <option value="debit">{text.walletOperationDebit}</option>
-              </select>
-            </label>
+            <div className={styles.formGrid}>
+              <label className={styles.field}>
+                <span>{text.walletOperationLabel}</span>
+                <select
+                  value={operation}
+                  onChange={(event) => setOperation(event.target.value as "credit" | "debit")}
+                  className={styles.select}
+                  disabled={isSubmitting}
+                >
+                  <option value="credit">{text.walletOperationCredit}</option>
+                  <option value="debit">{text.walletOperationDebit}</option>
+                </select>
+              </label>
+
+              <label className={styles.field}>
+                <span>{text.walletAmountLabel}</span>
+                <input
+                  value={amount}
+                  onChange={(event) =>
+                    setAmount(event.target.value.replace(/\D+/g, "").slice(0, 8))
+                  }
+                  inputMode="numeric"
+                  maxLength={8}
+                  className={styles.input}
+                  disabled={isSubmitting}
+                />
+              </label>
+            </div>
 
             <label className={styles.field}>
-              <span>{text.walletAmountLabel}</span>
-              <input
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                inputMode="numeric"
-                className={styles.input}
+              <span>{text.walletReasonLabel}</span>
+              <textarea
+                value={reason}
+                onChange={(event) => setReason(event.target.value.slice(0, 240))}
+                rows={3}
+                maxLength={240}
+                className={styles.textarea}
+                placeholder={text.walletReasonPlaceholder}
+                disabled={isSubmitting}
               />
             </label>
-          </div>
 
-          <label className={styles.field}>
-            <span>{text.walletReasonLabel}</span>
-            <textarea
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              rows={3}
-              className={styles.textarea}
-              placeholder={text.walletReasonPlaceholder}
-            />
-          </label>
+            <div className={styles.actions}>
+              <Button type="button" onClick={() => void handleSubmit()} disabled={!canSubmit}>
+                <span>{isSubmitting ? text.walletSaving : text.walletApplyAction}</span>
+              </Button>
+            </div>
 
-          <div className={styles.actions}>
-            <Button type="button" onClick={() => void handleSubmit()} disabled={isSubmitting}>
-              <span>{isSubmitting ? text.walletSaving : text.walletApplyAction}</span>
-            </Button>
-          </div>
-
-          {feedback ? (
-            <AdminStateCard
-              tone={feedback.tone}
-              title={feedback.message}
-              className={styles.feedback}
-            />
-          ) : null}
-        </section>
+            {feedback ? (
+              <AdminStateCard
+                tone={feedback.tone}
+                title={feedback.message}
+                className={styles.feedback}
+              />
+            ) : null}
+          </section>
+        ) : null}
 
         <section className={styles.ledger}>
           <div className={styles.sectionHeader}>
@@ -182,9 +251,9 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
                     </strong>
                     <span>{formatDateTime(item.createdAtUtc, locale)}</span>
                   </div>
-                  <p>{item.reason}</p>
+                  <p>{sanitizeSensitiveText(item.reason, 180)}</p>
                   <div className={styles.meta}>
-                    <span>{item.source}</span>
+                    <span>{sanitizeSensitiveText(item.source, 80)}</span>
                     <span>
                       {text.walletBalanceLabel}: {item.balanceAfter}
                     </span>
@@ -197,6 +266,21 @@ export function UserWalletPanel({ locale, userId, analytics, onUpdated }: UserWa
           )}
         </section>
       </div>
+      <ConfirmationDialog
+        open={canAdjustWallet && pendingAdjustment !== null}
+        title={text.walletConfirmTitle}
+        description={pendingDescription}
+        confirmLabel={isSubmitting ? text.walletSaving : text.walletApplyAction}
+        cancelLabel={text.walletConfirmCancel}
+        isSubmitting={isSubmitting}
+        tone={pendingAdjustment?.operation === "debit" ? "danger" : "primary"}
+        onCancel={() => {
+          if (!isSubmitting) {
+            setPendingAdjustment(null);
+          }
+        }}
+        onConfirm={() => void confirmWalletAdjustment()}
+      />
     </AdminCard>
   );
 }

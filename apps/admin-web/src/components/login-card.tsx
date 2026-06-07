@@ -4,18 +4,22 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import styles from "@/components/login-card.module.css";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
+import { getDefaultAdminPath, hasAdminPanelAccess } from "@/lib/admin-rbac";
 import {
   acceptCurrentLegalDocuments,
   fetchCurrentLegalDocuments,
   isAuthSessionExpired,
   login,
   logout,
+  restoreSession,
   useAuthSession,
   type AuthSession,
   type LegalAcceptanceStatus,
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale, getDictionary } from "@/lib/i18n";
+import { maskEmail } from "@/lib/sensitive-display";
 
 /* ── SVG icons ────────────────────────────────────────────────────── */
 function IconEmail() {
@@ -96,14 +100,19 @@ function IconEyeOff() {
 /* ── Component ────────────────────────────────────────────────────── */
 type LoginCardProps = { locale: Locale };
 
-function hasAdminAccess(roles: string[] | undefined): boolean {
-  return (roles ?? []).some((role) => role === "Admin" || role === "Moderator");
-}
-
 function hasAcceptanceVersions(legalAcceptance: LegalAcceptanceStatus | undefined): boolean {
   return Boolean(
     legalAcceptance?.currentTermsOfUseVersion && legalAcceptance.currentPrivacyPolicyVersion
   );
+}
+
+function resolveLoginErrorMessage(error: unknown, fallback: string): string {
+  const status = error && typeof error === "object" ? (error as { status?: number }).status : undefined;
+  if (status === 400 || status === 401) {
+    return fallback;
+  }
+
+  return getAdminErrorMessage(error, fallback);
 }
 
 async function ensureLegalAcceptance(locale: Locale, session: AuthSession): Promise<void> {
@@ -140,29 +149,70 @@ export function LoginCard({ locale }: LoginCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const isRestoringSessionRef = useRef(false);
   const emailInputRef = useRef<HTMLInputElement | null>(null);
   const existingSession = useAuthSession();
   const isCheckingSession = existingSession === undefined;
+  const needsSessionRestore =
+    Boolean(existingSession) &&
+    (!existingSession?.accessToken || isAuthSessionExpired(existingSession));
   const hasValidExistingSession =
     Boolean(existingSession?.accessToken) && !isAuthSessionExpired(existingSession);
   const isRedirecting = hasValidExistingSession;
 
   useEffect(() => {
-    if (hasValidExistingSession) {
-      router.replace(`/${locale}/dashboard`);
+    if (!needsSessionRestore || isRestoringSessionRef.current) {
+      return;
     }
-  }, [hasValidExistingSession, locale, router]);
+
+    isRestoringSessionRef.current = true;
+    void restoreSession()
+      .then((restored) => {
+        if (!restored) {
+          void logout();
+        }
+      })
+      .catch(() => {
+        void logout();
+      })
+      .finally(() => {
+        isRestoringSessionRef.current = false;
+      });
+  }, [needsSessionRestore]);
 
   useEffect(() => {
-    router.prefetch(`/${locale}/dashboard`);
-  }, [locale, router]);
+    if (hasValidExistingSession) {
+      if (!hasAdminPanelAccess(existingSession?.user.roles)) {
+        void logout();
+        return;
+      }
+
+      router.replace(getDefaultAdminPath(locale, existingSession?.user.roles));
+    }
+  }, [existingSession?.user.roles, hasValidExistingSession, locale, router]);
+
+  useEffect(() => {
+    const prefetchPath = hasAdminPanelAccess(existingSession?.user.roles)
+      ? getDefaultAdminPath(locale, existingSession?.user.roles)
+      : `/${locale}/dashboard`;
+    router.prefetch(prefetchPath);
+  }, [existingSession?.user.roles, locale, router]);
 
   useEffect(() => {
     if (existingSession === null) emailInputRef.current?.focus();
   }, [existingSession]);
 
+  const isRu = locale === "ru";
+  const normalizedEmail = email.trim();
+  const normalizedPassword = password.trim();
+  const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
+  const isPasswordValid = normalizedPassword.length >= 1;
+  const canSubmit = isEmailValid && isPasswordValid && !isSubmitting;
+
   /* Dark skeleton while checking session */
-  if (isCheckingSession || isRedirecting) {
+  if (isCheckingSession || needsSessionRestore || isRedirecting) {
     return (
       <div className={styles.formArea}>
         <div className={styles.skeleton}>
@@ -178,15 +228,27 @@ export function LoginCard({ locale }: LoginCardProps) {
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
+
+    if (!isEmailValid || !isPasswordValid) {
+      setError(
+        locale === "ru"
+          ? "Введите корректный email и пароль."
+          : "Enter a valid email and password."
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "");
-    const password = String(formData.get("password") ?? "");
-    try {
-      const session = await login(email, password);
 
-      if (!hasAdminAccess(session.user.roles)) {
+    try {
+      const session = await login(normalizedEmail, normalizedPassword);
+
+      if (!hasAdminPanelAccess(session.user.roles)) {
         await logout();
         setError(
           locale === "ru"
@@ -197,20 +259,19 @@ export function LoginCard({ locale }: LoginCardProps) {
       }
 
       await ensureLegalAcceptance(locale, session);
-      router.replace(`/${locale}/dashboard`);
+      router.replace(getDefaultAdminPath(locale, session.user.roles));
     } catch (error) {
       clientLogger.warn("auth.login_failed", {
         locale,
-        email,
+        maskedEmail: maskEmail(normalizedEmail),
         error,
       });
-      setError(text.loginFailed);
+      setError(resolveLoginErrorMessage(error, text.loginFailed));
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  const isRu = locale === "ru";
   const contactText = isRu ? "Проблемы с доступом? " : "Access issues? ";
   const contactLinkText = isRu ? "Свяжитесь с администратором" : "Contact administrator";
   const orText = isRu ? "или" : "or";
@@ -240,8 +301,17 @@ export function LoginCard({ locale }: LoginCardProps) {
               className={styles.input}
               type="email"
               name="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value.slice(0, 254));
+                if (error) {
+                  setError(null);
+                }
+              }}
               placeholder={isRu ? "Введите email" : "Enter email"}
               required
+              maxLength={254}
+              aria-invalid={email.length > 0 && !isEmailValid}
               autoComplete="email"
             />
           </div>
@@ -259,8 +329,17 @@ export function LoginCard({ locale }: LoginCardProps) {
               className={`${styles.input} ${styles.inputPaddedRight}`}
               type={showPassword ? "text" : "password"}
               name="password"
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value.slice(0, 128));
+                if (error) {
+                  setError(null);
+                }
+              }}
               placeholder={isRu ? "Введите пароль" : "Enter password"}
               required
+              maxLength={128}
+              aria-invalid={password.length > 0 && !isPasswordValid}
               autoComplete="current-password"
             />
             <button
@@ -283,7 +362,7 @@ export function LoginCard({ locale }: LoginCardProps) {
         </div>
 
         {/* Submit */}
-        <button type="submit" className={styles.submit} disabled={isSubmitting}>
+        <button type="submit" className={styles.submit} disabled={!canSubmit}>
           {isSubmitting ? <span className={styles.spinner} aria-hidden="true" /> : null}
           {text.signIn}
         </button>

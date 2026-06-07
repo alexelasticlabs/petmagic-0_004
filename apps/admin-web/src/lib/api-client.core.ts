@@ -2,7 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 
+import { getAdminApiBaseUrl } from "./admin-api-base-url";
+import { createAdminCorrelationId } from "./admin-correlation-id";
 import { clientLogger } from "./client-logger";
+import { sanitizeSensitiveText } from "./sensitive-display";
 
 import type {
   AcceptLegalDocumentsCommand,
@@ -25,25 +28,14 @@ import type {
   LegalDocumentsResponse,
   TemplateType,
   UserProfile,
-  UserListItem,
+  UserListPage,
 } from "./api-client.types";
 
 const AUTH_KEY = "petmagic_admin_auth";
 const AUTH_SESSION_EVENT = "petmagic_admin_auth_changed";
 const ADMIN_LIST_CACHE_TTL_MS = 120_000;
 const API_REQUEST_TIMEOUT_MS = 15_000;
-
-function getApiBaseUrl(): string {
-  if (typeof window === "undefined") {
-    return (
-      process.env.INTERNAL_API_BASE_URL ??
-      process.env.NEXT_PUBLIC_API_BASE_URL ??
-      "http://localhost:5000"
-    );
-  }
-
-  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000";
-}
+const LOGOUT_REQUEST_TIMEOUT_MS = 5_000;
 
 type ApiError = Error & {
   status?: number;
@@ -55,8 +47,12 @@ type AuthSessionSnapshot = AuthSession | null | undefined;
 
 let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
+let volatileAccessToken: string | null = null;
 let volatileRefreshToken: string | null = null;
-export const cachedUsersLists = new Map<string, { value: UserListItem[]; expiresAt: number }>();
+let volatileTokenUserId: string | null = null;
+let refreshSessionInFlight: Promise<boolean> | null = null;
+let authSessionMutationVersion = 0;
+export const cachedUsersLists = new Map<string, { value: UserListPage; expiresAt: number }>();
 export const cachedAdminUserDetails = new Map<
   string,
   { value: AdminUserDetail; expiresAt: number }
@@ -157,12 +153,23 @@ export function getTemplateRecentGenerationsCacheKey(templateId: string, take?: 
 export async function cachedGet<TResponse>(
   cacheKey: string,
   cache: Map<string, { value: TResponse; expiresAt: number }>,
-  request: () => Promise<TResponse>
+  request: () => Promise<TResponse>,
+  signal?: AbortSignal
 ): Promise<TResponse> {
   const now = Date.now();
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > now) {
     return cached.value;
+  }
+
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+
+  if (signal) {
+    const value = await request();
+    cache.set(cacheKey, { value, expiresAt: Date.now() + ADMIN_LIST_CACHE_TTL_MS });
+    return value;
   }
 
   const inflight = inflightGetRequests.get(cacheKey) as Promise<TResponse> | undefined;
@@ -201,15 +208,57 @@ export function getSession(): AuthSession | null {
 
   try {
     const parsed = JSON.parse(raw) as AuthSession;
+    const parsedUserId = parsed.user?.userId ?? null;
+    const hasStoredToken =
+      (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) ||
+      (typeof parsed.accessToken === "string" && parsed.accessToken.trim().length > 0);
     if (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) {
       volatileRefreshToken = parsed.refreshToken;
+    }
+    if (typeof parsed.accessToken === "string" && parsed.accessToken.trim().length > 0) {
+      volatileAccessToken = parsed.accessToken;
+    }
+    if (hasStoredToken) {
+      volatileTokenUserId = parsedUserId;
+    } else if (volatileTokenUserId && volatileTokenUserId !== parsedUserId) {
+      volatileAccessToken = null;
+      volatileRefreshToken = null;
+      volatileTokenUserId = null;
+    }
+    if (volatileAccessToken) {
+      parsed.accessToken = volatileAccessToken;
+    } else {
+      parsed.accessToken = undefined;
+    }
+    parsed.refreshToken = undefined;
+    if (hasStoredToken) {
+      const legacyAuthRaw = raw;
+      queueMicrotask(() => {
+        try {
+          if (window.sessionStorage.getItem(AUTH_KEY) !== legacyAuthRaw) {
+            return;
+          }
+          window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(parsed)));
+        } catch (storageError) {
+          clientLogger.warn("auth.session_token_migration_failed", { error: storageError });
+        }
+      });
     }
 
     cachedAuthSession = parsed;
     return cachedAuthSession;
   } catch (error) {
     clientLogger.warn("auth.session_parse_failed", { error });
+    cachedAuthRaw = null;
     cachedAuthSession = null;
+    volatileAccessToken = null;
+    volatileRefreshToken = null;
+    volatileTokenUserId = null;
+    try {
+      window.sessionStorage.removeItem(AUTH_KEY);
+    } catch (storageError) {
+      clientLogger.warn("auth.session_parse_cleanup_failed", { error: storageError });
+    }
     return null;
   }
 }
@@ -269,7 +318,11 @@ export function useAuthSession(): AuthSessionSnapshot {
 
 export function clearSession(): void {
   clearAdminListCaches();
+  authSessionMutationVersion += 1;
+  volatileAccessToken = null;
   volatileRefreshToken = null;
+  volatileTokenUserId = null;
+  refreshSessionInFlight = null;
 
   if (typeof window !== "undefined") {
     window.sessionStorage.removeItem(AUTH_KEY);
@@ -277,13 +330,73 @@ export function clearSession(): void {
   }
 }
 
+function getFallbackApiErrorMessage(status: number): string {
+  if (status === 400) {
+    return "Request data is invalid.";
+  }
+
+  if (status === 401) {
+    return "Session expired. Sign in again.";
+  }
+
+  if (status === 403) {
+    return "You do not have permission to perform this action.";
+  }
+
+  if (status === 404) {
+    return "Requested resource was not found.";
+  }
+
+  if (status === 409) {
+    return "This action conflicts with the current server state.";
+  }
+
+  if (status === 422) {
+    return "Request validation failed.";
+  }
+
+  if (status >= 500) {
+    return "Server error. Try again later.";
+  }
+
+  return "Request failed. Try again.";
+}
+
+function isTechnicalProblemMessage(value: string): boolean {
+  return /^[a-z0-9_.-]+$/i.test(value.trim()) || /^API request failed with status \d+$/i.test(value);
+}
+
+function sanitizeApiErrorText(value: string): string {
+  return sanitizeSensitiveText(value, 240);
+}
+
+function isJsonResponse(response: Response): boolean {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  return contentType.includes("application/json") || contentType.includes("+json");
+}
+
+function createApiError(message: string, code: string, detail?: string): ApiError {
+  const error = new Error(message) as ApiError;
+  error.code = code;
+  error.detail = detail;
+  return error;
+}
+
+function isIdempotentRequestMethod(method: string | undefined): boolean {
+  const normalizedMethod = (method ?? "GET").trim().toUpperCase();
+  return normalizedMethod === "GET" || normalizedMethod === "HEAD" || normalizedMethod === "OPTIONS";
+}
+
 function sanitizeSessionForStorage(session: AuthSession): AuthSession {
-  return { ...session, refreshToken: undefined };
+  return { ...session, accessToken: undefined, refreshToken: undefined };
 }
 
 function saveSession(session: AuthSession): void {
   clearAdminListCaches();
+  authSessionMutationVersion += 1;
+  volatileAccessToken = session.accessToken?.trim() ? session.accessToken : null;
   volatileRefreshToken = session.refreshToken?.trim() ? session.refreshToken : null;
+  volatileTokenUserId = session.user.userId;
 
   if (typeof window !== "undefined") {
     window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(session)));
@@ -303,6 +416,9 @@ export async function apiRequest<TResponse>(
   const headers = new Headers(init.headers);
   if (typeof init.body !== "undefined" && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
+  }
+  if (!headers.has("X-Correlation-ID")) {
+    headers.set("X-Correlation-ID", createAdminCorrelationId());
   }
 
   if (requireAuth && session?.accessToken) {
@@ -331,7 +447,7 @@ export async function apiRequest<TResponse>(
   let response: Response;
 
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, {
+    response = await fetch(`${getAdminApiBaseUrl()}${path}`, {
       ...init,
       headers,
       credentials: "include",
@@ -339,22 +455,33 @@ export async function apiRequest<TResponse>(
     });
   } catch (error) {
     if (isTimedOut) {
-      const timeoutError = new Error("API request timed out") as ApiError;
+      clientLogger.warn("api.request_timeout", {
+        path,
+        method: init.method ?? "GET",
+        correlationId: headers.get("X-Correlation-ID"),
+      });
+      const timeoutError = new Error("Request timed out. Try again.") as ApiError;
       timeoutError.code = "request.timeout";
       timeoutError.detail = "Request timed out.";
       throw timeoutError;
     }
 
     const wasManuallyAborted = abortController.signal.aborted;
-    if (!wasManuallyAborted) {
-      clientLogger.warn("api.request_failed", {
-        path,
-        method: init.method ?? "GET",
-        error,
-      });
+    if (wasManuallyAborted) {
+      throw error;
     }
 
-    throw error;
+    clientLogger.warn("api.request_failed", {
+      path,
+      method: init.method ?? "GET",
+      correlationId: headers.get("X-Correlation-ID"),
+      error,
+    });
+
+    const networkError = new Error("Network error. Check connection and try again.") as ApiError;
+    networkError.code = "request.network_error";
+    networkError.detail = "Network request failed.";
+    throw networkError;
   } finally {
     globalThis.clearTimeout(timeoutId);
 
@@ -366,44 +493,79 @@ export async function apiRequest<TResponse>(
   if (response.status === 401 && allowRefresh && requireAuth) {
     const refreshed = await refreshSession();
     if (refreshed) {
-      return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
+      if (isIdempotentRequestMethod(init.method)) {
+        return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
+      }
+
+      clientLogger.warn("api.auth_retry_required_after_refresh", {
+        path,
+        method: init.method ?? "GET",
+        correlationId: headers.get("X-Correlation-ID"),
+      });
+
+      const retryError = new Error(
+        "Session was refreshed. Review and retry this action."
+      ) as ApiError;
+      retryError.status = 409;
+      retryError.code = "auth.retry_required_after_refresh";
+      retryError.detail = "Non-idempotent request was not replayed after token refresh.";
+      throw retryError;
     }
   }
 
   if (!response.ok) {
-    const error = new Error(`API request failed with status ${response.status}`) as ApiError;
+    if (response.status === 401 && requireAuth) {
+      clearSession();
+    }
+
+    clientLogger.warn("api.request_non_success", {
+      path,
+      method: init.method ?? "GET",
+      status: response.status,
+      correlationId: headers.get("X-Correlation-ID"),
+    });
+
+    const fallbackMessage = getFallbackApiErrorMessage(response.status);
+    const error = new Error(fallbackMessage) as ApiError;
     error.status = response.status;
 
-    try {
-      const problem = (await response.json()) as {
-        title?: string;
-        detail?: string;
-        errors?: Record<string, string[]>;
-      };
-      error.code = problem.title;
-      error.detail = problem.detail;
-      const validationErrors = Object.values(problem.errors ?? {})
-        .flat()
-        .map((value) => value.trim())
-        .filter(Boolean);
+    if (isJsonResponse(response)) {
+      try {
+        const problem = (await response.json()) as {
+          title?: string;
+          detail?: string;
+          errors?: Record<string, string[]>;
+        };
+        error.code = problem.title ? sanitizeApiErrorText(problem.title) : undefined;
+        error.detail = problem.detail ? sanitizeApiErrorText(problem.detail) : undefined;
+        const validationErrors = Object.values(problem.errors ?? {})
+          .flat()
+          .map((value) => value.trim())
+          .map((value) => sanitizeApiErrorText(value))
+          .filter(Boolean);
 
-      if (validationErrors.length > 0) {
-        error.validationErrors = validationErrors;
-      }
+        if (validationErrors.length > 0) {
+          error.validationErrors = validationErrors;
+        }
 
-      if (problem.detail) {
-        error.message = problem.detail;
-      } else if (validationErrors.length > 0) {
-        error.message = validationErrors.join(" ");
-      } else if (problem.title) {
-        error.message = problem.title;
+        if (problem.detail && !isTechnicalProblemMessage(problem.detail)) {
+          error.message = sanitizeApiErrorText(problem.detail);
+        } else if (validationErrors.length > 0) {
+          error.message = validationErrors.join(" ");
+        } else if (problem.title && !isTechnicalProblemMessage(problem.title)) {
+          error.message = sanitizeApiErrorText(problem.title);
+        } else {
+          error.message = fallbackMessage;
+        }
+      } catch (parseError) {
+        clientLogger.warn("api.error_payload_parse_failed", {
+          path,
+          method: init.method ?? "GET",
+          status: response.status,
+          correlationId: headers.get("X-Correlation-ID"),
+          error: parseError,
+        });
       }
-    } catch (parseError) {
-      clientLogger.warn("api.error_payload_parse_failed", {
-        path,
-        status: response.status,
-        error: parseError,
-      });
     }
 
     throw error;
@@ -413,13 +575,33 @@ export async function apiRequest<TResponse>(
     return undefined as TResponse;
   }
 
-  return (await response.json()) as TResponse;
+  const responseText = await response.text();
+  if (!responseText.trim()) {
+    return undefined as TResponse;
+  }
+
+  try {
+    return JSON.parse(responseText) as TResponse;
+  } catch (error) {
+    clientLogger.warn("api.response_payload_parse_failed", {
+      path,
+      method: init.method ?? "GET",
+      status: response.status,
+      correlationId: headers.get("X-Correlation-ID"),
+      error,
+    });
+    throw createApiError(
+      "Unexpected server response. Try again.",
+      "response.invalid_json",
+      "Response body was not valid JSON."
+    );
+  }
 }
 
-async function refreshSession(): Promise<boolean> {
-  const body = volatileRefreshToken?.trim()
-    ? JSON.stringify({ refreshToken: volatileRefreshToken })
-    : undefined;
+async function refreshSessionInternal(): Promise<boolean> {
+  const refreshToken = volatileRefreshToken?.trim() ? volatileRefreshToken : null;
+  const mutationVersionAtStart = authSessionMutationVersion;
+  const body = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
 
   try {
     const refreshed = await apiRequest<AuthSession>(
@@ -434,16 +616,35 @@ async function refreshSession(): Promise<boolean> {
       }
     );
 
+    if (mutationVersionAtStart !== authSessionMutationVersion) {
+      return false;
+    }
+
     saveSession(refreshed);
     return true;
   } catch (error) {
     clientLogger.warn("auth.refresh_failed", {
-      hasRefreshToken: Boolean(volatileRefreshToken?.trim()),
+      hasRefreshToken: Boolean(refreshToken),
       error,
     });
     clearSession();
     return false;
   }
+}
+
+async function refreshSession(): Promise<boolean> {
+  if (refreshSessionInFlight) {
+    return refreshSessionInFlight;
+  }
+
+  refreshSessionInFlight = refreshSessionInternal().finally(() => {
+    refreshSessionInFlight = null;
+  });
+  return refreshSessionInFlight;
+}
+
+export async function restoreSession(): Promise<boolean> {
+  return refreshSession();
 }
 
 export async function login(email: string, password: string): Promise<AuthSession> {
@@ -496,28 +697,41 @@ export async function acceptCurrentLegalDocuments(
 export async function logout(): Promise<void> {
   const session = getSession();
   const refreshToken = volatileRefreshToken?.trim() ? volatileRefreshToken : null;
+  const accessToken = volatileAccessToken?.trim() ? volatileAccessToken : session?.accessToken;
 
   clearSession();
 
-  if (session?.accessToken || refreshToken) {
+  if (accessToken || refreshToken) {
     const headers = new Headers();
     const requestBody = refreshToken ? JSON.stringify({ refreshToken }) : undefined;
+    const logoutAbortController = new AbortController();
+    const logoutTimeoutId = globalThis.setTimeout(() => {
+      logoutAbortController.abort();
+    }, LOGOUT_REQUEST_TIMEOUT_MS);
 
     if (requestBody) {
       headers.set("Content-Type", "application/json");
     }
+    headers.set("X-Correlation-ID", createAdminCorrelationId());
 
-    if (session?.accessToken) {
-      headers.set("Authorization", `Bearer ${session.accessToken}`);
+    if (accessToken) {
+      headers.set("Authorization", `Bearer ${accessToken}`);
     }
 
-    void fetch(`${getApiBaseUrl()}/api/auth/logout`, {
+    void fetch(`${getAdminApiBaseUrl()}/api/auth/logout`, {
       method: "POST",
       headers,
       body: requestBody,
       credentials: "include",
-    }).catch((error: unknown) => {
-      clientLogger.warn("auth.logout_failed", { error });
-    });
+      signal: logoutAbortController.signal,
+    })
+      .catch((error: unknown) => {
+        if (!logoutAbortController.signal.aborted) {
+          clientLogger.warn("auth.logout_failed", { error });
+        }
+      })
+      .finally(() => {
+        globalThis.clearTimeout(logoutTimeoutId);
+      });
   }
 }

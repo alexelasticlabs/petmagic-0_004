@@ -16,84 +16,177 @@ import type {
   OffsetPagedResponse,
 } from "./api-client.types";
 
-export async function fetchAdminEconomyLedger(params?: {
-  skip?: number;
-  take?: number;
-  source?: string;
-  userId?: string;
-}): Promise<OffsetPagedResponse<AdminEconomyLedgerItem>> {
-  const search = new URLSearchParams();
-  if (params?.skip !== undefined) search.set("skip", String(params.skip));
-  if (params?.take !== undefined) search.set("take", String(params.take));
-  if (params?.source) search.set("source", params.source);
-  if (params?.userId) search.set("userId", params.userId);
-
-  const query = search.size ? `?${search.toString()}` : "";
-  return apiRequest<OffsetPagedResponse<AdminEconomyLedgerItem>>(
-    `/api/admin/economy/ledger${query}`,
-    { method: "GET" }
-  );
-}
-
-export async function fetchAdminEconomyPurchases(params?: {
-  skip?: number;
-  take?: number;
-  status?: string;
-  userId?: string;
-}): Promise<OffsetPagedResponse<AdminEconomyPurchase>> {
-  const search = new URLSearchParams();
-  if (params?.skip !== undefined) search.set("skip", String(params.skip));
-  if (params?.take !== undefined) search.set("take", String(params.take));
-  if (params?.status) search.set("status", params.status);
-  if (params?.userId) search.set("userId", params.userId);
-
-  const query = search.size ? `?${search.toString()}` : "";
-  return apiRequest<OffsetPagedResponse<AdminEconomyPurchase>>(
-    `/api/admin/economy/purchases${query}`,
-    { method: "GET" }
-  );
-}
-
-export async function fetchAdminEconomyUserSubscriptionSummary(
-  userId: string
-): Promise<AdminEconomyUserSubscriptionSummary> {
-  return apiRequest<AdminEconomyUserSubscriptionSummary>(
-    `/api/admin/economy/users/${userId}/subscription-summary`,
-    { method: "GET" }
-  );
-}
-
-export async function fetchAdminEconomySubscriptions(params?: {
+export type AdminEconomyPurchasesQuery = {
   skip?: number;
   take?: number;
   status?: string;
   provider?: string;
-}): Promise<OffsetPagedResponse<AdminEconomySubscription>> {
+  search?: string;
+  userId?: string;
+};
+
+export type AdminEconomySubscriptionsQuery = {
+  skip?: number;
+  take?: number;
+  status?: string;
+  provider?: string;
+  search?: string;
+};
+
+function normalizePagedValue(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : undefined;
+}
+
+function normalizeTakeValue(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.min(Math.floor(value), 200)
+    : undefined;
+}
+
+function normalizeFilterValue(value: string | undefined): string | undefined {
+  return value?.trim() || undefined;
+}
+
+export function normalizeAdminEconomyPurchasesQuery(
+  params: AdminEconomyPurchasesQuery = {}
+): AdminEconomyPurchasesQuery {
+  return {
+    skip: normalizePagedValue(params.skip),
+    take: normalizeTakeValue(params.take),
+    status: normalizeFilterValue(params.status),
+    provider: normalizeFilterValue(params.provider),
+    search: normalizeFilterValue(params.search),
+    userId: normalizeFilterValue(params.userId),
+  };
+}
+
+export function normalizeAdminEconomySubscriptionsQuery(
+  params: AdminEconomySubscriptionsQuery = {}
+): AdminEconomySubscriptionsQuery {
+  return {
+    skip: normalizePagedValue(params.skip),
+    take: normalizeTakeValue(params.take),
+    status: normalizeFilterValue(params.status),
+    provider: normalizeFilterValue(params.provider),
+    search: normalizeFilterValue(params.search),
+  };
+}
+
+export async function fetchAdminEconomyLedger(
+  params?: {
+    skip?: number;
+    take?: number;
+    source?: string;
+    userId?: string;
+  },
+  signal?: AbortSignal
+): Promise<OffsetPagedResponse<AdminEconomyLedgerItem>> {
+  const normalizedSkip = normalizePagedValue(params?.skip);
+  const normalizedTake = normalizeTakeValue(params?.take);
   const search = new URLSearchParams();
-  if (params?.skip !== undefined) search.set("skip", String(params.skip));
-  if (params?.take !== undefined) search.set("take", String(params.take));
-  if (params?.status) search.set("status", params.status);
-  if (params?.provider) search.set("provider", params.provider);
+  if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
+  if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
+  if (params?.source?.trim()) search.set("source", params.source.trim());
+  if (params?.userId?.trim()) search.set("userId", params.userId.trim());
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminEconomyLedgerItem>>(
+    `/api/admin/economy/ledger${query}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function fetchAdminEconomyPurchases(
+  params?: AdminEconomyPurchasesQuery,
+  signal?: AbortSignal
+): Promise<OffsetPagedResponse<AdminEconomyPurchase>> {
+  const normalizedParams = normalizeAdminEconomyPurchasesQuery(params);
+  const search = new URLSearchParams();
+  if (normalizedParams.skip !== undefined) search.set("skip", String(normalizedParams.skip));
+  if (normalizedParams.take !== undefined) search.set("take", String(normalizedParams.take));
+  if (normalizedParams.status) search.set("status", normalizedParams.status);
+  if (normalizedParams.provider) search.set("provider", normalizedParams.provider);
+  if (normalizedParams.search) search.set("search", normalizedParams.search);
+  if (normalizedParams.userId) search.set("userId", normalizedParams.userId);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<OffsetPagedResponse<AdminEconomyPurchase>>(
+    `/api/admin/economy/purchases${query}`,
+    { method: "GET", signal }
+  );
+}
+
+export async function refundAdminEconomyPurchase(
+  orderId: string,
+  reason?: string
+): Promise<AdminEconomyPurchase> {
+  return apiRequest<AdminEconomyPurchase>(`/api/admin/economy/purchases/${orderId}/refund`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason?.trim() || undefined }),
+  });
+}
+
+export async function fetchAdminEconomyUserSubscriptionSummary(
+  userId: string,
+  signal?: AbortSignal
+): Promise<AdminEconomyUserSubscriptionSummary> {
+  return apiRequest<AdminEconomyUserSubscriptionSummary>(
+    `/api/admin/economy/users/${userId}/subscription-summary`,
+    { method: "GET", signal }
+  );
+}
+
+export async function fetchAdminEconomySubscriptions(
+  params?: AdminEconomySubscriptionsQuery,
+  signal?: AbortSignal
+): Promise<OffsetPagedResponse<AdminEconomySubscription>> {
+  const normalizedParams = normalizeAdminEconomySubscriptionsQuery(params);
+  const search = new URLSearchParams();
+  if (normalizedParams.skip !== undefined) search.set("skip", String(normalizedParams.skip));
+  if (normalizedParams.take !== undefined) search.set("take", String(normalizedParams.take));
+  if (normalizedParams.status) search.set("status", normalizedParams.status);
+  if (normalizedParams.provider) search.set("provider", normalizedParams.provider);
+  if (normalizedParams.search) search.set("search", normalizedParams.search);
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminEconomySubscription>>(
     `/api/admin/economy/subscriptions${query}`,
-    { method: "GET" }
+    { method: "GET", signal }
   );
 }
 
-export async function fetchAdminSubscriptionPlans(): Promise<AdminSubscriptionPlan[]> {
+export async function adminCancelPremiumSubscription(
+  userId: string,
+  paymentProvider = "stripe"
+): Promise<AdminEconomyUserSubscriptionSummary> {
+  return apiRequest<AdminEconomyUserSubscriptionSummary>(
+    `/api/admin/economy/users/${userId}/premium/revoke`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ paymentProvider }),
+    }
+  );
+}
+
+export async function fetchAdminSubscriptionPlans(
+  signal?: AbortSignal
+): Promise<AdminSubscriptionPlan[]> {
   return apiRequest<AdminSubscriptionPlan[]>("/api/admin/economy/subscription-plans", {
     method: "GET",
+    signal,
   });
 }
 
-export async function fetchAdminPaymentProviderConfigs(): Promise<
+export async function fetchAdminPaymentProviderConfigs(
+  signal?: AbortSignal
+): Promise<
   AdminPaymentProviderConfiguration[]
 > {
   return apiRequest<AdminPaymentProviderConfiguration[]>(
     "/api/admin/economy/payment-provider-configs",
-    { method: "GET" }
+    { method: "GET", signal }
   );
 }
 
@@ -214,27 +307,32 @@ export async function testAdminPaymentProviderConfigMatch(payload: {
   );
 }
 
-export async function fetchAdminSubscriptionEvents(params?: {
-  skip?: number;
-  take?: number;
-  provider?: string;
-  status?: string;
-}): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
+export async function fetchAdminSubscriptionEvents(
+  params?: {
+    skip?: number;
+    take?: number;
+    provider?: string;
+    status?: string;
+  },
+  signal?: AbortSignal
+): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
+  const normalizedSkip = normalizePagedValue(params?.skip);
+  const normalizedTake = normalizeTakeValue(params?.take);
   const search = new URLSearchParams();
-  if (params?.skip !== undefined) search.set("skip", String(params.skip));
-  if (params?.take !== undefined) search.set("take", String(params.take));
-  if (params?.provider) search.set("provider", params.provider);
-  if (params?.status) search.set("status", params.status);
+  if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
+  if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
+  if (params?.provider?.trim()) search.set("provider", params.provider.trim());
+  if (params?.status?.trim()) search.set("status", params.status.trim());
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminSubscriptionEvent>>(
     `/api/admin/economy/subscription-events${query}`,
-    { method: "GET" }
+    { method: "GET", signal }
   );
 }
 
-export async function fetchAdminCurrencyPacks(): Promise<AdminCurrencyPack[]> {
-  return apiRequest<AdminCurrencyPack[]>("/api/admin/economy/packs", { method: "GET" });
+export async function fetchAdminCurrencyPacks(signal?: AbortSignal): Promise<AdminCurrencyPack[]> {
+  return apiRequest<AdminCurrencyPack[]>("/api/admin/economy/packs", { method: "GET", signal });
 }
 
 export async function updateAdminCurrencyPack(
@@ -250,8 +348,11 @@ export async function updateAdminCurrencyPack(
   });
 }
 
-export async function fetchAdminRedeemCodes(): Promise<AdminRedeemCode[]> {
-  return apiRequest<AdminRedeemCode[]>("/api/admin/economy/redeem-codes", { method: "GET" });
+export async function fetchAdminRedeemCodes(signal?: AbortSignal): Promise<AdminRedeemCode[]> {
+  return apiRequest<AdminRedeemCode[]>("/api/admin/economy/redeem-codes", {
+    method: "GET",
+    signal,
+  });
 }
 
 export async function createAdminRedeemCode(payload: {
@@ -281,17 +382,20 @@ export async function fetchAdminRedeemCodeActivations(
     skip?: number;
     take?: number;
     userId?: string;
-  }
+  },
+  signal?: AbortSignal
 ): Promise<OffsetPagedResponse<AdminRedeemCodeRedemption>> {
+  const normalizedSkip = normalizePagedValue(params?.skip);
+  const normalizedTake = normalizeTakeValue(params?.take);
   const search = new URLSearchParams();
-  if (params?.skip !== undefined) search.set("skip", String(params.skip));
-  if (params?.take !== undefined) search.set("take", String(params.take));
-  if (params?.userId) search.set("userId", params.userId);
+  if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
+  if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
+  if (params?.userId?.trim()) search.set("userId", params.userId.trim());
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminRedeemCodeRedemption>>(
     `/api/admin/economy/redeem-codes/${redeemCodeId}/activations${query}`,
-    { method: "GET" }
+    { method: "GET", signal }
   );
 }
 

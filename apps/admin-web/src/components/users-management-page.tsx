@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,6 +23,8 @@ import {
   adminTableStyles,
   type AdminTone,
 } from "@/components/admin/admin-primitives";
+import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
@@ -36,6 +38,7 @@ import {
   deleteAdminUser,
   fetchAdminEconomyUserSubscriptionSummary,
   fetchAdminUserAnalytics,
+  fetchUsers,
   fetchSupportInbox,
   revokePremium,
   revokeRole,
@@ -45,6 +48,12 @@ import {
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
+import {
+  getAdminUserDisplayName,
+  maskEmail,
+  sanitizeSensitiveText,
+  shortIdentifier,
+} from "@/lib/sensitive-display";
 
 type UsersManagementPageProps = {
   locale: Locale;
@@ -65,9 +74,19 @@ type WalletDialogState = {
   error: string | null;
 };
 
-type RangeDays = 7 | 30 | 90;
+type ConfirmationDialogState = {
+  userId: string;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  successMessage?: string;
+  errorMessage?: string;
+  tone?: "danger" | "primary";
+  action: () => Promise<void>;
+  afterSuccess?: () => void;
+};
 
-type SortMode = "created-desc" | "created-asc" | "last-activity-desc" | "last-activity-asc";
+type RangeDays = 7 | 30 | 90;
 
 type RoleFilter = "all" | "Admin" | "Moderator" | "User";
 type PremiumFilter = "all" | "premium" | "free";
@@ -78,6 +97,7 @@ type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "us
 
 const PAGE_SIZE = 12;
 const LIVE_METRICS_UPDATE_INTERVAL_MS = 60_000;
+const ADMIN_COUNT_QUERY_PARAMS = { role: "Admin", skip: 0, take: 1 } as const;
 
 function getUserRoleLabel(role: string, text: UserRoleText) {
   return role === "Admin"
@@ -86,7 +106,7 @@ function getUserRoleLabel(role: string, text: UserRoleText) {
       ? text.userRoleModerator
       : role === "User"
         ? text.userRoleUser
-        : role;
+        : sanitizeSensitiveText(role, 32);
 }
 
 function getUserRoleTone(role: string): AdminTone {
@@ -101,8 +121,8 @@ function getUserRoleTone(role: string): AdminTone {
   return "neutral";
 }
 
-function normalizeText(value: string): string {
-  return value.trim().toLowerCase();
+function getUserAvatarLabel(user: Pick<UserListItem, "displayName" | "email" | "userId">): string {
+  return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
 }
 
 function getAccountStatus(user: UserListItem): "active" | "blocked" | "unconfirmed" {
@@ -138,7 +158,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             filterPremium: "Premium",
             filterActivity: "Активность",
             filterStatus: "Статус",
-            sortLabel: "Сортировка",
             resetFilters: "Сбросить",
             any: "Все",
             premiumOnly: "Только Premium",
@@ -148,10 +167,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             statusActive: "Аккаунт активен",
             statusBlocked: "Заблокирован",
             statusUnconfirmed: "Почта не подтверждена",
-            sortCreatedDesc: "Регистрация: новые",
-            sortCreatedAsc: "Регистрация: старые",
-            sortLastActivityDesc: "Последняя активность: свежие",
-            sortLastActivityAsc: "Последняя активность: старые",
             usersCount: "Пользователей",
             accountStatus: "Статус аккаунта",
             premiumAndExpiry: "Premium и окончание",
@@ -194,6 +209,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             activeBadge: "Активен",
             unconfirmedBadge: "Не подтвержден",
             sideOpenFullProfile: "Открыть полную страницу",
+            confirmCancel: "Отмена",
+            confirmDeleteTitle: "Удалить пользователя?",
+            confirmBlockTitle: "Заблокировать пользователя?",
+            confirmUnblockTitle: "Разблокировать пользователя?",
+            confirmPremiumTitle: "Изменить Premium?",
+            confirmRoleTitle: "Изменить роль?",
+            lastAdminProtected: "Последнего Admin нельзя понизить",
+            confirmAction: "Подтвердить",
           }
         : {
             summaryTotal: "Total users",
@@ -211,7 +234,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             filterPremium: "Premium",
             filterActivity: "Activity",
             filterStatus: "Status",
-            sortLabel: "Sorting",
             resetFilters: "Reset",
             any: "All",
             premiumOnly: "Premium only",
@@ -221,10 +243,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             statusActive: "Account active",
             statusBlocked: "Blocked",
             statusUnconfirmed: "Email not confirmed",
-            sortCreatedDesc: "Registration: newest",
-            sortCreatedAsc: "Registration: oldest",
-            sortLastActivityDesc: "Last activity: newest",
-            sortLastActivityAsc: "Last activity: oldest",
             usersCount: "Users",
             accountStatus: "Account status",
             premiumAndExpiry: "Premium and expiry",
@@ -267,19 +285,24 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             activeBadge: "Active",
             unconfirmedBadge: "Unconfirmed",
             sideOpenFullProfile: "Open full profile",
+            confirmCancel: "Cancel",
+            confirmDeleteTitle: "Delete user?",
+            confirmBlockTitle: "Block user?",
+            confirmUnblockTitle: "Unblock user?",
+            confirmPremiumTitle: "Change Premium?",
+            confirmRoleTitle: "Change role?",
+            lastAdminProtected: "The last Admin cannot be downgraded",
+            confirmAction: "Confirm",
           },
     [locale]
   );
 
-  const { busyUserId, canManageRoles, error, isLoading, runAction, toast, users } =
-    useUsersAdmin(locale);
-
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [premiumFilter, setPremiumFilter] = useState<PremiumFilter>("all");
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [sortMode, setSortMode] = useState<SortMode>("created-desc");
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [page, setPage] = useState(1);
   const [nowTs, setNowTs] = useState(() => Date.now());
@@ -289,9 +312,58 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [walletDialog, setWalletDialog] = useState<WalletDialogState | null>(null);
   const [walletDialogSubmitting, setWalletDialogSubmitting] = useState(false);
+  const [confirmationDialog, setConfirmationDialog] = useState<ConfirmationDialogState | null>(
+    null
+  );
+  const [confirmationSubmitting, setConfirmationSubmitting] = useState(false);
 
   const menuRootRef = useRef<HTMLDivElement | null>(null);
   const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [search]);
+
+  const usersStatusFilter = statusFilter !== "all" ? statusFilter : activityFilter;
+  const usersQueryParams = useMemo(
+    () => ({
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      search: debouncedSearch || undefined,
+      role: roleFilter === "all" ? undefined : roleFilter,
+      status: usersStatusFilter === "all" ? undefined : usersStatusFilter,
+      isPremium:
+        premiumFilter === "premium" ? true : premiumFilter === "free" ? false : undefined,
+    }),
+    [debouncedSearch, page, premiumFilter, roleFilter, usersStatusFilter]
+  );
+
+  const {
+    busyUserId,
+    canManageRoles,
+    error,
+    isFetching: isUsersFetching,
+    isLoading,
+    refreshUsers,
+    runAction,
+    toast,
+    users,
+    usersPage,
+  } = useUsersAdmin(locale, usersQueryParams);
+
+  const adminCountQuery = useQuery({
+    queryKey: adminQueryKeys.users(ADMIN_COUNT_QUERY_PARAMS),
+    queryFn: ({ signal }) => fetchUsers(ADMIN_COUNT_QUERY_PARAMS, signal),
+    enabled: canManageRoles,
+    placeholderData: keepPreviousData,
+  });
+  const totalAdminCount = adminCountQuery.data?.totalCount ?? null;
 
   const closeActionsMenu = useCallback(() => {
     setOpenActionsUserId(null);
@@ -309,8 +381,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   }, []);
 
   const supportInboxQuery = useQuery({
-    queryKey: adminQueryKeys.supportInbox("all", "all"),
-    queryFn: () => fetchSupportInbox(undefined, "all"),
+    queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
+    queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
     enabled: users.length > 0,
   });
 
@@ -320,12 +392,16 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     queryKey: selectedUserId
       ? adminQueryKeys.economyUserSubscriptionSummary(selectedUserId)
       : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
-    queryFn: () => fetchAdminEconomyUserSubscriptionSummary(selectedUserId!),
+    queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(selectedUserId!, signal),
     enabled: Boolean(selectedUserId),
   });
 
   const openWalletDialog = useCallback(
     (userId: string, operation: "credit" | "debit") => {
+      if (!canManageRoles) {
+        return;
+      }
+
       setOpenActionsUserId(null);
       setActionsMenuPosition(null);
       setWalletDialog({
@@ -336,7 +412,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         error: null,
       });
     },
-    [text.usersBalanceReasonDefault]
+    [canManageRoles, text.usersBalanceReasonDefault]
   );
 
   const closeWalletDialog = useCallback(() => {
@@ -353,16 +429,199 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       action: () => Promise<void>,
       options?: { successMessage?: string; errorMessage?: string }
     ) => {
-      await runAction(userId, action, options);
-      if (selectedUserId === userId) {
+      const succeeded = await runAction(userId, action, options);
+      if (succeeded && selectedUserId === userId) {
         await selectedUserProfile.refresh();
       }
+      return succeeded;
     },
     [runAction, selectedUserId, selectedUserProfile]
   );
 
+  const closeConfirmationDialog = useCallback(() => {
+    if (confirmationSubmitting) {
+      return;
+    }
+
+    setConfirmationDialog(null);
+  }, [confirmationSubmitting]);
+
+  const submitConfirmationDialog = useCallback(async () => {
+    if (!confirmationDialog || confirmationSubmitting) {
+      return;
+    }
+
+    setConfirmationSubmitting(true);
+    try {
+      const succeeded = await runUserAction(confirmationDialog.userId, confirmationDialog.action, {
+        successMessage: confirmationDialog.successMessage,
+        errorMessage: confirmationDialog.errorMessage,
+      });
+      if (succeeded) {
+        confirmationDialog.afterSuccess?.();
+        setConfirmationDialog(null);
+      }
+    } finally {
+      setConfirmationSubmitting(false);
+    }
+  }, [confirmationDialog, confirmationSubmitting, runUserAction]);
+
+  const requestUserConfirmation = useCallback((next: ConfirmationDialogState) => {
+    closeActionsMenu();
+    setConfirmationDialog(next);
+  }, [closeActionsMenu]);
+
+  const getUserLabel = useCallback((user: UserListItem) => {
+    return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
+  }, []);
+
+  const requestActiveChange = useCallback(
+    (user: UserListItem) => {
+      if (!canManageRoles) {
+        return;
+      }
+
+      const nextIsActive = !user.isActive;
+      const userLabel = getUserLabel(user);
+      requestUserConfirmation({
+        userId: user.userId,
+        title: nextIsActive ? ui.confirmUnblockTitle : ui.confirmBlockTitle,
+        description:
+          locale === "ru"
+            ? `${userLabel}: действие будет записано в audit log и немедленно изменит доступ пользователя.`
+            : `${userLabel}: this will be written to the audit log and immediately change user access.`,
+        confirmLabel: nextIsActive ? text.activate : text.deactivate,
+        errorMessage: text.errorLoadingUsers,
+        action: () => setActive(user.userId, nextIsActive),
+      });
+    },
+    [
+      getUserLabel,
+      locale,
+      requestUserConfirmation,
+      text.activate,
+      text.deactivate,
+      text.errorLoadingUsers,
+      ui.confirmBlockTitle,
+      ui.confirmUnblockTitle,
+      canManageRoles,
+    ]
+  );
+
+  const requestDeleteUser = useCallback(
+    (user: UserListItem, afterSuccess?: () => void) => {
+      if (!canManageRoles) {
+        return;
+      }
+
+      const userLabel = getUserLabel(user);
+      requestUserConfirmation({
+        userId: user.userId,
+        title: ui.confirmDeleteTitle,
+        description:
+          locale === "ru"
+            ? `${userLabel}: ${text.usersDeleteConfirm}`
+            : `${userLabel}: ${text.usersDeleteConfirm}`,
+        confirmLabel: text.usersDeleteAction,
+        successMessage: text.usersDeletedSuccess,
+        errorMessage: text.errorLoadingUsers,
+        action: () => deleteAdminUser(user.userId),
+        afterSuccess,
+      });
+    },
+    [
+      getUserLabel,
+      locale,
+      requestUserConfirmation,
+      text.errorLoadingUsers,
+      text.usersDeleteAction,
+      text.usersDeleteConfirm,
+      text.usersDeletedSuccess,
+      ui.confirmDeleteTitle,
+      canManageRoles,
+    ]
+  );
+
+  const requestPremiumChange = useCallback(
+    (user: UserListItem) => {
+      if (!canManageRoles) {
+        return;
+      }
+
+      const userLabel = getUserLabel(user);
+      requestUserConfirmation({
+        userId: user.userId,
+        title: ui.confirmPremiumTitle,
+        description:
+          locale === "ru"
+            ? `${userLabel}: Premium-статус изменится через admin endpoint и будет записан в audit log.`
+            : `${userLabel}: Premium status will be changed through the admin endpoint and written to the audit log.`,
+        confirmLabel: user.isPremium ? text.removePremium : text.makePremium,
+        errorMessage: text.errorLoadingUsers,
+        action: () => (user.isPremium ? revokePremium(user.userId) : setPremium(user.userId, true)),
+      });
+    },
+    [
+      getUserLabel,
+      locale,
+      requestUserConfirmation,
+      text.errorLoadingUsers,
+      text.makePremium,
+      text.removePremium,
+      ui.confirmPremiumTitle,
+      canManageRoles,
+    ]
+  );
+
+  const requestRoleChange = useCallback(
+    (user: UserListItem, role: "Admin" | "Moderator") => {
+      if (!canManageRoles) {
+        return;
+      }
+
+      const hasRole = user.roles.includes(role);
+      if (role === "Admin" && hasRole && (totalAdminCount === null || totalAdminCount <= 1)) {
+        return;
+      }
+
+      const userLabel = getUserLabel(user);
+      requestUserConfirmation({
+        userId: user.userId,
+        title: ui.confirmRoleTitle,
+        description:
+          locale === "ru"
+            ? `${userLabel}: ${hasRole ? "роль будет снята" : "роль будет назначена"} (${role}).`
+            : `${userLabel}: the ${role} role will be ${hasRole ? "revoked" : "assigned"}.`,
+        confirmLabel:
+          role === "Admin"
+            ? hasRole
+              ? text.revokeAdmin
+              : text.assignAdmin
+            : hasRole
+              ? text.revokeModerator
+              : text.assignModerator,
+        errorMessage: text.errorLoadingUsers,
+        action: () =>
+          hasRole ? revokeRole(user.userId, role) : assignRole(user.userId, role),
+      });
+    },
+    [
+      getUserLabel,
+      locale,
+      requestUserConfirmation,
+      text.assignAdmin,
+      text.assignModerator,
+      text.errorLoadingUsers,
+      text.revokeAdmin,
+      text.revokeModerator,
+      totalAdminCount,
+      ui.confirmRoleTitle,
+      canManageRoles,
+    ]
+  );
+
   const submitWalletDialog = useCallback(async () => {
-    if (!walletDialog) {
+    if (!canManageRoles || !walletDialog || walletDialogSubmitting) {
       return;
     }
 
@@ -383,96 +642,40 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     }
 
     setWalletDialogSubmitting(true);
-    await runUserAction(
-      walletDialog.userId,
-      async () => {
-        await adjustAdminUserWallet(walletDialog.userId, walletDialog.operation, amount, reason);
-      },
-      {
-        successMessage: text.walletOperationSaved,
-        errorMessage: text.walletOperationError,
+    try {
+      const succeeded = await runUserAction(
+        walletDialog.userId,
+        async () => {
+          await adjustAdminUserWallet(walletDialog.userId, walletDialog.operation, amount, reason);
+        },
+        {
+          successMessage: text.walletOperationSaved,
+          errorMessage: text.walletOperationError,
+        }
+      );
+      if (succeeded) {
+        setWalletDialog(null);
       }
-    );
-    setWalletDialogSubmitting(false);
-    setWalletDialog(null);
+    } finally {
+      setWalletDialogSubmitting(false);
+    }
   }, [
     runUserAction,
     text.usersBalanceInvalidAmount,
     text.walletOperationError,
     text.walletOperationSaved,
     ui.walletReasonRequired,
+    canManageRoles,
     walletDialog,
+    walletDialogSubmitting,
   ]);
 
-  const filteredUsersBase = useMemo(() => {
-    const normalizedSearch = normalizeText(search);
-
-    return users.filter((user) => {
-      const bySearch =
-        normalizedSearch.length === 0 ||
-        normalizeText(user.email).includes(normalizedSearch) ||
-        normalizeText(user.userId).includes(normalizedSearch);
-      if (!bySearch) {
-        return false;
-      }
-
-      if (roleFilter !== "all" && !user.roles.includes(roleFilter)) {
-        return false;
-      }
-
-      if (premiumFilter === "premium" && !user.isPremium) {
-        return false;
-      }
-
-      if (premiumFilter === "free" && user.isPremium) {
-        return false;
-      }
-
-      if (activityFilter === "active" && !user.isActive) {
-        return false;
-      }
-
-      if (activityFilter === "blocked" && user.isActive) {
-        return false;
-      }
-
-      const userStatus = getAccountStatus(user);
-      if (statusFilter !== "all" && statusFilter !== userStatus) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [activityFilter, premiumFilter, roleFilter, search, statusFilter, users]);
-
-  const preSortedUsers = useMemo(() => {
-    if (sortMode === "created-asc") {
-      return [...filteredUsersBase].sort(
-        (a, b) => new Date(a.createdAtUtc).getTime() - new Date(b.createdAtUtc).getTime()
-      );
-    }
-
-    if (sortMode === "created-desc") {
-      return [...filteredUsersBase].sort(
-        (a, b) => new Date(b.createdAtUtc).getTime() - new Date(a.createdAtUtc).getTime()
-      );
-    }
-
-    return filteredUsersBase;
-  }, [filteredUsersBase, sortMode]);
-
-  const sortByLastActivity = sortMode === "last-activity-asc" || sortMode === "last-activity-desc";
-  const preSortedTotalPages = Math.max(1, Math.ceil(preSortedUsers.length / PAGE_SIZE));
-  const preSortedCurrentPage = Math.min(page, preSortedTotalPages);
-
-  const analyticsTargetUsers = sortByLastActivity
-    ? filteredUsersBase
-    : preSortedUsers.slice((preSortedCurrentPage - 1) * PAGE_SIZE, preSortedCurrentPage * PAGE_SIZE);
+  const pageUsers = users;
 
   const analyticsQueries = useQueries({
-    queries: analyticsTargetUsers.map((user) => ({
+    queries: pageUsers.map((user) => ({
       queryKey: adminQueryKeys.userAnalytics(user.userId),
-      queryFn: () => fetchAdminUserAnalytics(user.userId),
+      queryFn: ({ signal }) => fetchAdminUserAnalytics(user.userId, signal),
       enabled: true,
       staleTime: 30_000,
     })),
@@ -480,44 +683,23 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
   const analyticsByUserId = useMemo(() => {
     const map = new Map<string, Awaited<ReturnType<typeof fetchAdminUserAnalytics>>>();
-    for (const [index, user] of analyticsTargetUsers.entries()) {
+    for (const [index, user] of pageUsers.entries()) {
       const analytics = analyticsQueries[index]?.data;
       if (analytics) {
         map.set(user.userId, analytics);
       }
     }
     return map;
-  }, [analyticsQueries, analyticsTargetUsers]);
+  }, [analyticsQueries, pageUsers]);
 
-  const sortedUsers = useMemo(() => {
-    if (!sortByLastActivity) {
-      return preSortedUsers;
-    }
-
-    const direction = sortMode === "last-activity-asc" ? 1 : -1;
-    return [...filteredUsersBase].sort((a, b) => {
-      const aTime = new Date(
-        analyticsByUserId.get(a.userId)?.summary.lastActivityAtUtc ?? 0
-      ).getTime();
-      const bTime = new Date(
-        analyticsByUserId.get(b.userId)?.summary.lastActivityAtUtc ?? 0
-      ).getTime();
-      return (aTime - bTime) * direction;
-    });
-  }, [analyticsByUserId, filteredUsersBase, preSortedUsers, sortByLastActivity, sortMode]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-
-  const pagedUsers = useMemo(
-    () => sortedUsers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
-    [currentPage, sortedUsers]
-  );
+  const currentPage = Math.max(1, Math.floor(usersPage.skip / PAGE_SIZE) + 1);
+  const totalPages = Math.max(1, Math.ceil(usersPage.totalCount / PAGE_SIZE));
+  const pagedUsers = pageUsers;
 
   const pageSubscriptionQueries = useQueries({
     queries: pagedUsers.map((user) => ({
       queryKey: adminQueryKeys.economyUserSubscriptionSummary(user.userId),
-      queryFn: () => fetchAdminEconomyUserSubscriptionSummary(user.userId),
+      queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(user.userId, signal),
       enabled: user.isPremium,
       staleTime: 45_000,
     })),
@@ -564,6 +746,13 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
   const selectedUser = selectedUserProfile.user ?? selectedListUser;
   const selectedUserAnalytics = selectedUserProfile.analytics;
+  const openActionsUser =
+    openActionsUserId === null
+      ? null
+      : (users.find((candidate) => candidate.userId === openActionsUserId) ?? null);
+  const cannotRevokeLastAdmin =
+    Boolean(openActionsUser?.roles.includes("Admin")) &&
+    (totalAdminCount === null || totalAdminCount <= 1);
   const selectedUserSupportTickets = useMemo(
     () =>
       selectedUserId
@@ -685,11 +874,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [selectedUserId]);
-
-  const openActionsUser =
-    openActionsUserId === null
-      ? null
-      : (users.find((candidate) => candidate.userId === openActionsUserId) ?? null);
 
   const hero = (
     <AdminPageHero
@@ -820,21 +1004,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
           <select
             className={styles.filterSelect}
-            value={sortMode}
-            onChange={(event) => {
-              setSortMode(event.target.value as SortMode);
-              setPage(1);
-            }}
-            aria-label={ui.sortLabel}
-          >
-            <option value="created-desc">{ui.sortCreatedDesc}</option>
-            <option value="created-asc">{ui.sortCreatedAsc}</option>
-            <option value="last-activity-desc">{ui.sortLastActivityDesc}</option>
-            <option value="last-activity-asc">{ui.sortLastActivityAsc}</option>
-          </select>
-
-          <select
-            className={styles.filterSelect}
             value={String(rangeDays)}
             onChange={(event) => {
               setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);
@@ -856,7 +1025,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
               setPremiumFilter("all");
               setActivityFilter("all");
               setStatusFilter("all");
-              setSortMode("created-desc");
               setPage(1);
             }}
           >
@@ -864,9 +1032,25 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           </Button>
         </div>
 
-        {error ? <AdminStateCard tone="danger" className={styles.message} title={error} /> : null}
+        {error ? (
+          <AdminStateCard
+            tone="danger"
+            className={styles.message}
+            title={error}
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={isUsersFetching}
+                onClick={() => void refreshUsers().catch(() => undefined)}
+              >
+                {text.supportRetryAction}
+              </Button>
+            }
+          />
+        ) : null}
 
-        {!sortedUsers.length ? (
+        {!pageUsers.length ? (
           <AdminStateCard
             tone="info"
             className={styles.emptyState}
@@ -875,9 +1059,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           />
         ) : null}
 
-        {!!sortedUsers.length && (
+        {!!pageUsers.length && (
           <>
-            <div className={`${adminTableStyles.tableWrap} ${styles.tableWrap}`}>
+            <div
+              className={`${adminTableStyles.tableWrap} ${styles.tableWrap}`}
+              aria-busy={isUsersFetching ? "true" : undefined}
+            >
               <table className={adminTableStyles.table}>
                 <thead>
                   <tr>
@@ -905,8 +1092,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         <td data-label={text.avatarLabel}>
                           <UserAvatarView
                             avatar={user.avatar}
-                            label={`${text.avatarLabel}: ${user.displayName ?? user.email}`}
-                            fallbackLabel={user.displayName ?? user.email}
+                            label={`${text.avatarLabel}: ${getUserAvatarLabel(user)}`}
+                            fallbackLabel={getUserAvatarLabel(user)}
                           />
                         </td>
                         <td data-label={text.emailLabel}>
@@ -915,13 +1102,15 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                               href={`/${locale}/users/${user.userId}`}
                               className={`${styles.userAnchor} ${styles.userAnchorActive}`}
                             >
-                              <span>{user.email}</span>
+                              <span>{maskEmail(user.email)}</span>
                             </Link>
-                            <span className={styles.userMeta}>{user.displayName ?? "—"}</span>
+                            <span className={styles.userMeta}>
+                              {sanitizeSensitiveText(user.displayName, 96)}
+                            </span>
                           </div>
                         </td>
                         <td data-label="userId" className={adminTableStyles.mono}>
-                          {user.userId}
+                          {shortIdentifier(user.userId)}
                         </td>
                         <td data-label={text.roleLabel}>
                           <div className={styles.roleList}>
@@ -983,48 +1172,42 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                             >
                               {ui.openSideCard}
                             </button>
-                            <button
-                              type="button"
-                              className={styles.quickActionBtn}
-                              disabled={isBusy}
-                              onClick={() =>
-                                void runUserAction(user.userId, () =>
-                                  user.isPremium
-                                    ? revokePremium(user.userId)
-                                    : setPremium(user.userId, true)
-                                )
-                              }
-                            >
-                              {user.isPremium ? text.removePremium : text.makePremium}
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.quickActionBtn}
-                              disabled={isBusy}
-                              onClick={() => openWalletDialog(user.userId, "credit")}
-                            >
-                              {ui.quickCredit}
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.quickActionBtn}
-                              disabled={isBusy}
-                              onClick={() => openWalletDialog(user.userId, "debit")}
-                            >
-                              {ui.quickDebit}
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.quickActionBtn}
-                              disabled={isBusy}
-                              onClick={() =>
-                                void runUserAction(user.userId, () =>
-                                  setActive(user.userId, !user.isActive)
-                                )
-                              }
-                            >
-                              {user.isActive ? text.deactivate : text.activate}
-                            </button>
+                            {canManageRoles ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className={styles.quickActionBtn}
+                                  disabled={isBusy}
+                                  onClick={() => requestPremiumChange(user)}
+                                >
+                                  {user.isPremium ? text.removePremium : text.makePremium}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.quickActionBtn}
+                                  disabled={isBusy}
+                                  onClick={() => openWalletDialog(user.userId, "credit")}
+                                >
+                                  {ui.quickCredit}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.quickActionBtn}
+                                  disabled={isBusy}
+                                  onClick={() => openWalletDialog(user.userId, "debit")}
+                                >
+                                  {ui.quickDebit}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.quickActionBtn}
+                                  disabled={isBusy}
+                                  onClick={() => requestActiveChange(user)}
+                                >
+                                  {user.isActive ? text.deactivate : text.activate}
+                                </button>
+                              </>
+                            ) : null}
                             <button
                               type="button"
                               className={styles.actionMenuTrigger}
@@ -1050,14 +1233,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
             <div className={styles.pagination}>
               <div>
-                {ui.usersCount}: {sortedUsers.length}
+                {ui.usersCount}: {usersPage.totalCount}
               </div>
               <div className={styles.paginationControls}>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={currentPage <= 1}
+                  disabled={currentPage <= 1 || isUsersFetching}
                 >
                   {ui.prevPage}
                 </Button>
@@ -1068,7 +1251,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={currentPage >= totalPages}
+                  disabled={currentPage >= totalPages || isUsersFetching}
                 >
                   {ui.nextPage}
                 </Button>
@@ -1107,28 +1290,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   <UsersIcon className={styles.buttonIcon} />
                   <span>{ui.openCard}</span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.actionMenuItem}
-                  disabled={busyUserId === openActionsUser.userId}
-                  onClick={() => {
-                    openWalletDialog(openActionsUser.userId, "credit");
-                  }}
-                >
-                  <DollarIcon className={styles.buttonIcon} />
-                  <span>{text.usersBalanceCredit}</span>
-                </button>
-                <button
-                  type="button"
-                  className={styles.actionMenuItem}
-                  disabled={busyUserId === openActionsUser.userId}
-                  onClick={() => {
-                    openWalletDialog(openActionsUser.userId, "debit");
-                  }}
-                >
-                  <DollarIcon className={styles.buttonIcon} />
-                  <span>{text.usersBalanceDebit}</span>
-                </button>
                 {canManageRoles && (
                   <>
                     <button
@@ -1136,12 +1297,29 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                       className={styles.actionMenuItem}
                       disabled={busyUserId === openActionsUser.userId}
                       onClick={() => {
-                        closeActionsMenu();
-                        void runUserAction(openActionsUser.userId, () =>
-                          openActionsUser.roles.includes("Moderator")
-                            ? revokeRole(openActionsUser.userId, "Moderator")
-                            : assignRole(openActionsUser.userId, "Moderator")
-                        );
+                        openWalletDialog(openActionsUser.userId, "credit");
+                      }}
+                    >
+                      <DollarIcon className={styles.buttonIcon} />
+                      <span>{text.usersBalanceCredit}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionMenuItem}
+                      disabled={busyUserId === openActionsUser.userId}
+                      onClick={() => {
+                        openWalletDialog(openActionsUser.userId, "debit");
+                      }}
+                    >
+                      <DollarIcon className={styles.buttonIcon} />
+                      <span>{text.usersBalanceDebit}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.actionMenuItem}
+                      disabled={busyUserId === openActionsUser.userId}
+                      onClick={() => {
+                        requestRoleChange(openActionsUser, "Moderator");
                       }}
                     >
                       <UsersIcon className={styles.buttonIcon} />
@@ -1154,14 +1332,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={styles.actionMenuItem}
-                      disabled={busyUserId === openActionsUser.userId}
+                      disabled={busyUserId === openActionsUser.userId || cannotRevokeLastAdmin}
+                      title={cannotRevokeLastAdmin ? ui.lastAdminProtected : undefined}
                       onClick={() => {
-                        closeActionsMenu();
-                        void runUserAction(openActionsUser.userId, () =>
-                          openActionsUser.roles.includes("Admin")
-                            ? revokeRole(openActionsUser.userId, "Admin")
-                            : assignRole(openActionsUser.userId, "Admin")
-                        );
+                        requestRoleChange(openActionsUser, "Admin");
                       }}
                     >
                       <UsersIcon className={styles.buttonIcon} />
@@ -1176,19 +1350,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                       className={`${styles.actionMenuItem} ${styles.actionMenuItemDanger}`}
                       disabled={busyUserId === openActionsUser.userId}
                       onClick={() => {
-                        closeActionsMenu();
-                        if (!window.confirm(text.usersDeleteConfirm)) {
-                          return;
-                        }
-
-                        void runUserAction(
-                          openActionsUser.userId,
-                          () => deleteAdminUser(openActionsUser.userId),
-                          {
-                            successMessage: text.usersDeletedSuccess,
-                            errorMessage: text.errorLoadingUsers,
-                          }
-                        );
+                        requestDeleteUser(openActionsUser);
                       }}
                     >
                       <CancelCircleIcon className={styles.buttonIcon} />
@@ -1208,6 +1370,20 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             document.body
           )
         : null}
+
+      <ConfirmationDialog
+        open={confirmationDialog !== null}
+        title={confirmationDialog?.title ?? ""}
+        description={confirmationDialog?.description ?? ""}
+        confirmLabel={confirmationDialog?.confirmLabel ?? ui.confirmAction}
+        cancelLabel={ui.confirmCancel}
+        isSubmitting={confirmationSubmitting}
+        tone={confirmationDialog?.tone ?? "danger"}
+        onCancel={closeConfirmationDialog}
+        onConfirm={() => {
+          void submitConfirmationDialog();
+        }}
+      />
 
       {walletDialog && typeof window !== "undefined"
         ? createPortal(
@@ -1331,16 +1507,16 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                       <div className={styles.profileRow}>
                         <UserAvatarView
                           avatar={selectedUser.avatar}
-                          label={`${text.avatarLabel}: ${selectedUser.displayName ?? selectedUser.email}`}
-                          fallbackLabel={selectedUser.displayName ?? selectedUser.email}
+                          label={`${text.avatarLabel}: ${getUserAvatarLabel(selectedUser)}`}
+                          fallbackLabel={getUserAvatarLabel(selectedUser)}
                           size="lg"
                         />
                         <div>
                           <p className={styles.profileTitle}>
-                            {selectedUser.displayName ?? selectedUser.email}
+                            {sanitizeSensitiveText(getAdminUserDisplayName(selectedUser), 96)}
                           </p>
-                          <p className={styles.profileSub}>{selectedUser.email}</p>
-                          <p className={styles.profileSub}>{selectedUser.userId}</p>
+                          <p className={styles.profileSub}>{maskEmail(selectedUser.email)}</p>
+                          <p className={styles.profileSub}>{shortIdentifier(selectedUser.userId)}</p>
                         </div>
                       </div>
                       <div className={styles.badgeRow}>
@@ -1362,7 +1538,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                       <h4>{ui.sectionPremium}</h4>
                       <p>
                         {selectedSubscriptionQuery.data
-                          ? `${selectedSubscriptionQuery.data.status} • ${formatDateTime(
+                          ? `${sanitizeSensitiveText(
+                              selectedSubscriptionQuery.data.status,
+                              48
+                            )} • ${formatDateTime(
                               selectedSubscriptionQuery.data.currentPeriodEndUtc,
                               locale
                             )}`
@@ -1396,9 +1575,9 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         <div className={styles.listBlock}>
                           {selectedUserSupportTickets.slice(0, 6).map((ticket) => (
                             <article key={ticket.conversationId} className={styles.listCard}>
-                              <strong>{ticket.status}</strong>
+                              <strong>{sanitizeSensitiveText(ticket.status, 48)}</strong>
                               <span>{formatDateTime(ticket.updatedAtUtc, locale)}</span>
-                              <span>{ticket.lastMessagePreview ?? "—"}</span>
+                              <span>{formatSupportMessagePreview(ticket.lastMessagePreview, "—")}</span>
                             </article>
                           ))}
                         </div>
@@ -1415,7 +1594,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                             <article key={purchase.orderId} className={styles.listCard}>
                               <strong>{purchase.sparkToGrant} spark</strong>
                               <span>
-                                {purchase.priceAmount} {purchase.currencyCode}
+                                {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
                               </span>
                               <span>
                                 {formatDateTime(
@@ -1437,8 +1616,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         <div className={styles.listBlock}>
                           {selectedUserAnalytics.recentGenerations.slice(0, 5).map((generation) => (
                             <article key={generation.generationId} className={styles.listCard}>
-                              <strong>{generation.templateTitle}</strong>
-                              <span>{generation.status}</span>
+                              <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
+                              <span>{sanitizeSensitiveText(generation.status, 48)}</span>
                               <span>
                                 {formatDateTime(
                                   generation.completedAtUtc ?? generation.createdAtUtc,
@@ -1461,7 +1640,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                             <article key={event.auditEventId} className={styles.listCard}>
                               <strong>{event.action}</strong>
                               <span>{formatDateTime(event.occurredAtUtc, locale)}</span>
-                              <span>{event.details}</span>
+                              <span>{sanitizeSensitiveText(event.details, 180)}</span>
                             </article>
                           ))}
                         </div>
@@ -1470,49 +1649,37 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                       )}
                     </section>
 
-                    <section className={`${styles.panelSection} ${styles.dangerZone}`}>
-                      <h4>{ui.sectionDanger}</h4>
-                      <div className={styles.dangerActions}>
-                        <button
-                          type="button"
-                          className={styles.dangerBtn}
-                          onClick={() =>
-                            void runUserAction(selectedUser.userId, () =>
-                              setActive(selectedUser.userId, !selectedUser.isActive)
-                            )
-                          }
-                        >
-                          {selectedUser.isActive ? text.deactivate : text.activate}
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.dangerBtn}
-                          onClick={() => {
-                            if (!window.confirm(text.usersDeleteConfirm)) {
-                              return;
+                    {canManageRoles ? (
+                      <section className={`${styles.panelSection} ${styles.dangerZone}`}>
+                        <h4>{ui.sectionDanger}</h4>
+                        <div className={styles.dangerActions}>
+                          <button
+                            type="button"
+                            className={styles.dangerBtn}
+                            disabled={busyUserId === selectedUser.userId}
+                            onClick={() => requestActiveChange(selectedUser)}
+                          >
+                            {selectedUser.isActive ? text.deactivate : text.activate}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.dangerBtn}
+                            disabled={busyUserId === selectedUser.userId}
+                            onClick={() =>
+                              requestDeleteUser(selectedUser, () => setSelectedUserId(null))
                             }
-
-                            void runUserAction(
-                              selectedUser.userId,
-                              () => deleteAdminUser(selectedUser.userId),
-                              {
-                                successMessage: text.usersDeletedSuccess,
-                                errorMessage: text.errorLoadingUsers,
-                              }
-                            );
-                            setSelectedUserId(null);
-                          }}
-                        >
-                          {text.usersDeleteAction}
-                        </button>
-                        <Link
-                          href={`/${locale}/users/${selectedUser.userId}`}
-                          className={styles.profileLinkBtn}
-                        >
-                          {ui.sideOpenFullProfile}
-                        </Link>
-                      </div>
-                    </section>
+                          >
+                            {text.usersDeleteAction}
+                          </button>
+                          <Link
+                            href={`/${locale}/users/${selectedUser.userId}`}
+                            className={styles.profileLinkBtn}
+                          >
+                            {ui.sideOpenFullProfile}
+                          </Link>
+                        </div>
+                      </section>
+                    ) : null}
                   </div>
                 )}
               </aside>

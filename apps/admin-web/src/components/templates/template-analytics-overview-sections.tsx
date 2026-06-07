@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 
 import { ChartIcon, DashboardIcon, GlobeIcon, TrendUpIcon } from "@/components/admin/admin-icons";
@@ -27,6 +26,7 @@ import {
   type TrendMetricKey,
 } from "@/components/templates/template-analytics-utils";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import {
   type AdminTemplate,
   type AdminTemplateEventAnalytics,
@@ -34,6 +34,7 @@ import {
   type AdminTemplateTrendPoint,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type AnalyticsText = Record<string, string>;
 type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";
@@ -273,6 +274,9 @@ function TemplateProfileCard({
   const previewKind = previewUrl ? inferTemplateMediaKind(previewContentType, previewUrl) : null;
   const [brokenPreviewUrl, setBrokenPreviewUrl] = useState<string | null>(null);
   const isPreviewBroken = previewUrl === brokenPreviewUrl;
+  const safeTemplateTitle = sanitizeSensitiveText(template.title, 96);
+  const safeTemplateDescription = sanitizeSensitiveText(template.shortDescription, 180);
+  const safeTemplateCategory = sanitizeSensitiveText(template.category, 64);
 
   return (
     <article className={styles.templateCard}>
@@ -281,29 +285,40 @@ function TemplateProfileCard({
       >
         {previewUrl && !isPreviewBroken ? (
           previewKind === "video" ? (
-            <video
-              src={previewUrl}
+            <TemplateSecureMedia
+              url={previewUrl}
+              kind="video"
               className={styles.templatePreviewImage}
               muted
               playsInline
               autoPlay
               loop
               preload="metadata"
-              onError={() => setBrokenPreviewUrl(previewUrl)}
+              onLoadFailed={() => setBrokenPreviewUrl(previewUrl)}
+              logContext={{
+                templateId: template.templateId,
+                contentType: previewContentType,
+                surface: "template_analytics_profile",
+              }}
             />
           ) : (
-            <Image
-              src={previewUrl}
+            <TemplateSecureMedia
+              url={previewUrl}
+              kind="image"
               alt=""
               width={480}
               height={600}
-              unoptimized
               className={styles.templatePreviewImage}
-              onError={() => setBrokenPreviewUrl(previewUrl)}
+              onLoadFailed={() => setBrokenPreviewUrl(previewUrl)}
+              logContext={{
+                templateId: template.templateId,
+                contentType: previewContentType,
+                surface: "template_analytics_profile",
+              }}
             />
           )
         ) : (
-          <div className={styles.templatePreviewFallback}>{template.title.slice(0, 1)}</div>
+          <div className={styles.templatePreviewFallback}>{safeTemplateTitle.slice(0, 1)}</div>
         )}
       </div>
 
@@ -311,7 +326,7 @@ function TemplateProfileCard({
         <div className={styles.templateTitleRow}>
           <div>
             <span>{text.templateOverviewTitle}</span>
-            <h2>{template.title}</h2>
+            <h2>{safeTemplateTitle}</h2>
           </div>
           <span
             className={`${styles.statusBadge} ${styles[getStatusBadgeClassName(template.status)]}`}
@@ -320,11 +335,11 @@ function TemplateProfileCard({
           </span>
         </div>
 
-        <p>{template.shortDescription}</p>
+        <p>{safeTemplateDescription}</p>
 
         <div className={styles.templateMetaGrid}>
           <SummaryRow label={text.templateIdLabel} value={shortenId(template.templateId)} />
-          <SummaryRow label={text.categoryLabel} value={template.category} />
+          <SummaryRow label={text.categoryLabel} value={safeTemplateCategory} />
           <SummaryRow
             label={text.priceLabel}
             value={getTemplateAccessLabel(template.isPremium, dictionary)}

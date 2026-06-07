@@ -25,6 +25,13 @@
   background: var(--surface-3);
 }
 
+.errorActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .profileHeader {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 17rem);

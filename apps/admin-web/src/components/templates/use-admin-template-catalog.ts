@@ -28,18 +28,21 @@ export function useAdminTemplateCatalog({
 }: UseAdminTemplateCatalogOptions) {
   const templatesQuery = useQuery<AdminTemplateListItem[]>({
     queryKey: adminQueryKeys.templateCatalog(templateType),
-    queryFn: () => fetchAdminTemplates(templateType),
+    queryFn: ({ signal }) => fetchAdminTemplates(templateType, signal),
     enabled,
   });
 
   const analyticsRowsQuery = useQuery<AnalyticsRowsMap>({
     queryKey: adminQueryKeys.templateCatalogAnalyticsRows(templateType),
-    queryFn: async () => {
-      const response = await fetchAdminTemplatesAnalyticsOverview({
-        templateType,
-        sort: "updated",
-        take: 500,
-      });
+    queryFn: async ({ signal }) => {
+      const response = await fetchAdminTemplatesAnalyticsOverview(
+        {
+          templateType,
+          sort: "updated",
+          take: 500,
+        },
+        signal
+      );
       const rowsByTemplateId: AnalyticsRowsMap = {};
 
       for (const row of response.templates) {
@@ -77,6 +80,7 @@ export function useAdminTemplateCatalog({
     getAnalyticsRow,
     hasError: templatesQuery.isError,
     hasSecondaryError: analyticsRowsQuery.isError,
+    isFetching: templatesQuery.isFetching || analyticsRowsQuery.isFetching,
     isLoading: templatesQuery.isLoading,
     isSecondaryLoading: analyticsRowsQuery.isLoading,
     refresh,

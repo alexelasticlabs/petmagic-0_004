@@ -3,6 +3,7 @@
 import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
 import { useEffect, useEffectEvent } from "react";
 
+import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
 import { clientLogger } from "@/lib/client-logger";
 
 export type SupportConversationUpdatedEvent = {
@@ -16,7 +17,6 @@ export type SupportConversationUpdatedEvent = {
   userUnreadCount?: number;
 };
 
-const supportHubUrl = `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000"}/hubs/support-chat`;
 const supportRealtimeCooldownMs = 30_000;
 
 let supportRealtimeBlockedUntil = 0;
@@ -32,6 +32,7 @@ export function useSupportRealtime(
       return;
     }
 
+    const supportHubUrl = `${getAdminPublicApiBaseUrl()}/hubs/support-chat`;
     const connection = new HubConnectionBuilder()
       .withUrl(supportHubUrl, {
         accessTokenFactory: async () => accessToken,

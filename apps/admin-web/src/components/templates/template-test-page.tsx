@@ -25,18 +25,23 @@ import {
   VideoIcon,
 } from "@/components/admin/admin-icons";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import styles from "@/components/templates/template-test-page.module.css";
 import { Button } from "@/components/ui/button";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {
   fetchAdminTemplate,
   fetchAdminTemplateTest,
   fetchAdminTemplateTestHistory,
   startAdminTemplateTest,
+  useAuthSession,
   type AdminTemplate,
   type AdminTemplateTestRun,
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateTestPageProps = {
   locale: Locale;
@@ -64,10 +69,33 @@ type ArtifactItem = {
   downloadName?: string;
 };
 
+const MAX_TEMPLATE_TEST_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function formatTemplateTestDisplayText(
+  value: string | null | undefined,
+  fallback = "-",
+  maxLength = 160
+) {
+  const trimmed = value?.trim();
+  return sanitizeSensitiveText(trimmed || fallback, maxLength);
+}
+
+function isTemplateTestRunInFlight(run: AdminTemplateTestRun | null | undefined): boolean {
+  return run?.status === "Queued" || run?.status === "Processing" || run?.status === "Retrying";
+}
+
 export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) {
   const isRu = locale === "ru";
   const text = getDictionary(locale);
   const router = useRouter();
+  const session = useAuthSession();
+  const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
+  const templateTestActionsAdminOnly = isRu
+    ? "Тестовые генерации шаблонов доступны только Admin."
+    : "Template test generations are available to Admin only.";
+  const templateTestInFlightMessage = isRu
+    ? "Дождитесь завершения текущей тестовой генерации перед заменой фото."
+    : "Wait for the current template test generation to finish before replacing the photo.";
   const [template, setTemplate] = useState<AdminTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -85,6 +113,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
     async function loadTemplate() {
       setIsLoading(true);
@@ -95,19 +124,27 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           return;
         }
 
-        const response = await fetchAdminTemplate(templateId);
+        const response = await fetchAdminTemplate(templateId, controller.signal);
         if (!isCancelled) {
           setTemplate(response);
         }
 
         try {
-          const historyResponse = await fetchAdminTemplateTestHistory(templateId, 12);
+          const historyResponse = await fetchAdminTemplateTestHistory(
+            templateId,
+            12,
+            controller.signal
+          );
           if (!isCancelled) {
             setHistory(historyResponse);
             setRun(historyResponse[0] ?? null);
             setSelectedHistoryGenerationId(null);
           }
         } catch (error) {
+          if (controller.signal.aborted || isCancelled) {
+            return;
+          }
+
           clientLogger.warn("templates.test_history_load_failed", {
             templateId,
             error,
@@ -117,6 +154,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           }
         }
       } catch (error) {
+        if (controller.signal.aborted || isCancelled) {
+          return;
+        }
+
         clientLogger.error("templates.test_template_load_failed", {
           templateId,
           error,
@@ -139,6 +180,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, [isRu, locale, router, templateId]);
 
@@ -147,9 +189,14 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const latest = await fetchAdminTemplateTest(run.generationId);
+        const latest = await fetchAdminTemplateTest(run.generationId, controller.signal);
+        if (controller.signal.aborted) {
+          return;
+        }
+
         setRun(latest);
         setHistory((current) =>
           [latest, ...current.filter((item) => item.generationId !== latest.generationId)].slice(
@@ -158,6 +205,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           )
         );
       } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
         clientLogger.warn("templates.test_polling_failed", {
           templateId,
           generationId: run.generationId,
@@ -169,6 +220,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
     return () => {
       window.clearTimeout(timer);
+      controller.abort();
     };
   }, [isRu, run, templateId]);
 
@@ -182,6 +234,15 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   );
 
   async function handleStartTest() {
+    if (!canManageTemplates) {
+      setRunError(templateTestActionsAdminOnly);
+      return;
+    }
+
+    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+      return;
+    }
+
     if (!selectedFile) {
       setRunError(
         isRu ? "Сначала выберите тестовое фото питомца." : "Choose a test pet photo first."
@@ -214,9 +275,28 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
+    if (!canManageTemplates) {
+      setRunError(templateTestActionsAdminOnly);
+      return;
+    }
+
+    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+      setRunError(templateTestInFlightMessage);
+      return;
+    }
+
     if (!file.type.startsWith("image/")) {
       setRunError(
         isRu ? "Можно загрузить только image/* файл." : "Only image/* files are supported."
+      );
+      return;
+    }
+
+    if (file.size > MAX_TEMPLATE_TEST_IMAGE_BYTES) {
+      setRunError(
+        isRu
+          ? "Файл слишком большой. Максимальный размер тестового фото - 8 MB."
+          : "File is too large. The maximum test photo size is 8 MB."
       );
       return;
     }
@@ -232,6 +312,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   }
 
   function handleResetTest() {
+    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+      setRunError(templateTestInFlightMessage);
+      return;
+    }
+
     clearSelectedFilePreviewUrl();
     setSelectedFile(null);
     setRun(null);
@@ -257,6 +342,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
     return history.find((item) => item.generationId === selectedHistoryGenerationId) ?? run;
   }, [history, run, selectedHistoryGenerationId]);
+  const isCurrentRunInFlight = isTemplateTestRunInFlight(run);
   const timeline = useMemo(
     () => buildTimeline(activeRun, locale, isVideoTemplate),
     [activeRun, isVideoTemplate, locale]
@@ -291,8 +377,17 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const internalBillingText = formatTokenCost(internalTokenCost);
   const providerCostText = formatProviderCost(activeRun, locale);
   const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
-  const statusText = activeRun?.status ?? (isRu ? "Ожидает запуска" : "Waiting to start");
+  const statusText = formatTemplateTestDisplayText(
+    activeRun?.status,
+    isRu ? "Ожидает запуска" : "Waiting to start",
+    64
+  );
   const lastUpdateText = activeRun ? formatDateTime(activeRun.updatedAtUtc, locale, true) : "-";
+  const templateTitle = template
+    ? formatTemplateTestDisplayText(template.title, isRu ? "Шаблон" : "Template", 120)
+    : isRu
+      ? "Шаблон"
+      : "Template";
   const finalDownloadName =
     activeRun && template
       ? buildGeneratedDownloadName(
@@ -412,7 +507,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 : "Image templates"}
           </Link>
           <span aria-hidden="true">/</span>
-          <Link href={editorPath}>{template.title}</Link>
+          {canManageTemplates ? (
+            <Link href={editorPath}>{templateTitle}</Link>
+          ) : (
+            <span>{templateTitle}</span>
+          )}
           <span aria-hidden="true">/</span>
           <span>{isRu ? "Тест шаблона" : "Template test"}</span>
         </div>
@@ -438,7 +537,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <StatusPill tone="muted">
                 {isVideoTemplate
                   ? formatReferenceDuration(template.referenceVideoDurationSeconds, isRu)
-                  : (template.imageModel ?? (isRu ? "Image model" : "Image model"))}
+                  : formatTemplateTestDisplayText(
+                      template.imageModel,
+                      isRu ? "Image model" : "Image model",
+                      80
+                    )}
               </StatusPill>
             </div>
           </div>
@@ -448,10 +551,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <TableIcon className={styles.inlineIcon} />
               <span>{isRu ? "К каталогу" : "Back to catalog"}</span>
             </Link>
-            <Link href={editorPath} className={styles.primaryLink}>
-              <ChartIcon className={styles.inlineIcon} />
-              <span>{isRu ? "Открыть редактор" : "Open editor"}</span>
-            </Link>
+            {canManageTemplates ? (
+              <Link href={editorPath} className={styles.primaryLink}>
+                <ChartIcon className={styles.inlineIcon} />
+                <span>{isRu ? "Открыть редактор" : "Open editor"}</span>
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
@@ -477,7 +582,9 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 </StatusPill>
                 <Button
                   variant="primary"
-                  disabled={isSubmitting}
+                  disabled={
+                    !canManageTemplates || isSubmitting || isCurrentRunInFlight || !selectedFile
+                  }
                   onClick={() => void handleStartTest()}
                 >
                   <PlayCircleIcon className={styles.inlineIcon} />
@@ -485,6 +592,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                     ? isRu
                       ? "Запуск..."
                       : "Launching..."
+                    : isCurrentRunInFlight
+                      ? isRu
+                        ? "В работе..."
+                        : "Running..."
                     : isRu
                       ? "Сгенерировать тест"
                       : "Generate test"}
@@ -503,6 +614,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 fileName={selectedFileName}
                 fileMeta={selectedFileMeta}
                 isDragActive={isSourceDragActive}
+                isDisabled={!canManageTemplates || isSubmitting || isCurrentRunInFlight}
                 onDragActiveChange={setIsSourceDragActive}
                 onFileSelected={handleSourceFileSelected}
                 onReset={hasSourceImage ? handleResetTest : undefined}
@@ -612,9 +724,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <div className={styles.historyList}>
                 {history.map((item) => {
                   const isCurrent = activeRun?.generationId === item.generationId;
-                  const sourceLabel =
+                  const sourceLabel = sanitizeSensitiveText(
                     item.sourceImageAsset?.fileName ??
-                    (isRu ? "Фото не выбрано" : "No photo selected");
+                      (isRu ? "Фото не выбрано" : "No photo selected"),
+                    120
+                  );
 
                   return (
                     <button
@@ -642,7 +756,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                                   : "muted"
                           }
                         >
-                          {item.status}
+                          {formatTemplateTestDisplayText(item.status, "-", 64)}
                         </StatusPill>
                       </div>
                       <div className={styles.historyItemMeta}>
@@ -696,7 +810,10 @@ function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate
   }
 
   if (Array.isArray(apiError.validationErrors) && apiError.validationErrors.length > 0) {
-    return apiError.validationErrors.join(" ");
+    return getAdminErrorMessage(
+      { validationErrors: apiError.validationErrors },
+      isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation."
+    );
   }
 
   if (apiError.code === "templates.invalid_status") {
@@ -738,19 +855,10 @@ function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate
       : "Video test requires reference duration so character orientation can be resolved.";
   }
 
-  if (
-    typeof apiError.message === "string" &&
-    apiError.message.trim().length > 0 &&
-    !/^API request failed with status \d+$/i.test(apiError.message)
-  ) {
-    return apiError.message;
-  }
-
-  if (typeof apiError.detail === "string" && apiError.detail.trim().length > 0) {
-    return apiError.detail;
-  }
-
-  return isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation.";
+  return getAdminErrorMessage(
+    error,
+    isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation."
+  );
 }
 
 type DetailItem = {
@@ -801,7 +909,7 @@ function buildRunDetails({
       },
       {
         label: isRu ? "Fal image request" : "Fal image request",
-        value: run?.preprocessingProviderRequestId ?? "-",
+        value: formatTemplateTestDisplayText(run?.preprocessingProviderRequestId, "-", 120),
       },
       {
         label: isRu ? "Fal image inference" : "Fal image inference",
@@ -811,7 +919,10 @@ function buildRunDetails({
         label: isRu ? "Импорт медиа" : "Media import",
         value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
       },
-      { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
+      {
+        label: isRu ? "Код ошибки" : "Failure code",
+        value: formatTemplateTestDisplayText(run?.failureCode, "-", 120),
+      },
     ];
   }
 
@@ -823,7 +934,7 @@ function buildRunDetails({
     },
     {
       label: isRu ? "Fal preprocess request" : "Fal preprocess request",
-      value: run?.preprocessingProviderRequestId ?? "-",
+      value: formatTemplateTestDisplayText(run?.preprocessingProviderRequestId, "-", 120),
     },
     {
       label: isRu ? "Fal preprocess inference" : "Fal preprocess inference",
@@ -835,7 +946,7 @@ function buildRunDetails({
     },
     {
       label: isRu ? "Fal motion request" : "Fal motion request",
-      value: run?.motionProviderRequestId ?? "-",
+      value: formatTemplateTestDisplayText(run?.motionProviderRequestId, "-", 120),
     },
     {
       label: isRu ? "Fal motion inference" : "Fal motion inference",
@@ -849,7 +960,10 @@ function buildRunDetails({
       label: isRu ? "Импорт медиа" : "Media import",
       value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
     },
-    { label: isRu ? "Ошибка" : "Failure", value: run?.failureMessage ?? "-", multiline: true },
+    {
+      label: isRu ? "Код ошибки" : "Failure code",
+      value: formatTemplateTestDisplayText(run?.failureCode, "-", 120),
+    },
   ];
 }
 
@@ -924,6 +1038,7 @@ function DetailRow({
   ) : (
     <ImageIcon className={styles.detailIcon} />
   );
+  const safeValue = formatTemplateTestDisplayText(value, "-", multiline ? 320 : 180);
 
   return (
     <div className={multiline ? styles.detailRowMultiline : styles.detailRow}>
@@ -931,7 +1046,7 @@ function DetailRow({
         <span className={styles.detailLabelIcon}>{icon}</span>
         <span>{label}</span>
       </span>
-      <strong>{value}</strong>
+      <strong>{safeValue}</strong>
     </div>
   );
 }
@@ -960,34 +1075,114 @@ function MediaPreviewCard({
   downloadName?: string;
 }) {
   const previewUrl = videoUrl ?? imageUrl;
+  const mediaType = videoUrl ? "video" : "image";
+  const [pendingMediaAction, setPendingMediaAction] = useState<"download" | "open" | null>(
+    null
+  );
+  const mediaActionAbortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      mediaActionAbortControllerRef.current?.abort();
+    },
+    []
+  );
+
+  async function fetchPreviewBlob(
+    action: "download" | "open",
+    signal: AbortSignal
+  ): Promise<Blob | null> {
+    if (!previewUrl) {
+      return null;
+    }
+
+    try {
+      const response = await fetchWithTimeout(previewUrl, { credentials: "include", signal });
+      if (!response.ok) {
+        clientLogger.warn("templates.media_preview_fetch_failed", {
+          action,
+          mediaType,
+          status: response.status,
+        });
+        return null;
+      }
+
+      return response.blob();
+    } catch (error) {
+      if (signal.aborted) {
+        return null;
+      }
+
+      clientLogger.warn("templates.media_preview_fetch_failed", {
+        action,
+        mediaType,
+        error,
+      });
+      return null;
+    }
+  }
 
   async function handleDownload() {
-    if (!previewUrl) {
+    if (!previewUrl || pendingMediaAction) {
       return;
     }
 
-    const isSameOrigin = (() => {
-      try {
-        return new URL(previewUrl, window.location.href).origin === window.location.origin;
-      } catch (error) {
-        clientLogger.warn("templates.media_preview_origin_check_failed", {
-          previewUrl,
-          error,
-        });
-        return false;
+    mediaActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    mediaActionAbortControllerRef.current = controller;
+    setPendingMediaAction("download");
+    try {
+      const blob = await fetchPreviewBlob("download", controller.signal);
+      if (!blob || controller.signal.aborted) {
+        return;
       }
-    })();
 
-    const anchor = document.createElement("a");
-    anchor.href = previewUrl;
-    anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
-    anchor.rel = "noreferrer";
-    if (!isSameOrigin) {
-      anchor.target = "_blank";
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
+      anchor.rel = "noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } finally {
+      if (mediaActionAbortControllerRef.current === controller) {
+        mediaActionAbortControllerRef.current = null;
+        setPendingMediaAction(null);
+      }
     }
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+  }
+
+  async function handleOpen() {
+    if (!previewUrl || pendingMediaAction) {
+      return;
+    }
+
+    mediaActionAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    mediaActionAbortControllerRef.current = controller;
+    setPendingMediaAction("open");
+    try {
+      const blob = await fetchPreviewBlob("open", controller.signal);
+      if (!blob || controller.signal.aborted) {
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } finally {
+      if (mediaActionAbortControllerRef.current === controller) {
+        mediaActionAbortControllerRef.current = null;
+        setPendingMediaAction(null);
+      }
+    }
   }
 
   return (
@@ -1005,20 +1200,26 @@ function MediaPreviewCard({
       </div>
 
       {videoUrl ? (
-        <video
-          src={videoUrl}
+        <TemplateSecureMedia
+          url={videoUrl}
+          kind="video"
           controls
           muted
           playsInline
           preload="metadata"
           className={styles.mediaAsset}
+          ariaLabel={title}
+          logContext={{ surface: "template_test_result" }}
         />
       ) : imageUrl ? (
-        <div
-          role="img"
-          aria-label={title}
+        <TemplateSecureMedia
+          url={imageUrl}
+          kind="image"
+          alt={title}
+          width={720}
+          height={420}
           className={`${styles.mediaAsset} ${styles.mediaAssetImage}`}
-          style={{ backgroundImage: toCssImageUrl(imageUrl) }}
+          logContext={{ surface: "template_test_result" }}
         />
       ) : (
         <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
@@ -1034,10 +1235,10 @@ function MediaPreviewCard({
       <div className={styles.mediaFooter}>
         {previewUrl ? (
           <div className={styles.mediaActions}>
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              type="button"
+              onClick={() => void handleOpen()}
+              disabled={pendingMediaAction !== null}
               className={styles.mediaActionLink}
             >
               {videoUrl ? (
@@ -1046,10 +1247,11 @@ function MediaPreviewCard({
                 <ImageIcon className={styles.inlineIcon} />
               )}
               <span>{openLabel ?? "Open"}</span>
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => void handleDownload()}
+              disabled={pendingMediaAction !== null}
               className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}
             >
               <DownloadIcon className={styles.inlineIcon} />
@@ -1068,6 +1270,7 @@ function SourceUploadCard({
   fileName,
   fileMeta,
   isDragActive,
+  isDisabled,
   onDragActiveChange,
   onFileSelected,
   onReset,
@@ -1077,19 +1280,31 @@ function SourceUploadCard({
   fileName: string;
   fileMeta: string;
   isDragActive: boolean;
+  isDisabled: boolean;
   onDragActiveChange: (value: boolean) => void;
   onFileSelected: (file: File | null) => void;
   onReset?: () => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const safeFileName = sanitizeSensitiveText(fileName, 120);
+  const safeFileMeta = sanitizeSensitiveText(fileMeta, 120);
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    if (isDisabled) {
+      event.target.value = "";
+      return;
+    }
+
     onFileSelected(event.target.files?.[0] ?? null);
     event.target.value = "";
   }
 
   function handleDragOver(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
+    if (isDisabled) {
+      return;
+    }
+
     onDragActiveChange(true);
   }
 
@@ -1103,10 +1318,18 @@ function SourceUploadCard({
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
     onDragActiveChange(false);
+    if (isDisabled) {
+      return;
+    }
+
     onFileSelected(event.dataTransfer.files?.[0] ?? null);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLLabelElement>) {
+    if (isDisabled) {
+      return;
+    }
+
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       inputRef.current?.click();
@@ -1129,21 +1352,26 @@ function SourceUploadCard({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onKeyDown={handleKeyDown}
-        tabIndex={0}
+        aria-disabled={isDisabled}
+        tabIndex={isDisabled ? -1 : 0}
       >
         <input
           ref={inputRef}
           className={styles.uploadDropzoneInput}
           type="file"
           accept="image/*"
+          disabled={isDisabled}
           onChange={handleInputChange}
         />
         {imageUrl ? (
-          <div
-            role="img"
-            aria-label={fileName}
+          <TemplateSecureMedia
+            url={imageUrl}
+            kind="image"
+            alt={safeFileName}
+            width={720}
+            height={420}
             className={`${styles.mediaAsset} ${styles.mediaAssetImage}`}
-            style={{ backgroundImage: toCssImageUrl(imageUrl) }}
+            logContext={{ surface: "template_test_source" }}
           />
         ) : (
           <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
@@ -1169,13 +1397,15 @@ function SourceUploadCard({
 
       <div className={styles.sourceUploadFooter}>
         <div className={styles.sourceUploadMeta}>
-          <strong>{imageUrl ? fileName : isRu ? "Фото не выбрано" : "No photo selected"}</strong>
+          <strong>
+            {imageUrl ? safeFileName : isRu ? "Фото не выбрано" : "No photo selected"}
+          </strong>
           <span>
             {imageUrl
-              ? fileMeta
+              ? safeFileMeta
               : isRu
-                ? "Поддерживается image/* и drag-and-drop."
-                : "Supports image/* and drag-and-drop."}
+                ? "Поддерживается image/* до 8 MB и drag-and-drop."
+                : "Supports image/* up to 8 MB and drag-and-drop."}
           </span>
         </div>
         {onReset ? (
@@ -1200,10 +1430,6 @@ function formatReferenceDuration(value: number | undefined, isRu: boolean) {
     .padStart(2, "0");
   const seconds = (rounded % 60).toString().padStart(2, "0");
   return rounded >= 60 ? `${minutes}:${seconds}` : isRu ? `${rounded} сек` : `${rounded} sec`;
-}
-
-function toCssImageUrl(value: string) {
-  return `url(${JSON.stringify(value)})`;
 }
 
 function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolean) {
@@ -1322,19 +1548,25 @@ function buildGeneratedDownloadName(
   generationId: string,
   extension: ".mp4" | ".png"
 ) {
-  const safeTitle = templateTitle
+  const safeTitle = sanitizeSensitiveText(templateTitle, 96)
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9а-яё]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
+  const safeGenerationId = sanitizeSensitiveText(generationId, 64)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
 
-  return `${safeTitle || "template-test"}-${generationId}${extension}`;
+  return `${safeTitle || "template-test"}-${safeGenerationId || "run"}${extension}`;
 }
 
 function formatTemplateStatus(status: AdminTemplate["status"], locale: Locale) {
   if (locale !== "ru") {
-    return status;
+    return formatTemplateTestDisplayText(status, "-", 48);
   }
 
   if (status === "Active") {
@@ -1345,7 +1577,7 @@ function formatTemplateStatus(status: AdminTemplate["status"], locale: Locale) {
     return "Черновик";
   }
 
-  return "Архив";
+  return status === "Archived" ? "Архив" : formatTemplateTestDisplayText(status, "Архив", 48);
 }
 
 function buildTimeline(
@@ -1390,7 +1622,11 @@ function buildTimeline(
           ? "Генерация изображения запущена"
           : "Image generation started",
       at: formatDateTime(run.startedAtUtc, locale),
-      description: `${isRu ? "Модель" : "Model"}: ${run.usedPreprocessingModel ?? "-"}`,
+      description: `${isRu ? "Модель" : "Model"}: ${formatTemplateTestDisplayText(
+        run.usedPreprocessingModel,
+        "-",
+        80
+      )}`,
       done: Boolean(run.preprocessingCompletedAtUtc),
     });
   }
@@ -1420,7 +1656,11 @@ function buildTimeline(
     items.push({
       label: isRu ? "Генерация движения" : "Motion generation",
       at: formatDateTime(run.preprocessingCompletedAtUtc ?? run.startedAtUtc, locale),
-      description: `${isRu ? "Модель" : "Model"}: ${run.usedKlingModel ?? "-"}`,
+      description: `${isRu ? "Модель" : "Model"}: ${formatTemplateTestDisplayText(
+        run.usedKlingModel,
+        "-",
+        80
+      )}`,
       done: Boolean(run.motionGenerationCompletedAtUtc),
     });
   }
@@ -1468,8 +1708,11 @@ function buildTimeline(
     items.push({
       label: isRu ? "Тест завершён с ошибкой" : "Test failed",
       at: formatDateTime(run.completedAtUtc, locale),
-      description:
-        run.failureMessage ?? run.failureCode ?? (isRu ? "Ошибка генерации" : "Generation failed"),
+      description: formatTemplateTestDisplayText(
+        run.failureCode,
+        isRu ? "Ошибка генерации" : "Generation failed",
+        120
+      ),
       done: false,
     });
   }

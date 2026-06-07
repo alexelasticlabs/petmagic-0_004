@@ -1,16 +1,17 @@
 const supportInboxRoot = ["admin", "support", "inbox"] as const;
 
 export const adminQueryKeys = {
-  users: ["admin", "users"] as const,
+  usersRoot: ["admin", "users"] as const,
+  users: (query: unknown) => ["admin", "users", query] as const,
   userDetail: (userId: string) => ["admin", "users", userId, "detail"] as const,
   userDetailDisabled: ["admin", "users", "detail", "disabled"] as const,
   userAnalytics: (userId: string) => ["admin", "users", userId, "analytics"] as const,
   userAnalyticsDisabled: ["admin", "users", "analytics", "disabled"] as const,
   economyLedger: (source: string, statusUserKey: string) =>
     ["admin", "economy", "ledger", source, statusUserKey] as const,
-  economyPurchases: (status: string) => ["admin", "economy", "purchases", status] as const,
-  economySubscriptions: (status: string, provider: string) =>
-    ["admin", "economy", "subscriptions", status, provider] as const,
+  economyPurchases: (query: unknown) => ["admin", "economy", "purchases", query] as const,
+  economySubscriptions: (query: unknown) =>
+    ["admin", "economy", "subscriptions", query] as const,
   economyUserSubscriptionSummary: (userId: string) =>
     ["admin", "economy", "users", userId, "subscription-summary"] as const,
   economyUserSubscriptionSummaryDisabled: [
@@ -29,8 +30,19 @@ export const adminQueryKeys = {
   economyRedeemCodeActivations: (redeemCodeId: string, skip: number, take: number) =>
     ["admin", "economy", "redeem-codes", redeemCodeId, "activations", skip, take] as const,
   supportInboxRoot,
-  supportInbox: (status: string, assignment: string) =>
-    [...supportInboxRoot, status, assignment] as const,
+  supportInbox: (
+    status: string,
+    assignment: string,
+    options?: { search?: string; page?: number; pageSize?: number }
+  ) =>
+    [
+      ...supportInboxRoot,
+      status,
+      assignment,
+      options?.search?.trim() || "",
+      options?.page ?? 1,
+      options?.pageSize ?? 50,
+    ] as const,
   supportConversation: (conversationId: string) =>
     ["admin", "support", conversationId, "detail"] as const,
   supportTemplates: ["admin", "support", "templates"] as const,
@@ -46,4 +58,6 @@ export const adminQueryKeys = {
     ["admin", "templates", templateId, "analytics-secondary", previewTake ?? "default"] as const,
   templateAnalyticsFeedback: (templateId: string, feedbackType: string, search: string) =>
     ["admin", "templates", templateId, "analytics-feedback", feedbackType, search] as const,
+  templateGenerations: (query: unknown) => ["admin", "templates", "generations", query] as const,
+  moderationQueue: (query: unknown) => ["admin", "moderation", query] as const,
 };

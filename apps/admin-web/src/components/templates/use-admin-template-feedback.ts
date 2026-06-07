@@ -24,12 +24,12 @@ export function useAdminTemplateFeedback({
 }: UseAdminTemplateFeedbackOptions) {
   const feedbackQuery = useQuery<AdminTemplateFeedbackItem[]>({
     queryKey: adminQueryKeys.templateAnalyticsFeedback(templateId, filter, search),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       fetchAdminTemplateFeedback(templateId, {
         search: search || undefined,
         take,
         type: filter === "all" ? undefined : filter,
-      }),
+      }, signal),
     enabled,
   });
 

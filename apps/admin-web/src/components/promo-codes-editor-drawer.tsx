@@ -3,7 +3,13 @@
 import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 
 import { AdminCard } from "@/components/admin/admin-primitives";
-import { type PromoForm, type PromoFormMode } from "@/components/promo-codes-view.helpers";
+import {
+  PROMO_NUMERIC_FIELD_MAX_LENGTH,
+  isPromoIntegerInput,
+  normalizePromoIntegerInput,
+  type PromoForm,
+  type PromoFormMode,
+} from "@/components/promo-codes-view.helpers";
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -51,6 +57,17 @@ export function PromoCodesEditorDrawer({
       : panelMode === "duplicate"
         ? text.promoCodesDuplicatePanelTitle
         : text.promoCodesCreatePanelTitle;
+  const isCodeInvalid = form.code.trim().length < 4 || form.code.trim().length > 48;
+  const hasInvalidNumber =
+    !isPromoIntegerInput(form.rewardValue, false) ||
+    !isPromoIntegerInput(form.maxRedemptions, false) ||
+    !isPromoIntegerInput(form.maxRedemptionsPerUser, false) ||
+    !isPromoIntegerInput(form.minimumSuccessfulPurchases, true);
+  const hasInvalidDateWindow =
+    Boolean(form.startsAtUtc) &&
+    Boolean(form.expiresAtUtc) &&
+    new Date(form.startsAtUtc).getTime() > new Date(form.expiresAtUtc).getTime();
+  const isSubmitDisabled = isMutating || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow;
 
   return (
     <div className={styles.drawerBackdrop} onClick={onClose}>
@@ -78,6 +95,10 @@ export function PromoCodesEditorDrawer({
                   <input
                     className={`${styles.input} ${styles.codeInput}`}
                     value={form.code}
+                    required
+                    minLength={4}
+                    maxLength={48}
+                    aria-invalid={isCodeInvalid}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -103,8 +124,9 @@ export function PromoCodesEditorDrawer({
                 <span className={styles.fieldLabel}>{text.promoCodesDescriptionLabel}</span>
                 <input
                   className={styles.input}
-                  placeholder="Например: Новогодняя акция 2025"
+                  placeholder={text.promoCodesDescriptionPlaceholder}
                   value={form.description}
+                  maxLength={160}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, description: event.target.value }))
                   }
@@ -155,10 +177,19 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesRewardValueLabel}</span>
                   <input
                     className={styles.input}
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    min={1}
+                    required
+                    maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
+                    aria-invalid={!isPromoIntegerInput(form.rewardValue, false)}
                     value={form.rewardValue}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, rewardValue: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        rewardValue: normalizePromoIntegerInput(event.target.value),
+                      }))
                     }
                   />
                   <div className={styles.quickChips}>
@@ -189,10 +220,19 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesLimitLabel}</span>
                   <input
                     className={styles.input}
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    min={1}
+                    required
+                    maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
+                    aria-invalid={!isPromoIntegerInput(form.maxRedemptions, false)}
                     value={form.maxRedemptions}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, maxRedemptions: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        maxRedemptions: normalizePromoIntegerInput(event.target.value),
+                      }))
                     }
                   />
                   <div className={styles.quickChips}>
@@ -214,12 +254,18 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesPerUserLimitLabel}</span>
                   <input
                     className={styles.input}
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    min={1}
+                    required
+                    maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
+                    aria-invalid={!isPromoIntegerInput(form.maxRedemptionsPerUser, false)}
                     value={form.maxRedemptionsPerUser}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        maxRedemptionsPerUser: event.target.value,
+                        maxRedemptionsPerUser: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
                   />
@@ -254,6 +300,7 @@ export function PromoCodesEditorDrawer({
                       className={styles.input}
                       type="datetime-local"
                       value={form.startsAtUtc}
+                      aria-invalid={hasInvalidDateWindow}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, startsAtUtc: event.target.value }))
                       }
@@ -287,6 +334,7 @@ export function PromoCodesEditorDrawer({
                       className={styles.input}
                       type="datetime-local"
                       value={form.expiresAtUtc}
+                      aria-invalid={hasInvalidDateWindow}
                       onChange={(event) =>
                         setForm((current) => ({ ...current, expiresAtUtc: event.target.value }))
                       }
@@ -328,12 +376,18 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesMinimumPurchasesLabel}</span>
                   <input
                     className={styles.input}
+                    type="text"
                     inputMode="numeric"
+                    pattern="[0-9]*"
+                    min={0}
+                    required
+                    maxLength={PROMO_NUMERIC_FIELD_MAX_LENGTH}
+                    aria-invalid={!isPromoIntegerInput(form.minimumSuccessfulPurchases, true)}
                     value={form.minimumSuccessfulPurchases}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        minimumSuccessfulPurchases: event.target.value,
+                        minimumSuccessfulPurchases: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
                   />
@@ -343,8 +397,9 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesCampaignNameLabel}</span>
                   <input
                     className={styles.input}
-                    placeholder="Например: summer2025"
+                    placeholder={text.promoCodesCampaignNamePlaceholder}
                     value={form.campaignName}
+                    maxLength={80}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, campaignName: event.target.value }))
                     }
@@ -354,8 +409,9 @@ export function PromoCodesEditorDrawer({
                   <span className={styles.fieldLabel}>{text.promoCodesCampaignChannelLabel}</span>
                   <input
                     className={styles.input}
-                    placeholder="Например: telegram, email"
+                    placeholder={text.promoCodesCampaignChannelPlaceholder}
                     value={form.campaignChannel}
+                    maxLength={80}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
@@ -367,7 +423,7 @@ export function PromoCodesEditorDrawer({
               </div>
             </section>
 
-            <div className={styles.formSummary} aria-label="Сводка параметров промокода">
+            <div className={styles.formSummary} aria-label={text.promoCodesFormSummaryLabel}>
               <span className={styles.formSummaryItem}>
                 🎁 <strong>{form.rewardValue || "—"}</strong>
                 {" PawSpark"}
@@ -376,10 +432,11 @@ export function PromoCodesEditorDrawer({
                 ·
               </span>
               <span className={styles.formSummaryItem}>
-                🔢 лимит <strong>{form.maxRedemptions || "—"}</strong>
+                🔢 {text.promoCodesSummaryLimitLabel}{" "}
+                <strong>{form.maxRedemptions || "—"}</strong>
                 {" ("}
                 <strong>{form.maxRedemptionsPerUser || "—"}</strong>
-                {" / чел)"}
+                {` ${text.promoCodesSummaryPerUserSuffix})`}
               </span>
               <span className={styles.formSummarySep} aria-hidden="true">
                 ·
@@ -414,7 +471,7 @@ export function PromoCodesEditorDrawer({
                 <Button type="button" variant="secondary" onClick={onReset} disabled={isMutating}>
                   {text.resetForm}
                 </Button>
-                <Button variant="primary" type="submit" disabled={isMutating}>
+                <Button variant="primary" type="submit" disabled={isSubmitDisabled}>
                   {panelMode === "edit"
                     ? text.promoCodesSaveUpdateAction
                     : text.promoCodesSaveCreateAction}

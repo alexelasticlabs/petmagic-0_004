@@ -5,6 +5,7 @@ import type {
   TemplateStatus,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type PeriodKey = "7d" | "30d" | "90d" | "all";
 export type TrendMetricKey =
@@ -245,7 +246,7 @@ export function formatFailureCode(value: string, unknownFailureLabel: string) {
     return unknownFailureLabel;
   }
 
-  return value;
+  return sanitizeSensitiveText(value, 120);
 }
 
 export function formatAnalyticsValue(value: string | null | undefined) {
@@ -253,7 +254,10 @@ export function formatAnalyticsValue(value: string | null | undefined) {
     return "-";
   }
 
-  return value.toUpperCase() === value && value.length <= 3 ? value : value.replace(/[_-]+/g, " ");
+  const safeValue = sanitizeSensitiveText(value, 120);
+  return safeValue.toUpperCase() === safeValue && safeValue.length <= 3
+    ? safeValue
+    : safeValue.replace(/[_-]+/g, " ");
 }
 
 export function formatPercent(value: number, isRu: boolean) {
@@ -366,8 +370,7 @@ export function formatModelSummary(
   klingModel: string | null | undefined
 ) {
   const values = [preprocessingModel, klingModel].filter(Boolean).map((value) => {
-    const parts = value!.split("/");
-    return parts.length >= 2 ? parts.slice(-2).join("/") : value!;
+    return formatModelValue(value);
   });
 
   return values.length ? values.join(" + ") : "-";
@@ -378,8 +381,13 @@ export function formatModelValue(value: string | null | undefined) {
     return "-";
   }
 
-  const parts = value.split("/");
-  return parts.length >= 2 ? parts.slice(-2).join("/") : value;
+  const safeValue = sanitizeSensitiveText(value, 120);
+  if (safeValue.includes("://")) {
+    return safeValue;
+  }
+
+  const parts = safeValue.split("/");
+  return parts.length >= 2 ? parts.slice(-2).join("/") : safeValue;
 }
 
 export function shortenId(value: string) {

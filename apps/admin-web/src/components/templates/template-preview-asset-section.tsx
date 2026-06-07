@@ -1,11 +1,12 @@
-import Image from "next/image";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/templates/template-editor.module.css";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import type { Dictionary } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplatePreviewAssetSectionProps = {
   text: Dictionary;
@@ -38,7 +39,10 @@ export function TemplatePreviewAssetSection({
   const previewKind = previewFile
     ? inferTemplateMediaKind(previewFile.type, previewFile.name)
     : inferTemplateMediaKind(form.previewContentType, persistedPreviewUrl);
-  const previewFileLabel = previewFile?.name || form.previewFileName || text.noFileSelected;
+  const previewFileLabel = sanitizeSensitiveText(
+    previewFile?.name || form.previewFileName || text.noFileSelected,
+    120
+  );
   const previewStateLabel = hasPreview ? text.editorReady : text.editorMissing;
 
   useEffect(() => {
@@ -128,20 +132,29 @@ export function TemplatePreviewAssetSection({
         </div>
         {hasPreview ? (
           previewKind === "video" ? (
-            <video
-              src={effectivePreviewUrl}
+            <TemplateSecureMedia
+              url={effectivePreviewUrl}
+              kind="video"
               className={styles.assetPreviewMedia}
               controls
               playsInline
+              logContext={{
+                contentType: previewFile?.type || form.previewContentType,
+                surface: "template_editor_preview",
+              }}
             />
           ) : (
-            <Image
-              src={effectivePreviewUrl}
+            <TemplateSecureMedia
+              url={effectivePreviewUrl}
+              kind="image"
               alt={previewFileLabel || text.previewAssetTitle}
               width={480}
               height={600}
-              unoptimized
               className={styles.assetPreviewMedia}
+              logContext={{
+                contentType: previewFile?.type || form.previewContentType,
+                surface: "template_editor_preview",
+              }}
             />
           )
         ) : (
@@ -158,10 +171,9 @@ export function TemplatePreviewAssetSection({
             <span>{text.previewUrlLabel}</span>
           </span>
           <input
-            value={form.previewUrl}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, previewUrl: event.target.value }))
-            }
+            value={hasPreview ? `${previewStateLabel}: ${previewFileLabel}` : ""}
+            placeholder={text.noFileSelected}
+            readOnly
           />
         </label>
         <div className={styles.uploadPanel}>

@@ -1,11 +1,13 @@
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/templates/template-editor.module.css";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
 import { formatPrice, getImageModelPrice, getMotionModelPrice } from "@/lib/model-pricing";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
 const promptMaxLength = 2000;
@@ -53,7 +55,10 @@ export function TemplateReferenceAssetSection({
   const persistedReferenceUrl = form.referenceUrl.trim();
   const effectiveReferenceUrl = localReferenceUrl ?? persistedReferenceUrl;
   const hasReference = Boolean(effectiveReferenceUrl);
-  const referenceFileLabel = referenceFile?.name || form.referenceFileName || text.noFileSelected;
+  const referenceFileLabel = sanitizeSensitiveText(
+    referenceFile?.name || form.referenceFileName || text.noFileSelected,
+    120
+  );
   const referenceStateLabel = hasReference ? text.editorReady : text.editorMissing;
 
   useEffect(() => {
@@ -136,11 +141,16 @@ export function TemplateReferenceAssetSection({
           </span>
         </div>
         {hasReference ? (
-          <video
-            src={effectiveReferenceUrl}
+          <TemplateSecureMedia
+            url={effectiveReferenceUrl}
+            kind="video"
             className={styles.assetPreviewMedia}
             controls
             playsInline
+            logContext={{
+              contentType: referenceFile?.type || form.referenceContentType,
+              surface: "template_editor_reference_motion",
+            }}
           />
         ) : (
           <div className={styles.assetPreviewPlaceholder}>
@@ -156,10 +166,9 @@ export function TemplateReferenceAssetSection({
             <span>{text.referenceUrlLabel}</span>
           </span>
           <input
-            value={form.referenceUrl}
-            onChange={(event) =>
-              setForm((current) => ({ ...current, referenceUrl: event.target.value }))
-            }
+            value={hasReference ? `${referenceStateLabel}: ${referenceFileLabel}` : ""}
+            placeholder={text.noFileSelected}
+            readOnly
           />
         </label>
         <div className={styles.uploadPanel}>

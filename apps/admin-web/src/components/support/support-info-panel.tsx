@@ -1,20 +1,23 @@
 "use client";
 
-import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   formatAccountAge,
   formatDateTime,
   formatFileSize,
   formatRelativeTime,
+  formatSafeSupportDisplay,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
 import styles from "@/components/support/support-page.module.css";
+import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { type SupportConversationStatus } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { type Locale } from "@/lib/i18n";
 
 type SupportInfoPanelProps = {
@@ -22,12 +25,16 @@ type SupportInfoPanelProps = {
   controller: ReturnType<typeof useSupportConversationController>;
 };
 
+type SupportInfoAttachment = ReturnType<typeof getMessageAttachments>[number];
+
 export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) {
   const [pendingStatusConfirm, setPendingStatusConfirm] =
     useState<SupportConversationStatus | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [isTagEditorOpen, setIsTagEditorOpen] = useState(false);
+  const [pendingAttachmentOpenKey, setPendingAttachmentOpenKey] = useState<string | null>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const attachmentOpenAbortControllerRef = useRef<AbortController | null>(null);
 
   const {
     activeSidePanelTab,
@@ -38,6 +45,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     conversation,
     conversationTimeline,
     destructiveStatusAction,
+    canManageSupportWorkspace,
+    canViewSubjectUserContext,
     lastActivityAtUtc,
     operatorPriority,
     operatorTags,
@@ -55,7 +64,14 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     userQuery,
   } = controller;
 
-  const isUserPremium = userQuery.data?.isPremium ?? false;
+  const isUserPremium = canViewSubjectUserContext ? (userQuery.data?.isPremium ?? false) : false;
+
+  useEffect(
+    () => () => {
+      attachmentOpenAbortControllerRef.current?.abort();
+    },
+    []
+  );
 
   const recentAttachments = useMemo(() => {
     const entries = (conversation?.messages ?? [])
@@ -72,7 +88,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
 
     const seen = new Set<string>();
     return entries.filter((entry) => {
-      const key = `${entry.attachment.fileUrl}|${entry.attachment.fileName}|${entry.createdAtUtc}`;
+      const key = `${entry.messageId}|${entry.attachment.fileName}|${entry.attachment.sizeBytes}|${entry.createdAtUtc}`;
       if (seen.has(key)) {
         return false;
       }
@@ -93,6 +109,10 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   );
 
   const handleAddTag = () => {
+    if (!canManageSupportWorkspace) {
+      return;
+    }
+
     const nextTag = tagInput.trim();
     if (!nextTag) {
       return;
@@ -102,6 +122,82 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     if (added) {
       setTagInput("");
       setIsTagEditorOpen(false);
+    }
+  };
+
+  const getAttachmentOpenKey = (
+    messageId: string,
+    createdAtUtc: string,
+    attachment: SupportInfoAttachment,
+    index: number
+  ) => `${messageId}:${createdAtUtc}:${attachment.fileName}:${attachment.sizeBytes}:${index}`;
+
+  const openAttachmentBlob = async (
+    messageId: string,
+    createdAtUtc: string,
+    attachment: SupportInfoAttachment,
+    index: number
+  ) => {
+    const openKey = getAttachmentOpenKey(messageId, createdAtUtc, attachment, index);
+    if (pendingAttachmentOpenKey !== null) {
+      return;
+    }
+
+    setPendingAttachmentOpenKey(openKey);
+    attachmentOpenAbortControllerRef.current?.abort();
+    const controller = new AbortController();
+    attachmentOpenAbortControllerRef.current = controller;
+    try {
+      const response = await fetchWithTimeout(attachment.fileUrl, {
+        credentials: "include",
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        clientLogger.warn("support.attachment_open_failed", {
+          messageId,
+          status: response.status,
+          mimeType: attachment.mimeType,
+        });
+        return;
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
+      if (!opened) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+    } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
+      clientLogger.warn("support.attachment_open_failed", {
+        messageId,
+        mimeType: attachment.mimeType,
+        error,
+      });
+    } finally {
+      if (attachmentOpenAbortControllerRef.current === controller) {
+        attachmentOpenAbortControllerRef.current = null;
+        setPendingAttachmentOpenKey(null);
+      }
+    }
+  };
+
+  const confirmPendingStatusChange = async () => {
+    if (!canManageSupportWorkspace || !pendingStatusConfirm || statusMutation.isPending) {
+      return;
+    }
+
+    try {
+      await statusMutation.mutateAsync(pendingStatusConfirm);
+      setPendingStatusConfirm(null);
+    } catch {
+      // The controller mutation already routes sanitized errors to support notifications.
     }
   };
 
@@ -150,6 +246,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   <Select
                     value={operatorPriority}
                     onChange={(value) => setOperatorPriority(value as typeof operatorPriority)}
+                    disabled={!canManageSupportWorkspace}
                     showSelectedDescription={false}
                     options={[
                       { value: "Low", label: text.supportPriorityLow },
@@ -196,26 +293,48 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   {attachmentPreviewEntries.map((entry, index) => {
                     const { attachment } = entry;
                     const isImage = attachment.mimeType.toLowerCase().startsWith("image/");
-                    const safeName =
-                      attachment.fileName?.trim() || (locale === "ru" ? "Файл" : "File");
+                    const safeName = formatSafeSupportDisplay(
+                      attachment.fileName,
+                      locale === "ru" ? "Файл" : "File",
+                      120
+                    );
 
                     return (
-                      <a
+                      <button
                         key={`${entry.messageId}-${index}`}
-                        href={attachment.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                        type="button"
+                        onClick={() =>
+                          void openAttachmentBlob(
+                            entry.messageId,
+                            entry.createdAtUtc,
+                            attachment,
+                            index
+                          )
+                        }
+                        disabled={
+                          pendingAttachmentOpenKey ===
+                          getAttachmentOpenKey(
+                            entry.messageId,
+                            entry.createdAtUtc,
+                            attachment,
+                            index
+                          )
+                        }
                         className={styles.infoPanelAttachmentPreviewTile}
                         title={safeName}
                       >
                         {isImage ? (
-                          <Image
-                            src={attachment.fileUrl}
+                          <SupportSecureMedia
+                            url={attachment.fileUrl}
+                            kind="image"
                             alt={safeName}
                             width={64}
                             height={64}
                             className={styles.infoPanelAttachmentPreviewImage}
-                            unoptimized
+                            logContext={{
+                              messageId: entry.messageId,
+                              mimeType: attachment.mimeType,
+                            }}
                           />
                         ) : (
                           <span className={styles.infoPanelAttachmentPreviewIcon}>FILE</span>
@@ -223,7 +342,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                         <span className={styles.infoPanelAttachmentPreviewSize}>
                           {formatFileSize(attachment.sizeBytes, locale)}
                         </span>
-                      </a>
+                      </button>
                     );
                   })}
                   {remainingAttachmentCount > 0 ? (
@@ -244,9 +363,13 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   type="button"
                   className={styles.infoPanelTagAddChip}
                   onClick={() => {
+                    if (!canManageSupportWorkspace) {
+                      return;
+                    }
                     setIsTagEditorOpen((current) => !current);
                     window.setTimeout(() => tagInputRef.current?.focus(), 0);
                   }}
+                  disabled={!canManageSupportWorkspace}
                   aria-label={locale === "ru" ? "Добавить тег" : "Add tag"}
                   title={locale === "ru" ? "Добавить тег" : "Add tag"}
                 >
@@ -261,9 +384,11 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       type="button"
                       className={styles.infoPanelTagChip}
                       onClick={() => removeOperatorTag(tag)}
+                      disabled={!canManageSupportWorkspace}
                       title={locale === "ru" ? "Удалить тег" : "Remove tag"}
                     >
-                      {tag} <span aria-hidden="true">×</span>
+                      {formatSafeSupportDisplay(tag, locale === "ru" ? "Тег" : "Tag", 40)}{" "}
+                      <span aria-hidden="true">×</span>
                     </button>
                   ))}
                 </div>
@@ -274,16 +399,24 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     ref={tagInputRef}
                     className={styles.infoPanelTagInput}
                     value={tagInput}
-                    onChange={(event) => setTagInput(event.target.value)}
+                    onChange={(event) => setTagInput(event.target.value.slice(0, 40))}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === ",") {
                         event.preventDefault();
                         handleAddTag();
                       }
                     }}
+                    maxLength={40}
                     placeholder={text.tagsLabel}
+                    disabled={!canManageSupportWorkspace}
                   />
-                  <Button type="button" size="sm" variant="secondary" onClick={handleAddTag}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleAddTag}
+                    disabled={!canManageSupportWorkspace || !tagInput.trim()}
+                  >
                     {locale === "ru" ? "Добавить" : "Add"}
                   </Button>
                 </div>
@@ -301,29 +434,33 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   {locale === "ru" ? "Пользователь" : "User"}
                 </span>
               </div>
-              <div className={styles.infoPanelStatsGrid}>
-                <div className={styles.infoPanelStatTile}>
-                  <span>{text.supportPlanLabel}</span>
-                  <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
+              {canViewSubjectUserContext ? (
+                <div className={styles.infoPanelStatsGrid}>
+                  <div className={styles.infoPanelStatTile}>
+                    <span>{text.supportPlanLabel}</span>
+                    <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
+                  </div>
+                  <div className={styles.infoPanelStatTile}>
+                    <span>{locale === "ru" ? "PawSpark" : "PawSpark"}</span>
+                    <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
+                  </div>
+                  <div className={styles.infoPanelStatTile}>
+                    <span>{text.supportAccountAgeLabel}</span>
+                    <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
+                  </div>
                 </div>
-                <div className={styles.infoPanelStatTile}>
-                  <span>{locale === "ru" ? "PawSpark" : "PawSpark"}</span>
-                  <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
-                </div>
-                <div className={styles.infoPanelStatTile}>
-                  <span>{text.supportAccountAgeLabel}</span>
-                  <strong>{formatAccountAge(accountCreatedAt, locale)}</strong>
-                </div>
-              </div>
+              ) : null}
               <div className={styles.infoPanelStatsSecondaryGrid}>
-                <button
-                  type="button"
-                  className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
-                  onClick={() => setActiveSidePanelTab("activity")}
-                >
-                  <span>{locale === "ru" ? "Покупки" : "Purchases"}</span>
-                  <strong>{String(totalPurchases)}</strong>
-                </button>
+                {canViewSubjectUserContext ? (
+                  <button
+                    type="button"
+                    className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
+                    onClick={() => setActiveSidePanelTab("activity")}
+                  >
+                    <span>{locale === "ru" ? "Покупки" : "Purchases"}</span>
+                    <strong>{String(totalPurchases)}</strong>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
@@ -358,14 +495,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       <Button
                         variant="primary"
                         size="sm"
-                        onClick={() => {
-                          const nextStatus = pendingStatusConfirm;
-                          setPendingStatusConfirm(null);
-                          if (nextStatus) {
-                            statusMutation.mutate(nextStatus);
-                          }
-                        }}
-                        disabled={statusMutation.isPending}
+                        onClick={() => void confirmPendingStatusChange()}
+                        disabled={!canManageSupportWorkspace || statusMutation.isPending}
                       >
                         {locale === "ru" ? "Закрыть" : "Close"}
                       </Button>
@@ -390,7 +521,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       }
                     }}
                     disabled={
-                      statusMutation.isPending || conversation.status === primaryStatusAction.status
+                      !canManageSupportWorkspace ||
+                      statusMutation.isPending ||
+                      conversation.status === primaryStatusAction.status
                     }
                   >
                     {primaryStatusAction.label}
@@ -409,7 +542,11 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                         statusMutation.mutate(action.status);
                       }
                     }}
-                    disabled={statusMutation.isPending || conversation.status === action.status}
+                    disabled={
+                      !canManageSupportWorkspace ||
+                      statusMutation.isPending ||
+                      conversation.status === action.status
+                    }
                   >
                     {action.label}
                   </button>
@@ -418,8 +555,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                 {destructiveStatusAction ? (
                   <Button
                     variant="danger"
-                    onClick={() => statusMutation.mutate(destructiveStatusAction.status)}
+                    onClick={() => setPendingStatusConfirm(destructiveStatusAction.status)}
                     disabled={
+                      !canManageSupportWorkspace ||
                       statusMutation.isPending ||
                       conversation.status === destructiveStatusAction.status
                     }
@@ -447,8 +585,11 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
               <div className={styles.attachmentList}>
                 {recentAttachments.map((entry, index) => {
                   const { attachment } = entry;
-                  const safeName =
-                    attachment.fileName?.trim() || (locale === "ru" ? "Файл" : "File");
+                  const safeName = formatSafeSupportDisplay(
+                    attachment.fileName,
+                    locale === "ru" ? "Файл" : "File",
+                    120
+                  );
                   const isImage = attachment.mimeType.toLowerCase().startsWith("image/");
                   const attachmentKindLabel = getAttachmentKindLabel(
                     attachment.mimeType,
@@ -459,21 +600,40 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   return (
                     <div key={`${entry.messageId}-${index}`} className={styles.attachmentListItem}>
                       {isImage ? (
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void openAttachmentBlob(
+                              entry.messageId,
+                              entry.createdAtUtc,
+                              attachment,
+                              index
+                            )
+                          }
+                          disabled={
+                            pendingAttachmentOpenKey ===
+                            getAttachmentOpenKey(
+                              entry.messageId,
+                              entry.createdAtUtc,
+                              attachment,
+                              index
+                            )
+                          }
                           className={styles.attachmentListThumbButton}
                         >
-                          <Image
-                            src={attachment.fileUrl}
+                          <SupportSecureMedia
+                            url={attachment.fileUrl}
+                            kind="image"
                             alt={safeName}
                             width={76}
                             height={76}
                             className={styles.attachmentListThumb}
-                            unoptimized
+                            logContext={{
+                              messageId: entry.messageId,
+                              mimeType: attachment.mimeType,
+                            }}
                           />
-                        </a>
+                        </button>
                       ) : (
                         <span className={styles.attachmentPreviewFileIcon}>FILE</span>
                       )}
@@ -494,14 +654,29 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                         </span>
                       </div>
                       <div className={styles.attachmentListActions}>
-                        <a
-                          href={attachment.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void openAttachmentBlob(
+                              entry.messageId,
+                              entry.createdAtUtc,
+                              attachment,
+                              index
+                            )
+                          }
+                          disabled={
+                            pendingAttachmentOpenKey ===
+                            getAttachmentOpenKey(
+                              entry.messageId,
+                              entry.createdAtUtc,
+                              attachment,
+                              index
+                            )
+                          }
                           className="ui-button ui-button--secondary ui-button--sm"
                         >
                           {locale === "ru" ? "Открыть" : "Open"}
-                        </a>
+                        </button>
                       </div>
                     </div>
                   );
@@ -519,7 +694,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
               </span>
             </div>
             <div className={styles.sidePanelContent}>
-              {recentUserPurchases.length > 0 ? (
+              {canViewSubjectUserContext && recentUserPurchases.length > 0 ? (
                 <div className={styles.sectionBlock}>
                   <div className={styles.sectionHeaderCompact}>
                     <strong>{locale === "ru" ? "Покупки" : "Purchases"}</strong>
@@ -528,7 +703,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     {recentUserPurchases.slice(0, 4).map((purchase) => (
                       <article key={purchase.orderId} className={styles.timelineCard}>
                         <div className={styles.timelineCardHeader}>
-                          <strong>{purchase.paymentProvider}</strong>
+                          <strong>
+                            {formatSafeSupportDisplay(purchase.paymentProvider, "—", 48)}
+                          </strong>
                           <span>
                             {formatRelativeTime(
                               purchase.confirmedAtUtc ?? purchase.createdAtUtc,
@@ -537,7 +714,11 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                           </span>
                         </div>
                         <p className={styles.timelineCardBody}>
-                          {`${purchase.priceAmount} ${purchase.currencyCode} · ${purchase.status}`}
+                          {`${purchase.priceAmount} ${formatSafeSupportDisplay(
+                            purchase.currencyCode,
+                            "—",
+                            12
+                          )} · ${formatSafeSupportDisplay(purchase.status, "—", 48)}`}
                         </p>
                       </article>
                     ))}
@@ -554,7 +735,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     {recentFailures.map((item) => (
                       <article key={item.failureCode} className={styles.timelineCard}>
                         <div className={styles.timelineCardHeader}>
-                          <strong>{item.failureCode}</strong>
+                          <strong>{formatSafeSupportDisplay(item.failureCode, "—", 120)}</strong>
                           <span>{formatRelativeTime(item.lastOccurredAtUtc, locale)}</span>
                         </div>
                         <p className={styles.timelineCardBody}>

@@ -13,10 +13,12 @@ import {
   subscriptionStatusOptions,
   type EconomyPageText,
 } from "@/components/economy-page.content";
+import { canCancelSubscription } from "@/components/economy-page.helpers";
 import styles from "@/components/economy-page.module.css";
 import { type AdminEconomySubscription, type AdminSubscriptionEvent } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type EconomyPageSubscriptionsSectionProps = {
   locale: Locale;
@@ -25,12 +27,19 @@ type EconomyPageSubscriptionsSectionProps = {
   subscriptionStatus: string;
   eventProvider: string;
   eventStatus: string;
+  subscriptionSearch: string;
+  subscriptionPage: number;
+  subscriptionsHasMore: boolean;
   subscriptionItems: AdminEconomySubscription[];
+  subscriptionsIsFetching: boolean;
   subscriptionEvents: AdminSubscriptionEvent[];
   setSubscriptionProvider: (value: string) => void;
   setSubscriptionStatus: (value: string) => void;
+  setSubscriptionSearch: (value: string) => void;
+  setSubscriptionPage: (value: number | ((current: number) => number)) => void;
   setEventProvider: (value: string) => void;
   setEventStatus: (value: string) => void;
+  onCancelSubscription: (subscription: AdminEconomySubscription) => void;
   shortGuid: (value: string) => string;
   humanizeProvider: (value: string, locale: Locale) => string;
   humanizeStatus: (value: string, locale: Locale) => string;
@@ -60,12 +69,19 @@ export function EconomyPageSubscriptionsSection({
   subscriptionStatus,
   eventProvider,
   eventStatus,
+  subscriptionSearch,
+  subscriptionPage,
+  subscriptionsHasMore,
   subscriptionItems,
+  subscriptionsIsFetching,
   subscriptionEvents,
   setSubscriptionProvider,
   setSubscriptionStatus,
+  setSubscriptionSearch,
+  setSubscriptionPage,
   setEventProvider,
   setEventStatus,
+  onCancelSubscription,
   shortGuid,
   humanizeProvider,
   humanizeStatus,
@@ -92,6 +108,16 @@ export function EconomyPageSubscriptionsSection({
               options={subscriptionStatusOptions[locale]}
               className={styles.compactSelect}
             />
+            <label className={styles.filterField}>
+              <span>{text.searchFilterLabel}</span>
+              <input
+                className={styles.input}
+                value={subscriptionSearch}
+                onChange={(event) => setSubscriptionSearch(event.target.value)}
+                maxLength={100}
+                placeholder={text.subscriptionSearchPlaceholder}
+              />
+            </label>
           </div>
         }
       >
@@ -105,6 +131,7 @@ export function EconomyPageSubscriptionsSection({
                   <th>{text.providerColumn}</th>
                   <th>{text.statusColumn}</th>
                   <th>{text.renewalColumn}</th>
+                  <th>{text.actionsColumn}</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,14 +140,14 @@ export function EconomyPageSubscriptionsSection({
                     <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
                     <td>
                       <div className={styles.packMeta}>
-                        <strong>{item.planName || item.planId}</strong>
+                        <strong>{safeText(item.planName || item.planId)}</strong>
                         <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
                       </div>
                     </td>
                     <td>
                       <div className={styles.packMeta}>
                         <strong>{humanizeProvider(item.provider, locale)}</strong>
-                        <span>{`${item.purchaseChannel} • ${item.region}`}</span>
+                        <span>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</span>
                       </div>
                     </td>
                     <td>
@@ -136,10 +163,38 @@ export function EconomyPageSubscriptionsSection({
                       </div>
                     </td>
                     <td>{formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        disabled={!canCancelSubscription(item)}
+                        onClick={() => onCancelSubscription(item)}
+                      >
+                        {text.cancelSubscriptionAction}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className={styles.pager}>
+            <button
+              type="button"
+              className={styles.pagerButton}
+              disabled={subscriptionPage === 0 || subscriptionsIsFetching}
+              onClick={() => setSubscriptionPage((current) => Math.max(0, current - 1))}
+            >
+              {text.previousPage}
+            </button>
+            <button
+              type="button"
+              className={styles.pagerButton}
+              disabled={!subscriptionsHasMore || subscriptionsIsFetching}
+              onClick={() => setSubscriptionPage((current) => current + 1)}
+            >
+              {text.nextPage}
+            </button>
           </div>
         </TableOrEmpty>
       </AdminCard>
@@ -188,11 +243,12 @@ export function EconomyPageSubscriptionsSection({
                     <td>{humanizeProvider(item.provider, locale)}</td>
                     <td>
                       <div className={styles.packMeta}>
-                        <strong>{item.eventType}</strong>
+                        <strong>{safeText(item.eventType, 80)}</strong>
                         <span>
-                          {item.externalSubscriptionId ||
-                            item.externalEventId ||
-                            text.noDescription}
+                          {formatExternalEventId(
+                            item.externalSubscriptionId || item.externalEventId,
+                            text.noDescription
+                          )}
                         </span>
                       </div>
                     </td>
@@ -215,4 +271,19 @@ export function EconomyPageSubscriptionsSection({
       </AdminCard>
     </>
   );
+}
+
+function safeText(value: string | null | undefined, maxLength = 120) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
+}
+
+function formatExternalEventId(value: string | null | undefined, fallback: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  const sanitized = sanitizeSensitiveText(trimmed, 96);
+  return sanitized.length > 16 ? `${sanitized.slice(0, 8)}...${sanitized.slice(-4)}` : sanitized;
 }

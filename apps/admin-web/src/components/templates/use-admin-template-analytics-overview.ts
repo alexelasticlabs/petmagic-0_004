@@ -40,10 +40,10 @@ export function useAdminTemplateAnalyticsOverview({
 }: UseAdminTemplateAnalyticsOverviewOptions) {
   const primaryQuery = useQuery<Pick<AdminTemplateAnalyticsOverview, "statistics" | "template">>({
     queryKey: adminQueryKeys.templateAnalyticsPrimary(templateId),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [template, statistics] = await Promise.all([
-        fetchAdminTemplate(templateId),
-        fetchAdminTemplateStatistics(templateId),
+        fetchAdminTemplate(templateId, signal),
+        fetchAdminTemplateStatistics(templateId, signal),
       ]);
 
       return {
@@ -61,12 +61,12 @@ export function useAdminTemplateAnalyticsOverview({
     >
   >({
     queryKey: adminQueryKeys.templateAnalyticsSecondary(templateId, previewTake),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all([
-        fetchAdminTemplateTrends(templateId),
-        fetchAdminTemplateRecentGenerations(templateId, previewTake),
-        fetchAdminTemplateFailureBreakdown(templateId),
-        fetchAdminTemplateEventAnalytics(templateId),
+        fetchAdminTemplateTrends(templateId, signal),
+        fetchAdminTemplateRecentGenerations(templateId, previewTake, signal),
+        fetchAdminTemplateFailureBreakdown(templateId, signal),
+        fetchAdminTemplateEventAnalytics(templateId, signal),
       ]);
 
       return {
@@ -84,6 +84,7 @@ export function useAdminTemplateAnalyticsOverview({
     failureBreakdown: secondaryQuery.data?.failureBreakdown ?? [],
     hasError: primaryQuery.isError,
     hasSecondaryError: secondaryQuery.isError,
+    isFetching: primaryQuery.isFetching || secondaryQuery.isFetching,
     isLoading: primaryQuery.isLoading,
     isSecondaryLoading: primaryQuery.isSuccess && secondaryQuery.isLoading,
     recentRunsPreview: secondaryQuery.data?.recentRunsPreview ?? [],

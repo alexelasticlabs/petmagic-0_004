@@ -17,10 +17,24 @@ import type {
   SupportInboxAssignmentScope,
 } from "./api-client.types";
 
+function normalizePositiveInteger(value: number | undefined, maxValue: number): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.min(Math.floor(value), maxValue)
+    : undefined;
+}
+
 export async function fetchSupportInbox(
   status?: SupportConversationStatus,
-  assignment: SupportInboxAssignmentScope = "all"
+  assignment: SupportInboxAssignmentScope = "all",
+  options?: {
+    search?: string;
+    page?: number;
+    pageSize?: number;
+    signal?: AbortSignal;
+  }
 ): Promise<AdminSupportConversationSummary[]> {
+  const normalizedPage = normalizePositiveInteger(options?.page, 10_000);
+  const normalizedPageSize = normalizePositiveInteger(options?.pageSize, 100);
   const searchParams = new URLSearchParams();
   if (status) {
     searchParams.set("status", status);
@@ -28,11 +42,22 @@ export async function fetchSupportInbox(
   if (assignment !== "all") {
     searchParams.set("assignment", assignment);
   }
+  const search = options?.search?.trim();
+  if (search) {
+    searchParams.set("search", search);
+  }
+  if (normalizedPage) {
+    searchParams.set("page", String(normalizedPage));
+  }
+  if (normalizedPageSize) {
+    searchParams.set("pageSize", String(normalizedPageSize));
+  }
 
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
 
   return apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/tickets${query}`, {
     method: "GET",
+    signal: options?.signal,
   });
 }
 
@@ -41,11 +66,13 @@ export async function fetchSupportConversation(
   options?: {
     take?: number;
     beforeMessageCreatedAtUtc?: string | null;
+    signal?: AbortSignal;
   }
 ): Promise<AdminSupportConversation> {
+  const normalizedTake = normalizePositiveInteger(options?.take, 100);
   const searchParams = new URLSearchParams();
-  if (options?.take && options.take > 0) {
-    searchParams.set("take", String(options.take));
+  if (normalizedTake) {
+    searchParams.set("take", String(normalizedTake));
   }
 
   if (options?.beforeMessageCreatedAtUtc) {
@@ -58,6 +85,7 @@ export async function fetchSupportConversation(
     `/api/admin/support/tickets/${conversationId}${query}`,
     {
       method: "GET",
+      signal: options?.signal,
     }
   );
 }
@@ -174,9 +202,18 @@ export async function updateSupportConversationMetadata(
   return conversation;
 }
 
-export async function fetchSupportReplyTemplates(): Promise<AdminSupportReplyTemplate[]> {
-  return cachedGet("support-templates", cachedSupportTemplates, () =>
-    apiRequest<AdminSupportReplyTemplate[]>("/api/admin/support/templates", { method: "GET" })
+export async function fetchSupportReplyTemplates(
+  signal?: AbortSignal
+): Promise<AdminSupportReplyTemplate[]> {
+  return cachedGet(
+    "support-templates",
+    cachedSupportTemplates,
+    () =>
+      apiRequest<AdminSupportReplyTemplate[]>("/api/admin/support/templates", {
+        method: "GET",
+        signal,
+      }),
+    signal
   );
 }
 

@@ -1,0 +1,47 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const catalogViewPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
+
+describe("templates catalog actions", () => {
+  it("confirms archive changes and sanitizes backend action errors", () => {
+    const source = readFileSync(catalogViewPath, "utf8");
+
+    expect(source).toContain("import { getAdminErrorMessage }");
+    expect(source).toContain("if (busyTemplateId === templateId) {\n      return false;");
+    expect(source).toContain("async function handleStatusChange(templateId: string, status: TemplateStatus): Promise<boolean>");
+    expect(source).toContain("async function handleDelete(templateId: string): Promise<boolean>");
+    expect(source).toContain("setActionError(getAdminErrorMessage(error, text.errorSavingTemplate))");
+    expect(source).toContain("setActionError(getAdminErrorMessage(error, text.errorDeletingTemplate))");
+    expect(source).toContain("function assertCanManageTemplates(): boolean");
+    expect(source).toContain("setActionError(copy.templateActionsAdminOnly)");
+    expect(source).toContain("if (!assertCanManageTemplates()) {\n      return false;");
+    expect(source).toContain("if (!assertCanManageTemplates()) {\n      return;");
+    expect(source).toContain("const [templatePendingArchiveId, setTemplatePendingArchiveId]");
+    expect(source).toContain("function requestStatusChange(templateId: string, status: TemplateStatus)");
+    expect(source).toContain("function requestDeleteTemplate(templateId: string)");
+    expect(source).toContain("setTemplatePendingArchiveId(templateId)");
+    expect(source).toContain("if (busyTemplateId === templateId) {\n      return;\n    }");
+    expect(source).toContain("setTemplatePendingDeleteId(templateId)");
+    expect(source).toContain("open={templatePendingArchiveId !== null}");
+    expect(source).toContain("function formatTemplateActionLabel(");
+    expect(source).toContain("return sanitizeSensitiveText(template?.title ?? templateId, 96);");
+    expect(source).toContain("function formatTemplateId(templateId: string, maxLength: number)");
+    expect(source).toContain("ID: {formatTemplateId(template.templateId, 12)}");
+    expect(source).toContain("disabled={isFetching}");
+    expect(source).toContain("void refresh().catch(() => undefined);");
+    expect(source).toContain("void handleStatusChange(templatePendingArchiveId, \"Archived\").then((succeeded) => {");
+    expect(source).toContain("if (succeeded) {\n              setTemplatePendingArchiveId(null);");
+    expect(source).toContain("void handleDelete(templatePendingDeleteId).then((succeeded) => {");
+    expect(source).toContain("if (succeeded) {\n              setTemplatePendingDeleteId(null);");
+    expect(source).not.toContain("ID: {template.templateId.slice(0, 12)}");
+    expect(source).not.toContain("templates.find((template) => template.templateId === templatePendingArchiveId)?.title ?? templatePendingArchiveId");
+    expect(source).not.toContain("templates.find((template) => template.templateId === templatePendingDeleteId)?.title ?? templatePendingDeleteId");
+    expect(source).not.toContain("onDeleteTemplate={setTemplatePendingDeleteId}");
+    expect(source).not.toContain("onClick={() => setTemplatePendingDeleteId(template.templateId)}");
+    expect(source).not.toContain("setTemplatePendingArchiveId(template.templateId)");
+    expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
+    expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
+  });
+});

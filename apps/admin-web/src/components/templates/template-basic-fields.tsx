@@ -1,4 +1,8 @@
 import styles from "@/components/templates/template-editor.module.css";
+import {
+  TEMPLATE_TOKEN_COST_MAX_LENGTH,
+  normalizeTemplateIntegerInput,
+} from "@/components/templates/template-form-mappers";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
@@ -210,17 +214,18 @@ export function TemplateBasicFields({
             onChange={(event) =>
               setForm((current) => ({
                 ...current,
-                tokenCost: event.target.value.replace(/\D+/g, ""),
+                tokenCost: normalizeTemplateIntegerInput(event.target.value),
               }))
             }
             onBlur={(event) =>
               setForm((current) => ({
                 ...current,
-                tokenCost: event.target.value.replace(/\D+/g, ""),
+                tokenCost: normalizeTemplateIntegerInput(event.target.value),
               }))
             }
             inputMode="numeric"
             pattern="[0-9]*"
+            maxLength={TEMPLATE_TOKEN_COST_MAX_LENGTH}
             min="1"
             step="1"
             required

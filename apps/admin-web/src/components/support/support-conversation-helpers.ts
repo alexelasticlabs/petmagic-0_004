@@ -4,6 +4,7 @@ import type {
   AdminUserAnalytics,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type RelativeTimeFormat = "compact" | "verbose";
 
@@ -14,6 +15,29 @@ export type SupportTimelineItem = {
   occurredAtUtc: string;
   tone: "neutral" | "primary" | "info" | "success" | "warning" | "danger";
 };
+
+export function formatSafeSupportDisplay(
+  value: string | null | undefined,
+  fallback: string,
+  maxLength = 120
+) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : fallback;
+}
+
+export function formatSafeSupportDownloadName(
+  value: string | null | undefined,
+  fallback = "attachment"
+) {
+  const sanitized = sanitizeSensitiveText(value?.trim() || fallback, 160)
+    .replace(/\*/g, "x")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\.+$/, "");
+
+  return sanitized && sanitized !== "—" ? sanitized : fallback;
+}
 
 export function formatDateTime(value: string | null | undefined, locale: Locale) {
   if (!value) {
@@ -184,11 +208,23 @@ export function pluralizeRu(value: number, one: string, few: string, many: strin
 }
 
 export function formatMoney(amount: number, currencyCode: string, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
-    style: "currency",
-    currency: currencyCode,
+  const value = Number.isFinite(amount) ? amount : 0;
+  const safeCurrencyCode = formatSafeSupportDisplay(currencyCode?.toUpperCase(), "USD", 12);
+  if (/^[A-Z]{3}$/.test(safeCurrencyCode)) {
+    try {
+      return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+        style: "currency",
+        currency: safeCurrencyCode,
+        maximumFractionDigits: 2,
+      }).format(value);
+    } catch {
+      // Fall through to a non-throwing display for unexpected backend currency codes.
+    }
+  }
+
+  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(value)} ${safeCurrencyCode}`;
 }
 
 export function hasAttachment(
@@ -344,7 +380,8 @@ export function initialsFor(value: string) {
 }
 
 export function shortId(value: string) {
-  return value.length > 8 ? `#${value.slice(0, 8)}` : value;
+  const safeValue = formatSafeSupportDisplay(value, "—", 32);
+  return safeValue.length > 8 ? `#${safeValue.slice(0, 8)}` : safeValue;
 }
 
 type SupportQueueItem = Pick<
@@ -510,15 +547,15 @@ export function buildActivityTimeline(
   return [
     ...(analytics?.recentActivity ?? []).slice(0, 4).map((item) => ({
       id: `activity:${item.kind}:${item.occurredAtUtc}:${item.title}`,
-      title: item.title,
-      subtitle: item.details || item.kind,
+      title: formatSafeSupportDisplay(item.title, item.kind, 120),
+      subtitle: formatSafeSupportDisplay(item.details || item.kind, item.kind, 180),
       occurredAtUtc: item.occurredAtUtc,
       tone: "info" as const,
     })),
     ...(analytics?.recentAuditEvents ?? []).slice(0, 4).map((item) => ({
       id: `audit:${item.auditEventId}`,
-      title: item.action,
-      subtitle: item.details,
+      title: formatSafeSupportDisplay(item.action, "Audit event", 120),
+      subtitle: formatSafeSupportDisplay(item.details, "—", 180),
       occurredAtUtc: item.occurredAtUtc,
       tone: "warning" as const,
     })),
@@ -549,14 +586,18 @@ export function buildConversationTimeline({
     {
       id: `conversation:${conversation.conversationId}`,
       title: labels.conversationCreated,
-      subtitle: userDisplayName,
+      subtitle: formatSafeSupportDisplay(userDisplayName, "—", 72),
       occurredAtUtc: conversation.createdAtUtc,
       tone: "info" as const,
     },
     ...conversation.messages.map((message) => ({
       id: message.messageId,
       title: message.isFromAdmin ? labels.adminReply : labels.userMessage,
-      subtitle: `${message.senderDisplayName} • ${truncateText(message.body, 112)}`,
+      subtitle: `${formatSafeSupportDisplay(
+        message.senderDisplayName,
+        labels.userMessage,
+        72
+      )} • ${formatSafeSupportDisplay(message.body, "—", 112)}`,
       occurredAtUtc: message.createdAtUtc,
       tone: message.isFromAdmin ? ("success" as const) : ("primary" as const),
     })),
@@ -573,12 +614,4 @@ export function mergeTemplateDraft(currentValue: string, template: string) {
   }
 
   return `${normalizedCurrentValue}\n\n${template}`;
-}
-
-export function truncateText(value: string, maxLength: number) {
-  if (value.length <= maxLength) {
-    return value;
-  }
-
-  return `${value.slice(0, maxLength - 1).trimEnd()}…`;
 }

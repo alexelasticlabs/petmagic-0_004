@@ -3,6 +3,7 @@
 import { AdminCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import {
   formatDateTime,
+  formatPromoDisplayText,
   formatRewardValue,
   getUserLabels,
 } from "@/components/promo-codes-view.helpers";
@@ -63,7 +64,7 @@ export function PromoCodeActivationsCard({
       title={text.promoCodesRecentUsageTitle}
       description={
         selectedCode
-          ? `${selectedCode.code || `${selectedCode.codePrefix}...`} · ${selectedStatusLabel ?? ""}`
+          ? `${formatPromoDisplayText(selectedCode.code || `${selectedCode.codePrefix}...`, 80)} · ${selectedStatusLabel ?? ""}`
           : text.promoCodesNoCodeSelectedDescription
       }
       className={styles.usageCard}
@@ -83,17 +84,20 @@ export function PromoCodeActivationsCard({
           <strong>{text.promoCodesRecentUsageTitle}</strong>
           <span>{text.promoCodesRecentUsageEmpty}</span>
         </div>
+      ) : activationsIsError ? (
+        <div className={styles.usageWarning}>
+          <span>{text.promoCodesActivationsError}</span>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={activationsIsFetching}
+            onClick={() => void onRefetchActivations()}
+          >
+            {text.promoCodesRefreshAction}
+          </Button>
+        </div>
       ) : (
         <>
-          {activationsIsError ? (
-            <div className={styles.usageWarning}>
-              <span>{text.promoCodesActivationsError}</span>
-              <Button variant="secondary" size="sm" onClick={() => void onRefetchActivations()}>
-                {text.promoCodesRefreshAction}
-              </Button>
-            </div>
-          ) : null}
-
           <div className={styles.usageTableWrap}>
             <table className={styles.usageTable}>
               <thead>

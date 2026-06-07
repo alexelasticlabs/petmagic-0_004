@@ -1,7 +1,6 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -33,7 +32,13 @@ import {
   getTemplateStatusLabel,
   getTemplateTypeLabel,
 } from "@/components/templates/template-admin-shared";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
+import {
+  sanitizeTemplatesAnalyticsOverviewForExport,
+  sanitizeTemplatesAnalyticsQueryForExport,
+} from "@/components/templates/templates-analytics-hub-export";
 import styles from "@/components/templates/templates-analytics-hub-page.module.css";
+import { Button } from "@/components/ui/button";
 import {
   fetchAdminTemplatesAnalyticsOverview,
   useAuthSession,
@@ -49,6 +54,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplatesAnalyticsHubPageProps = {
   locale: AppLocale;
@@ -69,6 +75,10 @@ const PERIOD_OPTIONS: Array<{ key: PeriodKey; ru: string; en: string }> = [
   { key: "90", ru: "90 дней", en: "90 days" },
   { key: "all", ru: "Всё время", en: "All time" },
 ];
+
+function formatAnalyticsDisplayText(value: string, maxLength = 120) {
+  return sanitizeSensitiveText(value, maxLength);
+}
 
 export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageProps) {
   const isRu = locale === "ru";
@@ -116,7 +126,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       query.sort ?? null,
       query.take ?? null,
     ],
-    queryFn: () => fetchAdminTemplatesAnalyticsOverview(query),
+    queryFn: ({ signal }) => fetchAdminTemplatesAnalyticsOverview(query, signal),
     enabled: Boolean(session),
     placeholderData: keepPreviousData,
   });
@@ -149,9 +159,21 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       return;
     }
 
-    const blob = new Blob([JSON.stringify({ query, overview }, null, 2)], {
-      type: "application/json",
-    });
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            query: sanitizeTemplatesAnalyticsQueryForExport(query),
+            overview: sanitizeTemplatesAnalyticsOverviewForExport(overview),
+          },
+          null,
+          2
+        ),
+      ],
+      {
+        type: "application/json",
+      }
+    );
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -171,7 +193,20 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   if (error || !overview) {
     return (
       <AdminPage className={styles.page}>
-        <AdminStateCard tone="danger" title={error ?? text.loadError} />
+        <AdminStateCard
+          tone="danger"
+          title={error ?? text.loadError}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={overviewQuery.isFetching}
+              onClick={() => void overviewQuery.refetch().catch(() => undefined)}
+            >
+              {text.retryAction}
+            </Button>
+          }
+        />
       </AdminPage>
     );
   }
@@ -293,7 +328,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             onChange={setCategory}
             options={[
               { value: "", label: text.allCategories },
-              ...overview.availableCategories.map((value) => ({ value, label: value })),
+              ...overview.availableCategories.map((value) => ({
+                value,
+                label: formatAnalyticsDisplayText(value, 120),
+              })),
             ]}
           />
           <SelectBox
@@ -529,7 +567,9 @@ function FeedbackFeedPanel({
               <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
             </div>
             <p className={styles.feedbackMessage}>
-              {item.feedbackMessage?.trim() || text.feedbackMessageMissing}
+              {item.feedbackMessage?.trim()
+                ? sanitizeSensitiveText(item.feedbackMessage, 240)
+                : text.feedbackMessageMissing}
             </p>
             <div className={styles.feedbackMeta}>
               <span>
@@ -853,9 +893,10 @@ function TopTemplatesPanel({
             <span className={styles.rank}>{index + 1}</span>
             <TemplateThumb row={row} />
             <div>
-              <strong>{row.title}</strong>
+              <strong>{formatAnalyticsDisplayText(row.title, 120)}</strong>
               <span>
-                {getTemplateTypeLabel(row.templateType, dictionary)} · {row.category}
+                {getTemplateTypeLabel(row.templateType, dictionary)} ·{" "}
+                {formatAnalyticsDisplayText(row.category, 120)}
               </span>
             </div>
             <span>{formatNumber(row.views, locale)}</span>
@@ -902,13 +943,13 @@ function TemplatesTable({
                 <div className={styles.templateCell}>
                   <TemplateThumb row={row} />
                   <div>
-                    <strong>{row.title}</strong>
+                    <strong>{formatAnalyticsDisplayText(row.title, 120)}</strong>
                     <span>{shortId(row.templateId)}</span>
                   </div>
                 </div>
               </td>
               <td>{getTemplateTypeLabel(row.templateType, dictionary)}</td>
-              <td>{row.category}</td>
+              <td>{formatAnalyticsDisplayText(row.category, 120)}</td>
               <td>
                 <span
                   className={`${styles.statusBadge} ${styles[`status_${row.status.toLowerCase()}`]}`}
@@ -942,11 +983,28 @@ function TemplatesTable({
 function TemplateThumb({ row }: { row: AdminTemplatesAnalyticsTemplateRow }) {
   const previewUrl = row.previewAsset?.url;
   if (!previewUrl || row.previewAsset?.contentType.startsWith("video/")) {
-    return <div className={styles.thumbFallback}>{row.title.slice(0, 1)}</div>;
+    return (
+      <div className={styles.thumbFallback}>
+        {formatAnalyticsDisplayText(row.title, 24).slice(0, 1)}
+      </div>
+    );
   }
 
   return (
-    <Image src={previewUrl} alt="" width={48} height={48} unoptimized className={styles.thumb} />
+    <TemplateSecureMedia
+      url={previewUrl}
+      kind="image"
+      alt=""
+      width={48}
+      height={48}
+      className={styles.thumb}
+      ariaHidden
+      logContext={{
+        templateId: row.templateId,
+        contentType: row.previewAsset?.contentType,
+        surface: "analytics_hub_thumb",
+      }}
+    />
   );
 }
 
@@ -1050,6 +1108,7 @@ function getCopy(locale: AppLocale) {
     loadError: isRu
       ? "Не удалось загрузить аналитику шаблонов."
       : "Failed to load template analytics.",
+    retryAction: isRu ? "Повторить" : "Retry",
     periodLabel: isRu ? "Период" : "Period",
     typeFilter: isRu ? "Тип" : "Type",
     categoryFilter: isRu ? "Категория" : "Category",

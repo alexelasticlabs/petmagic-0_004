@@ -15,6 +15,7 @@ import {
   formatCampaignMeta,
   formatDateTime,
   formatNumber,
+  formatPromoDisplayText,
   formatRewardValue,
   formatWindow,
   getPromoStatus,
@@ -44,6 +45,7 @@ type PromoCodesListCardProps = {
   pageSizeOptions: SelectOption[];
   hasCodes: boolean;
   hasFilteredCodes: boolean;
+  canManagePromoCodes: boolean;
   promoCodesQueryIsFetching: boolean;
   autoRefreshMs: number;
   dataUpdatedAt: number;
@@ -91,6 +93,7 @@ export function PromoCodesListCard({
   pageSizeOptions,
   hasCodes,
   hasFilteredCodes,
+  canManagePromoCodes,
   promoCodesQueryIsFetching,
   autoRefreshMs,
   dataUpdatedAt,
@@ -176,13 +179,17 @@ export function PromoCodesListCard({
         </div>
 
         <div className={styles.toolbarActions}>
-          <Button variant="secondary" onClick={onExport} disabled={!hasFilteredCodes}>
+          <Button
+            variant="secondary"
+            onClick={onExport}
+            disabled={!hasFilteredCodes || !canManagePromoCodes}
+          >
             <DownloadIcon className={styles.actionIcon} /> {text.promoCodesExportAction}
           </Button>
           <Button variant="secondary" onClick={onRefresh} disabled={promoCodesQueryIsFetching}>
             <RefreshIcon className={styles.actionIcon} /> {text.promoCodesRefreshAction}
           </Button>
-          <Button variant="primary" onClick={onOpenCreatePanel}>
+          <Button variant="primary" onClick={onOpenCreatePanel} disabled={!canManagePromoCodes}>
             {text.promoCodesCreateAction}
           </Button>
           <PromoCodesAutoRefreshBadge
@@ -275,7 +282,10 @@ export function PromoCodesListCard({
                   const status = getPromoStatus(code, text, nowMs).key;
                   const statusView = getPromoStatus(code, text, nowMs);
                   const isSelected = selectedCodeId === code.redeemCodeId;
-                  const codeValue = code.code || `${code.codePrefix}...`;
+                  const codeValue = formatPromoDisplayText(
+                    code.code || `${code.codePrefix}...`,
+                    80
+                  );
                   const actionBusy = busyCodeId === code.redeemCodeId;
                   const campaignMeta = formatCampaignMeta(code);
                   const usagePercent = Math.min(
@@ -307,7 +317,9 @@ export function PromoCodesListCard({
                       <td>
                         <div className={styles.codeCell}>
                           <strong className={styles.codeValue}>{codeValue}</strong>
-                          <span className={styles.codeMeta}>{code.description.trim() || "-"}</span>
+                          <span className={styles.codeMeta}>
+                            {formatPromoDisplayText(code.description, 160)}
+                          </span>
                           {campaignMeta ? (
                             <span className={styles.codeMeta}>{campaignMeta}</span>
                           ) : null}
@@ -359,7 +371,7 @@ export function PromoCodesListCard({
                       <td>
                         <div className={styles.createdCell}>
                           <strong>{formatDateTime(code.createdAtUtc, locale)}</strong>
-                          <span>{code.createdBy?.trim() || "-"}</span>
+                          <span>{formatPromoDisplayText(code.createdBy, 80)}</span>
                         </div>
                       </td>
                       <td>

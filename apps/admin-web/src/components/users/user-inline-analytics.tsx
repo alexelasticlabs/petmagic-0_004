@@ -9,12 +9,15 @@ import {
   AdminMetricStrip,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
+import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-inline-analytics.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
+import { useAuthSession } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { getAdminUserDisplayName, maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type UserInlineAnalyticsProps = {
   locale: Locale;
@@ -23,7 +26,10 @@ type UserInlineAnalyticsProps = {
 
 export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps) {
   const text = getDictionary(locale);
-  const { analytics, hasError, isLoading, refresh, user } = useAdminUserProfile({ userId });
+  const session = useAuthSession();
+  const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
+    userId,
+  });
 
   if (!userId) {
     return (
@@ -46,8 +52,27 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
   }
 
   if (hasError || !user || !analytics) {
-    return <AdminStateCard tone="danger" title={text.userAnalyticsLoadError} />;
+    return (
+      <AdminStateCard
+        tone="danger"
+        title={text.userAnalyticsLoadError}
+        action={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              void refresh().catch(() => undefined);
+            }}
+            disabled={isFetching}
+          >
+            {text.supportRetryAction}
+          </Button>
+        }
+      />
+    );
   }
+
+  const safeUserName = sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
 
   return (
     <AdminCard
@@ -62,16 +87,16 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       <div className={styles.header}>
         <UserAvatarView
           avatar={user.avatar}
-          label={`${text.avatarLabel}: ${user.displayName ?? user.email}`}
-          fallbackLabel={user.displayName ?? user.email}
+          label={`${text.avatarLabel}: ${safeUserName}`}
+          fallbackLabel={safeUserName}
           size="lg"
         />
         <div className={styles.identity}>
-          <h3>{user.displayName?.trim() || user.email}</h3>
-          <p>{user.email}</p>
+          <h3>{safeUserName}</h3>
+          <p>{maskEmail(user.email)}</p>
           <div className={styles.badges}>
             <AdminBadge tone={user.isActive ? "success" : "danger"}>
-              {user.isActive ? text.activeLabel : text.deactivate}
+              {user.isActive ? text.activeLabel : text.blockedLabel}
             </AdminBadge>
             <AdminBadge tone={user.isPremium ? "warning" : "neutral"}>
               {user.isPremium ? text.premiumLabel : text.freeLabel}
@@ -132,10 +157,10 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
                 className={styles.timelineItem}
               >
                 <div className={styles.timelineHeader}>
-                  <strong>{item.title}</strong>
+                  <strong>{sanitizeSensitiveText(item.title, 120)}</strong>
                   <span>{formatDateTime(item.occurredAtUtc, locale)}</span>
                 </div>
-                {item.details ? <p>{item.details}</p> : null}
+                {item.details ? <p>{sanitizeSensitiveText(item.details, 180)}</p> : null}
               </article>
             ))}
           </div>
@@ -153,7 +178,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
                 <article key={purchase.orderId} className={styles.compactCard}>
                   <strong>{purchase.sparkToGrant} spark</strong>
                   <span>
-                    {purchase.priceAmount} {purchase.currencyCode}
+                    {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
                   </span>
                   <span>
                     {formatDateTime(purchase.confirmedAtUtc ?? purchase.createdAtUtc, locale)}
@@ -172,9 +197,9 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
             <div className={styles.list}>
               {analytics.recentGenerations.slice(0, 4).map((generation) => (
                 <article key={generation.generationId} className={styles.compactCard}>
-                  <strong>{generation.templateTitle}</strong>
+                  <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
                   <span>
-                    {generation.status} • {generation.tokenCost}
+                    {sanitizeSensitiveText(generation.status, 48)} • {generation.tokenCost}
                   </span>
                   <span>
                     {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
@@ -193,7 +218,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
         {analytics.failureBreakdown.length ? (
           <AdminMetricStrip
             items={analytics.failureBreakdown.map((item) => ({
-              label: item.failureCode,
+              label: sanitizeSensitiveText(item.failureCode, 120),
               value: `${item.count} • ${formatDateTime(item.lastOccurredAtUtc, locale)}`,
             }))}
           />
@@ -206,6 +231,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
         locale={locale}
         userId={user.userId}
         analytics={analytics}
+        canAdjustWallet={session?.user.roles.includes("Admin") ?? false}
         onUpdated={async () => {
           await refresh();
         }}
