@@ -20,7 +20,7 @@ Do not use string interpolation or concatenate values into log messages. Put val
 
 ## Required Context
 
-Application logs should carry:
+HTTP request completion logs should carry:
 
 - `ApplicationName`
 - `Environment`
@@ -34,6 +34,8 @@ Application logs should carry:
 - `Path`
 - `StatusCode`
 - `ElapsedMs`
+
+Business logs written while an endpoint is executing inherit the ambient HTTP context: `ApplicationName`, `Environment`, `TraceId`, `CorrelationId`, `RequestId`, `UserId`, `Role`, `Endpoint`, `HttpMethod`, and `Path`. `StatusCode` and `ElapsedMs` belong to the completion log because they are only known after the endpoint returns.
 
 Worker generation logs also include `JobId`, `GenerationId`, `Provider`, `Attempt`, and `MaxAttempts`.
 

@@ -139,6 +139,12 @@ public static class AuthEndpoints
         group.MapPost("/external/google/native", GoogleNativeLoginAsync)
             .AllowAnonymous();
 
+        group.MapPost("/google", GoogleSocialLoginAsync)
+            .AllowAnonymous();
+
+        group.MapPost("/apple", AppleSocialLoginAsync)
+            .AllowAnonymous();
+
         return endpoints;
     }
 
@@ -668,9 +674,9 @@ public static class AuthEndpoints
     private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> GoogleNativeLoginAsync(
         HttpContext context,
         GoogleNativeLoginCommand command,
-        IValidator<GoogleNativeLoginCommand> validator,
-        IGoogleIdentityTokenVerifier verifier,
-        IIdentityService service,
+        [FromServices] IValidator<GoogleNativeLoginCommand> validator,
+        [FromServices] IGoogleIdentityTokenVerifier verifier,
+        [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
         var validation = await validator.ValidateAsync(command, cancellationToken);
@@ -680,6 +686,80 @@ public static class AuthEndpoints
         }
 
         var verification = await verifier.VerifyIdTokenAsync(command.IdToken, cancellationToken);
+        if (verification.IsFailure)
+        {
+            var statusCode = string.Equals(verification.Error.Code, "auth.external_not_configured", StringComparison.Ordinal)
+                ? StatusCodes.Status404NotFound
+                : StatusCodes.Status401Unauthorized;
+
+            return TypedResults.Problem(
+                title: verification.Error.Code,
+                detail: verification.Error.Message,
+                statusCode: statusCode);
+        }
+
+        var result = await service.ExternalLoginAsync(verification.Value, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        WriteRefreshTokenCookie(context, result.Value.RefreshToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> GoogleSocialLoginAsync(
+        HttpContext context,
+        GoogleSocialLoginCommand command,
+        [FromServices] IValidator<GoogleSocialLoginCommand> validator,
+        [FromServices] IGoogleIdentityTokenVerifier verifier,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        return await CompleteSocialLoginAsync(
+            context,
+            verifier.VerifyIdTokenAsync(command.IdToken, cancellationToken),
+            service,
+            cancellationToken);
+    }
+
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> AppleSocialLoginAsync(
+        HttpContext context,
+        AppleSocialLoginCommand command,
+        [FromServices] IValidator<AppleSocialLoginCommand> validator,
+        [FromServices] IAppleIdentityTokenVerifier verifier,
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        return await CompleteSocialLoginAsync(
+            context,
+            verifier.VerifyIdTokenAsync(command.IdentityToken, cancellationToken),
+            service,
+            cancellationToken);
+    }
+
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> CompleteSocialLoginAsync(
+        HttpContext context,
+        Task<PetMagic.BuildingBlocks.Results.Result<ExternalLoginCallbackCommand>> verificationTask,
+        IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var verification = await verificationTask;
         if (verification.IsFailure)
         {
             var statusCode = string.Equals(verification.Error.Code, "auth.external_not_configured", StringComparison.Ordinal)

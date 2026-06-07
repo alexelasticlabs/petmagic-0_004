@@ -66,6 +66,94 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task GoogleSocialLogin_ShouldReturnSession_WhenTokenVerificationSucceeds()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(
+            isConfigured: true,
+            clientId: "google-web-client-id",
+            verifiedCommand: new ExternalLoginCallbackCommand(
+                "Google",
+                "google-subject-2",
+                "pet@example.com",
+                "Pet Parent"));
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/google",
+            new GoogleSocialLoginCommand("native-google-id-token", "server-auth-code"));
+        var payload = await response.Content.ReadFromJsonAsync<TokenPairResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("pet@example.com", payload!.User.Email);
+        Assert.NotNull(service.LastExternalLoginCommand);
+        Assert.Equal("Google", service.LastExternalLoginCommand!.Provider);
+        Assert.Equal("google-subject-2", service.LastExternalLoginCommand.ProviderSubject);
+    }
+
+    [Fact]
+    public async Task GoogleSocialLogin_ShouldReturnUnauthorized_WhenTokenVerificationFails()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/google",
+            new GoogleSocialLoginCommand("invalid-google-id-token", "server-auth-code"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(service.LastExternalLoginCommand);
+    }
+
+    [Fact]
+    public async Task AppleSocialLogin_ShouldReturnSession_WhenTokenVerificationSucceeds()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var appleVerifier = new FakeAppleIdentityTokenVerifier(
+            verifiedCommand: new ExternalLoginCallbackCommand(
+                "Apple",
+                "apple-subject-1",
+                "relay@privaterelay.appleid.com",
+                null));
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service, appleVerifier: appleVerifier);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/apple",
+            new AppleSocialLoginCommand("apple-identity-token", "apple-auth-code"));
+        var payload = await response.Content.ReadFromJsonAsync<TokenPairResponse>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("relay@privaterelay.appleid.com", payload!.User.Email);
+        Assert.NotNull(service.LastExternalLoginCommand);
+        Assert.Equal("Apple", service.LastExternalLoginCommand!.Provider);
+        Assert.Equal("apple-subject-1", service.LastExternalLoginCommand.ProviderSubject);
+    }
+
+    [Fact]
+    public async Task AppleSocialLogin_ShouldReturnUnauthorized_WhenTokenVerificationFails()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var appleVerifier = new FakeAppleIdentityTokenVerifier();
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service, appleVerifier: appleVerifier);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/apple",
+            new AppleSocialLoginCommand("invalid-apple-identity-token", "apple-auth-code"));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Null(service.LastExternalLoginCommand);
+    }
+
+    [Fact]
     public async Task Refresh_ShouldUseCookieToken_WhenRequestBodyDoesNotContainToken()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
@@ -139,7 +227,8 @@ public sealed class AuthEndpointsNativeGoogleTests
         public static async Task<TestApplication> CreateAsync(
             IGoogleIdentityTokenVerifier verifier,
             FakeIdentityService service,
-            Uri? baseAddress = null)
+            Uri? baseAddress = null,
+            IAppleIdentityTokenVerifier? appleVerifier = null)
         {
             var builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
@@ -158,6 +247,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiModule();
             builder.Services.AddSingleton(verifier);
+            builder.Services.AddSingleton(appleVerifier ?? new FakeAppleIdentityTokenVerifier());
             builder.Services.AddSingleton<ILegalDocumentsCatalog>(new FakeLegalDocumentsCatalog());
             builder.Services.AddSingleton<IIdentityService>(service);
 
@@ -180,6 +270,23 @@ public sealed class AuthEndpointsNativeGoogleTests
             Client.Dispose();
             await app.StopAsync();
             await app.DisposeAsync();
+        }
+    }
+
+    private sealed class FakeAppleIdentityTokenVerifier(
+        ExternalLoginCallbackCommand? verifiedCommand = null) : IAppleIdentityTokenVerifier
+    {
+        public bool IsConfigured => true;
+
+        public Task<Result<ExternalLoginCallbackCommand>> VerifyIdTokenAsync(string identityToken, CancellationToken cancellationToken)
+        {
+            if (verifiedCommand is null)
+            {
+                return Task.FromResult(Result.Failure<ExternalLoginCallbackCommand>(
+                    new Error("auth.external_token_invalid", "External identity token is invalid.")));
+            }
+
+            return Task.FromResult(Result.Success(verifiedCommand));
         }
     }
 
@@ -297,6 +404,7 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
+        public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
         public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();

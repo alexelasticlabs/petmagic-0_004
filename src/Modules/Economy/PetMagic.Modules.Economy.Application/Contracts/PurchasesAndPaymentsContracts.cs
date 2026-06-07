@@ -45,7 +45,10 @@ public sealed record PurchaseHistoryItemResponse(
     string? ExternalPaymentId,
     DateTime CreatedAtUtc,
     DateTime? ConfirmedAtUtc,
-    bool CanRefund = false);
+    bool CanRefund = false,
+    string ProductType = "TokenPack",
+    int TokenAmount = 0,
+    string RefundStatus = "none");
 
 public sealed record PaymentMethodResponse(
     Guid PaymentMethodId,
@@ -82,3 +85,33 @@ public sealed record PremiumStoreVerificationResponse(
     bool IsActive,
     DateTime? ExpiresAtUtc,
     string Status);
+
+public sealed record BillingProductsResponse(
+    IReadOnlyList<BillingTokenPackProductResponse> TokenPacks,
+    IReadOnlyList<BillingSubscriptionProductResponse> Subscriptions);
+
+public sealed record BillingTokenPackProductResponse(
+    Guid PackId,
+    string Code,
+    string DisplayName,
+    int TokenAmount,
+    string GooglePlayProductId,
+    string AppleAppStoreProductId);
+
+public sealed record BillingSubscriptionProductResponse(
+    string PlanId,
+    string Name,
+    string BillingPeriod,
+    int MonthlyTokenLimit,
+    string? GooglePlayProductId,
+    string? AppleAppStoreProductId);
+
+public sealed record StoreBillingValidationResponse(
+    string Provider,
+    string ProductType,
+    string ProductId,
+    string Status,
+    bool TokensGranted,
+    int TokenAmount,
+    bool IsPremium,
+    DateTime? ExpiresAtUtc);

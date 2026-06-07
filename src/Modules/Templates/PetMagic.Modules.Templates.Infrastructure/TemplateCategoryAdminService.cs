@@ -22,12 +22,30 @@ internal sealed class TemplateCategoryAdminService(
             .ThenBy(x => x.Name)
             .ToArrayAsync(cancellationToken);
 
+        if (categories.Length == 0)
+        {
+            return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>([]);
+        }
+
+        var categoryNames = categories.Select(category => category.Name).ToArray();
         var templates = await dbContext.TemplateItems
             .AsNoTracking()
+            .Where(template => categoryNames.Contains(template.Category))
+            .Select(template => new TemplateCategorySnapshot(
+                template.Category,
+                template.TemplateType,
+                template.Status,
+                template.IsPremium,
+                template.Tags))
             .ToArrayAsync(cancellationToken);
+        var templatesByCategory = templates
+            .GroupBy(template => template.Category, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => (IReadOnlyCollection<TemplateCategorySnapshot>)group.ToArray(), StringComparer.Ordinal);
 
         var response = categories
-            .Select(category => MapAdminCategory(category, [.. templates.Where(template => string.Equals(template.Category, category.Name, StringComparison.Ordinal))]))
+            .Select(category => MapAdminCategory(
+                category,
+                templatesByCategory.TryGetValue(category.Name, out var categoryTemplates) ? categoryTemplates : []))
             .ToArray();
 
         return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(response);
@@ -162,6 +180,12 @@ internal sealed class TemplateCategoryAdminService(
         var templates = await dbContext.TemplateItems
             .AsNoTracking()
             .Where(x => x.Category == category.Name)
+            .Select(template => new TemplateCategorySnapshot(
+                template.Category,
+                template.TemplateType,
+                template.Status,
+                template.IsPremium,
+                template.Tags))
             .ToArrayAsync(cancellationToken);
 
         return MapAdminCategory(category, templates);
@@ -200,7 +224,7 @@ internal sealed class TemplateCategoryAdminService(
         return NormalizeTags(tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
-    private static AdminTemplateCategoryListItemResponse MapAdminCategory(TemplateCategory category, IReadOnlyCollection<TemplateItem> templates)
+    private static AdminTemplateCategoryListItemResponse MapAdminCategory(TemplateCategory category, IReadOnlyCollection<TemplateCategorySnapshot> templates)
     {
         var tags = templates
             .SelectMany(template => DeserializeTags(template.Tags))
@@ -223,4 +247,11 @@ internal sealed class TemplateCategoryAdminService(
             category.CreatedAtUtc,
             category.UpdatedAtUtc);
     }
+
+    private sealed record TemplateCategorySnapshot(
+        string Category,
+        TemplateType TemplateType,
+        TemplateStatus Status,
+        bool IsPremium,
+        string? Tags);
 }

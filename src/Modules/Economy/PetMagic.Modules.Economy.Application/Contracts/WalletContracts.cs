@@ -24,7 +24,9 @@ public sealed record WalletLedgerItemResponse(
     int BalanceAfter,
     string Source,
     string Reason,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string? SourceProvider = null,
+    string? SourceTransactionId = null);
 
 public sealed record CurrencyPackResponse(
     Guid PackId,

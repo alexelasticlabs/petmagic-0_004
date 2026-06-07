@@ -51,14 +51,34 @@ Copy-Item .env.example .env
 ```env
 GOOGLE_CLIENT_ID=вставь_сюда_google_client_id
 GOOGLE_CLIENT_SECRET=вставь_сюда_google_client_secret
+GOOGLE_AUDIENCES=web_client_id,ios_client_id,android_client_id
 ```
 
 Важно:
 
 - сюда нужно вставлять Web application OAuth client из Google Cloud Console
-- эти значения использует backend для проверки Google identity token и для browser fallback
+- `GOOGLE_AUDIENCES` не является секретом; указывай client IDs, которые backend принимает в `aud` Google ID token для конкретной среды
+- backend проверяет Google identity token и требует `email_verified=true`
 
-### 2.2 SMTP для писем
+### 2.2 Apple Sign in для backend
+
+Вставь в .env:
+
+```env
+APPLE_CLIENT_ID=com.petmagic.app
+APPLE_CLIENT_SECRET=generated_apple_client_secret
+APPLE_AUDIENCES=com.petmagic.app,services.id.if.used
+APPLE_AUTHORIZATION_ENDPOINT=https://appleid.apple.com/auth/authorize
+APPLE_TOKEN_ENDPOINT=https://appleid.apple.com/auth/token
+```
+
+Важно:
+
+- Apple private key, Team ID и Key ID используются для генерации `APPLE_CLIENT_SECRET`; private key не коммить в git
+- `APPLE_AUDIENCES` не является секретом; указывай Bundle ID и Services ID, которые backend принимает в `aud` Apple identity token для конкретной среды
+- скрытый Apple email и Private Relay сохраняются как обычный verified email от Apple
+
+### 2.3 SMTP для писем
 
 Вставь в .env:
 

@@ -317,10 +317,75 @@ public sealed class SupportChatServiceTests
 
         Assert.True(mineResult.IsSuccess);
         Assert.True(unassignedResult.IsSuccess);
-        Assert.Single(mineResult.Value);
-        Assert.Single(unassignedResult.Value);
-        Assert.Equal(assignedConversationId, mineResult.Value[0].ConversationId);
-        Assert.Equal(unassignedConversationId, unassignedResult.Value[0].ConversationId);
+        Assert.Single(mineResult.Value.Items);
+        Assert.Single(unassignedResult.Value.Items);
+        Assert.Equal(1, mineResult.Value.TotalCount);
+        Assert.Equal(1, unassignedResult.Value.TotalCount);
+        Assert.False(mineResult.Value.HasMore);
+        Assert.False(unassignedResult.Value.HasMore);
+        Assert.Equal(assignedConversationId, mineResult.Value.Items[0].ConversationId);
+        Assert.Equal(unassignedConversationId, unassignedResult.Value.Items[0].ConversationId);
+    }
+
+    [Fact]
+    public async Task GetAdminInboxMetricsAsync_ShouldReturnBackendAggregatedQueueCounts()
+    {
+        var store = CreateStore();
+
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var userC = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userA, "user-a@petmagic.test", "Pet User A");
+        await SeedUserAsync(store, userB, "user-b@petmagic.test", "Pet User B");
+        await SeedUserAsync(store, userC, "user-c@petmagic.test", "Pet User C");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid readConversationId;
+        Guid assignedConversationId;
+        Guid closedConversationId;
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            readConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(userA, "Read case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            assignedConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(userB, "Assigned unread case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            closedConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(userC, "Closed unread case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var mutateScope = await store.CreateScopeAsync())
+        {
+            var service = mutateScope.CreateService();
+            var markRead = await service.MarkConversationReadAsync(
+                new MarkSupportConversationReadCommand(readConversationId, adminId, true),
+                CancellationToken.None);
+            var assign = await service.SendMessageAsync(
+                new SendSupportMessageCommand(assignedConversationId, adminId, "We are checking this", true),
+                CancellationToken.None);
+            var close = await service.CloseConversationAsync(
+                new CloseSupportConversationCommand(closedConversationId, adminId, true),
+                CancellationToken.None);
+
+            Assert.True(markRead.IsSuccess);
+            Assert.True(assign.IsSuccess);
+            Assert.True(close.IsSuccess);
+        }
+
+        await using var metricsScope = await store.CreateScopeAsync();
+        var metrics = await metricsScope.CreateService().GetAdminInboxMetricsAsync(CancellationToken.None);
+
+        Assert.True(metrics.IsSuccess);
+        Assert.Equal(3, metrics.Value.TotalConversations);
+        Assert.Equal(2, metrics.Value.OpenConversations);
+        Assert.Equal(1, metrics.Value.ClosedConversations);
+        Assert.Equal(2, metrics.Value.UnassignedConversations);
+        Assert.Equal(2, metrics.Value.UnreadForAdminConversations);
     }
 
     [Fact]

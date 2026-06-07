@@ -152,7 +152,7 @@ public sealed partial class SupportChatService(
         CancellationToken cancellationToken)
         => GetUserConversationAsync(userId, new SupportConversationMessagesQuery(), cancellationToken);
 
-    public async Task<Result<IReadOnlyList<SupportConversationSummaryResponse>>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken)
+    public async Task<Result<SupportConversationInboxPageResponse>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken)
     {
         var conversationsQuery = supportChatDbContext.SupportConversations
             .AsNoTracking()
@@ -162,7 +162,7 @@ public sealed partial class SupportChatService(
         {
             if (!Enum.TryParse<SupportConversationStatus>(query.Status, true, out var status))
             {
-                return Result.Failure<IReadOnlyList<SupportConversationSummaryResponse>>(InvalidStatus);
+                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
             }
             var requestedStatus = ToCanonicalStatus(status);
             conversationsQuery = requestedStatus switch
@@ -185,7 +185,7 @@ public sealed partial class SupportChatService(
         {
             if (!Enum.TryParse<SupportConversationSource>(query.Source, true, out var source))
             {
-                return Result.Failure<IReadOnlyList<SupportConversationSummaryResponse>>(InvalidStatus);
+                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
             }
 
             var requestedSource = ToCanonicalSource(source);
@@ -198,7 +198,7 @@ public sealed partial class SupportChatService(
         {
             if (!Enum.TryParse<SupportConversationPriority>(query.Priority, true, out var priority))
             {
-                return Result.Failure<IReadOnlyList<SupportConversationSummaryResponse>>(InvalidStatus);
+                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
             }
 
             conversationsQuery = conversationsQuery.Where(x => x.Priority == priority);
@@ -224,6 +224,7 @@ public sealed partial class SupportChatService(
 
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var totalCount = await conversationsQuery.CountAsync(cancellationToken);
 
         var conversationRows = await conversationsQuery
             .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
@@ -327,7 +328,42 @@ public sealed partial class SupportChatService(
                 CanReopenConversation(normalizedStatus, conversation.ResolvedAtUtc, conversation.ReopenUntilUtc, now));
         }).ToList();
 
-        return Result.Success<IReadOnlyList<SupportConversationSummaryResponse>>(summaries);
+        return Result.Success(new SupportConversationInboxPageResponse(
+            summaries,
+            page,
+            pageSize,
+            totalCount,
+            page * pageSize < totalCount));
+    }
+
+    public async Task<Result<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(CancellationToken cancellationToken)
+    {
+        var metrics = await supportChatDbContext.SupportConversations
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalConversations = group.Count(),
+                ClosedConversations = group.Count(x =>
+                    x.Status == SupportConversationStatus.Closed ||
+                    (int)x.Status == LegacyResolvedStatusValue),
+                UnassignedConversations = group.Count(x => x.AssignedAdminId == null),
+                UnreadForAdminConversations = group.Count(x =>
+                    x.Messages.Any(message => !message.IsFromAdmin && message.ReadAtUtc == null))
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (metrics is null)
+        {
+            return Result.Success(new AdminSupportInboxMetricsResponse(0, 0, 0, 0, 0));
+        }
+
+        return Result.Success(new AdminSupportInboxMetricsResponse(
+            metrics.TotalConversations,
+            Math.Max(0, metrics.TotalConversations - metrics.ClosedConversations),
+            metrics.ClosedConversations,
+            metrics.UnassignedConversations,
+            metrics.UnreadForAdminConversations));
     }
 
     public async Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(

@@ -423,6 +423,7 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(queue.IsSuccess);
         var item = Assert.Single(queue.Value.Items);
+        Assert.Equal(1, queue.Value.TotalCount);
         Assert.Equal("pending", item.Status);
         Assert.Equal("Unsafe result", item.Message);
 

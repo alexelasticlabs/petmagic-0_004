@@ -71,7 +71,9 @@ internal sealed class AdminUserEconomyAnalyticsReader(EconomyDbContext dbContext
                 x.BalanceAfter,
                 x.Source,
                 x.Reason,
-                x.CreatedAtUtc))
+                x.CreatedAtUtc,
+                x.SourceProvider,
+                null))
             .ToListAsync(cancellationToken);
 
         var recentActivity = recentPurchases

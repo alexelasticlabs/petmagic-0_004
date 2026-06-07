@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -18,12 +19,56 @@ namespace PetMagic.Modules.Identity.Tests.Economy;
 
 public sealed partial class EconomyServiceTests
 {
+    private static string BuildAppStoreSignedTransactionInfo(
+        string productId,
+        string transactionId,
+        string bundleId = "com.petmagic.app",
+        DateTime? expiresAtUtc = null,
+        DateTime? revokedAtUtc = null,
+        string environment = "production")
+    {
+        var payload = new Dictionary<string, object?>
+        {
+            ["bundleId"] = bundleId,
+            ["productId"] = productId,
+            ["transactionId"] = transactionId,
+            ["originalTransactionId"] = transactionId,
+            ["environment"] = environment
+        };
+
+        if (expiresAtUtc.HasValue)
+        {
+            payload["expiresDate"] = new DateTimeOffset(expiresAtUtc.Value).ToUnixTimeMilliseconds();
+        }
+
+        if (revokedAtUtc.HasValue)
+        {
+            payload["revocationDate"] = new DateTimeOffset(revokedAtUtc.Value).ToUnixTimeMilliseconds();
+        }
+
+        var header = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
+        {
+            ["alg"] = "ES256",
+            ["typ"] = "JWT"
+        }));
+        var body = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(payload));
+        return $"{header}.{body}.test-signature";
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
 
     private static EconomyService CreateService(
         EconomyDbContext dbContext,
         FakePaymentGateway? gateway = null,
         FakeStoreSubscriptionVerifier? storeVerifier = null,
-        IIdentityService? identityService = null)
+        IIdentityService? identityService = null,
+        IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null)
     {
         var options = Options.Create(new EconomyOptions
         {
@@ -45,7 +90,10 @@ public sealed partial class EconomyServiceTests
             options,
             null,
             null,
-            identityService);
+            identityService,
+            null,
+            null,
+            storeWebhookSecurityValidator ?? new FakeStoreWebhookSecurityValidator(Result.Success()));
     }
 
     private static EconomyDbContext CreateDbContext()
@@ -209,6 +257,19 @@ public sealed partial class EconomyServiceTests
         }
     }
 
+    private sealed class FakeStoreWebhookSecurityValidator(Result appStoreResult) : IStoreWebhookSecurityValidator
+    {
+        public Result ValidateAppStoreSignedPayload(string signedPayload)
+        {
+            return appStoreResult;
+        }
+
+        public Task<Result> ValidateGooglePlayPushAsync(string? authorizationHeader, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
+        }
+    }
+
     private sealed class FakeIdentityService : IIdentityService
     {
         private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
@@ -267,6 +328,7 @@ public sealed partial class EconomyServiceTests
         public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
+        public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();
         public Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserDetailResponse>();
         public Task<Result<AdminUserAnalyticsResponse>> GetAdminUserAnalyticsAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<AdminUserAnalyticsResponse>();
         public Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken) => NotSupported<AdminUserWalletOperationResponse>();

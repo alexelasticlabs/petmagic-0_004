@@ -83,7 +83,9 @@ public interface ISupportChatService
         SupportConversationMessagesQuery query,
         CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<SupportConversationSummaryResponse>>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken);
+    Task<Result<SupportConversationInboxPageResponse>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken);
+
+    Task<Result<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(CancellationToken cancellationToken);
 
     Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(
         Guid conversationId,

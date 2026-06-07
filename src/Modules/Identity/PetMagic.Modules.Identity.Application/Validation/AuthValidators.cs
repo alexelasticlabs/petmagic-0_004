@@ -224,6 +224,24 @@ public sealed class GoogleNativeLoginCommandValidator : AbstractValidator<Google
     }
 }
 
+public sealed class GoogleSocialLoginCommandValidator : AbstractValidator<GoogleSocialLoginCommand>
+{
+    public GoogleSocialLoginCommandValidator()
+    {
+        RuleFor(x => x.IdToken).NotEmpty();
+        RuleFor(x => x.ServerAuthCode).NotEmpty();
+    }
+}
+
+public sealed class AppleSocialLoginCommandValidator : AbstractValidator<AppleSocialLoginCommand>
+{
+    public AppleSocialLoginCommandValidator()
+    {
+        RuleFor(x => x.IdentityToken).NotEmpty();
+        RuleFor(x => x.AuthorizationCode).NotEmpty();
+    }
+}
+
 public sealed class AssignRoleCommandValidator : AbstractValidator<AssignRoleCommand>
 {
     public AssignRoleCommandValidator()

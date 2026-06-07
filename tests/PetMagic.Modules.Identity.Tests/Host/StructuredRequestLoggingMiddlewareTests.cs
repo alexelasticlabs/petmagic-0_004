@@ -110,6 +110,29 @@ public sealed class StructuredRequestLoggingMiddlewareTests
         Assert.Equal("/api/failing-endpoint", scope["Path"]);
     }
 
+    [Fact]
+    public async Task Middleware_ShouldResolveLoggingOptionsFromDependencyInjection()
+    {
+        var logger = new CapturingLogger<StructuredRequestLoggingMiddleware>();
+        var services = new ServiceCollection()
+            .AddSingleton<IHostEnvironment>(new TestHostEnvironment())
+            .AddSingleton<ILogger<StructuredRequestLoggingMiddleware>>(logger)
+            .Configure<LoggingOptions>(options => options.SlowRequestThresholdMs = 1)
+            .BuildServiceProvider();
+        var context = CreateContext(HttpMethods.Get, "/api/di-slow");
+        context.RequestServices = services;
+
+        var middleware = ActivatorUtilities.CreateInstance<StructuredRequestLoggingMiddleware>(
+            services,
+            (RequestDelegate)(_ => Task.Delay(20)));
+
+        await middleware.InvokeAsync(context);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains("HTTP GET /api/di-slow responded 200", entry.Message, StringComparison.Ordinal);
+    }
+
     private static DefaultHttpContext CreateContext(string method, string path)
     {
         var services = new ServiceCollection()

@@ -42,7 +42,12 @@ public sealed record ExternalLoginCallbackCommand(
     string Provider,
     string ProviderSubject,
     string? Email,
-    string? DisplayName);
+    string? DisplayName,
+    bool EmailVerified = true);
+
+public sealed record AppleSocialLoginCommand(string IdentityToken, string AuthorizationCode);
+
+public sealed record GoogleSocialLoginCommand(string IdToken, string ServerAuthCode);
 
 public sealed record LinkedAccountResponse(
     string Provider,
@@ -102,6 +107,20 @@ public sealed record UserListPageResponse(
     int Take,
     bool HasMore,
     int TotalCount);
+
+public sealed record AdminUserDashboardMetricsResponse(
+    int TotalUsers,
+    int PremiumUsers,
+    int ActiveUsers,
+    int BlockedUsers,
+    int AdminUsers,
+    int ModeratorUsers,
+    int RegularUsers,
+    int UsersThisWeek,
+    int UsersPreviousWeek,
+    int NewUsersLast7Days,
+    int NewUsersLast30Days,
+    int NewUsersLast90Days);
 
 public sealed record SendBulkEmailCommand(
     string Audience,

@@ -45,9 +45,13 @@ public sealed partial class EconomyService
                 x.order.PriceAmount,
                 x.order.CurrencyCode,
                 x.order.SparkToGrant,
-                x.order.ExternalPaymentId,
+                x.order.PaymentProvider == "stripe" ? x.order.ExternalPaymentId : null,
                 x.order.CreatedAtUtc,
-                x.order.ConfirmedAtUtc))
+                x.order.ConfirmedAtUtc,
+                false,
+                "TokenPack",
+                x.order.SparkToGrant,
+                x.order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -259,15 +263,274 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.StorePurchaseInvalid);
         }
 
-        order.ExternalPaymentId = string.Equals(provider, "google_play", StringComparison.Ordinal)
-            ? command.ServerVerificationData
-            : verification.Value.ExternalTransactionId
-                ?? command.PurchaseId
-                ?? order.ExternalPaymentId;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var externalPaymentId = ResolveStoreExternalPaymentId(provider, command.ServerVerificationData, verification.Value.ExternalTransactionId, command.PurchaseId);
+        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken);
+        if (confirmResult.IsFailure)
+        {
+            return Result.Failure<PurchaseOrderResponse>(confirmResult.Error);
+        }
 
-        // Store purchase settlement is webhook-authoritative.
-        return Result.Success(ToPurchaseOrderResponse(order));
+        logger?.LogInformation(
+            "Store token pack validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} OrderId={OrderId} TokenAmount={TokenAmount} Environment={Environment} CorrelationId={CorrelationId}",
+            provider,
+            command.UserId,
+            command.ProductId,
+            confirmResult.Value.Id,
+            confirmResult.Value.SparkToGrant,
+            ResolveStoreEnvironment(provider),
+            CurrentCorrelationId);
+
+        return Result.Success(ToPurchaseOrderResponse(confirmResult.Value));
+    }
+
+    public async Task<Result<StoreBillingValidationResponse>> ValidateGooglePlayBillingAsync(
+        ValidateGooglePlayBillingCommand command,
+        CancellationToken cancellationToken)
+    {
+        var configuredPackageName = options.Value.GooglePlayPackageName?.Trim();
+        if (!string.IsNullOrWhiteSpace(configuredPackageName)
+            && !string.Equals(configuredPackageName, command.PackageName.Trim(), StringComparison.Ordinal))
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        return await ValidateStoreBillingAsync(
+            command.UserId,
+            "google_play",
+            command.ProductId,
+            command.PurchaseToken,
+            null,
+            command.PurchaseToken,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<Result<StoreBillingValidationResponse>> ValidateAppleAppStoreBillingAsync(
+        ValidateAppleAppStoreBillingCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (storeWebhookSecurityValidator is null)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StoreVerificationUnavailable);
+        }
+
+        var signatureValidation = storeWebhookSecurityValidator.ValidateAppStoreSignedPayload(command.SignedTransactionInfo);
+        if (signatureValidation.IsFailure)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(signatureValidation.Error);
+        }
+
+        var transactionInfo = EconomyWebhookParser.TryReadAppStoreTransactionInfo(command.SignedTransactionInfo);
+        if (transactionInfo is null
+            || string.IsNullOrWhiteSpace(transactionInfo.ProductId)
+            || string.IsNullOrWhiteSpace(transactionInfo.TransactionId)
+            || !string.Equals(transactionInfo.BundleId, options.Value.AppStoreBundleId, StringComparison.Ordinal)
+            || transactionInfo.RevokedAtUtc.HasValue)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var expectedEnvironment = options.Value.AppStoreEnvironment?.Trim();
+        if (!string.IsNullOrWhiteSpace(expectedEnvironment)
+            && !string.IsNullOrWhiteSpace(transactionInfo.Environment)
+            && !string.Equals(transactionInfo.Environment, expectedEnvironment, StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        return await ValidateStoreBillingAsync(
+            command.UserId,
+            "app_store",
+            transactionInfo.ProductId,
+            command.SignedTransactionInfo,
+            null,
+            transactionInfo.TransactionId,
+            null,
+            cancellationToken);
+    }
+
+    private async Task<Result<StoreBillingValidationResponse>> ValidateStoreBillingAsync(
+        Guid userId,
+        string provider,
+        string productId,
+        string serverVerificationData,
+        string? localVerificationData,
+        string? purchaseId,
+        string? transactionDate,
+        CancellationToken cancellationToken)
+    {
+        var normalizedProductId = productId.Trim();
+        var plan = await ResolveStorePlanByProductIdAsync(provider, normalizedProductId, cancellationToken);
+        if (plan is not null)
+        {
+            var subscriptionVerification = await VerifyPremiumStorePurchaseAsync(
+                new VerifyPremiumStorePurchaseCommand(
+                    userId,
+                    plan.PlanCode,
+                    provider,
+                    normalizedProductId,
+                    serverVerificationData,
+                    localVerificationData,
+                    purchaseId,
+                    transactionDate),
+                cancellationToken);
+
+            if (subscriptionVerification.IsFailure)
+            {
+                return Result.Failure<StoreBillingValidationResponse>(subscriptionVerification.Error);
+            }
+
+            return Result.Success(new StoreBillingValidationResponse(
+                provider,
+                "Subscription",
+                normalizedProductId,
+                subscriptionVerification.Value.Status,
+                false,
+                0,
+                subscriptionVerification.Value.IsActive,
+                subscriptionVerification.Value.ExpiresAtUtc));
+        }
+
+        var activePacks = await dbContext.CurrencyPacks
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .ToListAsync(cancellationToken);
+        var pack = activePacks.FirstOrDefault(x => ResolvePackStoreProductId(x, provider) == normalizedProductId);
+        if (pack is null)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var verification = await storeSubscriptionVerifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                userId,
+                provider,
+                normalizedProductId,
+                serverVerificationData,
+                localVerificationData,
+                purchaseId,
+                transactionDate),
+            cancellationToken);
+
+        if (verification.IsFailure)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(verification.Error);
+        }
+
+        if (!verification.Value.IsPurchased)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var externalPaymentId = ResolveStoreExternalPaymentId(provider, serverVerificationData, verification.Value.ExternalTransactionId, purchaseId);
+        var existing = await dbContext.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.PaymentProvider == provider && x.ExternalPaymentId == externalPaymentId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.UserId != userId)
+            {
+                return Result.Failure<StoreBillingValidationResponse>(EconomyErrors.StorePurchaseInvalid);
+            }
+
+            return Result.Success(new StoreBillingValidationResponse(
+                provider,
+                "TokenPack",
+                normalizedProductId,
+                existing.Status,
+                false,
+                existing.SparkToGrant,
+                false,
+                null));
+        }
+
+        var now = DateTime.UtcNow;
+        var order = new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PackId = pack.Id,
+            PaymentProvider = provider,
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = pack.PriceAmount,
+            CurrencyCode = pack.CurrencyCode,
+            SparkToGrant = pack.GrantedSpark + pack.BonusSpark,
+            CheckoutUrl = string.Empty,
+            CreatedAtUtc = now
+        };
+
+        dbContext.PurchaseOrders.Add(order);
+        var confirmResult = await ConfirmStorePurchaseInternalAsync(order, externalPaymentId, cancellationToken);
+        if (confirmResult.IsFailure)
+        {
+            return Result.Failure<StoreBillingValidationResponse>(confirmResult.Error);
+        }
+
+        logger?.LogInformation(
+            "Store token pack validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} OrderId={OrderId} TokenAmount={TokenAmount} Environment={Environment} CorrelationId={CorrelationId}",
+            provider,
+            userId,
+            normalizedProductId,
+            confirmResult.Value.Id,
+            confirmResult.Value.SparkToGrant,
+            ResolveStoreEnvironment(provider),
+            CurrentCorrelationId);
+
+        return Result.Success(new StoreBillingValidationResponse(
+            provider,
+            "TokenPack",
+            normalizedProductId,
+            confirmResult.Value.Status,
+            true,
+            confirmResult.Value.SparkToGrant,
+            false,
+            null));
+    }
+
+    private async Task<ResolvedPremiumPlan?> ResolveStorePlanByProductIdAsync(
+        string provider,
+        string productId,
+        CancellationToken cancellationToken)
+    {
+        var configuredPlan = await dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.IsActive
+                    && (provider == "google_play"
+                        ? x.GoogleProductId == productId
+                        : x.AppleProductId == productId),
+                cancellationToken);
+
+        if (configuredPlan is not null)
+        {
+            return await ResolveConfiguredPremiumPlanAsync(configuredPlan.Id, cancellationToken);
+        }
+
+        return PremiumPlanCatalog.All
+            .FirstOrDefault(x => string.Equals(
+                provider == "google_play" ? x.GooglePlayProductId : x.AppStoreProductId,
+                productId,
+                StringComparison.Ordinal))
+            is { } catalogPlan
+                ? await ResolveConfiguredPremiumPlanAsync(catalogPlan.PlanCode, cancellationToken)
+                : null;
+    }
+
+    private static string ResolveStoreExternalPaymentId(
+        string provider,
+        string serverVerificationData,
+        string? externalTransactionId,
+        string? purchaseId)
+    {
+        return string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? serverVerificationData.Trim()
+            : (externalTransactionId ?? purchaseId ?? serverVerificationData).Trim();
+    }
+
+    private string ResolveStoreEnvironment(string provider)
+    {
+        return provider == "google_play"
+            ? options.Value.GooglePlayEnvironment
+            : options.Value.AppStoreEnvironment;
     }
 
     private string ResolvePackStoreProductId(CurrencyPack pack, string provider)

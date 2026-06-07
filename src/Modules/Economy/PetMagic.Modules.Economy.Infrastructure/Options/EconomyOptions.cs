@@ -48,9 +48,13 @@ public sealed class EconomyOptions
 
     public string GooglePlayPubSubExpectedEmail { get; init; } = string.Empty;
 
+    public string GooglePlayEnvironment { get; init; } = "production";
+
     public string AppStoreBundleId { get; init; } = "com.petmagic.app";
 
     public string AppStoreSharedSecret { get; init; } = string.Empty;
+
+    public string AppStoreEnvironment { get; init; } = "production";
 
     public bool FirebasePushEnabled { get; init; }
 

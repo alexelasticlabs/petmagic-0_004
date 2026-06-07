@@ -118,6 +118,42 @@ public sealed partial class EconomyService
         return Result.Success<IReadOnlyList<PremiumPlanResponse>>(catalogPlans);
     }
 
+    public async Task<Result<BillingProductsResponse>> ListBillingProductsAsync(CancellationToken cancellationToken)
+    {
+        var packs = await dbContext.CurrencyPacks
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.CurrencyCode)
+            .ThenBy(x => x.SortOrder)
+            .ToListAsync(cancellationToken);
+
+        var plans = await dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.DisplayOrder)
+            .ToListAsync(cancellationToken);
+
+        return Result.Success(new BillingProductsResponse(
+            packs
+                .Select(x => new BillingTokenPackProductResponse(
+                    x.Id,
+                    x.Code,
+                    x.DisplayName,
+                    x.GrantedSpark + x.BonusSpark,
+                    ResolvePackStoreProductId(x, "google_play"),
+                    ResolvePackStoreProductId(x, "app_store")))
+                .ToList(),
+            plans
+                .Select(x => new BillingSubscriptionProductResponse(
+                    x.Id,
+                    x.Name,
+                    x.BillingPeriod,
+                    x.MonthlyTokenLimit,
+                    x.GoogleProductId,
+                    x.AppleProductId))
+                .ToList()));
+    }
+
     public async Task<Result<PaywallConfigResponse>> GetPaywallConfigAsync(GetPaywallConfigQuery query, CancellationToken cancellationToken)
     {
         var plans = await dbContext.SubscriptionPlans
@@ -171,18 +207,6 @@ public sealed partial class EconomyService
         var wallet = await GetOrCreateWalletAsync(userId, cancellationToken);
         var subscription = await GetLatestUserSubscriptionAsync(userId, cancellationToken);
 
-        var profileIsPremium = false;
-        if (identityService is not null)
-        {
-            var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
-            if (profile.IsFailure)
-            {
-                return Result.Failure<SubscriptionSummaryResponse>(profile.Error);
-            }
-
-            profileIsPremium = profile.Value.IsPremium;
-        }
-
         SubscriptionPlan? plan = null;
         if (!string.IsNullOrWhiteSpace(subscription?.PlanId))
         {
@@ -191,7 +215,7 @@ public sealed partial class EconomyService
                 .FirstOrDefaultAsync(x => x.Id == subscription.PlanId, cancellationToken);
         }
 
-        var isPremium = IsActivePremiumSubscription(subscription) || profileIsPremium;
+        var isPremium = IsActivePremiumSubscription(subscription);
         var manageAction = GetManageSubscriptionAction(subscription?.Provider);
 
         string? cardBrand = null;
@@ -337,7 +361,9 @@ public sealed partial class EconomyService
                 x.BalanceAfter,
                 x.Source,
                 x.Reason,
-                x.CreatedAtUtc))
+                x.CreatedAtUtc,
+                x.SourceProvider,
+                null))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));

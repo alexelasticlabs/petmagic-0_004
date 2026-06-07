@@ -61,6 +61,16 @@ public sealed record VerifyPackStorePurchaseCommand(
     string? PurchaseId,
     string? TransactionDate);
 
+public sealed record ValidateGooglePlayBillingCommand(
+    Guid UserId,
+    string PurchaseToken,
+    string ProductId,
+    string PackageName);
+
+public sealed record ValidateAppleAppStoreBillingCommand(
+    Guid UserId,
+    string SignedTransactionInfo);
+
 public sealed record ConfirmPackPurchaseCommand(Guid UserId, Guid OrderId);
 
 public sealed record CreatePaymentMethodSetupCommand(Guid UserId, string PaymentProvider);

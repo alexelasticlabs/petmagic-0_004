@@ -8,6 +8,8 @@ public static class IdentityErrors
 
     public static readonly Error AccountLocked = new("auth.account_locked", "Account is temporarily locked.");
 
+    public static readonly Error AccountDeleted = new("auth.account_deleted", "Account was deleted.");
+
     public static readonly Error InvalidSubject = new("auth.invalid_subject", "Invalid access token subject.");
 
     public static readonly Error UserAlreadyExists = new("auth.user_exists", "A user with this email already exists.");
@@ -21,6 +23,8 @@ public static class IdentityErrors
     public static readonly Error ExternalTokenInvalid = new("auth.external_token_invalid", "External identity token is invalid.");
 
     public static readonly Error ExternalEmailMissing = new("auth.external_email_missing", "External provider did not supply an email.");
+
+    public static readonly Error ExternalEmailNotVerified = new("auth.external_email_not_verified", "External provider email is not verified.");
 
     public static readonly Error ExternalAlreadyLinked = new("auth.external_already_linked", "This external account is already linked to another user.");
 

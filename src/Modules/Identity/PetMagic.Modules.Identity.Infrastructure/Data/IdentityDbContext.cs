@@ -11,6 +11,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
 {
     public DbSet<RefreshTokenSession> RefreshTokenSessions => Set<RefreshTokenSession>();
 
+    public DbSet<ExternalAuthProvider> ExternalAuthProviders => Set<ExternalAuthProvider>();
+
+    public DbSet<DeletedAccountBlock> DeletedAccountBlocks => Set<DeletedAccountBlock>();
+
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public DbSet<UserEmailCode> UserEmailCodes => Set<UserEmailCode>();
@@ -35,6 +39,7 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.AvatarContentType).HasMaxLength(128);
             entity.Property(x => x.AccountStatus).HasConversion<int>().HasDefaultValue(AccountStatus.PendingEmailVerification);
             entity.Property(x => x.AccountStatusUpdatedAtUtc);
+            entity.Property(x => x.LastLoginAtUtc);
             entity.HasIndex(x => x.AccountStatus);
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.AccountStatus, x.AccountStatusUpdatedAtUtc, x.CreatedAtUtc });
@@ -55,6 +60,36 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.TokenHash).HasMaxLength(200).IsRequired();
             entity.HasIndex(x => x.TokenHash).IsUnique();
             entity.HasIndex(x => x.UserId);
+        });
+
+        builder.Entity<ExternalAuthProvider>(entity =>
+        {
+            entity.ToTable("external_auth_providers");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Provider).HasMaxLength(32).IsRequired();
+            entity.Property(x => x.ProviderUserId).HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Email).HasMaxLength(320);
+            entity.Property(x => x.CreatedAt).IsRequired();
+            entity.Property(x => x.LastUsedAt).IsRequired();
+            entity.HasIndex(x => new { x.Provider, x.ProviderUserId }).IsUnique();
+            entity.HasIndex(x => x.UserId);
+            entity.HasIndex(x => x.Email);
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DeletedAccountBlock>(entity =>
+        {
+            entity.ToTable("deleted_account_blocks");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).HasMaxLength(320);
+            entity.Property(x => x.Provider).HasMaxLength(32);
+            entity.Property(x => x.ProviderUserId).HasMaxLength(256);
+            entity.Property(x => x.DeletedAtUtc).IsRequired();
+            entity.HasIndex(x => x.Email).IsUnique();
+            entity.HasIndex(x => new { x.Provider, x.ProviderUserId }).IsUnique();
         });
 
         builder.Entity<AuditEvent>(entity =>

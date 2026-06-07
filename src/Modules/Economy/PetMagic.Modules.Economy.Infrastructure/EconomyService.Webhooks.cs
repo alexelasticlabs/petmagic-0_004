@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 using Npgsql;
+using System.Text.Json;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -508,7 +509,7 @@ public sealed partial class EconomyService
             subscription.Status,
             parsed.EventId,
             subscription.ExternalSubscriptionId,
-            command.SignedPayload,
+            BuildSafeAppStoreWebhookPayloadMetadata(parsed),
             cancellationToken);
 
         LogSubscriptionUpdated(
@@ -704,7 +705,7 @@ public sealed partial class EconomyService
             subscription.Status,
             parsed.EventId,
             subscription.ExternalSubscriptionId,
-            command.MessageData,
+            BuildSafeGooglePlayWebhookPayloadMetadata(parsed),
             cancellationToken);
 
         LogSubscriptionUpdated(
@@ -725,5 +726,32 @@ public sealed partial class EconomyService
 
         LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
         return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
+    }
+
+    private static string BuildSafeAppStoreWebhookPayloadMetadata(
+        (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd) parsed)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            parsed.NotificationType,
+            parsed.Subtype,
+            parsed.ProductId,
+            parsed.ExpiresAtUtc,
+            parsed.CancelAtPeriodEnd,
+            HasExternalSubscriptionId = !string.IsNullOrWhiteSpace(parsed.ExternalSubscriptionId),
+            HasExternalPurchaseId = !string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
+        });
+    }
+
+    private static string BuildSafeGooglePlayWebhookPayloadMetadata(
+        (bool Success, string? EventId, int NotificationType, string? ProductId, string? PurchaseToken, bool IsSubscriptionNotification, bool IsOneTimeProductNotification) parsed)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            parsed.NotificationType,
+            parsed.ProductId,
+            parsed.IsSubscriptionNotification,
+            parsed.IsOneTimeProductNotification
+        });
     }
 }

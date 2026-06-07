@@ -32,16 +32,31 @@ internal sealed partial class TemplatesService
                 job.Status
             })
             .ToListAsync(cancellationToken);
+        var statusCounts = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .GroupBy(job => job.Status)
+            .Select(group => new
+            {
+                Status = group.Key,
+                Count = group.Count()
+            })
+            .ToListAsync(cancellationToken);
+        var statusCountByStatus = statusCounts.ToDictionary(row => row.Status, row => row.Count);
 
         return Result.Success(new AdminTemplateGenerationDashboardMetricsResponse(
+            TotalJobs: statusCounts.Sum(row => row.Count),
             GenerationsToday: jobs.Count(job => job.CreatedAtUtc >= todayStart),
             GenerationsThisWeek: jobs.Count(job => job.CreatedAtUtc >= weekStart),
             GenerationsThisMonth: jobs.Count(job => job.CreatedAtUtc >= monthStart),
             FailedGenerationsToday: jobs.Count(job => job.Status == TemplateGenerationStatus.Failed && job.CreatedAtUtc >= todayStart),
             FailedGenerationsThisWeek: jobs.Count(job => job.Status == TemplateGenerationStatus.Failed && job.CreatedAtUtc >= weekStart),
             FailedGenerationsThisMonth: jobs.Count(job => job.Status == TemplateGenerationStatus.Failed && job.CreatedAtUtc >= monthStart),
-            PendingJobs: jobs.Count(job => job.Status == TemplateGenerationStatus.Queued),
-            RunningJobs: jobs.Count(job => job.Status == TemplateGenerationStatus.Processing || job.Status == TemplateGenerationStatus.Retrying),
+            PendingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Queued),
+            RunningJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Processing),
+            CompletedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Completed),
+            FailedJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Failed),
+            CancelledJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Cancelled),
+            RetryingJobs: statusCountByStatus.GetValueOrDefault(TemplateGenerationStatus.Retrying),
             GeneratedAtUtc: now));
     }
 

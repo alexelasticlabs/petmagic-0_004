@@ -63,15 +63,21 @@ public static class AdminTemplateEndpoints
         return endpoints;
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminTemplateListItemResponse>>> ListAsync(
+    private static async Task<Ok<AdminTemplateCatalogPageResponse>> ListAsync(
         [FromQuery] string? type,
         [FromQuery] string? status,
+        [FromQuery] string? search,
+        [FromQuery] string? category,
+        [FromQuery] string? access,
+        [FromQuery] string? sort,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var templateType = ParseType(type);
-        var templateStatus = ParseStatus(status);
-        var result = await service.ListAdminAsync(templateType, templateStatus, cancellationToken);
+        var result = await service.ListAdminAsync(
+            new AdminTemplateCatalogQuery(type, status, search, category, access, sort, skip, take),
+            cancellationToken);
 
         return TypedResults.Ok(result.Value);
     }
@@ -487,16 +493,6 @@ public static class AdminTemplateEndpoints
         }
 
         return TypedResults.NoContent();
-    }
-
-    private static TemplateType? ParseType(string? raw)
-    {
-        return Enum.TryParse<TemplateType>(raw, true, out var value) ? value : null;
-    }
-
-    private static TemplateStatus? ParseStatus(string? raw)
-    {
-        return Enum.TryParse<TemplateStatus>(raw, true, out var value) ? value : null;
     }
 
     private static async Task<Dictionary<string, string[]>> ValidateSourceImageAsync(

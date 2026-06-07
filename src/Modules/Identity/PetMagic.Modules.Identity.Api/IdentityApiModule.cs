@@ -33,6 +33,8 @@ public static class IdentityApiModule
         services.AddScoped<IValidator<LogoutCommand>, LogoutCommandValidator>();
         services.AddScoped<IValidator<ExternalLoginCallbackCommand>, ExternalLoginCallbackCommandValidator>();
         services.AddScoped<IValidator<GoogleNativeLoginCommand>, GoogleNativeLoginCommandValidator>();
+        services.AddScoped<IValidator<GoogleSocialLoginCommand>, GoogleSocialLoginCommandValidator>();
+        services.AddScoped<IValidator<AppleSocialLoginCommand>, AppleSocialLoginCommandValidator>();
         services.AddScoped<IValidator<SendBulkEmailCommand>, SendBulkEmailCommandValidator>();
         services.AddScoped<IValidator<AssignRoleCommand>, AssignRoleCommandValidator>();
         services.AddScoped<IValidator<RevokeRoleCommand>, RevokeRoleCommandValidator>();

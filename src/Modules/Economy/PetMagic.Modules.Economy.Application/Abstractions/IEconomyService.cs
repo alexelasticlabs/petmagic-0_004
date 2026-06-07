@@ -27,6 +27,8 @@ public interface IEconomyService
 
     Task<Result<IReadOnlyList<PremiumPlanResponse>>> ListPremiumPlansAsync(CancellationToken cancellationToken);
 
+    Task<Result<BillingProductsResponse>> ListBillingProductsAsync(CancellationToken cancellationToken);
+
     Task<Result<PaywallConfigResponse>> GetPaywallConfigAsync(GetPaywallConfigQuery query, CancellationToken cancellationToken);
 
     Task<Result<PremiumStatusResponse>> GetPremiumStatusAsync(Guid userId, CancellationToken cancellationToken);
@@ -59,6 +61,10 @@ public interface IEconomyService
 
     Task<Result<PurchaseOrderResponse>> VerifyPackStorePurchaseAsync(VerifyPackStorePurchaseCommand command, CancellationToken cancellationToken);
 
+    Task<Result<StoreBillingValidationResponse>> ValidateGooglePlayBillingAsync(ValidateGooglePlayBillingCommand command, CancellationToken cancellationToken);
+
+    Task<Result<StoreBillingValidationResponse>> ValidateAppleAppStoreBillingAsync(ValidateAppleAppStoreBillingCommand command, CancellationToken cancellationToken);
+
     Task<Result<OffsetPagedResponse<PurchaseHistoryItemResponse>>> GetPurchaseHistoryAsync(Guid userId, int skip, int take, CancellationToken cancellationToken);
 
     Task<Result<PurchaseOrderResponse>> ConfirmPackPurchaseAsync(ConfirmPackPurchaseCommand command, CancellationToken cancellationToken);
@@ -79,6 +85,8 @@ public interface IEconomyService
         CancellationToken cancellationToken);
 
     Task<Result<PurchaseHistoryItemResponse>> RefundAdminPurchaseAsync(AdminRefundPurchaseCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminEconomyDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(CancellationToken cancellationToken);
 
     Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(int skip, int take, string? status, string? provider, string? search, CancellationToken cancellationToken);
 
@@ -102,7 +110,13 @@ public interface IEconomyService
 
     Task<Result<AdminPaymentProviderConfigurationResponse>> UpdatePaymentProviderConfigurationAsync(UpdatePaymentProviderConfigurationCommand command, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(CancellationToken cancellationToken);
+    Task<Result<OffsetPagedResponse<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(
+        AdminRedeemCodeListQuery query,
+        CancellationToken cancellationToken);
+
+    Task<Result<AdminRedeemCodeMetricsResponse>> GetAdminRedeemCodeMetricsAsync(
+        AdminRedeemCodeListQuery query,
+        CancellationToken cancellationToken);
 
     Task<Result<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>> GetAdminRedeemCodeActivationsAsync(
         Guid redeemCodeId,

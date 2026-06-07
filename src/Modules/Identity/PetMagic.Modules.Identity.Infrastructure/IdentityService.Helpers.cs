@@ -2,7 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 
-using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -105,18 +105,21 @@ public sealed partial class IdentityService
 
     private async Task<IReadOnlyList<LinkedAccountResponse>> ListLinkedAccountsAsync(AppUser user)
     {
-        var userLogins = await userManager.GetLoginsAsync(user);
+        var providerAccounts = await dbContext.ExternalAuthProviders
+            .Where(x => x.UserId == user.Id)
+            .OrderBy(x => x.Provider)
+            .ToListAsync();
 
-        return [.. userLogins
-            .GroupBy(x => x.LoginProvider, StringComparer.OrdinalIgnoreCase)
+        return [.. providerAccounts
+            .GroupBy(x => x.Provider, StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(group => new LinkedAccountResponse(
-                group.First().LoginProvider,
-                ToLinkedAccountDisplayName(group.First().ProviderDisplayName ?? group.First().LoginProvider),
-                CanDisconnectLinkedProvider(user, userLogins, group.Count())))];
+                group.First().Provider,
+                ToLinkedAccountDisplayName(group.First().Provider),
+                CanDisconnectLinkedProvider(user, providerAccounts, group.Count())))];
     }
 
-    private static bool CanDisconnectLinkedProvider(AppUser user, IEnumerable<UserLoginInfo> allLogins, int providerLoginCount)
+    private static bool CanDisconnectLinkedProvider(AppUser user, IEnumerable<ExternalAuthProvider> allLogins, int providerLoginCount)
     {
         if (!string.IsNullOrWhiteSpace(user.PasswordHash))
         {
@@ -141,6 +144,43 @@ public sealed partial class IdentityService
         return provider;
     }
 
+    private static string? NormalizeEmail(string? email)
+    {
+        var normalized = email?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static string? NormalizeExternalProvider(string? provider)
+    {
+        if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Google";
+        }
+
+        if (string.Equals(provider, "Apple", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Apple";
+        }
+
+        return null;
+    }
+
+    private async Task<bool> IsDeletedEmailBlockedAsync(string email, CancellationToken cancellationToken)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        return !string.IsNullOrWhiteSpace(normalizedEmail)
+            && await dbContext.DeletedAccountBlocks
+                .AnyAsync(x => x.Email == normalizedEmail, cancellationToken);
+    }
+
+    private async Task<bool> IsDeletedProviderBlockedAsync(string provider, string providerUserId, CancellationToken cancellationToken)
+    {
+        return await dbContext.DeletedAccountBlocks
+            .AnyAsync(
+                x => x.Provider == provider && x.ProviderUserId == providerUserId,
+                cancellationToken);
+    }
+
     private UserProfileResponse ToUserProfileResponse(AppUser user, IEnumerable<string> roles) =>
         new(
             user.Id,
@@ -156,4 +196,3 @@ public sealed partial class IdentityService
             [.. roles],
             ToAvatarResponse(user));
 }
-

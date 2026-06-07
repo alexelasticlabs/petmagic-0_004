@@ -109,6 +109,47 @@ public sealed partial class IdentityServiceProfileTests
     }
 
     [Fact]
+    public async Task GetAdminUserDashboardMetricsAsync_ShouldAggregateUsersRolesAndWeeklyRegistrations()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var now = DateTime.UtcNow;
+        var todayStart = new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc);
+        var admin = CreateListUser("admin-metrics@petmagic.app", todayStart.AddHours(12));
+        admin.IsPremium = true;
+        var moderator = CreateListUser("moderator-metrics@petmagic.app", todayStart.AddDays(-2).AddHours(12));
+        var regular = CreateListUser("regular-metrics@petmagic.app", todayStart.AddDays(-8).AddHours(12));
+        var older = CreateListUser("older-metrics@petmagic.app", todayStart.AddDays(-20).AddHours(12));
+        older.IsPremium = true;
+        older.IsActive = false;
+
+        identityDb.Users.AddRange(admin, moderator, regular, older);
+        await identityDb.SaveChangesAsync();
+        await AddUserRoleAsync(identityDb, admin.Id, SystemRoles.Admin);
+        await AddUserRoleAsync(identityDb, moderator.Id, SystemRoles.Moderator);
+        await AddUserRoleAsync(identityDb, regular.Id, SystemRoles.User);
+        await AddUserRoleAsync(identityDb, older.Id, SystemRoles.User);
+
+        var result = await service.GetAdminUserDashboardMetricsAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(4, result.Value.TotalUsers);
+        Assert.Equal(2, result.Value.PremiumUsers);
+        Assert.Equal(3, result.Value.ActiveUsers);
+        Assert.Equal(1, result.Value.BlockedUsers);
+        Assert.Equal(1, result.Value.AdminUsers);
+        Assert.Equal(1, result.Value.ModeratorUsers);
+        Assert.Equal(2, result.Value.RegularUsers);
+        Assert.Equal(2, result.Value.UsersThisWeek);
+        Assert.Equal(1, result.Value.UsersPreviousWeek);
+        Assert.Equal(2, result.Value.NewUsersLast7Days);
+        Assert.Equal(4, result.Value.NewUsersLast30Days);
+        Assert.Equal(4, result.Value.NewUsersLast90Days);
+    }
+
+    [Fact]
     public async Task RevokeRoleAsync_ShouldRejectRemovingLastAdmin()
     {
         await using var identityDb = CreateIdentityDbContext();

@@ -1025,10 +1025,12 @@ public sealed partial class EconomyServiceTests
         redemptions[5].RedeemedAtUtc = now.AddHours(-1);
         await dbContext.SaveChangesAsync();
 
-        var list = await service.ListAdminRedeemCodesAsync(CancellationToken.None);
+        var list = await service.ListAdminRedeemCodesAsync(
+            new AdminRedeemCodeListQuery(0, 20),
+            CancellationToken.None);
 
         Assert.True(list.IsSuccess);
-        var code = Assert.Single(list.Value, x => x.RedeemCodeId == codeResult.Value.RedeemCodeId);
+        var code = Assert.Single(list.Value.Items, x => x.RedeemCodeId == codeResult.Value.RedeemCodeId);
 
         Assert.Equal(4, code.UsesLast7d);
         Assert.Equal(80, code.GrantedLast7d);
@@ -1036,6 +1038,112 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(5, code.Redemptions.Count);
         Assert.Equal(redemptions.Max(x => x.RedeemedAtUtc), code.LastRedeemedAtUtc);
         Assert.DoesNotContain(code.Redemptions, x => x.RedeemedAtUtc == now.AddDays(-10));
+    }
+
+    [Fact]
+    public async Task ListAdminRedeemCodesAsync_ShouldFilterAndPageOnBackend()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var now = DateTime.UtcNow;
+
+        var activeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("LAUNCH-ACTIVE", "Launch campaign", RedeemCodeRewardKind.Spark, 25, 100, 1, true, null, now.AddDays(7)),
+            CancellationToken.None);
+        var pausedResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("LAUNCH-PAUSED", "Launch campaign paused", RedeemCodeRewardKind.Spark, 25, 100, 1, false, null, now.AddDays(7)),
+            CancellationToken.None);
+        var otherResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("OTHER-ACTIVE", "Other campaign", RedeemCodeRewardKind.Spark, 50, 100, 1, true, null, now.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(activeResult.IsSuccess);
+        Assert.True(pausedResult.IsSuccess);
+        Assert.True(otherResult.IsSuccess);
+
+        var firstPage = await service.ListAdminRedeemCodesAsync(
+            new AdminRedeemCodeListQuery(0, 1, Search: "launch", Status: "active", RewardKind: "spark", Sort: "code"),
+            CancellationToken.None);
+        var secondPage = await service.ListAdminRedeemCodesAsync(
+            new AdminRedeemCodeListQuery(1, 1, Search: "launch", Status: "active", RewardKind: "spark", Sort: "code"),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        var firstItem = Assert.Single(firstPage.Value.Items);
+        Assert.Equal(activeResult.Value.RedeemCodeId, firstItem.RedeemCodeId);
+        Assert.Equal(1, firstPage.Value.TotalCount);
+        Assert.False(firstPage.Value.HasMore);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.Empty(secondPage.Value.Items);
+        Assert.Equal(1, secondPage.Value.TotalCount);
+        Assert.False(secondPage.Value.HasMore);
+    }
+
+    [Fact]
+    public async Task GetAdminRedeemCodeMetricsAsync_ShouldReturnBackendAggregatesForFilteredCodes()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var now = DateTime.UtcNow;
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+
+        var activeResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("LAUNCH-METRICS", "Launch metrics", RedeemCodeRewardKind.Spark, 25, 100, 1, true, null, now.AddDays(7)),
+            CancellationToken.None);
+        var pausedResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("LAUNCH-METRICS-PAUSED", "Launch metrics paused", RedeemCodeRewardKind.Spark, 40, 100, 1, false, null, now.AddDays(7)),
+            CancellationToken.None);
+        var otherResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand("OTHER-METRICS", "Other metrics", RedeemCodeRewardKind.Spark, 100, 100, 1, true, null, now.AddDays(7)),
+            CancellationToken.None);
+
+        Assert.True(activeResult.IsSuccess);
+        Assert.True(pausedResult.IsSuccess);
+        Assert.True(otherResult.IsSuccess);
+
+        var firstApply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(firstUserId, "LAUNCH-METRICS"),
+            CancellationToken.None);
+        var secondApply = await service.ApplyRedeemCodeAsync(
+            new ApplyRedeemCodeCommand(secondUserId, "LAUNCH-METRICS"),
+            CancellationToken.None);
+
+        Assert.True(firstApply.IsSuccess);
+        Assert.True(secondApply.IsSuccess);
+
+        var oldRedemption = await dbContext.RedeemCodeRedemptions
+            .Where(x => x.RedeemCodeId == activeResult.Value.RedeemCodeId)
+            .OrderBy(x => x.RedeemedAtUtc)
+            .FirstAsync();
+        oldRedemption.RedeemedAtUtc = now.AddDays(-8);
+        await dbContext.SaveChangesAsync();
+
+        var allLaunchMetrics = await service.GetAdminRedeemCodeMetricsAsync(
+            new AdminRedeemCodeListQuery(Search: "launch", RewardKind: "spark"),
+            CancellationToken.None);
+        var activeLaunchMetrics = await service.GetAdminRedeemCodeMetricsAsync(
+            new AdminRedeemCodeListQuery(Search: "launch", Status: "active", RewardKind: "spark"),
+            CancellationToken.None);
+
+        Assert.True(allLaunchMetrics.IsSuccess);
+        Assert.Equal(2, allLaunchMetrics.Value.TotalCodes);
+        Assert.Equal(1, allLaunchMetrics.Value.ActiveCodes);
+        Assert.Equal(2, allLaunchMetrics.Value.TotalUses);
+        Assert.Equal(50, allLaunchMetrics.Value.TotalGranted);
+        Assert.Equal(2, allLaunchMetrics.Value.CreatedLast7d);
+        Assert.Equal(1, allLaunchMetrics.Value.ActiveTouchedLast7d);
+        Assert.Equal(1, allLaunchMetrics.Value.UsesLast7d);
+        Assert.Equal(25, allLaunchMetrics.Value.GrantedLast7d);
+
+        Assert.True(activeLaunchMetrics.IsSuccess);
+        Assert.Equal(1, activeLaunchMetrics.Value.TotalCodes);
+        Assert.Equal(1, activeLaunchMetrics.Value.ActiveCodes);
+        Assert.Equal(2, activeLaunchMetrics.Value.TotalUses);
+        Assert.Equal(50, activeLaunchMetrics.Value.TotalGranted);
     }
 
     [Fact]

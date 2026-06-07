@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Infrastructure.Options;
 
 namespace PetMagic.Modules.Economy.Infrastructure.Payments;
@@ -15,6 +16,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 public sealed class StoreSubscriptionVerifier(
     IHttpClientFactory httpClientFactory,
     IOptions<EconomyOptions> options,
+    IStoreWebhookSecurityValidator appStoreSignedPayloadValidator,
     ILogger<StoreSubscriptionVerifier>? logger = null) : IStoreSubscriptionVerifier
 {
     public const string HttpClientName = "StoreSubscriptionVerifier";
@@ -91,6 +93,7 @@ public sealed class StoreSubscriptionVerifier(
 
             DateTime? expiresAtUtc = null;
             string? externalSubscriptionId = null;
+            var matchedLineItem = false;
             if (root.TryGetProperty("latestOrderId", out var orderIdElement) && orderIdElement.ValueKind == JsonValueKind.String)
             {
                 externalSubscriptionId = orderIdElement.GetString();
@@ -101,12 +104,14 @@ public sealed class StoreSubscriptionVerifier(
             {
                 foreach (var item in lineItemsElement.EnumerateArray())
                 {
-                    if (item.TryGetProperty("productId", out var productIdElement)
-                        && productIdElement.ValueKind == JsonValueKind.String
-                        && !string.Equals(productIdElement.GetString(), request.ProductId, StringComparison.Ordinal))
+                    if (!item.TryGetProperty("productId", out var productIdElement)
+                        || productIdElement.ValueKind != JsonValueKind.String
+                        || !string.Equals(productIdElement.GetString(), request.ProductId, StringComparison.Ordinal))
                     {
                         continue;
                     }
+
+                    matchedLineItem = true;
 
                     if (item.TryGetProperty("expiryTime", out var expiryTimeElement)
                         && expiryTimeElement.ValueKind == JsonValueKind.String
@@ -117,6 +122,11 @@ public sealed class StoreSubscriptionVerifier(
 
                     break;
                 }
+            }
+
+            if (!matchedLineItem)
+            {
+                return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
             }
 
             if (!isActive)
@@ -143,6 +153,30 @@ public sealed class StoreSubscriptionVerifier(
         StoreSubscriptionVerificationRequest request,
         CancellationToken cancellationToken)
     {
+        if (IsLikelyJws(request.ServerVerificationData))
+        {
+            var signatureValidation = appStoreSignedPayloadValidator.ValidateAppStoreSignedPayload(request.ServerVerificationData);
+            if (signatureValidation.IsFailure)
+            {
+                return Result.Failure<StoreSubscriptionVerificationResponse>(signatureValidation.Error);
+            }
+
+            var transactionInfo = EconomyWebhookParser.TryReadAppStoreTransactionInfo(request.ServerVerificationData);
+            if (!IsValidAppStoreTransaction(transactionInfo, request.ProductId))
+            {
+                return Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+            }
+
+            var isActive = transactionInfo!.ExpiresAtUtc.HasValue
+                && transactionInfo.ExpiresAtUtc.Value > DateTime.UtcNow;
+
+            return Result.Success(new StoreSubscriptionVerificationResponse(
+                isActive,
+                transactionInfo.ExpiresAtUtc,
+                isActive ? "active" : "expired",
+                transactionInfo.OriginalTransactionId ?? transactionInfo.TransactionId));
+        }
+
         if (string.IsNullOrWhiteSpace(options.Value.AppStoreSharedSecret)
             || string.IsNullOrWhiteSpace(options.Value.AppStoreBundleId))
         {
@@ -217,8 +251,24 @@ public sealed class StoreSubscriptionVerifier(
                 && purchaseStateElement.ValueKind == JsonValueKind.Number
                 ? purchaseStateElement.GetInt32()
                 : -1;
+            var acknowledgementState = root.TryGetProperty("acknowledgementState", out var acknowledgementStateElement)
+                && acknowledgementStateElement.ValueKind == JsonValueKind.Number
+                ? acknowledgementStateElement.GetInt32()
+                : 1;
+            var purchaseType = root.TryGetProperty("purchaseType", out var purchaseTypeElement)
+                && purchaseTypeElement.ValueKind == JsonValueKind.Number
+                ? purchaseTypeElement.GetInt32()
+                : 0;
+            var hasRefundOrCancelSignal = root.TryGetProperty("voidedPurchaseType", out _)
+                || root.TryGetProperty("cancelReason", out _)
+                || root.TryGetProperty("refundableQuantity", out var refundableQuantityElement)
+                    && refundableQuantityElement.ValueKind == JsonValueKind.Number
+                    && refundableQuantityElement.GetInt32() == 0;
 
-            var isPurchased = purchaseState == 0;
+            var isPurchased = purchaseState == 0
+                && acknowledgementState == 1
+                && !hasRefundOrCancelSignal
+                && purchaseType >= 0;
             var orderId = root.TryGetProperty("orderId", out var orderIdElement)
                 && orderIdElement.ValueKind == JsonValueKind.String
                 ? orderIdElement.GetString()
@@ -246,6 +296,26 @@ public sealed class StoreSubscriptionVerifier(
         StoreProductVerificationRequest request,
         CancellationToken cancellationToken)
     {
+        if (IsLikelyJws(request.ServerVerificationData))
+        {
+            var signatureValidation = appStoreSignedPayloadValidator.ValidateAppStoreSignedPayload(request.ServerVerificationData);
+            if (signatureValidation.IsFailure)
+            {
+                return Result.Failure<StoreProductVerificationResponse>(signatureValidation.Error);
+            }
+
+            var transactionInfo = EconomyWebhookParser.TryReadAppStoreTransactionInfo(request.ServerVerificationData);
+            if (!IsValidAppStoreTransaction(transactionInfo, request.ProductId))
+            {
+                return Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+            }
+
+            return Result.Success(new StoreProductVerificationResponse(
+                true,
+                "purchased",
+                transactionInfo!.TransactionId ?? request.PurchaseId));
+        }
+
         if (string.IsNullOrWhiteSpace(options.Value.AppStoreSharedSecret)
             || string.IsNullOrWhiteSpace(options.Value.AppStoreBundleId))
         {
@@ -465,6 +535,32 @@ public sealed class StoreSubscriptionVerifier(
         return url.Contains("sandbox", StringComparison.OrdinalIgnoreCase)
             ? "sandbox"
             : "production";
+    }
+
+    private bool IsValidAppStoreTransaction(
+        EconomyWebhookParser.AppStoreTransactionInfo? transactionInfo,
+        string expectedProductId)
+    {
+        if (transactionInfo is null
+            || string.IsNullOrWhiteSpace(transactionInfo.TransactionId)
+            || string.IsNullOrWhiteSpace(transactionInfo.BundleId)
+            || string.IsNullOrWhiteSpace(transactionInfo.ProductId)
+            || !string.Equals(transactionInfo.BundleId, options.Value.AppStoreBundleId, StringComparison.Ordinal)
+            || !string.Equals(transactionInfo.ProductId, expectedProductId, StringComparison.Ordinal)
+            || transactionInfo.RevokedAtUtc.HasValue)
+        {
+            return false;
+        }
+
+        var expectedEnvironment = options.Value.AppStoreEnvironment?.Trim();
+        return string.IsNullOrWhiteSpace(expectedEnvironment)
+            || string.IsNullOrWhiteSpace(transactionInfo.Environment)
+            || string.Equals(transactionInfo.Environment, expectedEnvironment, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsLikelyJws(string value)
+    {
+        return value.Split('.').Length >= 3;
     }
 
     private static bool TryMatchAppStoreProductTransaction(

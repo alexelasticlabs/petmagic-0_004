@@ -189,6 +189,123 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListAdminCategoriesAsync_ShouldReturnBackendAggregatedCountsAndTags()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var activeImage = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait Active",
+                "Active portrait",
+                "Portrait",
+                ["cozy", "Spark"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait-active.jpg", "portrait-active.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+        var draftImage = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait Draft",
+                "Draft portrait",
+                "Portrait",
+                ["cozy", "draft"],
+                false,
+                10,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait-draft.jpg", "portrait-draft.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+        var archivedImage = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait Archived",
+                "Archived portrait",
+                "Portrait",
+                ["archive"],
+                false,
+                10,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/portrait-archived.jpg", "portrait-archived.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Archived.ToString()),
+            CancellationToken.None);
+        var activePremiumVideo = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Portrait Motion",
+                "Premium motion",
+                "Portrait",
+                ["motion", "spark"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                CreatePreviewAsset("https://cdn.example.com/portrait-motion.mp4", "portrait-motion.mp4", "video/mp4"),
+                CreateReferenceAsset(8.2),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "funny dance",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+        var seasonal = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Seasonal Portrait",
+                "Seasonal portrait",
+                "Seasonal",
+                ["holiday"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/seasonal.jpg", "seasonal.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(activeImage.IsSuccess);
+        Assert.True(draftImage.IsSuccess);
+        Assert.True(archivedImage.IsSuccess);
+        Assert.True(activePremiumVideo.IsSuccess);
+        Assert.True(seasonal.IsSuccess);
+
+        var seasonalCategory = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Seasonal");
+        var archivedCategory = await service.ChangeCategoryArchiveStateAsync(
+            new ChangeTemplateCategoryArchiveStateCommand(seasonalCategory.Id, true),
+            CancellationToken.None);
+
+        Assert.True(archivedCategory.IsSuccess);
+
+        var activeCategories = await service.ListAdminCategoriesAsync(false, CancellationToken.None);
+        var allCategories = await service.ListAdminCategoriesAsync(true, CancellationToken.None);
+
+        Assert.True(activeCategories.IsSuccess);
+        Assert.DoesNotContain(activeCategories.Value, category => category.Name == "Seasonal");
+
+        Assert.True(allCategories.IsSuccess);
+        var portrait = Assert.Single(allCategories.Value, category => category.Name == "Portrait");
+        Assert.Equal(4, portrait.TotalTemplates);
+        Assert.Equal(1, portrait.VideoTemplates);
+        Assert.Equal(3, portrait.ImageTemplates);
+        Assert.Equal(2, portrait.ActiveTemplates);
+        Assert.Equal(1, portrait.DraftTemplates);
+        Assert.Equal(1, portrait.ArchivedTemplates);
+        Assert.Equal(1, portrait.PremiumTemplates);
+        Assert.Equal(["archive", "cozy", "draft", "motion", "Spark"], portrait.Tags);
+
+        var archivedSeasonal = Assert.Single(allCategories.Value, category => category.Name == "Seasonal");
+        Assert.True(archivedSeasonal.IsArchived);
+        Assert.Equal(1, archivedSeasonal.TotalTemplates);
+        Assert.Equal(["holiday"], archivedSeasonal.Tags);
+    }
+
+    [Fact]
     public async Task ChangeStatusAsync_ShouldRejectActivation_WhenReferenceDurationWasNotResolved()
     {
         await using var dbContext = CreateDbContext();

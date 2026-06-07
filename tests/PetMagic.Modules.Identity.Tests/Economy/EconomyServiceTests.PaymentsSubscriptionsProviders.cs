@@ -2,6 +2,7 @@ using System.Text;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -90,7 +91,7 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
-    public async Task VerifyPremiumStorePurchaseAsync_ShouldMarkPendingUntilWebhook()
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldActivateAfterBackendValidation()
     {
         await using var dbContext = CreateDbContext();
 
@@ -155,17 +156,393 @@ public sealed partial class EconomyServiceTests
             .ToListAsync();
         var hasWallet = await dbContext.Wallets.AnyAsync(x => x.UserId == userId);
 
-        Assert.False(first.Value.IsActive);
-        Assert.Equal("pending_webhook", first.Value.Status);
-        Assert.False(second.Value.IsActive);
-        Assert.Equal("pending_webhook", second.Value.Status);
-        Assert.False(hasWallet);
+        Assert.True(first.Value.IsActive);
+        Assert.Equal("Active", first.Value.Status);
+        Assert.True(second.Value.IsActive);
+        Assert.Equal("Active", second.Value.Status);
+        Assert.True(hasWallet);
         Assert.Equal("monthly", subscription.PlanId);
         Assert.Equal(777, subscription.MonthlyTokenLimit);
-        Assert.Equal("Pending", subscription.Status);
-        Assert.Equal(0, subscription.MonthlyTokensGranted);
-        Assert.Empty(grantEntries);
-        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Equal("Active", subscription.Status);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Single(grantEntries);
+        Assert.Equal(2, identityService.SetPremiumStatusCalls.Count);
+    }
+
+    [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectSubscriptionOwnedByAnotherUser()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            Status = "active",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var first = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                Guid.NewGuid(),
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "gp-premium-token-owned-by-first-user",
+                null,
+                "gp-premium-order-owned-by-first-user",
+                null),
+            CancellationToken.None);
+
+        var second = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                Guid.NewGuid(),
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "gp-premium-token-owned-by-first-user",
+                null,
+                "gp-premium-order-owned-by-first-user",
+                null),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, second.Error.Code);
+        Assert.Single(await dbContext.UserSubscriptions.ToListAsync());
+        Assert.Single(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ValidateGooglePlayBillingAsync_ShouldGrantTokenPackOnce()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var first = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                userId,
+                "gp-token-pack-1",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        var second = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                userId,
+                "gp-token-pack-1",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal("TokenPack", first.Value.ProductType);
+        Assert.True(first.Value.TokensGranted);
+        Assert.False(second.Value.TokensGranted);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        var ledgerEntries = await dbContext.WalletLedgerEntries.Where(x => x.UserId == userId).ToListAsync();
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal("succeeded", order.Status);
+        Assert.Equal("gp-token-pack-1", order.ExternalPaymentId);
+        Assert.Equal(120, wallet.Balance);
+        Assert.Single(ledgerEntries);
+        Assert.Equal(120, ledgerEntries[0].Delta);
+    }
+
+    [Fact]
+    public async Task StoreTokenPackResponses_ShouldNotExposePurchaseTokenOrTransactionId()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var validation = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                userId,
+                "gp-sensitive-purchase-token-1",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        Assert.True(validation.IsSuccess);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        var ledgerEntry = await dbContext.WalletLedgerEntries.SingleAsync(x => x.UserId == userId);
+        Assert.Equal("gp-sensitive-purchase-token-1", order.ExternalPaymentId);
+        Assert.Equal("gp-sensitive-purchase-token-1", ledgerEntry.SourceTransactionId);
+
+        var purchaseResponse = await service.GetPurchaseAsync(userId, order.Id, CancellationToken.None);
+        var purchaseHistory = await service.GetPurchaseHistoryAsync(userId, 0, 10, CancellationToken.None);
+        var userLedger = await service.GetWalletLedgerAsync(userId, 0, 10, CancellationToken.None);
+        var adminLedger = await service.GetAdminWalletLedgerAsync(0, 10, null, userId, CancellationToken.None);
+
+        Assert.True(purchaseResponse.IsSuccess);
+        Assert.Null(purchaseResponse.Value.ExternalPaymentId);
+        Assert.True(purchaseHistory.IsSuccess);
+        Assert.Single(purchaseHistory.Value.Items);
+        Assert.Null(purchaseHistory.Value.Items[0].ExternalPaymentId);
+        Assert.True(userLedger.IsSuccess);
+        Assert.Single(userLedger.Value.Items);
+        Assert.Null(userLedger.Value.Items[0].SourceTransactionId);
+        Assert.True(adminLedger.IsSuccess);
+        Assert.Single(adminLedger.Value.Items);
+        Assert.Null(adminLedger.Value.Items[0].SourceTransactionId);
+    }
+
+    [Fact]
+    public async Task ValidateGooglePlayBillingAsync_ShouldRejectWrongPackageName()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var result = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                Guid.NewGuid(),
+                "gp-token-pack-1",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.attacker.app"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ValidateGooglePlayBillingAsync_ShouldRejectTokenPackOwnedByAnotherUser()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var firstUserId = Guid.NewGuid();
+        var first = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                firstUserId,
+                "gp-token-owned-by-first-user",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        var second = await service.ValidateGooglePlayBillingAsync(
+            new ValidateGooglePlayBillingCommand(
+                Guid.NewGuid(),
+                "gp-token-owned-by-first-user",
+                "com.petmagic.app.tokens.google.pack100",
+                "com.petmagic.app"),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, second.Error.Code);
+        Assert.Single(await dbContext.PurchaseOrders.ToListAsync());
+        Assert.Single(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ValidateAppleAppStoreBillingAsync_ShouldGrantTokenPackOnce()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack200",
+            DisplayName = "Pack 200",
+            CurrencyCode = "USD",
+            PriceAmount = 6.99m,
+            GrantedSpark = 180,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 2
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var signedTransactionInfo = BuildAppStoreSignedTransactionInfo(
+            productId: "com.petmagic.app.tokens.apple.pack200",
+            transactionId: "apple-txn-pack-1");
+
+        var first = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(userId, signedTransactionInfo),
+            CancellationToken.None);
+        var second = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(userId, signedTransactionInfo),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal("TokenPack", first.Value.ProductType);
+        Assert.True(first.Value.TokensGranted);
+        Assert.False(second.Value.TokensGranted);
+
+        var order = await dbContext.PurchaseOrders.SingleAsync();
+        var ledgerEntries = await dbContext.WalletLedgerEntries.Where(x => x.UserId == userId).ToListAsync();
+
+        Assert.Equal("succeeded", order.Status);
+        Assert.Equal("apple-txn-pack-1", order.ExternalPaymentId);
+        Assert.Single(ledgerEntries);
+        Assert.Equal("app_store", ledgerEntries[0].SourceProvider);
+        Assert.Equal("apple-txn-pack-1", ledgerEntries[0].SourceTransactionId);
+    }
+
+    [Fact]
+    public async Task ValidateAppleAppStoreBillingAsync_ShouldRejectRevokedTransaction()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack200",
+            DisplayName = "Pack 200",
+            CurrencyCode = "USD",
+            PriceAmount = 6.99m,
+            GrantedSpark = 180,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 2
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var signedTransactionInfo = BuildAppStoreSignedTransactionInfo(
+            productId: "com.petmagic.app.tokens.apple.pack200",
+            transactionId: "apple-txn-revoked-1",
+            revokedAtUtc: DateTime.UtcNow);
+
+        var result = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(Guid.NewGuid(), signedTransactionInfo),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+        Assert.Empty(await dbContext.PurchaseOrders.ToListAsync());
+        Assert.Empty(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ValidateAppleAppStoreBillingAsync_ShouldRejectWrongBundleId()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var signedTransactionInfo = BuildAppStoreSignedTransactionInfo(
+            productId: "com.petmagic.app.tokens.apple.pack200",
+            transactionId: "apple-txn-wrong-bundle-1",
+            bundleId: "com.attacker.app");
+
+        var result = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(Guid.NewGuid(), signedTransactionInfo),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ValidateAppleAppStoreBillingAsync_ShouldRejectInvalidSignedTransactionInfo()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(
+            dbContext,
+            storeWebhookSecurityValidator: new FakeStoreWebhookSecurityValidator(Result.Failure(EconomyErrors.InvalidStoreWebhookSignature)));
+
+        var signedTransactionInfo = BuildAppStoreSignedTransactionInfo(
+            productId: "com.petmagic.app.tokens.apple.pack200",
+            transactionId: "apple-txn-invalid-signature-1");
+
+        var result = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(Guid.NewGuid(), signedTransactionInfo),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.InvalidStoreWebhookSignature.Code, result.Error.Code);
+        Assert.Empty(await dbContext.PurchaseOrders.ToListAsync());
+        Assert.Empty(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ValidateAppleAppStoreBillingAsync_ShouldRejectWrongEnvironment()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var signedTransactionInfo = BuildAppStoreSignedTransactionInfo(
+            productId: "com.petmagic.app.tokens.apple.pack200",
+            transactionId: "apple-txn-wrong-environment-1",
+            environment: "sandbox");
+
+        var result = await service.ValidateAppleAppStoreBillingAsync(
+            new ValidateAppleAppStoreBillingCommand(Guid.NewGuid(), signedTransactionInfo),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
     }
 
     [Fact]
@@ -375,6 +752,148 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(40, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "app_store");
+        Assert.NotNull(eventLog.PayloadJson);
+        Assert.Contains("DID_CHANGE_RENEWAL_STATUS", eventLog.PayloadJson);
+        Assert.Contains("com.petmagic.custom.monthly.apple", eventLog.PayloadJson);
+        Assert.DoesNotContain(signedPayload, eventLog.PayloadJson);
+        Assert.DoesNotContain(signedTransactionInfo, eventLog.PayloadJson);
+        Assert.DoesNotContain("signedTransactionInfo", eventLog.PayloadJson);
+        Assert.DoesNotContain("txn-app-2", eventLog.PayloadJson);
+    }
+
+    [Fact]
+    public async Task HandleAppStoreServerNotificationAsync_ShouldExpireSubscriptionOnRefund()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(20);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "app_store",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "orig-app-refund-1",
+            ExternalTransactionId = "txn-app-refund-1",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-refund-1\",\"transactionId\":\"txn-app-refund-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
+        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-refund-notification-1\",\"notificationType\":\"REFUND\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+
+        var result = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
+        Assert.Equal("Expired", subscription.Status);
+        Assert.NotNull(subscription.ExpiredAtUtc);
+        Assert.Equal("txn-app-refund-2", subscription.ExternalTransactionId);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
+    public async Task HandleAppStoreServerNotificationAsync_ShouldExpireSubscriptionOnRevoke()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(20);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "app_store",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "orig-app-revoke-1",
+            ExternalTransactionId = "txn-app-revoke-1",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-revoke-1\",\"transactionId\":\"txn-app-revoke-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
+        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-revoke-notification-1\",\"notificationType\":\"REVOKE\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+
+        var result = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
+        Assert.Equal("Expired", subscription.Status);
+        Assert.NotNull(subscription.ExpiredAtUtc);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
     }
 
     [Fact]
@@ -452,6 +971,160 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(40, wallet.Balance);
         Assert.Single(identityService.SetPremiumStatusCalls);
         Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "google_play");
+        Assert.NotNull(eventLog.PayloadJson);
+        Assert.Contains("\"NotificationType\":3", eventLog.PayloadJson);
+        Assert.Contains("com.petmagic.custom.monthly.google", eventLog.PayloadJson);
+        Assert.DoesNotContain(messageData, eventLog.PayloadJson);
+        Assert.DoesNotContain("purchaseToken", eventLog.PayloadJson);
+        Assert.DoesNotContain("gp-token-1", eventLog.PayloadJson);
+    }
+
+    [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldRenewExistingSubscription()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var previousExpiryUtc = now.AddDays(1);
+        var renewedExpiryUtc = now.AddDays(31);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "google_play",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "order-renewal-1",
+            ExternalTransactionId = "gp-renewal-token-1",
+            CurrentPeriodStartUtc = now.AddDays(-29),
+            CurrentPeriodEndUtc = previousExpiryUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":2,\"purchaseToken\":\"gp-renewal-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = renewedExpiryUtc,
+            Status = "SUBSCRIPTION_STATE_ACTIVE",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-renewal-message-1"),
+            CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
+        Assert.Equal("Active", subscription.Status);
+        Assert.False(subscription.CancelAtPeriodEnd);
+        Assert.Equal(renewedExpiryUtc, subscription.CurrentPeriodEndUtc);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldExpireExistingSubscription()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiredAtUtc = now.AddDays(-1);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "google_play",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "order-expired-1",
+            ExternalTransactionId = "gp-expired-token-1",
+            CurrentPeriodStartUtc = now.AddDays(-31),
+            CurrentPeriodEndUtc = expiredAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":13,\"purchaseToken\":\"gp-expired-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = expiredAtUtc,
+            Status = "SUBSCRIPTION_STATE_EXPIRED",
+            IsActive = false,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-expired-message-1"),
+            CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
+        Assert.Equal("Expired", subscription.Status);
+        Assert.NotNull(subscription.ExpiredAtUtc);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
     }
 
     [Fact]

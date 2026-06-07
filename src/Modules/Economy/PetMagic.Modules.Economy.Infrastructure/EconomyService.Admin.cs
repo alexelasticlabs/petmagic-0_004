@@ -52,7 +52,9 @@ public sealed partial class EconomyService
                 x.BalanceAfter,
                 x.Source,
                 x.Reason,
-                x.CreatedAtUtc))
+                x.CreatedAtUtc,
+                x.SourceProvider,
+                null))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -140,7 +142,10 @@ public sealed partial class EconomyService
                 x.order.PaymentProvider == "stripe"
                     && x.order.Status == PurchaseOrderStatus.Succeeded
                     && x.order.ExternalPaymentId != null
-                    && x.order.ExternalPaymentId != string.Empty))
+                    && x.order.ExternalPaymentId != string.Empty,
+                "TokenPack",
+                x.order.SparkToGrant,
+                x.order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
@@ -203,6 +208,94 @@ public sealed partial class EconomyService
             .FirstOrDefaultAsync(x => x.Id == order.PackId, cancellationToken);
 
         return Result.Success(ToPurchaseHistoryItem(order, pack));
+    }
+
+    public async Task<Result<AdminEconomyDashboardMetricsResponse>> GetAdminDashboardMetricsAsync(
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var currentWeekStart = StartOfUtcDay(now.AddDays(-6));
+        var previousWeekStart = currentWeekStart.AddDays(-7);
+        var nextDayStart = StartOfUtcDay(now).AddDays(1);
+
+        var activeSubscriptions = await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .CountAsync(x => x.Status.ToLower() == "active", cancellationToken);
+        var renewalStops = await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .CountAsync(x => x.CancelAtPeriodEnd, cancellationToken);
+        var totalWalletCredits = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .Where(x => x.Delta > 0)
+            .SumAsync(x => (long?)x.Delta, cancellationToken) ?? 0L;
+        var totalWalletDebits = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .Where(x => x.Delta < 0)
+            .SumAsync(x => (long?)(-x.Delta), cancellationToken) ?? 0L;
+
+        var orders = await dbContext.PurchaseOrders
+            .AsNoTracking()
+            .Where(x => (x.ConfirmedAtUtc ?? x.CreatedAtUtc) >= previousWeekStart
+                        && (x.ConfirmedAtUtc ?? x.CreatedAtUtc) < nextDayStart)
+            .Select(x => new
+            {
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                OccurredAtUtc = x.ConfirmedAtUtc ?? x.CreatedAtUtc
+            })
+            .Select(x => new DashboardPurchaseMetric(
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.OccurredAtUtc))
+            .ToListAsync(cancellationToken);
+
+        var currentWeekOrders = orders
+            .Where(x => x.OccurredAtUtc >= currentWeekStart)
+            .ToList();
+        var previousWeekOrders = orders
+            .Where(x => x.OccurredAtUtc >= previousWeekStart && x.OccurredAtUtc < currentWeekStart)
+            .ToList();
+        var currentSucceeded = currentWeekOrders
+            .Where(x => x.Status == PurchaseOrderStatus.Succeeded)
+            .ToList();
+        var previousSucceeded = previousWeekOrders
+            .Where(x => x.Status == PurchaseOrderStatus.Succeeded)
+            .ToList();
+        var currencyCode = ResolveDashboardCurrency(currentSucceeded, previousSucceeded);
+        var revenueSeries = Enumerable.Range(0, 7)
+            .Select(offset =>
+            {
+                var date = DateOnly.FromDateTime(currentWeekStart.AddDays(offset));
+                var amount = currentSucceeded
+                    .Where(x => DateOnly.FromDateTime(x.OccurredAtUtc) == date
+                                && NormalizeCurrencyCode(x.CurrencyCode) == currencyCode)
+                    .Sum(x => x.PriceAmount);
+
+                return new AdminEconomyDashboardRevenuePointResponse(date, amount);
+            })
+            .ToArray();
+
+        return Result.Success(new AdminEconomyDashboardMetricsResponse(
+            currentWeekOrders.Count,
+            previousWeekOrders.Count,
+            currentSucceeded.Count,
+            previousSucceeded.Count,
+            currentWeekOrders.Count(x => x.Status == PurchaseOrderStatus.Failed),
+            previousWeekOrders.Count(x => x.Status == PurchaseOrderStatus.Failed),
+            currentSucceeded
+                .Where(x => NormalizeCurrencyCode(x.CurrencyCode) == currencyCode)
+                .Sum(x => x.PriceAmount),
+            previousSucceeded
+                .Where(x => NormalizeCurrencyCode(x.CurrencyCode) == currencyCode)
+                .Sum(x => x.PriceAmount),
+            totalWalletCredits,
+            totalWalletDebits,
+            activeSubscriptions,
+            renewalStops,
+            currencyCode,
+            revenueSeries));
     }
 
     public async Task<Result<OffsetPagedResponse<AdminUserSubscriptionResponse>>> GetAdminSubscriptionsAsync(
@@ -284,7 +377,12 @@ public sealed partial class EconomyService
                     x.subscription.MonthlyTokensGranted,
                     x.subscription.LastTokenGrantAtUtc,
                     x.subscription.CreatedAtUtc,
-                    x.subscription.UpdatedAtUtc))
+                    x.subscription.UpdatedAtUtc,
+                    x.subscription.ProductId,
+                    !x.subscription.CancelAtPeriodEnd,
+                    x.subscription.CancelledAtUtc,
+                    x.subscription.ExpiredAtUtc,
+                    x.subscription.LastValidatedAtUtc))
             .OrderByDescending(x => x.UpdatedAtUtc)
             .ThenByDescending(x => x.SubscriptionId)
             .Skip(normalizedSkip)
@@ -305,6 +403,39 @@ public sealed partial class EconomyService
         return trimmed.Length <= 240 ? trimmed : trimmed[..240];
     }
 
+    private static DateTime StartOfUtcDay(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static string NormalizeCurrencyCode(string? value)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value)
+            ? "USD"
+            : value.Trim().ToUpperInvariant();
+
+        return normalized.Length == 3 ? normalized : "USD";
+    }
+
+    private static string ResolveDashboardCurrency(
+        IReadOnlyList<DashboardPurchaseMetric> currentSucceeded,
+        IReadOnlyList<DashboardPurchaseMetric> previousSucceeded)
+    {
+        return currentSucceeded
+            .Concat(previousSucceeded)
+            .GroupBy(x => NormalizeCurrencyCode(x.CurrencyCode))
+            .OrderByDescending(group => group.Sum(x => x.PriceAmount))
+            .ThenBy(group => group.Key)
+            .Select(group => group.Key)
+            .FirstOrDefault() ?? "USD";
+    }
+
+    private sealed record DashboardPurchaseMetric(
+        string Status,
+        decimal PriceAmount,
+        string CurrencyCode,
+        DateTime OccurredAtUtc);
+
     private static PurchaseHistoryItemResponse ToPurchaseHistoryItem(
         PurchaseOrder order,
         CurrencyPack? pack)
@@ -323,7 +454,10 @@ public sealed partial class EconomyService
             null,
             order.CreatedAtUtc,
             order.ConfirmedAtUtc,
-            false);
+            false,
+            "TokenPack",
+            order.SparkToGrant,
+            order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none");
     }
 
     public async Task<Result<IReadOnlyList<AdminCurrencyPackResponse>>> ListAdminCurrencyPacksAsync(CancellationToken cancellationToken)
@@ -390,9 +524,18 @@ public sealed partial class EconomyService
         return await _adminConfigurationService.UpdatePaymentProviderConfigurationAsync(command, cancellationToken);
     }
 
-    public async Task<Result<IReadOnlyList<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(CancellationToken cancellationToken)
+    public async Task<Result<OffsetPagedResponse<AdminRedeemCodeResponse>>> ListAdminRedeemCodesAsync(
+        AdminRedeemCodeListQuery query,
+        CancellationToken cancellationToken)
     {
-        return await _adminRedeemCodeService.ListAdminRedeemCodesAsync(cancellationToken);
+        return await _adminRedeemCodeService.ListAdminRedeemCodesAsync(query, cancellationToken);
+    }
+
+    public async Task<Result<AdminRedeemCodeMetricsResponse>> GetAdminRedeemCodeMetricsAsync(
+        AdminRedeemCodeListQuery query,
+        CancellationToken cancellationToken)
+    {
+        return await _adminRedeemCodeService.GetAdminRedeemCodeMetricsAsync(query, cancellationToken);
     }
 
     public async Task<Result<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>> GetAdminRedeemCodeActivationsAsync(

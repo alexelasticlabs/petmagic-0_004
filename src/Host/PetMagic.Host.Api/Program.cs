@@ -24,13 +24,15 @@ using PetMagic.Modules.Templates.Infrastructure;
 
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Json;
 
 LoadDotEnvFileIfPresent();
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .Enrich.WithProperty("ApplicationName", "PetMagic.Host.Api")
-    .WriteTo.Console()
+    .Enrich.WithProperty("Environment", ResolveBootstrapEnvironment())
+    .WriteTo.Console(new JsonFormatter(), standardErrorFromLevel: LogEventLevel.Error)
     .CreateLogger();
 
 try
@@ -353,6 +355,7 @@ try
     app.UseAuthentication();
     app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
     app.UseAuthorization();
+    app.UseMiddleware<RequestLogContextMiddleware>();
 
     app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
         .AllowAnonymous();
@@ -490,4 +493,11 @@ static void LoadDotEnvFileIfPresent()
 
         currentDirectory = currentDirectory.Parent;
     }
+}
+
+static string ResolveBootstrapEnvironment()
+{
+    return Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+        ?? Environments.Production;
 }

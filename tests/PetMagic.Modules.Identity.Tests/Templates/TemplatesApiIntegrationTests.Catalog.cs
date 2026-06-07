@@ -55,11 +55,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Draft", created.Status);
         Assert.Equal(8.75, created.ReferenceVideoDurationSeconds);
 
-        var adminDraftList = await GetFromJsonAsync<IReadOnlyList<AdminTemplateListItemResponse>>(
+        var adminDraftList = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
             application.Client,
             "/api/admin/templates/?type=Video&status=Draft");
 
-        var persistedDraftItem = Assert.Single(adminDraftList);
+        var persistedDraftItem = Assert.Single(adminDraftList.Items);
         var templateId = persistedDraftItem.TemplateId;
         Assert.Equal("Meme soundtrack", persistedDraftItem.MusicDescription);
 
@@ -108,11 +108,11 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal("Active", activated.Status);
 
-        var adminActiveList = await GetFromJsonAsync<IReadOnlyList<AdminTemplateListItemResponse>>(
+        var adminActiveList = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
             application.Client,
             "/api/admin/templates/?type=Video&status=Active");
 
-        var listedAdminItem = Assert.Single(adminActiveList);
+        var listedAdminItem = Assert.Single(adminActiveList.Items);
         Assert.Equal(templateId, listedAdminItem.TemplateId);
         Assert.Equal("Viral Dance Deluxe", listedAdminItem.Title);
         Assert.Equal("Updated soundtrack", listedAdminItem.MusicDescription);
@@ -207,11 +207,11 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal("Active", created.Status);
 
-        var adminActiveListAfterCreate = await GetFromJsonAsync<IReadOnlyList<AdminTemplateListItemResponse>>(
+        var adminActiveListAfterCreate = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
             application.Client,
             "/api/admin/templates/?type=Image&status=Active");
 
-        var persistedActiveItem = Assert.Single(adminActiveListAfterCreate);
+        var persistedActiveItem = Assert.Single(adminActiveListAfterCreate.Items);
         var templateId = persistedActiveItem.TemplateId;
 
         var updated = await PutAsJsonAsync<AdminTemplateResponse>(
@@ -234,11 +234,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Active", updated.Status);
         Assert.Equal(25, updated.TokenCost);
 
-        var adminList = await GetFromJsonAsync<IReadOnlyList<AdminTemplateListItemResponse>>(
+        var adminList = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
             application.Client,
             "/api/admin/templates/?type=Image&status=Active");
 
-        var listedAdminItem = Assert.Single(adminList);
+        var listedAdminItem = Assert.Single(adminList.Items);
         Assert.Equal(templateId, listedAdminItem.TemplateId);
         Assert.Equal("Cozy Portrait Plus", listedAdminItem.Title);
         Assert.Null(listedAdminItem.MusicDescription);
@@ -295,6 +295,37 @@ public sealed partial class TemplatesApiIntegrationTests
         var secondPageItem = Assert.Single(secondPage.Items);
         Assert.Contains(secondPageItem.TemplateId, new[] { first.TemplateId, second.TemplateId });
         Assert.NotEqual(firstPageItem.TemplateId, secondPageItem.TemplateId);
+    }
+
+    [Fact]
+    public async Task AdminTemplatesCatalog_ShouldPageSearchAndFilterOnBackend()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        await CreateActiveImageTemplateAsync(application.Client, "Catalog Alpha", "Portrait", ["catalog", "alpha"]);
+        var premium = await CreateActivePremiumImageTemplateAsync(application.Client, "Catalog Beta", "Portrait", ["catalog", "beta"]);
+        await CreateActiveImageTemplateAsync(application.Client, "Catalog Gamma", "Fun", ["catalog", "gamma"]);
+
+        var firstPage = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
+            application.Client,
+            "/api/admin/templates/?type=Image&status=not_archived&search=catalog&category=Portrait&access=premium&sort=title&skip=0&take=1");
+
+        Assert.False(firstPage.HasMore);
+        Assert.Equal(0, firstPage.Skip);
+        Assert.Equal(1, firstPage.Take);
+        Assert.Equal(1, firstPage.TotalCount);
+        var firstPageItem = Assert.Single(firstPage.Items);
+        Assert.Equal(premium.TemplateId, firstPageItem.TemplateId);
+        Assert.True(firstPageItem.IsPremium);
+        Assert.Equal("Portrait", firstPageItem.Category);
+
+        var secondPage = await GetFromJsonAsync<AdminTemplateCatalogPageResponse>(
+            application.Client,
+            "/api/admin/templates/?type=Image&status=not_archived&search=catalog&category=Portrait&access=free&sort=title&skip=1&take=1");
+
+        Assert.False(secondPage.HasMore);
+        Assert.Equal(1, secondPage.TotalCount);
+        Assert.Empty(secondPage.Items);
     }
 
     [Fact]

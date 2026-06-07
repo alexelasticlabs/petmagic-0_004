@@ -129,6 +129,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();
+        services.AddScoped<IAppleIdentityTokenVerifier, AppleIdentityTokenVerifier>();
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
         services.AddScoped<IAdminAuditLog, IdentityAdminAuditLog>();
         services.AddScoped<IEmailSender, SmtpEmailSender>();
@@ -258,16 +259,37 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             Google = new ExternalAuthOptions.GoogleOAuthOptions
             {
                 ClientId = ReadValue(section.GetSection("Google"), "ClientId", "GOOGLE_CLIENT_ID") ?? string.Empty,
-                ClientSecret = ReadValue(section.GetSection("Google"), "ClientSecret", "GOOGLE_CLIENT_SECRET") ?? string.Empty
+                ClientSecret = ReadValue(section.GetSection("Google"), "ClientSecret", "GOOGLE_CLIENT_SECRET") ?? string.Empty,
+                Audiences = ReadCsvValues(section.GetSection("Google"), "Audiences", "GOOGLE_AUDIENCES")
             },
             Apple = new ExternalAuthOptions.OAuthProviderOptions
             {
                 ClientId = ReadValue(section.GetSection("Apple"), "ClientId", "APPLE_CLIENT_ID") ?? string.Empty,
                 ClientSecret = ReadValue(section.GetSection("Apple"), "ClientSecret", "APPLE_CLIENT_SECRET") ?? string.Empty,
                 AuthorizationEndpoint = ReadValue(section.GetSection("Apple"), "AuthorizationEndpoint", "APPLE_AUTHORIZATION_ENDPOINT") ?? string.Empty,
-                TokenEndpoint = ReadValue(section.GetSection("Apple"), "TokenEndpoint", "APPLE_TOKEN_ENDPOINT") ?? string.Empty
+                TokenEndpoint = ReadValue(section.GetSection("Apple"), "TokenEndpoint", "APPLE_TOKEN_ENDPOINT") ?? string.Empty,
+                Audiences = ReadCsvValues(section.GetSection("Apple"), "Audiences", "APPLE_AUDIENCES")
             }
         };
+    }
+
+    private static string[] ReadCsvValues(IConfigurationSection section, string key, string environmentVariable)
+    {
+        var configured = section.GetSection(key).Get<string[]>();
+        if (configured is { Length: > 0 })
+        {
+            return [.. configured.Where(static x => !string.IsNullOrWhiteSpace(x)).Select(static x => x.Trim())];
+        }
+
+        var raw = Environment.GetEnvironmentVariable(environmentVariable);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        return [.. raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(static x => !string.IsNullOrWhiteSpace(x))];
     }
 
     private static EmailOptions BuildEmailOptions(IConfigurationSection section)

@@ -154,6 +154,23 @@ public sealed record AdminTemplateListItemResponse(
     decimal? EstimatedCostUsd = null,
     IReadOnlyList<string>? PetPhotoRequirements = null);
 
+public sealed record AdminTemplateCatalogQuery(
+    string? Type,
+    string? Status,
+    string? Search,
+    string? Category,
+    string? Access,
+    string? Sort,
+    int? Skip,
+    int? Take);
+
+public sealed record AdminTemplateCatalogPageResponse(
+    IReadOnlyList<AdminTemplateListItemResponse> Items,
+    int Skip,
+    int Take,
+    int TotalCount,
+    bool HasMore);
+
 public sealed record AdminTemplateCategoryListItemResponse(
     Guid CategoryId,
     string Name,
@@ -336,6 +353,7 @@ public sealed record AdminModerationQueuePageResponse(
     IReadOnlyList<AdminModerationQueueItemResponse> Items,
     int Skip,
     int Take,
+    int TotalCount,
     bool HasMore,
     DateTime GeneratedAtUtc);
 
@@ -499,6 +517,7 @@ public sealed record AdminTemplatesAnalyticsOverviewResponse(
     DateTime GeneratedAtUtc);
 
 public sealed record AdminTemplateGenerationDashboardMetricsResponse(
+    int TotalJobs,
     int GenerationsToday,
     int GenerationsThisWeek,
     int GenerationsThisMonth,
@@ -507,6 +526,10 @@ public sealed record AdminTemplateGenerationDashboardMetricsResponse(
     int FailedGenerationsThisMonth,
     int PendingJobs,
     int RunningJobs,
+    int CompletedJobs,
+    int FailedJobs,
+    int CancelledJobs,
+    int RetryingJobs,
     DateTime GeneratedAtUtc);
 
 public sealed record AdminTemplateGenerationsQuery(

@@ -458,7 +458,7 @@ public static partial class SupportChatEndpoints
     }
 
 
-    private static async Task<Results<Ok<IReadOnlyList<SupportConversationSummaryResponse>>, ProblemHttpResult>> ListAdminInboxAsync(
+    private static async Task<Results<Ok<SupportConversationInboxPageResponse>, ProblemHttpResult>> ListAdminInboxAsync(
         HttpContext httpContext,
         [FromQuery] string? status,
         [FromQuery] string? assignment,
@@ -501,6 +501,14 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(
+        [FromServices] ISupportChatService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminInboxMetricsAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 

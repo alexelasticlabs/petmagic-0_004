@@ -42,6 +42,7 @@ internal sealed partial class TemplatesService
                 (analyticsEvent.GenerationId != null && analyticsEvent.GenerationId.ToString()!.ToLower().Contains(search)));
         }
 
+        var totalCount = await events.CountAsync(cancellationToken);
         var items = await events
             .OrderBy(analyticsEvent => analyticsEvent.ModerationStatus == "pending" ? 0 : 1)
             .ThenByDescending(analyticsEvent => analyticsEvent.CreatedAtUtc)
@@ -61,6 +62,7 @@ internal sealed partial class TemplatesService
             items,
             skip,
             take,
+            totalCount,
             hasMore,
             DateTime.UtcNow));
     }

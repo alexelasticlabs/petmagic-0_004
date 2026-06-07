@@ -578,6 +578,41 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetAdminGenerationDashboardMetricsAsync_ShouldAggregateGlobalStatusCounts()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Admin Metrics Portrait", "Portrait", ["admin-jobs"]);
+        var todayStart = DateTime.UtcNow.Date;
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Queued, todayStart.AddHours(1)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Processing, todayStart.AddHours(2)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Retrying, todayStart.AddHours(3)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Failed, todayStart.AddHours(4)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Cancelled, todayStart.AddHours(5)),
+            CreateAdminMetricsJob(templateId, TemplateGenerationStatus.Completed, todayStart.AddDays(-40).AddHours(1)));
+        await dbContext.SaveChangesAsync();
+
+        var metrics = await service.GetAdminGenerationDashboardMetricsAsync(CancellationToken.None);
+
+        Assert.True(metrics.IsSuccess);
+        Assert.Equal(6, metrics.Value.TotalJobs);
+        Assert.Equal(5, metrics.Value.GenerationsToday);
+        Assert.Equal(5, metrics.Value.GenerationsThisWeek);
+        Assert.Equal(5, metrics.Value.GenerationsThisMonth);
+        Assert.Equal(1, metrics.Value.FailedGenerationsToday);
+        Assert.Equal(1, metrics.Value.FailedGenerationsThisWeek);
+        Assert.Equal(1, metrics.Value.FailedGenerationsThisMonth);
+        Assert.Equal(1, metrics.Value.PendingJobs);
+        Assert.Equal(1, metrics.Value.RunningJobs);
+        Assert.Equal(1, metrics.Value.CompletedJobs);
+        Assert.Equal(1, metrics.Value.FailedJobs);
+        Assert.Equal(1, metrics.Value.CancelledJobs);
+        Assert.Equal(1, metrics.Value.RetryingJobs);
+    }
+
+    [Fact]
     public async Task ListAsync_ShouldCalculateQueueMetricsForQueuedHistory()
     {
         await using var dbContext = CreateDbContext();
@@ -675,6 +710,30 @@ public sealed partial class TemplatesServiceTests
         var processing = Assert.Single(history.Value, x => x.GenerationId == processingJobId);
         Assert.Null(processing.QueuePosition);
         Assert.Null(processing.EstimatedWaitSeconds);
+    }
+
+    private static TemplateGenerationJob CreateAdminMetricsJob(
+        Guid templateId,
+        TemplateGenerationStatus status,
+        DateTime createdAtUtc)
+    {
+        return new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Status = status,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/admin-metrics-source.jpg",
+            SourceImageFileName = "admin-metrics-source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = createdAtUtc,
+            QueuedAtUtc = createdAtUtc,
+            UpdatedAtUtc = createdAtUtc,
+            CompletedAtUtc = status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed or TemplateGenerationStatus.Cancelled
+                ? createdAtUtc
+                : null
+        };
     }
 
     [Fact]

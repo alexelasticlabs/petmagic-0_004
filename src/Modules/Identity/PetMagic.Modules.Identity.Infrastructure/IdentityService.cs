@@ -333,6 +333,31 @@ public sealed partial class IdentityService(
             CorrelationContext.ResolveOrCreate());
     }
 
+    private void LogSocialAuthInformation(string operation, string provider, Guid userId, string result, bool isNewUser = false)
+    {
+        logger?.LogInformation(
+            "Social authentication event. Operation={Operation} Provider={Provider} Platform={Platform} UserId={UserId} IsNewUser={IsNewUser} Result={Result} CorrelationId={CorrelationId}",
+            operation,
+            provider,
+            httpContextAccessor.HttpContext?.Request.Headers["X-Client-Platform"].ToString(),
+            userId,
+            isNewUser,
+            result,
+            CorrelationContext.ResolveOrCreate());
+    }
+
+    private void LogSocialAuthWarning(string operation, string? provider, Guid? userId, string reason)
+    {
+        logger?.LogWarning(
+            "Social authentication failure. Operation={Operation} Provider={Provider} Platform={Platform} UserId={UserId} Reason={Reason} CorrelationId={CorrelationId}",
+            operation,
+            provider,
+            httpContextAccessor.HttpContext?.Request.Headers["X-Client-Platform"].ToString(),
+            userId,
+            reason,
+            CorrelationContext.ResolveOrCreate());
+    }
+
     private void LogAuthWarning(string operation, Guid? userId, string reason)
     {
         logger?.LogWarning(

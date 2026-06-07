@@ -13,6 +13,8 @@ public sealed class ExternalAuthOptions
         public string ClientId { get; init; } = string.Empty;
 
         public string ClientSecret { get; init; } = string.Empty;
+
+        public string[] Audiences { get; init; } = [];
     }
 
     public sealed class OAuthProviderOptions
@@ -24,5 +26,7 @@ public sealed class ExternalAuthOptions
         public string AuthorizationEndpoint { get; init; } = string.Empty;
 
         public string TokenEndpoint { get; init; } = string.Empty;
+
+        public string[] Audiences { get; init; } = [];
     }
 }

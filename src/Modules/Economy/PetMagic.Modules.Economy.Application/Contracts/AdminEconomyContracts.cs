@@ -9,6 +9,14 @@ public sealed record AdminRedeemCodeRedemptionResponse(
     DateTime? PremiumExpiresAtUtc,
     DateTime RedeemedAtUtc);
 
+public sealed record AdminRedeemCodeListQuery(
+    int Skip = 0,
+    int Take = 50,
+    string? Search = null,
+    string? Status = null,
+    string? RewardKind = null,
+    string? Sort = null);
+
 public sealed record AdminRedeemCodeResponse(
     Guid RedeemCodeId,
     string Code,
@@ -33,6 +41,16 @@ public sealed record AdminRedeemCodeResponse(
     int UsesLast7d = 0,
     int GrantedLast7d = 0,
     int MaxRedeemedBySingleUser = 0);
+
+public sealed record AdminRedeemCodeMetricsResponse(
+    int TotalCodes,
+    int ActiveCodes,
+    int TotalUses,
+    int TotalGranted,
+    int CreatedLast7d,
+    int ActiveTouchedLast7d,
+    int UsesLast7d,
+    int GrantedLast7d);
 
 public sealed record AdminCurrencyPackResponse(
     Guid PackId,
@@ -112,7 +130,12 @@ public sealed record AdminUserSubscriptionResponse(
     int MonthlyTokensGranted,
     DateTime? LastTokenGrantAtUtc,
     DateTime CreatedAtUtc,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    string? ProductId = null,
+    bool AutoRenewing = false,
+    DateTime? CancelledAtUtc = null,
+    DateTime? ExpiredAtUtc = null,
+    DateTime? LastValidatedAtUtc = null);
 
 public sealed record AdminUserEconomyPurchaseResponse(
     Guid OrderId,
@@ -130,7 +153,9 @@ public sealed record AdminUserEconomyWalletLedgerResponse(
     int BalanceAfter,
     string Source,
     string Reason,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    string? SourceProvider = null,
+    string? SourceTransactionId = null);
 
 public sealed record AdminUserEconomyActivityResponse(
     string Kind,
@@ -152,6 +177,26 @@ public sealed record AdminUserEconomyAnalyticsResponse(
     IReadOnlyList<AdminUserEconomyPurchaseResponse> RecentPurchases,
     IReadOnlyList<AdminUserEconomyWalletLedgerResponse> RecentWalletLedger,
     IReadOnlyList<AdminUserEconomyActivityResponse> RecentActivity);
+
+public sealed record AdminEconomyDashboardRevenuePointResponse(
+    DateOnly Date,
+    decimal Amount);
+
+public sealed record AdminEconomyDashboardMetricsResponse(
+    int PurchasesThisWeek,
+    int PurchasesPreviousWeek,
+    int SuccessfulPaymentsThisWeek,
+    int SuccessfulPaymentsPreviousWeek,
+    int FailedPaymentsThisWeek,
+    int FailedPaymentsPreviousWeek,
+    decimal RevenueThisWeek,
+    decimal RevenuePreviousWeek,
+    long TotalWalletCredits,
+    long TotalWalletDebits,
+    int ActiveSubscriptions,
+    int RenewalStops,
+    string CurrencyCode,
+    IReadOnlyList<AdminEconomyDashboardRevenuePointResponse> RevenueSeries);
 
 public sealed record AdminSubscriptionEventResponse(
     Guid EventId,

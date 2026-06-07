@@ -47,6 +47,87 @@ public sealed class IdentityInfrastructureConfigurationTests
     }
 
     [Fact]
+    public void AddIdentityInfrastructure_ShouldReadExternalAuthAudiencesFromEnvironment()
+    {
+        SetEnvironmentVariables(new Dictionary<string, string?>
+        {
+            ["GOOGLE_CLIENT_ID"] = "google-web-client-id",
+            ["GOOGLE_CLIENT_SECRET"] = "google-client-secret",
+            ["GOOGLE_AUDIENCES"] = " google-web-client-id,google-ios-client-id ,, google-android-client-id ",
+            ["APPLE_CLIENT_ID"] = "com.petmagic.app",
+            ["APPLE_CLIENT_SECRET"] = "apple-client-secret",
+            ["APPLE_AUTHORIZATION_ENDPOINT"] = "https://appleid.apple.com/auth/authorize",
+            ["APPLE_TOKEN_ENDPOINT"] = "https://appleid.apple.com/auth/token",
+            ["APPLE_AUDIENCES"] = " com.petmagic.app,com.petmagic.service "
+        });
+
+        try
+        {
+            var services = CreateServices();
+            var configuration = CreateConfiguration([]);
+
+            services.AddIdentityInfrastructure(configuration);
+
+            using var provider = services.BuildServiceProvider();
+            var options = provider.GetRequiredService<ExternalAuthOptions>();
+
+            Assert.Equal(
+                ["google-web-client-id", "google-ios-client-id", "google-android-client-id"],
+                options.Google.Audiences);
+            Assert.Equal(["com.petmagic.app", "com.petmagic.service"], options.Apple.Audiences);
+        }
+        finally
+        {
+            ClearEnvironmentVariables(
+                "GOOGLE_CLIENT_ID",
+                "GOOGLE_CLIENT_SECRET",
+                "GOOGLE_AUDIENCES",
+                "APPLE_CLIENT_ID",
+                "APPLE_CLIENT_SECRET",
+                "APPLE_AUTHORIZATION_ENDPOINT",
+                "APPLE_TOKEN_ENDPOINT",
+                "APPLE_AUDIENCES");
+        }
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldPreferConfiguredAudienceArraysOverEnvironment()
+    {
+        Environment.SetEnvironmentVariable("GOOGLE_AUDIENCES", "google-env-client-id");
+        Environment.SetEnvironmentVariable("APPLE_AUDIENCES", "apple.env.service");
+
+        try
+        {
+            var services = CreateServices();
+            var configuration = CreateConfiguration(new Dictionary<string, string?>
+            {
+                ["ExternalAuth:Google:ClientId"] = "google-web-client-id",
+                ["ExternalAuth:Google:ClientSecret"] = "google-client-secret",
+                ["ExternalAuth:Google:Audiences:0"] = "google-web-client-id",
+                ["ExternalAuth:Google:Audiences:1"] = " google-ios-client-id ",
+                ["ExternalAuth:Apple:ClientId"] = "com.petmagic.app",
+                ["ExternalAuth:Apple:ClientSecret"] = "apple-client-secret",
+                ["ExternalAuth:Apple:AuthorizationEndpoint"] = "https://appleid.apple.com/auth/authorize",
+                ["ExternalAuth:Apple:TokenEndpoint"] = "https://appleid.apple.com/auth/token",
+                ["ExternalAuth:Apple:Audiences:0"] = "com.petmagic.app",
+                ["ExternalAuth:Apple:Audiences:1"] = " com.petmagic.service "
+            });
+
+            services.AddIdentityInfrastructure(configuration);
+
+            using var provider = services.BuildServiceProvider();
+            var options = provider.GetRequiredService<ExternalAuthOptions>();
+
+            Assert.Equal(["google-web-client-id", "google-ios-client-id"], options.Google.Audiences);
+            Assert.Equal(["com.petmagic.app", "com.petmagic.service"], options.Apple.Audiences);
+        }
+        finally
+        {
+            ClearEnvironmentVariables("GOOGLE_AUDIENCES", "APPLE_AUDIENCES");
+        }
+    }
+
+    [Fact]
     public void AddIdentityInfrastructure_ShouldRejectIncompleteGoogleConfiguration()
     {
         var services = CreateServices();
@@ -200,6 +281,22 @@ public sealed class IdentityInfrastructureConfigurationTests
         services.AddLogging();
         services.AddSingleton(environment ?? new TestHostEnvironment(Directory.GetCurrentDirectory()));
         return services;
+    }
+
+    private static void SetEnvironmentVariables(IReadOnlyDictionary<string, string?> values)
+    {
+        foreach (var (key, value) in values)
+        {
+            Environment.SetEnvironmentVariable(key, value);
+        }
+    }
+
+    private static void ClearEnvironmentVariables(params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            Environment.SetEnvironmentVariable(key, null);
+        }
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment

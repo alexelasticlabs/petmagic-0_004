@@ -10,7 +10,7 @@ namespace PetMagic.Modules.Identity.Infrastructure;
 internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) : IGoogleIdentityTokenVerifier
 {
     public bool IsConfigured =>
-        !string.IsNullOrWhiteSpace(options.Google.ClientId) &&
+        ResolveAudiences().Count > 0 &&
         !string.IsNullOrWhiteSpace(options.Google.ClientSecret);
 
     public string? ClientId => IsConfigured ? options.Google.ClientId : null;
@@ -33,18 +33,38 @@ internal sealed class GoogleIdentityTokenVerifier(ExternalAuthOptions options) :
                 idToken,
                 new GoogleJsonWebSignature.ValidationSettings
                 {
-                    Audience = [options.Google.ClientId]
+                    Audience = [.. ResolveAudiences()]
                 });
+
+            if (!payload.EmailVerified)
+            {
+                return Result.Failure<ExternalLoginCallbackCommand>(IdentityErrors.ExternalEmailNotVerified);
+            }
 
             return Result.Success(new ExternalLoginCallbackCommand(
                 "Google",
                 payload.Subject,
                 payload.Email,
-                payload.Name));
+                payload.Name,
+                payload.EmailVerified));
         }
         catch (InvalidJwtException)
         {
             return Result.Failure<ExternalLoginCallbackCommand>(IdentityErrors.ExternalTokenInvalid);
         }
+    }
+
+    private IReadOnlyList<string> ResolveAudiences()
+    {
+        if (options.Google.Audiences.Length > 0)
+        {
+            return options.Google.Audiences
+                .Where(static x => !string.IsNullOrWhiteSpace(x))
+                .Select(static x => x.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        return string.IsNullOrWhiteSpace(options.Google.ClientId) ? [] : [options.Google.ClientId];
     }
 }

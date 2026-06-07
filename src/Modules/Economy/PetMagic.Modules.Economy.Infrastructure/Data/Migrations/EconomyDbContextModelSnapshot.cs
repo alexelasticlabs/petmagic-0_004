@@ -328,7 +328,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("SavedPaymentMethodId");
 
-                    b.HasIndex("PaymentProvider", "ExternalPaymentId");
+                    b.HasIndex("PaymentProvider", "ExternalPaymentId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_epo_Provider_ExternalPaymentId")
+                        .HasFilter("\"ExternalPaymentId\" IS NOT NULL AND \"ExternalPaymentId\" <> ''");
 
                     b.HasIndex("CreatedAtUtc");
 
@@ -740,6 +743,9 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.Property<bool>("CancelAtPeriodEnd")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -761,6 +767,12 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
+                    b.Property<DateTime?>("ExpiredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LastValidatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LastTokenGrantAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -774,6 +786,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ProductId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
 
                     b.Property<string>("Provider")
                         .IsRequired()
@@ -805,6 +821,11 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasIndex("Provider", "ExternalSubscriptionId")
                         .IsUnique();
+
+                    b.HasIndex("Provider", "ExternalTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_eus_Provider_ExternalTransactionId")
+                        .HasFilter("\"ExternalTransactionId\" IS NOT NULL AND \"ExternalTransactionId\" <> ''");
 
                     b.HasIndex("UpdatedAtUtc");
 
@@ -872,6 +893,14 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)");
 
+                    b.Property<string>("SourceProvider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("SourceTransactionId")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
@@ -880,6 +909,11 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("Source", "CreatedAtUtc");
+
+                    b.HasIndex("SourceProvider", "SourceTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId")
+                        .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
 

@@ -24,6 +24,7 @@ public static class AdminUserEndpoints
             .RequireAuthorization("ModeratorOrAdmin");
 
         group.MapGet("/", ListUsersAsync);
+        group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
         group.MapPost("/{userId:guid}/wallet", AdjustWalletAsync).RequireAuthorization("AdminOnly");
@@ -65,6 +66,14 @@ public static class AdminUserEndpoints
         httpContext.Response.Headers["X-Pagination-Take"] = result.Value.Take.ToString(CultureInfo.InvariantCulture);
         httpContext.Response.Headers["X-Pagination-Has-More"] = result.Value.HasMore ? "true" : "false";
 
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminUserDashboardMetricsResponse>> GetDashboardMetricsAsync(
+        [FromServices] IIdentityService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminUserDashboardMetricsAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 

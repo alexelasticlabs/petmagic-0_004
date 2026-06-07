@@ -82,6 +82,11 @@ public static class EconomyEndpoints
         group.MapGet("/subscriptions/paywall-config", GetPaywallConfigAsync)
             .AllowAnonymous();
 
+        endpoints.MapGet("/api/billing/products", GetBillingProductsAsync)
+            .WithTags("Billing")
+            .AllowAnonymous()
+            .RequireRateLimiting("economy");
+
         group.MapGet("/premium/status", GetPremiumStatusAsync)
             .RequireAuthorization();
 
@@ -102,6 +107,16 @@ public static class EconomyEndpoints
 
         group.MapPost("/premium/store/verify", VerifyPremiumStorePurchaseAsync)
             .RequireAuthorization();
+
+        endpoints.MapPost("/api/billing/google/validate", ValidateGooglePlayBillingAsync)
+            .WithTags("Billing")
+            .RequireAuthorization()
+            .RequireRateLimiting("economy");
+
+        endpoints.MapPost("/api/billing/apple/validate", ValidateAppleAppStoreBillingAsync)
+            .WithTags("Billing")
+            .RequireAuthorization()
+            .RequireRateLimiting("economy");
 
         group.MapPost("/premium/verify-stripe", VerifyPremiumStripeSubscriptionAsync)
             .RequireAuthorization();
@@ -141,7 +156,17 @@ public static class EconomyEndpoints
             .AllowAnonymous()
             .RequireRateLimiting("webhooks");
 
+        endpoints.MapPost("/api/webhooks/apple-app-store", AppStoreServerNotificationAsync)
+            .WithTags("Billing Webhooks")
+            .AllowAnonymous()
+            .RequireRateLimiting("webhooks");
+
         group.MapPost("/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting("webhooks");
+
+        endpoints.MapPost("/api/webhooks/google-play", GooglePlayDeveloperNotificationAsync)
+            .WithTags("Billing Webhooks")
             .AllowAnonymous()
             .RequireRateLimiting("webhooks");
 
@@ -495,6 +520,14 @@ public static class EconomyEndpoints
             new GetPaywallConfigQuery(platform, appVersion, country, locale),
             cancellationToken);
 
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<BillingProductsResponse>> GetBillingProductsAsync(
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListBillingProductsAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -1131,6 +1164,86 @@ public static class EconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Results<Ok<StoreBillingValidationResponse>, ValidationProblem, ProblemHttpResult>> ValidateGooglePlayBillingAsync(
+        HttpContext context,
+        GooglePlayBillingValidationRequest request,
+        [FromServices] IValidator<ValidateGooglePlayBillingCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new ValidateGooglePlayBillingCommand(
+            userId!.Value,
+            request.PurchaseToken,
+            request.ProductId,
+            request.PackageName);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ValidateGooglePlayBillingAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToStoreValidationProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<StoreBillingValidationResponse>, ValidationProblem, ProblemHttpResult>> ValidateAppleAppStoreBillingAsync(
+        HttpContext context,
+        AppleAppStoreBillingValidationRequest request,
+        [FromServices] IValidator<ValidateAppleAppStoreBillingCommand> validator,
+        IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var (userId, _, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new ValidateAppleAppStoreBillingCommand(
+            userId!.Value,
+            request.SignedTransactionInfo);
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.ValidateAppleAppStoreBillingAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToStoreValidationProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static ProblemHttpResult ToStoreValidationProblem(PetMagic.BuildingBlocks.Results.Error error)
+    {
+        var statusCode = error.Code switch
+        {
+            "economy.premium_plan_not_found" => StatusCodes.Status404NotFound,
+            "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
+            "economy.store_purchase_invalid" => StatusCodes.Status400BadRequest,
+            "economy.store_purchase_inactive" => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest,
+        };
+
+        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+    }
+
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> GetPurchaseAsync(
         HttpContext context,
         Guid orderId,
@@ -1448,6 +1561,14 @@ public static class EconomyEndpoints
         string? LocalVerificationData,
         string? PurchaseId,
         string? TransactionDate);
+
+    public sealed record GooglePlayBillingValidationRequest(
+        string PurchaseToken,
+        string ProductId,
+        string PackageName);
+
+    public sealed record AppleAppStoreBillingValidationRequest(
+        string SignedTransactionInfo);
 
     public sealed record AppStoreServerNotificationRequest(string SignedPayload);
 

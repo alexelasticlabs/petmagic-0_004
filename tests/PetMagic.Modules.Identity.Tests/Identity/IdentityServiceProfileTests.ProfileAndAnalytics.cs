@@ -158,7 +158,7 @@ public sealed partial class IdentityServiceProfileTests
 
         Assert.True(result.IsSuccess);
         Assert.False(await identityDb.Users.AnyAsync(x => x.Id == userId));
-        Assert.False(await identityDb.RefreshTokenSessions.AnyAsync(x => x.UserId == userId));
+        Assert.True(await identityDb.RefreshTokenSessions.AnyAsync(x => x.UserId == userId && x.RevokedAtUtc != null));
         Assert.False(await identityDb.UserEmailCodes.AnyAsync(x => x.UserId == userId));
         Assert.False(await identityDb.EmailDispatchJobs.AnyAsync(x => x.UserId == userId));
         Assert.Contains("delete.png", avatarStorage.DeletedUrls.Single());

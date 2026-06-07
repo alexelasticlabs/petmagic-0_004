@@ -15,6 +15,11 @@ public sealed partial class IdentityService
     {
         var email = command.Email.Trim();
         var normalizedEmail = email.ToUpperInvariant();
+        if (await IsDeletedEmailBlockedAsync(email, cancellationToken))
+        {
+            return Result.Failure<UserProfileResponse>(IdentityErrors.AccountDeleted);
+        }
+
         var existing = await userManager.Users
             .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
 
@@ -443,35 +448,59 @@ public sealed partial class IdentityService
 
     public async Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.Provider) || string.IsNullOrWhiteSpace(command.ProviderSubject))
+        var provider = NormalizeExternalProvider(command.Provider);
+        var providerUserId = command.ProviderSubject.Trim();
+        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(providerUserId))
         {
+            LogSocialAuthWarning("social_login_failed", command.Provider, null, "validation_failure");
             return Result.Failure<TokenPairResponse>(IdentityErrors.ExternalPrincipalInvalid);
         }
 
-        var user = await userManager.FindByLoginAsync(command.Provider, command.ProviderSubject);
+        var now = DateTime.UtcNow;
+        var providerAccount = await dbContext.ExternalAuthProviders
+            .FirstOrDefaultAsync(x => x.Provider == provider && x.ProviderUserId == providerUserId, cancellationToken);
+        if (providerAccount is null && await IsDeletedProviderBlockedAsync(provider, providerUserId, cancellationToken))
+        {
+            LogSocialAuthWarning("social_login_failed", provider, null, "deleted_account");
+            return Result.Failure<TokenPairResponse>(IdentityErrors.AccountDeleted);
+        }
+
+        var user = providerAccount is null
+            ? null
+            : await userManager.FindByIdAsync(providerAccount.UserId.ToString());
+        var isNewUser = false;
 
         if (user is null)
         {
-            if (string.IsNullOrWhiteSpace(command.Email))
+            var normalizedEmail = NormalizeEmail(command.Email);
+            if (string.IsNullOrWhiteSpace(normalizedEmail) || !command.EmailVerified)
             {
+                LogSocialAuthWarning("social_login_failed", provider, null, "missing_or_unverified_email");
                 return Result.Failure<TokenPairResponse>(IdentityErrors.ExternalEmailMissing);
             }
 
-            user = await userManager.FindByEmailAsync(command.Email);
+            if (await IsDeletedEmailBlockedAsync(normalizedEmail, cancellationToken))
+            {
+                LogSocialAuthWarning("social_login_failed", provider, null, "deleted_account");
+                return Result.Failure<TokenPairResponse>(IdentityErrors.AccountDeleted);
+            }
+
+            user = await userManager.FindByEmailAsync(normalizedEmail);
 
             if (user is null)
             {
-                var now = DateTime.UtcNow;
+                isNewUser = true;
                 user = new AppUser
                 {
                     Id = Guid.NewGuid(),
-                    UserName = command.Email,
-                    Email = command.Email,
+                    UserName = normalizedEmail,
+                    Email = normalizedEmail,
                     EmailConfirmed = true,
                     DisplayName = command.DisplayName,
                     IsPremium = false,
                     IsActive = true,
                     CreatedAtUtc = now,
+                    LastLoginAtUtc = now,
                     AccountStatus = AccountStatus.Active,
                     AccountStatusUpdatedAtUtc = now
                 };
@@ -479,23 +508,45 @@ public sealed partial class IdentityService
                 var createResult = await userManager.CreateAsync(user);
                 if (!createResult.Succeeded)
                 {
+                    LogSocialAuthWarning("social_login_failed", provider, null, "user_create_failed");
                     return Result.Failure<TokenPairResponse>(IdentityErrors.OperationFailed);
                 }
 
                 await userManager.AddToRoleAsync(user, SystemRoles.User);
             }
-
-            var addLoginResult = await userManager.AddLoginAsync(user, new UserLoginInfo(command.Provider, command.ProviderSubject, command.Provider));
-            if (!addLoginResult.Succeeded)
+            else if (command.EmailVerified)
             {
-                return Result.Failure<TokenPairResponse>(IdentityErrors.OperationFailed);
+                user.EmailConfirmed = true;
+                user.AccountStatus = AccountStatus.Active;
+                user.AccountStatusUpdatedAtUtc = now;
             }
+
+            providerAccount = new ExternalAuthProvider
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                Provider = provider,
+                ProviderUserId = providerUserId,
+                Email = normalizedEmail,
+                CreatedAt = now,
+                LastUsedAt = now
+            };
+            dbContext.ExternalAuthProviders.Add(providerAccount);
         }
 
         if (!user.IsActive)
         {
+            LogSocialAuthWarning("social_login_failed", provider, user.Id, "inactive_account");
             return Result.Failure<TokenPairResponse>(IdentityErrors.InvalidCredentials);
         }
+
+        if (providerAccount is not null)
+        {
+            providerAccount.Email = NormalizeEmail(command.Email) ?? providerAccount.Email;
+            providerAccount.LastUsedAt = now;
+        }
+
+        user.LastLoginAtUtc = now;
 
         var accountStatusNormalization = await NormalizeAccountStatusForAuthenticatedUserAsync(user, cancellationToken);
         if (accountStatusNormalization.IsFailure)
@@ -511,8 +562,9 @@ public sealed partial class IdentityService
         }
 
         var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
-        await WriteAuditAsync(user.Id, "auth.external_login.succeeded", $"External provider: {command.Provider}", cancellationToken);
-        LogAuthInformation("external_login", user.Id, "succeeded");
+        await WriteAuditAsync(user.Id, "auth.external_login.succeeded", $"External provider: {provider}", cancellationToken);
+        LogSocialAuthInformation("social_login_success", provider, user.Id, "succeeded", isNewUser);
+        LogSocialAuthInformation(isNewUser ? "new_user_registered" : "existing_user_logged_in", provider, user.Id, "succeeded", isNewUser);
 
         return Result.Success(tokenPair);
     }
@@ -530,7 +582,9 @@ public sealed partial class IdentityService
 
     public async Task<Result<IReadOnlyList<LinkedAccountResponse>>> LinkExternalLoginAsync(Guid userId, ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(command.Provider) || string.IsNullOrWhiteSpace(command.ProviderSubject))
+        var provider = NormalizeExternalProvider(command.Provider);
+        var providerUserId = command.ProviderSubject.Trim();
+        if (string.IsNullOrWhiteSpace(provider) || string.IsNullOrWhiteSpace(providerUserId))
         {
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalPrincipalInvalid);
         }
@@ -546,20 +600,20 @@ public sealed partial class IdentityService
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.InvalidCredentials);
         }
 
-        var existingOwner = await userManager.FindByLoginAsync(command.Provider, command.ProviderSubject);
-        if (existingOwner is not null && existingOwner.Id != user.Id)
+        var existingProvider = await dbContext.ExternalAuthProviders
+            .FirstOrDefaultAsync(x => x.Provider == provider && x.ProviderUserId == providerUserId, cancellationToken);
+        if (existingProvider is not null && existingProvider.UserId != user.Id)
         {
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalAlreadyLinked);
         }
 
-        var userLogins = await userManager.GetLoginsAsync(user);
-        var providerLogins = userLogins
-            .Where(x => string.Equals(x.LoginProvider, command.Provider, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var providerLogins = await dbContext.ExternalAuthProviders
+            .Where(x => x.UserId == user.Id && x.Provider == provider)
+            .ToListAsync(cancellationToken);
 
         if (providerLogins.Count > 0)
         {
-            if (providerLogins.Any(x => string.Equals(x.ProviderKey, command.ProviderSubject, StringComparison.Ordinal)))
+            if (providerLogins.Any(x => string.Equals(x.ProviderUserId, providerUserId, StringComparison.Ordinal)))
             {
                 return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
             }
@@ -567,15 +621,20 @@ public sealed partial class IdentityService
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalProviderAlreadyLinked);
         }
 
-        var addLoginResult = await userManager.AddLoginAsync(
-            user,
-            new UserLoginInfo(command.Provider, command.ProviderSubject, command.Provider));
-        if (!addLoginResult.Succeeded)
+        var now = DateTime.UtcNow;
+        dbContext.ExternalAuthProviders.Add(new ExternalAuthProvider
         {
-            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.OperationFailed);
-        }
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Provider = provider,
+            ProviderUserId = providerUserId,
+            Email = NormalizeEmail(command.Email),
+            CreatedAt = now,
+            LastUsedAt = now
+        });
 
-        await WriteAuditAsync(user.Id, "auth.external_link.succeeded", $"External provider linked: {command.Provider}", cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.external_link.succeeded", $"External provider linked: {provider}", cancellationToken);
         return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
     }
 
@@ -592,9 +651,17 @@ public sealed partial class IdentityService
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.UserNotFound);
         }
 
-        var userLogins = await userManager.GetLoginsAsync(user);
+        var normalizedProvider = NormalizeExternalProvider(provider);
+        if (normalizedProvider is null)
+        {
+            return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalPrincipalInvalid);
+        }
+
+        var userLogins = await dbContext.ExternalAuthProviders
+            .Where(x => x.UserId == user.Id)
+            .ToListAsync(cancellationToken);
         var providerLogins = userLogins
-            .Where(x => string.Equals(x.LoginProvider, provider, StringComparison.OrdinalIgnoreCase))
+            .Where(x => string.Equals(x.Provider, normalizedProvider, StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (providerLogins.Count == 0)
         {
@@ -607,16 +674,10 @@ public sealed partial class IdentityService
             return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.ExternalLastSignInMethod);
         }
 
-        foreach (var login in providerLogins)
-        {
-            var removeLoginResult = await userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
-            if (!removeLoginResult.Succeeded)
-            {
-                return Result.Failure<IReadOnlyList<LinkedAccountResponse>>(IdentityErrors.OperationFailed);
-            }
-        }
+        dbContext.ExternalAuthProviders.RemoveRange(providerLogins);
 
-        await WriteAuditAsync(user.Id, "auth.external_link.removed", $"External provider unlinked: {provider}", cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAuditAsync(user.Id, "auth.external_link.removed", $"External provider unlinked: {normalizedProvider}", cancellationToken);
         return Result.Success<IReadOnlyList<LinkedAccountResponse>>(await ListLinkedAccountsAsync(user));
     }
 

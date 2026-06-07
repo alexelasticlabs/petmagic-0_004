@@ -33,18 +33,78 @@ internal sealed partial class TemplatesService
         return await _templateCategoryAdminService.DeleteCategoryAsync(categoryId, cancellationToken);
     }
 
-    public async Task<Result<IReadOnlyList<AdminTemplateListItemResponse>>> ListAdminAsync(TemplateType? type, TemplateStatus? status, CancellationToken cancellationToken)
+    public async Task<Result<AdminTemplateCatalogPageResponse>> ListAdminAsync(
+        AdminTemplateCatalogQuery query,
+        CancellationToken cancellationToken)
     {
-        var items = await dbContext.TemplateItems
+        var templateType = ParseTemplateType(query.Type);
+        var templateStatus = ParseTemplateStatus(query.Status);
+        var normalizedSearch = NormalizeCatalogFilter(query.Search);
+        var normalizedCategory = NormalizeCatalogFilter(query.Category);
+        var normalizedAccess = NormalizeCatalogFilter(query.Access);
+        var normalizedSort = NormalizeCatalogFilter(query.Sort);
+        var normalizedStatus = NormalizeCatalogFilter(query.Status);
+        var normalizedSkip = Math.Max(0, query.Skip ?? 0);
+        var normalizedTake = NormalizeTake(query.Take, 24, 100);
+        var excludeArchived = normalizedStatus == "not_archived";
+
+        var itemsQuery = dbContext.TemplateItems
             .AsNoTracking()
             .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null)
-            .Where(x => !type.HasValue || x.TemplateType == type.Value)
-            .Where(x => !status.HasValue || x.Status == status.Value)
-            .OrderByDescending(x => x.UpdatedAtUtc)
-            .ToArrayAsync(cancellationToken);
+            .Where(x => !templateType.HasValue || x.TemplateType == templateType.Value)
+            .Where(x => !templateStatus.HasValue || x.Status == templateStatus.Value)
+            .Where(x => !excludeArchived || x.Status != TemplateStatus.Archived)
+            .AsQueryable();
 
-        return Result.Success<IReadOnlyList<AdminTemplateListItemResponse>>([.. items.Select(MapAdminListItem)]);
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            itemsQuery = itemsQuery.Where(x =>
+                x.Title.ToLower().Contains(normalizedSearch) ||
+                x.ShortDescription.ToLower().Contains(normalizedSearch) ||
+                x.Category.ToLower().Contains(normalizedSearch) ||
+                x.Tags.ToLower().Contains(normalizedSearch));
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalizedCategory) && normalizedCategory != "all")
+        {
+            itemsQuery = itemsQuery.Where(x => x.Category.ToLower() == normalizedCategory);
+        }
+
+        if (normalizedAccess == "premium")
+        {
+            itemsQuery = itemsQuery.Where(x => x.IsPremium);
+        }
+        else if (normalizedAccess == "free")
+        {
+            itemsQuery = itemsQuery.Where(x => !x.IsPremium);
+        }
+
+        itemsQuery = normalizedSort switch
+        {
+            "title" => itemsQuery.OrderBy(x => x.Title).ThenByDescending(x => x.UpdatedAtUtc),
+            "tokens" => itemsQuery.OrderByDescending(x => x.TokenCost).ThenByDescending(x => x.UpdatedAtUtc),
+            _ => itemsQuery.OrderByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.CreatedAtUtc)
+        };
+
+        var totalCount = await itemsQuery.CountAsync(cancellationToken);
+        var items = await itemsQuery
+            .Skip(normalizedSkip)
+            .Take(normalizedTake + 1)
+            .ToListAsync(cancellationToken);
+
+        var hasMore = items.Count > normalizedTake;
+        if (hasMore)
+        {
+            items.RemoveAt(items.Count - 1);
+        }
+
+        return Result.Success(new AdminTemplateCatalogPageResponse(
+            [.. items.Select(MapAdminListItem)],
+            normalizedSkip,
+            normalizedTake,
+            totalCount,
+            hasMore));
     }
 
     public async Task<Result<AdminTemplateResponse>> GetAdminAsync(Guid templateId, CancellationToken cancellationToken)
@@ -53,6 +113,42 @@ internal sealed partial class TemplatesService
         return template is null || template.DeletedAtUtc is not null
             ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.NotFound)
             : Result.Success(MapAdminResponse(template));
+    }
+
+    private static TemplateType? ParseTemplateType(string? raw)
+    {
+        return Enum.TryParse<TemplateType>(raw, true, out var value) ? value : null;
+    }
+
+    private static TemplateStatus? ParseTemplateStatus(string? raw)
+    {
+        if (string.Equals(raw?.Trim(), "not_archived", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return Enum.TryParse<TemplateStatus>(raw, true, out var value) ? value : null;
+    }
+
+    private static string? NormalizeCatalogFilter(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized.Length > 120 ? normalized[..120] : normalized;
+    }
+
+    private static int NormalizeTake(int? take, int fallback, int max)
+    {
+        if (!take.HasValue || take.Value <= 0)
+        {
+            return fallback;
+        }
+
+        return Math.Min(take.Value, max);
     }
 
     public async Task<Result<AdminTemplateStatisticsResponse>> GetAdminStatisticsAsync(Guid templateId, CancellationToken cancellationToken)

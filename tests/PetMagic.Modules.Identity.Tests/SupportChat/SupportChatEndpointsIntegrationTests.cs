@@ -89,11 +89,13 @@ public sealed class SupportChatEndpointsIntegrationTests
         using var regularUserInbox = await application.CreateClient(UserId, "User").GetAsync("/api/admin/support/tickets");
         Assert.Equal(HttpStatusCode.Forbidden, regularUserInbox.StatusCode);
 
-        var moderatorInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
+        var moderatorInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             application.CreateClient(ModeratorId, "Moderator"),
             "/api/admin/support/tickets");
 
-        var conversation = Assert.Single(moderatorInbox);
+        Assert.Equal(1, moderatorInbox.TotalCount);
+        Assert.False(moderatorInbox.HasMore);
+        var conversation = Assert.Single(moderatorInbox.Items);
         Assert.Equal(created.ConversationId, conversation.ConversationId);
         Assert.Equal("New", conversation.Status);
         Assert.Equal("user@petmagic.test", conversation.UserEmail);
@@ -123,18 +125,57 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Unassigned case", SupportConversationPriority.Normal));
 
-        var mineInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
+        var mineInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             adminClient,
             "/api/admin/support/tickets?assignment=mine");
 
-        var unassignedInbox = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
+        var unassignedInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             adminClient,
             "/api/admin/support/tickets?assignment=unassigned");
 
-        Assert.Single(mineInbox);
-        Assert.Single(unassignedInbox);
-        Assert.Equal(mine.ConversationId, mineInbox[0].ConversationId);
-        Assert.Equal(unassignedApplication.ConversationId, unassignedInbox[0].ConversationId);
+        Assert.Single(mineInbox.Items);
+        Assert.Single(unassignedInbox.Items);
+        Assert.Equal(1, mineInbox.TotalCount);
+        Assert.Equal(1, unassignedInbox.TotalCount);
+        Assert.Equal(mine.ConversationId, mineInbox.Items[0].ConversationId);
+        Assert.Equal(unassignedApplication.ConversationId, unassignedInbox.Items[0].ConversationId);
+    }
+
+    [Fact]
+    public async Task AdminInbox_ShouldReturnPagedMetadata()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("First paged case", SupportConversationPriority.Normal));
+
+        await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(OtherUserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Second paged case", SupportConversationPriority.Normal));
+
+        var firstPage = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            "/api/admin/support/tickets?page=1&pageSize=1");
+
+        Assert.Equal(1, firstPage.Page);
+        Assert.Equal(1, firstPage.PageSize);
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.True(firstPage.HasMore);
+        Assert.Single(firstPage.Items);
+
+        var secondPage = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            "/api/admin/support/tickets?page=2&pageSize=1");
+
+        Assert.Equal(2, secondPage.Page);
+        Assert.Equal(1, secondPage.PageSize);
+        Assert.Equal(2, secondPage.TotalCount);
+        Assert.False(secondPage.HasMore);
+        Assert.Single(secondPage.Items);
+        Assert.NotEqual(firstPage.Items[0].ConversationId, secondPage.Items[0].ConversationId);
     }
 
     [Fact]
@@ -150,11 +191,15 @@ public sealed class SupportChatEndpointsIntegrationTests
             "/api/support/conversation/open",
             new OpenConversationRequest("Queue action case", SupportConversationPriority.High));
 
-        var tickets = await GetFromJsonAsync<IReadOnlyList<SupportConversationSummaryResponse>>(
+        var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
             adminClient,
             "/api/admin/support/tickets?status=New&source=MobileChat&page=1&pageSize=10");
 
-        var ticket = Assert.Single(tickets);
+        Assert.Equal(1, tickets.Page);
+        Assert.Equal(10, tickets.PageSize);
+        Assert.Equal(1, tickets.TotalCount);
+        Assert.False(tickets.HasMore);
+        var ticket = Assert.Single(tickets.Items);
         Assert.Equal(created.ConversationId, ticket.ConversationId);
         Assert.Equal("MobileChat", ticket.Source);
         Assert.Equal("Queue action case", ticket.LastMessagePreview);

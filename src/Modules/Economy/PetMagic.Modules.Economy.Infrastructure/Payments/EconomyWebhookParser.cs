@@ -7,6 +7,15 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 internal static partial class EconomyWebhookParser
 {
+    public sealed record AppStoreTransactionInfo(
+        string? BundleId,
+        string? ProductId,
+        string? TransactionId,
+        string? OriginalTransactionId,
+        DateTime? ExpiresAtUtc,
+        DateTime? RevokedAtUtc,
+        string? Environment);
+
     public static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
     {
         if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
@@ -156,6 +165,60 @@ internal static partial class EconomyWebhookParser
         catch
         {
             return (false, null, null, null, null, null, null, null, false);
+        }
+    }
+
+    public static string? TryReadAppStoreProductId(string signedTransactionInfo)
+    {
+        return TryReadAppStoreTransactionInfo(signedTransactionInfo)?.ProductId;
+    }
+
+    public static AppStoreTransactionInfo? TryReadAppStoreTransactionInfo(string signedTransactionInfo)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(DecodeJwsPayloadJson(signedTransactionInfo));
+            var root = document.RootElement;
+
+            var bundleId = root.TryGetProperty("bundleId", out var bundleElement)
+                && bundleElement.ValueKind == JsonValueKind.String
+                    ? bundleElement.GetString()
+                    : null;
+            var productId = root.TryGetProperty("productId", out var productElement)
+                && productElement.ValueKind == JsonValueKind.String
+                    ? productElement.GetString()
+                    : null;
+            var transactionId = root.TryGetProperty("transactionId", out var transactionElement)
+                && transactionElement.ValueKind == JsonValueKind.String
+                    ? transactionElement.GetString()
+                    : null;
+            var originalTransactionId = root.TryGetProperty("originalTransactionId", out var originalElement)
+                && originalElement.ValueKind == JsonValueKind.String
+                    ? originalElement.GetString()
+                    : null;
+            var expiresAtUtc = root.TryGetProperty("expiresDate", out var expiresElement)
+                ? ParseUnixMilliseconds(expiresElement)
+                : null;
+            var revokedAtUtc = root.TryGetProperty("revocationDate", out var revocationElement)
+                ? ParseUnixMilliseconds(revocationElement)
+                : null;
+            var environment = root.TryGetProperty("environment", out var environmentElement)
+                && environmentElement.ValueKind == JsonValueKind.String
+                    ? environmentElement.GetString()
+                    : null;
+
+            return new AppStoreTransactionInfo(
+                bundleId,
+                productId,
+                transactionId,
+                originalTransactionId,
+                expiresAtUtc,
+                revokedAtUtc,
+                environment);
+        }
+        catch
+        {
+            return null;
         }
     }
 

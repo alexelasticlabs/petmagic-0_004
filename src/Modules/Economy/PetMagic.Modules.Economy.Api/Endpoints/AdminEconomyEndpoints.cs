@@ -21,6 +21,7 @@ public static class AdminEconomyEndpoints
             .RequireAuthorization("AdminOnly");
 
         group.MapGet("/ledger", GetWalletLedgerAsync);
+        group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/purchases", GetPurchasesAsync);
         group.MapPost("/purchases/{orderId:guid}/refund", RefundPurchaseAsync)
             .RequireAuthorization("AdminOnly");
@@ -46,6 +47,7 @@ public static class AdminEconomyEndpoints
             .RequireAuthorization("AdminOnly");
         group.MapPut("/payment-provider-configs/{configurationId:guid}", UpdatePaymentProviderConfigurationAsync)
             .RequireAuthorization("AdminOnly");
+        group.MapGet("/redeem-codes/metrics", GetRedeemCodeMetricsAsync);
         group.MapGet("/redeem-codes", ListRedeemCodesAsync);
         group.MapGet("/redeem-codes/{redeemCodeId:guid}/activations", ListRedeemCodeActivationsAsync);
         group.MapPost("/redeem-codes", CreateRedeemCodeAsync)
@@ -70,6 +72,14 @@ public static class AdminEconomyEndpoints
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminEconomyDashboardMetricsResponse>> GetDashboardMetricsAsync(
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminDashboardMetricsAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
@@ -473,11 +483,30 @@ public static class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminRedeemCodeResponse>>> ListRedeemCodesAsync(
+    private static async Task<Ok<OffsetPagedResponse<AdminRedeemCodeResponse>>> ListRedeemCodesAsync(
+        [FromQuery] int skip,
+        [FromQuery] int take,
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? rewardKind,
+        [FromQuery] string? sort,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.ListAdminRedeemCodesAsync(cancellationToken);
+        var query = new AdminRedeemCodeListQuery(skip, take, search, status, rewardKind, sort);
+        var result = await service.ListAdminRedeemCodesAsync(query, cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminRedeemCodeMetricsResponse>> GetRedeemCodeMetricsAsync(
+        [FromQuery] string? search,
+        [FromQuery] string? status,
+        [FromQuery] string? rewardKind,
+        [FromServices] IEconomyService service,
+        CancellationToken cancellationToken)
+    {
+        var query = new AdminRedeemCodeListQuery(Search: search, Status: status, RewardKind: rewardKind);
+        var result = await service.GetAdminRedeemCodeMetricsAsync(query, cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 

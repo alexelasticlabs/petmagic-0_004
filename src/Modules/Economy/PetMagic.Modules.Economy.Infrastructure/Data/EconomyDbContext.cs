@@ -56,9 +56,15 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Source).HasMaxLength(80).IsRequired();
             entity.Property(x => x.Reason).HasMaxLength(120).IsRequired();
+            entity.Property(x => x.SourceProvider).HasMaxLength(32);
+            entity.Property(x => x.SourceTransactionId).HasMaxLength(160);
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.Source, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.SourceProvider, x.SourceTransactionId })
+                .IsUnique()
+                .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL")
+                .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId");
         });
 
         builder.Entity<CurrencyPack>(entity =>
@@ -89,7 +95,10 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.UserId, x.PaymentProvider, x.CreatedAtUtc })
                 .HasDatabaseName("IX_economy_purchase_orders_UserId_PaymentProvider_CreatedAtUtc");
             entity.HasIndex(x => x.SavedPaymentMethodId);
-            entity.HasIndex(x => new { x.PaymentProvider, x.ExternalPaymentId });
+            entity.HasIndex(x => new { x.PaymentProvider, x.ExternalPaymentId })
+                .IsUnique()
+                .HasFilter("\"ExternalPaymentId\" IS NOT NULL AND \"ExternalPaymentId\" <> ''")
+                .HasDatabaseName("UX_epo_Provider_ExternalPaymentId");
         });
 
         builder.Entity<ProcessedWebhookEvent>(entity =>
@@ -218,6 +227,7 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.Property(x => x.PurchaseChannel).HasMaxLength(32).IsRequired();
             entity.Property(x => x.Region).HasMaxLength(16).IsRequired();
             entity.Property(x => x.PlanId).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ProductId).HasMaxLength(160);
             entity.Property(x => x.Status).HasMaxLength(32).IsRequired();
             entity.Property(x => x.ExternalCustomerId).HasMaxLength(160);
             entity.Property(x => x.ExternalSubscriptionId).HasMaxLength(160);
@@ -230,6 +240,10 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.Provider, x.UpdatedAtUtc });
             entity.HasIndex(x => new { x.Provider, x.ExternalSubscriptionId }).IsUnique();
+            entity.HasIndex(x => new { x.Provider, x.ExternalTransactionId })
+                .IsUnique()
+                .HasFilter("\"ExternalTransactionId\" IS NOT NULL AND \"ExternalTransactionId\" <> ''")
+                .HasDatabaseName("UX_eus_Provider_ExternalTransactionId");
         });
 
         builder.Entity<PaymentProviderConfiguration>(entity =>

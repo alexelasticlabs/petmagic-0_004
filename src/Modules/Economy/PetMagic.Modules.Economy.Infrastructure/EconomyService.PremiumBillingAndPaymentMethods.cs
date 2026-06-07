@@ -370,16 +370,46 @@ public sealed partial class EconomyService
             externalSubscriptionId = existingGoogleSubscription?.ExternalSubscriptionId ?? verification.Value.ExternalSubscriptionId;
         }
 
+        var mappedStatus = EconomyWebhookParser.MapStoreSubscriptionStatus(verification.Value.Status, verification.Value.IsActive);
+        var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(mappedStatus, verification.Value.ExpiresAtUtc);
+        var externalTransactionId = string.Equals(provider, "google_play", StringComparison.Ordinal)
+            ? command.ServerVerificationData
+            : command.PurchaseId;
+
+        if (await StoreSubscriptionBelongsToAnotherUserAsync(
+                command.UserId,
+                provider,
+                externalSubscriptionId,
+                externalTransactionId,
+                cancellationToken))
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        if (identityService is null)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(EconomyErrors.PremiumBillingUnavailable);
+        }
+
+        var premiumResult = await identityService.SetPremiumStatusAsync(
+            new SetPremiumStatusCommand(command.UserId, isPremium),
+            cancellationToken);
+
+        if (premiumResult.IsFailure)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(premiumResult.Error);
+        }
+
         var userSubscription = await UpsertUserSubscriptionAsync(
             command.UserId,
             provider,
             "in_app",
             string.Empty,
             plan.PlanCode,
-            "Pending",
+            mappedStatus,
             null,
             externalSubscriptionId,
-            string.Equals(provider, "google_play", StringComparison.Ordinal) ? command.ServerVerificationData : command.PurchaseId,
+            externalTransactionId,
             DeriveCurrentPeriodStartUtc(plan.BillingPeriod, verification.Value.ExpiresAtUtc, DateTime.UtcNow),
             verification.Value.ExpiresAtUtc,
             false,
@@ -396,14 +426,40 @@ public sealed partial class EconomyService
             verification.Value.ExternalSubscriptionId,
             null,
             cancellationToken);
+
+        logger?.LogInformation(
+            "Store subscription validation succeeded. Provider={Provider} UserId={UserId} ProductId={ProductId} PlanId={PlanId} Status={Status} IsPremium={IsPremium} Environment={Environment} CorrelationId={CorrelationId}",
+            provider,
+            command.UserId,
+            command.ProductId,
+            plan.PlanCode,
+            mappedStatus,
+            isPremium,
+            provider == "google_play" ? options.Value.GooglePlayEnvironment : options.Value.AppStoreEnvironment,
+            CurrentCorrelationId);
+
+        if (isPremium)
+        {
+            await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                userSubscription,
+                provider,
+                cancellationToken);
+
+            await SettlePendingReferralBonusAsync(
+                command.UserId,
+                $"premium:{provider}:{userSubscription.PlanId}",
+                DateTime.UtcNow,
+                cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new PremiumStoreVerificationResponse(
             provider,
             command.ProductId,
-            false,
+            isPremium,
             verification.Value.ExpiresAtUtc,
-            "pending_webhook"));
+            mappedStatus));
     }
 
     public async Task<Result<SubscriptionSummaryResponse>> VerifyPremiumStripeSubscriptionAsync(

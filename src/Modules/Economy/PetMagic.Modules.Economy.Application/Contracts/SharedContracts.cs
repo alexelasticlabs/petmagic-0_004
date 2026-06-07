@@ -4,4 +4,5 @@ public sealed record OffsetPagedResponse<T>(
     IReadOnlyList<T> Items,
     int Skip,
     int Take,
-    bool HasMore);
+    bool HasMore,
+    int? TotalCount = null);

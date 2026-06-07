@@ -62,10 +62,33 @@ public sealed partial class EconomyService
         subscription.PurchaseChannel = purchaseChannel;
         subscription.Region = region;
         subscription.PlanId = planId;
+        subscription.ProductId = await ResolveSubscriptionProductIdAsync(provider, planId, cancellationToken)
+            ?? subscription.ProductId;
         subscription.Status = normalizedStatus;
         subscription.ExternalCustomerId = externalCustomerId ?? subscription.ExternalCustomerId;
         subscription.ExternalSubscriptionId = externalSubscriptionId ?? subscription.ExternalSubscriptionId;
         subscription.ExternalTransactionId = externalTransactionId ?? subscription.ExternalTransactionId;
+        subscription.LastValidatedAtUtc = now;
+
+        if (string.Equals(normalizedStatus, "Canceled", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "Cancelled", StringComparison.OrdinalIgnoreCase))
+        {
+            subscription.CancelledAtUtc ??= now;
+        }
+        else if (string.Equals(normalizedStatus, "Active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "Trialing", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "GracePeriod", StringComparison.OrdinalIgnoreCase))
+        {
+            subscription.CancelledAtUtc = cancelAtPeriodEnd ? subscription.CancelledAtUtc : null;
+            subscription.ExpiredAtUtc = null;
+        }
+
+        if (string.Equals(normalizedStatus, "Expired", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "Refunded", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedStatus, "Revoked", StringComparison.OrdinalIgnoreCase))
+        {
+            subscription.ExpiredAtUtc ??= now;
+        }
 
         if (currentPeriodStartUtc.HasValue
             && (!previousPeriodStartUtc.HasValue || currentPeriodStartUtc.Value > previousPeriodStartUtc.Value))
@@ -82,6 +105,69 @@ public sealed partial class EconomyService
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return subscription;
+    }
+
+    private async Task<bool> StoreSubscriptionBelongsToAnotherUserAsync(
+        Guid userId,
+        string provider,
+        string? externalSubscriptionId,
+        string? externalTransactionId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedExternalSubscriptionId = string.IsNullOrWhiteSpace(externalSubscriptionId)
+            ? null
+            : externalSubscriptionId.Trim();
+        var normalizedExternalTransactionId = string.IsNullOrWhiteSpace(externalTransactionId)
+            ? null
+            : externalTransactionId.Trim();
+
+        if (normalizedExternalSubscriptionId is null && normalizedExternalTransactionId is null)
+        {
+            return false;
+        }
+
+        return await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Provider == provider
+                    && x.UserId != userId
+                    && ((normalizedExternalSubscriptionId != null && x.ExternalSubscriptionId == normalizedExternalSubscriptionId)
+                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)),
+                cancellationToken);
+    }
+
+    private async Task<string?> ResolveSubscriptionProductIdAsync(
+        string provider,
+        string planId,
+        CancellationToken cancellationToken)
+    {
+        var configuredPlan = await dbContext.SubscriptionPlans
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == planId, cancellationToken);
+
+        if (configuredPlan is not null)
+        {
+            return provider switch
+            {
+                "google_play" => configuredPlan.GoogleProductId,
+                "app_store" => configuredPlan.AppleProductId,
+                "stripe" => configuredPlan.StripePriceId,
+                _ => null
+            };
+        }
+
+        var catalogPlan = PremiumPlanCatalog.Find(planId);
+        if (catalogPlan is null)
+        {
+            return null;
+        }
+
+        return provider switch
+        {
+            "google_play" => catalogPlan.GooglePlayProductId,
+            "app_store" => catalogPlan.AppStoreProductId,
+            _ => null
+        };
     }
 
     private async Task AppendSubscriptionEventAsync(

@@ -14,6 +14,8 @@ public sealed class UserSubscription
 
     public string PlanId { get; set; } = string.Empty;
 
+    public string? ProductId { get; set; }
+
     public string Status { get; set; } = string.Empty;
 
     public string? ExternalCustomerId { get; set; }
@@ -27,6 +29,12 @@ public sealed class UserSubscription
     public DateTime? CurrentPeriodEndUtc { get; set; }
 
     public bool CancelAtPeriodEnd { get; set; }
+
+    public DateTime? CancelledAtUtc { get; set; }
+
+    public DateTime? ExpiredAtUtc { get; set; }
+
+    public DateTime? LastValidatedAtUtc { get; set; }
 
     public int MonthlyTokenLimit { get; set; }
 

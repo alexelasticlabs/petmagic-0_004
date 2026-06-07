@@ -58,6 +58,7 @@ public static partial class SupportChatEndpoints
             .RequireAuthorization("ModeratorOrAdmin");
 
         adminGroup.MapGet("/tickets", ListAdminInboxAsync);
+        adminGroup.MapGet("/tickets/metrics", GetAdminInboxMetricsAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}", GetAdminConversationAsync);
         adminGroup.MapGet("/tickets/{conversationId:guid}/context", GetAdminTicketContextAsync);
         adminGroup.MapPost("/tickets/{conversationId:guid}/assign-to-me", AssignConversationToMeAsync);

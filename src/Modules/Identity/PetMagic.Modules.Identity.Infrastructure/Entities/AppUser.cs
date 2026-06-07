@@ -39,6 +39,8 @@ public sealed class AppUser : IdentityUser<Guid>
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
+    public DateTime? LastLoginAtUtc { get; set; }
+
     public AccountStatus AccountStatus { get; set; } = AccountStatus.PendingEmailVerification;
 
     public DateTime? AccountStatusUpdatedAtUtc { get; set; }

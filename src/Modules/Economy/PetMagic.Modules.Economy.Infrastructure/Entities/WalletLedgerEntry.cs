@@ -14,5 +14,9 @@ public sealed class WalletLedgerEntry
 
     public string Reason { get; set; } = string.Empty;
 
+    public string? SourceProvider { get; set; }
+
+    public string? SourceTransactionId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
 }

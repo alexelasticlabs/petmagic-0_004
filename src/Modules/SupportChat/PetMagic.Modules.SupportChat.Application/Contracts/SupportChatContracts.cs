@@ -23,6 +23,20 @@ public sealed record ListAdminSupportInboxQuery(
     int PageSize = 50,
     string? Sort = null);
 
+public sealed record SupportConversationInboxPageResponse(
+    IReadOnlyList<SupportConversationSummaryResponse> Items,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    bool HasMore);
+
+public sealed record AdminSupportInboxMetricsResponse(
+    int TotalConversations,
+    int OpenConversations,
+    int ClosedConversations,
+    int UnassignedConversations,
+    int UnreadForAdminConversations);
+
 public sealed record SupportConversationMessagesQuery(
     int Take = 60,
     DateTime? BeforeMessageCreatedAtUtc = null);

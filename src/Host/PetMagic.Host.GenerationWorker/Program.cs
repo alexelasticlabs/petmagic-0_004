@@ -12,13 +12,15 @@ using PetMagic.Modules.Templates.Infrastructure;
 
 using Serilog;
 using Serilog.Events;
+using Serilog.Formatting.Json;
 
 LoadDotEnvFileIfPresent();
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .Enrich.WithProperty("ApplicationName", "PetMagic.Host.GenerationWorker")
-    .WriteTo.Console()
+    .Enrich.WithProperty("Environment", ResolveBootstrapEnvironment())
+    .WriteTo.Console(new JsonFormatter(), standardErrorFromLevel: LogEventLevel.Error)
     .CreateLogger();
 
 try
@@ -141,4 +143,11 @@ static void LoadDotEnvFileIfPresent()
 
         return;
     }
+}
+
+static string ResolveBootstrapEnvironment()
+{
+    return Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+        ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        ?? Environments.Production;
 }

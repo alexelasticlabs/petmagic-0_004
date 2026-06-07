@@ -16,7 +16,9 @@ public interface ITemplatesService
 
     Task<Result> DeleteCategoryAsync(Guid categoryId, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<AdminTemplateListItemResponse>>> ListAdminAsync(TemplateType? type, TemplateStatus? status, CancellationToken cancellationToken);
+    Task<Result<AdminTemplateCatalogPageResponse>> ListAdminAsync(
+        AdminTemplateCatalogQuery query,
+        CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateResponse>> GetAdminAsync(Guid templateId, CancellationToken cancellationToken);
 

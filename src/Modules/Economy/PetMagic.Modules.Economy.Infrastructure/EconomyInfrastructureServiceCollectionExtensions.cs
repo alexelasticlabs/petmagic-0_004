@@ -77,10 +77,12 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             GooglePlayPackageName = section["GooglePlayPackageName"] ?? "com.petmagic.app",
             GooglePlayServiceAccountEmail = ReadValue(section, "GooglePlayServiceAccountEmail", "GOOGLE_PLAY_SERVICE_ACCOUNT_EMAIL") ?? string.Empty,
             GooglePlayPrivateKeyPem = NormalizePem(ReadValue(section, "GooglePlayPrivateKeyPem", "GOOGLE_PLAY_PRIVATE_KEY_PEM")),
+            GooglePlayEnvironment = ReadValue(section, "GooglePlayEnvironment", "GOOGLE_PLAY_ENVIRONMENT") ?? "production",
             GooglePlayPubSubAudience = ReadValue(section, "GooglePlayPubSubAudience", "GOOGLE_PLAY_PUBSUB_AUDIENCE") ?? string.Empty,
             GooglePlayPubSubExpectedEmail = ReadValue(section, "GooglePlayPubSubExpectedEmail", "GOOGLE_PLAY_PUBSUB_EXPECTED_EMAIL") ?? string.Empty,
             AppStoreBundleId = section["AppStoreBundleId"] ?? "com.petmagic.app",
             AppStoreSharedSecret = ReadValue(section, "AppStoreSharedSecret", "APP_STORE_SHARED_SECRET") ?? string.Empty,
+            AppStoreEnvironment = ReadValue(section, "AppStoreEnvironment", "APP_STORE_ENVIRONMENT") ?? "production",
             FirebasePushEnabled =
                 bool.TryParse(
                     ReadValue(
@@ -139,7 +141,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddSingleton<IStoreSubscriptionVerifier>(serviceProvider =>
             new StoreSubscriptionVerifier(
                 serviceProvider.GetRequiredService<IHttpClientFactory>(),
-                serviceProvider.GetRequiredService<IOptions<EconomyOptions>>()));
+                serviceProvider.GetRequiredService<IOptions<EconomyOptions>>(),
+                serviceProvider.GetRequiredService<IStoreWebhookSecurityValidator>()));
 
         return services;
     }

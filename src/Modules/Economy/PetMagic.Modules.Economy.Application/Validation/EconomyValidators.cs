@@ -166,6 +166,26 @@ public sealed class VerifyPackStorePurchaseCommandValidator : AbstractValidator<
     }
 }
 
+public sealed class ValidateGooglePlayBillingCommandValidator : AbstractValidator<ValidateGooglePlayBillingCommand>
+{
+    public ValidateGooglePlayBillingCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.PurchaseToken).NotEmpty().MaximumLength(8192);
+        RuleFor(x => x.ProductId).NotEmpty().MaximumLength(160);
+        RuleFor(x => x.PackageName).NotEmpty().MaximumLength(160);
+    }
+}
+
+public sealed class ValidateAppleAppStoreBillingCommandValidator : AbstractValidator<ValidateAppleAppStoreBillingCommand>
+{
+    public ValidateAppleAppStoreBillingCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.SignedTransactionInfo).NotEmpty().MaximumLength(32768);
+    }
+}
+
 public sealed class CreatePaymentMethodSetupCommandValidator : AbstractValidator<CreatePaymentMethodSetupCommand>
 {
     public CreatePaymentMethodSetupCommandValidator()

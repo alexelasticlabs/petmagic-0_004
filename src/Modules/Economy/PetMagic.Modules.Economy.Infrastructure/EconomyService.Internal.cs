@@ -112,16 +112,7 @@ public sealed partial class EconomyService
     private async Task<bool> ResolvePremiumStatusAsync(Guid userId, bool fallbackIsPremium, CancellationToken cancellationToken)
     {
         var subscription = await GetLatestUserSubscriptionAsync(userId, cancellationToken);
-        var subscriptionIsPremium = IsActivePremiumSubscription(subscription);
-
-        if (identityService is null)
-        {
-            return subscriptionIsPremium || fallbackIsPremium;
-        }
-
-        var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
-        var profileIsPremium = profile.IsSuccess ? profile.Value.IsPremium : fallbackIsPremium;
-        return subscriptionIsPremium || profileIsPremium;
+        return IsActivePremiumSubscription(subscription);
     }
 
     private async Task<Wallet> GetOrCreateWalletAsync(Guid userId, CancellationToken cancellationToken)
@@ -258,12 +249,27 @@ public sealed partial class EconomyService
         referral.UpdatedAtUtc = now;
     }
 
-    private WalletOperationResponse ApplyWalletDelta(Wallet wallet, int delta, string source, string reason, DateTime now)
+    private WalletOperationResponse ApplyWalletDelta(
+        Wallet wallet,
+        int delta,
+        string source,
+        string reason,
+        DateTime now,
+        string? sourceProvider = null,
+        string? sourceTransactionId = null)
     {
-        return ApplyWalletDelta(wallet, delta, source, reason, now, out _);
+        return ApplyWalletDelta(wallet, delta, source, reason, now, out _, sourceProvider, sourceTransactionId);
     }
 
-    private WalletOperationResponse ApplyWalletDelta(Wallet wallet, int delta, string source, string reason, DateTime now, out Guid ledgerEntryId)
+    private WalletOperationResponse ApplyWalletDelta(
+        Wallet wallet,
+        int delta,
+        string source,
+        string reason,
+        DateTime now,
+        out Guid ledgerEntryId,
+        string? sourceProvider = null,
+        string? sourceTransactionId = null)
     {
         ledgerEntryId = Guid.NewGuid();
         wallet.Balance += delta;
@@ -277,6 +283,8 @@ public sealed partial class EconomyService
             BalanceAfter = wallet.Balance,
             Source = source,
             Reason = reason,
+            SourceProvider = string.IsNullOrWhiteSpace(sourceProvider) ? null : sourceProvider.Trim(),
+            SourceTransactionId = string.IsNullOrWhiteSpace(sourceTransactionId) ? null : sourceTransactionId.Trim(),
             CreatedAtUtc = now
         });
 
@@ -334,7 +342,14 @@ public sealed partial class EconomyService
         var wallet = await GetOrCreateWalletAsync(order.UserId, cancellationToken);
         var now = DateTime.UtcNow;
 
-        ApplyWalletDelta(wallet, order.SparkToGrant, WalletLedgerSource.PackPurchase, $"purchase:{order.Id:D}", now);
+        ApplyWalletDelta(
+            wallet,
+            order.SparkToGrant,
+            WalletLedgerSource.PackPurchase,
+            $"purchase:{order.Id:D}",
+            now,
+            order.PaymentProvider,
+            order.ExternalPaymentId);
         await SettlePendingReferralBonusAsync(order.UserId, $"purchase:{order.Id:D}", now, cancellationToken);
 
         order.Status = PurchaseOrderStatus.Succeeded;
@@ -351,6 +366,50 @@ public sealed partial class EconomyService
             cancellationToken);
         LogPaymentSucceeded(order, "purchase.confirm");
         return Result.Success(order);
+    }
+
+    private async Task<Result<PurchaseOrder>> ConfirmStorePurchaseInternalAsync(
+        PurchaseOrder order,
+        string externalPaymentId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedExternalPaymentId = externalPaymentId.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedExternalPaymentId))
+        {
+            return Result.Failure<PurchaseOrder>(EconomyErrors.StorePurchaseInvalid);
+        }
+
+        var existingOrder = await dbContext.PurchaseOrders
+            .FirstOrDefaultAsync(
+                x => x.PaymentProvider == order.PaymentProvider
+                    && x.ExternalPaymentId == normalizedExternalPaymentId,
+                cancellationToken);
+
+        if (existingOrder is not null && existingOrder.Id != order.Id)
+        {
+            if (existingOrder.UserId != order.UserId)
+            {
+                return Result.Failure<PurchaseOrder>(EconomyErrors.StorePurchaseInvalid);
+            }
+
+            return Result.Success(existingOrder);
+        }
+
+        order.ExternalPaymentId = normalizedExternalPaymentId;
+        if (string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result.Success(order);
+        }
+
+        var confirmResult = await ConfirmPurchaseInternalAsync(order, cancellationToken);
+        if (confirmResult.IsFailure
+            && string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+        {
+            return Result.Success(order);
+        }
+
+        return confirmResult;
     }
 
     private async Task<PurchaseOrder?> ResolveOrderAsync(Guid? orderId, string? externalPaymentId, CancellationToken cancellationToken)
@@ -404,9 +463,15 @@ public sealed partial class EconomyService
             order.PriceAmount,
             order.CurrencyCode,
             order.SparkToGrant,
-            order.ExternalPaymentId,
+            IsStoreProvider(order.PaymentProvider) ? null : order.ExternalPaymentId,
             order.CreatedAtUtc,
             order.ConfirmedAtUtc);
+    }
+
+    private static bool IsStoreProvider(string provider)
+    {
+        return string.Equals(provider, "google_play", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(provider, "app_store", StringComparison.OrdinalIgnoreCase);
     }
 
     private static OffsetPagedResponse<T> ToPaged<T>(List<T> items, int skip, int take)

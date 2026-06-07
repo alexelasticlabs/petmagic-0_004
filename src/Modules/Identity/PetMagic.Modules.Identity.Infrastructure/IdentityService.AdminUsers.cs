@@ -7,6 +7,7 @@ using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
+using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Application.Abstractions;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
@@ -139,6 +140,40 @@ public sealed partial class IdentityService
         return Result.Success(new UserListPageResponse(output, normalizedSkip, normalizedTake, hasMore, totalCount));
     }
 
+    public async Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var currentWeekStart = StartOfUtcDay(now.AddDays(-6));
+        var previousWeekStart = currentWeekStart.AddDays(-7);
+
+        var users = userManager.Users.AsNoTracking();
+        var totalUsers = await users.CountAsync(cancellationToken);
+        var premiumUsers = await users.CountAsync(user => user.IsPremium, cancellationToken);
+        var activeUsers = await users.CountAsync(user => user.IsActive, cancellationToken);
+        var blockedUsers = await users.CountAsync(user => !user.IsActive, cancellationToken);
+        var usersThisWeek = await users.CountAsync(user => user.CreatedAtUtc >= currentWeekStart, cancellationToken);
+        var usersPreviousWeek = await users.CountAsync(
+            user => user.CreatedAtUtc >= previousWeekStart && user.CreatedAtUtc < currentWeekStart,
+            cancellationToken);
+        var newUsersLast30Days = await users.CountAsync(user => user.CreatedAtUtc >= now.AddDays(-30), cancellationToken);
+        var newUsersLast90Days = await users.CountAsync(user => user.CreatedAtUtc >= now.AddDays(-90), cancellationToken);
+        var roleCounts = await GetDashboardRoleCountsAsync(cancellationToken);
+        return Result.Success(new AdminUserDashboardMetricsResponse(
+            totalUsers,
+            premiumUsers,
+            activeUsers,
+            blockedUsers,
+            roleCounts.AdminUsers,
+            roleCounts.ModeratorUsers,
+            roleCounts.RegularUsers,
+            usersThisWeek,
+            usersPreviousWeek,
+            usersThisWeek,
+            newUsersLast30Days,
+            newUsersLast90Days));
+    }
+
     public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
     {
         var user = await userManager.FindByIdAsync(userId.ToString());
@@ -163,6 +198,41 @@ public sealed partial class IdentityService
 
         return await analyticsService.GetAdminUserAnalyticsAsync(userId, cancellationToken);
     }
+
+    private async Task<DashboardRoleCounts> GetDashboardRoleCountsAsync(CancellationToken cancellationToken)
+    {
+        var roleRows = await dbContext.UserRoles
+            .AsNoTracking()
+            .Join(
+                dbContext.Roles.AsNoTracking(),
+                userRole => userRole.RoleId,
+                role => role.Id,
+                (userRole, role) => new
+                {
+                    userRole.UserId,
+                    RoleName = role.Name ?? string.Empty
+                })
+            .Where(row =>
+                row.RoleName == SystemRoles.Admin ||
+                row.RoleName == SystemRoles.Moderator ||
+                row.RoleName == SystemRoles.User)
+            .ToListAsync(cancellationToken);
+
+        return new DashboardRoleCounts(
+            roleRows.Count(row => row.RoleName == SystemRoles.Admin),
+            roleRows.Count(row => row.RoleName == SystemRoles.Moderator),
+            roleRows.Count(row => row.RoleName == SystemRoles.User));
+    }
+
+    private static DateTime StartOfUtcDay(DateTime value)
+    {
+        return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private sealed record DashboardRoleCounts(
+        int AdminUsers,
+        int ModeratorUsers,
+        int RegularUsers);
 
     public async Task<Result<AdminUserWalletOperationResponse>> AdjustAdminUserWalletAsync(AdminAdjustUserWalletCommand command, CancellationToken cancellationToken)
     {
@@ -424,6 +494,12 @@ public sealed partial class IdentityService
         }
 
         var avatarUrl = user.AvatarUrl;
+        var now = DateTime.UtcNow;
+        var externalProviders = await dbContext.ExternalAuthProviders
+            .Where(x => x.UserId == userId)
+            .ToListAsync(cancellationToken);
+        await BlockDeletedAccountIdentifiersAsync(user.Email, externalProviders, now, cancellationToken);
+
         var deleteUserResult = await userManager.DeleteAsync(user);
         if (!deleteUserResult.Succeeded)
         {
@@ -442,9 +518,9 @@ public sealed partial class IdentityService
             .Where(x => x.UserId == userId)
             .ToListAsync(cancellationToken);
 
-        if (refreshSessions.Count > 0)
+        foreach (var refreshSession in refreshSessions.Where(static x => x.RevokedAtUtc is null))
         {
-            dbContext.RefreshTokenSessions.RemoveRange(refreshSessions);
+            refreshSession.RevokedAtUtc = now;
         }
 
         if (emailCodes.Count > 0)
@@ -468,6 +544,43 @@ public sealed partial class IdentityService
             targetId: userId.ToString("D"));
 
         return Result.Success();
+    }
+
+    private async Task BlockDeletedAccountIdentifiersAsync(
+        string? email,
+        IReadOnlyCollection<ExternalAuthProvider> externalProviders,
+        DateTime deletedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var normalizedEmail = NormalizeEmail(email);
+        if (!string.IsNullOrWhiteSpace(normalizedEmail)
+            && !await dbContext.DeletedAccountBlocks.AnyAsync(x => x.Email == normalizedEmail, cancellationToken))
+        {
+            dbContext.DeletedAccountBlocks.Add(new DeletedAccountBlock
+            {
+                Id = Guid.NewGuid(),
+                Email = normalizedEmail,
+                DeletedAtUtc = deletedAtUtc
+            });
+        }
+
+        foreach (var externalProvider in externalProviders)
+        {
+            if (await dbContext.DeletedAccountBlocks.AnyAsync(
+                    x => x.Provider == externalProvider.Provider && x.ProviderUserId == externalProvider.ProviderUserId,
+                    cancellationToken))
+            {
+                continue;
+            }
+
+            dbContext.DeletedAccountBlocks.Add(new DeletedAccountBlock
+            {
+                Id = Guid.NewGuid(),
+                Provider = externalProvider.Provider,
+                ProviderUserId = externalProvider.ProviderUserId,
+                DeletedAtUtc = deletedAtUtc
+            });
+        }
     }
 
     private async Task<bool> IsLastAdminAsync(Guid userId, CancellationToken cancellationToken)
