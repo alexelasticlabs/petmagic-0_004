@@ -28,18 +28,22 @@ import {
   fetchAdminUserAnalytics,
   fetchSupportConversation,
   fetchSupportInbox,
+  fetchSupportInboxMetrics,
   markSupportConversationRead,
   sendSupportAttachment,
   sendSupportMessage,
   setActive,
   setPremium,
+  SUPPORT_INBOX_SEARCH_MAX_LENGTH,
+  SUPPORT_MESSAGE_BODY_MAX_LENGTH,
   updateSupportConversationMetadata,
   updateSupportConversationStatus,
   useAuthSession,
   type AdminEconomyPurchase,
   type AdminEconomyUserSubscriptionSummary,
   type AdminSupportConversation,
-  type AdminSupportConversationSummary,
+  type AdminSupportInboxPage,
+  type AdminSupportInboxMetrics,
   type AdminUserAnalytics,
   type AdminUserDetail,
   type SupportConversationPriority,
@@ -147,6 +151,9 @@ export const statusOptions: SupportConversationStatus[] = [
   "Closed",
 ];
 
+export const SUPPORT_SEARCH_MAX_LENGTH = SUPPORT_INBOX_SEARCH_MAX_LENGTH;
+export const SUPPORT_REPLY_MAX_LENGTH = SUPPORT_MESSAGE_BODY_MAX_LENGTH;
+
 const supportPollingIntervalMs = 8_000;
 const supportConversationMessagesTake = 80;
 
@@ -195,6 +202,10 @@ export function useSupportConversationController({
     locale === "ru"
       ? "Действия поддержки доступны только Admin или Moderator."
       : "Support actions are available only to Admin or Moderator.";
+  const supportSubjectUserMissing =
+    locale === "ru"
+      ? "Карточка пользователя недоступна для этого обращения."
+      : "User context is unavailable for this conversation.";
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [queuePage, setQueuePage] = useState(1);
   const [searchQuery, setRawSearchQuery] = useState("");
@@ -208,7 +219,9 @@ export function useSupportConversationController({
   );
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [isSendReplyInFlight, setIsSendReplyInFlight] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const sendReplyInFlightRef = useRef(false);
   const markReadRequestRef = useRef<Promise<void> | null>(null);
   const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRealtimeToastRef = useRef<string | null>(null);
@@ -236,13 +249,14 @@ export function useSupportConversationController({
 
   const pushSupportNotification = useCallback(
     (type: ToastState["type"], message: string) => {
+      const supportConversationPathId = encodeURIComponent(conversationId);
       addNotification({
         title: locale === "ru" ? "Поддержка" : "Support",
         message,
         category: "support",
         source: "support-workspace",
         tone: type === "success" ? "success" : "error",
-        href: `/${locale}/support/${conversationId}`,
+        href: `/${locale}/support/${supportConversationPathId}`,
       });
     },
     [addNotification, conversationId, locale]
@@ -269,7 +283,11 @@ export function useSupportConversationController({
 
   const setSupportSearchQuery = useCallback((value: string) => {
     setQueuePage(1);
-    setRawSearchQuery(value);
+    setRawSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH));
+  }, []);
+
+  const setSupportReply = useCallback((value: string) => {
+    setReply(value.slice(0, SUPPORT_REPLY_MAX_LENGTH));
   }, []);
 
   const setSupportQueueFilter = useCallback((filter: SupportQueueFilter) => {
@@ -345,7 +363,7 @@ export function useSupportConversationController({
   const resolvedQueueFilter = resolveQueueFilter(queueFilter);
   const effectiveQueueStatus =
     queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;
-  const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
+  const inboxQuery = useQuery<AdminSupportInboxPage>({
     queryKey: adminQueryKeys.supportInbox(
       effectiveQueueStatus ?? "all",
       resolvedQueueFilter.assignment,
@@ -363,6 +381,13 @@ export function useSupportConversationController({
         signal,
       });
     },
+    enabled: Boolean(session && canManageSupportWorkspace),
+    refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
+    refetchIntervalInBackground: false,
+  });
+  const inboxMetricsQuery = useQuery<AdminSupportInboxMetrics>({
+    queryKey: adminQueryKeys.supportInboxMetrics,
+    queryFn: ({ signal }) => fetchSupportInboxMetrics(signal),
     enabled: Boolean(session && canManageSupportWorkspace),
     refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
     refetchIntervalInBackground: false,
@@ -724,7 +749,29 @@ export function useSupportConversationController({
 
       pushSupportError(error);
     },
+    onSettled: () => {
+      sendReplyInFlightRef.current = false;
+      setIsSendReplyInFlight(false);
+    },
   });
+
+  const isSendReplySubmitting = isSendReplyInFlight || sendMutation.isPending;
+
+  const requestSendReply = useCallback(() => {
+    if (
+      !canManageSupportWorkspace ||
+      sendReplyInFlightRef.current ||
+      sendMutation.isPending ||
+      (!reply.trim() && !selectedAttachment)
+    ) {
+      return false;
+    }
+
+    sendReplyInFlightRef.current = true;
+    setIsSendReplyInFlight(true);
+    sendMutation.mutate();
+    return true;
+  }, [canManageSupportWorkspace, reply, selectedAttachment, sendMutation]);
 
   const statusMutation = useMutation({
     mutationFn: async (status: SupportConversationStatus) => {
@@ -783,7 +830,7 @@ export function useSupportConversationController({
   const setUserActiveMutation = useMutation({
     mutationFn: async (isActive: boolean) => {
       if (!subjectUserId || !canViewSubjectUserContext) {
-        throw new Error("support.subject_user_missing");
+        throw new Error(supportSubjectUserMissing);
       }
 
       await setActive(subjectUserId, isActive);
@@ -820,7 +867,7 @@ export function useSupportConversationController({
   const setUserPremiumMutation = useMutation({
     mutationFn: async (isPremium: boolean) => {
       if (!subjectUserId || !canViewSubjectUserContext) {
-        throw new Error("support.subject_user_missing");
+        throw new Error(supportSubjectUserMissing);
       }
 
       await setPremium(subjectUserId, isPremium);
@@ -911,11 +958,11 @@ export function useSupportConversationController({
   });
 
   const filteredInboxItems = useMemo(
-    () => sortSupportQueueItems(inboxQuery.data ?? []),
+    () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );
   const canGoToPreviousQueuePage = queuePage > 1;
-  const canGoToNextQueuePage = (inboxQuery.data?.length ?? 0) >= SUPPORT_INBOX_PAGE_SIZE;
+  const canGoToNextQueuePage = Boolean(inboxQuery.data?.hasMore);
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
@@ -1127,6 +1174,8 @@ export function useSupportConversationController({
     canGoToNextQueuePage,
     canGoToPreviousQueuePage,
     hasComposerAttachment,
+    inboxMetrics: inboxMetricsQuery.data ?? null,
+    inboxMetricsQuery,
     inboxQuery,
     isAssignedToCurrentAdmin,
     isSidePanelOpen,
@@ -1139,18 +1188,20 @@ export function useSupportConversationController({
     reply,
     replyToMessage,
     replyToPreview,
+    requestSendReply,
     resetSelectedAttachment,
     searchQuery,
     selectedAttachment,
     secondaryStatusActions,
     sendMutation,
+    isSendReplySubmitting,
     sessionUserId,
     sessionUserRoles,
     setUserActiveMutation,
     setUserPremiumMutation,
     setActiveSidePanelTab,
     setIsSidePanelOpen,
-    setReply,
+    setReply: setSupportReply,
     setReplyToMessageId,
     setReplyToPreview,
     setSearchQuery: setSupportSearchQuery,

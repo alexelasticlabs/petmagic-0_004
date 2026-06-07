@@ -26,4 +26,15 @@ describe("support info attachment links", () => {
     expect(source).toContain("signal: controller.signal");
     expect(source).toContain("if (controller.signal.aborted)");
   });
+
+  it("guards attachment opens by support workspace permissions", () => {
+    const source = readFileSync(supportInfoPanelPath, "utf8");
+
+    expect(source).toContain("if (!canManageSupportWorkspace || pendingAttachmentOpenKey !== null)");
+    expect(source).toContain("disabled={\n                          !canManageSupportWorkspace ||");
+    expect(source).toContain("disabled={\n                            !canManageSupportWorkspace ||");
+    expect(source.match(/pendingAttachmentOpenKey !== null/g) ?? []).toHaveLength(4);
+    expect(source).not.toContain("pendingAttachmentOpenKey ===\n                          getAttachmentOpenKey");
+    expect(source).not.toContain("pendingAttachmentOpenKey ===\n                            getAttachmentOpenKey");
+  });
 });

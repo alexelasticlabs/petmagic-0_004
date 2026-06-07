@@ -5,10 +5,13 @@ import { inferTemplateMediaKind } from "@/components/templates/template-media-ut
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
+const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 32 * 1024 * 1024;
+
 type TemplatePreviewAssetSectionProps = {
+  locale: Locale;
   text: Dictionary;
   form: TemplateFormState;
   setForm: SetTemplateFormState;
@@ -19,6 +22,7 @@ type TemplatePreviewAssetSectionProps = {
 };
 
 export function TemplatePreviewAssetSection({
+  locale,
   text,
   form,
   setForm,
@@ -29,6 +33,7 @@ export function TemplatePreviewAssetSection({
 }: TemplatePreviewAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const localPreviewUrl = useMemo(
     () => (previewFile ? URL.createObjectURL(previewFile) : null),
     [previewFile]
@@ -63,9 +68,16 @@ export function TemplatePreviewAssetSection({
     }
 
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      setSelectionError(getPreviewSelectionError(locale, "type"));
       return;
     }
 
+    if (file.size > TEMPLATE_PREVIEW_ASSET_MAX_BYTES) {
+      setSelectionError(getPreviewSelectionError(locale, "size"));
+      return;
+    }
+
+    setSelectionError(null);
     setPreviewFile(file);
   }
 
@@ -204,6 +216,7 @@ export function TemplatePreviewAssetSection({
               className={styles.dangerButton}
               disabled={!previewFile && !hasPreview}
               onClick={() => {
+                setSelectionError(null);
                 setPreviewFile(null);
                 if (fileInputRef.current) {
                   fileInputRef.current.value = "";
@@ -211,6 +224,7 @@ export function TemplatePreviewAssetSection({
                 setForm((current) => ({
                   ...current,
                   previewUrl: "",
+                  previewUrlSource: "none",
                   previewFileName: "",
                   previewContentType: "",
                   previewFileSizeBytes: "",
@@ -221,9 +235,22 @@ export function TemplatePreviewAssetSection({
               {text.clearAsset}
             </Button>
           </div>
+          {selectionError ? <p className={styles.assetSelectionError}>{selectionError}</p> : null}
         </div>
         <p className={styles.muted}>{text.mediaUploadHint}</p>
       </div>
     </div>
   );
+}
+
+function getPreviewSelectionError(locale: Locale, reason: "size" | "type"): string {
+  if (reason === "size") {
+    return locale === "ru"
+      ? "Файл слишком большой. Максимальный размер preview - 32 MB."
+      : "File is too large. The maximum preview size is 32 MB.";
+  }
+
+  return locale === "ru"
+    ? "Можно загрузить только image/* или video/* файл."
+    : "Only image/* or video/* files are supported.";
 }

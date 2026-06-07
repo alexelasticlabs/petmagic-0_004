@@ -59,6 +59,9 @@ describe("support sensitive display", () => {
     expect(sidePanelSource).toContain(
       "title={formatSafeSupportDisplay(generation.templateTitle, \"—\", 120)}"
     );
+    expect(sidePanelSource).toContain(
+      "formatSafeSupportDisplay(conversation.assistantScenario, \"—\", 120)"
+    );
     expect(sidePanelSource).toContain("formatSafeSupportDisplay(generation.status, \"—\", 48)");
     expect(sidePanelSource).toContain("formatSafeSupportDisplay(generation.failureCode, \"—\", 120)");
     expect(sidePanelSource).toContain("formatSafeSupportDisplay(item.failureCode, \"—\", 120)");
@@ -70,6 +73,7 @@ describe("support sensitive display", () => {
       /formatSafeSupportDisplay\(\s*subscriptionQuery\.data\?\.planName/
     );
     expect(sidePanelSource).not.toContain("title={generation.templateTitle}");
+    expect(sidePanelSource).not.toContain("<strong>{conversation.assistantScenario}</strong>");
     expect(sidePanelSource).not.toContain("{generation.status}");
     expect(sidePanelSource).not.toContain("title={item.failureCode}");
     expect(sidePanelSource).not.toContain("details={purchase.paymentProvider}");
@@ -141,8 +145,9 @@ describe("support sensitive display", () => {
       "formatSafeSupportDisplay(message.body, \"\", 2000)"
     );
     expect(supportPageSource).toContain(
-      "onClick={() => {\n                        void inboxQuery.refetch().catch(() => undefined);"
+      "if (!canManageSupportWorkspace) {\n                          return;\n                        }\n\n                        void inboxQuery.refetch().catch(() => undefined);"
     );
+    expect(supportPageSource).toContain("disabled={!canManageSupportWorkspace || inboxQuery.isFetching}");
     expect(supportPageSource).not.toContain("<div className={styles.messageBody}>{message.body}</div>");
     expect(supportPageSource).not.toContain(
       "const file = new File([blob], fullscreenImage.fileName?.trim() || defaultFileName"

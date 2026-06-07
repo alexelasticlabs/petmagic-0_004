@@ -13,10 +13,11 @@ import {
   getJobStatusClassName,
   shortenId,
 } from "@/components/templates/template-analytics-utils";
-import type {
-  AdminTemplateFailureBreakdownItem,
-  AdminTemplateFeedbackItem,
-  AdminTemplateRecentGeneration,
+import {
+  TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
+  type AdminTemplateFailureBreakdownItem,
+  type AdminTemplateFeedbackItem,
+  type AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -80,6 +81,7 @@ type FeedbackText = {
 };
 
 export function TemplateAnalyticsRecentRunsSection({
+  canLoadRecentRuns,
   canShowFailedRecentRuns,
   canShowRecentRunModes,
   error,
@@ -90,6 +92,7 @@ export function TemplateAnalyticsRecentRunsSection({
   onModeChange,
   text,
 }: {
+  canLoadRecentRuns: boolean;
   canShowFailedRecentRuns: boolean;
   canShowRecentRunModes: boolean;
   error: string | null;
@@ -130,7 +133,7 @@ export function TemplateAnalyticsRecentRunsSection({
               type="button"
               className={mode === "all" ? styles.chartTabActive : styles.chartTab}
               onClick={() => onModeChange("all")}
-              disabled={isLoading}
+              disabled={isLoading || !canLoadRecentRuns}
             >
               <span>{isLoading ? text.recentRunsLoading : text.recentRunsAll}</span>
             </button>
@@ -139,7 +142,7 @@ export function TemplateAnalyticsRecentRunsSection({
                 type="button"
                 className={mode === "failed" ? styles.chartTabActive : styles.chartTab}
                 onClick={() => onModeChange("failed")}
-                disabled={isLoading}
+                disabled={isLoading || !canLoadRecentRuns}
               >
                 <span>{text.recentRunsFailed}</span>
               </button>
@@ -227,7 +230,12 @@ export function TemplateAnalyticsFeedbackSection({
           <input
             type="search"
             value={feedbackSearch}
-            onChange={(event) => onFeedbackSearchChange(event.target.value)}
+            onChange={(event) =>
+              onFeedbackSearchChange(
+                event.target.value.slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH)
+              )
+            }
+            maxLength={TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH}
             className={styles.feedbackSearchInput}
             placeholder={text.feedbackSearchPlaceholder}
             aria-label={text.feedbackSearchLabel}

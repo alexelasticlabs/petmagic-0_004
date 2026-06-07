@@ -107,30 +107,54 @@ describe("economy-page content", () => {
     expect(source).toContain("function requestCancelSubscription(subscription: AdminEconomySubscription)");
     expect(source).toContain("function requestRefundPurchase(purchase: AdminEconomyPurchase)");
     expect(source).toContain("reportEconomyAccessDenied(error);");
+    expect(source).toContain("useRef,");
+    expect(source).toContain("const cancelSubscriptionInFlightRef = useRef(false);");
+    expect(source).toContain("const refundPurchaseInFlightRef = useRef(false);");
+    expect(source).toContain("const isCancelSubscriptionSubmitting =");
+    expect(source).toContain("const isRefundPurchaseSubmitting =");
     expect(source).toContain(
-      "if (cancelSubscriptionMutation.isPending || !canCancelSubscription(subscription)) {"
+      "cancelSubscriptionInFlightRef.current ||\n      cancelSubscriptionMutation.isPending ||\n      !canCancelSubscription(subscription)"
     );
     expect(source).toContain(
-      "if (refundPurchaseMutation.isPending || !canRefundPurchase(purchase)) {"
+      "refundPurchaseInFlightRef.current ||\n      refundPurchaseMutation.isPending ||\n      !canRefundPurchase(purchase)"
     );
     expect(source).toContain("onCancelSubscription={requestCancelSubscription}");
     expect(source).toContain("onClick={() => requestRefundPurchase(item)}");
     expect(source).not.toContain("onCancelSubscription={setCancelTarget}");
     expect(source).not.toContain("onClick={() => setRefundTarget(item)}");
+
+    const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
+    expect(source).toContain("cancelSubscriptionPending={isCancelSubscriptionSubmitting}");
+    expect(source).toContain("disabled={isRefundPurchaseSubmitting}");
+    expect(subscriptionsSource).toContain("cancelSubscriptionPending: boolean;");
+    expect(subscriptionsSource).toContain(
+      "disabled={cancelSubscriptionPending || !canCancelSubscription(item)}"
+    );
+    expect(subscriptionsSource).not.toContain("disabled={!canCancelSubscription(item)}");
   });
 
   it("keeps the economy page error state recoverable with a guarded retry action", () => {
     const economySource = readFileSync(economyPagePath, "utf8");
     const controllerSource = readFileSync(economyControllerPath, "utf8");
 
+    expect(controllerSource).toContain(
+      'const canLoadEconomy = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(controllerSource).toContain(
+      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
+    );
+    expect(controllerSource.match(/enabled: canLoadEconomy/g) ?? []).toHaveLength(8);
+    expect(controllerSource).toContain("if (!canLoadEconomy) {\n      return;\n    }");
     expect(controllerSource).toContain("const refetchAll = useCallback(async () => {");
     expect(controllerSource).toContain("ledgerQuery.refetch()");
     expect(controllerSource).toContain("purchasesQuery.refetch()");
     expect(controllerSource).toContain("subscriptionsQuery.refetch()");
     expect(controllerSource).toContain("isFetching,");
     expect(controllerSource).toContain("refetchAll,");
-    expect(economySource).toContain("disabled={isFetching}");
-    expect(economySource).toContain("void refetchAll().catch(() => undefined);");
+    expect(economySource).toContain("disabled={!canManageEconomy || isFetching}");
+    expect(economySource).toContain(
+      "if (!canManageEconomy) {\n                  return;\n                }\n\n                void refetchAll().catch(() => undefined);"
+    );
     expect(economySource).toContain('{locale === "ru" ? "Повторить" : "Retry"}');
   });
 
@@ -149,6 +173,41 @@ describe("economy-page content", () => {
     const source = readFileSync(providerConfigsSectionPath, "utf8");
 
     expect(source).toContain("normalizeEconomyPercentInput(event.target.value)");
+    expect(source).toContain("const isCreateProviderConfigInvalid =");
+    expect(source).toContain("disabled={createProviderConfigPending || isCreateProviderConfigInvalid}");
+    expect(source).toContain("const isProviderConfigMatchInvalid =");
+    expect(source).toContain("disabled={testProviderConfigPending || isProviderConfigMatchInvalid}");
+    expect(source).toContain("const isProviderConfigInvalid = isPaymentRouteDraftInvalid(draft);");
+    expect(source).toContain("disabled={saveProviderConfigPending || isProviderConfigInvalid}");
+    expect(source).toContain("provider: normalizeProviderCodeInput(event.target.value)");
+    expect(source).toContain("platform: normalizeProviderCodeInput(event.target.value)");
+    expect(source).toContain("region: normalizeProviderRegionInput(event.target.value)");
+    expect(source).toContain("mode: normalizeProviderCodeInput(event.target.value)");
+    expect(source).toContain(
+      "allowedFromAppVersion: normalizeProviderVersionInput(event.target.value)"
+    );
+    expect(source).toContain("country: normalizeProviderRegionInput(event.target.value)");
+    expect(source).toContain("appVersion: normalizeProviderVersionInput(event.target.value)");
+    expect(source).toContain("displayLabel: normalizeProviderLabelInput(event.target.value)");
+    expect(source).toContain("displaySubtitle: normalizeProviderLabelInput(");
+    expect(source).toContain("warningTitle: normalizeProviderLabelInput(event.target.value)");
+    expect(source).toContain("warningMessage: normalizeProviderMessageInput(");
+    expect(source).toContain("notes: normalizeProviderMessageInput(event.target.value)");
+    expect(source).toContain(
+      "[config.configurationId]: normalizeProviderRegionInput("
+    );
+    expect(source).toContain("function normalizeProviderCodeInput(value: string)");
+    expect(source).toContain("return value.toLowerCase().slice(0, ECONOMY_PROVIDER_CODE_MAX_LENGTH);");
+    expect(source).toContain("function normalizeProviderRegionInput(value: string)");
+    expect(source).toContain("return value.toUpperCase().slice(0, ECONOMY_PROVIDER_REGION_MAX_LENGTH);");
+    expect(source).toContain("function normalizeProviderVersionInput(value: string)");
+    expect(source).toContain("return value.slice(0, ECONOMY_PROVIDER_VERSION_MAX_LENGTH);");
+    expect(source).toContain("function normalizeProviderLabelInput(value: string)");
+    expect(source).toContain("return value.slice(0, ECONOMY_PROVIDER_LABEL_MAX_LENGTH);");
+    expect(source).toContain("function normalizeProviderMessageInput(value: string)");
+    expect(source).toContain("return value.slice(0, ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH);");
+    expect(source).toContain("function isPaymentRouteDraftInvalid(draft: ProviderConfigDraft)");
+    expect(source).toContain("bonusPercent > 100");
     expect(source).toContain("maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}");
     expect(source).toContain("maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}");
     expect(source).toContain("maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}");
@@ -156,6 +215,36 @@ describe("economy-page content", () => {
     expect(source).toContain("maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}");
     expect(source).toContain('pattern="[0-9]*"');
     expect(source).not.toContain('type="number"');
+    expect(source).not.toContain("region: event.target.value.toUpperCase()");
+    expect(source).not.toContain("allowedFromAppVersion: event.target.value");
+    expect(source).not.toContain("mode: event.target.value");
+    expect(source).not.toContain("displayLabel: event.target.value");
+    expect(source).not.toContain("warningMessage: event.target.value");
+    expect(source).not.toContain("[config.configurationId]: event.target.value.toUpperCase()");
+  });
+
+  it("guards payment route actions against double submits in handlers", () => {
+    const source = readFileSync(providerConfigsSectionPath, "utf8");
+
+    expect(source).toContain("const requestCreateProviderConfig = () => {");
+    expect(source).toContain(
+      "if (createProviderConfigPending || isCreateProviderConfigInvalid) {\n      return;\n    }"
+    );
+    expect(source).toContain("const requestTestProviderConfig = () => {");
+    expect(source).toContain(
+      "if (testProviderConfigPending || isProviderConfigMatchInvalid) {\n      return;\n    }"
+    );
+    expect(source).toContain("onClick={requestCreateProviderConfig}");
+    expect(source).toContain("onClick={requestTestProviderConfig}");
+    expect(source).toContain(
+      "if (saveProviderConfigPending || isProviderConfigInvalid) {\n                              return;\n                            }"
+    );
+    expect(source).toContain(
+      "if (cloneProviderConfigPending || !cloneRegion) {\n                              return;\n                            }"
+    );
+    expect(source).toContain(
+      "if (deleteProviderConfigPending) {\n                              return;\n                            }"
+    );
   });
 
   it("sanitizes payment and subscription display strings before rendering backend values", () => {
@@ -166,6 +255,8 @@ describe("economy-page content", () => {
     expect(economySource).toContain("import { sanitizeSensitiveText }");
     expect(economySource).toContain("function safeText");
     expect(economySource).toContain("return safeText(value, 32).slice(0, 8);");
+    expect(economySource).toContain("safeText(pack.code.toUpperCase(), 32)");
+    expect(economySource).toContain("safeText(pack.currencyCode.toUpperCase(), 12)");
     expect(economySource).toContain("safeText(item.reason)");
     expect(economySource).toContain("safeText(item.packDisplayName)");
     expect(economySource).toContain("const safeCurrencyCode = safeText(currencyCode.toUpperCase(), 12)");
@@ -189,6 +280,9 @@ describe("economy-page content", () => {
     expect(providerConfigsSource).toContain("safeText(matchResult.decisionMessage");
     expect(providerConfigsSource).toContain("safeText(matchResult.matchedConfiguration.region");
     expect(economySource).toContain("safeText(\n                cancelTarget.planName ?? cancelTarget.planId");
+    expect(economySource).not.toContain("label: `${pack.code.toUpperCase()} • ${pack.currencyCode}`");
+    expect(economySource).not.toContain("<strong>{pack.code.toUpperCase()}</strong>");
+    expect(economySource).not.toContain("<span>{pack.currencyCode}</span>");
     expect(economySource).not.toContain(
       "${text.cancelSubscriptionDescription} ${shortGuid(cancelTarget.userId)} / ${cancelTarget.planName ?? cancelTarget.planId}"
     );
@@ -198,7 +292,13 @@ describe("economy-page content", () => {
     const source = readFileSync(economyPagePath, "utf8");
     const matches = source.match(/refundPurchaseMutation\.mutate\(refundTarget\)/g) ?? [];
 
-    expect(source).toContain("if (refundPurchaseMutation.isPending) {\n            return;\n          }");
+    expect(source).toContain(
+      "if (refundPurchaseInFlightRef.current || refundPurchaseMutation.isPending) {\n            return;\n          }"
+    );
+    expect(source).toContain("refundPurchaseInFlightRef.current = true;");
+    expect(source).toContain("setIsRefundPurchaseInFlight(true);");
+    expect(source).toContain("refundPurchaseInFlightRef.current = false;");
+    expect(source).toContain("setIsRefundPurchaseInFlight(false);");
     expect(matches).toHaveLength(1);
   });
 
@@ -207,8 +307,12 @@ describe("economy-page content", () => {
     const matches = source.match(/cancelSubscriptionMutation\.mutate\(cancelTarget\)/g) ?? [];
 
     expect(source).toContain(
-      "if (cancelSubscriptionMutation.isPending) {\n            return;\n          }"
+      "if (cancelSubscriptionInFlightRef.current || cancelSubscriptionMutation.isPending) {\n            return;\n          }"
     );
+    expect(source).toContain("cancelSubscriptionInFlightRef.current = true;");
+    expect(source).toContain("setIsCancelSubscriptionInFlight(true);");
+    expect(source).toContain("cancelSubscriptionInFlightRef.current = false;");
+    expect(source).toContain("setIsCancelSubscriptionInFlight(false);");
     expect(matches).toHaveLength(1);
   });
 
@@ -217,7 +321,9 @@ describe("economy-page content", () => {
 
     expect(source).toContain("onSuccess: async (_, subscription) => {");
     expect(source).toContain("adminQueryKeys.economyUserSubscriptionSummary(subscription.userId)");
+    expect(source).toContain("queryKey: adminQueryKeys.economyDashboardMetrics");
     expect(source).toContain("queryKey: adminQueryKeys.usersRoot");
+    expect(source).toContain("queryKey: adminQueryKeys.userDashboardMetrics");
     expect(source).toContain("adminQueryKeys.userDetail(subscription.userId)");
     expect(source).toContain("adminQueryKeys.userAnalytics(subscription.userId)");
     expect(source).toContain("onSuccess: async (_, purchase) => {");
@@ -231,6 +337,20 @@ describe("economy-page content", () => {
     const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
     const controllerSource = readFileSync(economyControllerPath, "utf8");
 
+    expect(economySource).toContain("ECONOMY_QUERY_FILTER_MAX_LENGTH,");
+    expect(economySource).toContain("maxLength={ECONOMY_QUERY_FILTER_MAX_LENGTH}");
+    expect(economySource).toContain(
+      "setPurchaseSearch(event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH))"
+    );
+    expect(subscriptionsSource).toContain("ECONOMY_QUERY_FILTER_MAX_LENGTH,");
+    expect(subscriptionsSource).toContain("maxLength={ECONOMY_QUERY_FILTER_MAX_LENGTH}");
+    expect(subscriptionsSource).toContain(
+      "setSubscriptionSearch(\n                    event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)\n                  )"
+    );
+    expect(economySource).not.toContain("maxLength={100}");
+    expect(economySource).not.toContain("setPurchaseSearch(event.target.value)");
+    expect(subscriptionsSource).not.toContain("maxLength={100}");
+    expect(subscriptionsSource).not.toContain("setSubscriptionSearch(event.target.value)");
     expect(controllerSource).toContain("purchasesIsFetching: purchasesQuery.isFetching");
     expect(controllerSource).toContain("subscriptionsIsFetching: subscriptionsQuery.isFetching");
     expect(economySource).toContain("disabled={purchasePage === 0 || purchasesIsFetching}");
@@ -240,6 +360,85 @@ describe("economy-page content", () => {
     );
     expect(subscriptionsSource).toContain(
       "disabled={!subscriptionsHasMore || subscriptionsIsFetching}"
+    );
+  });
+
+  it("bounds economy pack and premium plan free-text state updates", () => {
+    const economySource = readFileSync(economyPagePath, "utf8");
+    const subscriptionPlansSource = readFileSync(subscriptionPlansSectionPath, "utf8");
+
+    expect(economySource).toContain("normalizeEconomyPackDisplayNameInput(");
+    expect(subscriptionPlansSource).toContain("normalizeEconomyPlanNameInput(event.target.value)");
+    expect(subscriptionPlansSource).toContain("normalizeEconomyPlanProductIdInput(");
+    expect(economySource).not.toContain("displayName: event.target.value");
+    expect(subscriptionPlansSource).not.toContain("name: event.target.value");
+    expect(subscriptionPlansSource).not.toContain("appleProductId: event.target.value");
+    expect(subscriptionPlansSource).not.toContain("googleProductId: event.target.value");
+    expect(subscriptionPlansSource).not.toContain("stripePriceId: event.target.value");
+  });
+
+  it("locks economy row save actions globally while the matching mutation is pending", () => {
+    const economySource = readFileSync(economyPagePath, "utf8");
+    const subscriptionPlansSource = readFileSync(subscriptionPlansSectionPath, "utf8");
+    const providerConfigsSource = readFileSync(providerConfigsSectionPath, "utf8");
+
+    expect(economySource).toContain("function requestSavePack(packId: string)");
+    expect(economySource).toContain("if (savePackMutation.isPending) {\n      return;\n    }");
+    expect(economySource).toContain("savePackMutation.mutate(packId);");
+    expect(economySource).toContain("onClick={() => requestSavePack(pack.packId)}");
+    expect(economySource).toContain("disabled={savePackMutation.isPending}");
+    expect(economySource).not.toContain("onClick={() => savePackMutation.mutate(pack.packId)}");
+    expect(economySource).not.toContain("disabled={isSavingRow}");
+
+    expect(economySource).toContain("function requestSavePlan(planId: string)");
+    expect(economySource).toContain("if (savePlanMutation.isPending) {\n      return;\n    }");
+    expect(economySource).toContain("onSavePlan={requestSavePlan}");
+    expect(subscriptionPlansSource).toContain(
+      "<Button onClick={() => onSavePlan(plan.planId)} disabled={savePlanPending}>"
+    );
+    expect(subscriptionPlansSource).not.toContain("disabled={isSavingPlan}");
+
+    expect(economySource).toContain(
+      "function requestSaveProviderConfig(configurationId: string)"
+    );
+    expect(economySource).toContain(
+      "if (saveProviderConfigMutation.isPending) {\n      return;\n    }"
+    );
+    expect(economySource).toContain("onSaveProviderConfig={requestSaveProviderConfig}");
+    expect(economySource).toContain("function requestCreateProviderConfig()");
+    expect(economySource).toContain(
+      "if (createProviderConfigMutation.isPending) {\n      return;\n    }"
+    );
+    expect(economySource).toContain("onCreateProviderConfig={requestCreateProviderConfig}");
+    expect(economySource).not.toContain(
+      "onCreateProviderConfig={() => createProviderConfigMutation.mutate()}"
+    );
+    expect(economySource).toContain("function requestTestProviderConfig()");
+    expect(economySource).toContain(
+      "if (testProviderConfigMutation.isPending) {\n      return;\n    }"
+    );
+    expect(economySource).toContain("onTestProviderConfig={requestTestProviderConfig}");
+    expect(economySource).not.toContain(
+      "onTestProviderConfig={() => testProviderConfigMutation.mutate()}"
+    );
+    expect(economySource).toContain(
+      "function requestCloneProviderConfig(payload: { configurationId: string; region: string })"
+    );
+    expect(economySource).toContain(
+      "if (cloneProviderConfigMutation.isPending) {\n      return;\n    }"
+    );
+    expect(economySource).toContain("onCloneProviderConfig={requestCloneProviderConfig}");
+    expect(economySource).not.toContain(
+      "onCloneProviderConfig={(payload) => cloneProviderConfigMutation.mutate(payload)}"
+    );
+    expect(providerConfigsSource).toContain(
+      "if (saveProviderConfigPending || isProviderConfigInvalid) {\n                              return;\n                            }"
+    );
+    expect(providerConfigsSource).toContain(
+      "disabled={saveProviderConfigPending || isProviderConfigInvalid}"
+    );
+    expect(providerConfigsSource).not.toContain(
+      "disabled={isSavingConfig || isProviderConfigInvalid}"
     );
   });
 });

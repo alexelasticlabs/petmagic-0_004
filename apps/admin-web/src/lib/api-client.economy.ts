@@ -1,7 +1,8 @@
-import { apiRequest } from "./api-client.core";
+import { apiRequest, encodePathSegment } from "./api-client.core";
 
 import type {
   AdminCurrencyPack,
+  AdminEconomyDashboardMetrics,
   AdminEconomyLedgerItem,
   AdminEconomyPurchase,
   AdminEconomySubscription,
@@ -9,7 +10,9 @@ import type {
   AdminPaymentProviderConfiguration,
   AdminPaymentProviderConfigurationMatch,
   AdminRedeemCode,
+  AdminRedeemCodeMetrics,
   AdminRedeemCodeRedemption,
+  AdminRedeemCodesPage,
   AdminRedeemRewardKind,
   AdminSubscriptionEvent,
   AdminSubscriptionPlan,
@@ -33,6 +36,18 @@ export type AdminEconomySubscriptionsQuery = {
   search?: string;
 };
 
+export type AdminRedeemCodesQuery = {
+  skip?: number;
+  take?: number;
+  search?: string;
+  status?: string;
+  rewardKind?: string;
+  sort?: string;
+};
+
+export const ECONOMY_QUERY_FILTER_MAX_LENGTH = 120;
+export const ECONOMY_REFUND_REASON_MAX_LENGTH = 240;
+
 function normalizePagedValue(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.floor(value))
@@ -46,7 +61,7 @@ function normalizeTakeValue(value: number | undefined): number | undefined {
 }
 
 function normalizeFilterValue(value: string | undefined): string | undefined {
-  return value?.trim() || undefined;
+  return value?.trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH) || undefined;
 }
 
 export function normalizeAdminEconomyPurchasesQuery(
@@ -74,6 +89,19 @@ export function normalizeAdminEconomySubscriptionsQuery(
   };
 }
 
+export function normalizeAdminRedeemCodesQuery(
+  params: AdminRedeemCodesQuery = {}
+): AdminRedeemCodesQuery {
+  return {
+    skip: normalizePagedValue(params.skip),
+    take: normalizeTakeValue(params.take),
+    search: normalizeFilterValue(params.search),
+    status: normalizeFilterValue(params.status),
+    rewardKind: normalizeFilterValue(params.rewardKind),
+    sort: normalizeFilterValue(params.sort),
+  };
+}
+
 export async function fetchAdminEconomyLedger(
   params?: {
     skip?: number;
@@ -85,11 +113,13 @@ export async function fetchAdminEconomyLedger(
 ): Promise<OffsetPagedResponse<AdminEconomyLedgerItem>> {
   const normalizedSkip = normalizePagedValue(params?.skip);
   const normalizedTake = normalizeTakeValue(params?.take);
+  const normalizedSource = normalizeFilterValue(params?.source);
+  const normalizedUserId = normalizeFilterValue(params?.userId);
   const search = new URLSearchParams();
   if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
   if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
-  if (params?.source?.trim()) search.set("source", params.source.trim());
-  if (params?.userId?.trim()) search.set("userId", params.userId.trim());
+  if (normalizedSource) search.set("source", normalizedSource);
+  if (normalizedUserId) search.set("userId", normalizedUserId);
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminEconomyLedgerItem>>(
@@ -118,22 +148,37 @@ export async function fetchAdminEconomyPurchases(
   );
 }
 
+export async function fetchAdminEconomyDashboardMetrics(
+  signal?: AbortSignal
+): Promise<AdminEconomyDashboardMetrics> {
+  return apiRequest<AdminEconomyDashboardMetrics>("/api/admin/economy/dashboard/metrics", {
+    method: "GET",
+    signal,
+  });
+}
+
 export async function refundAdminEconomyPurchase(
   orderId: string,
   reason?: string
 ): Promise<AdminEconomyPurchase> {
-  return apiRequest<AdminEconomyPurchase>(`/api/admin/economy/purchases/${orderId}/refund`, {
-    method: "POST",
-    body: JSON.stringify({ reason: reason?.trim() || undefined }),
-  });
+  const encodedOrderId = encodePathSegment(orderId);
+  const normalizedReason = reason?.trim().slice(0, ECONOMY_REFUND_REASON_MAX_LENGTH) || undefined;
+  return apiRequest<AdminEconomyPurchase>(
+    `/api/admin/economy/purchases/${encodedOrderId}/refund`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason: normalizedReason }),
+    }
+  );
 }
 
 export async function fetchAdminEconomyUserSubscriptionSummary(
   userId: string,
   signal?: AbortSignal
 ): Promise<AdminEconomyUserSubscriptionSummary> {
+  const encodedUserId = encodePathSegment(userId);
   return apiRequest<AdminEconomyUserSubscriptionSummary>(
-    `/api/admin/economy/users/${userId}/subscription-summary`,
+    `/api/admin/economy/users/${encodedUserId}/subscription-summary`,
     { method: "GET", signal }
   );
 }
@@ -161,8 +206,9 @@ export async function adminCancelPremiumSubscription(
   userId: string,
   paymentProvider = "stripe"
 ): Promise<AdminEconomyUserSubscriptionSummary> {
+  const encodedUserId = encodePathSegment(userId);
   return apiRequest<AdminEconomyUserSubscriptionSummary>(
-    `/api/admin/economy/users/${userId}/premium/revoke`,
+    `/api/admin/economy/users/${encodedUserId}/premium/revoke`,
     {
       method: "PUT",
       body: JSON.stringify({ paymentProvider }),
@@ -206,10 +252,14 @@ export async function updateAdminSubscriptionPlan(
     | "displayOrder"
   >
 ): Promise<AdminSubscriptionPlan> {
-  return apiRequest<AdminSubscriptionPlan>(`/api/admin/economy/subscription-plans/${planId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  const encodedPlanId = encodePathSegment(planId);
+  return apiRequest<AdminSubscriptionPlan>(
+    `/api/admin/economy/subscription-plans/${encodedPlanId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
 }
 
 export async function updateAdminPaymentProviderConfig(
@@ -233,8 +283,9 @@ export async function updateAdminPaymentProviderConfig(
     | "notes"
   >
 ): Promise<AdminPaymentProviderConfiguration> {
+  const encodedConfigurationId = encodePathSegment(configurationId);
   return apiRequest<AdminPaymentProviderConfiguration>(
-    `/api/admin/economy/payment-provider-configs/${configurationId}`,
+    `/api/admin/economy/payment-provider-configs/${encodedConfigurationId}`,
     {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -277,8 +328,9 @@ export async function cloneAdminPaymentProviderConfig(
   configurationId: string,
   payload: { region: string }
 ): Promise<AdminPaymentProviderConfiguration> {
+  const encodedConfigurationId = encodePathSegment(configurationId);
   return apiRequest<AdminPaymentProviderConfiguration>(
-    `/api/admin/economy/payment-provider-configs/${configurationId}/clone`,
+    `/api/admin/economy/payment-provider-configs/${encodedConfigurationId}/clone`,
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -287,7 +339,8 @@ export async function cloneAdminPaymentProviderConfig(
 }
 
 export async function deleteAdminPaymentProviderConfig(configurationId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/economy/payment-provider-configs/${configurationId}`, {
+  const encodedConfigurationId = encodePathSegment(configurationId);
+  await apiRequest<void>(`/api/admin/economy/payment-provider-configs/${encodedConfigurationId}`, {
     method: "DELETE",
   });
 }
@@ -318,11 +371,13 @@ export async function fetchAdminSubscriptionEvents(
 ): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
   const normalizedSkip = normalizePagedValue(params?.skip);
   const normalizedTake = normalizeTakeValue(params?.take);
+  const normalizedProvider = normalizeFilterValue(params?.provider);
+  const normalizedStatus = normalizeFilterValue(params?.status);
   const search = new URLSearchParams();
   if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
   if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
-  if (params?.provider?.trim()) search.set("provider", params.provider.trim());
-  if (params?.status?.trim()) search.set("status", params.status.trim());
+  if (normalizedProvider) search.set("provider", normalizedProvider);
+  if (normalizedStatus) search.set("status", normalizedStatus);
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminSubscriptionEvent>>(
@@ -342,14 +397,45 @@ export async function updateAdminCurrencyPack(
     "displayName" | "priceAmount" | "grantedSpark" | "bonusSpark" | "isActive" | "sortOrder"
   >
 ): Promise<AdminCurrencyPack> {
-  return apiRequest<AdminCurrencyPack>(`/api/admin/economy/packs/${packId}`, {
+  const encodedPackId = encodePathSegment(packId);
+  return apiRequest<AdminCurrencyPack>(`/api/admin/economy/packs/${encodedPackId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-export async function fetchAdminRedeemCodes(signal?: AbortSignal): Promise<AdminRedeemCode[]> {
-  return apiRequest<AdminRedeemCode[]>("/api/admin/economy/redeem-codes", {
+export async function fetchAdminRedeemCodes(
+  params?: AdminRedeemCodesQuery,
+  signal?: AbortSignal
+): Promise<AdminRedeemCodesPage> {
+  const normalizedParams = normalizeAdminRedeemCodesQuery(params);
+  const search = new URLSearchParams();
+  if (normalizedParams.skip !== undefined) search.set("skip", String(normalizedParams.skip));
+  if (normalizedParams.take !== undefined) search.set("take", String(normalizedParams.take));
+  if (normalizedParams.search) search.set("search", normalizedParams.search);
+  if (normalizedParams.status) search.set("status", normalizedParams.status);
+  if (normalizedParams.rewardKind) search.set("rewardKind", normalizedParams.rewardKind);
+  if (normalizedParams.sort) search.set("sort", normalizedParams.sort);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<AdminRedeemCodesPage>(`/api/admin/economy/redeem-codes${query}`, {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function fetchAdminRedeemCodeMetrics(
+  params?: Pick<AdminRedeemCodesQuery, "search" | "status" | "rewardKind">,
+  signal?: AbortSignal
+): Promise<AdminRedeemCodeMetrics> {
+  const normalizedParams = normalizeAdminRedeemCodesQuery(params);
+  const search = new URLSearchParams();
+  if (normalizedParams.search) search.set("search", normalizedParams.search);
+  if (normalizedParams.status) search.set("status", normalizedParams.status);
+  if (normalizedParams.rewardKind) search.set("rewardKind", normalizedParams.rewardKind);
+
+  const query = search.size ? `?${search.toString()}` : "";
+  return apiRequest<AdminRedeemCodeMetrics>(`/api/admin/economy/redeem-codes/metrics${query}`, {
     method: "GET",
     signal,
   });
@@ -385,16 +471,18 @@ export async function fetchAdminRedeemCodeActivations(
   },
   signal?: AbortSignal
 ): Promise<OffsetPagedResponse<AdminRedeemCodeRedemption>> {
+  const encodedRedeemCodeId = encodePathSegment(redeemCodeId);
   const normalizedSkip = normalizePagedValue(params?.skip);
   const normalizedTake = normalizeTakeValue(params?.take);
+  const normalizedUserId = normalizeFilterValue(params?.userId);
   const search = new URLSearchParams();
   if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
   if (normalizedTake !== undefined) search.set("take", String(normalizedTake));
-  if (params?.userId?.trim()) search.set("userId", params.userId.trim());
+  if (normalizedUserId) search.set("userId", normalizedUserId);
 
   const query = search.size ? `?${search.toString()}` : "";
   return apiRequest<OffsetPagedResponse<AdminRedeemCodeRedemption>>(
-    `/api/admin/economy/redeem-codes/${redeemCodeId}/activations${query}`,
+    `/api/admin/economy/redeem-codes/${encodedRedeemCodeId}/activations${query}`,
     { method: "GET", signal }
   );
 }
@@ -417,7 +505,8 @@ export async function updateAdminRedeemCode(
     | "expiresAtUtc"
   >
 ): Promise<AdminRedeemCode> {
-  return apiRequest<AdminRedeemCode>(`/api/admin/economy/redeem-codes/${redeemCodeId}`, {
+  const encodedRedeemCodeId = encodePathSegment(redeemCodeId);
+  return apiRequest<AdminRedeemCode>(`/api/admin/economy/redeem-codes/${encodedRedeemCodeId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });

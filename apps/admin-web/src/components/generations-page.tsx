@@ -1,6 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -12,12 +13,18 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/generations-page.module.css";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
+  fetchAdminTemplateGenerationMetrics,
   fetchAdminTemplateGenerations,
+  GENERATION_PROVIDER_FILTER_MAX_LENGTH,
+  GENERATION_SEARCH_FILTER_MAX_LENGTH,
+  GENERATION_USER_FILTER_MAX_LENGTH,
   normalizeAdminTemplateGenerationsQuery,
+  useAuthSession,
   type AdminGenerationStatus,
   type AdminTemplateGenerationListItem,
 } from "@/lib/api-client";
@@ -49,8 +56,8 @@ function getCopy(locale: Locale) {
     eyebrow: isRu ? "Operations" : "Operations",
     title: isRu ? "Генерации" : "Generations",
     description: isRu
-      ? "Серверный список generation jobs без signed URLs, provider payloads и API keys."
-      : "Server-backed generation jobs without signed URLs, provider payloads, or API keys.",
+      ? "Операционный список generation jobs, статусов, провайдеров, попыток и кодов ошибок."
+      : "Operational list of generation jobs, statuses, providers, attempts, and failure codes.",
     total: isRu ? "Всего jobs" : "Total jobs",
     pending: isRu ? "Ожидает" : "Pending",
     running: isRu ? "В работе" : "Running",
@@ -58,11 +65,11 @@ function getCopy(locale: Locale) {
     failed: isRu ? "Ошибка" : "Failed",
     cancelled: isRu ? "Отменена" : "Cancelled",
     retrying: isRu ? "Повторяется" : "Retrying",
-    currentPageScope: isRu ? "Текущая страница" : "Current page",
+    allJobsScope: isRu ? "Все jobs" : "All jobs",
     filtersTitle: isRu ? "Фильтры" : "Filters",
     filtersDescription: isRu
-      ? "Поиск и фильтры выполняются на backend; устаревшие запросы отменяются."
-      : "Search and filters run on the backend; stale requests are aborted.",
+      ? "Сузьте список по job id, статусу, provider или user id."
+      : "Narrow the list by job id, status, provider, or user id.",
     searchLabel: isRu ? "Job id" : "Job id",
     searchPlaceholder: isRu ? "Поиск по generation id" : "Search by generation id",
     statusLabel: isRu ? "Статус" : "Status",
@@ -94,9 +101,6 @@ function getCopy(locale: Locale) {
     next: isRu ? "Вперед" : "Next",
     page: isRu ? "Страница" : "Page",
     of: isRu ? "из" : "of",
-    unsupportedActions: isRu
-      ? "Retry/cancel не показаны: backend пока не предоставляет эти операции."
-      : "Retry/cancel are hidden because the backend does not expose those operations yet.",
     templateImage: isRu ? "Изображение" : "Image",
     templateVideo: isRu ? "Видео" : "Video",
   };
@@ -157,6 +161,10 @@ function formatMoney(value?: number | null) {
     currency: "USD",
     maximumFractionDigits: 4,
   }).format(value);
+}
+
+function formatMetricCount(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(Math.max(0, value)) : "-";
 }
 
 function formatStatus(status: StatusFilter, text: ReturnType<typeof getCopy>) {
@@ -236,6 +244,9 @@ function GenerationRow({
 
 export function GenerationsPage({ locale }: GenerationsPageProps) {
   const text = getCopy(locale);
+  const router = useRouter();
+  const session = useAuthSession();
+  const canViewGenerations = session?.user.roles.includes("Admin") ?? false;
   const [pageIndex, setPageIndex] = useState(0);
   const [status, setStatus] = useState<StatusFilter>("All");
   const [provider, setProvider] = useState("");
@@ -245,6 +256,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const debouncedProvider = useDebouncedValue(provider, 350);
   const debouncedUser = useDebouncedValue(user, 350);
   const debouncedSearch = useDebouncedValue(search, 350);
+
+  useEffect(() => {
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
+  }, [locale, router, session]);
 
   const query = useMemo(
     () =>
@@ -262,18 +277,22 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const generationsQuery = useQuery({
     queryKey: adminQueryKeys.templateGenerations(query),
     queryFn: ({ signal }) => fetchAdminTemplateGenerations(query, signal),
+    enabled: canViewGenerations,
     placeholderData: keepPreviousData,
+  });
+  const generationMetricsQuery = useQuery({
+    queryKey: adminQueryKeys.templateGenerationMetrics,
+    queryFn: ({ signal }) => fetchAdminTemplateGenerationMetrics(signal),
+    enabled: canViewGenerations,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 
   const page = generationsQuery.data;
   const items = page?.items ?? [];
   const totalCount = page?.totalCount ?? 0;
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const pendingCount = items.filter((item) => item.status === "Pending").length;
-  const runningCount = items.filter((item) => item.status === "Running").length;
-  const failedCount = items.filter((item) => item.status === "Failed").length;
-  const cancelledCount = items.filter((item) => item.status === "Cancelled").length;
-  const retryingCount = items.filter((item) => item.status === "Retrying").length;
+  const generationMetrics = generationMetricsQuery.data ?? null;
 
   return (
     <section className={styles.page}>
@@ -282,39 +301,42 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
         title={text.title}
         description={text.description}
         badge={<AdminBadge tone="danger">Admin only</AdminBadge>}
-        metaItems={[text.unsupportedActions]}
       />
 
       <div className={styles.kpiGrid}>
-        <AdminKpiCard label={text.total} value={String(totalCount)} tone="primary" />
+        <AdminKpiCard
+          label={text.total}
+          value={formatMetricCount(generationMetrics?.totalJobs)}
+          tone="primary"
+        />
         <AdminKpiCard
           label={text.pending}
-          value={String(pendingCount)}
-          hint={text.currentPageScope}
+          value={formatMetricCount(generationMetrics?.pendingJobs)}
+          hint={text.allJobsScope}
           tone="warning"
         />
         <AdminKpiCard
           label={text.running}
-          value={String(runningCount)}
-          hint={text.currentPageScope}
+          value={formatMetricCount(generationMetrics?.runningJobs)}
+          hint={text.allJobsScope}
           tone="info"
         />
         <AdminKpiCard
           label={text.failed}
-          value={String(failedCount)}
-          hint={text.currentPageScope}
+          value={formatMetricCount(generationMetrics?.failedJobs)}
+          hint={text.allJobsScope}
           tone="danger"
         />
         <AdminKpiCard
           label={text.retrying}
-          value={String(retryingCount)}
-          hint={text.currentPageScope}
+          value={formatMetricCount(generationMetrics?.retryingJobs)}
+          hint={text.allJobsScope}
           tone="warning"
         />
         <AdminKpiCard
           label={text.cancelled}
-          value={String(cancelledCount)}
-          hint={text.currentPageScope}
+          value={formatMetricCount(generationMetrics?.cancelledJobs)}
+          hint={text.allJobsScope}
           tone="neutral"
         />
       </div>
@@ -327,10 +349,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               className={styles.input}
               value={search}
               onChange={(event) => {
-                setSearch(event.target.value);
+                setSearch(event.target.value.slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH));
                 setPageIndex(0);
               }}
-              maxLength={80}
+              maxLength={GENERATION_SEARCH_FILTER_MAX_LENGTH}
               placeholder={text.searchPlaceholder}
             />
           </label>
@@ -357,10 +379,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               className={styles.input}
               value={provider}
               onChange={(event) => {
-                setProvider(event.target.value);
+                setProvider(event.target.value.slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH));
                 setPageIndex(0);
               }}
-              maxLength={40}
+              maxLength={GENERATION_PROVIDER_FILTER_MAX_LENGTH}
               placeholder={text.providerPlaceholder}
             />
           </label>
@@ -370,10 +392,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               className={styles.input}
               value={user}
               onChange={(event) => {
-                setUser(event.target.value);
+                setUser(event.target.value.slice(0, GENERATION_USER_FILTER_MAX_LENGTH));
                 setPageIndex(0);
               }}
-              maxLength={80}
+              maxLength={GENERATION_USER_FILTER_MAX_LENGTH}
               placeholder={text.userPlaceholder}
             />
           </label>
@@ -391,8 +413,14 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <button
               type="button"
               className={styles.button}
-              disabled={generationsQuery.isFetching}
-              onClick={() => void generationsQuery.refetch().catch(() => undefined)}
+              disabled={!canViewGenerations || generationsQuery.isFetching}
+              onClick={() => {
+                if (!canViewGenerations) {
+                  return;
+                }
+
+                void generationsQuery.refetch().catch(() => undefined);
+              }}
             >
               {text.retry}
             </button>

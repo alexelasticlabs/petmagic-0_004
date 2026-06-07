@@ -45,6 +45,9 @@ type PromoStatusModel = {
 };
 
 export const PROMO_NUMERIC_FIELD_MAX_LENGTH = 8;
+export const PROMO_CODE_MAX_LENGTH = 48;
+export const PROMO_DESCRIPTION_MAX_LENGTH = 160;
+export const PROMO_CAMPAIGN_FIELD_MAX_LENGTH = 80;
 
 export function createDefaultPromoForm(): PromoForm {
   return {
@@ -65,10 +68,13 @@ export function createDefaultPromoForm(): PromoForm {
 
 export function toPromoForm(code: AdminRedeemCode): PromoForm {
   return {
-    code: code.code || `${code.codePrefix}...`,
-    description: code.description,
-    campaignName: code.campaignName ?? "",
-    campaignChannel: code.campaignChannel ?? "",
+    code: normalizePromoText(code.code || `${code.codePrefix}...`, PROMO_CODE_MAX_LENGTH),
+    description: normalizePromoText(code.description, PROMO_DESCRIPTION_MAX_LENGTH),
+    campaignName: normalizePromoText(code.campaignName ?? "", PROMO_CAMPAIGN_FIELD_MAX_LENGTH),
+    campaignChannel: normalizePromoText(
+      code.campaignChannel ?? "",
+      PROMO_CAMPAIGN_FIELD_MAX_LENGTH
+    ),
     minimumSuccessfulPurchases: code.minimumSuccessfulPurchases.toString(),
     rewardKind: code.rewardKind,
     rewardValue: code.rewardValue.toString(),
@@ -84,10 +90,10 @@ export function toCreatePayload(form: PromoForm, text: PromoDictionary) {
   validatePromoForm(form, 0, 0, text);
 
   return {
-    code: form.code.trim(),
-    description: form.description.trim(),
-    campaignName: form.campaignName.trim() || null,
-    campaignChannel: form.campaignChannel.trim() || null,
+    code: normalizePromoText(form.code, PROMO_CODE_MAX_LENGTH),
+    description: normalizePromoText(form.description, PROMO_DESCRIPTION_MAX_LENGTH),
+    campaignName: normalizePromoText(form.campaignName, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
+    campaignChannel: normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     rewardKind: form.rewardKind,
     rewardValue: Number(form.rewardValue.trim()),
@@ -103,9 +109,9 @@ export function toUpdatePayload(form: PromoForm, code: AdminRedeemCode, text: Pr
   validatePromoForm(form, code.redeemedCount, getMaxUserRedemptions(code), text);
 
   return {
-    description: form.description.trim(),
-    campaignName: form.campaignName.trim() || null,
-    campaignChannel: form.campaignChannel.trim() || null,
+    description: normalizePromoText(form.description, PROMO_DESCRIPTION_MAX_LENGTH),
+    campaignName: normalizePromoText(form.campaignName, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
+    campaignChannel: normalizePromoText(form.campaignChannel, PROMO_CAMPAIGN_FIELD_MAX_LENGTH) || null,
     minimumSuccessfulPurchases: Number(form.minimumSuccessfulPurchases.trim()),
     createdBy: code.createdBy?.trim() || null,
     rewardKind: form.rewardKind,
@@ -133,7 +139,11 @@ function validatePromoForm(
     true
   );
 
-  if (!normalizedCode || normalizedCode.length < 4 || normalizedCode.length > 48) {
+  if (
+    !normalizedCode ||
+    normalizedCode.length < 4 ||
+    normalizedCode.length > PROMO_CODE_MAX_LENGTH
+  ) {
     throw new Error(text.promoCodesInvalidCode);
   }
 
@@ -165,6 +175,10 @@ function validatePromoForm(
   ) {
     throw new Error(text.promoCodesInvalidWindow);
   }
+}
+
+function normalizePromoText(value: string, maxLength: number): string {
+  return value.trim().slice(0, maxLength);
 }
 
 export function normalizePromoIntegerInput(value: string): string {

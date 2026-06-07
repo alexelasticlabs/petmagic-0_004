@@ -218,7 +218,7 @@ export function formatMoney(amount: number, currencyCode: string, locale: Locale
         maximumFractionDigits: 2,
       }).format(value);
     } catch {
-      // Fall through to a non-throwing display for unexpected backend currency codes.
+      // Fall through to a non-throwing display for unexpected currency codes.
     }
   }
 

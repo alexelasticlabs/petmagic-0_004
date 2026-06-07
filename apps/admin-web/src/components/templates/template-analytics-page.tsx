@@ -27,6 +27,7 @@ import {
   TemplateAnalyticsRecentRunsSection,
 } from "@/components/templates/template-analytics-detail-sections";
 import {
+  formatSafeTemplateAnalyticsExportName,
   sanitizeEventAnalyticsForExport,
   sanitizeFailureBreakdownForExport,
   sanitizeRecentRunsForExport,
@@ -55,6 +56,7 @@ import { useAdminTemplateAnalyticsOverview } from "@/components/templates/use-ad
 import { useAdminTemplateFeedback } from "@/components/templates/use-admin-template-feedback";
 import { Button } from "@/components/ui/button";
 import {
+  TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   fetchAdminTemplateRecentGenerations,
   useAuthSession,
   type AdminTemplateEventAnalytics,
@@ -160,7 +162,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
-      setFeedbackSearch(feedbackSearchInput.trim());
+      setFeedbackSearch(
+        feedbackSearchInput.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH)
+      );
     }, 250);
 
     return () => {
@@ -199,8 +203,14 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <Button
               type="button"
               variant="secondary"
-              disabled={isFetching}
-              onClick={() => void refresh().catch(() => undefined)}
+              disabled={!session || isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void refresh().catch(() => undefined);
+              }}
             >
               {text.retryAction}
             </Button>
@@ -212,7 +222,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
   const templateSlug = template.templateType === "Video" ? "video" : "image";
   const catalogPath = `/${locale}/templates/${templateSlug}`;
-  const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
+  const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;
   const templateTitle = sanitizeSensitiveText(template.title, 120);
   const breadcrumbsRoot =
     template.templateType === "Video"
@@ -255,6 +265,13 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     }
 
     setRecentRunsMode(mode);
+    if (!session) {
+      recentRunsAbortControllerRef.current?.abort();
+      setIsRecentRunsLoading(false);
+      setRecentRunsMode("latest");
+      return;
+    }
+
     if (allRecentRuns || isRecentRunsLoading || !canShowAllRecentRuns) {
       return;
     }
@@ -381,7 +398,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `template-${template.templateId}-analytics.json`;
+    link.download = formatSafeTemplateAnalyticsExportName(template.templateId);
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -523,6 +540,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       <div className={styles.detailsGrid}>
         {isSecondaryReady ? (
           <TemplateAnalyticsRecentRunsSection
+            canLoadRecentRuns={Boolean(session)}
             canShowFailedRecentRuns={canShowFailedRecentRuns}
             canShowRecentRunModes={shouldShowRecentRunModes}
             error={recentRunsError}
@@ -568,7 +586,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         items={feedbackItems}
         locale={locale}
         onFeedbackFilterChange={setFeedbackFilter}
-        onFeedbackSearchChange={setFeedbackSearchInput}
+        onFeedbackSearchChange={(value) =>
+          setFeedbackSearchInput(value.slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH))
+        }
         text={text}
       />
 

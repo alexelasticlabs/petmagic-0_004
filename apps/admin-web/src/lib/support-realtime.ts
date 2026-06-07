@@ -1,6 +1,6 @@
 "use client";
 
-import { HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { HubConnectionBuilder, LogLevel, type HubConnection } from "@microsoft/signalr";
 import { useEffect, useEffectEvent } from "react";
 
 import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
@@ -20,6 +20,9 @@ export type SupportConversationUpdatedEvent = {
 const supportRealtimeCooldownMs = 30_000;
 
 let supportRealtimeBlockedUntil = 0;
+let supportRealtimeAccessToken: string | undefined;
+let supportRealtimeConnection: HubConnection | null = null;
+const supportRealtimeListeners = new Set<(event: SupportConversationUpdatedEvent) => void>();
 
 export function useSupportRealtime(
   accessToken: string | undefined,
@@ -32,19 +35,76 @@ export function useSupportRealtime(
       return;
     }
 
-    const supportHubUrl = `${getAdminPublicApiBaseUrl()}/hubs/support-chat`;
-    const connection = new HubConnectionBuilder()
-      .withUrl(supportHubUrl, {
-        accessTokenFactory: async () => accessToken,
-      })
-      .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
-      .configureLogging(LogLevel.None)
-      .build();
+    const listener = (event: SupportConversationUpdatedEvent) => handleConversationUpdated(event);
+    supportRealtimeListeners.add(listener);
+    ensureSupportRealtimeConnection(accessToken);
 
-    let isDisposed = false;
+    return () => {
+      supportRealtimeListeners.delete(listener);
+      if (supportRealtimeListeners.size === 0) {
+        stopSupportRealtimeConnection();
+      }
+    };
+  }, [accessToken]);
+}
 
-    connection.onclose((error: Error | undefined) => {
-      if (isDisposed) {
+function ensureSupportRealtimeConnection(accessToken: string): void {
+  if (supportRealtimeConnection && supportRealtimeAccessToken === accessToken) {
+    return;
+  }
+
+  stopSupportRealtimeConnection();
+  supportRealtimeAccessToken = accessToken;
+
+  const supportHubUrl = `${getAdminPublicApiBaseUrl()}/hubs/support-chat`;
+  const connection = new HubConnectionBuilder()
+    .withUrl(supportHubUrl, {
+      accessTokenFactory: async () => accessToken,
+    })
+    .withAutomaticReconnect([0, 2_000, 5_000, 10_000])
+    .configureLogging(LogLevel.None)
+    .build();
+
+  supportRealtimeConnection = connection;
+
+  connection.onclose((error: Error | undefined) => {
+    if (connection !== supportRealtimeConnection) {
+      return;
+    }
+
+    const expectedFailure = isExpectedConnectionFailure(error);
+    if (expectedFailure) {
+      supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
+    }
+
+    clientLogger.warn("support.realtime_closed", {
+      expectedFailure,
+      blockedUntil: supportRealtimeBlockedUntil,
+      error,
+    });
+
+    supportRealtimeConnection = null;
+    supportRealtimeAccessToken = undefined;
+  });
+
+  connection.on("conversation-updated", (payload: unknown) => {
+    const event = normalizeConversationUpdated(payload);
+    if (event) {
+      for (const listener of [...supportRealtimeListeners]) {
+        listener(event);
+      }
+    }
+  });
+
+  void connection
+    .start()
+    .then(() => {
+      if (connection === supportRealtimeConnection) {
+        supportRealtimeBlockedUntil = 0;
+      }
+    })
+    .catch((error: unknown) => {
+      if (connection !== supportRealtimeConnection) {
         return;
       }
 
@@ -53,50 +113,28 @@ export function useSupportRealtime(
         supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
       }
 
-      clientLogger.warn("support.realtime_closed", {
+      clientLogger.warn("support.realtime_start_failed", {
         expectedFailure,
         blockedUntil: supportRealtimeBlockedUntil,
         error,
       });
+
+      supportRealtimeConnection = null;
+      supportRealtimeAccessToken = undefined;
     });
+}
 
-    connection.on("conversation-updated", (payload: unknown) => {
-      const event = normalizeConversationUpdated(payload);
-      if (event) {
-        handleConversationUpdated(event);
-      }
-    });
+function stopSupportRealtimeConnection(): void {
+  const connection = supportRealtimeConnection;
+  supportRealtimeConnection = null;
+  supportRealtimeAccessToken = undefined;
 
-    void connection
-      .start()
-      .then(() => {
-        if (!isDisposed) {
-          supportRealtimeBlockedUntil = 0;
-        }
-      })
-      .catch((error: unknown) => {
-        if (isDisposed) {
-          return;
-        }
+  if (!connection) {
+    return;
+  }
 
-        const expectedFailure = isExpectedConnectionFailure(error);
-        if (expectedFailure) {
-          supportRealtimeBlockedUntil = Date.now() + supportRealtimeCooldownMs;
-        }
-
-        clientLogger.warn("support.realtime_start_failed", {
-          expectedFailure,
-          blockedUntil: supportRealtimeBlockedUntil,
-          error,
-        });
-      });
-
-    return () => {
-      isDisposed = true;
-      connection.off("conversation-updated");
-      void connection.stop();
-    };
-  }, [accessToken]);
+  connection.off("conversation-updated");
+  void connection.stop();
 }
 
 function isExpectedConnectionFailure(error: unknown) {

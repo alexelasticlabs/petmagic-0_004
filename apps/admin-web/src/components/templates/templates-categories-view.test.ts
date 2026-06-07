@@ -13,9 +13,10 @@ describe("template categories view actions", () => {
     expect(source).toContain('setToast({ type: "error", message: categoryActionsAdminOnly })');
     expect(source).toContain("if (!assertCanManageCategories()) {\n      return;");
     expect(source).toContain("if (!assertCanManageCategories()) {\n      return false;");
-    expect(source).toContain("if (isSubmitting) {\n      return;");
-    expect(source).toContain("if (busyCategoryId === categoryId) {\n      return;");
-    expect(source).toContain("if (busyCategoryId === category.categoryId) {\n      return false;");
+    expect(source).toContain("const isCategoryActionLocked = isSubmitting || busyCategoryId !== null;");
+    expect(source).toContain("if (isCategoryActionLocked) {\n      return;");
+    expect(source).toContain("if (isCategoryActionLocked) {\n      return false;");
+    expect(source).toContain("if (isCategoryActionLocked || category.totalTemplates > 0) {");
     expect(source).toContain("async function handleArchiveToggle(category: AdminTemplateCategory): Promise<boolean>");
     expect(source).toContain("async function handleDeleteCategory(category: AdminTemplateCategory): Promise<boolean>");
     expect(source).toContain("const [categoryPendingArchive, setCategoryPendingArchive]");
@@ -31,16 +32,49 @@ describe("template categories view actions", () => {
     expect(source).toContain("if (succeeded) {\n              setCategoryPendingArchive(null);");
     expect(source).toContain("void handleDeleteCategory(categoryPendingDelete).then((succeeded) => {");
     expect(source).toContain("if (succeeded) {\n              setCategoryPendingDelete(null);");
-    expect(source).toContain("isSubmitting={categoryPendingArchive?.categoryId === busyCategoryId}");
+    expect(source).toContain("disabled={isCategoryActionLocked || !newCategoryName.trim()}");
+    expect(source).toContain("disabled={isCategoryActionLocked}");
+    expect(source).toContain("isCategoryActionLocked || !editingName.trim()");
+    expect(source).toContain("isCategoryActionLocked ||\n                                    category.totalTemplates > 0");
+    expect(source).toContain("isSubmitting={Boolean(categoryPendingArchive && isCategoryActionLocked)}");
+    expect(source).toContain("isSubmitting={Boolean(categoryPendingDelete && isCategoryActionLocked)}");
+    expect(source).toContain("if (!isCategoryActionLocked) {\n            setCategoryPendingArchive(null);");
+    expect(source).toContain("if (!isCategoryActionLocked) {\n            setCategoryPendingDelete(null);");
+    expect(source).not.toContain("if (busyCategoryId === categoryId) {\n      return;");
+    expect(source).not.toContain("if (busyCategoryId === category.categoryId) {\n      return false;");
+    expect(source).not.toContain("disabled={busyCategoryId === category.categoryId}");
+    expect(source).not.toContain("isSubmitting={categoryPendingArchive?.categoryId === busyCategoryId}");
+  });
+
+  it("trims and bounds category names before state updates and mutations", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain("const CATEGORY_NAME_MAX_LENGTH = 64;");
+    expect(source).toContain("const name = normalizeCategoryName(newCategoryName);");
+    expect(source).toContain("const name = normalizeCategoryName(editingName);");
+    expect(source).toContain("setNewCategoryName(normalizeCategoryName(event.target.value))");
+    expect(source).toContain("setEditingName(normalizeCategoryName(event.target.value))");
+    expect(source).toContain("setEditingName(normalizeCategoryName(category.name))");
+    expect(source).toContain("maxLength={CATEGORY_NAME_MAX_LENGTH}");
+    expect(source).toContain("function normalizeCategoryName(value: string): string");
+    expect(source).toContain("return value.trim().slice(0, CATEGORY_NAME_MAX_LENGTH);");
+    expect(source).not.toContain("setNewCategoryName(event.target.value)");
+    expect(source).not.toContain("setEditingName(event.target.value)");
+    expect(source).not.toContain("const name = newCategoryName.trim();");
+    expect(source).not.toContain("const name = editingName.trim();");
+    expect(source).not.toContain("maxLength={64}");
   });
 
   it("keeps category load/action errors retryable", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
 
     expect(source).toContain("const { categories, hasError, isFetching, isLoading, refresh }");
+    expect(source).toContain("if (!session || isLoading)");
     expect(source).toContain("title={error}");
-    expect(source).toContain("disabled={isFetching}");
-    expect(source).toContain("void refresh().catch(() => undefined);");
+    expect(source).toContain("disabled={!session || isFetching}");
+    expect(source).toContain(
+      "if (!session) {\n                  return;\n                }\n\n                void refresh().catch(() => undefined);"
+    );
   });
 
   it("sanitizes category names before dangerous confirmation copy", () => {
@@ -53,5 +87,14 @@ describe("template categories view actions", () => {
     expect(source).toContain("formatCategoryActionName(categoryPendingDelete)");
     expect(source).not.toContain('categoryPendingArchive.name}"');
     expect(source).not.toContain('categoryPendingDelete.name}"');
+  });
+
+  it("sanitizes category names and tags before table display", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain("<strong>{sanitizeSensitiveText(category.name, 96)}</strong>");
+    expect(source).toContain(".map((tag) => `#${sanitizeSensitiveText(tag, 40)}`)");
+    expect(source).not.toContain("<strong>{category.name}</strong>");
+    expect(source).not.toContain(".map((tag) => `#${tag}`)");
   });
 });

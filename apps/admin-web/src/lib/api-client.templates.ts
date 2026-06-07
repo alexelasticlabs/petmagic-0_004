@@ -11,6 +11,7 @@ import {
   cachedTemplateLists,
   cachedTemplatesAnalyticsOverview,
   clearAdminListCaches,
+  encodePathSegment,
   getAnalyticsOverviewCacheKey,
   getTemplateListCacheKey,
   getTemplateRecentGenerationsCacheKey,
@@ -18,6 +19,7 @@ import {
 
 import type {
   AdminTemplate,
+  AdminTemplateCatalogPage,
   AdminTemplateCategory,
   AdminTemplateEventAnalytics,
   AdminTemplateFailureBreakdownItem,
@@ -29,7 +31,6 @@ import type {
   AdminTemplateGenerationDashboardMetrics,
   AdminTemplateGenerationsPage,
   AdminTemplateGenerationsQuery,
-  AdminTemplateListItem,
   AdminTemplateRecentGeneration,
   AdminTemplateStatistics,
   AdminTemplateTestRun,
@@ -45,18 +46,78 @@ import type {
   VideoTemplatePayload,
 } from "./api-client.types";
 
+export const MODERATION_SEARCH_MAX_LENGTH = 120;
+export const MODERATION_DECISION_REASON_MAX_LENGTH = 500;
+export const GENERATION_PROVIDER_FILTER_MAX_LENGTH = 40;
+export const GENERATION_USER_FILTER_MAX_LENGTH = 80;
+export const GENERATION_SEARCH_FILTER_MAX_LENGTH = 80;
+export const TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH = 120;
+export const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;
+
+export type AdminTemplateCatalogQuery = {
+  type?: TemplateType;
+  status?: TemplateStatus | "not_archived";
+  search?: string;
+  category?: string;
+  access?: "premium" | "free";
+  sort?: "newest" | "title" | "tokens";
+  skip?: number;
+  take?: number;
+};
+
+function normalizeTemplateCatalogFilter(value: string | undefined): string | undefined {
+  return value?.trim().slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH) || undefined;
+}
+
+function normalizeTemplateCatalogPagedValue(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.floor(value))
+    : undefined;
+}
+
+function normalizeTemplateCatalogTakeValue(value: number | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? Math.min(Math.floor(value), 100)
+    : undefined;
+}
+
+export function normalizeAdminTemplateCatalogQuery(
+  query: AdminTemplateCatalogQuery = {}
+): AdminTemplateCatalogQuery {
+  return {
+    type: query.type,
+    status: query.status,
+    search: normalizeTemplateCatalogFilter(query.search),
+    category: normalizeTemplateCatalogFilter(query.category),
+    access: query.access,
+    sort: query.sort,
+    skip: normalizeTemplateCatalogPagedValue(query.skip),
+    take: normalizeTemplateCatalogTakeValue(query.take),
+  };
+}
+
 export async function fetchAdminTemplates(
-  type?: TemplateType,
+  query: AdminTemplateCatalogQuery = {},
   signal?: AbortSignal
-): Promise<AdminTemplateListItem[]> {
-  const cacheKey = getTemplateListCacheKey(type);
-  const query = type ? `?type=${encodeURIComponent(type)}` : "";
+): Promise<AdminTemplateCatalogPage> {
+  const normalizedQuery = normalizeAdminTemplateCatalogQuery(query);
+  const cacheKey = getTemplateListCacheKey(JSON.stringify(normalizedQuery));
+  const search = new URLSearchParams();
+  if (normalizedQuery.type) search.set("type", normalizedQuery.type);
+  if (normalizedQuery.status) search.set("status", normalizedQuery.status);
+  if (normalizedQuery.search) search.set("search", normalizedQuery.search);
+  if (normalizedQuery.category) search.set("category", normalizedQuery.category);
+  if (normalizedQuery.access) search.set("access", normalizedQuery.access);
+  if (normalizedQuery.sort) search.set("sort", normalizedQuery.sort);
+  if (normalizedQuery.skip !== undefined) search.set("skip", String(normalizedQuery.skip));
+  if (normalizedQuery.take !== undefined) search.set("take", String(normalizedQuery.take));
+  const queryString = search.size ? `?${search.toString()}` : "";
 
   return cachedGet(
     `templates:${cacheKey}`,
     cachedTemplateLists,
     () =>
-      apiRequest<AdminTemplateListItem[]>(`/api/admin/templates/${query}`, {
+      apiRequest<AdminTemplateCatalogPage>(`/api/admin/templates/${queryString}`, {
         method: "GET",
         signal,
       }),
@@ -98,8 +159,9 @@ export async function updateTemplateCategory(
   categoryId: string,
   payload: TemplateCategoryPayload
 ): Promise<AdminTemplateCategory> {
+  const encodedCategoryId = encodePathSegment(categoryId);
   const category = await apiRequest<AdminTemplateCategory>(
-    `/api/admin/templates/categories/${categoryId}`,
+    `/api/admin/templates/categories/${encodedCategoryId}`,
     {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -113,8 +175,9 @@ export async function changeTemplateCategoryArchiveState(
   categoryId: string,
   isArchived: boolean
 ): Promise<AdminTemplateCategory> {
+  const encodedCategoryId = encodePathSegment(categoryId);
   const category = await apiRequest<AdminTemplateCategory>(
-    `/api/admin/templates/categories/${categoryId}/archive`,
+    `/api/admin/templates/categories/${encodedCategoryId}/archive`,
     {
       method: "PUT",
       body: JSON.stringify({ isArchived }),
@@ -125,7 +188,8 @@ export async function changeTemplateCategoryArchiveState(
 }
 
 export async function deleteTemplateCategory(categoryId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/templates/categories/${categoryId}`, {
+  const encodedCategoryId = encodePathSegment(categoryId);
+  await apiRequest<void>(`/api/admin/templates/categories/${encodedCategoryId}`, {
     method: "DELETE",
   });
   clearAdminListCaches();
@@ -135,10 +199,15 @@ export async function fetchAdminTemplate(
   templateId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplate> {
+  const encodedTemplateId = encodePathSegment(templateId);
   return cachedGet(
     `admin-template:${templateId}`,
     cachedAdminTemplateDetails,
-    () => apiRequest<AdminTemplate>(`/api/admin/templates/${templateId}`, { method: "GET", signal }),
+    () =>
+      apiRequest<AdminTemplate>(`/api/admin/templates/${encodedTemplateId}`, {
+        method: "GET",
+        signal,
+      }),
     signal
   );
 }
@@ -147,11 +216,12 @@ export async function fetchAdminTemplateStatistics(
   templateId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplateStatistics> {
+  const encodedTemplateId = encodePathSegment(templateId);
   return cachedGet(
     `admin-template-statistics:${templateId}`,
     cachedAdminTemplateStatistics,
     () =>
-      apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${templateId}/statistics`, {
+      apiRequest<AdminTemplateStatistics>(`/api/admin/templates/${encodedTemplateId}/statistics`, {
         method: "GET",
         signal,
       }),
@@ -163,12 +233,13 @@ export async function fetchAdminTemplateTrends(
   templateId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplateTrendPoint[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
   return cachedGet(
     `admin-template-trends:${templateId}`,
     cachedAdminTemplateTrends,
     () =>
       apiRequest<AdminTemplateTrendPoint[]>(
-        `/api/admin/templates/${templateId}/statistics/trends`,
+        `/api/admin/templates/${encodedTemplateId}/statistics/trends`,
         {
           method: "GET",
           signal,
@@ -183,6 +254,7 @@ export async function fetchAdminTemplateRecentGenerations(
   take?: number,
   signal?: AbortSignal
 ): Promise<AdminTemplateRecentGeneration[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
   const normalizedTake =
     typeof take === "number" && Number.isFinite(take) && take > 0
       ? Math.min(Math.floor(take), 100)
@@ -194,7 +266,7 @@ export async function fetchAdminTemplateRecentGenerations(
     cachedAdminTemplateRecentGenerations,
     () =>
       apiRequest<AdminTemplateRecentGeneration[]>(
-        `/api/admin/templates/${templateId}/statistics/recent${query}`,
+        `/api/admin/templates/${encodedTemplateId}/statistics/recent${query}`,
         { method: "GET", signal }
       ),
     signal
@@ -205,12 +277,13 @@ export async function fetchAdminTemplateFailureBreakdown(
   templateId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplateFailureBreakdownItem[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
   return cachedGet(
     `admin-template-failures:${templateId}`,
     cachedAdminTemplateFailureBreakdowns,
     () =>
       apiRequest<AdminTemplateFailureBreakdownItem[]>(
-        `/api/admin/templates/${templateId}/statistics/failures`,
+        `/api/admin/templates/${encodedTemplateId}/statistics/failures`,
         { method: "GET", signal }
       ),
     signal
@@ -221,12 +294,13 @@ export async function fetchAdminTemplateEventAnalytics(
   templateId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplateEventAnalytics> {
+  const encodedTemplateId = encodePathSegment(templateId);
   return cachedGet(
     `admin-template-events:${templateId}`,
     cachedAdminTemplateEventAnalytics,
     () =>
       apiRequest<AdminTemplateEventAnalytics>(
-        `/api/admin/templates/${templateId}/statistics/events`,
+        `/api/admin/templates/${encodedTemplateId}/statistics/events`,
         { method: "GET", signal }
       ),
     signal
@@ -238,13 +312,15 @@ export async function fetchAdminTemplateFeedback(
   query: AdminTemplateFeedbackQuery = {},
   signal?: AbortSignal
 ): Promise<AdminTemplateFeedbackItem[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
   const params = new URLSearchParams();
   if (query.take) params.set("take", String(query.take));
   if (query.type) params.set("type", query.type);
-  if (query.search?.trim()) params.set("search", query.search.trim());
+  const search = query.search?.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH);
+  if (search) params.set("search", search);
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
   return apiRequest<AdminTemplateFeedbackItem[]>(
-    `/api/admin/templates/${templateId}/statistics/feedback${suffix}`,
+    `/api/admin/templates/${encodedTemplateId}/statistics/feedback${suffix}`,
     { method: "GET", signal }
   );
 }
@@ -272,7 +348,7 @@ export function normalizeAdminModerationQueueQuery(
 ): AdminModerationQueueQuery {
   return {
     status: query.status && query.status !== "all" ? query.status : undefined,
-    search: query.search?.trim() || undefined,
+    search: query.search?.trim().slice(0, MODERATION_SEARCH_MAX_LENGTH) || undefined,
     skip:
       typeof query.skip === "number" && Number.isFinite(query.skip)
         ? Math.max(0, Math.floor(query.skip))
@@ -288,11 +364,15 @@ export async function decideAdminModerationItem(
   eventId: string,
   payload: { action: "approve" | "reject"; reason: string }
 ): Promise<AdminModerationQueueItem> {
+  const encodedEventId = encodePathSegment(eventId);
+  const normalizedReason = payload.reason
+    .trim()
+    .slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);
   return apiRequest<AdminModerationQueueItem>(
-    `/api/admin/templates/moderation/${eventId}/decision`,
+    `/api/admin/templates/moderation/${encodedEventId}/decision`,
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, reason: normalizedReason }),
     }
   );
 }
@@ -339,9 +419,9 @@ export function normalizeAdminTemplateGenerationsQuery(
 ): AdminTemplateGenerationsQuery {
   return {
     status: query.status && query.status !== "All" ? query.status : undefined,
-    provider: query.provider?.trim() || undefined,
-    user: query.user?.trim() || undefined,
-    search: query.search?.trim() || undefined,
+    provider: query.provider?.trim().slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH) || undefined,
+    user: query.user?.trim().slice(0, GENERATION_USER_FILTER_MAX_LENGTH) || undefined,
+    search: query.search?.trim().slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH) || undefined,
     skip:
       typeof query.skip === "number" && Number.isFinite(query.skip)
         ? Math.max(0, Math.floor(query.skip))
@@ -377,10 +457,11 @@ export async function startAdminTemplateTest(
   templateId: string,
   file: File
 ): Promise<AdminTemplateTestRun> {
+  const encodedTemplateId = encodePathSegment(templateId);
   const formData = new FormData();
   formData.append("sourceImage", file);
 
-  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/${templateId}/test`, {
+  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/${encodedTemplateId}/test`, {
     method: "POST",
     body: formData,
   });
@@ -390,7 +471,8 @@ export async function fetchAdminTemplateTest(
   generationId: string,
   signal?: AbortSignal
 ): Promise<AdminTemplateTestRun> {
-  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/tests/${generationId}`, {
+  const encodedGenerationId = encodePathSegment(generationId);
+  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/tests/${encodedGenerationId}`, {
     method: "GET",
     signal,
   });
@@ -401,16 +483,20 @@ export async function fetchAdminTemplateTestHistory(
   take?: number,
   signal?: AbortSignal
 ): Promise<AdminTemplateTestRun[]> {
+  const encodedTemplateId = encodePathSegment(templateId);
   const normalizedTake =
     typeof take === "number" && Number.isFinite(take) && take > 0
       ? Math.min(Math.floor(take), 100)
       : undefined;
   const query =
     typeof normalizedTake === "number" ? `?take=${encodeURIComponent(String(normalizedTake))}` : "";
-  return apiRequest<AdminTemplateTestRun[]>(`/api/admin/templates/${templateId}/tests${query}`, {
-    method: "GET",
-    signal,
-  });
+  return apiRequest<AdminTemplateTestRun[]>(
+    `/api/admin/templates/${encodedTemplateId}/tests${query}`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {
@@ -426,10 +512,14 @@ export async function updateImageTemplate(
   templateId: string,
   payload: ImageTemplatePayload
 ): Promise<AdminTemplate> {
-  const template = await apiRequest<AdminTemplate>(`/api/admin/templates/image/${templateId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  const encodedTemplateId = encodePathSegment(templateId);
+  const template = await apiRequest<AdminTemplate>(
+    `/api/admin/templates/image/${encodedTemplateId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
   cachedTemplateLists.clear();
   return template;
 }
@@ -447,10 +537,14 @@ export async function updateVideoTemplate(
   templateId: string,
   payload: VideoTemplatePayload
 ): Promise<AdminTemplate> {
-  const template = await apiRequest<AdminTemplate>(`/api/admin/templates/video/${templateId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
+  const encodedTemplateId = encodePathSegment(templateId);
+  const template = await apiRequest<AdminTemplate>(
+    `/api/admin/templates/video/${encodedTemplateId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
   cachedTemplateLists.clear();
   return template;
 }
@@ -459,16 +553,21 @@ export async function changeTemplateStatus(
   templateId: string,
   status: TemplateStatus
 ): Promise<AdminTemplate> {
-  const template = await apiRequest<AdminTemplate>(`/api/admin/templates/${templateId}/status`, {
-    method: "PUT",
-    body: JSON.stringify({ status }),
-  });
+  const encodedTemplateId = encodePathSegment(templateId);
+  const template = await apiRequest<AdminTemplate>(
+    `/api/admin/templates/${encodedTemplateId}/status`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ status }),
+    }
+  );
   cachedTemplateLists.clear();
   return template;
 }
 
 export async function deleteTemplate(templateId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/templates/${templateId}`, {
+  const encodedTemplateId = encodePathSegment(templateId);
+  await apiRequest<void>(`/api/admin/templates/${encodedTemplateId}`, {
     method: "DELETE",
   });
   cachedTemplateLists.clear();

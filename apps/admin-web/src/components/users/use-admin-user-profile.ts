@@ -11,31 +11,33 @@ import {
 } from "@/lib/api-client";
 
 type UseAdminUserProfileOptions = {
+  enabled?: boolean;
   userId: string | null;
 };
 
-export function useAdminUserProfile({ userId }: UseAdminUserProfileOptions) {
+export function useAdminUserProfile({ enabled = true, userId }: UseAdminUserProfileOptions) {
+  const canLoadUser = enabled && Boolean(userId);
   const userQuery = useQuery<AdminUserDetail>({
     queryKey: userId ? adminQueryKeys.userDetail(userId) : adminQueryKeys.userDetailDisabled,
     queryFn: ({ signal }) => fetchAdminUser(userId!, signal),
-    enabled: Boolean(userId),
+    enabled: canLoadUser,
   });
 
   const analyticsQuery = useQuery<AdminUserAnalytics>({
     queryKey: userId ? adminQueryKeys.userAnalytics(userId) : adminQueryKeys.userAnalyticsDisabled,
     queryFn: ({ signal }) => fetchAdminUserAnalytics(userId!, signal),
-    enabled: Boolean(userId),
+    enabled: canLoadUser,
   });
 
   const user = userQuery.data ?? null;
   const analytics = analyticsQuery.data ?? null;
   const isLoading =
-    Boolean(userId) && (!user || !analytics) && (userQuery.isLoading || analyticsQuery.isLoading);
+    canLoadUser && (!user || !analytics) && (userQuery.isLoading || analyticsQuery.isLoading);
   const hasError =
-    Boolean(userId) && ((!user && userQuery.isError) || (!analytics && analyticsQuery.isError));
+    canLoadUser && ((!user && userQuery.isError) || (!analytics && analyticsQuery.isError));
 
   async function refresh() {
-    if (!userId) {
+    if (!canLoadUser) {
       return;
     }
 

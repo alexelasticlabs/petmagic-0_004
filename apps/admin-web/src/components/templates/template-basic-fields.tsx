@@ -1,12 +1,20 @@
 import styles from "@/components/templates/template-editor.module.css";
 import {
+  TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH,
+  TEMPLATE_REQUIREMENT_MAX_LENGTH,
+  TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH,
+  TEMPLATE_TAG_MAX_COUNT,
+  TEMPLATE_TAG_MAX_LENGTH,
+  TEMPLATE_TITLE_MAX_LENGTH,
   TEMPLATE_TOKEN_COST_MAX_LENGTH,
   normalizeTemplateIntegerInput,
+  normalizeTemplateTextInput,
 } from "@/components/templates/template-form-mappers";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Select, type SelectOption } from "@/components/ui/select";
 import type { Dictionary } from "@/lib/i18n";
 import { joinClassNames } from "@/lib/join-class-names";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateBasicFieldsProps = {
   text: Dictionary;
@@ -16,9 +24,9 @@ type TemplateBasicFieldsProps = {
   showMusicDescription?: boolean;
 };
 
-const TITLE_LIMIT = 60;
-const SHORT_DESCRIPTION_LIMIT = 120;
-const PET_PHOTO_REQUIREMENTS_LIMIT = 1000;
+const PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH = TEMPLATE_REQUIREMENT_MAX_LENGTH * 6;
+const TAGS_INPUT_MAX_LENGTH = TEMPLATE_TAG_MAX_LENGTH * TEMPLATE_TAG_MAX_COUNT;
+const TEMPLATE_CATEGORY_SELECT_LABEL_MAX_LENGTH = 80;
 
 export function TemplateBasicFields({
   text,
@@ -39,7 +47,7 @@ export function TemplateBasicFields({
     },
     ...categoryValues.map((category) => ({
       value: category,
-      label: category,
+      label: sanitizeSensitiveText(category, TEMPLATE_CATEGORY_SELECT_LABEL_MAX_LENGTH),
       description: text.categoryLabel,
       tone: "neutral" as const,
     })),
@@ -88,13 +96,18 @@ export function TemplateBasicFields({
         <span className={styles.fieldHeader}>
           <span>{text.titleLabel}</span>
           <span className={styles.fieldCounter}>
-            {form.title.length}/{TITLE_LIMIT}
+            {form.title.length}/{TEMPLATE_TITLE_MAX_LENGTH}
           </span>
         </span>
         <input
           value={form.title}
-          maxLength={TITLE_LIMIT}
-          onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+          maxLength={TEMPLATE_TITLE_MAX_LENGTH}
+          onChange={(event) =>
+            setForm((current) => ({
+              ...current,
+              title: normalizeTemplateTextInput(event.target.value, TEMPLATE_TITLE_MAX_LENGTH),
+            }))
+          }
           required
         />
       </label>
@@ -103,14 +116,20 @@ export function TemplateBasicFields({
         <span className={styles.fieldHeader}>
           <span>{text.shortDescriptionLabel}</span>
           <span className={styles.fieldCounter}>
-            {form.shortDescription.length}/{SHORT_DESCRIPTION_LIMIT}
+            {form.shortDescription.length}/{TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH}
           </span>
         </span>
         <textarea
           value={form.shortDescription}
-          maxLength={SHORT_DESCRIPTION_LIMIT}
+          maxLength={TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH}
           onChange={(event) =>
-            setForm((current) => ({ ...current, shortDescription: event.target.value }))
+            setForm((current) => ({
+              ...current,
+              shortDescription: normalizeTemplateTextInput(
+                event.target.value,
+                TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH
+              ),
+            }))
           }
           rows={3}
           required
@@ -121,14 +140,20 @@ export function TemplateBasicFields({
         <span className={styles.fieldHeader}>
           <span>{text.petPhotoRequirementsLabel}</span>
           <span className={styles.fieldCounter}>
-            {form.petPhotoRequirements.length}/{PET_PHOTO_REQUIREMENTS_LIMIT}
+            {form.petPhotoRequirements.length}/{PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH}
           </span>
         </span>
         <textarea
           value={form.petPhotoRequirements}
-          maxLength={PET_PHOTO_REQUIREMENTS_LIMIT}
+          maxLength={PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH}
           onChange={(event) =>
-            setForm((current) => ({ ...current, petPhotoRequirements: event.target.value }))
+            setForm((current) => ({
+              ...current,
+              petPhotoRequirements: normalizeTemplateTextInput(
+                event.target.value,
+                PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH
+              ),
+            }))
           }
           rows={4}
           placeholder={text.petPhotoRequirementsHint}
@@ -154,7 +179,13 @@ export function TemplateBasicFields({
           </span>
           <input
             value={form.tags}
-            onChange={(event) => setForm((current) => ({ ...current, tags: event.target.value }))}
+            maxLength={TAGS_INPUT_MAX_LENGTH}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                tags: normalizeTemplateTextInput(event.target.value, TAGS_INPUT_MAX_LENGTH),
+              }))
+            }
           />
         </label>
       </div>
@@ -239,8 +270,15 @@ export function TemplateBasicFields({
             </span>
             <input
               value={form.musicDescription}
+              maxLength={TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH}
               onChange={(event) =>
-                setForm((current) => ({ ...current, musicDescription: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  musicDescription: normalizeTemplateTextInput(
+                    event.target.value,
+                    TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
+                  ),
+                }))
               }
             />
           </label>

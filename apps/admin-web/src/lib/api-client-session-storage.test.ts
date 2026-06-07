@@ -264,6 +264,44 @@ describe("api-client session storage", () => {
     expect(serialized).not.toContain("4242424242424242");
   });
 
+  it("uses fallback messages instead of raw JSON or stack-like problem details", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        {
+          title: "errors.validation_failed",
+          detail: '{"token":"raw-secret","message":"upstream failed"}',
+          errors: {
+            payload: ['{"receipt":"ios-secret"}', "TypeError: Cannot read properties of undefined"],
+          },
+        },
+        { status: 422 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    let caughtError: unknown;
+    try {
+      await apiRequest("/api/admin/templates/test", { method: "POST" }, { requireAuth: false });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    const apiError = caughtError as Error & { validationErrors?: string[] };
+    const serialized = JSON.stringify({
+      message: apiError.message,
+      validationErrors: apiError.validationErrors,
+    });
+
+    expect(apiError.message).toBe("Request validation failed.");
+    expect(apiError.validationErrors).toBeUndefined();
+    expect(serialized).not.toContain("raw-secret");
+    expect(serialized).not.toContain("ios-secret");
+    expect(serialized).not.toContain("TypeError");
+    expect(serialized).not.toContain("upstream failed");
+  });
+
   it("sanitizes backend problem titles before exposing ApiError codes", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi.fn(async () =>

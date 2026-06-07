@@ -61,6 +61,16 @@ describe("clientLogger", () => {
     const secondSerialized = JSON.stringify(secondPayload);
     expect(secondSerialized).not.toContain("alice@example.com");
     expect(secondSerialized).toContain("al***@e***.com");
+
+    clientLogger.warn("api.request_failed", {
+      path: "/support-attachments/file.png?Signature=raw-signature&Expires=9999999999",
+    });
+
+    const [, thirdPayload] = warnSpy.mock.calls[2] ?? [];
+    const thirdSerialized = JSON.stringify(thirdPayload);
+    expect(thirdSerialized).not.toContain("raw-signature");
+    expect(thirdSerialized).not.toContain("9999999999");
+    expect(thirdSerialized).toContain("[redacted]");
   });
 
   it("sanitizes sensitive Error stack content before writing console payloads", () => {

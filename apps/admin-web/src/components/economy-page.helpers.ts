@@ -95,7 +95,7 @@ export function canCancelSubscription(subscription: AdminEconomySubscription): b
 
 export function toDraft(pack: AdminCurrencyPack): PackDraft {
   return {
-    displayName: pack.displayName,
+    displayName: normalizeEconomyPackDisplayNameInput(pack.displayName),
     priceAmount: pack.priceAmount.toString(),
     grantedSpark: pack.grantedSpark.toString(),
     bonusSpark: pack.bonusSpark.toString(),
@@ -154,15 +154,15 @@ export function toCurrencyPackPayload(draft: PackDraft, text: EconomyValidationT
 
 export function toSubscriptionPlanDraft(plan: AdminSubscriptionPlan): SubscriptionPlanDraft {
   return {
-    name: plan.name,
+    name: normalizeEconomyPlanNameInput(plan.name),
     priceAmount: plan.priceAmount.toString(),
     currencyCode: plan.currencyCode,
     monthlyTokenLimit: plan.monthlyTokenLimit.toString(),
     isRecommended: plan.isRecommended,
     isActive: plan.isActive,
-    appleProductId: plan.appleProductId ?? "",
-    googleProductId: plan.googleProductId ?? "",
-    stripePriceId: plan.stripePriceId ?? "",
+    appleProductId: normalizeEconomyPlanProductIdInput(plan.appleProductId ?? ""),
+    googleProductId: normalizeEconomyPlanProductIdInput(plan.googleProductId ?? ""),
+    stripePriceId: normalizeEconomyPlanProductIdInput(plan.stripePriceId ?? ""),
     displayOrder: plan.displayOrder.toString(),
   };
 }
@@ -426,6 +426,18 @@ export function normalizeEconomyPriceInput(value: string): string {
 
 export function normalizeEconomyCurrencyInput(value: string): string {
   return value.replace(/[^a-z]/gi, "").toUpperCase().slice(0, 3);
+}
+
+export function normalizeEconomyPackDisplayNameInput(value: string): string {
+  return value.trim().slice(0, ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH);
+}
+
+export function normalizeEconomyPlanNameInput(value: string): string {
+  return value.trim().slice(0, ECONOMY_PLAN_NAME_MAX_LENGTH);
+}
+
+export function normalizeEconomyPlanProductIdInput(value: string): string {
+  return value.trim().slice(0, ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH);
 }
 
 function parseBonusTokensPercent(value: string): number | null {

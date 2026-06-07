@@ -50,7 +50,11 @@ export function getDefaultAdminPath(locale: string, roles?: readonly string[] | 
     return `/${locale}/support`;
   }
 
-  return `/${locale}/dashboard`;
+  if (role === "Admin") {
+    return `/${locale}/dashboard`;
+  }
+
+  return `/${locale}`;
 }
 
 export function canAccessAdminPath(

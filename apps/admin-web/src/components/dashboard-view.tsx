@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { type CSSProperties, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 
 import {
   ArrowUpSmallIcon,
@@ -30,20 +31,25 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
 import styles from "@/components/dashboard-view.module.css";
 import { Button } from "@/components/ui/button";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
+  fetchAdminEconomyDashboardMetrics,
   fetchAdminEconomyPurchases,
-  fetchAdminEconomySubscriptions,
   fetchAdminModerationQueue,
   fetchAdminTemplateGenerationMetrics,
+  fetchAdminUserDashboardMetrics,
   fetchSupportInbox,
   fetchUsers,
   useAuthSession,
+  type AdminEconomyDashboardMetrics,
   type AdminEconomyPurchase,
   type AdminTemplateGenerationDashboardMetrics,
   type AdminSupportConversationSummary,
+  type AdminUserDashboardMetrics,
   type UserListItem,
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
@@ -84,6 +90,12 @@ type DashboardUserDistributionItem = {
   label: string;
   pct: string;
   count: string;
+};
+
+type DashboardUserRoleCounts = {
+  admins: number;
+  moderators: number;
+  users: number;
 };
 
 type DashboardViewModel = {
@@ -154,13 +166,19 @@ function ActivityIcon({ type }: { type: DashboardActivityType }) {
 }
 
 export function DashboardView({ locale }: DashboardViewProps) {
+  const router = useRouter();
   const session = useAuthSession();
+  const canViewDashboard = session?.user.roles.includes("Admin") ?? false;
   const dashboardQuery = useQuery<DashboardViewModel>({
-    queryKey: ["admin", "dashboard", locale],
+    queryKey: adminQueryKeys.dashboard(locale),
     queryFn: ({ signal }) => loadDashboardViewModel(locale, signal),
-    enabled: Boolean(session),
+    enabled: canViewDashboard,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
+  }, [locale, router, session]);
 
   const viewModel = dashboardQuery.data;
   const statusColors = {
@@ -205,9 +223,13 @@ export function DashboardView({ locale }: DashboardViewProps) {
               <Button
                 variant="primary"
                 onClick={() => {
+                  if (!canViewDashboard) {
+                    return;
+                  }
+
                   void dashboardQuery.refetch().catch(() => undefined);
                 }}
-                disabled={dashboardQuery.isFetching}
+                disabled={!canViewDashboard || dashboardQuery.isFetching}
               >
                 {locale === "ru" ? "Повторить" : "Retry"}
               </Button>
@@ -325,8 +347,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
               title={locale === "ru" ? "Платежей пока нет" : "No payments yet"}
               description={
                 locale === "ru"
-                  ? "Когда backend вернет покупки, последние платежи появятся здесь."
-                  : "Recent payments will appear here when the backend returns purchases."
+                  ? "Последние платежи появятся здесь после первой успешной покупки."
+                  : "Recent payments will appear here after the first successful purchase."
               }
             />
           )}
@@ -408,30 +430,28 @@ async function loadDashboardViewModel(locale: Locale, signal?: AbortSignal): Pro
     purchases,
     supportConversations,
     moderationQueueCount,
-    activeSubscriptionCount,
     generationMetrics,
+    economyMetrics,
   ] = await Promise.all([
     fetchDashboardUsers(signal),
     fetchDashboardPurchases(signal),
-    fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
+    fetchDashboardSupportConversations(signal),
     fetchPendingModerationQueueCount(signal),
-    fetchActiveSubscriptionCount(signal),
     fetchAdminTemplateGenerationMetrics(signal),
+    fetchAdminEconomyDashboardMetrics(signal),
   ]);
 
   throwIfAborted(signal);
 
   const users = usersResult.items;
-  const totalUserCount = usersResult.totalCount;
-  const premiumUserCount = usersResult.premiumCount;
+  const userMetrics = usersResult.metrics;
 
   return buildDashboardFromData(
     locale,
     users,
-    totalUserCount,
-    premiumUserCount,
-    activeSubscriptionCount,
+    userMetrics,
     generationMetrics,
+    economyMetrics,
     purchases,
     supportConversations,
     moderationQueueCount
@@ -448,142 +468,53 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 async function fetchDashboardUsers(signal?: AbortSignal): Promise<{
   items: UserListItem[];
-  totalCount: number;
-  premiumCount: number;
+  metrics: AdminUserDashboardMetrics;
 }> {
-  const take = 200;
-  const maxPages = 5;
-  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  const items: UserListItem[] = [];
-  let totalCount = 0;
-  const premiumPage = await fetchUsers({ skip: 0, take: 1, isPremium: true }, signal);
+  const [metrics, recentUsersPage] = await Promise.all([
+    fetchAdminUserDashboardMetrics(signal),
+    fetchUsers({ skip: 0, take: 100 }, signal),
+  ]);
 
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchUsers({ skip: page * take, take }, signal);
-    items.push(...response.items);
-    totalCount = response.totalCount;
-
-    if (!response.hasMore) {
-      break;
-    }
-
-    const oldestItem = response.items[response.items.length - 1];
-    const oldestTimestamp = parseTimestamp(oldestItem?.createdAtUtc);
-    if (oldestTimestamp !== null && oldestTimestamp < cutoff) {
-      break;
-    }
-  }
-
-  return { items, totalCount, premiumCount: premiumPage.totalCount };
-}
-
-async function fetchActiveSubscriptionCount(signal?: AbortSignal): Promise<number> {
-  const take = 200;
-  const maxPages = 20;
-  let count = 0;
-
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchAdminEconomySubscriptions(
-      {
-        skip: page * take,
-        take,
-        status: "Active",
-      },
-      signal
-    );
-    const totalCount = getOptionalTotalCount(response);
-    if (totalCount !== null) {
-      return totalCount;
-    }
-
-    count += response.items.length;
-
-    if (!response.hasMore) {
-      break;
-    }
-  }
-
-  return count;
+  return {
+    items: recentUsersPage.items,
+    metrics,
+  };
 }
 
 async function fetchDashboardPurchases(signal?: AbortSignal): Promise<AdminEconomyPurchase[]> {
-  const take = 200;
-  const maxPages = 3;
-  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
-  const items: AdminEconomyPurchase[] = [];
+  const response = await fetchAdminEconomyPurchases({ skip: 0, take: 50 }, signal);
+  return response.items;
+}
 
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchAdminEconomyPurchases({ skip: page * take, take }, signal);
-    items.push(...response.items);
-
-    if (!response.hasMore) {
-      break;
-    }
-
-    const oldestItem = response.items[response.items.length - 1];
-    const oldestTimestamp = parseTimestamp(oldestItem?.confirmedAtUtc ?? oldestItem?.createdAtUtc);
-    if (oldestTimestamp !== null && oldestTimestamp < cutoff) {
-      break;
-    }
-  }
-
-  return items;
+async function fetchDashboardSupportConversations(
+  signal?: AbortSignal
+): Promise<AdminSupportConversationSummary[]> {
+  const response = await fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal });
+  return response.items;
 }
 
 async function fetchPendingModerationQueueCount(signal?: AbortSignal): Promise<number> {
-  const take = 100;
-  const maxPages = 20;
-  let count = 0;
-
-  for (let page = 0; page < maxPages; page += 1) {
-    const response = await fetchAdminModerationQueue(
-      {
-        status: "pending",
-        skip: page * take,
-        take,
-      },
-      signal
-    );
-    const totalCount = getOptionalTotalCount(response);
-    if (totalCount !== null) {
-      return totalCount;
-    }
-
-    count += response.items.length;
-
-    if (!response.hasMore) {
-      break;
-    }
-  }
-
-  return count;
-}
-
-function getOptionalTotalCount(response: unknown): number | null {
-  if (!response || typeof response !== "object" || !("totalCount" in response)) {
-    return null;
-  }
-
-  const totalCount = (response as { totalCount?: unknown }).totalCount;
-  return typeof totalCount === "number" && Number.isFinite(totalCount) ? totalCount : null;
+  const response = await fetchAdminModerationQueue(
+    {
+      status: "pending",
+      take: 1,
+    },
+    signal
+  );
+  return Math.max(0, response.totalCount);
 }
 
 function buildDashboardFromData(
   locale: Locale,
   users: UserListItem[],
-  totalUserCount: number,
-  premiumUserCount: number,
-  activeSubscriptionCount: number,
+  userMetrics: AdminUserDashboardMetrics,
   generationMetrics: AdminTemplateGenerationDashboardMetrics,
+  economyMetrics: AdminEconomyDashboardMetrics,
   purchases: AdminEconomyPurchase[],
   supportConversations: AdminSupportConversationSummary[],
   moderationQueueCount: number
 ): DashboardViewModel {
   const copy = getDashboardCopy(locale);
-  const now = Date.now();
-  const currentStart = startOfDayTimestamp(now - 6 * 24 * 60 * 60 * 1000);
-  const previousStart = currentStart - 7 * 24 * 60 * 60 * 1000;
-
   const purchasesSorted = [...purchases].sort((left, right) => {
     const leftTs = parseTimestamp(left.confirmedAtUtc ?? left.createdAtUtc) ?? 0;
     const rightTs = parseTimestamp(right.confirmedAtUtc ?? right.createdAtUtc) ?? 0;
@@ -591,45 +522,33 @@ function buildDashboardFromData(
   });
 
   const userMap = new Map(users.map((item) => [item.userId, item]));
-  const currentUsers = users.filter((item) => {
-    const timestamp = parseTimestamp(item.createdAtUtc);
-    return timestamp !== null && timestamp >= currentStart;
-  }).length;
-  const previousUsers = users.filter((item) => {
-    const timestamp = parseTimestamp(item.createdAtUtc);
-    return timestamp !== null && timestamp >= previousStart && timestamp < currentStart;
-  }).length;
+  const totalUserCount = Math.max(0, userMetrics.totalUsers);
+  const premiumUserCount = Math.max(0, userMetrics.premiumUsers);
+  const currentUsers = Math.max(0, userMetrics.usersThisWeek);
+  const previousUsers = Math.max(0, userMetrics.usersPreviousWeek);
+  const roleCounts: DashboardUserRoleCounts = {
+    admins: Math.max(0, userMetrics.adminUsers),
+    moderators: Math.max(0, userMetrics.moderatorUsers),
+    users: Math.max(0, userMetrics.regularUsers),
+  };
 
-  const currentPurchases = purchases.filter((item) => {
-    const timestamp = parseTimestamp(item.confirmedAtUtc ?? item.createdAtUtc);
-    return timestamp !== null && timestamp >= currentStart;
-  });
-  const previousPurchases = purchases.filter((item) => {
-    const timestamp = parseTimestamp(item.confirmedAtUtc ?? item.createdAtUtc);
-    return timestamp !== null && timestamp >= previousStart && timestamp < currentStart;
-  });
+  const currentPurchasesCount = Math.max(0, economyMetrics.purchasesThisWeek);
+  const previousPurchasesCount = Math.max(0, economyMetrics.purchasesPreviousWeek);
+  const currentSucceededCount = Math.max(0, economyMetrics.successfulPaymentsThisWeek);
+  const previousSucceededCount = Math.max(0, economyMetrics.successfulPaymentsPreviousWeek);
+  const currentFailedPayments = Math.max(0, economyMetrics.failedPaymentsThisWeek);
+  const activeSubscriptionCount = Math.max(0, economyMetrics.activeSubscriptions);
+  const revenueCurrency = normalizeCurrencyCode(economyMetrics.currencyCode);
+  const currentRevenue = safeNumber(economyMetrics.revenueThisWeek);
+  const previousRevenue = safeNumber(economyMetrics.revenuePreviousWeek);
 
-  const currentSucceeded = currentPurchases.filter((item) => item.status === "succeeded");
-  const previousSucceeded = previousPurchases.filter((item) => item.status === "succeeded");
-  const currentFailedPayments = currentPurchases.filter(
-    (item) => mapPurchaseStatus(item.status) === "cancelled"
-  ).length;
-  const revenueCurrency = detectMainCurrency(currentSucceeded, purchasesSorted);
-
-  const currentRevenue = currentSucceeded
-    .filter((item) => normalizeCurrencyCode(item.currencyCode) === revenueCurrency)
-    .reduce((sum, item) => sum + item.priceAmount, 0);
-  const previousRevenue = previousSucceeded
-    .filter((item) => normalizeCurrencyCode(item.currencyCode) === revenueCurrency)
-    .reduce((sum, item) => sum + item.priceAmount, 0);
-
-  const currentConversion = currentPurchases.length
-    ? (currentSucceeded.length / currentPurchases.length) * 100
+  const currentConversion = currentPurchasesCount
+    ? (currentSucceededCount / currentPurchasesCount) * 100
     : 0;
-  const previousConversion = previousPurchases.length
-    ? (previousSucceeded.length / previousPurchases.length) * 100
+  const previousConversion = previousPurchasesCount
+    ? (previousSucceededCount / previousPurchasesCount) * 100
     : 0;
-  const revenueSeries = buildRevenueSeries(purchases, revenueCurrency);
+  const revenueSeries = buildDashboardRevenueSeries(economyMetrics.revenueSeries);
 
   const stats: DashboardStatItem[] = [
     {
@@ -643,12 +562,12 @@ function buildDashboardFromData(
     },
     {
       label: copy.stats.orders,
-      value: formatNumber(currentPurchases.length, locale),
-      delta: formatSignedPercentDelta(currentPurchases.length, previousPurchases.length, locale),
+      value: formatNumber(currentPurchasesCount, locale),
+      delta: formatSignedPercentDelta(currentPurchasesCount, previousPurchasesCount, locale),
       subtext: copy.stats.ordersSubtext,
       icon: "cart",
       accentColor: "#22c55e",
-      isPositiveTrend: currentPurchases.length >= previousPurchases.length,
+      isPositiveTrend: currentPurchasesCount >= previousPurchasesCount,
     },
     {
       label: copy.stats.revenue,
@@ -710,7 +629,7 @@ function buildDashboardFromData(
     },
     {
       label: copy.stats.paymentSuccessFailure,
-      value: `${formatNumber(currentSucceeded.length, locale)} / ${formatNumber(currentFailedPayments, locale)}`,
+      value: `${formatNumber(currentSucceededCount, locale)} / ${formatNumber(currentFailedPayments, locale)}`,
       delta: copy.stats.currentWeek,
       subtext: copy.stats.paymentSuccessFailureSubtext,
       icon: "dollar",
@@ -739,7 +658,7 @@ function buildDashboardFromData(
   });
 
   const activities = buildActivities(locale, users, purchasesSorted, supportConversations, userMap);
-  const userDistribution = buildUserDistribution(locale, users);
+  const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts);
 
   return {
     hero: copy.hero,
@@ -836,20 +755,14 @@ function buildActivities(
 
 function buildUserDistribution(
   locale: Locale,
-  users: UserListItem[]
+  totalUserCount: number,
+  roleCounts: DashboardUserRoleCounts
 ): DashboardUserDistributionItem[] {
-  const admins = users.filter((item) => {
-    const normalizedRoles = item.roles.map((role) => role.toLowerCase());
-    return normalizedRoles.includes("admin") || normalizedRoles.includes("superadmin");
-  }).length;
-  const managers = users.filter((item) => {
-    const normalizedRoles = item.roles.map((role) => role.toLowerCase());
-    const isAdmin = normalizedRoles.includes("admin") || normalizedRoles.includes("superadmin");
-    const isManager = normalizedRoles.includes("manager") || normalizedRoles.includes("moderator");
-    return !isAdmin && isManager;
-  }).length;
-  const regular = Math.max(0, users.length - admins - managers);
-  const total = Math.max(1, users.length);
+  const admins = Math.max(0, roleCounts.admins);
+  const moderators = Math.max(0, roleCounts.moderators);
+  const regular = Math.max(0, roleCounts.users);
+  const roleTotal = admins + moderators + regular;
+  const total = Math.max(1, roleTotal || totalUserCount);
 
   const toPercent = (value: number) => `${Math.round((value / total) * 100)}%`;
 
@@ -862,9 +775,9 @@ function buildUserDistribution(
     },
     {
       color: "#059669",
-      label: locale === "ru" ? "Менеджеры" : "Managers",
-      pct: toPercent(managers),
-      count: formatNumber(managers, locale),
+      label: locale === "ru" ? "Модераторы" : "Moderators",
+      pct: toPercent(moderators),
+      count: formatNumber(moderators, locale),
     },
     {
       color: "#1f5d3c",
@@ -875,40 +788,15 @@ function buildUserDistribution(
   ];
 }
 
-function buildRevenueSeries(purchases: AdminEconomyPurchase[], currencyCode: string): number[] {
-  const todayStart = startOfDayTimestamp(Date.now());
-  const buckets = new Array<number>(7).fill(0);
-
-  for (const item of purchases) {
-    if (item.status !== "succeeded") {
-      continue;
-    }
-
-    if (normalizeCurrencyCode(item.currencyCode) !== currencyCode) {
-      continue;
-    }
-
-    const timestamp = parseTimestamp(item.confirmedAtUtc ?? item.createdAtUtc);
-    if (timestamp === null) {
-      continue;
-    }
-
-    const dayStart = startOfDayTimestamp(timestamp);
-    const offset = Math.round((todayStart - dayStart) / (24 * 60 * 60 * 1000));
-    if (offset < 0 || offset > 6) {
-      continue;
-    }
-
-    buckets[6 - offset] += item.priceAmount;
+function buildDashboardRevenueSeries(
+  points: AdminEconomyDashboardMetrics["revenueSeries"]
+): number[] {
+  const values = points.slice(-7).map((point) => safeNumber(point.amount));
+  while (values.length < 7) {
+    values.unshift(0);
   }
 
-  return buckets;
-}
-
-function startOfDayTimestamp(timestamp: number): number {
-  const date = new Date(timestamp);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
+  return values;
 }
 
 function parseTimestamp(value: string | null | undefined): number | null {
@@ -938,31 +826,8 @@ function isSupportedCurrencyCode(currencyCode: string): boolean {
   }
 }
 
-function detectMainCurrency(
-  preferred: AdminEconomyPurchase[],
-  fallback: AdminEconomyPurchase[]
-): string {
-  const source = preferred.length ? preferred : fallback;
-  if (!source.length) {
-    return "USD";
-  }
-
-  const buckets = new Map<string, number>();
-  for (const item of source) {
-    const currency = normalizeCurrencyCode(item.currencyCode);
-    buckets.set(currency, (buckets.get(currency) ?? 0) + 1);
-  }
-
-  let best = "USD";
-  let bestCount = 0;
-  for (const [currency, count] of buckets) {
-    if (count > bestCount) {
-      best = currency;
-      bestCount = count;
-    }
-  }
-
-  return best;
+function safeNumber(value: number): number {
+  return Number.isFinite(value) ? value : 0;
 }
 
 function formatNumber(value: number, locale: Locale, maximumFractionDigits = 0): string {
@@ -1145,7 +1010,7 @@ function getDashboardCopy(locale: Locale) {
       revenue: isRu ? "Выручка" : "Revenue",
       conversion: isRu ? "Конверсия" : "Conversion",
       usersSubtext: isRu ? "новые за 7 дней к предыдущим 7" : "new in 7d vs previous 7d",
-      premiumUsersSubtext: isRu ? "по backend-фильтру premium" : "from backend premium filter",
+      premiumUsersSubtext: isRu ? "по статусу Premium" : "by Premium status",
       activeSubscriptionsSubtext: isRu ? "статус Active" : "status Active",
       pendingJobsSubtext: isRu ? "ожидают обработки" : "waiting for processing",
       paymentSuccessFailureSubtext: isRu ? "за текущие 7 дней" : "current 7-day window",

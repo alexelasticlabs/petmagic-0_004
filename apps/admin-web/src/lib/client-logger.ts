@@ -132,6 +132,9 @@ function containsSensitiveInlineValue(value: string): boolean {
     /\b(authorization|access_?token|refresh_?token|token|secret|password|api_?key|receipt)=/i.test(
       value
     ) ||
+    /\b(signature|x-amz-signature|x-goog-signature|expires|x-amz-credential|x-goog-credential)=/i.test(
+      value
+    ) ||
     normalizedValue.includes("x-amz-signature=") ||
     normalizedValue.includes("x-goog-signature=")
   );

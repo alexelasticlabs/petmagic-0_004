@@ -55,6 +55,8 @@ const typeColors = {
   Archived: "#94a3b8",
 };
 
+const CATEGORY_NAME_MAX_LENGTH = 64;
+
 export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps) {
   const text = getDictionary(locale);
   const router = useRouter();
@@ -76,6 +78,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     useState<AdminTemplateCategory | null>(null);
   const [categoryPendingDelete, setCategoryPendingDelete] =
     useState<AdminTemplateCategory | null>(null);
+  const isCategoryActionLocked = isSubmitting || busyCategoryId !== null;
   const isRu = locale === "ru";
   const categoryActionsAdminOnly = isRu
     ? "Управление категориями доступно только Admin."
@@ -141,11 +144,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return;
     }
 
-    if (isSubmitting) {
+    if (isCategoryActionLocked) {
       return;
     }
 
-    const name = newCategoryName.trim();
+    const name = normalizeCategoryName(newCategoryName);
     if (!name) {
       return;
     }
@@ -178,11 +181,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return;
     }
 
-    if (busyCategoryId === categoryId) {
+    if (isCategoryActionLocked) {
       return;
     }
 
-    const name = editingName.trim();
+    const name = normalizeCategoryName(editingName);
     if (!name) {
       return;
     }
@@ -216,7 +219,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return false;
     }
 
-    if (busyCategoryId === category.categoryId) {
+    if (isCategoryActionLocked) {
       return false;
     }
 
@@ -262,7 +265,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return false;
     }
 
-    if (busyCategoryId === category.categoryId) {
+    if (isCategoryActionLocked) {
       return false;
     }
 
@@ -299,7 +302,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return;
     }
 
-    if (busyCategoryId === category.categoryId) {
+    if (isCategoryActionLocked) {
       return;
     }
 
@@ -311,14 +314,14 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       return;
     }
 
-    if (busyCategoryId === category.categoryId || category.totalTemplates > 0) {
+    if (isCategoryActionLocked || category.totalTemplates > 0) {
       return;
     }
 
     setCategoryPendingDelete(category);
   }
 
-  if (isLoading) {
+  if (!session || isLoading) {
     return (
       <AdminPage className={styles.catalogPage}>
         <AdminPageGrid
@@ -388,8 +391,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
             <Button
               type="button"
               variant="secondary"
-              disabled={isFetching}
+              disabled={!session || isFetching}
               onClick={() => {
+                if (!session) {
+                  return;
+                }
+
                 void refresh().catch(() => undefined);
               }}
             >
@@ -441,15 +448,15 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
               <input
                 className={styles.categoryInput}
                 value={newCategoryName}
-                onChange={(event) => setNewCategoryName(event.target.value)}
+                onChange={(event) => setNewCategoryName(normalizeCategoryName(event.target.value))}
                 placeholder={isRu ? "Например, Portrait Pets" : "For example, Portrait Pets"}
-                maxLength={64}
+                maxLength={CATEGORY_NAME_MAX_LENGTH}
               />
             </label>
             <Button
               type="submit"
               variant="primary"
-              disabled={isSubmitting || !newCategoryName.trim()}
+              disabled={isCategoryActionLocked || !newCategoryName.trim()}
             >
               {isRu ? "Добавить категорию" : "Add category"}
             </Button>
@@ -498,17 +505,17 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                         <input
                           className={styles.categoryInput}
                           value={editingName}
-                          onChange={(event) => setEditingName(event.target.value)}
-                          maxLength={64}
-                          disabled={busyCategoryId === category.categoryId}
+                          onChange={(event) => setEditingName(normalizeCategoryName(event.target.value))}
+                          maxLength={CATEGORY_NAME_MAX_LENGTH}
+                          disabled={isCategoryActionLocked}
                         />
                       ) : (
                         <div className={styles.titleCell}>
-                          <strong>{category.name}</strong>
+                          <strong>{sanitizeSensitiveText(category.name, 96)}</strong>
                           <span>
                             {category.tags
                               .slice(0, 4)
-                              .map((tag) => `#${tag}`)
+                              .map((tag) => `#${sanitizeSensitiveText(tag, 40)}`)
                               .join(" ") || "-"}
                           </span>
                         </div>
@@ -552,7 +559,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                               size="sm"
                               variant="primary"
                               disabled={
-                                busyCategoryId === category.categoryId || !editingName.trim()
+                                isCategoryActionLocked || !editingName.trim()
                               }
                               onClick={() => void handleUpdateCategory(category.categoryId)}
                             >
@@ -562,7 +569,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                               type="button"
                               size="sm"
                               variant="ghost"
-                              disabled={busyCategoryId === category.categoryId}
+                              disabled={isCategoryActionLocked}
                               onClick={() => {
                                 setEditingCategoryId(null);
                                 setEditingName("");
@@ -593,10 +600,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                   type="button"
                                   size="sm"
                                   variant="ghost"
-                                  disabled={busyCategoryId === category.categoryId}
+                                  disabled={isCategoryActionLocked}
                                   onClick={() => {
                                     setEditingCategoryId(category.categoryId);
-                                    setEditingName(category.name);
+                                    setEditingName(normalizeCategoryName(category.name));
                                   }}
                                 >
                                   {text.editTemplate}
@@ -605,7 +612,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                   type="button"
                                   size="sm"
                                   variant="secondary"
-                                  disabled={busyCategoryId === category.categoryId}
+                                  disabled={isCategoryActionLocked}
                                   onClick={() => requestArchiveToggle(category)}
                                 >
                                   {category.isArchived
@@ -619,7 +626,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                   size="sm"
                                   variant="danger"
                                   disabled={
-                                    busyCategoryId === category.categoryId ||
+                                    isCategoryActionLocked ||
                                     category.totalTemplates > 0
                                   }
                                   onClick={() => requestDeleteCategory(category)}
@@ -666,10 +673,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
           categoryPendingArchive?.isArchived ? (isRu ? "Вернуть" : "Restore") : text.archive
         }
         cancelLabel={isRu ? "Отмена" : "Cancel"}
-        isSubmitting={categoryPendingArchive?.categoryId === busyCategoryId}
+        isSubmitting={Boolean(categoryPendingArchive && isCategoryActionLocked)}
         tone="primary"
         onCancel={() => {
-          if (busyCategoryId === null) {
+          if (!isCategoryActionLocked) {
             setCategoryPendingArchive(null);
           }
         }}
@@ -698,9 +705,9 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         }
         confirmLabel={text.deleteTemplate}
         cancelLabel={isRu ? "Отмена" : "Cancel"}
-        isSubmitting={categoryPendingDelete?.categoryId === busyCategoryId}
+        isSubmitting={Boolean(categoryPendingDelete && isCategoryActionLocked)}
         onCancel={() => {
-          if (busyCategoryId === null) {
+          if (!isCategoryActionLocked) {
             setCategoryPendingDelete(null);
           }
         }}
@@ -724,4 +731,8 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
 function getActionErrorMessage(error: unknown, fallback: string): string {
   return getAdminErrorMessage(error, fallback);
+}
+
+function normalizeCategoryName(value: string): string {
+  return value.trim().slice(0, CATEGORY_NAME_MAX_LENGTH);
 }

@@ -9,7 +9,8 @@ describe("templates catalog actions", () => {
     const source = readFileSync(catalogViewPath, "utf8");
 
     expect(source).toContain("import { getAdminErrorMessage }");
-    expect(source).toContain("if (busyTemplateId === templateId) {\n      return false;");
+    expect(source).toContain("const isTemplateActionLocked = busyTemplateId !== null;");
+    expect(source).toContain("if (isTemplateActionLocked) {\n      return false;");
     expect(source).toContain("async function handleStatusChange(templateId: string, status: TemplateStatus): Promise<boolean>");
     expect(source).toContain("async function handleDelete(templateId: string): Promise<boolean>");
     expect(source).toContain("setActionError(getAdminErrorMessage(error, text.errorSavingTemplate))");
@@ -22,15 +23,39 @@ describe("templates catalog actions", () => {
     expect(source).toContain("function requestStatusChange(templateId: string, status: TemplateStatus)");
     expect(source).toContain("function requestDeleteTemplate(templateId: string)");
     expect(source).toContain("setTemplatePendingArchiveId(templateId)");
-    expect(source).toContain("if (busyTemplateId === templateId) {\n      return;\n    }");
+    expect(source).toContain("if (isTemplateActionLocked) {\n      return;\n    }");
     expect(source).toContain("setTemplatePendingDeleteId(templateId)");
     expect(source).toContain("open={templatePendingArchiveId !== null}");
+    expect(source).toContain("const isBusy = isTemplateActionLocked;");
+    expect(source).toContain("const isBusy = busyTemplateId !== null;");
+    expect(source).toContain("isSubmitting={Boolean(templatePendingArchiveId && isTemplateActionLocked)}");
+    expect(source).toContain("isSubmitting={Boolean(templatePendingDeleteId && isTemplateActionLocked)}");
+    expect(source).toContain("if (!isTemplateActionLocked) {\n            setTemplatePendingArchiveId(null);");
+    expect(source).toContain("if (!isTemplateActionLocked) {\n            setTemplatePendingDeleteId(null);");
     expect(source).toContain("function formatTemplateActionLabel(");
     expect(source).toContain("return sanitizeSensitiveText(template?.title ?? templateId, 96);");
     expect(source).toContain("function formatTemplateId(templateId: string, maxLength: number)");
     expect(source).toContain("ID: {formatTemplateId(template.templateId, 12)}");
-    expect(source).toContain("disabled={isFetching}");
-    expect(source).toContain("void refresh().catch(() => undefined);");
+    expect(source).toContain("if (!session || isLoading)");
+    expect(source).toContain("disabled={!session || isFetching}");
+    expect(source).toContain(
+      "if (!session) {\n                  return;\n                }\n\n                void refresh().catch(() => undefined);"
+    );
+    expect(source).toContain("totalCount");
+    expect(source).toContain("shownStart");
+    expect(source).toContain("shownEnd");
+    expect(source).toContain("Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}");
+    expect(source).toContain("currentPage >= totalPages");
+    expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
+    expect(source).toContain(
+      "setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH))"
+    );
+    expect(source).toContain("maxLength={TEMPLATE_CATALOG_SEARCH_MAX_LENGTH}");
+    expect(source).toContain("href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}");
+    expect(source).toContain(
+      "href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}"
+    );
+    expect(source).toContain("href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}");
     expect(source).toContain("void handleStatusChange(templatePendingArchiveId, \"Archived\").then((succeeded) => {");
     expect(source).toContain("if (succeeded) {\n              setTemplatePendingArchiveId(null);");
     expect(source).toContain("void handleDelete(templatePendingDeleteId).then((succeeded) => {");
@@ -41,6 +66,13 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("onDeleteTemplate={setTemplatePendingDeleteId}");
     expect(source).not.toContain("onClick={() => setTemplatePendingDeleteId(template.templateId)}");
     expect(source).not.toContain("setTemplatePendingArchiveId(template.templateId)");
+    expect(source).not.toContain("if (busyTemplateId === templateId) {\n      return false;");
+    expect(source).not.toContain("if (busyTemplateId === templateId) {\n      return;");
+    expect(source).not.toContain("isSubmitting={templatePendingArchiveId === busyTemplateId}");
+    expect(source).not.toContain("isSubmitting={templatePendingDeleteId === busyTemplateId}");
+    expect(source).not.toContain("href={`${analyticsBasePath}/${template.templateId}`}");
+    expect(source).not.toContain("href={`${editorBasePath}?templateId=${template.templateId}`}");
+    expect(source).not.toContain("href={`${testBasePath}/${template.templateId}`}");
     expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
   });

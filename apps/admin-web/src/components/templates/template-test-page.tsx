@@ -109,7 +109,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   );
   const [runError, setRunError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const startTestInFlightRef = useRef(false);
   const [isSourceDragActive, setIsSourceDragActive] = useState(false);
+  const [loadRetryNonce, setLoadRetryNonce] = useState(0);
+  const [pollRetryNonce, setPollRetryNonce] = useState(0);
 
   useEffect(() => {
     let isCancelled = false;
@@ -120,7 +123,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       setLoadError(null);
 
       try {
-        if (!ensureAdminSession(locale, router)) {
+        if (!ensureAdminSession(locale, router, { requiredRole: "Admin" })) {
           return;
         }
 
@@ -182,22 +185,24 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       isCancelled = true;
       controller.abort();
     };
-  }, [isRu, locale, router, templateId]);
+  }, [canManageTemplates, isRu, loadRetryNonce, locale, router, templateId]);
 
   useEffect(() => {
-    if (!run || (run.status !== "Queued" && run.status !== "Processing")) {
+    if (!run || !isTemplateTestRunInFlight(run)) {
       return;
     }
 
+    const activeRun = run;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
-        const latest = await fetchAdminTemplateTest(run.generationId, controller.signal);
+        const latest = await fetchAdminTemplateTest(activeRun.generationId, controller.signal);
         if (controller.signal.aborted) {
           return;
         }
 
         setRun(latest);
+        setRunError(null);
         setHistory((current) =>
           [latest, ...current.filter((item) => item.generationId !== latest.generationId)].slice(
             0,
@@ -211,10 +216,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
 
         clientLogger.warn("templates.test_polling_failed", {
           templateId,
-          generationId: run.generationId,
+          generationId: activeRun.generationId,
           error,
         });
         setRunError(isRu ? "Не удалось обновить статус теста." : "Failed to refresh test status.");
+        setPollRetryNonce((current) => current + 1);
       }
     }, 2500);
 
@@ -222,7 +228,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [isRu, run, templateId]);
+  }, [isRu, pollRetryNonce, run, templateId]);
 
   useEffect(
     () => () => {
@@ -239,7 +245,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
-    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+    if (startTestInFlightRef.current || isSubmitting || isTemplateTestRunInFlight(run)) {
       return;
     }
 
@@ -250,6 +256,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
+    startTestInFlightRef.current = true;
     setIsSubmitting(true);
     setRunError(null);
 
@@ -266,6 +273,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     } catch (error) {
       setRunError(getStartTestErrorMessage(error, isRu, template?.templateType === "Video"));
     } finally {
+      startTestInFlightRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -280,7 +288,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       return;
     }
 
-    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+    if (startTestInFlightRef.current || isSubmitting || isTemplateTestRunInFlight(run)) {
       setRunError(templateTestInFlightMessage);
       return;
     }
@@ -312,7 +320,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   }
 
   function handleResetTest() {
-    if (isSubmitting || isTemplateTestRunInFlight(run)) {
+    if (startTestInFlightRef.current || isSubmitting || isTemplateTestRunInFlight(run)) {
       setRunError(templateTestInFlightMessage);
       return;
     }
@@ -322,6 +330,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     setRun(null);
     setSelectedHistoryGenerationId(null);
     setRunError(null);
+  }
+
+  function handleRetryLoad() {
+    setLoadRetryNonce((current) => current + 1);
   }
 
   function clearSelectedFilePreviewUrl() {
@@ -348,16 +360,28 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     [activeRun, isVideoTemplate, locale]
   );
   const catalogPath = `/${locale}/templates/${templateSlug}`;
-  const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${templateId}`;
+  const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;
   const sourceImageUrl = selectedFilePreviewUrl ?? activeRun?.sourceImageAsset?.url ?? undefined;
   const selectedFileName =
-    selectedFile?.name ??
-    activeRun?.sourceImageAsset?.fileName ??
-    (isRu ? "Фото не выбрано" : "No photo selected");
+    selectedFile
+      ? formatTemplateTestDisplayText(selectedFile.name, isRu ? "Файл" : "File", 120)
+      : activeRun?.sourceImageAsset?.fileName
+        ? formatTemplateTestDisplayText(activeRun.sourceImageAsset.fileName, "-", 120)
+        : isRu
+          ? "Фото не выбрано"
+          : "No photo selected";
   const selectedFileMeta = selectedFile
-    ? `${formatBytes(selectedFile.size)} • ${selectedFile.type || "image/*"}`
+    ? `${formatBytes(selectedFile.size)} • ${formatTemplateTestDisplayText(
+        selectedFile.type || "image/*",
+        "image/*",
+        64
+      )}`
     : activeRun?.sourceImageAsset?.fileSizeBytes
-      ? `${formatBytes(activeRun.sourceImageAsset.fileSizeBytes)} • ${activeRun.sourceImageAsset.contentType}`
+      ? `${formatBytes(activeRun.sourceImageAsset.fileSizeBytes)} • ${formatTemplateTestDisplayText(
+          activeRun.sourceImageAsset.contentType,
+          "image/*",
+          64
+        )}`
       : isRu
         ? "Выберите image/* файл"
         : "Choose an image/* file";
@@ -489,6 +513,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         <p className={styles.errorText}>
           {loadError ?? (isRu ? "Шаблон не найден." : "Template was not found.")}
         </p>
+        <Button variant="secondary" onClick={handleRetryLoad}>
+          <RefreshIcon className={styles.inlineIcon} />
+          {isRu ? "Повторить" : "Retry"}
+        </Button>
       </section>
     );
   }
@@ -634,6 +662,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                     openLabel={middleArtifact.openLabel}
                     downloadLabel={middleArtifact.downloadLabel}
                     downloadName={middleArtifact.downloadName}
+                    canManageTemplates={canManageTemplates}
                   />
                   <WorkflowConnector />
                 </>
@@ -650,6 +679,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 openLabel={resultArtifact.openLabel}
                 downloadLabel={resultArtifact.downloadLabel}
                 downloadName={resultArtifact.downloadName}
+                canManageTemplates={canManageTemplates}
               />
             </div>
 
@@ -1062,6 +1092,7 @@ function MediaPreviewCard({
   openLabel,
   downloadLabel,
   downloadName,
+  canManageTemplates,
 }: {
   title: string;
   accent: "source" | "preprocess" | "result";
@@ -1073,6 +1104,7 @@ function MediaPreviewCard({
   openLabel?: string;
   downloadLabel?: string;
   downloadName?: string;
+  canManageTemplates: boolean;
 }) {
   const previewUrl = videoUrl ?? imageUrl;
   const mediaType = videoUrl ? "video" : "image";
@@ -1123,7 +1155,7 @@ function MediaPreviewCard({
   }
 
   async function handleDownload() {
-    if (!previewUrl || pendingMediaAction) {
+    if (!canManageTemplates || !previewUrl || pendingMediaAction) {
       return;
     }
 
@@ -1155,7 +1187,7 @@ function MediaPreviewCard({
   }
 
   async function handleOpen() {
-    if (!previewUrl || pendingMediaAction) {
+    if (!canManageTemplates || !previewUrl || pendingMediaAction) {
       return;
     }
 
@@ -1238,7 +1270,7 @@ function MediaPreviewCard({
             <button
               type="button"
               onClick={() => void handleOpen()}
-              disabled={pendingMediaAction !== null}
+              disabled={!canManageTemplates || pendingMediaAction !== null}
               className={styles.mediaActionLink}
             >
               {videoUrl ? (
@@ -1251,7 +1283,7 @@ function MediaPreviewCard({
             <button
               type="button"
               onClick={() => void handleDownload()}
-              disabled={pendingMediaAction !== null}
+              disabled={!canManageTemplates || pendingMediaAction !== null}
               className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}
             >
               <DownloadIcon className={styles.inlineIcon} />

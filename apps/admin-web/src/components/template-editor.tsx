@@ -120,6 +120,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
               <div className={styles.mediaGrid}>
                 <TemplatePreviewAssetSection
+                  locale={locale}
                   text={text}
                   form={form}
                   setForm={setForm}
@@ -131,6 +132,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
                 {isVideo ? (
                   <TemplateReferenceAssetSection
+                    locale={locale}
                     text={text}
                     form={form}
                     setForm={setForm}

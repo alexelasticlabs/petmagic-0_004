@@ -65,6 +65,19 @@ describe("ensureAdminSession", () => {
     expect(router.replace).not.toHaveBeenCalled();
   });
 
+  it("enforces Admin when a page requires the Admin role", () => {
+    const router = { replace: vi.fn() };
+
+    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Moderator"])));
+    expect(ensureAdminSession("en", router, { requiredRole: "Admin" })).toBe(false);
+    expect(router.replace).toHaveBeenCalledWith("/en");
+
+    router.replace.mockClear();
+    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin", "Moderator"])));
+    expect(ensureAdminSession("ru", router, { requiredRole: "Admin" })).toBe(true);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
   it("redirects sessions without admin-panel roles", () => {
     const router = { replace: vi.fn() };
 

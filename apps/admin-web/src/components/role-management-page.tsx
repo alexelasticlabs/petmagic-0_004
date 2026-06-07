@@ -1,8 +1,9 @@
 "use client";
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { type ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AdminBadge,
@@ -10,6 +11,7 @@ import {
   AdminPageHero,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import styles from "@/components/role-management-page.module.css";
 import { Toast } from "@/components/ui/toast";
@@ -19,6 +21,7 @@ import {
   assignRole,
   fetchUsers,
   revokeRole,
+  USER_SEARCH_MAX_LENGTH,
   useAuthSession,
   type UserListItem,
 } from "@/lib/api-client";
@@ -51,21 +54,21 @@ function getCopy(locale: Locale) {
     eyebrow: isRu ? "Access control" : "Access control",
     title: isRu ? "Управление ролями" : "Role Management",
     description: isRu
-      ? "Admin и Moderator управляются только через admin endpoints. Premium не считается ролью."
-      : "Admin and Moderator are managed only through admin endpoints. Premium is not a role.",
+      ? "Admin и Moderator управляются из этой панели. Premium не считается ролью."
+      : "Admin and Moderator are managed from this panel. Premium is not a role.",
     adminOnly: "Admin only",
     adminsTitle: "Admins",
     adminsDescription: isRu
-      ? "Список пользователей с полным доступом. Последнего Admin нельзя понизить на backend."
-      : "Users with full access. The backend prevents downgrading the last Admin.",
+      ? "Список пользователей с полным доступом. Последнего Admin нельзя понизить."
+      : "Users with full access. The last Admin cannot be downgraded.",
     moderatorsTitle: "Moderators",
     moderatorsDescription: isRu
       ? "Пользователи с ограниченным доступом к разрешенным разделам."
       : "Users with limited access to permitted sections.",
     searchTitle: isRu ? "Назначить Moderator" : "Assign Moderator",
     searchDescription: isRu
-      ? "Поиск выполняется на backend по email, id или имени."
-      : "Backend search by email, id, or name.",
+      ? "Поиск по email, id или имени."
+      : "Search by email, id, or name.",
     searchLabel: isRu ? "Пользователь" : "User",
     searchPlaceholder: isRu ? "email, user id или имя" : "email, user id, or name",
     loading: isRu ? "Загрузка ролей" : "Loading roles",
@@ -216,6 +219,7 @@ function RolePager({
 export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const text = getCopy(locale);
   const queryClient = useQueryClient();
+  const router = useRouter();
   const session = useAuthSession();
   const canManageRoles = session?.user.roles.includes("Admin") ?? false;
   const [search, setSearch] = useState("");
@@ -223,6 +227,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const [moderatorsPage, setModeratorsPage] = useState(0);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const roleActionInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const debouncedSearch = useDebouncedValue(search, 350);
 
@@ -234,6 +239,10 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
     const timeoutId = window.setTimeout(() => setToast(null), 2600);
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
+
+  useEffect(() => {
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
+  }, [locale, router, session]);
 
   const adminQueryParams = useMemo(
     () => ({ role: "Admin", skip: adminsPage * PAGE_SIZE, take: PAGE_SIZE }),
@@ -247,12 +256,14 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const adminsQuery = useQuery({
     queryKey: adminQueryKeys.users(adminQueryParams),
     queryFn: ({ signal }) => fetchUsers(adminQueryParams, signal),
+    enabled: canManageRoles,
     placeholderData: keepPreviousData,
   });
 
   const moderatorsQuery = useQuery({
     queryKey: adminQueryKeys.users(moderatorQueryParams),
     queryFn: ({ signal }) => fetchUsers(moderatorQueryParams, signal),
+    enabled: canManageRoles,
     placeholderData: keepPreviousData,
   });
 
@@ -263,7 +274,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const searchQuery = useQuery({
     queryKey: adminQueryKeys.users(searchQueryParams),
     queryFn: ({ signal }) => fetchUsers(searchQueryParams, signal),
-    enabled: debouncedSearch.trim().length >= 2,
+    enabled: canManageRoles && debouncedSearch.trim().length >= 2,
     placeholderData: keepPreviousData,
   });
 
@@ -283,7 +294,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   }
 
   async function runPendingAction() {
-    if (!pendingAction || isSubmitting) {
+    if (!pendingAction || roleActionInFlightRef.current || isSubmitting) {
       return;
     }
 
@@ -291,6 +302,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
       return;
     }
 
+    roleActionInFlightRef.current = true;
     setIsSubmitting(true);
     try {
       await pendingAction.action();
@@ -299,6 +311,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
     } catch (error) {
       setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) });
     } finally {
+      roleActionInFlightRef.current = false;
       setIsSubmitting(false);
     }
   }
@@ -371,8 +384,12 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
             <button
               type="button"
               className={styles.button}
-              disabled={isRoleRetryFetching}
+              disabled={!canManageRoles || isRoleRetryFetching}
               onClick={() => {
+                if (!canManageRoles) {
+                  return;
+                }
+
                 void Promise.all([adminsQuery.refetch(), moderatorsQuery.refetch()]).catch(
                   () => undefined
                 );
@@ -449,8 +466,8 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
             <input
               className={styles.input}
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              maxLength={100}
+              onChange={(event) => setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))}
+              maxLength={USER_SEARCH_MAX_LENGTH}
               placeholder={text.searchPlaceholder}
             />
           </label>
@@ -503,7 +520,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
         isSubmitting={isSubmitting}
         onConfirm={runPendingAction}
         onCancel={() => {
-          if (!isSubmitting) {
+          if (!roleActionInFlightRef.current && !isSubmitting) {
             setPendingAction(null);
           }
         }}

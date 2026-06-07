@@ -14,6 +14,8 @@ import {
   ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH,
   normalizeEconomyCurrencyInput,
   normalizeEconomyIntegerInput,
+  normalizeEconomyPlanNameInput,
+  normalizeEconomyPlanProductIdInput,
   normalizeEconomyPriceInput,
   toSubscriptionPlanDraft,
   updateSubscriptionPlanDraft,
@@ -109,7 +111,7 @@ export function EconomyPageSubscriptionPlansSection({
                         value={draft.name}
                         onChange={(event) =>
                           updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                            name: event.target.value,
+                            name: normalizeEconomyPlanNameInput(event.target.value),
                           })
                         }
                         maxLength={ECONOMY_PLAN_NAME_MAX_LENGTH}
@@ -181,7 +183,9 @@ export function EconomyPageSubscriptionPlansSection({
                             value={draft.appleProductId}
                             onChange={(event) =>
                               updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                                appleProductId: event.target.value,
+                                appleProductId: normalizeEconomyPlanProductIdInput(
+                                  event.target.value
+                                ),
                               })
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
@@ -194,7 +198,9 @@ export function EconomyPageSubscriptionPlansSection({
                             value={draft.googleProductId}
                             onChange={(event) =>
                               updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                                googleProductId: event.target.value,
+                                googleProductId: normalizeEconomyPlanProductIdInput(
+                                  event.target.value
+                                ),
                               })
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
@@ -207,7 +213,9 @@ export function EconomyPageSubscriptionPlansSection({
                             value={draft.stripePriceId}
                             onChange={(event) =>
                               updateSubscriptionPlanDraft(setPlanDrafts, plan.planId, {
-                                stripePriceId: event.target.value,
+                                stripePriceId: normalizeEconomyPlanProductIdInput(
+                                  event.target.value
+                                ),
                               })
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
@@ -245,7 +253,7 @@ export function EconomyPageSubscriptionPlansSection({
                       </div>
                     </td>
                     <td>
-                      <Button onClick={() => onSavePlan(plan.planId)} disabled={isSavingPlan}>
+                      <Button onClick={() => onSavePlan(plan.planId)} disabled={savePlanPending}>
                         {isSavingPlan ? text.savingAction : text.saveAction}
                       </Button>
                     </td>

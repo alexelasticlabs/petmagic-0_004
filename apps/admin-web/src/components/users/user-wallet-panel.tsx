@@ -12,7 +12,11 @@ import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { Button } from "@/components/ui/button";
 import styles from "@/components/users/user-wallet-panel.module.css";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
-import { adjustAdminUserWallet, type AdminUserAnalytics } from "@/lib/api-client";
+import {
+  adjustAdminUserWallet,
+  USER_WALLET_REASON_MAX_LENGTH,
+  type AdminUserAnalytics,
+} from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
@@ -51,7 +55,7 @@ export function UserWalletPanel({
     null
   );
   const parsedAmount = Number(amount);
-  const normalizedReason = reason.trim();
+  const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
   const canSubmit =
     canAdjustWallet &&
     Number.isInteger(parsedAmount) &&
@@ -209,9 +213,11 @@ export function UserWalletPanel({
               <span>{text.walletReasonLabel}</span>
               <textarea
                 value={reason}
-                onChange={(event) => setReason(event.target.value.slice(0, 240))}
+                onChange={(event) =>
+                  setReason(event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH))
+                }
                 rows={3}
-                maxLength={240}
+                maxLength={USER_WALLET_REASON_MAX_LENGTH}
                 className={styles.textarea}
                 placeholder={text.walletReasonPlaceholder}
                 disabled={isSubmitting}

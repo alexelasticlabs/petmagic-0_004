@@ -13,7 +13,10 @@ describe("admin retry hardening", () => {
     expect(source).toContain(
       "const isRoleRetryFetching = adminsQuery.isFetching || moderatorsQuery.isFetching"
     );
-    expect(source).toContain("disabled={isRoleRetryFetching}");
+    expect(source).toContain("disabled={!canManageRoles || isRoleRetryFetching}");
+    expect(source).toContain(
+      "if (!canManageRoles) {\n                  return;\n                }\n\n                void Promise.all([adminsQuery.refetch(), moderatorsQuery.refetch()]).catch("
+    );
     expect(source).toContain(
       "void Promise.all([adminsQuery.refetch(), moderatorsQuery.refetch()]).catch("
     );
@@ -24,7 +27,18 @@ describe("admin retry hardening", () => {
     const generationsSource = readFileSync(generationsPath, "utf8");
 
     expect(promoSource).toContain("promoCodesQuery.refetch().catch(() => undefined)");
+    expect(promoSource).toContain(
+      "!canManagePromoCodes || promoCodesQuery.isFetching || promoMetricsQuery.isFetching"
+    );
+    expect(promoSource).toContain(
+      "if (!canManagePromoCodes) {\n                  return;\n                }\n\n                void promoCodesQuery.refetch().catch(() => undefined);"
+    );
     expect(generationsSource).toContain("generationsQuery.refetch().catch(() => undefined)");
-    expect(generationsSource).toContain("disabled={generationsQuery.isFetching}");
+    expect(generationsSource).toContain(
+      "disabled={!canViewGenerations || generationsQuery.isFetching}"
+    );
+    expect(generationsSource).toContain(
+      "if (!canViewGenerations) {\n                  return;\n                }\n\n                void generationsQuery.refetch().catch(() => undefined);"
+    );
   });
 });

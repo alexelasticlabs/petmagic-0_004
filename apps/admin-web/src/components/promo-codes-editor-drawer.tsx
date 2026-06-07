@@ -4,6 +4,9 @@ import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 
 import { AdminCard } from "@/components/admin/admin-primitives";
 import {
+  PROMO_CAMPAIGN_FIELD_MAX_LENGTH,
+  PROMO_CODE_MAX_LENGTH,
+  PROMO_DESCRIPTION_MAX_LENGTH,
   PROMO_NUMERIC_FIELD_MAX_LENGTH,
   isPromoIntegerInput,
   normalizePromoIntegerInput,
@@ -57,7 +60,8 @@ export function PromoCodesEditorDrawer({
       : panelMode === "duplicate"
         ? text.promoCodesDuplicatePanelTitle
         : text.promoCodesCreatePanelTitle;
-  const isCodeInvalid = form.code.trim().length < 4 || form.code.trim().length > 48;
+  const isCodeInvalid =
+    form.code.trim().length < 4 || form.code.trim().length > PROMO_CODE_MAX_LENGTH;
   const hasInvalidNumber =
     !isPromoIntegerInput(form.rewardValue, false) ||
     !isPromoIntegerInput(form.maxRedemptions, false) ||
@@ -97,12 +101,12 @@ export function PromoCodesEditorDrawer({
                     value={form.code}
                     required
                     minLength={4}
-                    maxLength={48}
+                    maxLength={PROMO_CODE_MAX_LENGTH}
                     aria-invalid={isCodeInvalid}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        code: event.target.value.toUpperCase(),
+                        code: event.target.value.toUpperCase().slice(0, PROMO_CODE_MAX_LENGTH),
                       }))
                     }
                     readOnly={panelMode === "edit"}
@@ -126,9 +130,12 @@ export function PromoCodesEditorDrawer({
                   className={styles.input}
                   placeholder={text.promoCodesDescriptionPlaceholder}
                   value={form.description}
-                  maxLength={160}
+                  maxLength={PROMO_DESCRIPTION_MAX_LENGTH}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, description: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      description: event.target.value.slice(0, PROMO_DESCRIPTION_MAX_LENGTH),
+                    }))
                   }
                 />
               </label>
@@ -166,9 +173,6 @@ export function PromoCodesEditorDrawer({
                     }
                   >
                     <option value="spark">{text.promoCodesRewardTypeSparkOption}</option>
-                    <option value="premium_days" disabled>
-                      {text.promoCodesRewardTypePremiumOption}
-                    </option>
                   </select>
                   <span className={styles.helperText}>{text.promoCodesRewardTypeHint}</span>
                 </label>
@@ -399,9 +403,12 @@ export function PromoCodesEditorDrawer({
                     className={styles.input}
                     placeholder={text.promoCodesCampaignNamePlaceholder}
                     value={form.campaignName}
-                    maxLength={80}
+                    maxLength={PROMO_CAMPAIGN_FIELD_MAX_LENGTH}
                     onChange={(event) =>
-                      setForm((current) => ({ ...current, campaignName: event.target.value }))
+                      setForm((current) => ({
+                        ...current,
+                        campaignName: event.target.value.slice(0, PROMO_CAMPAIGN_FIELD_MAX_LENGTH),
+                      }))
                     }
                   />
                 </label>
@@ -411,11 +418,14 @@ export function PromoCodesEditorDrawer({
                     className={styles.input}
                     placeholder={text.promoCodesCampaignChannelPlaceholder}
                     value={form.campaignChannel}
-                    maxLength={80}
+                    maxLength={PROMO_CAMPAIGN_FIELD_MAX_LENGTH}
                     onChange={(event) =>
                       setForm((current) => ({
                         ...current,
-                        campaignChannel: event.target.value,
+                        campaignChannel: event.target.value.slice(
+                          0,
+                          PROMO_CAMPAIGN_FIELD_MAX_LENGTH
+                        ),
                       }))
                     }
                   />

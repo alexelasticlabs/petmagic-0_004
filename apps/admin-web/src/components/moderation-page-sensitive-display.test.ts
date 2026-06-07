@@ -40,7 +40,10 @@ describe("moderation page sensitive display", () => {
     const source = readFileSync(moderationPagePath, "utf8");
 
     expect(source).toContain("queueQuery.refetch().catch(() => undefined)");
-    expect(source).toContain("disabled={queueQuery.isFetching}");
+    expect(source).toContain("disabled={!session || queueQuery.isFetching}");
+    expect(source).toContain(
+      "if (!session) {\n                  return;\n                }\n\n                void queueQuery.refetch().catch(() => undefined);"
+    );
     expect(source).toContain("description={getAdminErrorMessage(queueQuery.error, text.error)}");
     expect(source).toContain('aria-busy={queueQuery.isFetching ? "true" : undefined}');
     expect(source).toContain("<span className={styles.pageInfo}>");
@@ -64,8 +67,26 @@ describe("moderation page sensitive display", () => {
   it("guards moderation decisions against stale rows and repeated submit", () => {
     const source = readFileSync(moderationPagePath, "utf8");
 
+    expect(source).toContain("MODERATION_SEARCH_MAX_LENGTH,");
+    expect(source).toContain("MODERATION_DECISION_REASON_MAX_LENGTH,");
+    expect(source).toContain(
+      "const trimmedReason = reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);"
+    );
+    expect(source).toContain("setSearch(event.target.value.slice(0, MODERATION_SEARCH_MAX_LENGTH));");
+    expect(source).toContain("maxLength={MODERATION_SEARCH_MAX_LENGTH}");
+    expect(source).toContain(
+      "setReason(event.target.value.slice(0, MODERATION_DECISION_REASON_MAX_LENGTH));"
+    );
+    expect(source).toContain("maxLength={MODERATION_DECISION_REASON_MAX_LENGTH}");
     expect(source).toContain("useAuthSession,");
     expect(source).toContain("const session = useAuthSession();");
+    expect(source).toContain("useRef,");
+    expect(source).toContain("const [isDecisionInFlight, setIsDecisionInFlight] = useState(false);");
+    expect(source).toContain("const decisionInFlightRef = useRef(false);");
+    expect(source).toContain(
+      "const isDecisionSubmitting = isDecisionInFlight || decisionMutation.isPending;"
+    );
+    expect(source).toContain("enabled: Boolean(session)");
     expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
     expect(source).toContain(
       'const canModerate = sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");'
@@ -78,23 +99,36 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain(
       "if (!assertCanModerate()) throw new Error(text.moderationActionsForbidden);"
     );
+    expect(source).toContain("onSettled: () => {\n      decisionInFlightRef.current = false;");
+    expect(source).toContain("setIsDecisionInFlight(false);");
     expect(source).toContain(
-      'if (decisionMutation.isPending || item.status !== "pending") {\n      return;'
+      'if (decisionInFlightRef.current || decisionMutation.isPending || item.status !== "pending") {\n      return;'
     );
     expect(source).toContain(
       "if (!assertCanModerate()) {\n      return;\n    }\n\n    setDecision({ item, action });"
     );
-    expect(source).toContain("if (decisionMutation.isPending) {\n      return;");
+    expect(source).toContain(
+      "if (decisionInFlightRef.current || decisionMutation.isPending) {\n      return;"
+    );
     expect(source).toContain(
       "if (!assertCanModerate()) {\n      return;\n    }\n\n    if (!isReasonValid)"
     );
-    expect(source).toContain("isSubmitting={decisionMutation.isPending}");
-    expect(source).toContain("disabled={decisionMutation.isPending}");
+    expect(source).toContain("decisionInFlightRef.current = true;");
+    expect(source).toContain("setIsDecisionInFlight(true);");
+    expect(source).toContain("isSubmitting={isDecisionSubmitting}");
+    expect(source).toContain("disabled={isDecisionSubmitting}");
+    expect(source).toContain("if (!decisionInFlightRef.current && !decisionMutation.isPending) {");
     expect(source).toContain("confirmDisabled={!canModerate || !isReasonValid}");
+    expect(source).toContain('await queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] });');
+    expect(source).toContain(
+      "await queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) });"
+    );
     expect(source).toContain("throw new Error(text.decisionMissing)");
     expect(source).toContain(
-      'disabled={\n                            !canModerate || item.status !== "pending" || decisionMutation.isPending\n                          }'
+      'disabled={!canModerate || item.status !== "pending" || isDecisionSubmitting}'
     );
+    expect(source).not.toContain("setSearch(event.target.value);");
+    expect(source).not.toContain("setReason(event.target.value);");
     expect(source).not.toContain('throw new Error("Missing decision")');
   });
 });

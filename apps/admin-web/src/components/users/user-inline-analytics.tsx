@@ -27,7 +27,9 @@ type UserInlineAnalyticsProps = {
 export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps) {
   const text = getDictionary(locale);
   const session = useAuthSession();
+  const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;
   const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
+    enabled: canViewUserProfile,
     userId,
   });
 
@@ -41,7 +43,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
     );
   }
 
-  if (isLoading) {
+  if (!canViewUserProfile || isLoading) {
     return (
       <AdminStateCard
         tone="info"
@@ -61,9 +63,13 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
             variant="secondary"
             size="sm"
             onClick={() => {
+              if (!canViewUserProfile) {
+                return;
+              }
+
               void refresh().catch(() => undefined);
             }}
-            disabled={isFetching}
+            disabled={!canViewUserProfile || isFetching}
           >
             {text.supportRetryAction}
           </Button>
@@ -79,7 +85,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
       title={text.userInlineAnalyticsTitle}
       description={text.userInlineAnalyticsDescription}
       action={
-        <Link href={`/${locale}/users/${user.userId}`} className={styles.profileLink}>
+        <Link href={`/${locale}/users/${encodeURIComponent(user.userId)}`} className={styles.profileLink}>
           {text.userOpenFullProfile}
         </Link>
       }
@@ -231,7 +237,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
         locale={locale}
         userId={user.userId}
         analytics={analytics}
-        canAdjustWallet={session?.user.roles.includes("Admin") ?? false}
+        canAdjustWallet={canViewUserProfile}
         onUpdated={async () => {
           await refresh();
         }}

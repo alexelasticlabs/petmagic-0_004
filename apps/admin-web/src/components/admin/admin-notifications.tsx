@@ -90,6 +90,9 @@ const ADMIN_NOTIFICATIONS_STORAGE_KEY = "petmagic.admin.notifications.v1";
 const MAX_PERSISTED_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_NOTIFICATION_TITLE_LENGTH = 120;
 const MAX_NOTIFICATION_MESSAGE_LENGTH = 280;
+const MAX_NOTIFICATION_SOURCE_LENGTH = 120;
+const MAX_NOTIFICATION_HREF_LENGTH = 240;
+const MAX_NOTIFICATION_DEDUPE_KEY_LENGTH = 360;
 
 const notificationCategories = new Set<AdminNotificationCategory>([
   "support",
@@ -116,11 +119,25 @@ function sanitizeNotificationHref(href: unknown): string | undefined {
     return undefined;
   }
 
-  return trimmed.split(/[?#]/, 1)[0] || undefined;
+  const sanitizedPath = trimmed.split(/[?#]/, 1)[0];
+  if (!sanitizedPath || sanitizedPath.length > MAX_NOTIFICATION_HREF_LENGTH) {
+    return undefined;
+  }
+
+  return sanitizedPath;
 }
 
 export function sanitizeAdminNotificationText(value: string, maxLength: number): string {
   return sanitizeSensitiveText(value, maxLength);
+}
+
+export function sanitizeAdminNotificationDedupeKey(value: string): string {
+  return sanitizeAdminNotificationText(value, MAX_NOTIFICATION_DEDUPE_KEY_LENGTH);
+}
+
+export function sanitizeAdminNotificationSource(value: string): string {
+  const trimmed = value.trim();
+  return trimmed ? sanitizeAdminNotificationText(trimmed, MAX_NOTIFICATION_SOURCE_LENGTH) : "";
 }
 
 export function buildAdminNotificationDedupeKey(
@@ -129,12 +146,14 @@ export function buildAdminNotificationDedupeKey(
   message: string,
   href?: string
 ): string {
-  return [
-    source,
-    type,
-    sanitizeAdminNotificationText(message, MAX_NOTIFICATION_MESSAGE_LENGTH),
-    sanitizeNotificationHref(href) ?? "",
-  ].join(":");
+  return sanitizeAdminNotificationDedupeKey(
+    [
+      sanitizeAdminNotificationSource(source),
+      sanitizeAdminNotificationText(type, MAX_NOTIFICATION_TITLE_LENGTH),
+      sanitizeAdminNotificationText(message, MAX_NOTIFICATION_MESSAGE_LENGTH),
+      sanitizeNotificationHref(href) ?? "",
+    ].join(":")
+  );
 }
 
 function toHydratedNotificationItem(
@@ -154,7 +173,8 @@ function toHydratedNotificationItem(
     typeof rawValue.message === "string"
       ? sanitizeAdminNotificationText(rawValue.message, MAX_NOTIFICATION_MESSAGE_LENGTH)
       : "";
-  const source = typeof rawValue.source === "string" ? rawValue.source : "";
+  const source =
+    typeof rawValue.source === "string" ? sanitizeAdminNotificationSource(rawValue.source) : "";
   const createdAt = typeof rawValue.createdAt === "string" ? rawValue.createdAt : "";
   const read = typeof rawValue.read === "boolean" ? rawValue.read : false;
   const category = rawValue.category;
@@ -254,9 +274,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   const addNotification = useCallback((input: AddAdminNotificationInput) => {
     const tone = input.tone ?? "info";
     const safeHref = sanitizeNotificationHref(input.href);
+    const sanitizedSource = sanitizeAdminNotificationSource(input.source);
     if (
       !isActionableAdminNotification({
-        source: input.source,
+        source: sanitizedSource,
         tone,
       })
     ) {
@@ -269,9 +290,12 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       input.message,
       MAX_NOTIFICATION_MESSAGE_LENGTH
     );
+    const sanitizedInputDedupeKey = input.dedupeKey?.trim()
+      ? sanitizeAdminNotificationDedupeKey(input.dedupeKey)
+      : undefined;
     const dedupeKey =
-      input.dedupeKey ??
-      [input.source, input.category, tone, sanitizedTitle, sanitizedMessage, safeHref]
+      sanitizedInputDedupeKey ??
+      [sanitizedSource, input.category, tone, sanitizedTitle, sanitizedMessage, safeHref]
         .filter(Boolean)
         .join("::");
     const previousTimestamp = dedupeMapRef.current.get(dedupeKey);
@@ -290,7 +314,7 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
       tone,
       priority: input.priority ?? (tone === "error" || tone === "warning" ? "critical" : "normal"),
       href: safeHref,
-      source: input.source,
+      source: sanitizedSource,
       createdAt: new Date(now).toISOString(),
       read: false,
     };

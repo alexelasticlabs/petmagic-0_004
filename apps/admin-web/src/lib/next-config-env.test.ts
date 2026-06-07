@@ -5,8 +5,25 @@ import { describe, expect, it } from "vitest";
 import { apiImageRemotePatterns } from "../../next.config";
 
 const adminDockerfilePath = fileURLToPath(new URL("../../Dockerfile", import.meta.url));
+const adminEnvExamplePath = fileURLToPath(new URL("../../.env.example", import.meta.url));
+const adminDevEnvExamplePath = fileURLToPath(
+  new URL("../../.env.development.example", import.meta.url)
+);
+const adminStagingEnvExamplePath = fileURLToPath(
+  new URL("../../.env.staging.example", import.meta.url)
+);
+const adminProductionEnvExamplePath = fileURLToPath(
+  new URL("../../.env.production.example", import.meta.url)
+);
 const rootEnvExamplePath = fileURLToPath(new URL("../../../../.env.example", import.meta.url));
 const rootDockerComposePath = fileURLToPath(new URL("../../../../docker-compose.yml", import.meta.url));
+
+function readActiveEnvLines(path: string): string[] {
+  return readFileSync(path, "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+}
 
 describe("next admin env config", () => {
   it("requires a public API URL for production builds", () => {
@@ -79,11 +96,7 @@ describe("next admin env config", () => {
   });
 
   it("keeps active root env example values free of localhost frontend defaults", () => {
-    const envExample = readFileSync(rootEnvExamplePath, "utf8");
-    const activeLines = envExample
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#"));
+    const activeLines = readActiveEnvLines(rootEnvExamplePath);
     const publicFrontendLines = activeLines.filter((line) =>
       /^(NEXT_PUBLIC_API_BASE_URL|INTERNAL_API_BASE_URL|BACKEND_PUBLIC_BASE_URL|STRIPE_CHECKOUT_SUCCESS_URL|STRIPE_CHECKOUT_CANCEL_URL|STRIPE_BILLING_PORTAL_RETURN_URL)=/.test(
         line
@@ -93,6 +106,34 @@ describe("next admin env config", () => {
     expect(publicFrontendLines.length).toBeGreaterThan(0);
     expect(publicFrontendLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\/backend/);
     expect(publicFrontendLines.join("\n")).toMatch(/https:\/\/.*example\.com/);
+  });
+
+  it("keeps admin dev, staging, and production env examples separated", () => {
+    const baseExample = readFileSync(adminEnvExamplePath, "utf8");
+    const devLines = readActiveEnvLines(adminDevEnvExamplePath);
+    const stagingLines = readActiveEnvLines(adminStagingEnvExamplePath);
+    const productionLines = readActiveEnvLines(adminProductionEnvExamplePath);
+
+    expect(baseExample).toContain(".env.development.example");
+    expect(baseExample).toContain(".env.staging.example");
+    expect(baseExample).toContain(".env.production.example");
+    expect(devLines).toEqual([
+      "NEXT_PUBLIC_API_BASE_URL=http://localhost:5000",
+      "INTERNAL_API_BASE_URL=http://localhost:5000",
+    ]);
+    expect(stagingLines).toEqual([
+      "NEXT_PUBLIC_API_BASE_URL=https://api-staging.example.com",
+      "INTERNAL_API_BASE_URL=https://api-staging.example.com",
+    ]);
+    expect(productionLines).toEqual([
+      "NEXT_PUBLIC_API_BASE_URL=https://api.example.com",
+      "INTERNAL_API_BASE_URL=https://api.example.com",
+    ]);
+    expect(stagingLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
+    expect(productionLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
+    expect([...devLines, ...stagingLines, ...productionLines]).not.toEqual(
+      expect.arrayContaining([expect.stringMatching(/^API_BASE_URL=/)])
+    );
   });
 
   it("passes admin API URLs into docker build without local production defaults", () => {

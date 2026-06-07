@@ -10,12 +10,14 @@ export type TemplateFormState = {
   isPremium: boolean;
   tokenCost: string;
   previewUrl: string;
+  previewUrlSource: "none" | "persisted" | "uploaded";
   previewFileName: string;
   previewContentType: string;
   previewFileSizeBytes: string;
   previewDurationSeconds: string;
   musicDescription: string;
   referenceUrl: string;
+  referenceUrlSource: "none" | "persisted" | "uploaded";
   referenceFileName: string;
   referenceContentType: string;
   referenceFileSizeBytes: string;

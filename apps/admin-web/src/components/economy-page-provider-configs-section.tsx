@@ -105,6 +105,32 @@ export function EconomyPageProviderConfigsSection({
   const configurationPendingDelete = configurationPendingDeleteId
     ? providerConfigs.find((config) => config.configurationId === configurationPendingDeleteId)
     : null;
+  const isCreateProviderConfigInvalid =
+    !createProviderDraft.provider.trim() ||
+    !createProviderDraft.platform.trim() ||
+    !createProviderDraft.region.trim() ||
+    !createProviderDraft.mode.trim() ||
+    !createProviderDraft.allowedFromAppVersion.trim() ||
+    !createProviderDraft.bonusTokensPercent.trim();
+  const isProviderConfigMatchInvalid =
+    !matchDraft.provider.trim() ||
+    !matchDraft.platform.trim() ||
+    !matchDraft.country.trim() ||
+    !matchDraft.appVersion.trim();
+  const requestCreateProviderConfig = () => {
+    if (createProviderConfigPending || isCreateProviderConfigInvalid) {
+      return;
+    }
+
+    onCreateProviderConfig();
+  };
+  const requestTestProviderConfig = () => {
+    if (testProviderConfigPending || isProviderConfigMatchInvalid) {
+      return;
+    }
+
+    onTestProviderConfig();
+  };
 
   return (
     <AdminCard title={text.providerConfigsTitle} description={text.providerConfigsDescription}>
@@ -119,7 +145,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    provider: event.target.value.toLowerCase(),
+                    provider: normalizeProviderCodeInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -134,7 +160,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    platform: event.target.value.toLowerCase(),
+                    platform: normalizeProviderCodeInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -149,7 +175,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    region: event.target.value.toUpperCase(),
+                    region: normalizeProviderRegionInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -164,7 +190,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    mode: event.target.value.toLowerCase(),
+                    mode: normalizeProviderCodeInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -182,7 +208,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setCreateProviderDraft((current) => ({
                     ...current,
-                    allowedFromAppVersion: event.target.value,
+                    allowedFromAppVersion: normalizeProviderVersionInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -263,7 +289,10 @@ export function EconomyPageProviderConfigsSection({
             </label>
           </div>
 
-          <Button onClick={onCreateProviderConfig} disabled={createProviderConfigPending}>
+          <Button
+            onClick={requestCreateProviderConfig}
+            disabled={createProviderConfigPending || isCreateProviderConfigInvalid}
+          >
             {createProviderConfigPending ? text.savingAction : text.providerConfigCreateAction}
           </Button>
         </div>
@@ -278,7 +307,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setMatchDraft((current) => ({
                     ...current,
-                    provider: event.target.value.toLowerCase(),
+                    provider: normalizeProviderCodeInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -293,7 +322,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setMatchDraft((current) => ({
                     ...current,
-                    platform: event.target.value.toLowerCase(),
+                    platform: normalizeProviderCodeInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -308,7 +337,7 @@ export function EconomyPageProviderConfigsSection({
                 onChange={(event) =>
                   setMatchDraft((current) => ({
                     ...current,
-                    country: event.target.value.toUpperCase(),
+                    country: normalizeProviderRegionInput(event.target.value),
                   }))
                 }
                 className={styles.input}
@@ -321,7 +350,10 @@ export function EconomyPageProviderConfigsSection({
               <input
                 value={matchDraft.appVersion}
                 onChange={(event) =>
-                  setMatchDraft((current) => ({ ...current, appVersion: event.target.value }))
+                  setMatchDraft((current) => ({
+                    ...current,
+                    appVersion: normalizeProviderVersionInput(event.target.value),
+                  }))
                 }
                 className={styles.input}
                 placeholder="1.0.0"
@@ -330,7 +362,10 @@ export function EconomyPageProviderConfigsSection({
             </label>
           </div>
 
-          <Button onClick={onTestProviderConfig} disabled={testProviderConfigPending}>
+          <Button
+            onClick={requestTestProviderConfig}
+            disabled={testProviderConfigPending || isProviderConfigMatchInvalid}
+          >
             {testProviderConfigPending ? text.savingAction : text.providerConfigTestAction}
           </Button>
 
@@ -368,6 +403,7 @@ export function EconomyPageProviderConfigsSection({
                   providerConfigDrafts[config.configurationId] ?? toProviderConfigDraft(config);
                 const isSavingConfig =
                   saveProviderConfigPending && saveProviderConfigId === config.configurationId;
+                const isProviderConfigInvalid = isPaymentRouteDraftInvalid(draft);
 
                 return (
                   <tr key={config.configurationId}>
@@ -381,7 +417,7 @@ export function EconomyPageProviderConfigsSection({
                             setProviderConfigDrafts,
                             config.configurationId,
                             {
-                              region: event.target.value.toUpperCase(),
+                              region: normalizeProviderRegionInput(event.target.value),
                             }
                           )
                         }
@@ -490,7 +526,9 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  allowedFromAppVersion: event.target.value,
+                                  allowedFromAppVersion: normalizeProviderVersionInput(
+                                    event.target.value
+                                  ),
                                 }
                               )
                             }
@@ -533,7 +571,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  mode: event.target.value,
+                                  mode: normalizeProviderCodeInput(event.target.value),
                                 }
                               )
                             }
@@ -550,7 +588,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  displayLabel: event.target.value,
+                                  displayLabel: normalizeProviderLabelInput(event.target.value),
                                 }
                               )
                             }
@@ -568,7 +606,9 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  displaySubtitle: event.target.value,
+                                  displaySubtitle: normalizeProviderLabelInput(
+                                    event.target.value
+                                  ),
                                 }
                               )
                             }
@@ -586,7 +626,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  warningTitle: event.target.value,
+                                  warningTitle: normalizeProviderLabelInput(event.target.value),
                                 }
                               )
                             }
@@ -604,7 +644,9 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  warningMessage: event.target.value,
+                                  warningMessage: normalizeProviderMessageInput(
+                                    event.target.value
+                                  ),
                                 }
                               )
                             }
@@ -622,7 +664,7 @@ export function EconomyPageProviderConfigsSection({
                                 setProviderConfigDrafts,
                                 config.configurationId,
                                 {
-                                  notes: event.target.value,
+                                  notes: normalizeProviderMessageInput(event.target.value),
                                 }
                               )
                             }
@@ -636,8 +678,14 @@ export function EconomyPageProviderConfigsSection({
                     <td>
                       <div className={styles.tableActions}>
                         <Button
-                          onClick={() => onSaveProviderConfig(config.configurationId)}
-                          disabled={isSavingConfig}
+                          onClick={() => {
+                            if (saveProviderConfigPending || isProviderConfigInvalid) {
+                              return;
+                            }
+
+                            onSaveProviderConfig(config.configurationId);
+                          }}
+                          disabled={saveProviderConfigPending || isProviderConfigInvalid}
                         >
                           {isSavingConfig ? text.savingAction : text.saveAction}
                         </Button>
@@ -647,7 +695,9 @@ export function EconomyPageProviderConfigsSection({
                           onChange={(event) =>
                             setCloneRegionDrafts((current) => ({
                               ...current,
-                              [config.configurationId]: event.target.value.toUpperCase(),
+                              [config.configurationId]: normalizeProviderRegionInput(
+                                event.target.value
+                              ),
                             }))
                           }
                           className={styles.input}
@@ -656,12 +706,18 @@ export function EconomyPageProviderConfigsSection({
                         />
 
                         <Button
-                          onClick={() =>
+                          onClick={() => {
+                            const cloneRegion = (cloneRegionDrafts[config.configurationId] ?? "")
+                              .trim();
+                            if (cloneProviderConfigPending || !cloneRegion) {
+                              return;
+                            }
+
                             onCloneProviderConfig({
                               configurationId: config.configurationId,
-                              region: (cloneRegionDrafts[config.configurationId] ?? "").trim(),
-                            })
-                          }
+                              region: cloneRegion,
+                            });
+                          }}
                           disabled={
                             cloneProviderConfigPending ||
                             !(cloneRegionDrafts[config.configurationId] ?? "").trim()
@@ -674,7 +730,13 @@ export function EconomyPageProviderConfigsSection({
                         </Button>
 
                         <Button
-                          onClick={() => setConfigurationPendingDeleteId(config.configurationId)}
+                          onClick={() => {
+                            if (deleteProviderConfigPending) {
+                              return;
+                            }
+
+                            setConfigurationPendingDeleteId(config.configurationId);
+                          }}
                           disabled={deleteProviderConfigPending}
                           variant="danger"
                         >
@@ -733,4 +795,38 @@ export function EconomyPageProviderConfigsSection({
 function safeText(value: string | null | undefined, maxLength = 120) {
   const trimmed = value?.trim();
   return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : "-";
+}
+
+function normalizeProviderCodeInput(value: string) {
+  return value.toLowerCase().slice(0, ECONOMY_PROVIDER_CODE_MAX_LENGTH);
+}
+
+function normalizeProviderRegionInput(value: string) {
+  return value.toUpperCase().slice(0, ECONOMY_PROVIDER_REGION_MAX_LENGTH);
+}
+
+function normalizeProviderVersionInput(value: string) {
+  return value.slice(0, ECONOMY_PROVIDER_VERSION_MAX_LENGTH);
+}
+
+function normalizeProviderLabelInput(value: string) {
+  return value.slice(0, ECONOMY_PROVIDER_LABEL_MAX_LENGTH);
+}
+
+function normalizeProviderMessageInput(value: string) {
+  return value.slice(0, ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH);
+}
+
+function isPaymentRouteDraftInvalid(draft: ProviderConfigDraft) {
+  const bonusPercent = Number(draft.bonusTokensPercent);
+
+  return (
+    !draft.region.trim() ||
+    !draft.mode.trim() ||
+    !draft.allowedFromAppVersion.trim() ||
+    !draft.bonusTokensPercent.trim() ||
+    !Number.isInteger(bonusPercent) ||
+    bonusPercent < 0 ||
+    bonusPercent > 100
+  );
 }

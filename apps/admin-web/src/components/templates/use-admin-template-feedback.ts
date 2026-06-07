@@ -3,7 +3,11 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { fetchAdminTemplateFeedback, type AdminTemplateFeedbackItem } from "@/lib/api-client";
+import {
+  fetchAdminTemplateFeedback,
+  TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
+  type AdminTemplateFeedbackItem,
+} from "@/lib/api-client";
 
 type FeedbackFilterKey = "all" | "complaint" | "feedback";
 
@@ -22,11 +26,12 @@ export function useAdminTemplateFeedback({
   take = 50,
   templateId,
 }: UseAdminTemplateFeedbackOptions) {
+  const normalizedSearch = search.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH);
   const feedbackQuery = useQuery<AdminTemplateFeedbackItem[]>({
-    queryKey: adminQueryKeys.templateAnalyticsFeedback(templateId, filter, search),
+    queryKey: adminQueryKeys.templateAnalyticsFeedback(templateId, filter, normalizedSearch),
     queryFn: ({ signal }) =>
       fetchAdminTemplateFeedback(templateId, {
-        search: search || undefined,
+        search: normalizedSearch || undefined,
         take,
         type: filter === "all" ? undefined : filter,
       }, signal),

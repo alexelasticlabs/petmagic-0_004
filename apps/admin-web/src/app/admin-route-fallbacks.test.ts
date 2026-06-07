@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const errorPagePath = fileURLToPath(new URL("./[locale]/error.tsx", import.meta.url));
+const globalErrorPagePath = fileURLToPath(new URL("./global-error.tsx", import.meta.url));
 const loadingPagePath = fileURLToPath(new URL("./[locale]/loading.tsx", import.meta.url));
 const rootNotFoundPagePath = fileURLToPath(new URL("./not-found.tsx", import.meta.url));
 const notFoundPagePath = fileURLToPath(
@@ -12,6 +13,7 @@ const notFoundPagePath = fileURLToPath(
 describe("admin route fallbacks", () => {
   it("uses generic safe fallback copy instead of raw errors or placeholder nav labels", () => {
     const errorSource = readFileSync(errorPagePath, "utf8");
+    const globalErrorSource = readFileSync(globalErrorPagePath, "utf8");
     const loadingSource = readFileSync(loadingPagePath, "utf8");
 
     expect(errorSource).toContain("title={text.adminErrorTitle}");
@@ -21,8 +23,19 @@ describe("admin route fallbacks", () => {
     expect(errorSource).not.toContain("description={text.navDashboard}");
     expect(errorSource).toContain("useAuthSession()");
     expect(errorSource).toContain("getDefaultAdminPath(locale, session?.user.roles)");
-    expect(errorSource).toContain('fallbackHref.endsWith("/support") ? text.navSupport : text.navDashboard');
+    expect(errorSource).toContain('fallbackHref.endsWith("/support")');
+    expect(errorSource).toContain('fallbackHref.endsWith("/dashboard")');
+    expect(errorSource).toContain("text.signIn");
     expect(errorSource).not.toContain('href={`/${locale}/dashboard`}');
+
+    expect(globalErrorSource).toContain('clientLogger.error("admin.global_error_boundary_triggered"');
+    expect(globalErrorSource).toContain("<html lang={isRu ? \"ru\" : \"en\"}>");
+    expect(globalErrorSource).toContain("onClick={reset}");
+    expect(globalErrorSource).toContain('href={isRu ? "/ru" : "/en"}');
+    expect(globalErrorSource).not.toContain("{error.message}");
+    expect(globalErrorSource).not.toContain("message: error.message");
+    expect(globalErrorSource).not.toContain("error.stack");
+    expect(globalErrorSource).not.toContain("JSON.stringify(error");
 
     expect(loadingSource).toContain("description={text.adminLoadingDescription}");
     expect(loadingSource).not.toContain("description={text.navDashboard}");
@@ -33,7 +46,9 @@ describe("admin route fallbacks", () => {
 
     expect(notFoundSource).toContain("useAuthSession()");
     expect(notFoundSource).toContain("getDefaultAdminPath(locale, session?.user.roles)");
-    expect(notFoundSource).toContain('fallbackHref.endsWith("/support") ? text.navSupport : text.navDashboard');
+    expect(notFoundSource).toContain('fallbackHref.endsWith("/support")');
+    expect(notFoundSource).toContain('fallbackHref.endsWith("/dashboard")');
+    expect(notFoundSource).toContain("text.signIn");
     expect(notFoundSource).not.toContain('href={`/${locale}/dashboard`}');
   });
 

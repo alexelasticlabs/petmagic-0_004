@@ -89,6 +89,10 @@ export function useAdminTemplateAnalyticsOverview({
     isSecondaryLoading: primaryQuery.isSuccess && secondaryQuery.isLoading,
     recentRunsPreview: secondaryQuery.data?.recentRunsPreview ?? [],
     refresh: async () => {
+      if (!enabled) {
+        return;
+      }
+
       await Promise.all([primaryQuery.refetch(), secondaryQuery.refetch()]);
     },
     statistics: primaryQuery.data?.statistics ?? null,

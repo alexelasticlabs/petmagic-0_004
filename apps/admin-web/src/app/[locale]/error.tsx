@@ -23,7 +23,11 @@ export default function Error({ error, reset }: ErrorPageProps) {
   const text = getDictionary(locale);
   const session = useAuthSession();
   const fallbackHref = getDefaultAdminPath(locale, session?.user.roles);
-  const fallbackLabel = fallbackHref.endsWith("/support") ? text.navSupport : text.navDashboard;
+  const fallbackLabel = fallbackHref.endsWith("/support")
+    ? text.navSupport
+    : fallbackHref.endsWith("/dashboard")
+      ? text.navDashboard
+      : text.signIn;
 
   useEffect(() => {
     clientLogger.error("admin.error_boundary_triggered", {

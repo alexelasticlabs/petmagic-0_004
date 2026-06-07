@@ -3,11 +3,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  PROMO_CAMPAIGN_FIELD_MAX_LENGTH,
+  PROMO_DESCRIPTION_MAX_LENGTH,
   buildPromoCodesCsv,
   formatCampaignMeta,
   getUserLabels,
   normalizePromoIntegerInput,
   toCreatePayload,
+  toPromoForm,
+  toUpdatePayload,
 } from "@/components/promo-codes-view.helpers";
 import type { AdminRedeemCode } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
@@ -142,6 +146,50 @@ describe("promo code numeric form validation", () => {
       toCreatePayload({ ...baseForm, maxRedemptionsPerUser: "123456789" }, text)
     ).toThrow(text.promoCodesInvalidNumbers);
   });
+
+  it("trims and bounds free-text values restored from backend and sent to mutations", () => {
+    const text = getDictionary("en");
+    const longDescription = ` ${"d".repeat(PROMO_DESCRIPTION_MAX_LENGTH + 20)} `;
+    const longCampaignName = ` ${"n".repeat(PROMO_CAMPAIGN_FIELD_MAX_LENGTH + 20)} `;
+    const longCampaignChannel = ` ${"c".repeat(PROMO_CAMPAIGN_FIELD_MAX_LENGTH + 20)} `;
+    const baseForm = {
+      code: "PM-SAFE",
+      description: longDescription,
+      campaignName: longCampaignName,
+      campaignChannel: longCampaignChannel,
+      minimumSuccessfulPurchases: "0",
+      rewardKind: "spark" as const,
+      rewardValue: "100",
+      maxRedemptions: "100",
+      maxRedemptionsPerUser: "1",
+      isActive: true,
+      startsAtUtc: "",
+      expiresAtUtc: "",
+    };
+
+    const createPayload = toCreatePayload(baseForm, text);
+    const updatePayload = toUpdatePayload(baseForm, createRedeemCode(), text);
+    const restoredForm = toPromoForm(
+      createRedeemCode({
+        description: longDescription,
+        campaignName: longCampaignName,
+        campaignChannel: longCampaignChannel,
+      })
+    );
+
+    expect(createPayload.description).toHaveLength(PROMO_DESCRIPTION_MAX_LENGTH);
+    expect(createPayload.campaignName).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(createPayload.campaignChannel).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(updatePayload.description).toHaveLength(PROMO_DESCRIPTION_MAX_LENGTH);
+    expect(updatePayload.campaignName).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(updatePayload.campaignChannel).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(restoredForm.description).toHaveLength(PROMO_DESCRIPTION_MAX_LENGTH);
+    expect(restoredForm.campaignName).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(restoredForm.campaignChannel).toHaveLength(PROMO_CAMPAIGN_FIELD_MAX_LENGTH);
+    expect(createPayload.description).not.toMatch(/^\s|\s$/);
+    expect(updatePayload.campaignName).not.toMatch(/^\s|\s$/);
+    expect(restoredForm.campaignChannel).not.toMatch(/^\s|\s$/);
+  });
 });
 
 describe("promo code dangerous action hardening", () => {
@@ -159,8 +207,17 @@ describe("promo code dangerous action hardening", () => {
     expect(source).toContain("function requestArchiveCode(code: AdminRedeemCode)");
     expect(source).toContain("onArchive={requestArchiveCode}");
     expect(source).not.toContain("setCodePendingArchive(code);\n        }}");
-    expect(source).toContain("disabled={promoCodesQuery.isFetching}");
+    expect(source).toContain(
+      "!canManagePromoCodes || promoCodesQuery.isFetching || promoMetricsQuery.isFetching"
+    );
+    expect(source).toContain(
+      "if (!canManagePromoCodes) {\n                  return;\n                }\n\n                void promoCodesQuery.refetch().catch(() => undefined);"
+    );
+    expect(source).toContain(
+      "if (!canManagePromoCodes) {\n              return;\n            }\n\n            void promoCodesQuery.refetch().catch(() => undefined);"
+    );
     expect(source).toContain("promoCodesQuery.refetch().catch(() => undefined)");
+    expect(source).toContain("promoMetricsQuery.refetch().catch(() => undefined)");
     expect(source).not.toContain(
       "handleArchive(codePendingArchive);\n          setCodePendingArchive(null);"
     );
@@ -203,6 +260,75 @@ describe("promo code activation data sourcing", () => {
     expect(cardSource.indexOf(") : activationsIsError ? (")).toBeLessThan(
       cardSource.indexOf("<div className={styles.usageTableWrap}>")
     );
+  });
+
+  it("uses backend pagination, search, filters, and query invalidation for promo code lists", () => {
+    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const queryKeysSource = readFileSync(
+      fileURLToPath(new URL("../lib/admin-query-keys.ts", import.meta.url)),
+      "utf8"
+    );
+
+    expect(viewSource).toContain("const debouncedSearch = useDebouncedValue(search, 350);");
+    expect(viewSource).toContain(
+      'const canManagePromoCodes = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(viewSource).toContain(
+      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
+    );
+    expect(viewSource).toContain("normalizeAdminRedeemCodesQuery({");
+    expect(viewSource).toContain("skip: (page - 1) * pageSize");
+    expect(viewSource).toContain("const promoCodesTotalCount =");
+    expect(viewSource).toContain("promoCodesPage?.totalCount");
+    expect(viewSource).toContain("Math.ceil(promoCodesTotalCount / pageSize)");
+    expect(viewSource).toContain("totalCount={promoCodesTotalCount}");
+    expect(readFileSync(promoCodesListCardPath, "utf8")).toContain(
+      "of ${formatNumber(totalCount, locale)}"
+    );
+    expect(viewSource).toContain("queryKey: adminQueryKeys.economyRedeemCodes(promoCodesQueryParams)");
+    expect(viewSource).toContain("fetchAdminRedeemCodes(promoCodesQueryParams, signal)");
+    expect(viewSource).toContain("enabled: canManagePromoCodes");
+    expect(viewSource).toContain(
+      "!canManagePromoCodes || hasActivePromoFilters || isEditorOpen"
+    );
+    expect(viewSource).toContain(
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot })"
+    );
+    expect(viewSource).not.toContain("const totalPages = hasMorePromoCodes ? currentPage + 1 : currentPage;");
+    expect(viewSource).not.toContain("hasMorePromoCodes");
+    expect(viewSource).not.toContain("promoCodesTotalCount === null");
+    expect(readFileSync(promoCodesListCardPath, "utf8")).not.toContain("totalCount === null");
+    expect(viewSource).not.toContain("useDeferredValue(search)");
+    expect(viewSource).not.toContain("return promoCodes\n      .filter((code) => {");
+    expect(queryKeysSource).toContain("economyRedeemCodesRoot");
+    expect(queryKeysSource).toContain("economyRedeemCodes: (query: unknown)");
+  });
+
+  it("sources promo code KPI cards from backend aggregate metrics", () => {
+    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const queryKeysSource = readFileSync(
+      fileURLToPath(new URL("../lib/admin-query-keys.ts", import.meta.url)),
+      "utf8"
+    );
+
+    expect(viewSource).toContain(
+      "queryKey: adminQueryKeys.economyRedeemCodeMetrics(promoCodeMetricsQueryParams)"
+    );
+    expect(viewSource).toContain("fetchAdminRedeemCodeMetrics(promoCodeMetricsQueryParams, signal)");
+    expect(viewSource).toContain("enabled: canManagePromoCodes");
+    expect(viewSource).toContain("value={formatNumber(metrics.totalCodes, locale)}");
+    expect(viewSource).toContain("value={formatNumber(metrics.activeCodes, locale)}");
+    expect(viewSource).toContain("value={formatNumber(metrics.totalUses, locale)}");
+    expect(viewSource).toContain(
+      "value={`${formatNumber(metrics.totalGranted, locale)} ${tokenUnit}`}"
+    );
+    expect(viewSource).not.toContain("pageCodes: promoCodes.length");
+    expect(viewSource).not.toContain("activeCodes: promoCodes.filter");
+    expect(viewSource).not.toContain("totalUses: promoCodes.reduce");
+    expect(viewSource).not.toContain("totalGranted: promoCodes.reduce");
+    expect(viewSource).not.toContain("Codes on page");
+    expect(viewSource).not.toContain("Exact global totals need a backend aggregate endpoint.");
+    expect(queryKeysSource).toContain("economyRedeemCodeMetrics: (query: unknown)");
   });
 });
 
@@ -253,6 +379,9 @@ describe("promo code sensitive display", () => {
     const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
 
     expect(viewSource).toContain("formatPromoDisplayText(\n                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,\n                80");
+    expect(viewSource).toContain("enabled: canManagePromoCodes && Boolean(selectedCodeId)");
+    expect(viewSource).toContain("selectedUsersQueries = useQueries({");
+    expect(viewSource).toContain("enabled: canManagePromoCodes");
     expect(viewSource).not.toContain("`${codePendingArchive.code}: ${text.promoCodesArchiveConfirm}`");
     expect(activationsSource).toContain("formatPromoDisplayText(selectedCode.code || `${selectedCode.codePrefix}...`, 80)");
     expect(activationsSource).toContain("disabled={activationsIsFetching}");

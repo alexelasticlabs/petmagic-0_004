@@ -39,7 +39,6 @@ export function buildPromoCodesViewOptions(
   const rewardOptions: SelectOption[] = [
     { value: "all", label: locale === "ru" ? "Все награды" : "All rewards", tone: "neutral" },
     { value: "spark", label: text.promoCodesRewardTypeSparkOption, tone: "recommended" },
-    { value: "premium_days", label: text.promoCodesRewardTypePremiumOption, tone: "premium" },
   ];
 
   const formStatusOptions: SelectOption[] = [

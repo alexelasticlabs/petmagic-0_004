@@ -4,12 +4,14 @@ import {
   cachedSupportConversations,
   cachedSupportInbox,
   cachedSupportTemplates,
+  encodePathSegment,
   inflightGetRequests,
 } from "./api-client.core";
 
 import type {
   AdminSupportConversation,
-  AdminSupportConversationSummary,
+  AdminSupportInboxMetrics,
+  AdminSupportInboxPage,
   AdminSupportMessage,
   AdminSupportReplyTemplate,
   SupportConversationPriority,
@@ -23,6 +25,17 @@ function normalizePositiveInteger(value: number | undefined, maxValue: number): 
     : undefined;
 }
 
+export const SUPPORT_INBOX_SEARCH_MAX_LENGTH = 120;
+export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 2_000;
+
+function normalizeSupportInboxSearch(value: string | undefined): string | undefined {
+  return value?.trim().slice(0, SUPPORT_INBOX_SEARCH_MAX_LENGTH) || undefined;
+}
+
+function normalizeSupportMessageBody(value: string | undefined): string {
+  return value?.trim().slice(0, SUPPORT_MESSAGE_BODY_MAX_LENGTH) ?? "";
+}
+
 export async function fetchSupportInbox(
   status?: SupportConversationStatus,
   assignment: SupportInboxAssignmentScope = "all",
@@ -32,7 +45,7 @@ export async function fetchSupportInbox(
     pageSize?: number;
     signal?: AbortSignal;
   }
-): Promise<AdminSupportConversationSummary[]> {
+): Promise<AdminSupportInboxPage> {
   const normalizedPage = normalizePositiveInteger(options?.page, 10_000);
   const normalizedPageSize = normalizePositiveInteger(options?.pageSize, 100);
   const searchParams = new URLSearchParams();
@@ -42,7 +55,7 @@ export async function fetchSupportInbox(
   if (assignment !== "all") {
     searchParams.set("assignment", assignment);
   }
-  const search = options?.search?.trim();
+  const search = normalizeSupportInboxSearch(options?.search);
   if (search) {
     searchParams.set("search", search);
   }
@@ -55,9 +68,16 @@ export async function fetchSupportInbox(
 
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
 
-  return apiRequest<AdminSupportConversationSummary[]>(`/api/admin/support/tickets${query}`, {
+  return apiRequest<AdminSupportInboxPage>(`/api/admin/support/tickets${query}`, {
     method: "GET",
     signal: options?.signal,
+  });
+}
+
+export async function fetchSupportInboxMetrics(signal?: AbortSignal): Promise<AdminSupportInboxMetrics> {
+  return apiRequest<AdminSupportInboxMetrics>("/api/admin/support/tickets/metrics", {
+    method: "GET",
+    signal,
   });
 }
 
@@ -69,6 +89,7 @@ export async function fetchSupportConversation(
     signal?: AbortSignal;
   }
 ): Promise<AdminSupportConversation> {
+  const encodedConversationId = encodePathSegment(conversationId);
   const normalizedTake = normalizePositiveInteger(options?.take, 100);
   const searchParams = new URLSearchParams();
   if (normalizedTake) {
@@ -82,7 +103,7 @@ export async function fetchSupportConversation(
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";
 
   return apiRequest<AdminSupportConversation>(
-    `/api/admin/support/tickets/${conversationId}${query}`,
+    `/api/admin/support/tickets/${encodedConversationId}${query}`,
     {
       method: "GET",
       signal: options?.signal,
@@ -95,12 +116,14 @@ export async function sendSupportMessage(
   body: string,
   replyToMessageId?: string | null
 ): Promise<AdminSupportMessage> {
+  const encodedConversationId = encodePathSegment(conversationId);
+  const normalizedBody = normalizeSupportMessageBody(body);
   const message = await apiRequest<AdminSupportMessage>(
-    `/api/admin/support/tickets/${conversationId}/messages`,
+    `/api/admin/support/tickets/${encodedConversationId}/messages`,
     {
       method: "POST",
       body: JSON.stringify({
-        body,
+        body: normalizedBody,
         ...(replyToMessageId?.trim() ? { replyToMessageId: replyToMessageId.trim() } : {}),
       }),
     }
@@ -116,10 +139,11 @@ export async function sendSupportAttachment(
   body?: string,
   replyToMessageId?: string | null
 ): Promise<AdminSupportMessage> {
+  const encodedConversationId = encodePathSegment(conversationId);
   const formData = new FormData();
-  const trimmedBody = body?.trim();
-  if (trimmedBody) {
-    formData.append("body", trimmedBody);
+  const normalizedBody = normalizeSupportMessageBody(body);
+  if (normalizedBody) {
+    formData.append("body", normalizedBody);
   }
   if (replyToMessageId?.trim()) {
     formData.append("replyToMessageId", replyToMessageId.trim());
@@ -128,7 +152,7 @@ export async function sendSupportAttachment(
   formData.append("file", file);
 
   const message = await apiRequest<AdminSupportMessage>(
-    `/api/admin/support/tickets/${conversationId}/attachments`,
+    `/api/admin/support/tickets/${encodedConversationId}/attachments`,
     {
       method: "POST",
       body: formData,
@@ -140,7 +164,8 @@ export async function sendSupportAttachment(
 }
 
 export async function markSupportConversationRead(conversationId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/support/tickets/${conversationId}/read`, {
+  const encodedConversationId = encodePathSegment(conversationId);
+  await apiRequest<void>(`/api/admin/support/tickets/${encodedConversationId}/read`, {
     method: "POST",
   });
 
@@ -151,6 +176,7 @@ export async function updateSupportConversationStatus(
   conversationId: string,
   status: SupportConversationStatus
 ): Promise<AdminSupportConversation> {
+  const encodedConversationId = encodePathSegment(conversationId);
   const actionPath =
     status === "WaitingForUser"
       ? "mark-waiting-for-user"
@@ -160,7 +186,7 @@ export async function updateSupportConversationStatus(
           ? "close"
           : "mark-in-progress";
   const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/tickets/${conversationId}/${actionPath}`,
+    `/api/admin/support/tickets/${encodedConversationId}/${actionPath}`,
     { method: "POST" }
   );
 
@@ -172,10 +198,11 @@ export async function assignSupportConversation(
   conversationId: string,
   assignedAdminId?: string | null
 ): Promise<AdminSupportConversation> {
+  const encodedConversationId = encodePathSegment(conversationId);
   const conversation = await apiRequest<AdminSupportConversation>(
     assignedAdminId
-      ? `/api/admin/support/tickets/${conversationId}/assign-to-me`
-      : `/api/admin/support/tickets/${conversationId}/unassign`,
+      ? `/api/admin/support/tickets/${encodedConversationId}/assign-to-me`
+      : `/api/admin/support/tickets/${encodedConversationId}/unassign`,
     { method: "POST" }
   );
 
@@ -190,8 +217,9 @@ export async function updateSupportConversationMetadata(
     tags: string[];
   }
 ): Promise<AdminSupportConversation> {
+  const encodedConversationId = encodePathSegment(conversationId);
   const conversation = await apiRequest<AdminSupportConversation>(
-    `/api/admin/support/tickets/${conversationId}/metadata`,
+    `/api/admin/support/tickets/${encodedConversationId}/metadata`,
     {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -241,8 +269,9 @@ export async function updateSupportReplyTemplate(
     sortOrder: number;
   }
 ): Promise<AdminSupportReplyTemplate> {
+  const encodedTemplateId = encodePathSegment(templateId);
   const template = await apiRequest<AdminSupportReplyTemplate>(
-    `/api/admin/support/templates/${templateId}`,
+    `/api/admin/support/templates/${encodedTemplateId}`,
     {
       method: "PUT",
       body: JSON.stringify(payload),
@@ -254,7 +283,8 @@ export async function updateSupportReplyTemplate(
 }
 
 export async function deleteSupportReplyTemplate(templateId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/support/templates/${templateId}`, {
+  const encodedTemplateId = encodePathSegment(templateId);
+  await apiRequest<void>(`/api/admin/support/templates/${encodedTemplateId}`, {
     method: "DELETE",
   });
 

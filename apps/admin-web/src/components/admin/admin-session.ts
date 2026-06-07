@@ -6,11 +6,22 @@ type AdminRouter = {
   replace: (href: string) => void;
 };
 
-export function ensureAdminSession(locale: Locale, router: AdminRouter) {
+type EnsureAdminSessionOptions = {
+  requiredRole?: "Admin";
+};
+
+export function ensureAdminSession(
+  locale: Locale,
+  router: AdminRouter,
+  options: EnsureAdminSessionOptions = {}
+) {
   const session = getSession();
   const hasFreshAccessToken =
     Boolean(session?.accessToken) && Boolean(session) && !isAuthSessionExpired(session);
-  if (session && hasFreshAccessToken && hasAdminPanelAccess(session.user.roles)) {
+  const hasRequiredRole = options.requiredRole
+    ? session?.user.roles.includes(options.requiredRole)
+    : hasAdminPanelAccess(session?.user.roles);
+  if (session && hasFreshAccessToken && hasRequiredRole) {
     return true;
   }
 

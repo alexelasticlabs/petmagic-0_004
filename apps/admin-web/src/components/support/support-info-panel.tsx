@@ -139,7 +139,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     index: number
   ) => {
     const openKey = getAttachmentOpenKey(messageId, createdAtUtc, attachment, index);
-    if (pendingAttachmentOpenKey !== null) {
+    if (!canManageSupportWorkspace || pendingAttachmentOpenKey !== null) {
       return;
     }
 
@@ -199,6 +199,23 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     } catch {
       // The controller mutation already routes sanitized errors to support notifications.
     }
+  };
+
+  const requestStatusChange = (status: SupportConversationStatus) => {
+    if (
+      !canManageSupportWorkspace ||
+      statusMutation.isPending ||
+      conversation.status === status
+    ) {
+      return;
+    }
+
+    if (status === "Closed") {
+      setPendingStatusConfirm(status);
+      return;
+    }
+
+    statusMutation.mutate(status);
   };
 
   return (
@@ -312,13 +329,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                           )
                         }
                         disabled={
-                          pendingAttachmentOpenKey ===
-                          getAttachmentOpenKey(
-                            entry.messageId,
-                            entry.createdAtUtc,
-                            attachment,
-                            index
-                          )
+                          !canManageSupportWorkspace ||
+                          pendingAttachmentOpenKey !== null
                         }
                         className={styles.infoPanelAttachmentPreviewTile}
                         title={safeName}
@@ -513,13 +525,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   <button
                     type="button"
                     className={`ui-button ui-button--primary ui-button--md ${styles.actionsPanelBtn}`}
-                    onClick={() => {
-                      if (primaryStatusAction.status === "Closed") {
-                        setPendingStatusConfirm(primaryStatusAction.status);
-                      } else {
-                        statusMutation.mutate(primaryStatusAction.status);
-                      }
-                    }}
+                    onClick={() => requestStatusChange(primaryStatusAction.status)}
                     disabled={
                       !canManageSupportWorkspace ||
                       statusMutation.isPending ||
@@ -535,13 +541,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     key={action.status}
                     type="button"
                     className={`ui-button ui-button--secondary ui-button--md ${styles.actionsPanelBtn}`}
-                    onClick={() => {
-                      if (action.status === "Closed") {
-                        setPendingStatusConfirm(action.status);
-                      } else {
-                        statusMutation.mutate(action.status);
-                      }
-                    }}
+                    onClick={() => requestStatusChange(action.status)}
                     disabled={
                       !canManageSupportWorkspace ||
                       statusMutation.isPending ||
@@ -555,7 +555,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                 {destructiveStatusAction ? (
                   <Button
                     variant="danger"
-                    onClick={() => setPendingStatusConfirm(destructiveStatusAction.status)}
+                    onClick={() => requestStatusChange(destructiveStatusAction.status)}
                     disabled={
                       !canManageSupportWorkspace ||
                       statusMutation.isPending ||
@@ -611,13 +611,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                             )
                           }
                           disabled={
-                            pendingAttachmentOpenKey ===
-                            getAttachmentOpenKey(
-                              entry.messageId,
-                              entry.createdAtUtc,
-                              attachment,
-                              index
-                            )
+                            !canManageSupportWorkspace ||
+                            pendingAttachmentOpenKey !== null
                           }
                           className={styles.attachmentListThumbButton}
                         >
@@ -665,13 +660,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                             )
                           }
                           disabled={
-                            pendingAttachmentOpenKey ===
-                            getAttachmentOpenKey(
-                              entry.messageId,
-                              entry.createdAtUtc,
-                              attachment,
-                              index
-                            )
+                            !canManageSupportWorkspace ||
+                            pendingAttachmentOpenKey !== null
                           }
                           className="ui-button ui-button--secondary ui-button--sm"
                         >

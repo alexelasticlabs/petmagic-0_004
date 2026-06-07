@@ -21,7 +21,7 @@ import {
   hasAdminPanelAccess,
 } from "@/lib/admin-rbac";
 import {
-  fetchSupportInbox,
+  fetchSupportInboxMetrics,
   isAuthSessionExpired,
   logout,
   restoreSession,
@@ -41,6 +41,17 @@ import {
 
 type AdminShellProps = { locale: Locale; children: ReactNode };
 
+function AdminAccessGate({ locale }: { locale: Locale }) {
+  return (
+    <div className={styles.authGate} aria-busy="true" aria-live="polite">
+      <div className={styles.authGateCard}>
+        <span className={styles.authGateMark}>PM</span>
+        <span>{locale === "ru" ? "Проверяем доступ..." : "Checking access..."}</span>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════════════════
    MAIN EXPORT
 ════════════════════════════════════════════════════════════════ */
@@ -52,7 +63,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const currentPath = stripLocalePrefix(pathname);
   const isLoginPage = currentPath === "/";
   const authSession = useAuthSession();
-  const session = isLoginPage ? null : authSession;
+  const session = authSession;
   const sessionRoles = useMemo(() => session?.user.roles ?? [], [session?.user.roles]);
   const hasPanelAccess = hasAdminPanelAccess(sessionRoles);
   const needsSessionRestore =
@@ -63,9 +74,9 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* Support unread count for nav badge */
   const queryClient = useQueryClient();
-  const inboxQuery = useQuery({
-    queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
-    queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
+  const inboxMetricsQuery = useQuery({
+    queryKey: adminQueryKeys.supportInboxMetrics,
+    queryFn: ({ signal }) => fetchSupportInboxMetrics(signal),
     enabled: hasFreshAccessToken && hasPanelAccess && !isLoginPage,
     staleTime: 30_000,
     refetchInterval: 120_000,
@@ -101,6 +112,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         : locale === "ru"
           ? "В поддержке появилось новое сообщение"
           : "A new support message arrived";
+    const supportConversationPathId = encodeURIComponent(event.conversationId);
 
     addNotification({
       title: locale === "ru" ? "Поддержка" : "Support",
@@ -108,14 +120,11 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       category: "support",
       source: "support-realtime",
       tone: "info",
-      href: `/${locale}/support/${event.conversationId}`,
+      href: `/${locale}/support/${supportConversationPathId}`,
       dedupeKey: `${event.conversationId}:${event.updatedAtUtc}`,
     });
   });
-  const supportUnreadCount = useMemo(
-    () => inboxQuery.data?.filter((c) => c.unreadForAdmin).length ?? 0,
-    [inboxQuery.data]
-  );
+  const supportUnreadCount = inboxMetricsQuery.data?.unreadForAdminConversations ?? 0;
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -163,13 +172,18 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   }, [isLoginPage, locale, router, session]);
 
   useEffect(() => {
-    if (isLoginPage || session == null || needsSessionRestore) {
+    if (session == null || needsSessionRestore) {
       return;
     }
 
     if (!hasPanelAccess) {
       void logout();
       router.replace(`/${locale}`);
+      return;
+    }
+
+    if (isLoginPage) {
+      router.replace(getDefaultAdminPath(locale, sessionRoles));
       return;
     }
 
@@ -228,6 +242,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
   /* ── Login screen ───────────────────────────────────────────── */
   if (isLoginPage) {
+    if (session !== null) {
+      return <AdminAccessGate locale={locale} />;
+    }
+
     return (
       <AdminLoginScreen locale={locale} onToggleTheme={handleToggleTheme}>
         {children}
@@ -242,14 +260,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     !hasPanelAccess ||
     !canAccessAdminPath(sessionRoles, currentPath)
   ) {
-    return (
-      <div className={styles.authGate} aria-busy="true" aria-live="polite">
-        <div className={styles.authGateCard}>
-          <span className={styles.authGateMark}>PM</span>
-          <span>{locale === "ru" ? "Проверяем доступ..." : "Checking access..."}</span>
-        </div>
-      </div>
-    );
+    return <AdminAccessGate locale={locale} />;
   }
 
   /* ── Admin panel layout ────────────────────────────────────── */

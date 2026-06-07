@@ -3,70 +3,6 @@
 This file tracks admin-panel production gaps that cannot be fully closed in the
 frontend without a backend contract change.
 
-## Promo code registry pagination
-
-Current frontend state:
-
-- `apps/admin-web` calls `GET /api/admin/economy/redeem-codes`.
-- The endpoint returns the full promo-code registry as an array.
-- The UI applies search, status filters, sorting, CSV scope, and page slicing in
-  the browser.
-- Promo-code activations already use backend pagination through
-  `GET /api/admin/economy/redeem-codes/{id}/activations?skip=&take=`.
-
-Production risk:
-
-- A large promo-code registry can increase payload size, slow down first render,
-  and make browser-side filtering inconsistent with the rest of admin tables.
-
-Required backend contract:
-
-- Add server-side search, filter, sort, and pagination to the promo-code registry:
-  `GET /api/admin/economy/redeem-codes?search=&status=&rewardKind=&skip=&take=&sort=`.
-- Return `items`, `totalCount`, `skip`, `take`, and `hasMore`.
-- Keep CSV export behavior explicit: either export the current filtered page from
-  the UI or provide a backend export endpoint for the full filtered result set.
-
-Frontend completion after backend change:
-
-- Replace the browser-side `filteredCodes.slice(...)` paging in
-  `PromoCodesView` with backend query params and React Query cache keys.
-- Keep debounce and `AbortSignal` behavior consistent with users, generations,
-  moderation, and economy purchases/subscriptions.
-
-## Template catalog pagination
-
-Current frontend state:
-
-- Template catalog screens call `GET /api/admin/templates?templateType=...` and
-  receive the full template list as an array.
-- Search, archive/category/access/status filters, and sorting are applied in the
-  browser.
-- Catalog analytics rows are hydrated from
-  `GET /api/admin/templates/analytics?templateType=...&sort=updated&take=500`.
-
-Production risk:
-
-- Large template catalogs can make the catalog route expensive to load and can
-  leave analytics rows incomplete after the first 500 templates.
-- Browser-side filtering can diverge from backend semantics when archived
-  templates, categories, or access rules change.
-
-Required backend contract:
-
-- Add server-side search, filter, sort, and pagination to template catalog:
-  `GET /api/admin/templates?templateType=&search=&category=&status=&access=&archive=&skip=&take=&sort=`.
-- Return `items`, `totalCount`, `skip`, `take`, and `hasMore`.
-- Add matching pagination or a keyed map endpoint for catalog analytics rows so
-  the UI can request analytics for the currently visible template ids.
-
-Frontend completion after backend change:
-
-- Replace browser-side catalog filtering/paging with backend query params.
-- Keep the current secure blob-media rendering and action confirmations.
-- Invalidate only the affected catalog page/template analytics rows after
-  status/archive/delete actions.
-
 ## Template media update keep semantics
 
 Current frontend state:
@@ -178,35 +114,6 @@ Frontend completion after backend change:
 - Keep row analytics requests only for metrics that are actually displayed, not
   for list ordering.
 
-## Support queue total counts
-
-Current frontend state:
-
-- Support inbox calls pass `page` and `pageSize` to backend search/filter
-  endpoints.
-- The routed conversation workspace exposes previous/next queue controls and
-  sends the selected page through the backend query params.
-- The UI infers `hasMore` from a full page because the inbox endpoint currently
-  returns an array rather than a paged response object.
-
-Production risk:
-
-- Operators can browse pages, but the UI cannot display an authoritative total
-  count or know that a partial page is the last page unless the backend contract
-  exposes it.
-
-Required backend contract:
-
-- Return `items`, `page`, `pageSize`, `totalCount`, and `hasMore` for support
-  inbox responses.
-- Keep the current `status`, `assignment`, `search`, `page`, and `pageSize`
-  query params.
-
-Frontend completion after backend change:
-
-- Replace the current full-page-size `hasMore` inference with backend `hasMore`.
-- Display exact total counts in the support queue footer.
-
 ## Support queue priority, sort, and waiting filters
 
 Current frontend state:
@@ -218,16 +125,17 @@ Current frontend state:
 - The UI no longer exposes priority or alternate sort controls as global queue
   filters because the current support inbox endpoint does not accept `priority`
   or `sort`.
-- The "waiting" quick filter remains a current-page convenience because it is a
-  composite of `New` and `WaitingForUser`, while the current backend contract
-  accepts only one `status` value.
+- The UI no longer exposes the composite "waiting" quick filter because it would
+  require `New OR WaitingForUser`, while the current backend contract accepts
+  only one `status` value.
 
 Production risk:
 
 - Reintroducing priority/sort as browser-only filters would make operators see
   a filtered current page rather than an authoritative filtered queue.
-- The waiting quick filter can miss matching conversations that are on another
-  backend page until the support inbox contract supports multi-status filtering.
+- Reintroducing the waiting quick filter before backend multi-status support
+  would make operators see a filtered current page rather than the authoritative
+  queue.
 
 Required backend contract:
 
@@ -235,11 +143,12 @@ Required backend contract:
   `GET /api/admin/support/tickets`, for example:
   `?status=New&status=WaitingForUser&priority=High&sort=priority&page=&pageSize=`.
 - Preserve existing `assignment`, `search`, `page`, and `pageSize` semantics.
-- Return the paged response object described in "Support queue total counts" so
-  filter totals and page controls remain authoritative.
+- Continue returning the current paged response object (`items`, `page`,
+  `pageSize`, `totalCount`, `hasMore`) so filter totals and page controls remain
+  authoritative.
 
 Frontend completion after backend change:
 
 - Re-enable priority and sort controls by passing backend query params through
   `fetchSupportInbox` and React Query keys.
-- Replace the current waiting quick filter with a multi-status backend query.
+- Re-enable the waiting quick filter only as a multi-status backend query.

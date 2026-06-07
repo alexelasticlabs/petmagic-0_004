@@ -20,18 +20,42 @@ describe("dashboard production data handling", () => {
   it("exposes retry and empty states for dashboard failures and empty live sections", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
+    expect(source).toContain(
+      'const canViewDashboard = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(source).toContain("enabled: canViewDashboard");
+    expect(source).toContain(
+      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
+    );
+    expect(source).toContain('import { adminQueryKeys } from "@/lib/admin-query-keys";');
+    expect(source).toContain("queryKey: adminQueryKeys.dashboard(locale)");
+    expect(source).toContain(
+      "if (!canViewDashboard) {\n                    return;\n                  }\n\n                  void dashboardQuery.refetch().catch(() => undefined);"
+    );
     expect(source).toContain("dashboardQuery.refetch().catch(() => undefined)");
-    expect(source).toContain("disabled={dashboardQuery.isFetching}");
+    expect(source).toContain("disabled={!canViewDashboard || dashboardQuery.isFetching}");
     expect(source).toContain("No payments yet");
     expect(source).toContain("No recent activity");
+    expect(source).toContain("Recent payments will appear here after the first successful purchase.");
+    expect(source).not.toContain("when the backend returns purchases");
+    expect(source).not.toContain("Когда backend вернет покупки");
   });
 
-  it("fetches dashboard purchase pages sequentially and stops when backend pagination ends", () => {
+  it("sources economy dashboard KPI values from backend aggregate metrics", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
-    expect(source).toContain("for (let page = 0; page < maxPages; page += 1)");
-    expect(source).toContain("if (!response.hasMore) {");
-    expect(source).not.toContain("Array.from({ length: maxPages }");
+    expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
+    expect(source).toContain("economyMetrics: AdminEconomyDashboardMetrics");
+    expect(source).toContain("economyMetrics.purchasesThisWeek");
+    expect(source).toContain("economyMetrics.successfulPaymentsThisWeek");
+    expect(source).toContain("economyMetrics.failedPaymentsThisWeek");
+    expect(source).toContain("economyMetrics.revenueThisWeek");
+    expect(source).toContain("economyMetrics.activeSubscriptions");
+    expect(source).toContain("buildDashboardRevenueSeries(economyMetrics.revenueSeries)");
+    expect(source).not.toContain("const currentSucceeded = currentPurchases.filter");
+    expect(source).not.toContain("buildRevenueSeries(purchases");
+    expect(source).not.toContain("fetchActiveSubscriptionCount");
+    expect(source).not.toContain("fetchAdminEconomySubscriptions");
   });
 
   it("sources moderation queue KPI from the moderation backend, not support tickets", () => {
@@ -40,8 +64,12 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("fetchAdminModerationQueue");
     expect(source).toContain("async function fetchPendingModerationQueueCount");
     expect(source).toContain('status: "pending"');
+    expect(source).toContain("take: 1");
+    expect(source).toContain("return Math.max(0, response.totalCount);");
     expect(source).toContain("moderationQueueCount");
     expect(source).toContain("pending moderation items");
+    expect(source).not.toContain("const maxPages = 20");
+    expect(source).not.toContain("count += response.items.length");
     expect(source).not.toContain(
       "const moderationQueue = supportConversations.filter((item) => item.status !== \"Closed\").length;"
     );
@@ -51,12 +79,42 @@ describe("dashboard production data handling", () => {
   it("uses backend total counts for dashboard KPI-only queries", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
-    expect(source).toContain("function getOptionalTotalCount(response: unknown)");
-    expect(source).toContain("const totalCount = getOptionalTotalCount(response);");
-    expect(source).toContain("return totalCount;");
-    expect(source).toContain('status: "Active"');
+    expect(source).toContain("fetchAdminUserDashboardMetrics(signal)");
+    expect(source).toContain("metrics: AdminUserDashboardMetrics");
+    expect(source).toContain("userMetrics.totalUsers");
+    expect(source).toContain("userMetrics.premiumUsers");
+    expect(source).toContain("userMetrics.usersThisWeek");
+    expect(source).toContain("userMetrics.usersPreviousWeek");
+    expect(source).toContain("fetchUsers({ skip: 0, take: 100 }, signal)");
+    expect(source).toContain("return Math.max(0, response.totalCount);");
+    expect(source).not.toContain('fetchUsers({ skip: 0, take: 1, isPremium: true }, signal)');
+    expect(source).not.toContain('fetchUsers({ role: "Admin", skip: 0, take: 1 }, signal)');
+    expect(source).not.toContain('fetchUsers({ role: "Moderator", skip: 0, take: 1 }, signal)');
+    expect(source).not.toContain('fetchUsers({ role: "User", skip: 0, take: 1 }, signal)');
+    expect(source).not.toContain("startOfDayTimestamp");
+    expect(source).not.toContain("const currentUsers = users.filter");
+    expect(source).not.toContain("const previousUsers = users.filter");
+    expect(source).not.toContain("adminRolePage.totalCount");
+    expect(source).not.toContain("moderatorRolePage.totalCount");
+    expect(source).not.toContain("userRolePage.totalCount");
+    expect(source).toContain("const roleCounts: DashboardUserRoleCounts = {");
     expect(source).toContain('status: "pending"');
-    expect(source).toContain("count += response.items.length");
+    expect(source).not.toContain("function getOptionalTotalCount(response: unknown)");
+  });
+
+  it("builds dashboard role distribution from backend role totals, not sampled users", () => {
+    const source = readFileSync(dashboardViewPath, "utf8");
+
+    expect(source).toContain("type DashboardUserRoleCounts = {");
+    expect(source).toContain("const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts)");
+    expect(source).toContain("const admins = Math.max(0, roleCounts.admins)");
+    expect(source).toContain("const moderators = Math.max(0, roleCounts.moderators)");
+    expect(source).toContain("const regular = Math.max(0, roleCounts.users)");
+    expect(source).toContain("const roleTotal = admins + moderators + regular");
+    expect(source).toContain('label: locale === "ru" ? "Модераторы" : "Moderators"');
+    expect(source).not.toContain("const userDistribution = buildUserDistribution(locale, users)");
+    expect(source).not.toContain("const normalizedRoles = item.roles.map");
+    expect(source).not.toContain("users.length - admins - managers");
   });
 
   it("keeps dashboard currency formatting non-throwing for backend currency codes", () => {

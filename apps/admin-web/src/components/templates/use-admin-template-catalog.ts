@@ -6,13 +6,15 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminTemplates,
   fetchAdminTemplatesAnalyticsOverview,
-  type AdminTemplateListItem,
+  normalizeAdminTemplateCatalogQuery,
+  type AdminTemplateCatalogQuery,
   type AdminTemplatesAnalyticsTemplateRow,
   type TemplateType,
 } from "@/lib/api-client";
 
 type UseAdminTemplateCatalogOptions = {
   enabled?: boolean;
+  query: AdminTemplateCatalogQuery;
   templateType: TemplateType;
 };
 
@@ -24,11 +26,13 @@ function normalizeTemplateId(templateId: string) {
 
 export function useAdminTemplateCatalog({
   enabled = true,
+  query,
   templateType,
 }: UseAdminTemplateCatalogOptions) {
-  const templatesQuery = useQuery<AdminTemplateListItem[]>({
-    queryKey: adminQueryKeys.templateCatalog(templateType),
-    queryFn: ({ signal }) => fetchAdminTemplates(templateType, signal),
+  const normalizedQuery = normalizeAdminTemplateCatalogQuery(query);
+  const templatesQuery = useQuery({
+    queryKey: adminQueryKeys.templateCatalog(normalizedQuery),
+    queryFn: ({ signal }) => fetchAdminTemplates(normalizedQuery, signal),
     enabled,
   });
 
@@ -52,17 +56,21 @@ export function useAdminTemplateCatalog({
 
       return rowsByTemplateId;
     },
-    enabled: enabled && templatesQuery.isSuccess && (templatesQuery.data?.length ?? 0) > 0,
+    enabled: enabled && templatesQuery.isSuccess && (templatesQuery.data?.items.length ?? 0) > 0,
   });
 
   async function refresh() {
+    if (!enabled) {
+      return templatesQuery;
+    }
+
     const templatesResult = await templatesQuery.refetch();
 
     if (templatesResult.isError) {
       throw templatesResult.error;
     }
 
-    if ((templatesResult.data?.length ?? 0) > 0) {
+    if ((templatesResult.data?.items.length ?? 0) > 0) {
       await analyticsRowsQuery.refetch();
     }
 
@@ -84,6 +92,10 @@ export function useAdminTemplateCatalog({
     isLoading: templatesQuery.isLoading,
     isSecondaryLoading: analyticsRowsQuery.isLoading,
     refresh,
-    templates: templatesQuery.data ?? [],
+    templates: templatesQuery.data?.items ?? [],
+    hasMore: Boolean(templatesQuery.data?.hasMore),
+    pageSkip: templatesQuery.data?.skip ?? normalizedQuery.skip ?? 0,
+    pageTake: templatesQuery.data?.take ?? normalizedQuery.take ?? 24,
+    totalCount: templatesQuery.data?.totalCount ?? 0,
   };
 }

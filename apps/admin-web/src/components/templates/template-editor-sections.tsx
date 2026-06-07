@@ -1,18 +1,21 @@
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "@/components/templates/template-editor.module.css";
+import { normalizeTemplateTextInput } from "@/components/templates/template-form-mappers";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import type { Dictionary } from "@/lib/i18n";
+import type { Dictionary, Locale } from "@/lib/i18n";
 import { formatPrice, getImageModelPrice, getMotionModelPrice } from "@/lib/model-pricing";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
+const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;
 const promptMaxLength = 2000;
 
 type TemplateReferenceAssetSectionProps = {
+  locale: Locale;
   text: Dictionary;
   form: TemplateFormState;
   setForm: SetTemplateFormState;
@@ -38,6 +41,7 @@ type TemplateImageModelSectionProps = {
 };
 
 export function TemplateReferenceAssetSection({
+  locale,
   text,
   form,
   setForm,
@@ -48,6 +52,7 @@ export function TemplateReferenceAssetSection({
 }: TemplateReferenceAssetSectionProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [selectionError, setSelectionError] = useState<string | null>(null);
   const localReferenceUrl = useMemo(
     () => (referenceFile ? URL.createObjectURL(referenceFile) : null),
     [referenceFile]
@@ -75,9 +80,18 @@ export function TemplateReferenceAssetSection({
 
   function handleReferenceFileSelection(file: File | null) {
     if (!file || !isSupportedReferenceMotionFile(file)) {
+      if (file) {
+        setSelectionError(getReferenceSelectionError(locale, "type"));
+      }
       return;
     }
 
+    if (file.size > TEMPLATE_REFERENCE_MOTION_MAX_BYTES) {
+      setSelectionError(getReferenceSelectionError(locale, "size"));
+      return;
+    }
+
+    setSelectionError(null);
     setReferenceFile(file);
   }
 
@@ -199,6 +213,7 @@ export function TemplateReferenceAssetSection({
               className={styles.dangerButton}
               disabled={!referenceFile && !hasReference}
               onClick={() => {
+                setSelectionError(null);
                 setReferenceFile(null);
                 if (fileInputRef.current) {
                   fileInputRef.current.value = "";
@@ -206,6 +221,7 @@ export function TemplateReferenceAssetSection({
                 setForm((current) => ({
                   ...current,
                   referenceUrl: "",
+                  referenceUrlSource: "none",
                   referenceFileName: "",
                   referenceContentType: "",
                   referenceFileSizeBytes: "",
@@ -216,11 +232,24 @@ export function TemplateReferenceAssetSection({
               {text.clearAsset}
             </Button>
           </div>
+          {selectionError ? <p className={styles.assetSelectionError}>{selectionError}</p> : null}
         </div>
         <p className={styles.muted}>{text.referenceMotionUploadHint}</p>
       </div>
     </div>
   );
+}
+
+function getReferenceSelectionError(locale: Locale, reason: "size" | "type"): string {
+  if (reason === "size") {
+    return locale === "ru"
+      ? "Файл слишком большой. Максимальный размер reference motion - 128 MB."
+      : "File is too large. The maximum reference motion size is 128 MB.";
+  }
+
+  return locale === "ru"
+    ? "Можно загрузить только MP4 video файл."
+    : "Only MP4 video files are supported.";
 }
 
 function isSupportedReferenceMotionFile(file: File): boolean {
@@ -282,7 +311,13 @@ export function TemplateVideoModelSection({
               value={form.preprocessingPrompt}
               maxLength={promptMaxLength}
               onChange={(event) =>
-                setForm((current) => ({ ...current, preprocessingPrompt: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  preprocessingPrompt: normalizeTemplateTextInput(
+                    event.target.value,
+                    promptMaxLength
+                  ),
+                }))
               }
               rows={7}
             />
@@ -317,7 +352,10 @@ export function TemplateVideoModelSection({
               value={form.klingPrompt}
               maxLength={promptMaxLength}
               onChange={(event) =>
-                setForm((current) => ({ ...current, klingPrompt: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  klingPrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength),
+                }))
               }
               rows={7}
             />
@@ -378,7 +416,10 @@ export function TemplateImageModelSection({
               value={form.imagePrompt}
               maxLength={promptMaxLength}
               onChange={(event) =>
-                setForm((current) => ({ ...current, imagePrompt: event.target.value }))
+                setForm((current) => ({
+                  ...current,
+                  imagePrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength),
+                }))
               }
               rows={7}
             />

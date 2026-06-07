@@ -26,9 +26,12 @@ describe("login card logging", () => {
   it("prefetches the role-aware landing page for restored admin sessions", () => {
     const source = readFileSync(loginCardPath, "utf8");
 
-    expect(source).toContain("const prefetchPath = hasAdminPanelAccess(existingSession?.user.roles)");
+    expect(source).toContain("if (!hasAdminPanelAccess(existingSession?.user.roles))");
     expect(source).toContain("getDefaultAdminPath(locale, existingSession?.user.roles)");
-    expect(source).toContain("router.prefetch(prefetchPath)");
+    expect(source).toContain(
+      "router.prefetch(getDefaultAdminPath(locale, existingSession?.user.roles))"
+    );
     expect(source).not.toContain("router.prefetch(`/${locale}/dashboard`)");
+    expect(source).not.toContain(": `/${locale}/dashboard`");
   });
 });

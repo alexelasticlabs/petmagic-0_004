@@ -10,13 +10,13 @@ import { sanitizeSensitiveText } from "./sensitive-display";
 import type {
   AcceptLegalDocumentsCommand,
   AdminSupportConversation,
-  AdminSupportConversationSummary,
+  AdminSupportInboxPage,
   AdminSupportReplyTemplate,
   AdminTemplate,
   AdminTemplateCategory,
   AdminTemplateEventAnalytics,
   AdminTemplateFailureBreakdownItem,
-  AdminTemplateListItem,
+  AdminTemplateCatalogPage,
   AdminTemplateRecentGeneration,
   AdminTemplateStatistics,
   AdminTemplateTrendPoint,
@@ -26,7 +26,6 @@ import type {
   AdminUserDetail,
   AuthSession,
   LegalDocumentsResponse,
-  TemplateType,
   UserProfile,
   UserListPage,
 } from "./api-client.types";
@@ -63,7 +62,7 @@ export const cachedAdminUserAnalytics = new Map<
 >();
 export const cachedSupportInbox = new Map<
   string,
-  { value: AdminSupportConversationSummary[]; expiresAt: number }
+  { value: AdminSupportInboxPage; expiresAt: number }
 >();
 export const cachedSupportConversations = new Map<
   string,
@@ -75,7 +74,7 @@ export const cachedSupportTemplates = new Map<
 >();
 export const cachedTemplateLists = new Map<
   string,
-  { value: AdminTemplateListItem[]; expiresAt: number }
+  { value: AdminTemplateCatalogPage; expiresAt: number }
 >();
 export const cachedTemplateCategories = new Map<
   string,
@@ -130,8 +129,8 @@ export function clearAdminListCaches(): void {
   inflightGetRequests.clear();
 }
 
-export function getTemplateListCacheKey(type?: TemplateType): string {
-  return type ?? "all";
+export function getTemplateListCacheKey(value?: string): string {
+  return value ?? "all";
 }
 
 export function getAnalyticsOverviewCacheKey(query: AdminTemplatesAnalyticsQuery): string {
@@ -148,6 +147,10 @@ export function getAnalyticsOverviewCacheKey(query: AdminTemplatesAnalyticsQuery
 
 export function getTemplateRecentGenerationsCacheKey(templateId: string, take?: number): string {
   return `${templateId}:${take ?? "default"}`;
+}
+
+export function encodePathSegment(value: string): string {
+  return encodeURIComponent(value);
 }
 
 export async function cachedGet<TResponse>(
@@ -363,7 +366,14 @@ function getFallbackApiErrorMessage(status: number): string {
 }
 
 function isTechnicalProblemMessage(value: string): boolean {
-  return /^[a-z0-9_.-]+$/i.test(value.trim()) || /^API request failed with status \d+$/i.test(value);
+  const trimmed = value.trim();
+  return (
+    /^[a-z0-9_.-]+$/i.test(trimmed) ||
+    /^API request failed with status \d+$/i.test(trimmed) ||
+    /^(?:TypeError|Error|SyntaxError|ReferenceError):/i.test(trimmed) ||
+    trimmed.startsWith("{") ||
+    trimmed.startsWith("[")
+  );
 }
 
 function sanitizeApiErrorText(value: string): string {
@@ -541,6 +551,7 @@ export async function apiRequest<TResponse>(
         const validationErrors = Object.values(problem.errors ?? {})
           .flat()
           .map((value) => value.trim())
+          .filter((value) => value && !isTechnicalProblemMessage(value))
           .map((value) => sanitizeApiErrorText(value))
           .filter(Boolean);
 

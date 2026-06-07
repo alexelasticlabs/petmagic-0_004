@@ -23,12 +23,20 @@ describe("user wallet panel hardening", () => {
     const source = readFileSync(walletPanelPath, "utf8");
 
     expect(source).toContain("import { ConfirmationDialog }");
+    expect(source).toContain("USER_WALLET_REASON_MAX_LENGTH,");
     expect(source).toContain("canAdjustWallet: boolean;");
     expect(source).toContain("if (!canAdjustWallet || isSubmitting) {\n      return;");
     expect(source).toContain("if (!canAdjustWallet || !pendingAdjustment || isSubmitting) {");
     expect(source).toContain("type PendingWalletAdjustment");
     expect(source).toContain("const [pendingAdjustment, setPendingAdjustment]");
     expect(source).toContain("setPendingAdjustment({");
+    expect(source).toContain(
+      "const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);"
+    );
+    expect(source).toContain(
+      "setReason(event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH))"
+    );
+    expect(source).toContain("maxLength={USER_WALLET_REASON_MAX_LENGTH}");
     expect(source).toContain("async function confirmWalletAdjustment()");
     expect(source).toContain("await adjustAdminUserWallet(");
     expect(source).toContain("{canAdjustWallet ? (\n          <section");
@@ -42,7 +50,7 @@ describe("user wallet panel hardening", () => {
     const detailSource = readFileSync(detailPagePath, "utf8");
     const inlineSource = readFileSync(inlineAnalyticsPath, "utf8");
 
-    expect(detailSource).toContain('canAdjustWallet={session?.user.roles.includes("Admin") ?? false}');
-    expect(inlineSource).toContain('canAdjustWallet={session?.user.roles.includes("Admin") ?? false}');
+    expect(detailSource).toContain("canAdjustWallet={canViewUserProfile}");
+    expect(inlineSource).toContain("canAdjustWallet={canViewUserProfile}");
   });
 });

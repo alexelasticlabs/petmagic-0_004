@@ -2,7 +2,7 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   CalendarIcon,
@@ -20,7 +20,6 @@ import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
 import { PromoCodesListCard } from "@/components/promo-codes-list-card";
 import {
   buildPromoCodesCsv,
-  comparePromoCodes,
   copyTextToClipboard,
   createDefaultPromoForm,
   createGeneratedPromoCode,
@@ -46,8 +45,10 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   createAdminRedeemCode,
   fetchAdminRedeemCodeActivations,
+  fetchAdminRedeemCodeMetrics,
   fetchAdminRedeemCodes,
   fetchAdminUser,
+  normalizeAdminRedeemCodesQuery,
   updateAdminRedeemCode,
   useAuthSession,
   type AdminRedeemCode,
@@ -65,6 +66,18 @@ const EMPTY_REDEMPTIONS: AdminRedeemCodeRedemption[] = [];
 const ACTIVATIONS_PREVIEW_LIMIT = 5;
 const ACTIVATIONS_EXPANDED_LIMIT = 20;
 const PROMO_ACTIONS_MENU_MIN_WIDTH_PX = 220;
+const PROMO_CODES_SEARCH_MAX_LENGTH = 120;
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debounced;
+}
 
 export function PromoCodesView({ locale }: { locale: Locale }) {
   const text = getDictionary(locale);
@@ -80,7 +93,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       : "Promo code management is available to Admin only.";
 
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
   const [statusFilter, setStatusFilter] = useState<PromoStatusFilter>("all");
   const [rewardFilter, setRewardFilter] = useState<"all" | AdminRedeemRewardKind>("all");
   const [sortMode, setSortMode] = useState<PromoSortMode>("updated");
@@ -100,6 +112,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     usePromoActionsMenu();
   const hasActivePromoFilters =
     search.trim().length > 0 || statusFilter !== "all" || rewardFilter !== "all";
+  const debouncedSearch = useDebouncedValue(search, 350);
 
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "promo",
@@ -109,9 +122,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   });
 
   useEffect(() => {
-    if (!session) {
-      ensureAdminSession(locale, router);
-    }
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
 
   useEffect(() => {
@@ -141,17 +152,57 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     };
   }, [isEditorOpen]);
 
+  const promoCodesQueryParams = useMemo(
+    () =>
+      normalizeAdminRedeemCodesQuery({
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        search: debouncedSearch,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        rewardKind: rewardFilter === "all" ? undefined : rewardFilter,
+        sort: sortMode,
+      }),
+    [debouncedSearch, page, pageSize, rewardFilter, sortMode, statusFilter]
+  );
+
+  const promoCodeMetricsQueryParams = useMemo(
+    () =>
+      normalizeAdminRedeemCodesQuery({
+        search: debouncedSearch,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        rewardKind: rewardFilter === "all" ? undefined : rewardFilter,
+      }),
+    [debouncedSearch, rewardFilter, statusFilter]
+  );
+
   const promoCodesQuery = useQuery({
-    queryKey: adminQueryKeys.economyRedeemCodes,
-    queryFn: ({ signal }) => fetchAdminRedeemCodes(signal),
+    queryKey: adminQueryKeys.economyRedeemCodes(promoCodesQueryParams),
+    queryFn: ({ signal }) => fetchAdminRedeemCodes(promoCodesQueryParams, signal),
+    enabled: canManagePromoCodes,
     staleTime: PROMO_CODES_AUTO_REFRESH_MS,
     refetchInterval:
-      hasActivePromoFilters || isEditorOpen ? false : PROMO_CODES_AUTO_REFRESH_MS,
+      !canManagePromoCodes || hasActivePromoFilters || isEditorOpen
+        ? false
+        : PROMO_CODES_AUTO_REFRESH_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
   });
 
-  const promoCodes = promoCodesQuery.data ?? EMPTY_PROMO_CODES;
+  const promoMetricsQuery = useQuery({
+    queryKey: adminQueryKeys.economyRedeemCodeMetrics(promoCodeMetricsQueryParams),
+    queryFn: ({ signal }) => fetchAdminRedeemCodeMetrics(promoCodeMetricsQueryParams, signal),
+    enabled: canManagePromoCodes,
+    staleTime: PROMO_CODES_AUTO_REFRESH_MS,
+    refetchInterval:
+      !canManagePromoCodes || hasActivePromoFilters || isEditorOpen
+        ? false
+        : PROMO_CODES_AUTO_REFRESH_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const promoCodesPage = promoCodesQuery.data;
+  const promoCodes = promoCodesPage?.items ?? EMPTY_PROMO_CODES;
   const nowMs = promoCodesQuery.dataUpdatedAt || fallbackNowMs;
   const selectedCode = useMemo(
     () => promoCodes.find((code) => code.redeemCodeId === selectedCodeId) ?? null,
@@ -174,7 +225,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         skip: activationsSkip,
         take: activationsTake,
       }, signal),
-    enabled: Boolean(selectedCodeId),
+    enabled: canManagePromoCodes && Boolean(selectedCodeId),
     staleTime: 20_000,
   });
 
@@ -199,6 +250,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     queries: selectedUserIds.map((userId) => ({
       queryKey: adminQueryKeys.userDetail(userId),
       queryFn: ({ signal }) => fetchAdminUser(userId, signal),
+      enabled: canManagePromoCodes,
       staleTime: 60_000,
     })),
   });
@@ -226,7 +278,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       setShowAllActivations(false);
       setActivationsPage(1);
       setForm(toPromoForm(code));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
     },
     onError: (error) => {
       setFeedback({
@@ -252,7 +304,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       setShowAllActivations(false);
       setActivationsPage(1);
       setForm(toPromoForm(code));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
     },
     onError: (error) => {
       setFeedback({
@@ -284,7 +336,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       if (selectedCodeId === code.redeemCodeId) {
         setForm(toPromoForm(code));
       }
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
     },
     onError: (error, variables) => {
       const fallback =
@@ -313,7 +365,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       if (selectedCodeId === code.redeemCodeId) {
         setForm(toPromoForm(code));
       }
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodes });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
     },
     onError: (error) => {
       setFeedback({
@@ -326,71 +378,23 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     },
   });
 
-  const metrics = useMemo(() => {
-    const sevenDaysAgo = nowMs - 7 * 24 * 60 * 60 * 1000;
-    const totalUses = promoCodes.reduce((sum, code) => sum + code.redeemedCount, 0);
-    const totalGranted = promoCodes.reduce(
-      (sum, code) =>
-        sum + (code.rewardKind === "spark" ? code.rewardValue * code.redeemedCount : 0),
-      0
-    );
-    const activeCodes = promoCodes.filter(
-      (code) => getPromoStatus(code, text, nowMs).key === "active"
-    ).length;
+  const metrics = promoMetricsQuery.data ?? {
+    totalCodes: 0,
+    activeCodes: 0,
+    totalUses: 0,
+    totalGranted: 0,
+    createdLast7d: 0,
+    activeTouchedLast7d: 0,
+    usesLast7d: 0,
+    grantedLast7d: 0,
+  };
 
-    const createdLast7d = promoCodes.filter(
-      (code) => new Date(code.createdAtUtc).getTime() >= sevenDaysAgo
-    ).length;
-    const activeTouchedLast7d = promoCodes.filter((code) => {
-      const isActive = getPromoStatus(code, text, nowMs).key === "active";
-      return isActive && new Date(code.updatedAtUtc).getTime() >= sevenDaysAgo;
-    }).length;
-
-    const usesLast7d = promoCodes.reduce((sum, code) => sum + code.usesLast7d, 0);
-
-    const grantedLast7d = promoCodes.reduce((sum, code) => {
-      return sum + code.grantedLast7d;
-    }, 0);
-
-    return {
-      totalCodes: promoCodes.length,
-      activeCodes,
-      totalUses,
-      totalGranted,
-      createdLast7d,
-      activeTouchedLast7d,
-      usesLast7d,
-      grantedLast7d,
-    };
-  }, [nowMs, promoCodes, text]);
-
-  const filteredCodes = useMemo(() => {
-    const normalizedSearch = deferredSearch.trim().toLowerCase();
-
-    return promoCodes
-      .filter((code) => {
-        const status = getPromoStatus(code, text, nowMs).key;
-        const codeValue = code.code || code.codePrefix;
-        const description = code.description || "";
-
-        const matchesStatus = statusFilter === "all" || status === statusFilter;
-        const matchesSearch =
-          !normalizedSearch ||
-          codeValue.toLowerCase().includes(normalizedSearch) ||
-          code.codePrefix.toLowerCase().includes(normalizedSearch) ||
-          description.toLowerCase().includes(normalizedSearch);
-        const matchesReward = rewardFilter === "all" || code.rewardKind === rewardFilter;
-
-        return matchesStatus && matchesSearch && matchesReward;
-      })
-      .sort((firstItem, secondItem) => comparePromoCodes(firstItem, secondItem, sortMode));
-  }, [deferredSearch, nowMs, promoCodes, rewardFilter, sortMode, statusFilter, text]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredCodes.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pagedCodes = filteredCodes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const hasCodes = promoCodes.length > 0;
-  const hasFilteredCodes = filteredCodes.length > 0;
+  const currentPage = page;
+  const promoCodesTotalCount = Math.max(0, promoCodesPage?.totalCount ?? 0);
+  const totalPages = Math.max(1, Math.ceil(promoCodesTotalCount / pageSize));
+  const pagedCodes = promoCodes;
+  const hasCodes = promoCodes.length > 0 || page > 1 || hasActivePromoFilters;
+  const hasFilteredCodes = promoCodes.length > 0;
   const isMutating =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -398,42 +402,15 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     archiveMutation.isPending;
 
   const shownRangeStart = hasFilteredCodes ? (currentPage - 1) * pageSize + 1 : 0;
-  const shownRangeEnd = hasFilteredCodes
-    ? Math.min(filteredCodes.length, currentPage * pageSize)
-    : 0;
+  const shownRangeEnd = hasFilteredCodes ? shownRangeStart + promoCodes.length - 1 : 0;
 
   const visiblePageNumbers = useMemo(() => {
     const maxVisible = 5;
-    if (totalPages <= maxVisible) {
-      return Array.from({ length: totalPages }, (_, index) => index + 1);
-    }
-
-    const half = Math.floor(maxVisible / 2);
-    const end = Math.min(totalPages, Math.max(1, currentPage - half) + maxVisible - 1);
+    const end = Math.min(totalPages, Math.max(1, currentPage));
     const start = Math.max(1, end - maxVisible + 1);
 
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }, [currentPage, totalPages]);
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<PromoStatusFilter, number> = {
-      all: promoCodes.length,
-      draft: 0,
-      scheduled: 0,
-      active: 0,
-      paused: 0,
-      exhausted: 0,
-      expired: 0,
-      archived: 0,
-    };
-
-    for (const code of promoCodes) {
-      const key = getPromoStatus(code, text, nowMs).key;
-      counts[key] += 1;
-    }
-
-    return counts;
-  }, [nowMs, promoCodes, text]);
 
   function handleResetPanel() {
     setFeedback(null);
@@ -542,11 +519,11 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       return;
     }
 
-    if (!filteredCodes.length) {
+    if (!promoCodes.length) {
       return;
     }
 
-    const csv = buildPromoCodesCsv(filteredCodes, locale, text, nowMs);
+    const csv = buildPromoCodesCsv(promoCodes, locale, text, nowMs);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -714,7 +691,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     pageSizeOptions,
   } = buildPromoCodesViewOptions(locale, text);
 
-  if (promoCodesQuery.isLoading) {
+  if (promoCodesQuery.isLoading || promoMetricsQuery.isLoading) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard
@@ -726,7 +703,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     );
   }
 
-  if (promoCodesQuery.isError) {
+  if (promoCodesQuery.isError || promoMetricsQuery.isError) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard
@@ -736,8 +713,17 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           action={
             <Button
               variant="secondary"
-              disabled={promoCodesQuery.isFetching}
-              onClick={() => void promoCodesQuery.refetch().catch(() => undefined)}
+              disabled={
+                !canManagePromoCodes || promoCodesQuery.isFetching || promoMetricsQuery.isFetching
+              }
+              onClick={() => {
+                if (!canManagePromoCodes) {
+                  return;
+                }
+
+                void promoCodesQuery.refetch().catch(() => undefined);
+                void promoMetricsQuery.refetch().catch(() => undefined);
+              }}
             >
               {text.promoCodesRefreshAction}
             </Button>
@@ -771,34 +757,50 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
       <div className={styles.kpiGrid}>
         <AdminKpiCard
-          label={text.promoCodesTotalLabel}
+          label={locale === "ru" ? "Коды" : "Codes"}
           value={formatNumber(metrics.totalCodes, locale)}
           delta={formatSevenDayDelta(metrics.createdLast7d, locale, text)}
-          hint={text.promoCodesKpiTotalHint}
+          hint={
+            locale === "ru"
+              ? "Текущий отфильтрованный список."
+              : "Current filtered list."
+          }
           tone="primary"
           icon={<PromoCodeIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={text.promoCodesActiveLabel}
+          label={locale === "ru" ? "Активные" : "Active"}
           value={formatNumber(metrics.activeCodes, locale)}
           delta={formatSevenDayDelta(metrics.activeTouchedLast7d, locale, text)}
-          hint={text.promoCodesKpiActiveHint}
+          hint={
+            locale === "ru"
+              ? "Текущий отфильтрованный список."
+              : "Current filtered list."
+          }
           tone="success"
           icon={<TrendUpIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={text.promoCodesUsesLabel}
+          label={locale === "ru" ? "Использования" : "Uses"}
           value={formatNumber(metrics.totalUses, locale)}
           delta={formatSevenDayDelta(metrics.usesLast7d, locale, text)}
-          hint={text.promoCodesKpiUsesHint}
+          hint={
+            locale === "ru"
+              ? "Итоги считаются агрегатом по всем найденным промокодам."
+              : "Totals are aggregated across all matching promo codes."
+          }
           tone="info"
           icon={<UsersIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={text.promoCodesGrantedLabel}
+          label={locale === "ru" ? "Выдано" : "Granted"}
           value={`${formatNumber(metrics.totalGranted, locale)} ${tokenUnit}`}
           delta={`${formatNumber(metrics.grantedLast7d, locale)} ${tokenUnit} ${text.promoCodesLast7DaysLabel}`}
-          hint={text.promoCodesKpiGrantedHint}
+          hint={
+            locale === "ru"
+              ? "Экспорт CSV выгружает текущую страницу результатов."
+              : "CSV export includes the current result page."
+          }
           tone="warning"
           icon={<CalendarIcon className={styles.kpiIcon} />}
         />
@@ -814,7 +816,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           rewardFilter={rewardFilter}
           sortMode={sortMode}
           statusTabs={statusTabs}
-          statusCounts={statusCounts}
           statusOptions={statusOptions}
           rewardOptions={rewardOptions}
           sortOptions={sortOptions}
@@ -826,12 +827,12 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           autoRefreshMs={PROMO_CODES_AUTO_REFRESH_MS}
           dataUpdatedAt={promoCodesQuery.dataUpdatedAt}
           pagedCodes={pagedCodes}
-          filteredCodesCount={filteredCodes.length}
           selectedCodeId={selectedCodeId}
           actionsMenuCodeId={actionsMenuCodeId}
           busyCodeId={busyCodeId}
           currentPage={currentPage}
           totalPages={totalPages}
+          totalCount={promoCodesTotalCount}
           visiblePageNumbers={visiblePageNumbers}
           shownRangeStart={shownRangeStart}
           shownRangeEnd={shownRangeEnd}
@@ -841,7 +842,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             setPage(1);
           }}
           onSearchChange={(value) => {
-            setSearch(value);
+            setSearch(value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH));
             setPage(1);
           }}
           onStatusFilterChange={(value) => {
@@ -867,7 +868,13 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             setPage(1);
           }}
           onExport={handleExport}
-          onRefresh={() => void promoCodesQuery.refetch().catch(() => undefined)}
+          onRefresh={() => {
+            if (!canManagePromoCodes) {
+              return;
+            }
+
+            void promoCodesQuery.refetch().catch(() => undefined);
+          }}
           onOpenCreatePanel={handleOpenCreatePanel}
           onFocusUsage={handleFocusUsage}
           onToggleActionsMenu={handleToggleActionsMenu}

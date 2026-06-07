@@ -44,6 +44,16 @@ export const KLING_MODELS = [
 ] as const;
 
 export const TEMPLATE_TOKEN_COST_MAX_LENGTH = 6;
+export const TEMPLATE_TITLE_MAX_LENGTH = 60;
+export const TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH = 120;
+export const TEMPLATE_REQUIREMENT_MAX_LENGTH = 180;
+export const TEMPLATE_CATEGORY_MAX_LENGTH = 64;
+export const TEMPLATE_TAG_MAX_LENGTH = 48;
+export const TEMPLATE_TAG_MAX_COUNT = 12;
+export const TEMPLATE_MODEL_MAX_LENGTH = 160;
+export const TEMPLATE_PROMPT_MAX_LENGTH = 4000;
+export const TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH = 240;
+export const TEMPLATE_ASSET_METADATA_MAX_LENGTH = 240;
 const TEMPLATE_ASSET_DURATION_MAX_SECONDS = 60 * 60;
 
 export function createInitialTemplateForm(templateType: TemplateType): TemplateFormState {
@@ -60,12 +70,14 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     isPremium: false,
     tokenCost: templateType === "Video" ? "60" : "20",
     previewUrl: "",
+    previewUrlSource: "none",
     previewFileName: "",
     previewContentType: templateType === "Video" ? "video/mp4" : "image/jpeg",
     previewFileSizeBytes: "",
     previewDurationSeconds: "",
     musicDescription: "",
     referenceUrl: "",
+    referenceUrlSource: "none",
     referenceFileName: "",
     referenceContentType: "video/mp4",
     referenceFileSizeBytes: "",
@@ -91,6 +103,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     isPremium: template.isPremium,
     tokenCost: template.tokenCost.toString(),
     previewUrl: template.previewAsset?.url ?? "",
+    previewUrlSource: template.previewAsset?.url ? "persisted" : "none",
     previewFileName: template.previewAsset?.fileName ?? "",
     previewContentType:
       template.previewAsset?.contentType ??
@@ -99,6 +112,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     previewDurationSeconds: template.previewAsset?.durationSeconds?.toString() ?? "",
     musicDescription: template.musicDescription ?? "",
     referenceUrl: template.referenceMotionAsset?.url ?? "",
+    referenceUrlSource: template.referenceMotionAsset?.url ? "persisted" : "none",
     referenceFileName: template.referenceMotionAsset?.fileName ?? "",
     referenceContentType: template.referenceMotionAsset?.contentType ?? "video/mp4",
     referenceFileSizeBytes: template.referenceMotionAsset?.fileSizeBytes?.toString() ?? "",
@@ -119,24 +133,28 @@ export async function saveImageTemplateFromForm(
   status: TemplateStatus
 ): Promise<AdminTemplate> {
   const payload: ImageTemplatePayload = {
-    title: form.title,
-    shortDescription: form.shortDescription,
+    title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
+    shortDescription: normalizeTemplateText(
+      form.shortDescription,
+      TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH
+    ),
     petPhotoRequirements: normalizeRequirements(form.petPhotoRequirements),
-    category: form.category,
+    category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH),
     status,
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
-    previewAsset: buildAsset(
+    previewAsset: buildUploadedAsset(
+      form.previewUrlSource,
       form.previewUrl,
       form.previewFileName,
       form.previewContentType,
       form.previewFileSizeBytes,
       form.previewDurationSeconds
     ),
-    imageModel: form.imageModel,
-    imagePrompt: form.imagePrompt,
+    imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH),
+    imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH),
   };
 
   return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);
@@ -148,34 +166,42 @@ export async function saveVideoTemplateFromForm(
   status: TemplateStatus
 ): Promise<AdminTemplate> {
   const payload: VideoTemplatePayload = {
-    title: form.title,
-    shortDescription: form.shortDescription,
+    title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH),
+    shortDescription: normalizeTemplateText(
+      form.shortDescription,
+      TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH
+    ),
     petPhotoRequirements: normalizeRequirements(form.petPhotoRequirements),
-    category: form.category,
+    category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH),
     status,
     promoBadgeMode: form.promoBadgeMode as TemplatePromoBadgeMode,
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
-    musicDescription: form.musicDescription,
-    previewAsset: buildAsset(
+    musicDescription: normalizeTemplateText(
+      form.musicDescription,
+      TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
+    ),
+    previewAsset: buildUploadedAsset(
+      form.previewUrlSource,
       form.previewUrl,
       form.previewFileName,
       form.previewContentType,
       form.previewFileSizeBytes,
       form.previewDurationSeconds
     ),
-    referenceMotionAsset: buildAsset(
+    referenceMotionAsset: buildUploadedAsset(
+      form.referenceUrlSource,
       form.referenceUrl,
       form.referenceFileName,
       form.referenceContentType,
       form.referenceFileSizeBytes,
       form.referenceDurationSeconds
     ),
-    preprocessingModel: form.preprocessingModel,
-    preprocessingPrompt: form.preprocessingPrompt,
-    klingModel: form.klingModel,
-    klingPrompt: form.klingPrompt,
+    preprocessingModel: normalizeTemplateText(form.preprocessingModel, TEMPLATE_MODEL_MAX_LENGTH),
+    preprocessingPrompt: normalizeTemplateText(form.preprocessingPrompt, TEMPLATE_PROMPT_MAX_LENGTH),
+    klingModel: normalizeTemplateText(form.klingModel, TEMPLATE_MODEL_MAX_LENGTH),
+    klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     keepOriginalSound: form.keepOriginalSound,
   };
 
@@ -204,13 +230,18 @@ export function parseOptionalDecimal(raw?: string): number | undefined {
     : undefined;
 }
 
-function buildAsset(
+function buildUploadedAsset(
+  source: TemplateFormState["previewUrlSource"] | TemplateFormState["referenceUrlSource"],
   url: string,
   fileName: string,
   contentType: string,
   fileSizeBytes: string,
   durationSeconds?: string
 ): TemplateAssetInput | undefined {
+  if (source !== "uploaded") {
+    return undefined;
+  }
+
   if (!url.trim()) {
     return undefined;
   }
@@ -220,8 +251,11 @@ function buildAsset(
 
   return {
     url: url.trim(),
-    fileName: fileName.trim() || inferFileName(url),
-    contentType: contentType.trim() || inferContentType(url),
+    fileName:
+      normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH) || inferFileName(url),
+    contentType:
+      normalizeTemplateText(contentType, TEMPLATE_ASSET_METADATA_MAX_LENGTH) ||
+      inferContentType(url),
     fileSizeBytes: size,
     durationSeconds: duration,
   };
@@ -230,16 +264,21 @@ function buildAsset(
 function normalizeTags(raw: string): string[] {
   return raw
     .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+    .map((tag) => normalizeTemplateText(tag, TEMPLATE_TAG_MAX_LENGTH))
+    .filter(Boolean)
+    .slice(0, TEMPLATE_TAG_MAX_COUNT);
 }
 
 function normalizeRequirements(raw: string): string[] {
   return raw
     .split(/\r?\n/)
-    .map((item) => item.trim())
+    .map((item) => normalizeTemplateText(item, TEMPLATE_REQUIREMENT_MAX_LENGTH))
     .filter(Boolean)
     .slice(0, 6);
+}
+
+export function normalizeTemplateText(raw: string, maxLength: number): string {
+  return raw.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 function parseOptionalNumber(raw: string): number | undefined {
@@ -250,6 +289,10 @@ function parseOptionalNumber(raw: string): number | undefined {
 
 export function normalizeTemplateIntegerInput(raw: string): string {
   return raw.replace(/\D+/g, "").slice(0, TEMPLATE_TOKEN_COST_MAX_LENGTH);
+}
+
+export function normalizeTemplateTextInput(raw: string, maxLength: number): string {
+  return raw.slice(0, maxLength);
 }
 
 function normalizeIntegerString(raw: string): string {

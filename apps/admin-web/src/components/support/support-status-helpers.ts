@@ -1,5 +1,6 @@
 import type { SupportConversationSource, SupportConversationStatus } from "@/lib/api-client";
 import type { Dictionary } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type StatusActionDescriptor = {
   status: SupportConversationStatus;
@@ -18,7 +19,7 @@ export function statusLabel(status: string, text: Dictionary) {
     case "closed":
       return text.supportStatusClosed;
     default:
-      return status;
+      return sanitizeSensitiveText(status, 48);
   }
 }
 

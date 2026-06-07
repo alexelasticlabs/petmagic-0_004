@@ -66,12 +66,32 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n        return {};");
     expect(controllerSource).toContain("canManageSupportWorkspace,");
     expect(controllerSource).toContain("sessionUserRoles,");
+    expect(controllerSource).toContain("const [isSendReplyInFlight, setIsSendReplyInFlight]");
+    expect(controllerSource).toContain("const sendReplyInFlightRef = useRef(false);");
+    expect(controllerSource).toContain("const isSendReplySubmitting = isSendReplyInFlight || sendMutation.isPending;");
+    expect(controllerSource).toContain("const requestSendReply = useCallback(() => {");
+    expect(controllerSource).toContain("sendReplyInFlightRef.current ||");
+    expect(controllerSource).toContain("sendReplyInFlightRef.current = true;");
+    expect(controllerSource).toContain("setIsSendReplyInFlight(true);");
+    expect(controllerSource).toContain("sendReplyInFlightRef.current = false;");
+    expect(controllerSource).toContain("setIsSendReplyInFlight(false);");
+    expect(controllerSource).toContain("requestSendReply,");
+    expect(controllerSource).toContain("isSendReplySubmitting,");
+    expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace;"
+      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
     );
-    expect(pageSource).toContain("!canManageSupportWorkspace ||\n      sendMutation.isPending");
     expect(pageSource).toContain("if (isComposerDisabled) return;");
     expect(sidePanelSource).toContain("if (!canManageSupportWorkspace) {\n      return;");
+    expect(sidePanelSource).toContain(
+      "const canRetrySubjectUserContext = canViewSubjectUserContext && !isSubjectUserDeleted;"
+    );
+    expect(sidePanelSource).toContain(
+      "!canRetrySubjectUserContext ||\n                      analyticsQuery.isFetching"
+    );
+    expect(sidePanelSource).toContain(
+      "if (!canRetrySubjectUserContext) {\n                        return;\n                      }\n\n                      void Promise.all(["
+    );
     expect(sidePanelSource).toContain(
       "disabled={!canManageSupportWorkspace || statusMutation.isPending}"
     );
@@ -92,18 +112,53 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("setQueuePage(1);");
     expect(controllerSource).toContain("page: queuePage");
     expect(controllerSource).toContain("canGoToNextQueuePage");
+    expect(controllerSource).toContain("useQuery<AdminSupportInboxPage>");
+    expect(controllerSource).toContain("sortSupportQueueItems(inboxQuery.data?.items ?? [])");
+    expect(controllerSource).toContain("const canGoToNextQueuePage = Boolean(inboxQuery.data?.hasMore);");
+    expect(controllerSource).not.toContain("(inboxQuery.data?.length ?? 0) >= SUPPORT_INBOX_PAGE_SIZE");
     expect(pageSource).toContain("setQueuePage((currentPage) => Math.max(1, currentPage - 1))");
     expect(pageSource).toContain("setQueuePage((currentPage) => currentPage + 1)");
     expect(pageSource).toContain("disabled={!canGoToNextQueuePage || inboxQuery.isFetching}");
     expect(inboxPageSource).toContain("if (selectedConversationId) {");
   });
 
+  it("bounds support queue search and reply composer values before storing them", () => {
+    const controllerSource = readFileSync(controllerPath, "utf8");
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(controllerSource).toContain("SUPPORT_INBOX_SEARCH_MAX_LENGTH,");
+    expect(controllerSource).toContain("SUPPORT_MESSAGE_BODY_MAX_LENGTH,");
+    expect(controllerSource).toContain(
+      "export const SUPPORT_SEARCH_MAX_LENGTH = SUPPORT_INBOX_SEARCH_MAX_LENGTH;"
+    );
+    expect(controllerSource).toContain(
+      "export const SUPPORT_REPLY_MAX_LENGTH = SUPPORT_MESSAGE_BODY_MAX_LENGTH;"
+    );
+    expect(controllerSource).toContain(
+      "setRawSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH));"
+    );
+    expect(controllerSource).toContain("const setSupportReply = useCallback((value: string) => {");
+    expect(controllerSource).toContain("setReply(value.slice(0, SUPPORT_REPLY_MAX_LENGTH));");
+    expect(controllerSource).toContain("setReply: setSupportReply,");
+    expect(pageSource).toContain("maxLength={SUPPORT_SEARCH_MAX_LENGTH}");
+    expect(pageSource).toContain("maxLength={SUPPORT_REPLY_MAX_LENGTH}");
+    expect(pageSource).toContain(
+      "setSearchQuery(event.target.value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))"
+    );
+    expect(pageSource).toContain("setReply(event.target.value.slice(0, SUPPORT_REPLY_MAX_LENGTH))");
+    expect(pageSource).not.toContain("onChange={(event) => setSearchQuery(event.target.value)}");
+    expect(pageSource).not.toContain("onChange={(event) => setReply(event.target.value)}");
+  });
+
   it("keeps route-level conversation load failures retryable", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
 
     expect(pageSource).toContain("conversationQuery.isError || !conversation");
+    expect(pageSource).toContain(
+      "if (!canManageSupportWorkspace) {\n                    return;\n                  }\n\n                  void conversationQuery.refetch().catch(() => undefined);"
+    );
     expect(pageSource).toContain("void conversationQuery.refetch().catch(() => undefined)");
-    expect(pageSource).toContain("disabled={conversationQuery.isFetching}");
+    expect(pageSource).toContain("disabled={!canManageSupportWorkspace || conversationQuery.isFetching}");
     expect(pageSource).toContain("{text.supportRetryAction}");
     expect(pageSource).toContain("{text.supportBackToInbox}");
   });
@@ -114,9 +169,15 @@ describe("support conversation controller errors", () => {
 
     expect(pageSource).toContain("queueStatusFilter,");
     expect(pageSource).toContain(
-      'setQueueStatusFilter(value as "all" | SupportConversationStatus);'
+      'const setExactQueueStatusFilter = (value: "all" | SupportConversationStatus) => {'
     );
+    expect(pageSource).toContain('setSubFilter("all");');
+    expect(pageSource).toContain('setQueueFilter("all");');
+    expect(pageSource).toContain("setQueueStatusFilter(value);");
     expect(pageSource).toContain("setQueuePage(1);");
+    expect(pageSource).toContain(
+      'setExactQueueStatusFilter(value as "all" | SupportConversationStatus);'
+    );
     expect(controllerSource).toContain('queueStatusFilter?: "all" | SupportConversationStatus;');
     expect(controllerSource).toContain(
       'const effectiveQueueStatus =\n    queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;'
@@ -134,7 +195,7 @@ describe("support conversation controller errors", () => {
 
     expect(pageSource).toContain("setQueueFilter,");
     expect(pageSource).toContain(
-      'const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {'
+      'const setQueueSubFilter = (value: "all" | "unassigned" | "archive") => {'
     );
     expect(pageSource).toContain('setQueueStatusFilter("all");');
     expect(pageSource).toContain('setQueueFilter("Closed");');
@@ -142,14 +203,70 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain('setQueueFilter("all");');
     expect(pageSource).toContain('onClick={() => setQueueSubFilter("archive")}');
     expect(pageSource).toContain('onClick={() => setQueueSubFilter("unassigned")}');
+    expect(pageSource).toContain("const displayedInboxItems = filteredInboxItems;");
     expect(pageSource).not.toContain('onClick={() => setSubFilter("archive")}');
     expect(pageSource).not.toContain('onClick={() => setSubFilter("unassigned")}');
+    expect(pageSource).not.toContain('const isArchived = item.status === "Closed";');
+    expect(pageSource).not.toContain("return !item.assignedAdminId;");
+  });
+
+  it("sources support queue counters from backend aggregate metrics", () => {
+    const controllerSource = readFileSync(controllerPath, "utf8");
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(controllerSource).toContain("fetchSupportInboxMetrics,");
+    expect(controllerSource).toContain("queryKey: adminQueryKeys.supportInboxMetrics");
+    expect(controllerSource).toContain("queryFn: ({ signal }) => fetchSupportInboxMetrics(signal)");
+    expect(controllerSource).toContain("inboxMetrics: inboxMetricsQuery.data ?? null");
+    expect(pageSource).toContain("const archiveCount = inboxMetrics?.closedConversations ?? 0;");
+    expect(pageSource).toContain("const queueCount = inboxMetrics?.openConversations ?? 0;");
+    expect(pageSource).toContain(
+      "const incomingMessagesCount = inboxMetrics?.unreadForAdminConversations ?? 0;"
+    );
+    expect(pageSource).toContain(
+      "const unassignedCount = inboxMetrics?.unassignedConversations ?? 0;"
+    );
+    expect(pageSource).not.toContain(
+      'filteredInboxItems.filter((item) => item.status === "Closed").length'
+    );
+    expect(pageSource).not.toContain(
+      "filteredInboxItems.filter((item) => item.unreadForAdmin).length"
+    );
+    expect(pageSource).not.toContain(
+      "filteredInboxItems.filter((item) => !item.assignedAdminId).length"
+    );
+  });
+
+  it("uses backend totalCount for support queue pagination footer", () => {
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(pageSource).toContain(
+      "const inboxTotalCount = inboxQuery.data?.totalCount ?? filteredInboxItems.length;"
+    );
+    expect(pageSource).toContain("const inboxPageSize = inboxQuery.data?.pageSize ?? displayedInboxItems.length;");
+    expect(pageSource).toContain("const inboxCurrentPage = inboxQuery.data?.page ?? queuePage;");
+    expect(pageSource).toContain(
+      "? `Страница ${inboxCurrentPage}: показано ${queueShownStart}-${queueShownEnd} из ${inboxTotalCount}`"
+    );
+    expect(pageSource).toContain(
+      ": `Page ${inboxCurrentPage}: showing ${queueShownStart}-${queueShownEnd} of ${inboxTotalCount}`"
+    );
+    expect(pageSource).not.toContain(
+      "`Page ${queuePage}: showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`"
+    );
+    expect(pageSource).not.toContain(
+      "`Страница ${queuePage}: показано ${displayedInboxItems.length} из ${filteredInboxItems.length}`"
+    );
   });
 
   it("does not expose backend-unsupported support priority and sort controls as local queue filters", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
     const followups = readFileSync(adminFollowupsPath, "utf8");
 
+    expect(pageSource).not.toContain('"waiting" | "unassigned"');
+    expect(pageSource).not.toContain('setQueueSubFilter("waiting")');
+    expect(pageSource).not.toContain('subFilter === "waiting"');
+    expect(pageSource).not.toContain('item.status === "New" || item.status === "WaitingForUser"');
     expect(pageSource).not.toContain("queuePriorityFilter");
     expect(pageSource).not.toContain("setQueuePriorityFilter");
     expect(pageSource).not.toContain("queueSortBy");
@@ -225,6 +342,44 @@ describe("support conversation controller errors", () => {
     expect(infoPanelSource).toContain("{canViewSubjectUserContext ? (");
   });
 
+  it("encodes support route ids before building notification and queue hrefs", () => {
+    const controllerSource = readFileSync(controllerPath, "utf8");
+    const pageSource = readFileSync(supportPagePath, "utf8");
+    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
+
+    expect(controllerSource).toContain(
+      "const supportConversationPathId = encodeURIComponent(conversationId);"
+    );
+    expect(controllerSource).toContain("href: `/${locale}/support/${supportConversationPathId}`");
+    expect(pageSource).toContain(
+      "const supportConversationPathId = encodeURIComponent(item.conversationId);"
+    );
+    expect(pageSource).toContain("href={`/${locale}/support/${supportConversationPathId}`}");
+    expect(sidePanelSource).toContain(
+      "`/${locale}/support/${encodeURIComponent(conversation.conversationId)}`"
+    );
+    expect(sidePanelSource).toContain(
+      "`/${locale}/users/${encodeURIComponent(conversation.initiatorUserId)}`"
+    );
+    expect(controllerSource).not.toContain("href: `/${locale}/support/${conversationId}`");
+    expect(pageSource).not.toContain("href={`/${locale}/support/${item.conversationId}`}");
+    expect(sidePanelSource).not.toContain("`/${locale}/support/${conversation.conversationId}`");
+    expect(sidePanelSource).not.toContain("`/${locale}/users/${conversation.initiatorUserId}`");
+  });
+
+  it("encodes support message ids before using them as DOM jump targets", () => {
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(pageSource).toContain("function getSupportMessageElementId(messageId: string)");
+    expect(pageSource).toContain("return `message-${encodeURIComponent(messageId)}`;");
+    expect(pageSource).toContain(
+      "const target = document.getElementById(getSupportMessageElementId(messageId));"
+    );
+    expect(pageSource).toContain("id={getSupportMessageElementId(message.messageId)}");
+    expect(pageSource).not.toContain("document.getElementById(`message-${messageId}`)");
+    expect(pageSource).not.toContain("id={`message-${message.messageId}`}");
+  });
+
   it("keeps close-conversation confirmations open until status mutations succeed", () => {
     const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
     const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
@@ -247,8 +402,33 @@ describe("support conversation controller errors", () => {
     expect(infoPanelSource).toContain(
       "if (!canManageSupportWorkspace || !pendingStatusConfirm || statusMutation.isPending)"
     );
+    expect(infoPanelSource).toContain("const requestStatusChange = (status: SupportConversationStatus) =>");
+    expect(infoPanelSource).toContain(
+      "!canManageSupportWorkspace ||\n      statusMutation.isPending ||\n      conversation.status === status"
+    );
+    expect(infoPanelSource).toContain("onClick={() => requestStatusChange(primaryStatusAction.status)}");
+    expect(infoPanelSource).toContain("onClick={() => requestStatusChange(action.status)}");
+    expect(infoPanelSource).toContain(
+      "onClick={() => requestStatusChange(destructiveStatusAction.status)}"
+    );
     expect(infoPanelSource).not.toContain(
       "const nextStatus = pendingStatusConfirm;\n                          setPendingStatusConfirm(null);"
+    );
+    expect(infoPanelSource).not.toContain("statusMutation.mutate(primaryStatusAction.status);");
+    expect(infoPanelSource).not.toContain("statusMutation.mutate(action.status);");
+  });
+
+  it("guards support reopen status actions in handlers, not only disabled UI", () => {
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(pageSource).toContain("const requestReopenConversation = () =>");
+    expect(pageSource).toContain(
+      "!canManageSupportWorkspace ||\n      !reopenStatusAction ||\n      statusMutation.isPending ||\n      conversation?.status === reopenStatusAction.status"
+    );
+    expect(pageSource).toContain("statusMutation.mutate(reopenStatusAction.status);");
+    expect(pageSource).toContain("onClick={requestReopenConversation}");
+    expect(pageSource).not.toContain(
+      "onClick={() => statusMutation.mutate(reopenStatusAction.status)}"
     );
   });
 
@@ -269,21 +449,46 @@ describe("support conversation controller errors", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
 
     expect(pageSource).toContain("const submitReply = () => {");
-    expect(pageSource).toContain("isConversationReadOnly ||\n      !canManageSupportWorkspace ||");
+    expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
     expect(pageSource).toContain(
-      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace;"
+      "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
     );
+    expect(pageSource).toContain("if (isComposerDisabled ||");
     expect(pageSource).toContain("(!reply.trim() && !hasComposerAttachment)");
-    expect(pageSource).toContain("sendMutation.mutate();");
+    expect(pageSource).toContain("disabled={isComposerDisabled}");
+    expect(pageSource).toContain(
+      "className={styles.composerReplyClose}\n                              onClick={() => selectReplyToMessage(null)}\n                              disabled={isComposerDisabled}"
+    );
+    expect(pageSource).toContain("requestSendReply();");
+    expect(pageSource).not.toContain("sendMutation.mutate();");
     expect(pageSource).not.toContain(
       "const submitReply = () => {\n    sendMutation.mutate();\n  };"
     );
   });
 
-  it("does not abort older-message loads or clear optimistic attachment URLs on preview changes", () => {
+  it("uses user-facing support errors for missing subject user context", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
 
+    expect(controllerSource).toContain("const supportSubjectUserMissing =");
+    expect(controllerSource).toContain("Карточка пользователя недоступна для этого обращения.");
+    expect(controllerSource).toContain("User context is unavailable for this conversation.");
+    expect(controllerSource).toContain("throw new Error(supportSubjectUserMissing);");
+    expect(controllerSource).not.toContain('throw new Error("support.subject_user_missing")');
+  });
+
+  it("does not abort older-message loads or clear optimistic attachment URLs on preview changes", () => {
+    const controllerSource = readFileSync(controllerPath, "utf8");
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
     expect(controllerSource).toContain("}, [attachmentPreviewUrl]);");
+    expect(controllerSource).toContain("const loadOlderMessages = useCallback(async () => {");
+    expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n      return;\n    }");
+    expect(pageSource).toContain(
+      "if (!canManageSupportWorkspace) {\n                                return;\n                              }\n\n                              void loadOlderMessages();"
+    );
+    expect(pageSource).toContain(
+      "disabled={!canManageSupportWorkspace || conversationQuery.isFetching}"
+    );
     expect(controllerSource).toContain("if (markReadDebounceRef.current) {");
     expect(controllerSource).toContain("clearTimeout(markReadDebounceRef.current);");
     expect(controllerSource).toContain("markReadDebounceRef.current = null;");

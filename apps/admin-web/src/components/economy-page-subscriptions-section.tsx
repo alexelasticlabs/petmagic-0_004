@@ -15,7 +15,11 @@ import {
 } from "@/components/economy-page.content";
 import { canCancelSubscription } from "@/components/economy-page.helpers";
 import styles from "@/components/economy-page.module.css";
-import { type AdminEconomySubscription, type AdminSubscriptionEvent } from "@/lib/api-client";
+import {
+  ECONOMY_QUERY_FILTER_MAX_LENGTH,
+  type AdminEconomySubscription,
+  type AdminSubscriptionEvent,
+} from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -32,6 +36,7 @@ type EconomyPageSubscriptionsSectionProps = {
   subscriptionsHasMore: boolean;
   subscriptionItems: AdminEconomySubscription[];
   subscriptionsIsFetching: boolean;
+  cancelSubscriptionPending: boolean;
   subscriptionEvents: AdminSubscriptionEvent[];
   setSubscriptionProvider: (value: string) => void;
   setSubscriptionStatus: (value: string) => void;
@@ -74,6 +79,7 @@ export function EconomyPageSubscriptionsSection({
   subscriptionsHasMore,
   subscriptionItems,
   subscriptionsIsFetching,
+  cancelSubscriptionPending,
   subscriptionEvents,
   setSubscriptionProvider,
   setSubscriptionStatus,
@@ -113,8 +119,12 @@ export function EconomyPageSubscriptionsSection({
               <input
                 className={styles.input}
                 value={subscriptionSearch}
-                onChange={(event) => setSubscriptionSearch(event.target.value)}
-                maxLength={100}
+                onChange={(event) =>
+                  setSubscriptionSearch(
+                    event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH)
+                  )
+                }
+                maxLength={ECONOMY_QUERY_FILTER_MAX_LENGTH}
                 placeholder={text.subscriptionSearchPlaceholder}
               />
             </label>
@@ -167,7 +177,7 @@ export function EconomyPageSubscriptionsSection({
                       <button
                         type="button"
                         className={styles.dangerButton}
-                        disabled={!canCancelSubscription(item)}
+                        disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
                         onClick={() => onCancelSubscription(item)}
                       >
                         {text.cancelSubscriptionAction}

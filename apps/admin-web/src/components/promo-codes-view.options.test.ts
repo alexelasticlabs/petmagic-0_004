@@ -1,7 +1,17 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
 import { getDictionary } from "@/lib/i18n";
+
+const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
+const promoCodesListCardPath = fileURLToPath(
+  new URL("./promo-codes-list-card.tsx", import.meta.url)
+);
+const promoCodesEditorDrawerPath = fileURLToPath(
+  new URL("./promo-codes-editor-drawer.tsx", import.meta.url)
+);
 
 describe("buildPromoCodesViewOptions", () => {
   it("returns stable options shape for ru locale", () => {
@@ -24,11 +34,7 @@ describe("buildPromoCodesViewOptions", () => {
       "archived",
     ]);
 
-    expect(result.rewardOptions.map((item) => item.value)).toEqual([
-      "all",
-      "spark",
-      "premium_days",
-    ]);
+    expect(result.rewardOptions.map((item) => item.value)).toEqual(["all", "spark"]);
 
     expect(result.formStatusOptions.map((item) => item.value)).toEqual(["active", "paused"]);
 
@@ -58,5 +64,32 @@ describe("buildPromoCodesViewOptions", () => {
       { value: "archived", label: "Archived" },
     ]);
     expect(result.pageSizeOptions[1]?.label).toBe("10 per page");
+  });
+
+  it("does not expose backend-unsupported premium rewards as production UI options", () => {
+    const text = getDictionary("en");
+    const result = buildPromoCodesViewOptions("en", text);
+    const drawerSource = readFileSync(promoCodesEditorDrawerPath, "utf8");
+
+    expect(text.promoCodesRewardTypePremiumOption).not.toMatch(/soon/i);
+    expect(getDictionary("ru").promoCodesRewardTypePremiumOption).not.toContain("скоро");
+    expect(result.rewardOptions.map((item) => item.value)).not.toContain("premium_days");
+    expect(drawerSource).not.toContain('<option value="premium_days" disabled>');
+    expect(drawerSource).toContain('<option value="spark">{text.promoCodesRewardTypeSparkOption}</option>');
+  });
+
+  it("bounds promo code search input before filtering the client-side registry", () => {
+    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const listSource = readFileSync(promoCodesListCardPath, "utf8");
+
+    expect(viewSource).toContain("const PROMO_CODES_SEARCH_MAX_LENGTH = 120;");
+    expect(viewSource).toContain("setSearch(value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH));");
+    expect(listSource).toContain("const PROMO_CODES_SEARCH_MAX_LENGTH = 120;");
+    expect(listSource).toContain(
+      "onSearchChange(event.target.value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH))"
+    );
+    expect(listSource).toContain("maxLength={PROMO_CODES_SEARCH_MAX_LENGTH}");
+    expect(viewSource).not.toContain("setSearch(value);\n            setPage(1);");
+    expect(listSource).not.toContain("onChange={(event) => onSearchChange(event.target.value)}");
   });
 });

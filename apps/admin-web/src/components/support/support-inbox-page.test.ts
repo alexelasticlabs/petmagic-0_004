@@ -10,8 +10,15 @@ describe("support inbox page", () => {
 
     expect(source).toContain("tone=\"danger\"");
     expect(source).toContain("title={text.supportLoadError}");
+    expect(source).toContain("enabled: Boolean(session)");
+    expect(source).toContain(
+      "if (!session) {\n                  return;\n                }\n\n                void inboxQuery.refetch().catch(() => undefined);"
+    );
     expect(source).toContain("inboxQuery.refetch().catch(() => undefined)");
-    expect(source).toContain("disabled={inboxQuery.isFetching}");
+    expect(source).toContain("disabled={!session || inboxQuery.isFetching}");
     expect(source).toContain("{text.adminRetryAction}");
+    expect(source).toContain("useQuery<AdminSupportInboxPage>");
+    expect(source).toContain("sortSupportQueueItems(inboxQuery.data?.items ?? [])");
+    expect(source).not.toContain("sortSupportQueueItems(inboxQuery.data ?? [])");
   });
 });

@@ -8,12 +8,14 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchAdminCurrencyPacks,
+  fetchAdminEconomyDashboardMetrics,
   fetchAdminEconomyLedger,
   fetchAdminEconomyPurchases,
   fetchAdminEconomySubscriptions,
   fetchAdminPaymentProviderConfigs,
   fetchAdminSubscriptionEvents,
   fetchAdminSubscriptionPlans,
+  ECONOMY_QUERY_FILTER_MAX_LENGTH,
   normalizeAdminEconomyPurchasesQuery,
   normalizeAdminEconomySubscriptionsQuery,
   useAuthSession,
@@ -40,6 +42,7 @@ function useDebouncedValue(value: string, delayMs: number) {
 export function useEconomyPageController({ locale }: UseEconomyPageControllerParams) {
   const router = useRouter();
   const session = useAuthSession();
+  const canLoadEconomy = session?.user.roles.includes("Admin") ?? false;
   const [ledgerSource, setLedgerSource] = useState("");
   const [purchaseStatus, setPurchaseStatus] = useState("");
   const [purchaseProvider, setPurchaseProvider] = useState("");
@@ -55,9 +58,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const debouncedSubscriptionSearch = useDebouncedValue(subscriptionSearch, 350);
 
   useEffect(() => {
-    if (!session) {
-      ensureAdminSession(locale, router);
-    }
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
 
   const updatePurchaseStatus = useCallback((value: string) => {
@@ -71,7 +72,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   }, []);
 
   const updatePurchaseSearch = useCallback((value: string) => {
-    setPurchaseSearch(value);
+    setPurchaseSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));
     setPurchasePage(0);
   }, []);
 
@@ -86,7 +87,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   }, []);
 
   const updateSubscriptionSearch = useCallback((value: string) => {
-    setSubscriptionSearch(value);
+    setSubscriptionSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));
     setSubscriptionPage(0);
   }, []);
 
@@ -94,6 +95,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     queryKey: adminQueryKeys.economyLedger(ledgerSource || "all", "all"),
     queryFn: ({ signal }) =>
       fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }, signal),
+    enabled: canLoadEconomy,
   });
 
   const purchasesQueryParams = useMemo(
@@ -111,6 +113,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const purchasesQuery = useQuery({
     queryKey: adminQueryKeys.economyPurchases(purchasesQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomyPurchases(purchasesQueryParams, signal),
+    enabled: canLoadEconomy,
     placeholderData: keepPreviousData,
   });
 
@@ -129,17 +132,20 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const subscriptionsQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptions(subscriptionsQueryParams),
     queryFn: ({ signal }) => fetchAdminEconomySubscriptions(subscriptionsQueryParams, signal),
+    enabled: canLoadEconomy,
     placeholderData: keepPreviousData,
   });
 
   const subscriptionPlansQuery = useQuery({
     queryKey: adminQueryKeys.economySubscriptionPlans,
     queryFn: ({ signal }) => fetchAdminSubscriptionPlans(signal),
+    enabled: canLoadEconomy,
   });
 
   const providerConfigsQuery = useQuery({
     queryKey: adminQueryKeys.economyPaymentProviderConfigs,
     queryFn: ({ signal }) => fetchAdminPaymentProviderConfigs(signal),
+    enabled: canLoadEconomy,
   });
 
   const subscriptionEventsQuery = useQuery({
@@ -153,11 +159,21 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
         provider: eventProvider || undefined,
         status: eventStatus || undefined,
       }, signal),
+    enabled: canLoadEconomy,
   });
 
   const packsQuery = useQuery({
     queryKey: adminQueryKeys.economyPacks,
     queryFn: ({ signal }) => fetchAdminCurrencyPacks(signal),
+    enabled: canLoadEconomy,
+  });
+
+  const economyDashboardMetricsQuery = useQuery({
+    queryKey: adminQueryKeys.economyDashboardMetrics,
+    queryFn: ({ signal }) => fetchAdminEconomyDashboardMetrics(signal),
+    enabled: canLoadEconomy,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
 
   const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
@@ -178,6 +194,10 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const packs = useMemo(() => packsQuery.data ?? [], [packsQuery.data]);
 
   const refetchAll = useCallback(async () => {
+    if (!canLoadEconomy) {
+      return;
+    }
+
     await Promise.all([
       ledgerQuery.refetch(),
       purchasesQuery.refetch(),
@@ -186,8 +206,11 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       providerConfigsQuery.refetch(),
       subscriptionEventsQuery.refetch(),
       packsQuery.refetch(),
+      economyDashboardMetricsQuery.refetch(),
     ]);
   }, [
+    economyDashboardMetricsQuery,
+    canLoadEconomy,
     ledgerQuery,
     packsQuery,
     providerConfigsQuery,
@@ -198,20 +221,23 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   ]);
 
   const metrics = useMemo(() => {
-    const credited = ledgerItems
-      .filter((item) => item.delta > 0)
-      .reduce((sum, item) => sum + item.delta, 0);
-    const debited = ledgerItems
-      .filter((item) => item.delta < 0)
-      .reduce((sum, item) => sum + Math.abs(item.delta), 0);
-    const grossRevenue = purchaseItems.reduce((sum, item) => sum + item.priceAmount, 0);
+    const credited = economyDashboardMetricsQuery.data?.totalWalletCredits ?? 0;
+    const debited = economyDashboardMetricsQuery.data?.totalWalletDebits ?? 0;
+    const grossRevenue = economyDashboardMetricsQuery.data?.revenueThisWeek ?? 0;
+    const revenueCurrencyCode = economyDashboardMetricsQuery.data?.currencyCode ?? "USD";
     const activePacks = packs.filter((pack) => pack.isActive).length;
 
-    return { credited, debited, grossRevenue, activePacks };
-  }, [ledgerItems, packs, purchaseItems]);
+    return { credited, debited, grossRevenue, revenueCurrencyCode, activePacks };
+  }, [
+    economyDashboardMetricsQuery.data?.currencyCode,
+    economyDashboardMetricsQuery.data?.revenueThisWeek,
+    economyDashboardMetricsQuery.data?.totalWalletCredits,
+    economyDashboardMetricsQuery.data?.totalWalletDebits,
+    packs,
+  ]);
 
-  const activeSubscriptions = subscriptionItems.filter((item) => item.status === "active").length;
-  const renewalStops = subscriptionItems.filter((item) => item.cancelAtPeriodEnd).length;
+  const activeSubscriptions = economyDashboardMetricsQuery.data?.activeSubscriptions ?? 0;
+  const renewalStops = economyDashboardMetricsQuery.data?.renewalStops ?? 0;
   const activePlans = subscriptionPlans.filter((item) => item.isActive).length;
   const enabledRoutes = providerConfigs.filter((item) => item.isEnabled).length;
   const premiumMetrics = { activeSubscriptions, renewalStops, activePlans, enabledRoutes };
@@ -223,7 +249,8 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isLoading ||
     providerConfigsQuery.isLoading ||
     subscriptionEventsQuery.isLoading ||
-    packsQuery.isLoading;
+    packsQuery.isLoading ||
+    economyDashboardMetricsQuery.isLoading;
 
   const hasError =
     ledgerQuery.isError ||
@@ -232,7 +259,8 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isError ||
     providerConfigsQuery.isError ||
     subscriptionEventsQuery.isError ||
-    packsQuery.isError;
+    packsQuery.isError ||
+    economyDashboardMetricsQuery.isError;
 
   const isFetching =
     ledgerQuery.isFetching ||
@@ -241,7 +269,8 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionPlansQuery.isFetching ||
     providerConfigsQuery.isFetching ||
     subscriptionEventsQuery.isFetching ||
-    packsQuery.isFetching;
+    packsQuery.isFetching ||
+    economyDashboardMetricsQuery.isFetching;
 
   return {
     eventProvider,

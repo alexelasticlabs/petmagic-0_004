@@ -14,7 +14,7 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   fetchSupportInbox,
   useAuthSession,
-  type AdminSupportConversationSummary,
+  type AdminSupportInboxPage,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
@@ -34,14 +34,14 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     }
   }, [locale, router, session]);
 
-  const inboxQuery = useQuery<AdminSupportConversationSummary[]>({
+  const inboxQuery = useQuery<AdminSupportInboxPage>({
     queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
     queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
     enabled: Boolean(session),
   });
 
   const sortedConversations = useMemo(
-    () => sortSupportQueueItems(inboxQuery.data ?? []),
+    () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );
 
@@ -79,8 +79,14 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
           action={
             <Button
               variant="secondary"
-              onClick={() => void inboxQuery.refetch().catch(() => undefined)}
-              disabled={inboxQuery.isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void inboxQuery.refetch().catch(() => undefined);
+              }}
+              disabled={!session || inboxQuery.isFetching}
             >
               {text.adminRetryAction}
             </Button>

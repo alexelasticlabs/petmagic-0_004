@@ -198,7 +198,7 @@ export function SupportConversationSidePanel({
 
   const openAttachmentBlob = async (message: AdminSupportMessage) => {
     const actionKey = getAttachmentActionKey(message, "open");
-    if (pendingAttachmentActionKey !== null) {
+    if (!canManageSupportWorkspace || pendingAttachmentActionKey !== null) {
       return;
     }
 
@@ -230,7 +230,7 @@ export function SupportConversationSidePanel({
 
   const downloadAttachmentBlob = async (message: AdminSupportMessage) => {
     const actionKey = getAttachmentActionKey(message, "download");
-    if (pendingAttachmentActionKey !== null) {
+    if (!canManageSupportWorkspace || pendingAttachmentActionKey !== null) {
       return;
     }
 
@@ -268,6 +268,7 @@ export function SupportConversationSidePanel({
   const isUserActive = userQuery.data?.isActive ?? true;
   const isUserPremium = canViewSubjectUserContext ? (userQuery.data?.isPremium ?? false) : false;
   const canManageSubjectUser = canViewSubjectUserContext && sessionUserRoles.includes("Admin");
+  const canRetrySubjectUserContext = canViewSubjectUserContext && !isSubjectUserDeleted;
   const isModerationPending = setUserActiveMutation.isPending || setUserPremiumMutation.isPending;
   const pendingUserActionCopy = pendingUserAction
     ? getPendingUserActionCopy(pendingUserAction, userDisplayName, locale)
@@ -473,7 +474,9 @@ export function SupportConversationSidePanel({
                     {conversation.assistantScenario ? (
                       <div className={styles.spKvRow}>
                         <span>{text.supportAssistantScenarioLabel}</span>
-                        <strong>{conversation.assistantScenario}</strong>
+                        <strong>
+                          {formatSafeSupportDisplay(conversation.assistantScenario, "—", 120)}
+                        </strong>
                       </div>
                     ) : null}
                     {conversation.relatedGenerationId ? (
@@ -536,8 +539,8 @@ export function SupportConversationSidePanel({
                     <Link
                       href={
                         isSubjectUserDeleted
-                          ? `/${locale}/support/${conversation.conversationId}`
-                          : `/${locale}/users/${conversation.initiatorUserId}`
+                          ? `/${locale}/support/${encodeURIComponent(conversation.conversationId)}`
+                          : `/${locale}/users/${encodeURIComponent(conversation.initiatorUserId)}`
                       }
                       className={styles.spLinkBtn}
                       aria-disabled={isSubjectUserDeleted}
@@ -620,12 +623,17 @@ export function SupportConversationSidePanel({
                     loadingTitle={text.loading}
                     errorTitle={text.supportContextLoadError}
                     isRetrying={
+                      !canRetrySubjectUserContext ||
                       analyticsQuery.isFetching ||
                       purchasesQuery.isFetching ||
                       subscriptionQuery.isFetching
                     }
                     retryLabel={text.supportRetryAction}
                     onRetry={() => {
+                      if (!canRetrySubjectUserContext) {
+                        return;
+                      }
+
                       void Promise.all([
                         analyticsQuery.refetch(),
                         purchasesQuery.refetch(),
@@ -958,7 +966,7 @@ export function SupportConversationSidePanel({
                           <button
                             type="button"
                             onClick={() => void openAttachmentBlob(message)}
-                            disabled={pendingAttachmentActionKey !== null}
+                            disabled={!canManageSupportWorkspace || pendingAttachmentActionKey !== null}
                             className="ui-button ui-button--secondary ui-button--sm"
                           >
                             {locale === "ru" ? "Открыть" : "Open"}
@@ -967,7 +975,7 @@ export function SupportConversationSidePanel({
                         <button
                           type="button"
                           onClick={() => void downloadAttachmentBlob(message)}
-                          disabled={pendingAttachmentActionKey !== null}
+                          disabled={!canManageSupportWorkspace || pendingAttachmentActionKey !== null}
                           className="ui-button ui-button--ghost ui-button--sm"
                         >
                           {locale === "ru" ? "Скачать" : "Download"}
@@ -1067,25 +1075,25 @@ function getPendingUserActionCopy(action: PendingUserAction, userLabel: string, 
       case "activate":
         return {
           title: "Разблокировать пользователя?",
-          description: `Доступ для ${target} будет восстановлен. Действие будет записано в audit log backend.`,
+          description: `Доступ для ${target} будет восстановлен. Действие будет записано в audit log.`,
           confirmLabel: "Разблокировать",
         };
       case "deactivate":
         return {
           title: "Заблокировать пользователя?",
-          description: `Пользователь ${target} потеряет доступ к приложению. Действие будет записано в audit log backend.`,
+          description: `Пользователь ${target} потеряет доступ к приложению. Действие будет записано в audit log.`,
           confirmLabel: "Заблокировать",
         };
       case "grantPremium":
         return {
           title: "Включить premium?",
-          description: `Premium для ${target} будет включен только через admin backend. Проверьте основание перед подтверждением.`,
+          description: `Premium для ${target} будет включен через admin-инструменты. Проверьте основание перед подтверждением.`,
           confirmLabel: "Включить",
         };
       case "revokePremium":
         return {
           title: "Отключить premium?",
-          description: `Premium для ${target} будет отключен через admin backend. Действие будет записано в audit log backend.`,
+          description: `Premium для ${target} будет отключен через admin-инструменты. Действие будет записано в audit log.`,
           confirmLabel: "Отключить",
         };
     }
@@ -1095,25 +1103,25 @@ function getPendingUserActionCopy(action: PendingUserAction, userLabel: string, 
     case "activate":
       return {
         title: "Unblock user?",
-        description: `Access for ${target} will be restored. The backend audit log will record this action.`,
+        description: `Access for ${target} will be restored. The audit log will record this action.`,
         confirmLabel: "Unblock",
       };
     case "deactivate":
       return {
         title: "Block user?",
-        description: `${target} will lose app access. The backend audit log will record this action.`,
+        description: `${target} will lose app access. The audit log will record this action.`,
         confirmLabel: "Block",
       };
     case "grantPremium":
       return {
         title: "Grant premium?",
-        description: `Premium for ${target} will be granted only through the admin backend. Verify the reason before confirming.`,
+        description: `Premium for ${target} will be granted through admin tools. Verify the reason before confirming.`,
         confirmLabel: "Grant",
       };
     case "revokePremium":
       return {
         title: "Revoke premium?",
-        description: `Premium for ${target} will be revoked through the admin backend. The backend audit log will record this action.`,
+        description: `Premium for ${target} will be revoked through admin tools. The audit log will record this action.`,
         confirmLabel: "Revoke",
       };
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatSafeTemplateAnalyticsExportName,
   sanitizeEventAnalyticsForExport,
   sanitizeFailureBreakdownForExport,
   sanitizeRecentRunsForExport,
@@ -9,6 +10,16 @@ import {
 import type { AdminTemplate, AdminTemplateRecentGeneration } from "@/lib/api-client";
 
 describe("template analytics export", () => {
+  it("formats safe analytics export filenames from template ids", () => {
+    expect(formatSafeTemplateAnalyticsExportName(" template/one two?x ")).toBe(
+      "template-template-one-two-x-analytics.json"
+    );
+    expect(formatSafeTemplateAnalyticsExportName("../")).toBe("template-template-analytics.json");
+    expect(formatSafeTemplateAnalyticsExportName("x".repeat(120))).toBe(
+      `template-${"x".repeat(80)}-analytics.json`
+    );
+  });
+
   it("omits output URLs and raw failure messages from recent run exports", () => {
     const runs: AdminTemplateRecentGeneration[] = [
       {

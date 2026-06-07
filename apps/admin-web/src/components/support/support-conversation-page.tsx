@@ -27,13 +27,12 @@ import { SupportInfoPanel } from "@/components/support/support-info-panel";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import styles from "@/components/support/support-page.module.css";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
+import { sourceLabel, statusHint, statusLabel, toneForStatus } from "@/components/support/support-status-helpers";
 import {
-  sourceLabel,
-  statusHint,
-  statusLabel,
-  toneForStatus,
-} from "@/components/support/support-status-helpers";
-import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
+  SUPPORT_REPLY_MAX_LENGTH,
+  SUPPORT_SEARCH_MAX_LENGTH,
+  useSupportConversationController,
+} from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Toast } from "@/components/ui/toast";
@@ -73,7 +72,7 @@ export function SupportConversationPage({
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-  const [subFilter, setSubFilter] = useState<"all" | "waiting" | "unassigned" | "archive">("all");
+  const [subFilter, setSubFilter] = useState<"all" | "unassigned" | "archive">("all");
   const [queueStatusFilter, setQueueStatusFilter] = useState<"all" | SupportConversationStatus>(
     "all"
   );
@@ -104,20 +103,22 @@ export function SupportConversationPage({
     canGoToNextQueuePage,
     canGoToPreviousQueuePage,
     hasComposerAttachment,
+    inboxMetrics,
     inboxQuery,
     isSidePanelOpen,
+    isSendReplySubmitting,
     loadOlderMessages,
     primaryStatusAction,
     reply,
     replyToMessage,
     replyToPreview,
     queuePage,
+    requestSendReply,
     resetSelectedAttachment,
     searchQuery,
     secondaryStatusActions,
     selectedAttachment,
     selectReplyToMessage,
-    sendMutation,
     setMessagesViewportVisible,
     setReply,
     setQueueFilter,
@@ -132,9 +133,10 @@ export function SupportConversationPage({
   } = controller;
 
   const isConversationReadOnly = conversation?.isReadOnly ?? false;
-  const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace;
+  const isComposerBusy = isSendReplySubmitting;
+  const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;
   const isConversationClosed = conversation?.status === "Closed";
-  const setQueueSubFilter = (value: "all" | "waiting" | "unassigned" | "archive") => {
+  const setQueueSubFilter = (value: "all" | "unassigned" | "archive") => {
     setSubFilter(value);
     setQueueStatusFilter("all");
     if (value === "archive") {
@@ -147,40 +149,26 @@ export function SupportConversationPage({
     }
     setQueueFilter("all");
   };
+  const setExactQueueStatusFilter = (value: "all" | SupportConversationStatus) => {
+    setSubFilter("all");
+    setQueueFilter("all");
+    setQueueStatusFilter(value);
+    setQueuePage(1);
+  };
 
-  const waitingCount = filteredInboxItems.filter(
-    (item) => item.status === "New" || item.status === "WaitingForUser"
-  ).length;
-  const archiveCount = filteredInboxItems.filter((item) => item.status === "Closed").length;
-  const activeCount = filteredInboxItems.length - archiveCount;
-  const incomingMessagesCount = filteredInboxItems.filter((item) => item.unreadForAdmin).length;
-  const unassignedCount = filteredInboxItems.filter((item) => !item.assignedAdminId).length;
-  const displayedInboxItems = filteredInboxItems
-    .filter((item) => {
-      const isArchived = item.status === "Closed";
-
-      if (subFilter === "archive") {
-        return isArchived;
-      }
-
-      if (isArchived) {
-        return false;
-      }
-
-      if (subFilter === "waiting") {
-        return item.status === "New" || item.status === "WaitingForUser";
-      }
-      if (subFilter === "unassigned") {
-        return !item.assignedAdminId;
-      }
-      return true;
-    })
-    .slice()
-    .sort((left, right) => {
-      const leftTs = left.lastMessageAtUtc ?? left.updatedAtUtc ?? left.createdAtUtc;
-      const rightTs = right.lastMessageAtUtc ?? right.updatedAtUtc ?? right.createdAtUtc;
-      return rightTs.localeCompare(leftTs);
-    });
+  const archiveCount = inboxMetrics?.closedConversations ?? 0;
+  const queueCount = inboxMetrics?.openConversations ?? 0;
+  const incomingMessagesCount = inboxMetrics?.unreadForAdminConversations ?? 0;
+  const unassignedCount = inboxMetrics?.unassignedConversations ?? 0;
+  const displayedInboxItems = filteredInboxItems;
+  const inboxTotalCount = inboxQuery.data?.totalCount ?? filteredInboxItems.length;
+  const inboxPageSize = inboxQuery.data?.pageSize ?? displayedInboxItems.length;
+  const inboxCurrentPage = inboxQuery.data?.page ?? queuePage;
+  const queueShownStart = inboxTotalCount > 0 ? (inboxCurrentPage - 1) * inboxPageSize + 1 : 0;
+  const queueShownEnd =
+    inboxTotalCount > 0
+      ? Math.min(inboxTotalCount, queueShownStart + displayedInboxItems.length - 1)
+      : 0;
   const reopenStatusAction =
     primaryStatusAction?.status === "InProgress"
       ? primaryStatusAction
@@ -277,16 +265,24 @@ export function SupportConversationPage({
   }, [conversationId, selectReplyToMessage]);
 
   const submitReply = () => {
+    if (isComposerDisabled || (!reply.trim() && !hasComposerAttachment)) {
+      return;
+    }
+
+    requestSendReply();
+  };
+
+  const requestReopenConversation = () => {
     if (
-      isConversationReadOnly ||
       !canManageSupportWorkspace ||
-      sendMutation.isPending ||
-      (!reply.trim() && !hasComposerAttachment)
+      !reopenStatusAction ||
+      statusMutation.isPending ||
+      conversation?.status === reopenStatusAction.status
     ) {
       return;
     }
 
-    sendMutation.mutate();
+    statusMutation.mutate(reopenStatusAction.status);
   };
 
   const avatarColorFor = (name: string): string => {
@@ -397,7 +393,7 @@ export function SupportConversationPage({
   }
 
   const saveFullscreenImage = async () => {
-    if (!fullscreenImage || pendingFullscreenAction !== null) {
+    if (!canManageSupportWorkspace || !fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
 
@@ -435,7 +431,7 @@ export function SupportConversationPage({
   };
 
   const shareFullscreenImage = async () => {
-    if (!fullscreenImage || pendingFullscreenAction !== null) {
+    if (!canManageSupportWorkspace || !fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
 
@@ -508,7 +504,7 @@ export function SupportConversationPage({
   };
 
   const openFullscreenImageInNewTab = async () => {
-    if (!fullscreenImage || pendingFullscreenAction !== null) {
+    if (!canManageSupportWorkspace || !fullscreenImage || pendingFullscreenAction !== null) {
       return;
     }
 
@@ -551,7 +547,7 @@ export function SupportConversationPage({
     attachmentIndex: number
   ) => {
     const actionKey = getAttachmentActionKey(message, attachment, attachmentIndex);
-    if (pendingAttachmentActionKey !== null) {
+    if (!canManageSupportWorkspace || pendingAttachmentActionKey !== null) {
       return;
     }
 
@@ -613,7 +609,7 @@ export function SupportConversationPage({
   };
 
   const jumpToMessage = (messageId: string) => {
-    const target = document.getElementById(`message-${messageId}`);
+    const target = document.getElementById(getSupportMessageElementId(messageId));
     if (!target) {
       return;
     }
@@ -831,8 +827,8 @@ export function SupportConversationPage({
         type="button"
         onClick={() => void downloadAttachmentFile(message, attachment, attachmentIndex)}
         disabled={
-          pendingAttachmentActionKey ===
-          getAttachmentActionKey(message, attachment, attachmentIndex)
+          !canManageSupportWorkspace ||
+          pendingAttachmentActionKey !== null
         }
         className={`${styles.messageAttachmentCard} ${styles.messageMediaFileTile}`}
       >
@@ -865,8 +861,14 @@ export function SupportConversationPage({
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
               <Button
                 variant="secondary"
-                onClick={() => void conversationQuery.refetch().catch(() => undefined)}
-                disabled={conversationQuery.isFetching}
+                onClick={() => {
+                  if (!canManageSupportWorkspace) {
+                    return;
+                  }
+
+                  void conversationQuery.refetch().catch(() => undefined);
+                }}
+                disabled={!canManageSupportWorkspace || conversationQuery.isFetching}
               >
                 {text.supportRetryAction}
               </Button>
@@ -901,7 +903,10 @@ export function SupportConversationPage({
                   ref={searchInputRef}
                   className={`${styles.searchInput} ${styles.supportPageSearchInput}`}
                   value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onChange={(event) =>
+                    setSearchQuery(event.target.value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))
+                  }
+                  maxLength={SUPPORT_SEARCH_MAX_LENGTH}
                   placeholder={text.supportSearchPlaceholder}
                   aria-label={text.supportSearchPlaceholder}
                   title={text.supportSearchKeyboardHint}
@@ -921,7 +926,7 @@ export function SupportConversationPage({
                 <div className={styles.queuePaneTitleRow}>
                   <h2 className={styles.queuePaneTitle}>{locale === "ru" ? "Очередь" : "Queue"}</h2>
                   <span className={styles.paneCountBadge}>
-                    {subFilter === "archive" ? archiveCount : activeCount}
+                    {subFilter === "archive" ? archiveCount : queueCount}
                   </span>
                   {incomingMessagesCount > 0 ? (
                     <span
@@ -946,16 +951,7 @@ export function SupportConversationPage({
                   }
                   onClick={() => setQueueSubFilter("all")}
                 >
-                  {locale === "ru" ? "Активные" : "Active"} {activeCount}
-                </button>
-                <button
-                  type="button"
-                  className={
-                    subFilter === "waiting" ? styles.queueSubFilterActive : styles.queueSubFilter
-                  }
-                  onClick={() => setQueueSubFilter("waiting")}
-                >
-                  {locale === "ru" ? "Ожидают" : "Waiting"} {waitingCount}
+                  {locale === "ru" ? "Все" : "All"} {queueCount}
                 </button>
                 <button
                   type="button"
@@ -983,8 +979,7 @@ export function SupportConversationPage({
                   <Select
                     value={queueStatusFilter}
                     onChange={(value) => {
-                      setQueueStatusFilter(value as "all" | SupportConversationStatus);
-                      setQueuePage(1);
+                      setExactQueueStatusFilter(value as "all" | SupportConversationStatus);
                     }}
                     showSelectedDescription={false}
                     options={[
@@ -1009,9 +1004,13 @@ export function SupportConversationPage({
                       variant="secondary"
                       size="sm"
                       onClick={() => {
+                        if (!canManageSupportWorkspace) {
+                          return;
+                        }
+
                         void inboxQuery.refetch().catch(() => undefined);
                       }}
-                      disabled={inboxQuery.isFetching}
+                      disabled={!canManageSupportWorkspace || inboxQuery.isFetching}
                     >
                       {text.supportRetryAction}
                     </Button>
@@ -1151,10 +1150,11 @@ export function SupportConversationPage({
                       );
                     }
 
+                    const supportConversationPathId = encodeURIComponent(item.conversationId);
                     return (
                       <Link
                         key={item.conversationId}
-                        href={`/${locale}/support/${item.conversationId}`}
+                        href={`/${locale}/support/${supportConversationPathId}`}
                         role="listitem"
                         aria-current={item.conversationId === conversationId ? "page" : undefined}
                         className={queueItemClassName}
@@ -1171,8 +1171,8 @@ export function SupportConversationPage({
                 <div className={styles.queueFooter}>
                   <span className={styles.queueFooterCount}>
                     {locale === "ru"
-                      ? `Страница ${queuePage}: показано ${displayedInboxItems.length} из ${filteredInboxItems.length}`
-                      : `Page ${queuePage}: showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`}
+                      ? `Страница ${inboxCurrentPage}: показано ${queueShownStart}-${queueShownEnd} из ${inboxTotalCount}`
+                      : `Page ${inboxCurrentPage}: showing ${queueShownStart}-${queueShownEnd} of ${inboxTotalCount}`}
                   </span>
                   <div className={styles.queuePagerActions}>
                     <button
@@ -1305,9 +1305,13 @@ export function SupportConversationPage({
                           <Button
                             variant="ghost"
                             onClick={() => {
+                              if (!canManageSupportWorkspace) {
+                                return;
+                              }
+
                               void loadOlderMessages();
                             }}
-                            disabled={conversationQuery.isFetching}
+                            disabled={!canManageSupportWorkspace || conversationQuery.isFetching}
                           >
                             {locale === "ru"
                               ? "Загрузить предыдущие сообщения"
@@ -1380,7 +1384,7 @@ export function SupportConversationPage({
                               return (
                                 <article
                                   key={message.messageId}
-                                  id={`message-${message.messageId}`}
+                                  id={getSupportMessageElementId(message.messageId)}
                                   className={`${styles.messageItem} ${message.isFromAdmin ? styles.messageAdmin : styles.messageUser} ${isBotMessage ? styles.messageBot : ""} ${highlightedMessageId === message.messageId ? styles.messageHighlighted : ""} ${hasMediaMessage ? styles.messageWithMedia : ""} ${isMediaOnlyBubble ? styles.messageMediaOnly : ""}`}
                                   onDoubleClick={() => startReplyToMessage(message)}
                                 >
@@ -1517,7 +1521,7 @@ export function SupportConversationPage({
                         <div className={styles.closedComposerActions}>
                           <Button
                             variant="primary"
-                            onClick={() => statusMutation.mutate(reopenStatusAction.status)}
+                            onClick={requestReopenConversation}
                             disabled={!canManageSupportWorkspace || statusMutation.isPending}
                           >
                             {text.supportReopenConversationAction}
@@ -1532,6 +1536,7 @@ export function SupportConversationPage({
                         type="file"
                         className={styles.hiddenFileInput}
                         accept="image/jpeg,image/png,image/webp"
+                        disabled={isComposerDisabled}
                         onChange={(event) => {
                           if (isComposerDisabled) {
                             event.currentTarget.value = "";
@@ -1571,6 +1576,7 @@ export function SupportConversationPage({
                               type="button"
                               className={styles.composerReplyClose}
                               onClick={() => selectReplyToMessage(null)}
+                              disabled={isComposerDisabled}
                               aria-label={locale === "ru" ? "Отменить ответ" : "Cancel reply"}
                               title={locale === "ru" ? "Отменить ответ" : "Cancel reply"}
                             >
@@ -1638,7 +1644,12 @@ export function SupportConversationPage({
                                 {text.supportAttachmentOpenAction}
                               </button>
                             ) : null}
-                            <Button variant="ghost" size="sm" onClick={resetSelectedAttachment}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={resetSelectedAttachment}
+                              disabled={isComposerDisabled}
+                            >
                               {text.supportAttachmentRemoveAction}
                             </Button>
                           </div>
@@ -1650,7 +1661,7 @@ export function SupportConversationPage({
                           type="button"
                           className={styles.composerIconBtn}
                           onClick={() => attachmentInputRef.current?.click()}
-                          disabled={isComposerDisabled || sendMutation.isPending}
+                          disabled={isComposerDisabled}
                           aria-label={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                           title={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                         >
@@ -1659,13 +1670,15 @@ export function SupportConversationPage({
                         <textarea
                           className={`${styles.textarea} ${styles.composerTextarea}`}
                           value={composerValue}
-                          onChange={(event) => setReply(event.target.value)}
+                          onChange={(event) =>
+                            setReply(event.target.value.slice(0, SUPPORT_REPLY_MAX_LENGTH))
+                          }
+                          maxLength={SUPPORT_REPLY_MAX_LENGTH}
                           onKeyDown={(event) => {
                             if (
                               event.key === "Enter" &&
                               !event.shiftKey &&
                               !isComposerDisabled &&
-                              !sendMutation.isPending &&
                               (reply.trim() || hasComposerAttachment)
                             ) {
                               event.preventDefault();
@@ -1673,7 +1686,7 @@ export function SupportConversationPage({
                             }
                           }}
                           placeholder={composerPlaceholder}
-                          disabled={isComposerDisabled || sendMutation.isPending}
+                          disabled={isComposerDisabled}
                           rows={1}
                         />
                         <div className={styles.composerSendGroup}>
@@ -1684,11 +1697,10 @@ export function SupportConversationPage({
                             className={styles.composerSendPrimary}
                             disabled={
                               isComposerDisabled ||
-                              sendMutation.isPending ||
                               (!reply.trim() && !hasComposerAttachment)
                             }
                           >
-                            {sendMutation.isPending
+                            {isComposerBusy
                               ? text.supportReplySending
                               : text.supportReplyAction}
                           </Button>
@@ -1785,7 +1797,7 @@ export function SupportConversationPage({
                     variant="secondary"
                     size="sm"
                     onClick={() => void saveFullscreenImage()}
-                    disabled={pendingFullscreenAction !== null}
+                    disabled={!canManageSupportWorkspace || pendingFullscreenAction !== null}
                   >
                     {imageViewerLabels.download}
                   </Button>
@@ -1793,7 +1805,7 @@ export function SupportConversationPage({
                     variant="secondary"
                     size="sm"
                     onClick={() => void shareFullscreenImage()}
-                    disabled={pendingFullscreenAction !== null}
+                    disabled={!canManageSupportWorkspace || pendingFullscreenAction !== null}
                   >
                     {imageViewerLabels.share}
                   </Button>
@@ -1814,7 +1826,7 @@ export function SupportConversationPage({
                     variant="secondary"
                     size="sm"
                     onClick={() => void openFullscreenImageInNewTab()}
-                    disabled={pendingFullscreenAction !== null}
+                    disabled={!canManageSupportWorkspace || pendingFullscreenAction !== null}
                   >
                     {imageViewerLabels.openOriginal}
                   </Button>
@@ -1829,4 +1841,8 @@ export function SupportConversationPage({
       )}
     </AdminPage>
   );
+}
+
+function getSupportMessageElementId(messageId: string) {
+  return `message-${encodeURIComponent(messageId)}`;
 }

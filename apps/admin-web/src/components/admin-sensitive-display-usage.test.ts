@@ -19,10 +19,12 @@ describe("admin sensitive display usage", () => {
     const source = files.map((file) => readFileSync(file, "utf8")).join("\n");
 
     expect(source).not.toContain("{event.details}");
+    expect(source).not.toContain("<strong>{event.action}</strong>");
     expect(source).not.toContain("{item.details}");
     expect(source).not.toContain("{event.feedbackMessage}");
     expect(source).not.toContain("{item.feedbackMessage?.trim() || text.feedbackMessageMissing}");
     expect(source).toContain("sanitizeSensitiveText(event.details");
+    expect(source).toContain("sanitizeSensitiveText(event.action");
     expect(source).toContain("sanitizeSensitiveText(item.details");
     expect(source).toContain("sanitizeSensitiveText(event.feedbackMessage");
     expect(source).toContain("sanitizeSensitiveText(item.feedbackMessage");
@@ -37,6 +39,13 @@ describe("admin sensitive display usage", () => {
     expect(usersManagementSource).toContain("shortIdentifier(selectedUser.userId)");
     expect(usersManagementSource).toContain("sanitizeSensitiveText(user.displayName, 96)");
     expect(usersManagementSource).toContain("sanitizeSensitiveText(generation.templateTitle, 120)");
+    expect(usersManagementSource).toContain("href={`/${locale}/users/${encodeURIComponent(user.userId)}`}");
+    expect(usersManagementSource).toContain(
+      "href={`/${locale}/users/${encodeURIComponent(openActionsUser.userId)}`}"
+    );
+    expect(usersManagementSource).toContain(
+      "href={`/${locale}/users/${encodeURIComponent(selectedUser.userId)}`}"
+    );
     expect(usersManagementSource).toContain(
       "sanitizeSensitiveText(\n                              selectedSubscriptionQuery.data.status,\n                              48"
     );
@@ -52,6 +61,13 @@ describe("admin sensitive display usage", () => {
     expect(usersManagementSource).not.toContain("{selectedSubscriptionQuery.data.status} •");
     expect(usersManagementSource).not.toContain("<strong>{ticket.status}</strong>");
     expect(usersManagementSource).not.toContain("{purchase.priceAmount} {purchase.currencyCode}");
+    expect(usersManagementSource).not.toContain("href={`/${locale}/users/${user.userId}`}");
+    expect(usersManagementSource).not.toContain(
+      "href={`/${locale}/users/${openActionsUser.userId}`}"
+    );
+    expect(usersManagementSource).not.toContain(
+      "href={`/${locale}/users/${selectedUser.userId}`}"
+    );
 
     expect(userDetailSource).toContain(
       "const safeUserName = sanitizeSensitiveText(getAdminUserDisplayName(user), 96)"
@@ -65,8 +81,31 @@ describe("admin sensitive display usage", () => {
     expect(userInlineAnalyticsSource).toContain(
       "const safeUserName = sanitizeSensitiveText(getAdminUserDisplayName(user), 96)"
     );
+    expect(userInlineAnalyticsSource).toContain(
+      "href={`/${locale}/users/${encodeURIComponent(user.userId)}`}"
+    );
     expect(userInlineAnalyticsSource).toContain("sanitizeSensitiveText(generation.templateTitle, 120)");
     expect(userInlineAnalyticsSource).toContain("sanitizeSensitiveText(item.failureCode, 120)");
     expect(userInlineAnalyticsSource).not.toContain("<h3>{getAdminUserDisplayName(user)}</h3>");
+    expect(userInlineAnalyticsSource).not.toContain("href={`/${locale}/users/${user.userId}`}");
+  });
+
+  it("encodes template analytics route ids before building hrefs", () => {
+    const hubSource = readFileSync(files[3], "utf8");
+
+    expect(hubSource).toContain(
+      'href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${encodeURIComponent(row.templateId)}`}'
+    );
+    expect(hubSource).toContain("const encodedTemplateId = encodeURIComponent(item.templateId);");
+    expect(hubSource).toContain(
+      '? `/${locale}/templates/video/analytics/${encodedTemplateId}`'
+    );
+    expect(hubSource).toContain(
+      ': `/${locale}/templates/image/analytics/${encodedTemplateId}`'
+    );
+    expect(hubSource).not.toContain(
+      'href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${row.templateId}`}'
+    );
+    expect(hubSource).not.toContain('analytics/${item.templateId}');
   });
 });

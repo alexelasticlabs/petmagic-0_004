@@ -56,7 +56,7 @@ export function useTemplateEditorController({
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
   const { categories } = useAdminTemplateCategories({
-    enabled: Boolean(session),
+    enabled: canManageTemplates,
     includeArchived: false,
   });
   const {
@@ -64,7 +64,7 @@ export function useTemplateEditorController({
     isLoading: isTemplateOptionsLoading,
     refresh: refreshTemplateOptions,
     templates,
-  } = useAdminTemplateOptions({ enabled: Boolean(session), templateType });
+  } = useAdminTemplateOptions({ enabled: canManageTemplates, templateType });
   const [selectedTemplate, setSelectedTemplate] = useState<AdminTemplate | null>(null);
   const [form, setForm] = useState<TemplateFormState>(() =>
     createInitialTemplateForm(templateType)
@@ -107,7 +107,7 @@ export function useTemplateEditorController({
 
       await Promise.allSettled([
         refreshTemplateOptions(),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCatalog(templateType) }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCatalogRoot }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCategories(false) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCategories(true) }),
       ]);
@@ -130,6 +130,7 @@ export function useTemplateEditorController({
           ? {
               ...current,
               previewUrl: asset.url,
+              previewUrlSource: "uploaded",
               previewFileName: asset.fileName,
               previewContentType: asset.contentType,
               previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
@@ -138,6 +139,7 @@ export function useTemplateEditorController({
           : {
               ...current,
               referenceUrl: asset.url,
+              referenceUrlSource: "uploaded",
               referenceFileName: asset.fileName,
               referenceContentType: asset.contentType,
               referenceFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
@@ -177,7 +179,7 @@ export function useTemplateEditorController({
     async function initialize() {
       setIsInitializing(true);
       try {
-        if (!ensureAdminSession(locale, router)) {
+        if (!ensureAdminSession(locale, router, { requiredRole: "Admin" })) {
           return;
         }
 
@@ -221,7 +223,14 @@ export function useTemplateEditorController({
       isCancelled = true;
       controller.abort();
     };
-  }, [initialTemplateId, locale, router, templateType, text.errorLoadingTemplates]);
+  }, [
+    canManageTemplates,
+    initialTemplateId,
+    locale,
+    router,
+    templateType,
+    text.errorLoadingTemplates,
+  ]);
 
   function resetForm() {
     setSelectedTemplate(null);

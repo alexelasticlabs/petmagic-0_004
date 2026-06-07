@@ -1,7 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+const sourceRoot = fileURLToPath(new URL("../", import.meta.url));
 const eslintConfigPath = fileURLToPath(new URL("../../eslint.config.mjs", import.meta.url));
 const clientLoggerPath = fileURLToPath(new URL("./client-logger.ts", import.meta.url));
 
@@ -22,4 +24,28 @@ describe("admin logging policy", () => {
     expect(source).not.toContain("console.info");
     expect(source).not.toContain("console.debug");
   });
+
+  it("does not use render, click, state, or full response console logging in app source", () => {
+    const violations = sourceFiles(sourceRoot)
+      .filter((path) => !/\.test\.(ts|tsx)$/.test(path))
+      .flatMap((path) => {
+        const source = readFileSync(path, "utf8");
+        const matches = source.match(/\bconsole\.(log|debug|info)\s*\(/g) ?? [];
+        return matches.map((match) => `${relative(sourceRoot, path)} uses ${match}`);
+      });
+
+    expect(violations).toEqual([]);
+  });
 });
+
+function sourceFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    const stat = statSync(path);
+    if (stat.isDirectory()) {
+      return sourceFiles(path);
+    }
+
+    return /\.(ts|tsx)$/.test(path) ? [path] : [];
+  });
+}

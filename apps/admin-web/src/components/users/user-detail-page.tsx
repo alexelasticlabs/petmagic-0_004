@@ -39,14 +39,14 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const router = useRouter();
   const session = useAuthSession();
+  const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;
   const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
+    enabled: canViewUserProfile,
     userId,
   });
 
   useEffect(() => {
-    if (!session) {
-      ensureAdminSession(locale, router);
-    }
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
 
   const metaItems = useMemo(() => {
@@ -72,7 +72,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
     user,
   ]);
 
-  if (isLoading) {
+  if (!canViewUserProfile || isLoading) {
     return (
       <AdminPage className={styles.page}>
         <AdminPageHero
@@ -102,9 +102,13 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                 variant="secondary"
                 size="sm"
                 onClick={() => {
+                  if (!canViewUserProfile) {
+                    return;
+                  }
+
                   void refresh().catch(() => undefined);
                 }}
-                disabled={isFetching}
+                disabled={!canViewUserProfile || isFetching}
               >
                 {text.supportRetryAction}
               </Button>
@@ -217,7 +221,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         locale={locale}
         userId={user.userId}
         analytics={analytics}
-        canAdjustWallet={session?.user.roles.includes("Admin") ?? false}
+        canAdjustWallet={canViewUserProfile}
         onUpdated={async () => {
           await refresh();
         }}

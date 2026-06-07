@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
@@ -30,6 +30,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [toast, setToast] = useState<UsersToastState | null>(null);
+  const actionInFlightUserIdRef = useRef<string | null>(null);
   const canManageRoles = session?.user.roles.includes("Admin") ?? false;
 
   useSyncToastToAdminNotifications(toast, {
@@ -42,7 +43,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
   const usersQuery = useQuery<UserListPage>({
     queryKey: adminQueryKeys.users(usersQueryParams),
     queryFn: ({ signal }) => fetchUsers(usersQueryParams, signal),
-    enabled: Boolean(session),
+    enabled: canManageRoles,
     placeholderData: keepPreviousData,
   });
 
@@ -56,9 +57,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
   }, [toast]);
 
   useEffect(() => {
-    if (!session) {
-      ensureAdminSession(locale, router);
-    }
+    ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
 
   const isLoading = usersQuery.isLoading;
@@ -67,6 +66,10 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
 
   async function refreshUsers() {
     setActionError(null);
+    if (!canManageRoles) {
+      return usersQuery;
+    }
+
     const refreshedUsers = await usersQuery.refetch();
     if (refreshedUsers.isError) {
       throw refreshedUsers.error;
@@ -80,6 +83,11 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
     action: () => Promise<void>,
     options?: RunActionOptions
   ): Promise<boolean> {
+    if (actionInFlightUserIdRef.current !== null) {
+      return false;
+    }
+
+    actionInFlightUserIdRef.current = userId;
     setBusyUserId(userId);
     setActionError(null);
 
@@ -90,6 +98,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(userId) }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics }),
         queryClient.invalidateQueries({
           queryKey: adminQueryKeys.economyUserSubscriptionSummary(userId),
         }),
@@ -113,6 +122,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
       setToast({ type: "error", message });
       return false;
     } finally {
+      actionInFlightUserIdRef.current = null;
       setBusyUserId(null);
     }
   }
@@ -121,6 +131,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
     busyUserId,
     canManageRoles,
     error,
+    hasSession: canManageRoles,
     isFetching,
     isLoading,
     refreshUsers,

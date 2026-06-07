@@ -4,10 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearAdminListCaches } from "@/lib/api-client.core";
 import {
+  decideAdminModerationItem,
+  fetchAdminModerationQueue,
+  fetchAdminTemplateGenerationMetrics,
+  fetchAdminTemplates,
+  fetchAdminTemplateFeedback,
   fetchAdminTemplateRecentGenerations,
+  fetchAdminTemplateTest,
   fetchAdminTemplateTestHistory,
+  GENERATION_PROVIDER_FILTER_MAX_LENGTH,
+  GENERATION_SEARCH_FILTER_MAX_LENGTH,
+  GENERATION_USER_FILTER_MAX_LENGTH,
+  MODERATION_DECISION_REASON_MAX_LENGTH,
+  MODERATION_SEARCH_MAX_LENGTH,
+  normalizeAdminTemplateCatalogQuery,
   normalizeAdminModerationQueueQuery,
   normalizeAdminTemplateGenerationsQuery,
+  TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
+  TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
 } from "@/lib/api-client.templates";
 
 function readSource(relativePath: string): string {
@@ -32,36 +46,68 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("normalizes generation list filters for stable cache keys and requests", () => {
+    const overlongProvider = "p".repeat(GENERATION_PROVIDER_FILTER_MAX_LENGTH + 12);
+    const overlongUser = "u".repeat(GENERATION_USER_FILTER_MAX_LENGTH + 12);
+    const overlongSearch = "g".repeat(GENERATION_SEARCH_FILTER_MAX_LENGTH + 12);
+
     expect(
       normalizeAdminTemplateGenerationsQuery({
         status: "All",
-        provider: " fal ",
-        user: "  ",
-        search: " job-123 ",
+        provider: ` ${overlongProvider} `,
+        user: ` ${overlongUser} `,
+        search: ` ${overlongSearch} `,
         skip: -25.5,
         take: 500.8,
       })
     ).toEqual({
       status: undefined,
-      provider: "fal",
-      user: undefined,
-      search: "job-123",
+      provider: "p".repeat(GENERATION_PROVIDER_FILTER_MAX_LENGTH),
+      user: "u".repeat(GENERATION_USER_FILTER_MAX_LENGTH),
+      search: "g".repeat(GENERATION_SEARCH_FILTER_MAX_LENGTH),
       skip: 0,
       take: 100,
     });
   });
 
   it("normalizes moderation queue filters for stable cache keys and requests", () => {
+    const overlongSearch = "m".repeat(MODERATION_SEARCH_MAX_LENGTH + 20);
+
     expect(
       normalizeAdminModerationQueueQuery({
         status: "all",
-        search: " template title ",
+        search: ` ${overlongSearch} `,
         skip: -1.5,
         take: 500.2,
       })
     ).toEqual({
       status: undefined,
-      search: "template title",
+      search: "m".repeat(MODERATION_SEARCH_MAX_LENGTH),
+      skip: 0,
+      take: 100,
+    });
+  });
+
+  it("normalizes template catalog filters for backend pagination requests", () => {
+    const overlongSearch = "t".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH + 20);
+
+    expect(
+      normalizeAdminTemplateCatalogQuery({
+        type: "Image",
+        status: "not_archived",
+        search: ` ${overlongSearch} `,
+        category: " Portrait ",
+        access: "premium",
+        sort: "title",
+        skip: -4.5,
+        take: 500.2,
+      })
+    ).toEqual({
+      type: "Image",
+      status: "not_archived",
+      search: "t".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH),
+      category: "Portrait",
+      access: "premium",
+      sort: "title",
       skip: 0,
       take: 100,
     });
@@ -110,10 +156,174 @@ describe("api-client.templates query normalization", () => {
     ]);
   });
 
+  it("sends template catalog search and filters to the backend", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        items: [],
+        skip: 12,
+        take: 24,
+        hasMore: false,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplates({
+      type: "Video",
+      status: "not_archived",
+      search: " dance ",
+      category: "Fun",
+      access: "free",
+      sort: "tokens",
+      skip: 12.9,
+      take: 24.2,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/?type=Video&status=not_archived&search=dance&category=Fun&access=free&sort=tokens&skip=12&take=24",
+    ]);
+  });
+
+  it("preserves moderation queue totalCount for dashboard KPI counts", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        items: [],
+        skip: 0,
+        take: 1,
+        totalCount: 42,
+        hasMore: true,
+        generatedAtUtc: "2026-06-07T00:00:00Z",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchAdminModerationQueue({ status: "pending", take: 1 });
+
+    expect(response.totalCount).toBe(42);
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/moderation?status=pending&take=1",
+    ]);
+  });
+
+  it("requests backend generation dashboard metrics with abort support", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        totalJobs: 12,
+        generationsToday: 3,
+        generationsThisWeek: 8,
+        generationsThisMonth: 11,
+        failedGenerationsToday: 1,
+        failedGenerationsThisWeek: 2,
+        failedGenerationsThisMonth: 4,
+        pendingJobs: 2,
+        runningJobs: 1,
+        completedJobs: 5,
+        failedJobs: 3,
+        cancelledJobs: 1,
+        retryingJobs: 1,
+        generatedAtUtc: "2026-06-07T00:00:00Z",
+      })
+    );
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchAdminTemplateGenerationMetrics(controller.signal);
+
+    expect(response.totalJobs).toBe(12);
+    expect(response.failedJobs).toBe(3);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe("https://api.example.com/api/admin/templates/generations/metrics");
+    expect(init?.method).toBe("GET");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("uses a stable cache key for equivalent template catalog queries", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        items: [],
+        skip: 0,
+        take: 24,
+        totalCount: 42,
+        hasMore: false,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const firstResponse = await fetchAdminTemplates({
+      type: "Image",
+      search: " portrait ",
+      skip: 0,
+      take: 24,
+    });
+    const secondResponse = await fetchAdminTemplates({
+      type: "Image",
+      search: "portrait",
+      skip: 0.5,
+      take: 24.9,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(firstResponse.totalCount).toBe(42);
+    expect(secondResponse.totalCount).toBe(42);
+  });
+
+  it("bounds template feedback search before request URLs", async () => {
+    const fetchMock = vi.fn(async () => Response.json([]));
+    const overlongSearch = "f".repeat(TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH + 20);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplateFeedback("template-feedback", {
+      search: ` ${overlongSearch} `,
+      take: 50,
+      type: "feedback",
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      `https://api.example.com/api/admin/templates/template-feedback/statistics/feedback?take=50&type=feedback&search=${"f".repeat(TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH)}`,
+    ]);
+  });
+
+  it("encodes template ids before placing them in API path segments", async () => {
+    const fetchMock = vi.fn(async () => Response.json([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplateRecentGenerations("template/one two?x", 25);
+    await fetchAdminTemplateTest("generation/one two?x");
+    await decideAdminModerationItem("event/one two?x", {
+      action: "reject",
+      reason: "Policy",
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/template%2Fone%20two%3Fx/statistics/recent?take=25",
+      "https://api.example.com/api/admin/templates/tests/generation%2Fone%20two%3Fx",
+      "https://api.example.com/api/admin/templates/moderation/event%2Fone%20two%3Fx/decision",
+    ]);
+  });
+
+  it("bounds moderation decision reasons before sending audit payloads", async () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    const overlongReason = "r".repeat(MODERATION_DECISION_REASON_MAX_LENGTH + 20);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await decideAdminModerationItem("event-1", {
+      action: "reject",
+      reason: ` ${overlongReason} `,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/templates/moderation/event-1/decision"
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({
+      action: "reject",
+      reason: "r".repeat(MODERATION_DECISION_REASON_MAX_LENGTH),
+    });
+  });
+
   it("propagates AbortSignal through template GET helpers", () => {
     const source = readSource("lib/api-client.templates.ts");
 
-    expect(source).toContain("export async function fetchAdminTemplates(\n  type?: TemplateType,\n  signal?: AbortSignal");
+    expect(source).toContain("export async function fetchAdminTemplates(\n  query: AdminTemplateCatalogQuery = {},\n  signal?: AbortSignal");
     expect(source).toContain("export async function fetchAdminTemplateCategories(\n  includeArchived = true,\n  signal?: AbortSignal");
     expect(source).toContain("export async function fetchAdminTemplate(\n  templateId: string,\n  signal?: AbortSignal");
     expect(source).toContain("export async function fetchAdminTemplateStatistics(\n  templateId: string,\n  signal?: AbortSignal");
@@ -133,7 +343,7 @@ describe("api-client.templates query normalization", () => {
     const categoriesSource = readSource("components/templates/use-admin-template-categories.ts");
     const hubSource = readSource("components/templates/templates-analytics-hub-page.tsx");
 
-    expect(catalogSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(templateType, signal)");
+    expect(catalogSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(normalizedQuery, signal)");
     expect(catalogSource).toContain("fetchAdminTemplatesAnalyticsOverview(");
     expect(catalogSource).toContain("signal");
     expect(overviewSource).toContain("queryFn: async ({ signal }) =>");
@@ -141,7 +351,7 @@ describe("api-client.templates query normalization", () => {
     expect(overviewSource).toContain("fetchAdminTemplateRecentGenerations(templateId, previewTake, signal)");
     expect(feedbackSource).toContain("queryFn: ({ signal }) =>");
     expect(feedbackSource).toContain("}, signal)");
-    expect(optionsSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(templateType, signal)");
+    expect(optionsSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(query, signal)");
     expect(categoriesSource).toContain(
       "queryFn: ({ signal }) => fetchAdminTemplateCategories(includeArchived, signal)"
     );
@@ -161,10 +371,21 @@ describe("api-client.templates query normalization", () => {
     expect(testPageSource).toContain("fetchAdminTemplate(templateId, controller.signal)");
     expect(testPageSource).toContain("fetchAdminTemplateTestHistory(");
     expect(testPageSource).toContain("controller.signal");
-    expect(testPageSource).toContain("fetchAdminTemplateTest(run.generationId, controller.signal)");
+    expect(testPageSource).toContain("const activeRun = run;");
+    expect(testPageSource).toContain(
+      "fetchAdminTemplateTest(activeRun.generationId, controller.signal)"
+    );
     expect(testPageSource).toContain("controller.abort();");
     expect(analyticsPageSource).toContain("recentRunsAbortControllerRef.current?.abort()");
     expect(analyticsPageSource).toContain("fetchAdminTemplateRecentGenerations(");
     expect(analyticsPageSource).toContain("controller.signal");
+    expect(testPageSource).toContain(
+      "const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;"
+    );
+    expect(analyticsPageSource).toContain(
+      "const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;"
+    );
+    expect(testPageSource).not.toContain("editor?templateId=${templateId}");
+    expect(analyticsPageSource).not.toContain("editor?templateId=${templateId}");
   });
 });

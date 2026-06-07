@@ -3,13 +3,31 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  TEMPLATE_CATEGORY_MAX_LENGTH,
+  TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH,
+  TEMPLATE_MODEL_MAX_LENGTH,
+  TEMPLATE_PROMPT_MAX_LENGTH,
+  TEMPLATE_REQUIREMENT_MAX_LENGTH,
+  TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH,
+  TEMPLATE_TAG_MAX_COUNT,
+  TEMPLATE_TAG_MAX_LENGTH,
+  TEMPLATE_TITLE_MAX_LENGTH,
   TEMPLATE_TOKEN_COST_MAX_LENGTH,
+  createFormFromTemplate,
+  createInitialTemplateForm,
+  normalizeTemplateText,
+  normalizeTemplateTextInput,
   normalizeTemplateIntegerInput,
   parseNumber,
   parseOptionalDecimal,
 } from "@/components/templates/template-form-mappers";
+import type { AdminTemplate } from "@/lib/api-client";
 
 const basicFieldsPath = fileURLToPath(new URL("./template-basic-fields.tsx", import.meta.url));
+const editorSectionsPath = fileURLToPath(
+  new URL("./template-editor-sections.tsx", import.meta.url)
+);
+const formMappersPath = fileURLToPath(new URL("./template-form-mappers.ts", import.meta.url));
 
 describe("template form numeric hardening", () => {
   it("normalizes token cost to bounded digits only", () => {
@@ -42,4 +60,142 @@ describe("template form numeric hardening", () => {
     expect(source).toContain("maxLength={TEMPLATE_TOKEN_COST_MAX_LENGTH}");
     expect(source).toContain('pattern="[0-9]*"');
   });
+
+  it("normalizes template text before building API payloads", () => {
+    expect(normalizeTemplateText("  Hello\n\n  world  ", 20)).toBe("Hello world");
+    expect(normalizeTemplateText("x".repeat(80), 12)).toBe("x".repeat(12));
+    expect(normalizeTemplateTextInput(`  ${"x".repeat(80)}  `, 12)).toBe(`  ${"x".repeat(10)}`);
+
+    const source = readFileSync(formMappersPath, "utf8");
+
+    expect(TEMPLATE_TITLE_MAX_LENGTH).toBe(60);
+    expect(TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH).toBe(120);
+    expect(TEMPLATE_CATEGORY_MAX_LENGTH).toBe(64);
+    expect(TEMPLATE_TAG_MAX_LENGTH).toBe(48);
+    expect(TEMPLATE_TAG_MAX_COUNT).toBe(12);
+    expect(TEMPLATE_MODEL_MAX_LENGTH).toBe(160);
+    expect(TEMPLATE_PROMPT_MAX_LENGTH).toBe(4000);
+    expect(source).toContain("title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH)");
+    expect(source).toContain("TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH");
+    expect(source).toContain("category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH)");
+    expect(source).toContain("imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH)");
+    expect(source).toContain("imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain("preprocessingPrompt: normalizeTemplateText(form.preprocessingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain("klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH)");
+    expect(source).toContain("normalizeTemplateText(tag, TEMPLATE_TAG_MAX_LENGTH)");
+    expect(source).toContain(".slice(0, TEMPLATE_TAG_MAX_COUNT)");
+    expect(source).toContain("normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH)");
+    expect(source).not.toContain("title: form.title");
+    expect(source).not.toContain("imagePrompt: form.imagePrompt");
+    expect(source).not.toContain(".map((tag) => tag.trim())");
+  });
+
+  it("bounds template editor text state before payload construction", () => {
+    const basicFieldsSource = readFileSync(basicFieldsPath, "utf8");
+    const editorSectionsSource = readFileSync(editorSectionsPath, "utf8");
+
+    expect(TEMPLATE_REQUIREMENT_MAX_LENGTH).toBe(180);
+    expect(TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH).toBe(240);
+    expect(basicFieldsSource).toContain("maxLength={TEMPLATE_TITLE_MAX_LENGTH}");
+    expect(basicFieldsSource).toContain("maxLength={TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH}");
+    expect(basicFieldsSource).toContain("maxLength={PET_PHOTO_REQUIREMENTS_INPUT_MAX_LENGTH}");
+    expect(basicFieldsSource).toContain("maxLength={TAGS_INPUT_MAX_LENGTH}");
+    expect(basicFieldsSource).toContain("maxLength={TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH}");
+    expect(basicFieldsSource).toContain("import { sanitizeSensitiveText }");
+    expect(basicFieldsSource).toContain("const TEMPLATE_CATEGORY_SELECT_LABEL_MAX_LENGTH = 80;");
+    expect(basicFieldsSource).toContain(
+      "label: sanitizeSensitiveText(category, TEMPLATE_CATEGORY_SELECT_LABEL_MAX_LENGTH)"
+    );
+    expect(basicFieldsSource).toContain(
+      "title: normalizeTemplateTextInput(event.target.value, TEMPLATE_TITLE_MAX_LENGTH)"
+    );
+    expect(basicFieldsSource).toContain("shortDescription: normalizeTemplateTextInput(");
+    expect(basicFieldsSource).toContain("petPhotoRequirements: normalizeTemplateTextInput(");
+    expect(basicFieldsSource).toContain(
+      "tags: normalizeTemplateTextInput(event.target.value, TAGS_INPUT_MAX_LENGTH)"
+    );
+    expect(basicFieldsSource).toContain("musicDescription: normalizeTemplateTextInput(");
+    expect(editorSectionsSource).toContain("normalizeTemplateTextInput(");
+    expect(editorSectionsSource).toContain("preprocessingPrompt: normalizeTemplateTextInput(");
+    expect(editorSectionsSource).toContain(
+      "klingPrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength)"
+    );
+    expect(editorSectionsSource).toContain(
+      "imagePrompt: normalizeTemplateTextInput(event.target.value, promptMaxLength)"
+    );
+    expect(basicFieldsSource).not.toContain("title: event.target.value");
+    expect(basicFieldsSource).not.toContain("shortDescription: event.target.value");
+    expect(basicFieldsSource).not.toContain("petPhotoRequirements: event.target.value");
+    expect(basicFieldsSource).not.toContain("tags: event.target.value");
+    expect(basicFieldsSource).not.toContain("musicDescription: event.target.value");
+    expect(basicFieldsSource).not.toContain("label: category");
+    expect(editorSectionsSource).not.toContain("preprocessingPrompt: event.target.value");
+    expect(editorSectionsSource).not.toContain("klingPrompt: event.target.value");
+    expect(editorSectionsSource).not.toContain("imagePrompt: event.target.value");
+  });
 });
+
+describe("template media asset payload hardening", () => {
+  it("tracks persisted template media separately from freshly uploaded media", () => {
+    const initialImageForm = createInitialTemplateForm("Image");
+    const formFromTemplate = createFormFromTemplate(createTemplate());
+
+    expect(initialImageForm.previewUrlSource).toBe("none");
+    expect(initialImageForm.referenceUrlSource).toBe("none");
+    expect(formFromTemplate.previewUrl).toContain("X-Amz-Signature=preview-secret");
+    expect(formFromTemplate.referenceUrl).toContain("X-Amz-Signature=reference-secret");
+    expect(formFromTemplate.previewUrlSource).toBe("persisted");
+    expect(formFromTemplate.referenceUrlSource).toBe("persisted");
+  });
+
+  it("does not include persisted signed template media URLs in save payload builders", () => {
+    const source = readFileSync(formMappersPath, "utf8");
+
+    expect(source).toContain("function buildUploadedAsset(");
+    expect(source).toContain('if (source !== "uploaded") {');
+    expect(source).toContain("return undefined;");
+    expect(source).toContain("previewAsset: buildUploadedAsset(");
+    expect(source).toContain("referenceMotionAsset: buildUploadedAsset(");
+    expect(source).not.toContain("previewAsset: buildAsset(");
+    expect(source).not.toContain("referenceMotionAsset: buildAsset(");
+  });
+});
+
+function createTemplate(): AdminTemplate {
+  return {
+    templateId: "template-1",
+    templateType: "Video",
+    title: "Template",
+    shortDescription: "Description",
+    petPhotoRequirements: ["One pet"],
+    category: "Pets",
+    status: "Draft",
+    promoBadgeMode: "Auto",
+    isPremium: false,
+    tokenCost: 60,
+    tags: [],
+    previewAsset: {
+      url: "https://cdn.example.com/preview.jpg?X-Amz-Signature=preview-secret",
+      fileName: "preview.jpg",
+      contentType: "image/jpeg",
+      fileSizeBytes: 100,
+    },
+    referenceMotionAsset: {
+      url: "https://cdn.example.com/reference.mp4?X-Amz-Signature=reference-secret",
+      fileName: "reference.mp4",
+      contentType: "video/mp4",
+      fileSizeBytes: 1000,
+      durationSeconds: 3,
+    },
+    musicDescription: "",
+    imageModel: "openai/gpt-image-2/edit",
+    imagePrompt: "Prompt",
+    preprocessingModel: "openai/gpt-image-2/edit",
+    preprocessingPrompt: "Prompt",
+    klingModel: "fal-ai/kling-video/v3/pro/motion-control",
+    klingPrompt: "Prompt",
+    keepOriginalSound: true,
+    createdAtUtc: "2026-06-07T00:00:00Z",
+    updatedAtUtc: "2026-06-07T00:00:00Z",
+  };
+}

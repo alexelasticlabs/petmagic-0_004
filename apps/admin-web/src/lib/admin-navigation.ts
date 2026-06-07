@@ -188,7 +188,7 @@ export function getAdminPageMeta(
       title: locale === "ru" ? "Управление ролями" : "Role Management",
       description:
         locale === "ru"
-          ? "Список Admin и Moderator, назначение и снятие Moderator с backend audit log."
+          ? "Список Admin и Moderator, назначение и снятие Moderator с audit log."
           : "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
     };
   }

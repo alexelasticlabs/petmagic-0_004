@@ -12,8 +12,11 @@ describe("admin user query cancellation", () => {
 
     expect(source).toContain("export async function fetchAdminUser(\n  userId: string,\n  signal?: AbortSignal");
     expect(source).toContain("export async function fetchAdminUserAnalytics(\n  userId: string,\n  signal?: AbortSignal");
-    expect(source).toContain("apiRequest<AdminUserDetail>(`/api/admin/users/${userId}`, { method: \"GET\", signal })");
-    expect(source).toContain("apiRequest<AdminUserAnalytics>(`/api/admin/users/${userId}/analytics`,");
+    expect(source).toContain("const encodedUserId = encodePathSegment(userId);");
+    expect(source).toContain("apiRequest<AdminUserDetail>(`/api/admin/users/${encodedUserId}`,");
+    expect(source).toContain(
+      "apiRequest<AdminUserAnalytics>(`/api/admin/users/${encodedUserId}/analytics`,"
+    );
     expect(source).toContain("signal");
   });
 

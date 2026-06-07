@@ -200,8 +200,14 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             <Button
               type="button"
               variant="secondary"
-              disabled={overviewQuery.isFetching}
-              onClick={() => void overviewQuery.refetch().catch(() => undefined)}
+              disabled={!session || overviewQuery.isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void overviewQuery.refetch().catch(() => undefined);
+              }}
             >
               {text.retryAction}
             </Button>
@@ -544,10 +550,11 @@ function FeedbackFeedPanel({
   return (
     <div className={styles.feedbackList}>
       {items.map((item) => {
+        const encodedTemplateId = encodeURIComponent(item.templateId);
         const templatePath =
           item.templateType === "Video"
-            ? `/${locale}/templates/video/analytics/${item.templateId}`
-            : `/${locale}/templates/image/analytics/${item.templateId}`;
+            ? `/${locale}/templates/video/analytics/${encodedTemplateId}`
+            : `/${locale}/templates/image/analytics/${encodedTemplateId}`;
 
         return (
           <article key={item.eventId} className={styles.feedbackItem}>
@@ -966,7 +973,7 @@ function TemplatesTable({
               <td>
                 <Link
                   className={styles.inlineAction}
-                  href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${row.templateId}`}
+                  href={`/${locale}/templates/${row.templateType === "Video" ? "video" : "image"}/analytics/${encodeURIComponent(row.templateId)}`}
                 >
                   {text.openAnalytics}
                 </Link>
@@ -1174,7 +1181,7 @@ function getCopy(locale: AppLocale) {
     trendTitle: isRu ? "Динамика по времени" : "Trend over time",
     trendHint: isRu
       ? "Дневная динамика просмотров, запусков, успешных генераций и реальных затрат."
-      : "Daily backend buckets for views, starts, completions, and real spend.",
+      : "Daily trend for views, starts, completions, and real spend.",
     noTrend: isRu ? "Пока нет точек тренда." : "No trend points yet.",
     currentMetric: isRu ? "Сумма выбранной метрики" : "Selected metric total",
     funnelTitle: isRu ? "Воронка конверсии" : "Conversion funnel",
@@ -1208,7 +1215,7 @@ function getCopy(locale: AppLocale) {
     topTitle: isRu ? "Топ шаблонов" : "Top templates",
     topHint: isRu
       ? "Сортировка синхронизирована с выбранными фильтрами."
-      : "Sorted by the backend query.",
+      : "Sorted with the selected filters.",
     tableTitle: isRu ? "Все шаблоны" : "All templates",
     tableHint: isRu
       ? "Сводная таблица шаблонов по просмотрам, генерациям, ошибкам и реальным затратам."

@@ -29,6 +29,8 @@ import { Select, type SelectOption } from "@/components/ui/select";
 import { type AdminRedeemCode, type AdminRedeemRewardKind } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
+const PROMO_CODES_SEARCH_MAX_LENGTH = 120;
+
 type PromoCodesListCardProps = {
   text: ReturnType<typeof getDictionary>;
   locale: Locale;
@@ -38,7 +40,6 @@ type PromoCodesListCardProps = {
   rewardFilter: "all" | AdminRedeemRewardKind;
   sortMode: PromoSortMode;
   statusTabs: Array<{ value: PromoStatusFilter; label: string }>;
-  statusCounts: Record<PromoStatusFilter, number>;
   statusOptions: SelectOption[];
   rewardOptions: SelectOption[];
   sortOptions: SelectOption[];
@@ -50,12 +51,12 @@ type PromoCodesListCardProps = {
   autoRefreshMs: number;
   dataUpdatedAt: number;
   pagedCodes: AdminRedeemCode[];
-  filteredCodesCount: number;
   selectedCodeId: string | null;
   actionsMenuCodeId: string | null;
   busyCodeId: string | null;
   currentPage: number;
   totalPages: number;
+  totalCount: number;
   visiblePageNumbers: number[];
   shownRangeStart: number;
   shownRangeEnd: number;
@@ -86,7 +87,6 @@ export function PromoCodesListCard({
   rewardFilter,
   sortMode,
   statusTabs,
-  statusCounts,
   statusOptions,
   rewardOptions,
   sortOptions,
@@ -98,12 +98,12 @@ export function PromoCodesListCard({
   autoRefreshMs,
   dataUpdatedAt,
   pagedCodes,
-  filteredCodesCount,
   selectedCodeId,
   actionsMenuCodeId,
   busyCodeId,
   currentPage,
   totalPages,
+  totalCount,
   visiblePageNumbers,
   shownRangeStart,
   shownRangeEnd,
@@ -170,9 +170,6 @@ export function PromoCodesListCard({
                 }}
               >
                 <span>{tab.label}</span>
-                <span className={styles.statusTabCount}>
-                  {formatNumber(statusCounts[tab.value], locale)}
-                </span>
               </button>
             );
           })}
@@ -208,7 +205,10 @@ export function PromoCodesListCard({
           <input
             className={styles.searchInput}
             value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
+            onChange={(event) =>
+              onSearchChange(event.target.value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH))
+            }
+            maxLength={PROMO_CODES_SEARCH_MAX_LENGTH}
             placeholder={text.promoCodesSearchPlaceholder}
           />
         </label>
@@ -406,8 +406,8 @@ export function PromoCodesListCard({
           <div className={styles.pagination}>
             <span className={styles.paginationInfo}>
               {locale === "ru"
-                ? `Показано ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} из ${formatNumber(filteredCodesCount, locale)}`
-                : `Showing ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} of ${formatNumber(filteredCodesCount, locale)}`}
+                ? `Показано ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} из ${formatNumber(totalCount, locale)}`
+                : `Showing ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} of ${formatNumber(totalCount, locale)}`}
             </span>
             <div className={styles.paginationCenter}>
               <Button

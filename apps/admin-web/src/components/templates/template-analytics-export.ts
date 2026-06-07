@@ -8,6 +8,7 @@ import type {
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const EXPORT_URL_PATTERN = /\bhttps?:\/\/[^\s<>"')]+/gi;
+const EXPORT_FILENAME_MAX_ID_LENGTH = 80;
 
 export type SafeTemplateAnalyticsTemplateExport = Omit<
   AdminTemplate,
@@ -38,6 +39,17 @@ export type SafeTemplateEventAnalyticsExport = AdminTemplateEventAnalytics;
 
 function sanitizeAnalyticsText(value: string, maxLength = 160) {
   return sanitizeSensitiveText(value.replace(EXPORT_URL_PATTERN, "[redacted-url]"), maxLength);
+}
+
+export function formatSafeTemplateAnalyticsExportName(templateId: string): string {
+  const safeId =
+    templateId
+      .trim()
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/^[.-]+|[.-]+$/g, "")
+      .slice(0, EXPORT_FILENAME_MAX_ID_LENGTH) || "template";
+
+  return `template-${safeId}-analytics.json`;
 }
 
 function sanitizeAnalyticsOptionalText(value: string | undefined, maxLength?: number): string | undefined;

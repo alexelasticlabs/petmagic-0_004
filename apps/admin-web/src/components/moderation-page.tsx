@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   AdminBadge,
@@ -19,6 +19,8 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   decideAdminModerationItem,
   fetchAdminModerationQueue,
+  MODERATION_DECISION_REASON_MAX_LENGTH,
+  MODERATION_SEARCH_MAX_LENGTH,
   normalizeAdminModerationQueueQuery,
   useAuthSession,
   type AdminModerationQueueItem,
@@ -47,8 +49,8 @@ function getCopy(locale: Locale) {
     eyebrow: isRu ? "Content safety" : "Content safety",
     title: isRu ? "Модерация" : "Moderation",
     description: isRu
-      ? "Очередь жалоб и обратной связи по шаблонам. Решения пишутся в backend audit log."
-      : "Complaint and feedback queue for templates. Decisions are written to backend audit log.",
+      ? "Очередь жалоб и обратной связи по шаблонам. Решения пишутся в audit log."
+      : "Complaint and feedback queue for templates. Decisions are written to the audit log.",
     filtersTitle: isRu ? "Фильтры" : "Filters",
     status: isRu ? "Статус" : "Status",
     search: isRu ? "Поиск" : "Search",
@@ -152,8 +154,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   const [reason, setReason] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isDecisionInFlight, setIsDecisionInFlight] = useState(false);
+  const decisionInFlightRef = useRef(false);
   const debouncedSearch = useDebouncedValue(search, 350);
-  const trimmedReason = reason.trim();
+  const trimmedReason = reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);
   const isReasonValid = trimmedReason.length >= 3;
 
   useEffect(() => {
@@ -176,6 +180,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   const queueQuery = useQuery({
     queryKey: adminQueryKeys.moderationQueue(query),
     queryFn: ({ signal }) => fetchAdminModerationQueue(query, signal),
+    enabled: Boolean(session),
     placeholderData: keepPreviousData,
   });
 
@@ -195,11 +200,17 @@ export function ModerationPage({ locale }: ModerationPageProps) {
       setReason("");
       setReasonError(null);
       await queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] });
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) });
     },
     onError: (error) =>
       setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) }),
+    onSettled: () => {
+      decisionInFlightRef.current = false;
+      setIsDecisionInFlight(false);
+    },
   });
 
+  const isDecisionSubmitting = isDecisionInFlight || decisionMutation.isPending;
   const items = queueQuery.data?.items ?? [];
 
   function assertCanModerate(): boolean {
@@ -215,7 +226,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   }
 
   function openDecision(item: AdminModerationQueueItem, action: "approve" | "reject") {
-    if (decisionMutation.isPending || item.status !== "pending") {
+    if (decisionInFlightRef.current || decisionMutation.isPending || item.status !== "pending") {
       return;
     }
 
@@ -229,7 +240,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   }
 
   function submitDecision() {
-    if (decisionMutation.isPending) {
+    if (decisionInFlightRef.current || decisionMutation.isPending) {
       return;
     }
 
@@ -243,6 +254,8 @@ export function ModerationPage({ locale }: ModerationPageProps) {
     }
 
     setReasonError(null);
+    decisionInFlightRef.current = true;
+    setIsDecisionInFlight(true);
     decisionMutation.mutate();
   }
 
@@ -279,10 +292,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
               className={styles.input}
               value={search}
               onChange={(event) => {
-                setSearch(event.target.value);
+                setSearch(event.target.value.slice(0, MODERATION_SEARCH_MAX_LENGTH));
                 setPage(0);
               }}
-              maxLength={120}
+              maxLength={MODERATION_SEARCH_MAX_LENGTH}
               placeholder={text.searchPlaceholder}
             />
           </label>
@@ -300,8 +313,14 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             <button
               type="button"
               className={styles.button}
-              disabled={queueQuery.isFetching}
-              onClick={() => void queueQuery.refetch().catch(() => undefined)}
+              disabled={!session || queueQuery.isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void queueQuery.refetch().catch(() => undefined);
+              }}
             >
               {text.retry}
             </button>
@@ -368,9 +387,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={styles.button}
-                          disabled={
-                            !canModerate || item.status !== "pending" || decisionMutation.isPending
-                          }
+                          disabled={!canModerate || item.status !== "pending" || isDecisionSubmitting}
                           onClick={() => openDecision(item, "approve")}
                         >
                           {text.approve}
@@ -378,9 +395,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={`${styles.button} ${styles.danger}`}
-                          disabled={
-                            !canModerate || item.status !== "pending" || decisionMutation.isPending
-                          }
+                          disabled={!canModerate || item.status !== "pending" || isDecisionSubmitting}
                           onClick={() => openDecision(item, "reject")}
                         >
                           {text.reject}
@@ -424,9 +439,9 @@ export function ModerationPage({ locale }: ModerationPageProps) {
         confirmLabel={decision?.action === "approve" ? text.approve : text.reject}
         cancelLabel={text.cancel}
         tone={decision?.action === "reject" ? "danger" : "primary"}
-        isSubmitting={decisionMutation.isPending}
+        isSubmitting={isDecisionSubmitting}
         onCancel={() => {
-          if (!decisionMutation.isPending) {
+          if (!decisionInFlightRef.current && !decisionMutation.isPending) {
             setDecision(null);
             setReason("");
             setReasonError(null);
@@ -441,14 +456,14 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             className={styles.textarea}
             value={reason}
             onChange={(event) => {
-              setReason(event.target.value);
+              setReason(event.target.value.slice(0, MODERATION_DECISION_REASON_MAX_LENGTH));
               if (reasonError) {
                 setReasonError(null);
               }
             }}
-            maxLength={500}
+            maxLength={MODERATION_DECISION_REASON_MAX_LENGTH}
             placeholder={text.reasonPlaceholder}
-            disabled={decisionMutation.isPending}
+            disabled={isDecisionSubmitting}
           />
         </label>
         {reasonError ? (

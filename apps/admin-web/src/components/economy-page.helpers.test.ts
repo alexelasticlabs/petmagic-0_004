@@ -6,16 +6,26 @@ import {
   createDefaultProviderConfigDraft,
   normalizeEconomyCurrencyInput,
   normalizeEconomyIntegerInput,
+  normalizeEconomyPackDisplayNameInput,
   normalizeEconomyPercentInput,
+  normalizeEconomyPlanNameInput,
+  normalizeEconomyPlanProductIdInput,
   normalizeEconomyPriceInput,
+  toDraft,
   toCurrencyPackPayload,
   toProviderConfigCreatePayload,
   toProviderConfigMatchPayload,
   toProviderConfigPayload,
+  toSubscriptionPlanDraft,
   toSubscriptionPlanPayload,
   type EconomyValidationText,
 } from "@/components/economy-page.helpers";
-import type { AdminEconomyPurchase, AdminEconomySubscription } from "@/lib/api-client";
+import type {
+  AdminCurrencyPack,
+  AdminEconomyPurchase,
+  AdminEconomySubscription,
+  AdminSubscriptionPlan,
+} from "@/lib/api-client";
 
 function createPurchase(patch: Partial<AdminEconomyPurchase> = {}): AdminEconomyPurchase {
   return {
@@ -51,6 +61,43 @@ function createSubscription(
     monthlyTokenLimit: 100,
     monthlyTokensGranted: 10,
     createdAtUtc: "2026-06-06T12:00:00Z",
+    updatedAtUtc: "2026-06-06T12:00:00Z",
+    ...patch,
+  };
+}
+
+function createCurrencyPack(patch: Partial<AdminCurrencyPack> = {}): AdminCurrencyPack {
+  return {
+    packId: "pack-1",
+    code: "starter",
+    displayName: "Starter",
+    currencyCode: "USD",
+    priceAmount: 9.99,
+    grantedSpark: 100,
+    bonusSpark: 10,
+    totalSpark: 110,
+    isActive: true,
+    sortOrder: 1,
+    ...patch,
+  };
+}
+
+function createSubscriptionPlan(
+  patch: Partial<AdminSubscriptionPlan> = {}
+): AdminSubscriptionPlan {
+  return {
+    planId: "plan-1",
+    name: "Premium",
+    billingPeriod: "month",
+    priceAmount: 19.99,
+    currencyCode: "USD",
+    monthlyTokenLimit: 1000,
+    isRecommended: true,
+    isActive: true,
+    appleProductId: "apple-premium",
+    googleProductId: "google-premium",
+    stripePriceId: "price_premium",
+    displayOrder: 1,
     updatedAtUtc: "2026-06-06T12:00:00Z",
     ...patch,
   };
@@ -107,6 +154,10 @@ describe("currency pack payloads", () => {
   it("normalizes currency pack inputs and rejects exponent or oversized values", () => {
     expect(normalizeEconomyPriceInput("1e2.345")).toBe("12.345");
     expect(normalizeEconomyIntegerInput("1e2.5abc999999999")).toBe("125999999");
+    expect(normalizeEconomyPackDisplayNameInput(` ${"p".repeat(90)} `)).toHaveLength(80);
+    expect(toDraft(createCurrencyPack({ displayName: ` ${"p".repeat(90)} ` })).displayName).toHaveLength(
+      80
+    );
 
     expect(() =>
       toCurrencyPackPayload(
@@ -186,6 +237,23 @@ describe("subscription plan payloads", () => {
 
   it("normalizes currency codes and rejects exponent or oversized plan values", () => {
     expect(normalizeEconomyCurrencyInput(" u-s$d1 ")).toBe("USD");
+    expect(normalizeEconomyPlanNameInput(` ${"p".repeat(90)} `)).toHaveLength(80);
+    expect(normalizeEconomyPlanProductIdInput(` ${"i".repeat(170)} `)).toHaveLength(160);
+    expect(
+      toSubscriptionPlanDraft(
+        createSubscriptionPlan({
+          name: ` ${"p".repeat(90)} `,
+          appleProductId: ` ${"a".repeat(170)} `,
+          googleProductId: ` ${"g".repeat(170)} `,
+          stripePriceId: ` ${"s".repeat(170)} `,
+        })
+      )
+    ).toMatchObject({
+      name: "p".repeat(80),
+      appleProductId: "a".repeat(160),
+      googleProductId: "g".repeat(160),
+      stripePriceId: "s".repeat(160),
+    });
 
     expect(() =>
       toSubscriptionPlanPayload(

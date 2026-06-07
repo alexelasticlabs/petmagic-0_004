@@ -51,4 +51,14 @@ describe("support message preview display", () => {
     expect(adminShellSource).not.toContain("event.lastMessagePreview?.trim()");
     expect(supportControllerSource).not.toContain("event.lastMessagePreview?.trim()");
   });
+
+  it("encodes support realtime notification route ids before building hrefs", () => {
+    const adminShellSource = readFileSync(adminShellPath, "utf8");
+
+    expect(adminShellSource).toContain(
+      "const supportConversationPathId = encodeURIComponent(event.conversationId);"
+    );
+    expect(adminShellSource).toContain("href: `/${locale}/support/${supportConversationPathId}`");
+    expect(adminShellSource).not.toContain("href: `/${locale}/support/${event.conversationId}`");
+  });
 });

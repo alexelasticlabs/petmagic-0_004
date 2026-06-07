@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +12,7 @@ import {
 } from "./admin-rbac";
 
 describe("admin-rbac", () => {
+  const localeAppRoot = fileURLToPath(new URL("../app/[locale]", import.meta.url));
   const concreteAdminRoutes = [
     "/dashboard",
     "/economy",
@@ -75,5 +79,52 @@ describe("admin-rbac", () => {
   it("uses a role-aware default landing page", () => {
     expect(getDefaultAdminPath("en", ["Admin"])).toBe("/en/dashboard");
     expect(getDefaultAdminPath("ru", ["Moderator"])).toBe("/ru/support");
+    expect(getDefaultAdminPath("en", ["Premium", "User"])).toBe("/en");
+    expect(getDefaultAdminPath("ru")).toBe("/ru");
+  });
+
+  it("keeps protected route coverage aligned with locale admin pages", () => {
+    expect(collectLocaleAdminRoutes(localeAppRoot).sort()).toEqual(
+      [...concreteAdminRoutes].sort()
+    );
   });
 });
+
+function collectLocaleAdminRoutes(root: string): string[] {
+  const routes: string[] = [];
+
+  function visit(directory: string): void {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const entryPath = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(entryPath);
+        continue;
+      }
+
+      if (entry.name !== "page.tsx") {
+        continue;
+      }
+
+      const route = normalizePageRoute(relative(root, entryPath));
+      if (route !== "/") {
+        routes.push(route);
+      }
+    }
+  }
+
+  visit(root);
+  return routes;
+}
+
+function normalizePageRoute(relativePagePath: string): string {
+  const route = relativePagePath
+    .split(sep)
+    .join("/")
+    .replace(/\/page\.tsx$/, "")
+    .replace(/^page\.tsx$/, "")
+    .replace(/\[conversationId\]/g, "conversation-1")
+    .replace(/\[templateId\]/g, "template-1")
+    .replace(/\[userId\]/g, "user-1");
+
+  return route ? `/${route}` : "/";
+}

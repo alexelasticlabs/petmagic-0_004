@@ -79,6 +79,21 @@ export type UserListPage = OffsetPagedResponse<UserListItem> & {
   totalCount: number;
 };
 
+export type AdminUserDashboardMetrics = {
+  totalUsers: number;
+  premiumUsers: number;
+  activeUsers: number;
+  blockedUsers: number;
+  adminUsers: number;
+  moderatorUsers: number;
+  regularUsers: number;
+  usersThisWeek: number;
+  usersPreviousWeek: number;
+  newUsersLast7Days: number;
+  newUsersLast30Days: number;
+  newUsersLast90Days: number;
+};
+
 export type AdminUserDetail = {
   userId: string;
   email: string;
@@ -208,6 +223,7 @@ export type OffsetPagedResponse<T> = {
   skip: number;
   take: number;
   hasMore: boolean;
+  totalCount?: number | null;
 };
 
 export type AdminEconomyLedgerItem = {
@@ -232,8 +248,33 @@ export type AdminEconomyPurchase = {
   currencyCode: string;
   sparkToGrant: number;
   canRefund?: boolean;
+  productType?: string;
+  tokenAmount?: number;
+  refundStatus?: string;
   createdAtUtc: string;
   confirmedAtUtc?: string | null;
+};
+
+export type AdminEconomyDashboardRevenuePoint = {
+  date: string;
+  amount: number;
+};
+
+export type AdminEconomyDashboardMetrics = {
+  purchasesThisWeek: number;
+  purchasesPreviousWeek: number;
+  successfulPaymentsThisWeek: number;
+  successfulPaymentsPreviousWeek: number;
+  failedPaymentsThisWeek: number;
+  failedPaymentsPreviousWeek: number;
+  revenueThisWeek: number;
+  revenuePreviousWeek: number;
+  totalWalletCredits: number;
+  totalWalletDebits: number;
+  activeSubscriptions: number;
+  renewalStops: number;
+  currencyCode: string;
+  revenueSeries: AdminEconomyDashboardRevenuePoint[];
 };
 
 export type AdminEconomySubscription = {
@@ -253,6 +294,11 @@ export type AdminEconomySubscription = {
   lastTokenGrantAtUtc?: string | null;
   createdAtUtc: string;
   updatedAtUtc: string;
+  productId?: string | null;
+  autoRenewing?: boolean;
+  cancelledAtUtc?: string | null;
+  expiredAtUtc?: string | null;
+  lastValidatedAtUtc?: string | null;
 };
 
 export type AdminEconomyUserSubscriptionSummary = {
@@ -387,6 +433,21 @@ export type AdminRedeemCode = {
   redemptions: AdminRedeemCodeRedemption[];
 };
 
+export type AdminRedeemCodesPage = OffsetPagedResponse<AdminRedeemCode> & {
+  totalCount: number;
+};
+
+export type AdminRedeemCodeMetrics = {
+  totalCodes: number;
+  activeCodes: number;
+  totalUses: number;
+  totalGranted: number;
+  createdLast7d: number;
+  activeTouchedLast7d: number;
+  usesLast7d: number;
+  grantedLast7d: number;
+};
+
 export type SupportConversationStatus = "New" | "InProgress" | "WaitingForUser" | "Closed";
 
 export type SupportConversationSource =
@@ -469,6 +530,22 @@ export type AdminSupportConversationSummary = {
   feedbackRating?: number | null;
   isReadOnly: boolean;
   canReopen: boolean;
+};
+
+export type AdminSupportInboxPage = {
+  items: AdminSupportConversationSummary[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  hasMore: boolean;
+};
+
+export type AdminSupportInboxMetrics = {
+  totalConversations: number;
+  openConversations: number;
+  closedConversations: number;
+  unassignedConversations: number;
+  unreadForAdminConversations: number;
 };
 
 export type AdminSupportConversation = {
@@ -581,6 +658,14 @@ export type AdminTemplateListItem = {
   createdAtUtc: string;
   updatedAtUtc: string;
   estimatedCostUsd?: number;
+};
+
+export type AdminTemplateCatalogPage = {
+  items: AdminTemplateListItem[];
+  skip: number;
+  take: number;
+  totalCount: number;
+  hasMore: boolean;
 };
 
 export type AdminTemplateCategory = {
@@ -734,6 +819,7 @@ export type AdminModerationQueuePage = {
   items: AdminModerationQueueItem[];
   skip: number;
   take: number;
+  totalCount: number;
   hasMore: boolean;
   generatedAtUtc: string;
 };
@@ -859,6 +945,7 @@ export type AdminTemplatesAnalyticsOverview = {
 };
 
 export type AdminTemplateGenerationDashboardMetrics = {
+  totalJobs: number;
   generationsToday: number;
   generationsThisWeek: number;
   generationsThisMonth: number;
@@ -867,6 +954,10 @@ export type AdminTemplateGenerationDashboardMetrics = {
   failedGenerationsThisMonth: number;
   pendingJobs: number;
   runningJobs: number;
+  completedJobs: number;
+  failedJobs: number;
+  cancelledJobs: number;
+  retryingJobs: number;
   generatedAtUtc: string;
 };
 

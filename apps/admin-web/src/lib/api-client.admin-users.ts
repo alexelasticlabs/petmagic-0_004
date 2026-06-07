@@ -4,10 +4,12 @@ import {
     cachedAdminUserDetails,
     cachedGet,
     cachedUsersLists,
+    encodePathSegment,
 } from "./api-client.core";
 
 import type {
     AdminUserAnalytics,
+    AdminUserDashboardMetrics,
     AdminUserDetail,
     AdminUserWalletOperation,
     UserListPage,
@@ -25,7 +27,8 @@ export type FetchUsersQuery = {
 type AdminAssignableRole = "Admin" | "Moderator";
 
 const USER_LIST_MAX_TAKE = 100;
-const USER_SEARCH_MAX_LENGTH = 120;
+export const USER_SEARCH_MAX_LENGTH = 120;
+export const USER_WALLET_REASON_MAX_LENGTH = 240;
 const allowedUserRoles = new Set(["Admin", "Moderator", "User"]);
 const allowedUserStatuses = new Set(["active", "blocked", "unconfirmed"]);
 const allowedAssignableRoles = new Set<AdminAssignableRole>(["Admin", "Moderator"]);
@@ -117,14 +120,28 @@ export async function fetchUsers(
   );
 }
 
+export async function fetchAdminUserDashboardMetrics(
+  signal?: AbortSignal
+): Promise<AdminUserDashboardMetrics> {
+  return apiRequest<AdminUserDashboardMetrics>("/api/admin/users/dashboard/metrics", {
+    method: "GET",
+    signal,
+  });
+}
+
 export async function fetchAdminUser(
   userId: string,
   signal?: AbortSignal
 ): Promise<AdminUserDetail> {
+  const encodedUserId = encodePathSegment(userId);
   return cachedGet(
     `admin-user:${userId}`,
     cachedAdminUserDetails,
-    () => apiRequest<AdminUserDetail>(`/api/admin/users/${userId}`, { method: "GET", signal }),
+    () =>
+      apiRequest<AdminUserDetail>(`/api/admin/users/${encodedUserId}`, {
+        method: "GET",
+        signal,
+      }),
     signal
   );
 }
@@ -133,11 +150,12 @@ export async function fetchAdminUserAnalytics(
   userId: string,
   signal?: AbortSignal
 ): Promise<AdminUserAnalytics> {
+  const encodedUserId = encodePathSegment(userId);
   return cachedGet(
     `admin-user-analytics:${userId}`,
     cachedAdminUserAnalytics,
     () =>
-      apiRequest<AdminUserAnalytics>(`/api/admin/users/${userId}/analytics`, {
+      apiRequest<AdminUserAnalytics>(`/api/admin/users/${encodedUserId}/analytics`, {
         method: "GET",
         signal,
       }),
@@ -151,10 +169,15 @@ export async function adjustAdminUserWallet(
   amount: number,
   reason: string
 ): Promise<AdminUserWalletOperation> {
-  const result = await apiRequest<AdminUserWalletOperation>(`/api/admin/users/${userId}/wallet`, {
-    method: "POST",
-    body: JSON.stringify({ operation, amount, reason }),
-  });
+  const encodedUserId = encodePathSegment(userId);
+  const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
+  const result = await apiRequest<AdminUserWalletOperation>(
+    `/api/admin/users/${encodedUserId}/wallet`,
+    {
+      method: "POST",
+      body: JSON.stringify({ operation, amount, reason: normalizedReason }),
+    }
+  );
 
   cachedUsersLists.clear();
   cachedAdminUserDetails.delete(`admin-user:${userId}`);
@@ -164,7 +187,8 @@ export async function adjustAdminUserWallet(
 
 export async function assignRole(userId: string, role: string): Promise<void> {
   const normalizedRole = assertAssignableRole(role);
-  await apiRequest<void>(`/api/admin/users/${userId}/role`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/users/${encodedUserId}/role`, {
     method: "PUT",
     body: JSON.stringify({ role: normalizedRole }),
   });
@@ -175,7 +199,8 @@ export async function assignRole(userId: string, role: string): Promise<void> {
 
 export async function revokeRole(userId: string, role: string): Promise<void> {
   const normalizedRole = assertAssignableRole(role);
-  await apiRequest<void>(`/api/admin/users/${userId}/role`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/users/${encodedUserId}/role`, {
     method: "DELETE",
     body: JSON.stringify({ role: normalizedRole }),
   });
@@ -185,7 +210,8 @@ export async function revokeRole(userId: string, role: string): Promise<void> {
 }
 
 export async function setPremium(userId: string, isPremium: boolean): Promise<void> {
-  await apiRequest<void>(`/api/admin/users/${userId}/premium`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/users/${encodedUserId}/premium`, {
     method: "PUT",
     body: JSON.stringify({ isPremium }),
   });
@@ -195,7 +221,8 @@ export async function setPremium(userId: string, isPremium: boolean): Promise<vo
 }
 
 export async function revokePremium(userId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/economy/users/${userId}/premium/revoke`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/economy/users/${encodedUserId}/premium/revoke`, {
     method: "PUT",
     body: JSON.stringify({ paymentProvider: "stripe" }),
   });
@@ -205,7 +232,8 @@ export async function revokePremium(userId: string): Promise<void> {
 }
 
 export async function setActive(userId: string, isActive: boolean): Promise<void> {
-  await apiRequest<void>(`/api/admin/users/${userId}/active`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/users/${encodedUserId}/active`, {
     method: "PUT",
     body: JSON.stringify({ isActive }),
   });
@@ -215,7 +243,8 @@ export async function setActive(userId: string, isActive: boolean): Promise<void
 }
 
 export async function deleteAdminUser(userId: string): Promise<void> {
-  await apiRequest<void>(`/api/admin/users/${userId}`, {
+  const encodedUserId = encodePathSegment(userId);
+  await apiRequest<void>(`/api/admin/users/${encodedUserId}`, {
     method: "DELETE",
   });
   cachedUsersLists.clear();

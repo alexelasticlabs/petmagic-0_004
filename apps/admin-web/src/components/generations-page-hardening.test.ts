@@ -23,7 +23,7 @@ describe("generations page hardening", () => {
     expect(source).not.toContain("title={item.userId}");
   });
 
-  it("localizes generation statuses and keeps unsupported retry/cancel actions hidden", () => {
+  it("localizes generation statuses and keeps unsupported retry/cancel actions out of the UI", () => {
     const source = readFileSync(generationsPagePath, "utf8");
 
     expect(source).toContain('pending: isRu ? "Ожидает" : "Pending"');
@@ -32,7 +32,11 @@ describe("generations page hardening", () => {
     expect(source).toContain('cancelled: isRu ? "Отменена" : "Cancelled"');
     expect(source).toContain("formatStatus(item.status, text)");
     expect(source).toContain("formatTemplateType(item.templateType, text)");
-    expect(source).toContain("Retry/cancel не показаны");
+    expect(source).not.toContain("unsupportedActions");
+    expect(source).not.toContain("Retry/cancel не показаны");
+    expect(source).not.toContain("Retry/cancel are hidden");
+    expect(source).not.toContain("backend does not expose");
+    expect(source).not.toContain("metaItems={[");
   });
 
   it("keeps generation search server-backed and disables repeated retry clicks", () => {
@@ -41,21 +45,53 @@ describe("generations page hardening", () => {
     expect(source).toContain("const debouncedProvider = useDebouncedValue(provider, 350)");
     expect(source).toContain("const debouncedUser = useDebouncedValue(user, 350)");
     expect(source).toContain("const debouncedSearch = useDebouncedValue(search, 350)");
+    expect(source).toContain("GENERATION_PROVIDER_FILTER_MAX_LENGTH,");
+    expect(source).toContain("GENERATION_SEARCH_FILTER_MAX_LENGTH,");
+    expect(source).toContain("GENERATION_USER_FILTER_MAX_LENGTH,");
+    expect(source).toContain("useAuthSession,");
+    expect(source).toContain("const session = useAuthSession();");
+    expect(source).toContain(
+      'const canViewGenerations = session?.user.roles.includes("Admin") ?? false;'
+    );
+    expect(source).toContain(
+      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
+    );
+    expect(source).toContain("setSearch(event.target.value.slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH));");
+    expect(source).toContain("setProvider(event.target.value.slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH));");
+    expect(source).toContain("setUser(event.target.value.slice(0, GENERATION_USER_FILTER_MAX_LENGTH));");
+    expect(source).toContain("maxLength={GENERATION_SEARCH_FILTER_MAX_LENGTH}");
+    expect(source).toContain("maxLength={GENERATION_PROVIDER_FILTER_MAX_LENGTH}");
+    expect(source).toContain("maxLength={GENERATION_USER_FILTER_MAX_LENGTH}");
     expect(source).toContain("normalizeAdminTemplateGenerationsQuery({");
     expect(source).toContain("fetchAdminTemplateGenerations(query, signal)");
+    expect(source).toContain("enabled: canViewGenerations");
     expect(source).toContain("placeholderData: keepPreviousData");
-    expect(source).toContain("disabled={generationsQuery.isFetching}");
-    expect(source).toContain("void generationsQuery.refetch().catch(() => undefined)");
+    expect(source).toContain("disabled={!canViewGenerations || generationsQuery.isFetching}");
+    expect(source).toContain(
+      "if (!canViewGenerations) {\n                  return;\n                }\n\n                void generationsQuery.refetch().catch(() => undefined);",
+    );
     expect(source).not.toContain(".filter((item) => item.generationId");
     expect(source).not.toContain(".filter((item) => item.provider");
     expect(source).not.toContain(".filter((item) => item.userId");
+    expect(source).not.toContain("setSearch(event.target.value);");
+    expect(source).not.toContain("setProvider(event.target.value);");
+    expect(source).not.toContain("setUser(event.target.value);");
   });
 
-  it("does not present current-page status counts as global metrics", () => {
+  it("sources status KPI cards from backend aggregate metrics", () => {
     const source = readFileSync(generationsPagePath, "utf8");
 
-    expect(source).toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');
-    expect(source).toContain("hint={text.currentPageScope}");
+    expect(source).toContain("fetchAdminTemplateGenerationMetrics(signal)");
+    expect(source).toContain("adminQueryKeys.templateGenerationMetrics");
+    expect(source).toContain("generationMetrics?.totalJobs");
+    expect(source).toContain("generationMetrics?.pendingJobs");
+    expect(source).toContain("generationMetrics?.runningJobs");
+    expect(source).toContain("generationMetrics?.failedJobs");
+    expect(source).toContain("generationMetrics?.retryingJobs");
+    expect(source).toContain("generationMetrics?.cancelledJobs");
+    expect(source).toContain("hint={text.allJobsScope}");
     expect(source).toContain('aria-busy={generationsQuery.isFetching ? "true" : undefined}');
+    expect(source).not.toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');
+    expect(source).not.toContain("items.filter((item) => item.status");
   });
 });

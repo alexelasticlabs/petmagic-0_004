@@ -6,7 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BellIcon, CaretDownIcon, MenuIcon } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
-import { useAdminNotifications } from "@/components/admin/admin-notifications";
+import {
+  sanitizeAdminNotificationText,
+  useAdminNotifications,
+} from "@/components/admin/admin-notifications";
 import styles from "@/components/admin/admin-shell.module.css";
 import { type Locale } from "@/lib/i18n";
 import { type AdminTheme } from "@/lib/theme";
@@ -36,6 +39,9 @@ type AdminTopbarProps = {
   onToggleSidebar: () => void;
   onToggleTheme: () => void;
 };
+
+const NOTIFICATION_RENDER_TITLE_MAX_LENGTH = 96;
+const NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH = 240;
 
 export function AdminTopbar({
   locale,
@@ -297,6 +303,14 @@ export function AdminTopbar({
                     </div>
                     <div className={styles.notificationGroupItems}>
                       {pinnedNotifications.map((item) => {
+                        const safeNotificationTitle = sanitizeAdminNotificationText(
+                          item.title,
+                          NOTIFICATION_RENDER_TITLE_MAX_LENGTH
+                        );
+                        const safeNotificationMessage = sanitizeAdminNotificationText(
+                          item.message,
+                          NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
+                        );
                         const content = (
                           <>
                             <div className={styles.notificationCardMeta}>
@@ -336,8 +350,12 @@ export function AdminTopbar({
                                 {formatRelativeNotificationTime(item.createdAt, locale)}
                               </span>
                             </div>
-                            <strong className={styles.notificationCardTitle}>{item.title}</strong>
-                            <p className={styles.notificationCardMessage}>{item.message}</p>
+                            <strong className={styles.notificationCardTitle}>
+                              {safeNotificationTitle}
+                            </strong>
+                            <p className={styles.notificationCardMessage}>
+                              {safeNotificationMessage}
+                            </p>
                           </>
                         );
 
@@ -379,6 +397,14 @@ export function AdminTopbar({
                     </div>
                     <div className={styles.notificationGroupItems}>
                       {group.items.map((item) => {
+                        const safeNotificationTitle = sanitizeAdminNotificationText(
+                          item.title,
+                          NOTIFICATION_RENDER_TITLE_MAX_LENGTH
+                        );
+                        const safeNotificationMessage = sanitizeAdminNotificationText(
+                          item.message,
+                          NOTIFICATION_RENDER_MESSAGE_MAX_LENGTH
+                        );
                         const content = (
                           <>
                             <div className={styles.notificationCardMeta}>
@@ -413,8 +439,12 @@ export function AdminTopbar({
                                 {formatRelativeNotificationTime(item.createdAt, locale)}
                               </span>
                             </div>
-                            <strong className={styles.notificationCardTitle}>{item.title}</strong>
-                            <p className={styles.notificationCardMessage}>{item.message}</p>
+                            <strong className={styles.notificationCardTitle}>
+                              {safeNotificationTitle}
+                            </strong>
+                            <p className={styles.notificationCardMessage}>
+                              {safeNotificationMessage}
+                            </p>
                           </>
                         );
 

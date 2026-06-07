@@ -38,12 +38,15 @@ import {
   deleteAdminUser,
   fetchAdminEconomyUserSubscriptionSummary,
   fetchAdminUserAnalytics,
-  fetchUsers,
+  fetchAdminUserDashboardMetrics,
   fetchSupportInbox,
   revokePremium,
   revokeRole,
   setActive,
   setPremium,
+  USER_SEARCH_MAX_LENGTH,
+  USER_WALLET_REASON_MAX_LENGTH,
+  type AdminUserDashboardMetrics,
   type UserListItem,
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
@@ -96,8 +99,6 @@ type StatusFilter = "all" | "active" | "blocked" | "unconfirmed";
 type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "userRoleUser">;
 
 const PAGE_SIZE = 12;
-const LIVE_METRICS_UPDATE_INTERVAL_MS = 60_000;
-const ADMIN_COUNT_QUERY_PARAMS = { role: "Admin", skip: 0, take: 1 } as const;
 
 function getUserRoleLabel(role: string, text: UserRoleText) {
   return role === "Admin"
@@ -135,6 +136,29 @@ function getAccountStatus(user: UserListItem): "active" | "blocked" | "unconfirm
   }
 
   return "active";
+}
+
+function formatMetricCount(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(Math.max(0, value)) : "—";
+}
+
+function getNewUsersCountForRange(
+  metrics: AdminUserDashboardMetrics | null,
+  rangeDays: RangeDays
+): number | null {
+  if (!metrics) {
+    return null;
+  }
+
+  if (rangeDays === 7) {
+    return metrics.newUsersLast7Days;
+  }
+
+  if (rangeDays === 30) {
+    return metrics.newUsersLast30Days;
+  }
+
+  return metrics.newUsersLast90Days;
 }
 
 export function UsersManagementPage({ locale }: UsersManagementPageProps) {
@@ -305,7 +329,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [page, setPage] = useState(1);
-  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const [openActionsUserId, setOpenActionsUserId] = useState<string | null>(null);
   const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
@@ -348,6 +371,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     busyUserId,
     canManageRoles,
     error,
+    hasSession,
     isFetching: isUsersFetching,
     isLoading,
     refreshUsers,
@@ -357,48 +381,41 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     usersPage,
   } = useUsersAdmin(locale, usersQueryParams);
 
-  const adminCountQuery = useQuery({
-    queryKey: adminQueryKeys.users(ADMIN_COUNT_QUERY_PARAMS),
-    queryFn: ({ signal }) => fetchUsers(ADMIN_COUNT_QUERY_PARAMS, signal),
-    enabled: canManageRoles,
+  const userMetricsQuery = useQuery({
+    queryKey: adminQueryKeys.userDashboardMetrics,
+    queryFn: ({ signal }) => fetchAdminUserDashboardMetrics(signal),
+    enabled: hasSession,
     placeholderData: keepPreviousData,
+    staleTime: 60_000,
   });
-  const totalAdminCount = adminCountQuery.data?.totalCount ?? null;
+  const userMetrics = userMetricsQuery.data ?? null;
+  const totalAdminCount = userMetrics?.adminUsers ?? null;
+  const isUserActionLocked = confirmationSubmitting || walletDialogSubmitting;
 
   const closeActionsMenu = useCallback(() => {
     setOpenActionsUserId(null);
     setActionsMenuPosition(null);
   }, []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setNowTs(Date.now());
-    }, LIVE_METRICS_UPDATE_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(timer);
-    };
-  }, []);
-
   const supportInboxQuery = useQuery({
     queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
     queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
-    enabled: users.length > 0,
+    enabled: hasSession && users.length > 0,
   });
 
-  const selectedUserProfile = useAdminUserProfile({ userId: selectedUserId });
+  const selectedUserProfile = useAdminUserProfile({ enabled: hasSession, userId: selectedUserId });
 
   const selectedSubscriptionQuery = useQuery({
     queryKey: selectedUserId
       ? adminQueryKeys.economyUserSubscriptionSummary(selectedUserId)
       : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
     queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(selectedUserId!, signal),
-    enabled: Boolean(selectedUserId),
+    enabled: hasSession && Boolean(selectedUserId),
   });
 
   const openWalletDialog = useCallback(
     (userId: string, operation: "credit" | "debit") => {
-      if (!canManageRoles) {
+      if (!canManageRoles || isUserActionLocked) {
         return;
       }
 
@@ -412,7 +429,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         error: null,
       });
     },
-    [canManageRoles, text.usersBalanceReasonDefault]
+    [canManageRoles, isUserActionLocked, text.usersBalanceReasonDefault]
   );
 
   const closeWalletDialog = useCallback(() => {
@@ -466,10 +483,17 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     }
   }, [confirmationDialog, confirmationSubmitting, runUserAction]);
 
-  const requestUserConfirmation = useCallback((next: ConfirmationDialogState) => {
-    closeActionsMenu();
-    setConfirmationDialog(next);
-  }, [closeActionsMenu]);
+  const requestUserConfirmation = useCallback(
+    (next: ConfirmationDialogState) => {
+      if (isUserActionLocked) {
+        return;
+      }
+
+      closeActionsMenu();
+      setConfirmationDialog(next);
+    },
+    [closeActionsMenu, isUserActionLocked]
+  );
 
   const getUserLabel = useCallback((user: UserListItem) => {
     return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
@@ -633,7 +657,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       return;
     }
 
-    const reason = walletDialog.reason.trim();
+    const reason = walletDialog.reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
     if (!reason) {
       setWalletDialog((current) =>
         current ? { ...current, error: ui.walletReasonRequired } : current
@@ -676,7 +700,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     queries: pageUsers.map((user) => ({
       queryKey: adminQueryKeys.userAnalytics(user.userId),
       queryFn: ({ signal }) => fetchAdminUserAnalytics(user.userId, signal),
-      enabled: true,
+      enabled: hasSession,
       staleTime: 30_000,
     })),
   });
@@ -700,7 +724,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     queries: pagedUsers.map((user) => ({
       queryKey: adminQueryKeys.economyUserSubscriptionSummary(user.userId),
       queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(user.userId, signal),
-      enabled: user.isPremium,
+      enabled: hasSession && user.isPremium,
       staleTime: 45_000,
     })),
   });
@@ -719,7 +743,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     return map;
   }, [pageSubscriptionQueries, pagedUsers]);
 
-  const supportTickets = useMemo(() => supportInboxQuery.data ?? [], [supportInboxQuery.data]);
+  const supportTickets = useMemo(
+    () => supportInboxQuery.data?.items ?? [],
+    [supportInboxQuery.data]
+  );
   const openSupportUserCount = useMemo(() => {
     const unique = new Set(
       supportTickets
@@ -729,15 +756,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     return unique.size;
   }, [supportTickets]);
 
-  const rangeMs = rangeDays * 24 * 60 * 60 * 1000;
-  const newUsersCount = users.filter((user) => {
-    const createdTs = new Date(user.createdAtUtc).getTime();
-    return Number.isFinite(createdTs) && nowTs - createdTs <= rangeMs;
-  }).length;
-
-  const activeCount = users.filter((user) => user.isActive).length;
-  const premiumCount = users.filter((user) => user.isPremium).length;
-  const blockedCount = users.filter((user) => !user.isActive).length;
+  const totalUsersValue = formatMetricCount(userMetrics?.totalUsers);
+  const activeUsersValue = formatMetricCount(userMetrics?.activeUsers);
+  const premiumUsersValue = formatMetricCount(userMetrics?.premiumUsers);
+  const blockedUsersValue = formatMetricCount(userMetrics?.blockedUsers);
+  const newUsersValue = formatMetricCount(getNewUsersCountForRange(userMetrics, rangeDays));
 
   const selectedListUser =
     selectedUserId === null
@@ -907,13 +930,13 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       {hero}
 
       <AdminPageGrid columns="four" className={styles.summaryGrid}>
-        <AdminKpiCard label={ui.summaryTotal} value={String(users.length)} tone="primary" />
-        <AdminKpiCard label={ui.summaryActive} value={String(activeCount)} tone="success" />
-        <AdminKpiCard label={ui.summaryPremium} value={String(premiumCount)} tone="warning" />
-        <AdminKpiCard label={ui.summaryBlocked} value={String(blockedCount)} tone="danger" />
+        <AdminKpiCard label={ui.summaryTotal} value={totalUsersValue} tone="primary" />
+        <AdminKpiCard label={ui.summaryActive} value={activeUsersValue} tone="success" />
+        <AdminKpiCard label={ui.summaryPremium} value={premiumUsersValue} tone="warning" />
+        <AdminKpiCard label={ui.summaryBlocked} value={blockedUsersValue} tone="danger" />
         <AdminKpiCard
           label={ui.summaryNew}
-          value={String(newUsersCount)}
+          value={newUsersValue}
           hint={`${ui.periodLabel}: ${rangeDays}`}
           tone="info"
         />
@@ -931,9 +954,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             placeholder={ui.searchPlaceholder}
             value={search}
             onChange={(event) => {
-              setSearch(event.target.value);
+              setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));
               setPage(1);
             }}
+            maxLength={USER_SEARCH_MAX_LENGTH}
           />
 
           <select
@@ -1082,7 +1106,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 </thead>
                 <tbody>
                   {pagedUsers.map((user) => {
-                    const isBusy = busyUserId === user.userId;
+                    const isBusy = busyUserId === user.userId || isUserActionLocked;
                     const status = getAccountStatus(user);
                     const rowAnalytics = analyticsByUserId.get(user.userId);
                     const rowSubscription = pageSubscriptionsByUserId.get(user.userId);
@@ -1099,7 +1123,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         <td data-label={text.emailLabel}>
                           <div className={styles.emailCell}>
                             <Link
-                              href={`/${locale}/users/${user.userId}`}
+                              href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
                               className={`${styles.userAnchor} ${styles.userAnchorActive}`}
                             >
                               <span>{maskEmail(user.email)}</span>
@@ -1215,6 +1239,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                               aria-label={ui.menuLabel}
                               aria-haspopup="menu"
                               aria-expanded={openActionsUserId === user.userId}
+                              disabled={isUserActionLocked}
                               ref={(node) => {
                                 triggerRefs.current[user.userId] = node;
                               }}
@@ -1281,7 +1306,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 <button
                   type="button"
                   className={styles.actionMenuItem}
-                  disabled={busyUserId === openActionsUser.userId}
+                  disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
                   onClick={() => {
                     closeActionsMenu();
                     setSelectedUserId(openActionsUser.userId);
@@ -1295,7 +1320,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={styles.actionMenuItem}
-                      disabled={busyUserId === openActionsUser.userId}
+                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
                       onClick={() => {
                         openWalletDialog(openActionsUser.userId, "credit");
                       }}
@@ -1306,7 +1331,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={styles.actionMenuItem}
-                      disabled={busyUserId === openActionsUser.userId}
+                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
                       onClick={() => {
                         openWalletDialog(openActionsUser.userId, "debit");
                       }}
@@ -1317,7 +1342,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={styles.actionMenuItem}
-                      disabled={busyUserId === openActionsUser.userId}
+                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
                       onClick={() => {
                         requestRoleChange(openActionsUser, "Moderator");
                       }}
@@ -1332,7 +1357,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={styles.actionMenuItem}
-                      disabled={busyUserId === openActionsUser.userId || cannotRevokeLastAdmin}
+                      disabled={
+                        isUserActionLocked ||
+                        busyUserId === openActionsUser.userId ||
+                        cannotRevokeLastAdmin
+                      }
                       title={cannotRevokeLastAdmin ? ui.lastAdminProtected : undefined}
                       onClick={() => {
                         requestRoleChange(openActionsUser, "Admin");
@@ -1348,7 +1377,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     <button
                       type="button"
                       className={`${styles.actionMenuItem} ${styles.actionMenuItemDanger}`}
-                      disabled={busyUserId === openActionsUser.userId}
+                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
                       onClick={() => {
                         requestDeleteUser(openActionsUser);
                       }}
@@ -1359,7 +1388,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   </>
                 )}
                 <Link
-                  href={`/${locale}/users/${openActionsUser.userId}`}
+                  href={`/${locale}/users/${encodeURIComponent(openActionsUser.userId)}`}
                   className={styles.actionMenuLink}
                   onClick={closeActionsMenu}
                 >
@@ -1415,13 +1444,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         current
                           ? {
                               ...current,
-                              amount: event.target.value,
+                              amount: event.target.value.replace(/\D+/g, "").slice(0, 8),
                               error: null,
                             }
                           : current
                       )
                     }
                     autoFocus
+                    maxLength={8}
                     disabled={walletDialogSubmitting}
                   />
                 </label>
@@ -1435,13 +1465,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         current
                           ? {
                               ...current,
-                              reason: event.target.value,
+                              reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH),
                               error: null,
                             }
                           : current
                       )
                     }
                     rows={3}
+                    maxLength={USER_WALLET_REASON_MAX_LENGTH}
                     disabled={walletDialogSubmitting}
                   />
                 </label>
@@ -1463,7 +1494,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                     onClick={() => {
                       void submitWalletDialog();
                     }}
-                    disabled={walletDialogSubmitting}
+                    disabled={
+                      walletDialogSubmitting ||
+                      !walletDialog.amount.trim() ||
+                      !walletDialog.reason.trim()
+                    }
                   >
                     {ui.walletSubmit}
                   </Button>
@@ -1638,7 +1673,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         <div className={styles.listBlock}>
                           {selectedUserAnalytics.recentAuditEvents.slice(0, 6).map((event) => (
                             <article key={event.auditEventId} className={styles.listCard}>
-                              <strong>{event.action}</strong>
+                              <strong>{sanitizeSensitiveText(event.action, 120)}</strong>
                               <span>{formatDateTime(event.occurredAtUtc, locale)}</span>
                               <span>{sanitizeSensitiveText(event.details, 180)}</span>
                             </article>
@@ -1656,7 +1691,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                           <button
                             type="button"
                             className={styles.dangerBtn}
-                            disabled={busyUserId === selectedUser.userId}
+                            disabled={isUserActionLocked || busyUserId === selectedUser.userId}
                             onClick={() => requestActiveChange(selectedUser)}
                           >
                             {selectedUser.isActive ? text.deactivate : text.activate}
@@ -1664,7 +1699,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                           <button
                             type="button"
                             className={styles.dangerBtn}
-                            disabled={busyUserId === selectedUser.userId}
+                            disabled={isUserActionLocked || busyUserId === selectedUser.userId}
                             onClick={() =>
                               requestDeleteUser(selectedUser, () => setSelectedUserId(null))
                             }
@@ -1672,7 +1707,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                             {text.usersDeleteAction}
                           </button>
                           <Link
-                            href={`/${locale}/users/${selectedUser.userId}`}
+                            href={`/${locale}/users/${encodeURIComponent(selectedUser.userId)}`}
                             className={styles.profileLinkBtn}
                           >
                             {ui.sideOpenFullProfile}

@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSupportConversation, fetchSupportInbox } from "@/lib/api-client.support";
+import {
+  fetchSupportConversation,
+  fetchSupportInbox,
+  fetchSupportInboxMetrics,
+  sendSupportMessage,
+  SUPPORT_INBOX_SEARCH_MAX_LENGTH,
+  SUPPORT_MESSAGE_BODY_MAX_LENGTH,
+} from "@/lib/api-client.support";
 
 describe("api-client.support query normalization", () => {
   const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -18,18 +25,50 @@ describe("api-client.support query normalization", () => {
   });
 
   it("normalizes support inbox page parameters before building request URLs", async () => {
-    const fetchMock = vi.fn(async () => Response.json([]));
+    const fetchMock = vi.fn(async () =>
+      Response.json({ items: [], page: 2, pageSize: 100, totalCount: 0, hasMore: false })
+    );
+    const overlongSearch = "s".repeat(SUPPORT_INBOX_SEARCH_MAX_LENGTH + 20);
     vi.stubGlobal("fetch", fetchMock);
 
-    await fetchSupportInbox("New", "unassigned", {
-      search: " alice@example.com ",
+    const response = await fetchSupportInbox("New", "unassigned", {
+      search: ` ${overlongSearch} `,
       page: 2.9,
       pageSize: 500.4,
     });
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      "https://api.example.com/api/admin/support/tickets?status=New&assignment=unassigned&search=alice%40example.com&page=2&pageSize=100"
+      `https://api.example.com/api/admin/support/tickets?status=New&assignment=unassigned&search=${"s".repeat(SUPPORT_INBOX_SEARCH_MAX_LENGTH)}&page=2&pageSize=100`
     );
+    expect(response).toEqual({
+      items: [],
+      page: 2,
+      pageSize: 100,
+      totalCount: 0,
+      hasMore: false,
+    });
+  });
+
+  it("requests support inbox metrics with abort support", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        totalConversations: 6,
+        openConversations: 4,
+        closedConversations: 2,
+        unassignedConversations: 3,
+        unreadForAdminConversations: 5,
+      })
+    );
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await fetchSupportInboxMetrics(controller.signal);
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(response.unreadForAdminConversations).toBe(5);
+    expect(String(url)).toBe("https://api.example.com/api/admin/support/tickets/metrics");
+    expect(init?.method).toBe("GET");
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
   });
 
   it("normalizes support conversation message take before building request URLs", async () => {
@@ -52,5 +91,51 @@ describe("api-client.support query normalization", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       "https://api.example.com/api/admin/support/tickets/conversation-1?take=25&beforeMessageCreatedAtUtc=2026-06-06T12%3A00%3A00Z"
     );
+  });
+
+  it("encodes support ids before placing them in API path segments", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        conversationId: "ticket/one two?x",
+        subjectUserId: "user-1",
+        status: "New",
+        priority: "Normal",
+        messages: [],
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportConversation("ticket/one two?x", { take: 10 });
+    await sendSupportMessage("ticket/one two?x", "Hello");
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/support/tickets/ticket%2Fone%20two%3Fx?take=10",
+      "https://api.example.com/api/admin/support/tickets/ticket%2Fone%20two%3Fx/messages",
+    ]);
+  });
+
+  it("bounds support message bodies before sending reply payloads", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        messageId: "message-1",
+        conversationId: "ticket-1",
+        senderType: "Admin",
+        body: "ok",
+        createdAtUtc: "2026-06-07T00:00:00Z",
+      })
+    );
+    const overlongBody = "b".repeat(SUPPORT_MESSAGE_BODY_MAX_LENGTH + 20);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendSupportMessage("ticket-1", ` ${overlongBody} `, " message-parent ");
+
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets/ticket-1/messages"
+    );
+    expect(JSON.parse(String(init?.body))).toEqual({
+      body: "b".repeat(SUPPORT_MESSAGE_BODY_MAX_LENGTH),
+      replyToMessageId: "message-parent",
+    });
   });
 });

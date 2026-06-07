@@ -41,6 +41,17 @@ describe("shouldCreateSupportRealtimeNotification", () => {
     ).toBe(false);
   });
 
+  it("compares active support routes using encoded conversation ids", () => {
+    expect(
+      shouldCreateSupportRealtimeNotification({
+        currentPath: "/support/team%2Fsecret%20chat",
+        conversationId: "team/secret chat",
+        isDocumentVisible: true,
+        isWindowFocused: true,
+      })
+    ).toBe(false);
+  });
+
   it("returns true for other conversations", () => {
     expect(
       shouldCreateSupportRealtimeNotification({

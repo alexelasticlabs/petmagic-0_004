@@ -20,11 +20,19 @@ export function useAdminTemplateCategories({
     enabled,
   });
 
+  async function refresh() {
+    if (!enabled) {
+      return categoriesQuery;
+    }
+
+    return categoriesQuery.refetch();
+  }
+
   return {
     categories: categoriesQuery.data ?? [],
     hasError: categoriesQuery.isError,
     isFetching: categoriesQuery.isFetching,
     isLoading: categoriesQuery.isLoading || categoriesQuery.isFetching,
-    refresh: categoriesQuery.refetch,
+    refresh,
   };
 }

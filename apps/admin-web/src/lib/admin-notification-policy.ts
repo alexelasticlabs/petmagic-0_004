@@ -17,7 +17,7 @@ export function shouldCreateSupportRealtimeNotification(input: {
   isDocumentVisible: boolean;
   isWindowFocused: boolean;
 }) {
-  const activeConversationPath = `/support/${input.conversationId}`;
+  const activeConversationPath = `/support/${encodeURIComponent(input.conversationId)}`;
   const isSameConversationOpen = input.currentPath === activeConversationPath;
 
   if (!isSameConversationOpen) {

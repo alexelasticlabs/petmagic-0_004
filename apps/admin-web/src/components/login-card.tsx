@@ -194,10 +194,11 @@ export function LoginCard({ locale }: LoginCardProps) {
   }, [existingSession?.user.roles, hasValidExistingSession, locale, router]);
 
   useEffect(() => {
-    const prefetchPath = hasAdminPanelAccess(existingSession?.user.roles)
-      ? getDefaultAdminPath(locale, existingSession?.user.roles)
-      : `/${locale}/dashboard`;
-    router.prefetch(prefetchPath);
+    if (!hasAdminPanelAccess(existingSession?.user.roles)) {
+      return;
+    }
+
+    router.prefetch(getDefaultAdminPath(locale, existingSession?.user.roles));
   }, [existingSession?.user.roles, locale, router]);
 
   useEffect(() => {
