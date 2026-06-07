@@ -360,6 +360,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       const SizedBox(height: 16),
                       _PacksSection(
                         packs: state.packs,
+                        storeProductPrices: state.storeProductPrices,
                         isBuying: state.isBuying,
                         onSelect: (pack) => _showPackDetailSheet(
                           context,
@@ -410,10 +411,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
     final text = AppLocalizations.of(context);
     if (!checkout.usesPaymentSheet) {
       final checkoutUrl = checkout.checkoutUrl.trim();
-      final uri = parseSafeExternalUri(
-        checkoutUrl,
-        allowedHttpsHosts: premiumExternalAllowedHosts(),
-      );
+      final uri = parseSafePremiumExternalUri(checkoutUrl);
       if (uri != null) {
         final launched = await launchUrl(
           uri,
@@ -745,6 +743,23 @@ String _formatPrice(CurrencyPackModel pack) {
   return NumberFormat.simpleCurrency(
     name: pack.currencyCode,
   ).format(pack.priceAmount);
+}
+
+String? _storePriceForPack(
+  CurrencyPackModel pack,
+  Map<String, String> storeProductPrices,
+) {
+  final googlePrice = pack.googlePlayProductId == null
+      ? null
+      : storeProductPrices[pack.googlePlayProductId];
+  if (googlePrice != null && googlePrice.isNotEmpty) {
+    return googlePrice;
+  }
+
+  final appStorePrice = pack.appStoreProductId == null
+      ? null
+      : storeProductPrices[pack.appStoreProductId];
+  return appStorePrice?.isEmpty == true ? null : appStorePrice;
 }
 
 String _formatDate(BuildContext context, DateTime? value) {

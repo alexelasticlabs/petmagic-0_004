@@ -17,11 +17,12 @@ void main() {
       expect(
         source,
         contains(
-          'await check(AppPermissionType.microphone),\n'
-          '      await check(AppPermissionType.photos),\n'
-          '      await check(AppPermissionType.videos),',
+          'AppPermissionType.microphone,\n'
+          '      AppPermissionType.photos,\n'
+          '      AppPermissionType.videos,',
         ),
       );
+      expect(source, contains('for (final type in types)'));
     },
   );
 

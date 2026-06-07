@@ -51,7 +51,22 @@ class _SubscriptionManagementPageState
           error: (_, _) => Center(
             child: Padding(
               padding: const EdgeInsets.all(20),
-              child: Text(text.premiumManageFailed),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    text.premiumManageFailed,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        ref.invalidate(premiumSubscriptionSummaryProvider),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(text.retryAction),
+                  ),
+                ],
+              ),
             ),
           ),
           data: (summary) => _SubscriptionContent(
@@ -81,10 +96,7 @@ class _SubscriptionManagementPageState
         return;
       }
 
-      final uri = parseSafeExternalUri(
-        url,
-        allowedHttpsHosts: premiumExternalAllowedHosts(),
-      );
+      final uri = parseSafePremiumExternalUri(url);
       if (uri == null) {
         if (mounted) {
           PetMagicToast.show(

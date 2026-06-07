@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -99,8 +100,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome back!'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Google'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Apple'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(OutlinedButton, 'Continue with Apple'),
+      Platform.isIOS ? findsOneWidget : findsNothing,
+    );
 
     await tester.scrollUntilVisible(
       find.widgetWithText(TextButton, 'Sign Up'),
@@ -121,8 +128,14 @@ void main() {
       find.text('I want to receive updates and offers from PetMagic'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(OutlinedButton, 'Google'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, 'Apple'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(OutlinedButton, 'Continue with Apple'),
+      Platform.isIOS ? findsOneWidget : findsNothing,
+    );
   });
 
   testWidgets('registration requires accepting terms', (tester) async {
@@ -358,7 +371,9 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+    );
     await tester.pump();
     await _pumpFrames(tester);
 
@@ -379,7 +394,9 @@ void main() {
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Google'));
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, 'Continue with Google'),
+    );
     await _pumpFrames(tester);
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);

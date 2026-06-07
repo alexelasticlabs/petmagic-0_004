@@ -1,8 +1,12 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
@@ -80,6 +84,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   @override
   void initState() {
     super.initState();
+    AppLogger.info(
+      feature: 'Profile.Auth',
+      operation: 'login_screen_opened',
+      message: 'login_screen_opened',
+      context: {'event': 'login_screen_opened'},
+    );
     Future.microtask(() {
       if (!mounted) {
         return;
@@ -134,6 +144,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         _confirmPasswordController.text != _passwordController.text;
     final submitDisabled =
         state.isSaving || (_isSignUp && confirmPasswordMismatch);
+    final showAppleSignIn = !kIsWeb && Platform.isIOS;
 
     ref.listen(profileControllerProvider, (previous, next) {
       if (!mounted) {
@@ -397,12 +408,13 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                   const SizedBox(height: 12),
                   AuthDivider(label: text.authOrContinueWith),
                   const SizedBox(height: 12),
-                  Row(
+                  Column(
                     children: [
-                      Expanded(
+                      SizedBox(
+                        width: double.infinity,
                         child: SocialButton(
                           icon: SocialGlyph.google(),
-                          label: text.authGoogleShortLabel,
+                          label: text.authContinueWithGoogle,
                           onPressed: state.isSaving
                               ? null
                               : () => _submitExternal(
@@ -410,17 +422,21 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                                 ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SocialButton(
-                          icon: SocialGlyph.apple(),
-                          label: text.authAppleShortLabel,
-                          onPressed: state.isSaving
-                              ? null
-                              : () =>
-                                    _submitExternal(ExternalAuthProvider.apple),
+                      if (showAppleSignIn) ...[
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: SocialButton(
+                            icon: SocialGlyph.apple(),
+                            label: text.authContinueWithApple,
+                            onPressed: state.isSaving
+                                ? null
+                                : () => _submitExternal(
+                                    ExternalAuthProvider.apple,
+                                  ),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -493,6 +509,21 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 
   Future<void> _submitExternal(ExternalAuthProvider provider) async {
+    AppLogger.info(
+      feature: 'Profile.Auth',
+      operation: provider == ExternalAuthProvider.apple
+          ? 'apple_login_clicked'
+          : 'google_login_clicked',
+      message: provider == ExternalAuthProvider.apple
+          ? 'apple_login_clicked'
+          : 'google_login_clicked',
+      context: {
+        'event': provider == ExternalAuthProvider.apple
+            ? 'apple_login_clicked'
+            : 'google_login_clicked',
+        'provider': provider.apiValue,
+      },
+    );
     final controller = ref.read(profileControllerProvider.notifier);
     final router = GoRouter.of(context);
     await controller.authenticateWithProvider(provider);

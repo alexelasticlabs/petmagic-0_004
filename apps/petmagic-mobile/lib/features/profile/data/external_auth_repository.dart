@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/core/network/authenticated_request_options.dart'
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 final appLinksProvider = Provider<AppLinks>((ref) {
@@ -73,6 +74,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required AppLinks appLinks,
     AuthSessionCoordinator? authSessionCoordinator,
     Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
+    Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)?
+    googleSignInDelegate,
+    Future<AuthorizationCredentialAppleID> Function()? appleSignInDelegate,
     Stream<Uri>? uriLinkStream,
   }) : _dio = dio,
        _sessionStorage = sessionStorage,
@@ -81,6 +85,16 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
        _launchUrl =
            launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
+       _googleSignIn =
+           googleSignInDelegate ?? ((googleSignIn) => googleSignIn.signIn()),
+       _appleSignIn =
+           appleSignInDelegate ??
+           (() => SignInWithApple.getAppleIDCredential(
+             scopes: const [
+               AppleIDAuthorizationScopes.email,
+               AppleIDAuthorizationScopes.fullName,
+             ],
+           )),
        _uriLinkStream = uriLinkStream ?? appLinks.uriLinkStream;
 
   static final Uri _callbackUri = Uri(
@@ -93,6 +107,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   final AuthSessionStorage _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
   final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
+  final Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)
+  _googleSignIn;
+  final Future<AuthorizationCredentialAppleID> Function() _appleSignIn;
   final Stream<Uri> _uriLinkStream;
 
   @override
@@ -101,7 +118,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       return _authenticateWithNativeGoogle();
     }
 
-    return _authenticateWithBrowserFlow(provider);
+    return _authenticateWithNativeApple();
   }
 
   @override
@@ -137,31 +154,55 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         serverClientId: serverClientId,
       );
 
-      final account = await googleSignIn.signIn();
+      final account = await _googleSignIn(googleSignIn);
       if (account == null) {
         throw const AppException(_cancelledCode);
       }
 
       final authentication = await account.authentication;
       final idToken = authentication.idToken;
-      if (idToken == null || idToken.isEmpty) {
+      final serverAuthCode = account.serverAuthCode;
+      if (idToken == null ||
+          idToken.isEmpty ||
+          serverAuthCode == null ||
+          serverAuthCode.isEmpty) {
         throw const AppException(_genericFailedCode);
       }
 
       final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/external/google/native',
-        data: {'idToken': idToken},
+        '/api/auth/google',
+        data: {'idToken': idToken, 'serverAuthCode': serverAuthCode},
+        options: Options(headers: {'X-Client-Platform': 'mobile'}),
       );
 
       final session = AuthSession.fromJson(response.data ?? const {});
       await _sessionStorage.save(session);
+      _trackSocialAuthEvent(
+        'social_login_success',
+        provider: ExternalAuthProvider.google,
+        status: 'success',
+      );
       return session;
-    } on AppException {
+    } on AppException catch (error) {
+      _trackSocialAuthEvent(
+        'social_login_failed',
+        provider: ExternalAuthProvider.google,
+        status: _classifyMappedFailure(error.message),
+      );
       await _resetGoogleSession(googleSignIn);
       rethrow;
     } on DioException catch (error) {
       await _resetGoogleSession(googleSignIn);
-      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
+      final mapped = _mapDioException(
+        error,
+        fallbackMessage: _genericFailedCode,
+      );
+      _trackSocialAuthEvent(
+        'social_login_failed',
+        provider: ExternalAuthProvider.google,
+        status: _classifyMappedFailure(mapped.message),
+      );
+      throw mapped;
     } catch (error, stackTrace) {
       _logExternalAuthFailure(
         'authenticate_native_google_unknown',
@@ -169,6 +210,78 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         stackTrace,
       );
       await _resetGoogleSession(googleSignIn);
+      throw const AppException(_genericFailedCode);
+    }
+  }
+
+  Future<AuthSession> _authenticateWithNativeApple() async {
+    try {
+      final credential = await _appleSignIn();
+      final identityToken = credential.identityToken;
+      final authorizationCode = credential.authorizationCode;
+      if (identityToken == null ||
+          identityToken.isEmpty ||
+          authorizationCode.isEmpty) {
+        throw const AppException(_genericFailedCode);
+      }
+
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/auth/apple',
+        data: {
+          'identityToken': identityToken,
+          'authorizationCode': authorizationCode,
+        },
+        options: Options(headers: {'X-Client-Platform': 'mobile'}),
+      );
+
+      final session = AuthSession.fromJson(response.data ?? const {});
+      await _sessionStorage.save(session);
+      _trackSocialAuthEvent(
+        'social_login_success',
+        provider: ExternalAuthProvider.apple,
+        status: 'existing_user_logged_in',
+      );
+      return session;
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        _trackSocialAuthEvent(
+          'social_login_failed',
+          provider: ExternalAuthProvider.apple,
+          status: 'user_cancellation',
+        );
+        throw const AppException(_cancelledCode);
+      }
+
+      _trackSocialAuthEvent(
+        'social_login_failed',
+        provider: ExternalAuthProvider.apple,
+        status: 'provider_failure',
+      );
+      throw const AppException(_genericFailedCode);
+    } on AppException {
+      rethrow;
+    } on DioException catch (error) {
+      final mapped = _mapDioException(
+        error,
+        fallbackMessage: _genericFailedCode,
+      );
+      _trackSocialAuthEvent(
+        'social_login_failed',
+        provider: ExternalAuthProvider.apple,
+        status: _classifyMappedFailure(mapped.message),
+      );
+      throw mapped;
+    } catch (error, stackTrace) {
+      _logExternalAuthFailure(
+        'authenticate_native_apple_unknown',
+        error,
+        stackTrace,
+      );
+      _trackSocialAuthEvent(
+        'social_login_failed',
+        provider: ExternalAuthProvider.apple,
+        status: 'provider_failure',
+      );
       throw const AppException(_genericFailedCode);
     }
   }
@@ -192,66 +305,6 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         );
         // Best-effort cleanup only.
       }
-    }
-  }
-
-  Future<AuthSession> _authenticateWithBrowserFlow(
-    ExternalAuthProvider provider,
-  ) async {
-    final completer = Completer<Uri>();
-    late final StreamSubscription<Uri> subscription;
-
-    subscription = _uriLinkStream.listen(
-      (uri) {
-        if (_isExpectedCallback(uri) && !completer.isCompleted) {
-          completer.complete(uri);
-        }
-      },
-      onError: (Object _) {
-        if (!completer.isCompleted) {
-          completer.completeError(const AppException(_callbackFailedCode));
-        }
-      },
-    );
-
-    try {
-      final authUri = Uri.parse(_dio.options.baseUrl).replace(
-        path: '/api/auth/external/${provider.apiValue}',
-        queryParameters: {'redirectUri': _callbackUri.toString()},
-      );
-
-      final launched = await _launchAuthUri(authUri);
-      if (!launched) {
-        throw const AppException(_launchFailedCode);
-      }
-
-      final callbackUri = await completer.future.timeout(
-        const Duration(minutes: 3),
-        onTimeout: () => throw const AppException(_timedOutCode),
-      );
-
-      final errorCode = callbackUri.queryParameters['error'];
-      if (errorCode != null && errorCode.isNotEmpty) {
-        throw AppException(_safeExternalCallbackErrorCode(errorCode));
-      }
-
-      final ticket = callbackUri.queryParameters['ticket'];
-      if (ticket == null || ticket.isEmpty) {
-        throw const AppException(_invalidSessionCode);
-      }
-
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/external/exchange',
-        data: {'ticket': ticket},
-      );
-
-      final session = AuthSession.fromJson(response.data ?? const {});
-      await _sessionStorage.save(session);
-      return session;
-    } on DioException catch (error) {
-      throw _mapDioException(error, fallbackMessage: _genericFailedCode);
-    } finally {
-      await subscription.cancel();
     }
   }
 
@@ -341,6 +394,36 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       'auth.external_token_invalid' ||
       _genericFailedCode => value,
       _ => _genericFailedCode,
+    };
+  }
+
+  void _trackSocialAuthEvent(
+    String eventName, {
+    required ExternalAuthProvider provider,
+    required String status,
+  }) {
+    AppLogger.info(
+      feature: 'Profile.ExternalAuth',
+      operation: eventName,
+      message: eventName,
+      context: {
+        'event': eventName,
+        'provider': provider.apiValue,
+        'status': status,
+      },
+    );
+  }
+
+  String _classifyMappedFailure(String code) {
+    return switch (code) {
+      _cancelledCode => 'user_cancellation',
+      'auth.external_token_invalid' ||
+      'auth.external_email_not_verified' ||
+      _genericFailedCode => 'validation_failure',
+      'network.unavailable' ||
+      'network.timeout' ||
+      'network.cancelled' => 'network_failure',
+      _ => 'backend_failure',
     };
   }
 

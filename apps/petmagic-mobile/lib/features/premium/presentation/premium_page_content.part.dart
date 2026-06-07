@@ -807,6 +807,7 @@ class _PlansSection extends StatelessWidget {
         ...state.plans.map(
           (plan) => _PlanCard(
             plan: plan,
+            displayPrice: state.storePriceFor(plan),
             isSelected: state.selectedPlanCode == plan.planCode,
             isDark: isDark,
             onTap: () {
@@ -826,12 +827,14 @@ class _PlansSection extends StatelessWidget {
 class _PlanCard extends StatelessWidget {
   const _PlanCard({
     required this.plan,
+    required this.displayPrice,
     required this.isSelected,
     required this.isDark,
     required this.onTap,
   });
 
   final PremiumPlanModel plan;
+  final String? displayPrice;
   final bool isSelected;
   final bool isDark;
   final VoidCallback onTap;
@@ -849,7 +852,7 @@ class _PlanCard extends StatelessWidget {
     final isYearly = _isYearlyPlan(plan);
     final title =
         '${text.premiumPageTitle} ${isYearly ? text.premiumYearlyPlan : text.premiumMonthlyPlan}';
-    final priceStr = '\$${plan.priceAmount.toStringAsFixed(2)}';
+    final priceStr = displayPrice ?? '\$${plan.priceAmount.toStringAsFixed(2)}';
     final interval = isYearly
         ? text.premiumYearlyPeriod
         : text.premiumMonthlyPeriod;
@@ -1549,10 +1552,7 @@ class _Link extends StatelessWidget {
   final VoidCallback? onTap;
 
   Future<void> _handleUrlTap(BuildContext context) async {
-    final safeUri = parseSafeExternalUri(
-      url,
-      allowedHttpsHosts: premiumExternalAllowedHosts(),
-    );
+    final safeUri = parseSafePremiumExternalUri(url);
     if (safeUri == null) {
       final text = _premiumText(context);
       PetMagicToast.show(

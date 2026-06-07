@@ -15,11 +15,24 @@ void main() {
     expect(body, contains('text.premiumPurchaseCancelled'));
     expect(body, contains('text.premiumStoreUnavailable'));
     expect(body, contains('text.premiumStoreProductUnavailable'));
+    expect(body, contains('text.templateFlowNetworkError'));
+  });
+
+  test('premium controller keeps network error key safe', () {
+    final premiumController = File(
+      'lib/features/premium/presentation/premium_controller.dart',
+    ).readAsStringSync();
+
+    final body = _functionBody(premiumController, '_isSafePremiumErrorKey');
+
+    expect(body, contains("value == 'templates.network_unavailable'"));
   });
 }
 
 String _functionBody(String source, String functionName) {
-  final start = source.indexOf('String $functionName(');
+  final start = source.indexOf(
+    RegExp(r'(?:String|bool) ' + functionName + r'\('),
+  );
   expect(start, isNonNegative, reason: '$functionName not found');
 
   final bodyStart = source.indexOf('{', start);

@@ -191,12 +191,19 @@ class WalletRepository {
     return PurchaseCheckoutModel.fromJson(response.data ?? const {});
   }
 
-  Future<({bool isAvailable, Set<String> productIds})> fetchStoreAvailability(
+  Future<
+    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+  >
+  fetchStoreAvailability(
     List<CurrencyPackModel> packs,
     WalletPaymentMethodModel paymentMethod,
   ) async {
     if (!paymentMethod.isStoreNative) {
-      return (isAvailable: false, productIds: const <String>{});
+      return (
+        isAvailable: false,
+        productIds: const <String>{},
+        productPrices: const <String, String>{},
+      );
     }
 
     final requestedIds = packs
@@ -206,12 +213,20 @@ class WalletRepository {
         .toSet();
 
     if (requestedIds.isEmpty) {
-      return (isAvailable: false, productIds: const <String>{});
+      return (
+        isAvailable: false,
+        productIds: const <String>{},
+        productPrices: const <String, String>{},
+      );
     }
 
     final isAvailable = await _inAppPurchase.isAvailable();
     if (!isAvailable) {
-      return (isAvailable: false, productIds: const <String>{});
+      return (
+        isAvailable: false,
+        productIds: const <String>{},
+        productPrices: const <String, String>{},
+      );
     }
 
     final response = await _inAppPurchase.queryProductDetails(requestedIds);
@@ -222,6 +237,9 @@ class WalletRepository {
     return (
       isAvailable: true,
       productIds: response.productDetails.map((product) => product.id).toSet(),
+      productPrices: {
+        for (final product in response.productDetails) product.id: product.price,
+      },
     );
   }
 

@@ -130,6 +130,43 @@ void main() {
     );
   });
 
+  testWidgets('all transactions error state exposes explicit safe retry', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final repository = _RetryLedgerWalletRepository(
+      wallet: _walletState,
+      ledger: _ledgerItems,
+      packs: _packs,
+      purchases: _purchases,
+    );
+
+    await _pumpAllTransactionsPage(tester, repository: repository);
+
+    final transactionsContext = tester.element(
+      find.byType(AllTransactionsPage),
+    );
+    final text = AppLocalizations.of(transactionsContext);
+
+    expect(find.text(text.walletPartialActivityUnavailable), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, text.retryAction), findsOneWidget);
+    expect(repository.ledgerAttempts, 1);
+
+    await tester.tap(find.widgetWithText(FilledButton, text.retryAction));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(repository.ledgerAttempts, 2);
+    expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-1')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('wallet auto refresh does not reschedule after page disposal', (
     tester,
   ) async {
@@ -809,6 +846,36 @@ class _FakeWalletRepository extends WalletRepository {
       referredUsersCount: 0,
       pendingReferredUsersCount: 0,
       rewardedReferredUsersCount: 0,
+    );
+  }
+}
+
+class _RetryLedgerWalletRepository extends _FakeWalletRepository {
+  _RetryLedgerWalletRepository({
+    required super.wallet,
+    required super.ledger,
+    required super.packs,
+    required super.purchases,
+  });
+
+  int ledgerAttempts = 0;
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    ledgerAttempts++;
+    if (ledgerAttempts == 1) {
+      throw Exception('ledger failed');
+    }
+
+    return OffsetPagedModel(
+      items: ledger,
+      skip: skip,
+      take: take,
+      hasMore: false,
     );
   }
 }

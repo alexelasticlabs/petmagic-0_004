@@ -41,10 +41,15 @@ class ApiBaseUrlResolver {
   String? _activeBaseUrl;
   Completer<String>? _resolveInFlight;
   bool _backgroundRefreshInFlight = false;
+  bool _disposed = false;
 
   String? get activeBaseUrl => _activeBaseUrl;
 
   Future<String> resolveBaseUrl({bool forceRefresh = false}) async {
+    if (_disposed) {
+      return _activeBaseUrl ?? AppConfig.apiBaseUrl;
+    }
+
     if (forceRefresh) {
       return _resolveWithProbe();
     }
@@ -68,6 +73,10 @@ class ApiBaseUrlResolver {
   }
 
   Future<String> _resolveWithProbe() async {
+    if (_disposed) {
+      return _activeBaseUrl ?? AppConfig.apiBaseUrl;
+    }
+
     final inFlight = _resolveInFlight;
     if (inFlight != null) {
       return inFlight.future;
@@ -78,6 +87,12 @@ class ApiBaseUrlResolver {
     try {
       final candidates = await prioritizedCandidates();
       final reachableBaseUrl = await _findReachableBaseUrl(candidates);
+      if (_disposed) {
+        final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
+        completer.complete(fallback);
+        return completer.future;
+      }
+
       if (reachableBaseUrl != null) {
         await markSuccessful(reachableBaseUrl);
         completer.complete(reachableBaseUrl);
@@ -99,7 +114,7 @@ class ApiBaseUrlResolver {
   }
 
   void _refreshInBackground() {
-    if (_backgroundRefreshInFlight) {
+    if (_disposed || _backgroundRefreshInFlight) {
       return;
     }
 
@@ -111,12 +126,19 @@ class ApiBaseUrlResolver {
             return _activeBaseUrl ?? AppConfig.apiBaseUrl;
           })
           .whenComplete(() {
+            if (_disposed) {
+              return;
+            }
             _backgroundRefreshInFlight = false;
           }),
     );
   }
 
   Future<List<String>> prioritizedCandidates() async {
+    if (_disposed) {
+      return const [];
+    }
+
     final candidates = <String>{};
 
     void addCandidate(String? raw) {
@@ -144,6 +166,10 @@ class ApiBaseUrlResolver {
   }
 
   Future<void> markSuccessful(String baseUrl) async {
+    if (_disposed) {
+      return;
+    }
+
     final normalized = _normalizeBaseUrl(baseUrl);
     if (normalized == null) {
       return;
@@ -158,6 +184,10 @@ class ApiBaseUrlResolver {
   }
 
   Future<void> invalidate(String baseUrl) async {
+    if (_disposed) {
+      return;
+    }
+
     final normalized = _normalizeBaseUrl(baseUrl);
     if (normalized == null) {
       return;
@@ -173,7 +203,11 @@ class ApiBaseUrlResolver {
     }
   }
 
-  void dispose() {}
+  void dispose() {
+    _disposed = true;
+    _backgroundRefreshInFlight = false;
+    _resolveInFlight = null;
+  }
 
   Future<String?> _findReachableBaseUrl(List<String> candidates) async {
     if (candidates.isEmpty) {

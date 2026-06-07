@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final walletControllerProvider =
     NotifierProvider<WalletController, WalletState>(WalletController.new);
@@ -49,6 +50,7 @@ class WalletState {
     this.checkoutUrl,
     this.pendingCheckoutOrderId,
     this.pendingStoreProvider,
+    this.storeProductPrices = const <String, String>{},
     this.checkoutVerificationState = WalletCheckoutVerificationState.idle,
     this.checkoutGrantedSpark,
     this.checkoutErrorMessage,
@@ -71,6 +73,7 @@ class WalletState {
   final String? checkoutUrl;
   final String? pendingCheckoutOrderId;
   final String? pendingStoreProvider;
+  final Map<String, String> storeProductPrices;
   final WalletCheckoutVerificationState checkoutVerificationState;
   final int? checkoutGrantedSpark;
   final String? checkoutErrorMessage;
@@ -114,6 +117,7 @@ class WalletState {
     String? checkoutUrl,
     String? pendingCheckoutOrderId,
     String? pendingStoreProvider,
+    Map<String, String>? storeProductPrices,
     WalletCheckoutVerificationState? checkoutVerificationState,
     int? checkoutGrantedSpark,
     String? checkoutErrorMessage,
@@ -147,6 +151,7 @@ class WalletState {
       pendingStoreProvider: clearPendingStoreProvider
           ? null
           : pendingStoreProvider ?? this.pendingStoreProvider,
+      storeProductPrices: storeProductPrices ?? this.storeProductPrices,
       checkoutVerificationState:
           checkoutVerificationState ?? this.checkoutVerificationState,
       checkoutGrantedSpark: clearCheckoutGrantedSpark
@@ -304,6 +309,7 @@ class WalletController extends Notifier<WalletState>
       RewardsSummaryModel? rewards;
       var packs = const <CurrencyPackModel>[];
       var paymentMethods = const <WalletPaymentMethodModel>[];
+      var storeProductPrices = const <String, String>{};
       var purchases = const <PurchaseHistoryItem>[];
       String? softError;
 
@@ -370,10 +376,12 @@ class WalletController extends Notifier<WalletState>
       }
 
       if (packs.isNotEmpty && paymentMethods.isNotEmpty) {
-        paymentMethods = await _resolvePaymentMethodsAvailability(
+        final availability = await _resolvePaymentMethodsAvailability(
           packs: packs,
           paymentMethods: paymentMethods,
         );
+        paymentMethods = availability.paymentMethods;
+        storeProductPrices = availability.productPrices;
       }
 
       _updateStateIfMounted(
@@ -383,6 +391,7 @@ class WalletController extends Notifier<WalletState>
           ledger: ledger,
           packs: packs,
           paymentMethods: paymentMethods,
+          storeProductPrices: storeProductPrices,
           purchases: purchases,
           isLoading: false,
           isRefreshing: false,
@@ -403,11 +412,18 @@ class WalletController extends Notifier<WalletState>
     }
   }
 
-  Future<List<WalletPaymentMethodModel>> _resolvePaymentMethodsAvailability({
+  Future<
+    ({
+      List<WalletPaymentMethodModel> paymentMethods,
+      Map<String, String> productPrices,
+    })
+  >
+  _resolvePaymentMethodsAvailability({
     required List<CurrencyPackModel> packs,
     required List<WalletPaymentMethodModel> paymentMethods,
   }) async {
     final resolved = <WalletPaymentMethodModel>[];
+    final productPrices = <String, String>{};
 
     for (final method in paymentMethods) {
       if (!method.isEnabled || !method.isStoreNative) {
@@ -420,6 +436,7 @@ class WalletController extends Notifier<WalletState>
           packs,
           method,
         );
+        productPrices.addAll(availability.productPrices);
 
         final hasSupportedPack = packs.any((pack) {
           final productId = pack.productIdForProvider(method.provider);
@@ -440,7 +457,7 @@ class WalletController extends Notifier<WalletState>
       }
     }
 
-    return resolved;
+    return (paymentMethods: resolved, productPrices: productPrices);
   }
 
   WalletPaymentMethodModel _copyPaymentMethodWithEnabled(
@@ -646,10 +663,41 @@ class WalletController extends Notifier<WalletState>
         return null;
       }
 
+      final safeCheckoutUri = checkout.usesPaymentSheet
+          ? null
+          : parseSafePremiumExternalUri(checkoutUrl);
+      if (!checkout.usesPaymentSheet && safeCheckoutUri == null) {
+        final payload = <String, Object>{
+          'pack_id': pack.packId,
+          'pack_code': pack.code,
+          'provider': paymentMethod.provider,
+          'order_id': checkout.orderId,
+          'status': checkout.status,
+        };
+        AppLogger.warn(
+          feature: 'Wallet.Checkout',
+          operation: 'unsafe_checkout_url',
+          message: 'Unsafe checkout URL received from purchase create API',
+          context: payload,
+          error: 'wallet.checkout_unsafe_url',
+        );
+
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isBuying: false,
+            clearCheckoutUrl: true,
+            clearPendingCheckout: true,
+            clearPendingStoreProvider: true,
+            errorMessage: 'payment_gateway_failed',
+          ),
+        );
+        return null;
+      }
+
       _updateStateIfMounted(
         (state) => state.copyWith(
           isBuying: false,
-          checkoutUrl: checkoutUrl,
+          checkoutUrl: safeCheckoutUri?.toString() ?? checkoutUrl,
           pendingCheckoutOrderId: checkout.orderId,
           clearPendingStoreProvider: true,
         ),

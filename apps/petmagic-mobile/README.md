@@ -65,15 +65,21 @@ Do not use the insecure override for production artifacts.
 
 ## External auth and password reset
 
-Google sign-in now uses native mobile sign-in first and only falls back to browser OAuth when needed.
+Google and Apple sign-in use native provider SDKs and send provider tokens to the backend for validation.
 
 For Google sign-in to work end-to-end:
 
 - configure `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` on the backend using the Google Web application client
+- optionally configure `GOOGLE_AUDIENCES` as comma-separated Web/iOS/Android OAuth client IDs for the current environment
 - create a separate Android OAuth client for `com.petmagic.app`
 - create a separate iOS OAuth client for `com.petmagic.app`
-- keep the backend fallback redirect URI `https://<your-api-host>/signin-google` configured in Google Cloud Console
 - run the app against the same backend host via `API_BASE_URL`
+
+For Apple sign-in to work end-to-end:
+
+- enable Sign in with Apple on the iOS Bundle ID
+- configure backend `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`, and optionally `APPLE_AUDIENCES`
+- use separate dev/stage/prod Apple credentials and keep private keys out of git
 
 Password reset emails are sent by the backend SMTP worker, so reset flow depends on valid backend email settings rather than any direct SMTP integration in Flutter.
 

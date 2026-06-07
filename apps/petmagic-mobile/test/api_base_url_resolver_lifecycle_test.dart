@@ -8,6 +8,8 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  const persistedBaseUrlKey = 'petmagic_mobile_last_api_base_url';
+
   test(
     'background base URL refresh contains async discovery failures',
     () async {
@@ -37,4 +39,40 @@ void main() {
       expect(uncaughtErrors, isEmpty);
     },
   );
+
+  test('late health probe completion does not mutate after dispose', () async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(() {
+      SharedPreferencesAsyncPlatform.instance = previousPreferences;
+    });
+
+    final preferences = SharedPreferencesAsync();
+    final probeStarted = Completer<void>();
+    final probeResult = Completer<bool>();
+    final resolver = ApiBaseUrlResolver(
+      preferences: preferences,
+      healthProbe: (_) {
+        if (!probeStarted.isCompleted) {
+          probeStarted.complete();
+        }
+        return probeResult.future;
+      },
+    );
+
+    final resolveFuture = resolver.resolveBaseUrl(forceRefresh: true);
+    await probeStarted.future;
+
+    resolver.dispose();
+    probeResult.complete(true);
+
+    expect(await resolveFuture, AppConfig.apiBaseUrl);
+    expect(resolver.activeBaseUrl, isNull);
+    expect(await preferences.getString(persistedBaseUrlKey), isNull);
+    expect(
+      await resolver.resolveBaseUrl(forceRefresh: true),
+      AppConfig.apiBaseUrl,
+    );
+  });
 }

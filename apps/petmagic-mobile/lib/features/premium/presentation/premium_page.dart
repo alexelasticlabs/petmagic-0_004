@@ -105,10 +105,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
   }
 
   Future<void> _openExternalUrl(String url) async {
-    final uri = parseSafeExternalUri(
-      url,
-      allowedHttpsHosts: premiumExternalAllowedHosts(),
-    );
+    final uri = parseSafePremiumExternalUri(url);
     if (uri == null) {
       if (mounted) {
         final text = _premiumText(context);
@@ -340,6 +337,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     }
     if (normalized.contains('premium.store_unavailable')) {
       return text.premiumStoreUnavailable;
+    }
+    if (normalized.contains('templates.network_unavailable')) {
+      return text.templateFlowNetworkError;
     }
     if (normalized.contains('premium.store_product_unavailable')) {
       return text.premiumStoreProductUnavailable;

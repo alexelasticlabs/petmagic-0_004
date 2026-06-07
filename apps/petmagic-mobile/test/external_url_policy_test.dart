@@ -149,4 +149,36 @@ void main() {
       );
     });
   });
+
+  group('profileAvatarAllowedHosts', () {
+    test('allows only trusted avatar origins', () {
+      final allowedHosts = profileAvatarAllowedHosts();
+
+      expect(hostsContainsCoreAvatarOrigins(allowedHosts), isTrue);
+      expect(
+        parseSafeExternalUri(
+          'https://cdn.petmagic.ai/avatars/user.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://evil.example/avatars/user.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNull,
+      );
+      expect(
+        parseSafeProfileAvatarUri('https://evil.example/avatars/user.jpg'),
+        isNull,
+      );
+    });
+  });
+}
+
+bool hostsContainsCoreAvatarOrigins(Set<String> hosts) {
+  return hosts.contains('api.petmagic.app') &&
+      hosts.contains('cdn.petmagic.app') &&
+      hosts.contains('cdn.petmagic.ai');
 }

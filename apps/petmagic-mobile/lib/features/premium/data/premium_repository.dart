@@ -177,7 +177,10 @@ class PremiumRepository {
     }
   }
 
-  Future<({bool isAvailable, Set<String> productIds})> fetchStoreAvailability(
+  Future<
+    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+  >
+  fetchStoreAvailability(
     List<PremiumPlanModel> plans,
     PremiumPaymentProvider provider,
   ) async {
@@ -188,12 +191,20 @@ class PremiumRepository {
         .toSet();
 
     if (requestedIds.isEmpty) {
-      return (isAvailable: false, productIds: const <String>{});
+      return (
+        isAvailable: false,
+        productIds: const <String>{},
+        productPrices: const <String, String>{},
+      );
     }
 
     final isAvailable = await _inAppPurchase.isAvailable();
     if (!isAvailable) {
-      return (isAvailable: false, productIds: const <String>{});
+      return (
+        isAvailable: false,
+        productIds: const <String>{},
+        productPrices: const <String, String>{},
+      );
     }
 
     final response = await _inAppPurchase.queryProductDetails(requestedIds);
@@ -204,6 +215,9 @@ class PremiumRepository {
     return (
       isAvailable: true,
       productIds: response.productDetails.map((product) => product.id).toSet(),
+      productPrices: {
+        for (final product in response.productDetails) product.id: product.price,
+      },
     );
   }
 
@@ -322,6 +336,22 @@ class PremiumRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'templates.network_unavailable',
+        includeCause: false,
+      );
+    }
+
+    if (NetworkErrorMapper.isServerError(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'premium.store_unavailable',
+        includeCause: false,
+      );
+    }
+
     final payload = NetworkErrorMapper.parseApiPayload(error);
     final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
     if (safeMessage != null) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -94,9 +96,11 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                     if (errorToShow != null && index == 1) {
                       return Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: ProfileMessageCard(
+                        child: _AllTransactionsErrorState(
                           message: errorToShow,
                           tone: colors.gold,
+                          onRetry: () =>
+                              unawaited(controller.load(refresh: true)),
                         ),
                       );
                     }
@@ -127,6 +131,53 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                   },
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _AllTransactionsErrorState extends StatelessWidget {
+  const _AllTransactionsErrorState({
+    required this.message,
+    required this.tone,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Color tone;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: tone.withValues(alpha: 0.28)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: TextStyle(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(text.retryAction),
+            ),
+          ],
+        ),
       ),
     );
   }

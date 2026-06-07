@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 class ProfileScreenBackground extends StatelessWidget {
   const ProfileScreenBackground({required this.child, super.key});
@@ -182,6 +183,7 @@ class ProfileAvatarBadge extends StatelessWidget {
         : '?';
     final avatarCacheSize = (size * MediaQuery.devicePixelRatioOf(context))
         .round();
+    final safeImageUrl = parseSafeProfileAvatarUri(imageUrl)?.toString();
 
     return SizedBox(
       width: size,
@@ -204,9 +206,9 @@ class ProfileAvatarBadge extends StatelessWidget {
                   border: Border.all(color: colors.border),
                 ),
                 child: ClipOval(
-                  child: imageUrl != null && imageUrl!.isNotEmpty
+                  child: safeImageUrl != null
                       ? CachedNetworkImage(
-                          imageUrl: imageUrl!,
+                          imageUrl: safeImageUrl,
                           width: size,
                           height: size,
                           fit: BoxFit.cover,

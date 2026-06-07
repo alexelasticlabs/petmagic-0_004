@@ -591,7 +591,7 @@ class SupportChatRepository {
       );
     }
 
-    if (NetworkErrorMapper.isConnectionUnavailable(error)) {
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
       return const AppException('support.unavailable', statusCode: 503);
     }
 

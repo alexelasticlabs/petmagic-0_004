@@ -37,4 +37,31 @@ void main() {
       expect(mapped, isNot(contains('signature=secret')));
     },
   );
+
+  testWidgets('profile network errors map to localized retryable copy', (
+    tester,
+  ) async {
+    late AppLocalizations text;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [Locale('en')],
+        home: Builder(
+          builder: (context) {
+            text = AppLocalizations.of(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    final mapped = mapProfileFeedbackMessage(
+      'templates.network_unavailable',
+      text,
+    );
+
+    expect(mapped, text.templateFlowNetworkError);
+  });
 }

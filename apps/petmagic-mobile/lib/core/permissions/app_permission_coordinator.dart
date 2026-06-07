@@ -35,14 +35,20 @@ class AppPermissionCoordinator {
     return AppPermissionStatus(type: type, state: _mapState(status));
   }
 
-  Future<List<AppPermissionStatus>> readStatuses() async {
-    return [
-      await check(AppPermissionType.notifications),
-      await check(AppPermissionType.camera),
-      await check(AppPermissionType.microphone),
-      await check(AppPermissionType.photos),
-      await check(AppPermissionType.videos),
-    ];
+  Future<List<AppPermissionStatus>> readStatuses({
+    List<AppPermissionType> types = const [
+      AppPermissionType.notifications,
+      AppPermissionType.camera,
+      AppPermissionType.microphone,
+      AppPermissionType.photos,
+      AppPermissionType.videos,
+    ],
+  }) async {
+    final statuses = <AppPermissionStatus>[];
+    for (final type in types) {
+      statuses.add(await check(type));
+    }
+    return statuses;
   }
 
   Future<bool> openSettings() => openAppSettings();

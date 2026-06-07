@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
@@ -24,6 +25,10 @@ class _StripePaymentSheetSmokeTestPageState
   @override
   void initState() {
     super.initState();
+    if (!kDebugMode) {
+      return;
+    }
+
     Future.microtask(() {
       if (!mounted) {
         return;
@@ -35,6 +40,10 @@ class _StripePaymentSheetSmokeTestPageState
 
   @override
   Widget build(BuildContext context) {
+    if (!kDebugMode) {
+      return const SizedBox.shrink();
+    }
+
     final text = AppLocalizations.of(context);
     final state = ref.watch(premiumControllerProvider);
 
@@ -69,6 +78,10 @@ class _StripePaymentSheetSmokeTestPageState
   }
 
   Future<void> _openPaymentSheet() async {
+    if (!kDebugMode) {
+      return;
+    }
+
     if (_isLaunching) {
       return;
     }

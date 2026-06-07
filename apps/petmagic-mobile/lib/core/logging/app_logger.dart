@@ -229,6 +229,11 @@ class AppLogger {
         continue;
       }
 
+      if (_isTransportPayloadKey(key)) {
+        sanitized[key] = '***';
+        continue;
+      }
+
       if (_isSensitiveKey(key)) {
         sanitized[key] = _maskSensitiveValue(key, value.toString());
         continue;
@@ -278,6 +283,10 @@ class AppLogger {
     }
 
     if (_isLocalFilePathKey(key)) {
+      return '***';
+    }
+
+    if (_isTransportPayloadKey(key)) {
       return '***';
     }
 
@@ -382,6 +391,28 @@ class AppLogger {
         normalizedKey.contains('imagepath') ||
         normalizedKey.contains('videopath') ||
         normalizedKey.contains('avatarpath');
+  }
+
+  static bool _isTransportPayloadKey(String key) {
+    final normalizedKey = key.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+
+    return normalizedKey == 'payload' ||
+        normalizedKey == 'rawpayload' ||
+        normalizedKey == 'apipayload' ||
+        normalizedKey == 'providerpayload' ||
+        normalizedKey == 'webhookpayload' ||
+        normalizedKey == 'body' ||
+        normalizedKey == 'requestbody' ||
+        normalizedKey == 'responsebody' ||
+        normalizedKey == 'requestdata' ||
+        normalizedKey == 'responsedata' ||
+        normalizedKey == 'formdata' ||
+        normalizedKey == 'headers' ||
+        normalizedKey == 'requestheaders' ||
+        normalizedKey == 'responseheaders';
   }
 
   static String _maskEmailValue(String value) {

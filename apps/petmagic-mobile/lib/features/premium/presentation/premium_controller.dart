@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final premiumControllerProvider =
     NotifierProvider<PremiumController, PremiumState>(PremiumController.new);
@@ -184,6 +185,7 @@ class PremiumState {
     this.isRestoring = false,
     this.isStoreAvailable = false,
     this.availableStoreProductIds = const <String>{},
+    this.storeProductPrices = const <String, String>{},
     this.errorMessage,
     this.externalUrl,
     this.successMessage,
@@ -206,6 +208,7 @@ class PremiumState {
   final bool isRestoring;
   final bool isStoreAvailable;
   final Set<String> availableStoreProductIds;
+  final Map<String, String> storeProductPrices;
   final String? errorMessage;
   final String? externalUrl;
   final String? successMessage;
@@ -264,6 +267,19 @@ class PremiumState {
     return isStoreAvailable &&
         productId != null &&
         availableStoreProductIds.contains(productId);
+  }
+
+  String? storePriceFor(PremiumPlanModel plan) {
+    if (selectedProvider == PremiumPaymentProvider.stripe) {
+      return null;
+    }
+
+    final productId = plan.productIdFor(selectedProvider);
+    if (productId == null || productId.isEmpty) {
+      return null;
+    }
+
+    return storeProductPrices[productId];
   }
 
   bool isProviderAvailable(PremiumPaymentProvider provider) {
@@ -328,6 +344,7 @@ class PremiumState {
     bool? isRestoring,
     bool? isStoreAvailable,
     Set<String>? availableStoreProductIds,
+    Map<String, String>? storeProductPrices,
     String? errorMessage,
     String? externalUrl,
     String? successMessage,
@@ -355,6 +372,7 @@ class PremiumState {
       isStoreAvailable: isStoreAvailable ?? this.isStoreAvailable,
       availableStoreProductIds:
           availableStoreProductIds ?? this.availableStoreProductIds,
+      storeProductPrices: storeProductPrices ?? this.storeProductPrices,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       externalUrl: clearExternalUrl ? null : externalUrl ?? this.externalUrl,
       successMessage: clearSuccess
@@ -492,6 +510,7 @@ class PremiumController extends Notifier<PremiumState> {
           selectedProvider: selectedProvider,
           isStoreAvailable: storeAvailability.isAvailable,
           availableStoreProductIds: storeAvailability.productIds,
+          storeProductPrices: storeAvailability.productPrices,
           isLoading: false,
           clearError: true,
         ),
@@ -575,11 +594,15 @@ class PremiumController extends Notifier<PremiumState> {
           return null;
         }
         if (!checkout.usesPaymentSheet) {
-          final checkoutUrl = checkout.checkoutUrl.trim();
-          if (checkoutUrl.isNotEmpty) {
+          final safeCheckoutUri = parseSafePremiumExternalUri(
+            checkout.checkoutUrl,
+          );
+          if (safeCheckoutUri != null) {
             _updateStateIfMounted(
-              (state) =>
-                  state.copyWith(isBuying: false, externalUrl: checkoutUrl),
+              (state) => state.copyWith(
+                isBuying: false,
+                externalUrl: safeCheckoutUri.toString(),
+              ),
             );
             return null;
           }
@@ -639,9 +662,21 @@ class PremiumController extends Notifier<PremiumState> {
       if (!ref.mounted) {
         return;
       }
+      final safeManagementUri = parseSafePremiumExternalUri(managementUrl);
+      if (safeManagementUri == null) {
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isManaging: false,
+            errorMessage: 'premium.manage_failed',
+          ),
+        );
+        return;
+      }
       _updateStateIfMounted(
-        (state) =>
-            state.copyWith(isManaging: false, externalUrl: managementUrl),
+        (state) => state.copyWith(
+          isManaging: false,
+          externalUrl: safeManagementUri.toString(),
+        ),
       );
     } catch (error) {
       _updateStateIfMounted(
@@ -1038,13 +1073,16 @@ class PremiumController extends Notifier<PremiumState> {
     return providers;
   }
 
-  Future<({bool isAvailable, Set<String> productIds})>
+  Future<
+    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+  >
   _resolveStoreAvailability(
     List<PremiumPlanModel> plans,
     List<PremiumPaymentProvider> providers,
   ) async {
     var isAvailable = false;
     final productIds = <String>{};
+    final productPrices = <String, String>{};
 
     for (final provider in providers) {
       if (provider == PremiumPaymentProvider.stripe) {
@@ -1058,6 +1096,7 @@ class PremiumController extends Notifier<PremiumState> {
         );
         isAvailable = isAvailable || availability.isAvailable;
         productIds.addAll(availability.productIds);
+        productPrices.addAll(availability.productPrices);
       } catch (error, stackTrace) {
         _logPremiumLoadFailure(
           'fetch_store_availability',
@@ -1069,7 +1108,11 @@ class PremiumController extends Notifier<PremiumState> {
       }
     }
 
-    return (isAvailable: isAvailable, productIds: productIds);
+    return (
+      isAvailable: isAvailable,
+      productIds: productIds,
+      productPrices: productPrices,
+    );
   }
 
   String _selectPlanCode(
@@ -1236,6 +1279,7 @@ bool _isSafePremiumErrorKey(String value) {
       value == 'premium.request_failed' ||
       value == 'premium.checkout_failed' ||
       value == 'premium.manage_failed' ||
+      value == 'templates.network_unavailable' ||
       value == 'premium.purchase_cancelled' ||
       value == 'premium.store_unavailable' ||
       value == 'premium.store_product_unavailable';

@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
@@ -330,16 +331,25 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
+    final templateId = widget.template.templateId;
+    final previewUrl = _normalizeTemplateMediaUrl(
+      widget.template.previewAsset!.url,
+    );
+    if (previewUrl == null) {
+      if (mounted) {
+        setState(() {
+          _videoLoadFailed = true;
+        });
+      }
+      return;
+    }
+
     if (!_hasPreviewSlot &&
         !MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
       return;
     }
     _hasPreviewSlot = true;
 
-    final templateId = widget.template.templateId;
-    final previewUrl =
-        _normalizeTemplateMediaUrl(widget.template.previewAsset!.url) ??
-        widget.template.previewAsset!.url;
     final requestVersion = ++_videoControllerRequestVersion;
     _videoControllerInitInFlight = true;
     VideoPlayerController? controller;
@@ -441,9 +451,9 @@ class _TemplateCardState extends State<TemplateCard> {
       return false;
     }
 
-    final currentPreviewUrl =
-        _normalizeTemplateMediaUrl(widget.template.previewAsset?.url) ??
-        widget.template.previewAsset?.url;
+    final currentPreviewUrl = _normalizeTemplateMediaUrl(
+      widget.template.previewAsset?.url,
+    );
     return currentPreviewUrl == previewUrl;
   }
 }
@@ -635,25 +645,26 @@ String? _normalizeTemplateMediaUrl(String? rawUrl) {
   }
 
   final sanitized = _sanitizeTemplateMediaUrl(trimmed);
+  String candidate;
 
   final parsed = Uri.tryParse(sanitized);
   if (parsed?.hasScheme == true) {
-    return parsed.toString();
-  }
-
-  if (sanitized.startsWith('//')) {
+    candidate = parsed.toString();
+  } else if (sanitized.startsWith('//')) {
     final base = Uri.tryParse(AppConfig.apiBaseUrl);
     final scheme = (base?.scheme.isNotEmpty ?? false) ? base!.scheme : 'http';
-    return '$scheme:$sanitized';
+    candidate = '$scheme:$sanitized';
+  } else {
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    if (baseUri == null) {
+      return null;
+    }
+
+    final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
+    candidate = baseUri.resolve(relativePath).toString();
   }
 
-  final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
-  if (baseUri == null) {
-    return sanitized;
-  }
-
-  final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
-  return baseUri.resolve(relativePath).toString();
+  return parseSafeGenerationMediaUri(candidate)?.toString();
 }
 
 String _sanitizeTemplateMediaUrl(String rawUrl) {

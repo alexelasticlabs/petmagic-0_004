@@ -112,7 +112,9 @@ class _ProfileNotificationsSettingsSectionState
 
   Future<void> _refreshDevicePermissions() async {
     try {
-      final statuses = await _permissionCoordinator.readStatuses();
+      final statuses = await _permissionCoordinator.readStatuses(
+        types: const [AppPermissionType.notifications],
+      );
       if (!mounted) {
         return;
       }

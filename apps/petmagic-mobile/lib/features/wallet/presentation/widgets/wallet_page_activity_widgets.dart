@@ -3,11 +3,13 @@ part of 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 class _PacksSection extends StatelessWidget {
   const _PacksSection({
     required this.packs,
+    required this.storeProductPrices,
     required this.isBuying,
     required this.onSelect,
   });
 
   final List<CurrencyPackModel> packs;
+  final Map<String, String> storeProductPrices;
   final bool isBuying;
   final ValueChanged<CurrencyPackModel> onSelect;
 
@@ -40,6 +42,10 @@ class _PacksSection extends StatelessWidget {
         for (var index = 0; index < sortedPacks.length; index++) ...[
           _FeaturedPackTile(
             pack: sortedPacks[index],
+            displayPrice: _storePriceForPack(
+              sortedPacks[index],
+              storeProductPrices,
+            ),
             isBestOffer: bestOfferPack.packId == sortedPacks[index].packId,
             isPopular:
                 popularPack?.packId == sortedPacks[index].packId &&
@@ -57,6 +63,7 @@ class _PacksSection extends StatelessWidget {
 class _FeaturedPackTile extends StatelessWidget {
   const _FeaturedPackTile({
     required this.pack,
+    required this.displayPrice,
     required this.isBestOffer,
     required this.isPopular,
     required this.isBuying,
@@ -64,6 +71,7 @@ class _FeaturedPackTile extends StatelessWidget {
   });
 
   final CurrencyPackModel pack;
+  final String? displayPrice;
   final bool isBestOffer;
   final bool isPopular;
   final bool isBuying;
@@ -73,7 +81,7 @@ class _FeaturedPackTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final price = _formatPrice(pack);
+    final price = displayPrice ?? _formatPrice(pack);
     final valueLabel = _valuePerCurrencyLabel(pack);
     final photosApprox = (pack.totalSpark / _kPhotoCostSpark).floor();
     final videosApprox = (pack.totalSpark / _kVideoCostSpark).floor();

@@ -3,12 +3,26 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('profile avatar rendering checks URLs before network image use', () {
+    final source = File(
+      'lib/features/profile/presentation/profile_surface_widgets.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('parseSafeProfileAvatarUri(imageUrl)'));
+    expect(source, contains('imageUrl: safeImageUrl'));
+    expect(source, isNot(contains('imageUrl: imageUrl!')));
+  });
+
   test('profile failure logs do not include raw avatar media urls', () {
     final source = File(
       'lib/features/profile/presentation/profile_controller.dart',
     ).readAsStringSync();
     final evictBody = _methodBody(source, 'Future<void> _evictAvatarCache');
 
+    expect(evictBody, contains('parseSafeProfileAvatarUri(imageUrl)'));
+    expect(evictBody, contains('evictFromCache(safeImageUrl)'));
+    expect(evictBody, contains('NetworkImage(safeImageUrl)'));
+    expect(evictBody, isNot(contains('NetworkImage(imageUrl)')));
     expect(evictBody, contains("'avatar_cache_evict_failed'"));
     expect(evictBody, isNot(contains('avatar_url')));
     expect(evictBody, isNot(contains('imageUrl}')));

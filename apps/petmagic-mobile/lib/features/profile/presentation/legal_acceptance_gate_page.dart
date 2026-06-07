@@ -34,7 +34,7 @@ class _LegalAcceptanceGatePageState
     final legalDocumentsAsync = ref.watch(
       currentLegalDocumentsProvider(locale),
     );
-    final profile = state.profile ?? state.session?.user;
+    final profile = state.profile;
 
     return Scaffold(
       appBar: AppBar(
@@ -140,7 +140,7 @@ class _LegalAcceptanceGatePageState
       return;
     }
 
-    final profile = next.profile ?? next.session?.user;
+    final profile = next.profile;
     final requires = profile?.legalAcceptance.requiresAcceptance ?? true;
     ref
         .read(appLaunchControllerProvider.notifier)

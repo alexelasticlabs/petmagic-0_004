@@ -352,7 +352,10 @@ class ProfileRepository {
   }) async {
     final fileName = filePath.split(Platform.pathSeparator).last;
     final mediaType = _resolveMediaType(fileName);
-    await _validateAvatarForUpload(filePath: filePath, mediaType: mediaType);
+    final uploadMediaType = await _validateAvatarForUpload(
+      filePath: filePath,
+      mediaType: mediaType,
+    );
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.put<Map<String, dynamic>>(
@@ -361,7 +364,7 @@ class ProfileRepository {
           'file': await MultipartFile.fromFile(
             filePath,
             filename: fileName,
-            contentType: mediaType,
+            contentType: uploadMediaType,
           ),
         }),
         cancelToken: cancelToken,
@@ -437,6 +440,14 @@ class ProfileRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(
+        error,
+        'templates.network_unavailable',
+        includeCause: false,
+      );
+    }
+
     final payload = NetworkErrorMapper.parseApiPayload(error);
     final statusCode = error.response?.statusCode;
     final title = payload.title?.trim();
@@ -460,7 +471,7 @@ class ProfileRepository {
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
   }
 
-  Future<void> _validateAvatarForUpload({
+  Future<MediaType> _validateAvatarForUpload({
     required String filePath,
     required MediaType mediaType,
   }) async {
@@ -482,6 +493,14 @@ class ProfileRepository {
     if (fileSizeBytes <= 0 || fileSizeBytes > _maxAvatarBytes) {
       throw const AppException('profile.action_failed', statusCode: 400);
     }
+
+    final detectedMediaType = await _detectAvatarMediaType(filePath);
+    if (detectedMediaType == null ||
+        !_isAllowedAvatarMediaType(detectedMediaType)) {
+      throw const AppException('profile.action_failed', statusCode: 400);
+    }
+
+    return detectedMediaType;
   }
 
   bool _isAllowedAvatarMediaType(MediaType mediaType) {
@@ -499,5 +518,68 @@ class ProfileRepository {
       'webp' => MediaType('image', 'webp'),
       _ => throw const AppException('profile.action_failed', statusCode: 400),
     };
+  }
+
+  Future<MediaType?> _detectAvatarMediaType(String path) async {
+    final header = await _avatarHeader(path);
+    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
+      return MediaType('image', 'jpeg');
+    }
+    if (_startsWith(header, const [
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+    ])) {
+      return MediaType('image', 'png');
+    }
+    if (header.length >= 12 &&
+        _asciiEquals(header, 0, 'RIFF') &&
+        _asciiEquals(header, 8, 'WEBP')) {
+      return MediaType('image', 'webp');
+    }
+
+    return null;
+  }
+
+  Future<List<int>> _avatarHeader(String path) async {
+    try {
+      final chunks = await File(path).openRead(0, 32).toList();
+      return [for (final chunk in chunks) ...chunk];
+    } on FileSystemException catch (error) {
+      throw AppException(
+        'profile.action_failed',
+        statusCode: 400,
+        cause: error,
+      );
+    }
+  }
+
+  bool _startsWith(List<int> bytes, List<int> prefix) {
+    if (bytes.length < prefix.length) {
+      return false;
+    }
+    for (var index = 0; index < prefix.length; index++) {
+      if (bytes[index] != prefix[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _asciiEquals(List<int> bytes, int offset, String value) {
+    if (bytes.length < offset + value.length) {
+      return false;
+    }
+    for (var index = 0; index < value.length; index++) {
+      if (bytes[offset + index] != value.codeUnitAt(index)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

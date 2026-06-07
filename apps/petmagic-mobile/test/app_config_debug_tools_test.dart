@@ -13,6 +13,9 @@ void main() {
       final router = await File(
         'lib/app/router/app_router.dart',
       ).readAsString();
+      final stripeSmokePage = await File(
+        'lib/features/premium/presentation/stripe_paymentsheet_smoke_test_page.dart',
+      ).readAsString();
 
       expect(
         source,
@@ -42,6 +45,15 @@ void main() {
           "        GoRoute(\n"
           "          path: StripePaymentSheetSmokeTestPage.routePath,",
         ),
+      );
+      expect(
+        stripeSmokePage,
+        contains("import 'package:flutter/foundation.dart';"),
+      );
+      expect(stripeSmokePage, contains('if (!kDebugMode) {\n      return;'));
+      expect(
+        stripeSmokePage,
+        contains('if (!kDebugMode) {\n      return const SizedBox.shrink();'),
       );
     },
   );

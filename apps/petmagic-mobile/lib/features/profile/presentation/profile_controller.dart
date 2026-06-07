@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final profileControllerProvider =
     NotifierProvider<ProfileController, ProfileState>(ProfileController.new);
@@ -21,7 +22,6 @@ class ProfileState {
     required this.email,
     required this.password,
     required this.confirmPassword,
-    this.session,
     this.profile,
     this.errorMessage,
     this.successMessage,
@@ -43,12 +43,11 @@ class ProfileState {
   final String email;
   final String password;
   final String confirmPassword;
-  final AuthSession? session;
   final MobileUserProfile? profile;
   final String? errorMessage;
   final String? successMessage;
 
-  bool get isAuthenticated => session != null;
+  bool get isAuthenticated => profile != null;
 
   ProfileState copyWith({
     bool? isLoading,
@@ -57,7 +56,6 @@ class ProfileState {
     String? email,
     String? password,
     String? confirmPassword,
-    AuthSession? session,
     MobileUserProfile? profile,
     String? errorMessage,
     String? successMessage,
@@ -73,7 +71,6 @@ class ProfileState {
       email: email ?? this.email,
       password: password ?? this.password,
       confirmPassword: confirmPassword ?? this.confirmPassword,
-      session: clearSession ? null : (session ?? this.session),
       profile: clearProfile ? null : (profile ?? this.profile),
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       successMessage: clearSuccess
@@ -184,18 +181,11 @@ class ProfileController extends Notifier<ProfileState> {
       if (!ref.mounted) {
         return;
       }
-      final hydratedSession = AuthSession(
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        expiresAtUtc: session.expiresAtUtc,
-        user: profile,
-      );
       _updateStateIfMounted(
         (state) => state.copyWith(
           isLoading: false,
-          session: hydratedSession,
           profile: profile,
-          email: hydratedSession.user.email,
+          email: profile.email,
           clearError: true,
         ),
       );
@@ -205,8 +195,7 @@ class ProfileController extends Notifier<ProfileState> {
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
-            requiresLegalAcceptance:
-                hydratedSession.user.legalAcceptance.requiresAcceptance,
+            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
     } on AppException catch (error) {
       final storedSession = await repository.readSession();
@@ -217,7 +206,6 @@ class ProfileController extends Notifier<ProfileState> {
         _updateStateIfMounted(
           (state) => state.copyWith(
             isLoading: false,
-            session: storedSession,
             profile: storedSession.user,
             email: storedSession.user.email,
             errorMessage: error.message,
@@ -253,7 +241,6 @@ class ProfileController extends Notifier<ProfileState> {
         _updateStateIfMounted(
           (state) => state.copyWith(
             isLoading: false,
-            session: storedSession,
             profile: storedSession.user,
             email: storedSession.user.email,
             errorMessage: _genericActionError,
@@ -313,10 +300,7 @@ class ProfileController extends Notifier<ProfileState> {
 
     final repository = _repository;
     try {
-      final session = await repository.login(
-        email: state.email,
-        password: state.password,
-      );
+      await repository.login(email: state.email, password: state.password);
       if (!ref.mounted) {
         return;
       }
@@ -324,16 +308,9 @@ class ProfileController extends Notifier<ProfileState> {
       if (!ref.mounted) {
         return;
       }
-      final hydratedSession = AuthSession(
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        expiresAtUtc: session.expiresAtUtc,
-        user: profile,
-      );
       _updateStateIfMounted(
         (state) => state.copyWith(
           isSaving: false,
-          session: hydratedSession,
           profile: profile,
           password: '',
           confirmPassword: '',
@@ -345,8 +322,7 @@ class ProfileController extends Notifier<ProfileState> {
       ref
           .read(appLaunchControllerProvider.notifier)
           .markSignedInWithLegalStatus(
-            requiresLegalAcceptance:
-                hydratedSession.user.legalAcceptance.requiresAcceptance,
+            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
           );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -438,7 +414,6 @@ class ProfileController extends Notifier<ProfileState> {
       _updateStateIfMounted(
         (state) => state.copyWith(
           isSaving: false,
-          session: session,
           profile: session.user,
           password: '',
           confirmPassword: '',
@@ -630,11 +605,7 @@ class ProfileController extends Notifier<ProfileState> {
       final nextAvatarUrl = profile.avatar?.url;
 
       _updateStateIfMounted(
-        (state) => state.copyWith(
-          isSaving: false,
-          profile: profile,
-          session: _replaceSessionUser(profile),
-        ),
+        (state) => state.copyWith(isSaving: false, profile: profile),
       );
 
       await _evictAvatarCache(previousAvatarUrl);
@@ -681,11 +652,7 @@ class ProfileController extends Notifier<ProfileState> {
     try {
       final profile = await _repository.removeAvatar();
       _updateStateIfMounted(
-        (state) => state.copyWith(
-          isSaving: false,
-          profile: profile,
-          session: _replaceSessionUser(profile),
-        ),
+        (state) => state.copyWith(isSaving: false, profile: profile),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -707,7 +674,6 @@ class ProfileController extends Notifier<ProfileState> {
         (state) => state.copyWith(
           isSaving: false,
           profile: profile,
-          session: _replaceSessionUser(profile),
           displayName: profile.displayName ?? '',
         ),
       );
@@ -733,11 +699,7 @@ class ProfileController extends Notifier<ProfileState> {
         documents: legalDocuments,
       );
       _updateStateIfMounted(
-        (state) => state.copyWith(
-          isSaving: false,
-          profile: profile,
-          session: _replaceSessionUser(profile),
-        ),
+        (state) => state.copyWith(isSaving: false, profile: profile),
       );
     } on AppException catch (error) {
       _setFailure(message: error.message);
@@ -766,28 +728,15 @@ class ProfileController extends Notifier<ProfileState> {
     );
   }
 
-  AuthSession? _replaceSessionUser(MobileUserProfile profile) {
-    final session = state.session;
-    if (session == null) {
-      return null;
-    }
-
-    return AuthSession(
-      accessToken: session.accessToken,
-      refreshToken: session.refreshToken,
-      expiresAtUtc: session.expiresAtUtc,
-      user: profile,
-    );
-  }
-
   Future<void> _evictAvatarCache(String? imageUrl) async {
-    if (imageUrl == null || imageUrl.trim().isEmpty) {
+    final safeImageUrl = parseSafeProfileAvatarUri(imageUrl)?.toString();
+    if (safeImageUrl == null) {
       return;
     }
 
     try {
-      await CachedNetworkImage.evictFromCache(imageUrl);
-      imageCache.evict(NetworkImage(imageUrl));
+      await CachedNetworkImage.evictFromCache(safeImageUrl);
+      imageCache.evict(NetworkImage(safeImageUrl));
     } catch (error, stackTrace) {
       _logProfileFailure('avatar_cache_evict_failed', error, stackTrace);
     }

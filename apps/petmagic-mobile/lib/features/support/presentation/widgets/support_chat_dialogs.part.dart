@@ -197,7 +197,15 @@ class _SupportVideoPreviewDialogState
   Future<void> _initialize() async {
     final requestVersion = ++_initializeRequestVersion;
     final videoUrl = widget.videoUrl;
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+    final safeUri = parseSafeSupportExternalUri(videoUrl);
+    if (safeUri == null) {
+      if (_isCurrentVideoRequestWithoutController(requestVersion, videoUrl)) {
+        setState(() => _failedToLoad = true);
+      }
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(safeUri);
     _controller = controller;
     try {
       await controller.initialize();
@@ -227,6 +235,16 @@ class _SupportVideoPreviewDialogState
         requestVersion == _initializeRequestVersion &&
         widget.videoUrl == videoUrl &&
         _controller == controller;
+  }
+
+  bool _isCurrentVideoRequestWithoutController(
+    int requestVersion,
+    String videoUrl,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.videoUrl == videoUrl &&
+        _controller == null;
   }
 
   String _formatDuration(Duration value) {

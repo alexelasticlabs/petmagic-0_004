@@ -1237,7 +1237,8 @@ class _GenerationResultView extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final outputUrl = generation.outputUrl ?? '';
+    final outputUrl =
+        parseSafeGenerationMediaUri(generation.outputUrl)?.toString() ?? '';
 
     return Column(
       key: const ValueKey('generation-result'),
@@ -1316,10 +1317,11 @@ class _AdaptiveTemplateMediaFrame extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final locale = Localizations.localeOf(context);
     final asset = template.previewAsset;
+    final safeAssetUrl = parseSafeGenerationMediaUri(asset?.url)?.toString();
     final ratio = template.isVideo ? 9 / 16 : 3 / 4;
 
     Widget media;
-    if (asset == null || asset.url.isEmpty) {
+    if (asset == null || safeAssetUrl == null || safeAssetUrl.isEmpty) {
       media = _TemplatePreviewPlaceholder(
         isVideo: template.isVideo,
         title: _templatePreviewMissingTitle(locale),
@@ -1329,10 +1331,10 @@ class _AdaptiveTemplateMediaFrame extends StatelessWidget {
         ),
       );
     } else if (template.isVideo && isVideoPreview(asset)) {
-      media = _NetworkVideoPreview(url: asset.url);
+      media = _NetworkVideoPreview(url: safeAssetUrl);
     } else {
       media = CachedNetworkImage(
-        imageUrl: asset.url,
+        imageUrl: safeAssetUrl,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         placeholder: (context, url) =>
@@ -1400,7 +1402,15 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
     final requestVersion = ++_initializeRequestVersion;
     final url = widget.url;
     setState(() => _failedToLoad = false);
-    final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+    final safeUri = parseSafeGenerationMediaUri(url);
+    if (safeUri == null) {
+      if (mounted) {
+        setState(() => _failedToLoad = true);
+      }
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(safeUri);
     _controller = controller;
     controller.setVolume(0);
     controller.setLooping(true);

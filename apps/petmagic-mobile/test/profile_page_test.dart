@@ -219,12 +219,6 @@ class _FakeProfileController extends ProfileController {
       email: profile.email,
       password: '',
       confirmPassword: '',
-      session: AuthSession(
-        accessToken: 'token',
-        refreshToken: 'refresh',
-        expiresAtUtc: DateTime.utc(2099, 1, 1),
-        user: profile,
-      ),
       profile: profile,
     );
   }

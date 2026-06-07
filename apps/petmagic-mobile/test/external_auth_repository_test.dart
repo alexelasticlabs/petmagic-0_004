@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -66,15 +67,27 @@ void main() {
     () async {
       final callbacks = StreamController<Uri>();
       addTearDown(callbacks.close);
+      final storage = _InMemoryAuthSessionStorage();
+      await storage.save(_authSession());
 
       final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
         ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/me/linked-accounts/Apple/prepare') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'ticket': 'link-ticket'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
           throw StateError('Unexpected path: ${options.path}');
         });
 
       final repository = MobileExternalAuthRepository(
         dio: dio,
-        sessionStorage: _InMemoryAuthSessionStorage(),
+        sessionStorage: storage,
         appLinks: AppLinks(),
         uriLinkStream: callbacks.stream,
         launchUrlDelegate: (Uri uri, LaunchMode mode) async {
@@ -92,7 +105,7 @@ void main() {
       );
 
       await expectLater(
-        repository.authenticate(ExternalAuthProvider.apple),
+        repository.link(ExternalAuthProvider.apple),
         throwsA(
           isA<AppException>()
               .having(
@@ -114,6 +127,51 @@ void main() {
       );
     },
   );
+
+  test(
+    'native apple auth posts identity token and authorization code',
+    () async {
+      final storage = _InMemoryAuthSessionStorage();
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          expect(options.path, '/api/auth/apple');
+          expect(options.data, {
+            'identityToken': 'apple-identity-token',
+            'authorizationCode': 'apple-auth-code',
+          });
+
+          return ResponseBody.fromString(
+            jsonEncode(_authSessionJson()),
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: storage,
+        appLinks: AppLinks(),
+        appleSignInDelegate: () async {
+          return const AuthorizationCredentialAppleID(
+            userIdentifier: 'apple-user-1',
+            givenName: null,
+            familyName: null,
+            authorizationCode: 'apple-auth-code',
+            email: 'relay@privaterelay.appleid.com',
+            identityToken: 'apple-identity-token',
+            state: null,
+          );
+        },
+      );
+
+      final session = await repository.authenticate(ExternalAuthProvider.apple);
+
+      expect(session.accessToken, 'access-token');
+      expect((await storage.read())?.refreshToken, 'refresh-token');
+    },
+  );
 }
 
 class _InMemoryAuthSessionStorage extends AuthSessionStorage {
@@ -133,6 +191,40 @@ class _InMemoryAuthSessionStorage extends AuthSessionStorage {
   Future<void> clear() async {
     _session = null;
   }
+}
+
+AuthSession _authSession() => AuthSession.fromJson(_authSessionJson());
+
+Map<String, dynamic> _authSessionJson() {
+  return {
+    'accessToken': 'access-token',
+    'refreshToken': 'refresh-token',
+    'expiresAtUtc': DateTime.now()
+        .add(const Duration(hours: 1))
+        .toIso8601String(),
+    'user': {
+      'userId': 'user-1',
+      'email': 'pet@example.com',
+      'displayName': 'Pet Parent',
+      'isPremium': false,
+      'emailConfirmed': true,
+      'termsOfUseAccepted': true,
+      'privacyPolicyAccepted': true,
+      'marketingEmailsEnabled': false,
+      'roles': ['user'],
+      'legalAcceptance': {
+        'termsOfUseAccepted': true,
+        'termsOfUseVersion': '2026-05-20',
+        'termsOfUseAcceptedAtUtc': DateTime.now().toIso8601String(),
+        'privacyPolicyAccepted': true,
+        'privacyPolicyVersion': '2026-05-20',
+        'privacyPolicyAcceptedAtUtc': DateTime.now().toIso8601String(),
+        'currentTermsOfUseVersion': '2026-05-20',
+        'currentPrivacyPolicyVersion': '2026-05-20',
+        'requiresAcceptance': false,
+      },
+    },
+  };
 }
 
 class _FakeHttpClientAdapter implements HttpClientAdapter {

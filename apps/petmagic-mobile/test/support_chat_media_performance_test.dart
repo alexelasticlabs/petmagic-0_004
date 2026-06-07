@@ -96,6 +96,9 @@ void main() {
     final actionsSource = await File(
       'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
     ).readAsString();
+    final dialogsSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_dialogs.part.dart',
+    ).readAsString();
 
     expect(
       mediaSource,
@@ -116,15 +119,28 @@ void main() {
     expect(actionsSource, contains('parseSafeSupportExternalUri(videoUrl)'));
     expect(
       mediaSource,
+      contains('final safeUri = parseSafeSupportExternalUri(videoUrl);'),
+    );
+    expect(
+      dialogsSource,
+      contains('final safeUri = parseSafeSupportExternalUri(videoUrl);'),
+    );
+    expect(mediaSource, contains('VideoPlayerController.networkUrl(safeUri)'));
+    expect(
+      dialogsSource,
+      contains('VideoPlayerController.networkUrl(safeUri)'),
+    );
+    expect(
+      mediaSource,
       isNot(contains('imageUrl: attachment.fileUrl,\n                  fit')),
     );
     expect(
       mediaSource,
-      isNot(
-        contains(
-          'VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))',
-        ),
-      ),
+      isNot(contains('VideoPlayerController.networkUrl(Uri.parse(videoUrl))')),
+    );
+    expect(
+      dialogsSource,
+      isNot(contains('VideoPlayerController.networkUrl(Uri.parse(videoUrl))')),
     );
   });
 

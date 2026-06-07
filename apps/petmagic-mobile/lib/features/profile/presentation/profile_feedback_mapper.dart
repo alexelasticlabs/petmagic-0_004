@@ -48,6 +48,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authRequestFailed;
     case 'auth.request_failed':
       return text.authRequestFailed;
+    case 'templates.network_unavailable':
+      return text.templateFlowNetworkError;
     case 'profile.action_failed':
       return text.profileActionFailed;
     default:

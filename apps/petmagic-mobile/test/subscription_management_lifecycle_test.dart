@@ -9,6 +9,61 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 
 void main() {
+  testWidgets('subscription summary failure shows retry and reloads safely', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    var loadAttempts = 0;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          premiumSubscriptionSummaryProvider.overrideWith((ref) async {
+            loadAttempts++;
+            if (loadAttempts == 1) {
+              throw StateError('summary unavailable');
+            }
+
+            return const PremiumSubscriptionSummaryView(
+              isPremium: true,
+              canManageSubscription: true,
+              status: 'active',
+              manageSubscriptionAction: 'StripeCustomerPortal',
+              provider: PremiumSubscriptionProviderView.stripe,
+              planName: 'PetMagic Premium',
+              cancelAtPeriodEnd: false,
+            );
+          }),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: const SubscriptionManagementPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(SubscriptionManagementPage));
+    final text = AppLocalizations.of(context);
+
+    expect(find.text(text.premiumManageFailed), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, text.retryAction), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, text.retryAction));
+    await tester.pump();
+    await tester.pump();
+
+    expect(loadAttempts, 2);
+    expect(find.text(text.premiumManageFailed), findsNothing);
+    expect(find.text('PetMagic Premium'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'restore completion is ignored after subscription page disposal',
     (tester) async {

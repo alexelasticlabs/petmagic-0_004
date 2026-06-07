@@ -712,7 +712,16 @@ class _NetworkVideoAttachmentPreviewState
   }
 
   Future<void> _initialize(int requestVersion, String videoUrl) async {
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+    final safeUri = parseSafeSupportExternalUri(videoUrl);
+    if (safeUri == null) {
+      if (_isCurrentVideoRequestWithoutController(requestVersion, videoUrl)) {
+        _releasePreviewSlot();
+        setState(() => _failedToLoad = true);
+      }
+      return;
+    }
+
+    final controller = VideoPlayerController.networkUrl(safeUri);
     _controller = controller;
     try {
       await controller.initialize();
@@ -744,6 +753,16 @@ class _NetworkVideoAttachmentPreviewState
         requestVersion == _initializeRequestVersion &&
         widget.videoUrl == videoUrl &&
         _controller == controller;
+  }
+
+  bool _isCurrentVideoRequestWithoutController(
+    int requestVersion,
+    String videoUrl,
+  ) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.videoUrl == videoUrl &&
+        _controller == null;
   }
 
   @override

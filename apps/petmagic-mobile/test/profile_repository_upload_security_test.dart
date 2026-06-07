@@ -79,6 +79,38 @@ void main() {
     );
   });
 
+  test('rejects spoofed avatar content before upload', () async {
+    final file = File('${tempDir.path}/spoofed-avatar.jpg');
+    await file.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+    var didAttemptUpload = false;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            didAttemptUpload = true;
+            handler.reject(DioException(requestOptions: options));
+          },
+        ),
+      );
+    final repository = ProfileRepository(
+      dio: dio,
+      sessionStorage: AuthSessionStorage(),
+    );
+
+    await expectLater(
+      repository.uploadAvatar(file.path),
+      throwsA(
+        isA<AppException>().having(
+          (error) => error.message,
+          'message',
+          'profile.action_failed',
+        ),
+      ),
+    );
+
+    expect(didAttemptUpload, isFalse);
+  });
+
   test('uses async file size validation for avatar uploads', () {
     final source = File(
       'lib/features/profile/data/profile_repository.dart',
@@ -86,6 +118,8 @@ void main() {
 
     expect(source, isNot(contains('lengthSync(')));
     expect(source, contains('await File(filePath).length()'));
+    expect(source, contains('await _detectAvatarMediaType(filePath)'));
+    expect(source, contains('return detectedMediaType;'));
     expect(source, contains('await _validateAvatarForUpload('));
     expect(source, contains('authenticatedMultipartRequestOptions'));
   });

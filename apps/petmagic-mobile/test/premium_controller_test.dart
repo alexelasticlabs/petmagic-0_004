@@ -41,6 +41,10 @@ void main() {
               'com.petmagic.app.premium.monthly',
               'com.petmagic.app.premium.yearly',
             },
+            productPrices: {
+              'com.petmagic.app.premium.monthly': r'$14.99',
+              'com.petmagic.app.premium.yearly': r'$99.99',
+            },
           ),
         },
       );
@@ -111,6 +115,57 @@ void main() {
     final state = container.read(premiumControllerProvider);
     expect(checkout, isNull);
     expect(state.externalUrl, 'https://checkout.stripe.com/c/pay/cs_test_123');
+    expect(state.isBuying, isFalse);
+  });
+
+  test('stripe checkout rejects unsafe external checkout url', () async {
+    final repository = _FakePremiumRepository(
+      config: _paywallConfig(
+        methods: const [
+          PremiumPaymentMethodModel(
+            provider: PremiumPaymentProvider.stripe,
+            purchaseChannel: 'external_checkout',
+            platform: 'android',
+            region: '*',
+            isEnabled: true,
+            isSelectedByDefault: true,
+            requiresExternalWarning: false,
+            requiresStoreDisclosure: false,
+            isRecommended: true,
+            bonusTokensPercent: 0,
+          ),
+        ],
+      ),
+      status: _status(provider: 'stripe', canManageSubscription: false),
+      stripeCheckout: const PremiumCheckoutModel(
+        paymentProvider: 'stripe',
+        checkoutUrl: 'https://checkout.stripe.com@evil.example/session',
+        status: 'pending',
+        externalSubscriptionId: 'cs_test_123',
+        paymentIntentClientSecret: null,
+        customerId: null,
+        customerEphemeralKeySecret: null,
+        publishableKey: null,
+      ),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        premiumRepositoryProvider.overrideWithValue(repository),
+        premiumRefreshProfileProvider.overrideWithValue(() async {}),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(premiumControllerProvider.notifier).load();
+    final checkout = await container
+        .read(premiumControllerProvider.notifier)
+        .startCheckout();
+
+    final state = container.read(premiumControllerProvider);
+    expect(checkout, isNull);
+    expect(state.externalUrl, isNull);
+    expect(state.errorMessage, 'premium.checkout_failed');
     expect(state.isBuying, isFalse);
   });
 
@@ -289,7 +344,11 @@ class _FakePremiumRepository extends PremiumRepository {
   final PremiumCheckoutModel stripeCheckout;
   final Map<
     PremiumPaymentProvider,
-    ({bool isAvailable, Set<String> productIds})
+    ({
+      bool isAvailable,
+      Set<String> productIds,
+      Map<String, String> productPrices,
+    })
   >
   availabilityByProvider;
 
@@ -322,12 +381,19 @@ class _FakePremiumRepository extends PremiumRepository {
       );
 
   @override
-  Future<({bool isAvailable, Set<String> productIds})> fetchStoreAvailability(
+  Future<
+    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+  >
+  fetchStoreAvailability(
     List<PremiumPlanModel> plans,
     PremiumPaymentProvider provider,
   ) async {
     return availabilityByProvider[provider] ??
-        (isAvailable: false, productIds: <String>{});
+        (
+          isAvailable: false,
+          productIds: <String>{},
+          productPrices: <String, String>{},
+        );
   }
 
   @override

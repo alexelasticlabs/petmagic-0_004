@@ -43,6 +43,20 @@ Uri? parseSafeGenerationMediaUri(String? rawValue) {
   );
 }
 
+Uri? parseSafeProfileAvatarUri(String? rawValue) {
+  return parseSafeExternalUri(
+    rawValue,
+    allowedHttpsHosts: profileAvatarAllowedHosts(),
+  );
+}
+
+Uri? parseSafePremiumExternalUri(String? rawValue) {
+  return parseSafeExternalUri(
+    rawValue,
+    allowedHttpsHosts: premiumExternalAllowedHosts(),
+  );
+}
+
 bool isAllowedExternalUri(Uri uri, {Set<String>? allowedHttpsHosts}) {
   final scheme = uri.scheme.toLowerCase();
   final host = uri.host.toLowerCase();
@@ -108,6 +122,21 @@ Set<String> supportExternalAllowedHosts() {
 }
 
 Set<String> generationMediaAllowedHosts() {
+  final result = <String>{
+    'api.petmagic.app',
+    'cdn.petmagic.app',
+    'cdn.petmagic.ai',
+  };
+
+  final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+  if (apiBaseUri != null && apiBaseUri.host.isNotEmpty) {
+    result.add(apiBaseUri.host.toLowerCase());
+  }
+
+  return result;
+}
+
+Set<String> profileAvatarAllowedHosts() {
   final result = <String>{
     'api.petmagic.app',
     'cdn.petmagic.app',

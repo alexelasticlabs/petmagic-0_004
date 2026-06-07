@@ -79,6 +79,30 @@ void main() {
   );
 
   test(
+    'wallet checkout rejects unsafe external checkout url before state update',
+    () async {
+      final repository = _DelayedWalletRepository(
+        checkoutUrl: 'https://checkout.stripe.com@evil.example/session',
+      );
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final checkout = await container
+          .read(walletControllerProvider.notifier)
+          .buyPack(_pack, _stripeMethod);
+
+      final state = container.read(walletControllerProvider);
+      expect(checkout, isNull);
+      expect(state.checkoutUrl, isNull);
+      expect(state.pendingCheckoutOrderId, isNull);
+      expect(state.errorMessage, 'payment_gateway_failed');
+      expect(state.isBuying, isFalse);
+    },
+  );
+
+  test(
     'stripe verification logging does not include raw payment reference',
     () {
       final source = File(
@@ -132,9 +156,11 @@ String _methodBody(String source, String methodName) {
 }
 
 class _DelayedWalletRepository extends WalletRepository {
-  _DelayedWalletRepository()
-    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+  _DelayedWalletRepository({
+    this.checkoutUrl = 'https://checkout.stripe.com/session',
+  }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
+  final String checkoutUrl;
   final Completer<void> fetchWalletStarted = Completer<void>();
   final Completer<void> _fetchWalletCompleter = Completer<void>();
   final Completer<void> verifyStripeStarted = Completer<void>();
@@ -210,10 +236,10 @@ class _DelayedWalletRepository extends WalletRepository {
     WalletPaymentMethodModel paymentMethod,
     Locale locale,
   ) async {
-    return const PurchaseCheckoutModel(
+    return PurchaseCheckoutModel(
       orderId: 'order-1',
       paymentProvider: 'stripe',
-      checkoutUrl: 'https://checkout.stripe.test/session',
+      checkoutUrl: checkoutUrl,
       externalPaymentId: 'cs_test_123',
       paymentIntentClientSecret: null,
       customerId: null,

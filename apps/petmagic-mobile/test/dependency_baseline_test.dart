@@ -31,11 +31,34 @@ void main() {
     final pubspec = File('pubspec.yaml').readAsStringSync();
     final lockfile = File('pubspec.lock').readAsStringSync();
 
-    expect(pubspec, isNot(contains('flutter_local_notifications:')));
-    expect(lockfile, isNot(contains('flutter_local_notifications')));
-    expect(lockfile, isNot(contains('timezone')));
-    expect(pubspec, isNot(contains('image_cropper:')));
-    expect(lockfile, isNot(contains('image_cropper')));
+    for (final package in const {
+      'flutter_local_notifications',
+      'timezone',
+      'image_cropper',
+      'camera',
+      'webview_flutter',
+      'flutter_inappwebview',
+      'geolocator',
+      'location',
+      'contacts_service',
+      'flutter_contacts',
+      'device_info_plus',
+      'package_info_plus',
+      'sensors_plus',
+      'flutter_blue_plus',
+    }) {
+      expect(
+        pubspec,
+        isNot(contains('$package:')),
+        reason: '$package should not be a direct dependency.',
+      );
+      expect(
+        lockfile,
+        isNot(contains('name: $package')),
+        reason: '$package should not enter the resolved dependency graph.',
+      );
+    }
+
     expect(
       pubspec,
       contains(
@@ -43,4 +66,65 @@ void main() {
       ),
     );
   });
+
+  test('runtime dependencies are used by app code or explicitly justified', () {
+    final pubspec = File('pubspec.yaml').readAsStringSync();
+    final runtimeDependencies = _directRuntimeDependencies(pubspec);
+    final appSource = Directory('lib')
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.dart'))
+        .map((file) => file.readAsStringSync())
+        .join('\n');
+
+    const sdkDependencies = {'flutter', 'flutter_localizations'};
+    const justifiedWithoutDirectImport = {
+      'cupertino_icons':
+          'Material/adaptive widgets can reference Cupertino glyphs in release builds.',
+    };
+
+    final staleDependencies = <String>[];
+    for (final dependency in runtimeDependencies) {
+      if (sdkDependencies.contains(dependency) ||
+          justifiedWithoutDirectImport.containsKey(dependency)) {
+        continue;
+      }
+
+      if (!appSource.contains('package:$dependency/')) {
+        staleDependencies.add(dependency);
+      }
+    }
+
+    expect(
+      staleDependencies,
+      isEmpty,
+      reason:
+          'Direct runtime dependencies must be imported by lib/ code or have an explicit justification.',
+    );
+  });
+}
+
+Set<String> _directRuntimeDependencies(String pubspec) {
+  final dependenciesHeader = RegExp(
+    r'^dependencies:\s*$',
+    multiLine: true,
+  ).firstMatch(pubspec);
+  final devDependenciesHeader = RegExp(
+    r'^dev_dependencies:\s*$',
+    multiLine: true,
+  ).firstMatch(pubspec);
+
+  if (dependenciesHeader == null || devDependenciesHeader == null) {
+    fail('pubspec.yaml must contain dependencies and dev_dependencies blocks.');
+  }
+
+  final dependenciesBlock = pubspec.substring(
+    dependenciesHeader.end,
+    devDependenciesHeader.start,
+  );
+
+  return RegExp(
+    r'^  ([A-Za-z0-9_]+):',
+    multiLine: true,
+  ).allMatches(dependenciesBlock).map((match) => match.group(1)!).toSet();
 }

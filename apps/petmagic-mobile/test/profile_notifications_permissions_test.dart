@@ -4,12 +4,28 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test(
-    'profile notification settings does not request media permissions',
+    'profile notification settings does not read or request media permissions',
     () async {
       final source = await File(
         'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
       ).readAsString();
 
+      final refreshDeviceBody = _methodBody(
+        source,
+        '_refreshDevicePermissions',
+      );
+
+      expect(
+        refreshDeviceBody,
+        contains('types: const [AppPermissionType.notifications]'),
+      );
+      expect(refreshDeviceBody, isNot(contains('AppPermissionType.camera')));
+      expect(refreshDeviceBody, isNot(contains('AppPermissionType.photos')));
+      expect(refreshDeviceBody, isNot(contains('AppPermissionType.videos')));
+      expect(
+        refreshDeviceBody,
+        isNot(contains('AppPermissionType.microphone')),
+      );
       expect(
         source,
         isNot(contains('requestOnDemand(AppPermissionType.camera)')),

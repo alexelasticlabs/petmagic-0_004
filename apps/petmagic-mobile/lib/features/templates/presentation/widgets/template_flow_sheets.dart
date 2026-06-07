@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_generat
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';

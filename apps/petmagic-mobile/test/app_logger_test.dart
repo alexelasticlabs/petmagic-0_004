@@ -169,7 +169,7 @@ void main() {
 
   test('sanitizes sensitive key value pairs inside nested text', () {
     final sanitized = AppLogger.sanitizeContextForTesting({
-      'payload': {
+      'metadata': {
         'accessToken': 'plain-access-token',
         'refresh_token': 'plain-refresh-token',
         'password': 'hunter2',
@@ -189,7 +189,7 @@ void main() {
           '"username":"pet-parent-42"}',
     });
 
-    final payload = sanitized['payload'] as String;
+    final payload = sanitized['metadata'] as String;
     final json = sanitized['json'] as String;
 
     expect(payload, contains('accessToken: ***'));
@@ -223,6 +223,39 @@ void main() {
     expect(json, isNot(contains('fal-key')));
     expect(json, isNot(contains('cs_test_checkoutSession123')));
     expect(json, isNot(contains('pet-parent-42')));
+  });
+
+  test('redacts full transport payload body and header context', () {
+    final sanitized = AppLogger.sanitizeContextForTesting({
+      'payload': {
+        'petName': 'Rover',
+        'prompt': 'make my pet fly',
+        'signedUrl': 'https://cdn.petmagic.ai/file.jpg?signature=secret',
+      },
+      'requestBody': '{"password":"hunter2","email":"pet.parent@example.com"}',
+      'responseBody': '{"token":"raw-token","status":"failed"}',
+      'providerPayload': '{"apiKey":"fal-secret","prompt":"raw user prompt"}',
+      'headers': {'Authorization': 'Bearer raw-token', 'X-Api-Key': 'raw-key'},
+      'payload_length': 256,
+      'status': 502,
+    });
+
+    expect(sanitized['payload'], '***');
+    expect(sanitized['requestBody'], '***');
+    expect(sanitized['responseBody'], '***');
+    expect(sanitized['providerPayload'], '***');
+    expect(sanitized['headers'], '***');
+    expect(sanitized['payload_length'], 256);
+    expect(sanitized['status'], 502);
+
+    final text = sanitized.toString();
+    expect(text, isNot(contains('Rover')));
+    expect(text, isNot(contains('raw user prompt')));
+    expect(text, isNot(contains('hunter2')));
+    expect(text, isNot(contains('pet.parent@example.com')));
+    expect(text, isNot(contains('raw-token')));
+    expect(text, isNot(contains('raw-key')));
+    expect(text, isNot(contains('signature=secret')));
   });
 
   test('masks standalone checkout session ids embedded in text', () {

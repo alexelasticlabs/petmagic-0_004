@@ -33,10 +33,51 @@ void main() {
         'lib/features/templates/presentation/widgets/template_card.dart',
       ).readAsString();
 
+      expect(source, contains('parseSafeGenerationMediaUri(candidate)'));
+      expect(source, isNot(contains('widget.template.previewAsset!.url;')));
+      expect(
+        source,
+        isNot(
+          contains(
+            '_normalizeTemplateMediaUrl(widget.template.previewAsset!.url) ??',
+          ),
+        ),
+      );
       expect(source, contains('CachedNetworkImage('));
       expect(source, contains('memCacheWidth: cacheWidth'));
       expect(source, contains('maxWidthDiskCache: cacheWidth'));
       expect(source, contains('filterQuality: FilterQuality.medium'));
+    },
+  );
+
+  test(
+    'template flow sheet media URLs are checked before rendering or sharing',
+    () async {
+      final sheetSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
+      ).readAsString();
+      final contentSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
+      ).readAsString();
+
+      expect(
+        sheetSource,
+        contains(
+          "import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';",
+        ),
+      );
+      expect(contentSource, contains('parseSafeGenerationMediaUri('));
+      expect(contentSource, contains('generation.outputUrl'));
+      expect(contentSource, contains('asset?.url'));
+      expect(contentSource, isNot(contains('imageUrl: asset.url')));
+      expect(
+        contentSource,
+        isNot(contains('_NetworkVideoPreview(url: asset.url)')),
+      );
+      expect(
+        contentSource,
+        isNot(contains('VideoPlayerController.networkUrl(Uri.parse(url))')),
+      );
     },
   );
 
