@@ -1,9 +1,14 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+
+using PetMagic.Modules.Economy.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
+    [DbContext(typeof(EconomyDbContext))]
+    [Migration("20260607153000_AddStoreBillingIdempotencyIndexes")]
     public partial class AddStoreBillingIdempotencyIndexes : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)

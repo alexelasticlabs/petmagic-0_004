@@ -28,7 +28,7 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var recentGenerations = await dbContext.TemplateGenerationJobs
+        var recentGenerationRows = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .Join(
@@ -38,19 +38,36 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
                 (generation, template) => new { generation, template })
             .OrderByDescending(x => x.generation.CreatedAtUtc)
             .Take(10)
-            .Select(x => new AdminUserTemplateGenerationResponse(
+            .Select(x => new
+            {
                 x.generation.Id,
                 x.generation.TemplateId,
-                x.template.Title,
-                x.template.TemplateType.ToString(),
-                x.generation.Status.ToString(),
+                TemplateTitle = x.template.Title,
+                TemplateType = x.template.TemplateType,
+                x.generation.Status,
                 x.generation.TokenCost,
-                x.generation.LastErrorCode,
-                x.generation.LastErrorMessage,
-                x.generation.ResultUrl,
+                FailureCode = x.generation.LastErrorCode,
+                FailureMessage = x.generation.LastErrorMessage,
+                OutputUrl = x.generation.ResultUrl,
                 x.generation.CreatedAtUtc,
-                x.generation.CompletedAtUtc))
+                x.generation.CompletedAtUtc
+            })
             .ToListAsync(cancellationToken);
+
+        var recentGenerations = recentGenerationRows
+            .Select(x => new AdminUserTemplateGenerationResponse(
+                x.Id,
+                x.TemplateId,
+                x.TemplateTitle,
+                x.TemplateType.ToString(),
+                x.Status.ToString(),
+                x.TokenCost,
+                x.FailureCode,
+                x.FailureMessage,
+                x.OutputUrl,
+                x.CreatedAtUtc,
+                x.CompletedAtUtc))
+            .ToList();
 
         var failureBreakdown = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
@@ -85,7 +102,7 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var recentTemplateEvents = await dbContext.TemplateAnalyticsEvents
+        var recentTemplateEventRows = await dbContext.TemplateAnalyticsEvents
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .Join(
@@ -95,18 +112,34 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
                 (templateEvent, template) => new { templateEvent, template })
             .OrderByDescending(x => x.templateEvent.CreatedAtUtc)
             .Take(10)
-            .Select(x => new AdminUserTemplateEventResponse(
+            .Select(x => new
+            {
                 x.templateEvent.Id,
                 x.templateEvent.TemplateId,
-                x.template.Title,
+                TemplateTitle = x.template.Title,
                 x.templateEvent.EventType,
                 x.templateEvent.Source,
                 x.templateEvent.DeviceClass,
                 x.templateEvent.CountryCode,
                 x.templateEvent.GenerationId,
                 x.templateEvent.FeedbackMessage,
-                x.templateEvent.CreatedAtUtc))
+                x.templateEvent.CreatedAtUtc
+            })
             .ToListAsync(cancellationToken);
+
+        var recentTemplateEvents = recentTemplateEventRows
+            .Select(x => new AdminUserTemplateEventResponse(
+                x.Id,
+                x.TemplateId,
+                x.TemplateTitle,
+                x.EventType,
+                x.Source,
+                x.DeviceClass,
+                x.CountryCode,
+                x.GenerationId,
+                x.FeedbackMessage,
+                x.CreatedAtUtc))
+            .ToList();
 
         var recentActivity = recentGenerations
             .Select(x => new AdminUserTemplateActivityResponse(

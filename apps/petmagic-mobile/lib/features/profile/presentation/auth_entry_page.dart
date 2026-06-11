@@ -18,7 +18,6 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
-import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -551,11 +550,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       return;
     }
 
-    context.go(
-      launchState.hasSeenOnboarding
-          ? GuestWelcomePage.routePath
-          : OnboardingPage.routePath,
-    );
+    context.go(GuestWelcomePage.routePath);
   }
 
   void _syncControllers(ProfileState state) {

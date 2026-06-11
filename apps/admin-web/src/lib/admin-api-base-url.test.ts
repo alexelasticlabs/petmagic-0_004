@@ -2,6 +2,43 @@ import { describe, expect, it } from "vitest";
 
 import { resolveAdminApiBaseUrl } from "@/lib/admin-api-base-url";
 
+describe("resolveAdminApiBaseUrl", () => {
+  it("rejects localhost public API URLs for production by default", () => {
+    expect(() =>
+      resolveAdminApiBaseUrl({
+        publicApiBaseUrl: "http://localhost:5000",
+        isServer: false,
+        nodeEnv: "production",
+      })
+    ).toThrow("Admin production API base URL cannot point to localhost.");
+  });
+
+  it("allows localhost public API URLs for opted-in local production builds", () => {
+    expect(
+      resolveAdminApiBaseUrl({
+        publicApiBaseUrl: "http://localhost:5000",
+        isServer: false,
+        nodeEnv: "production",
+        allowLocalApiBaseUrlInProduction: true,
+      })
+    ).toBe("http://localhost:5000");
+  });
+
+  it("still rejects non-local HTTP API URLs in production even with opt-in", () => {
+    expect(() =>
+      resolveAdminApiBaseUrl({
+        publicApiBaseUrl: "http://api.example.com",
+        isServer: false,
+        nodeEnv: "production",
+        allowLocalApiBaseUrlInProduction: true,
+      })
+    ).toThrow("Admin production API base URL must use HTTPS.");
+  });
+});
+import { describe, expect, it } from "vitest";
+
+import { resolveAdminApiBaseUrl } from "@/lib/admin-api-base-url";
+
 describe("admin-api-base-url", () => {
   it("uses localhost only outside production when no URL is configured", () => {
     expect(

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -52,6 +51,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
   bool _disposed = false;
+  bool? _isTabActive;
 
   @override
   void initState() {
@@ -65,11 +65,16 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (!mounted) {
         return;
       }
-      _handleScreenBecameVisible(fromAppResume: true);
       if (shouldLoadWallet) {
         unawaited(_walletController.load());
       }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTabVisibility(TickerMode.of(context), fromAppResume: false);
   }
 
   @override
@@ -92,7 +97,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         if (!mounted) {
           return;
         }
-        _handleScreenBecameVisible(fromAppResume: true);
+        _syncTabVisibility(TickerMode.of(context), fromAppResume: true);
       });
       return;
     }
@@ -102,28 +107,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         return;
       }
       _templatesController.setScreenVisible(false);
-    });
-  }
-
-  @override
-  void deactivate() {
-    _runAfterBuild(() {
-      if (!mounted) {
-        return;
-      }
-      _templatesController.setScreenVisible(false);
-    });
-    super.deactivate();
-  }
-
-  @override
-  void activate() {
-    super.activate();
-    _runAfterBuild(() {
-      if (!mounted) {
-        return;
-      }
-      _handleScreenBecameVisible(fromAppResume: false);
     });
   }
 
@@ -139,6 +122,29 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     if (shouldRefresh) {
       unawaited(_refreshFeed());
     }
+  }
+
+  void _syncTabVisibility(bool isTabActive, {required bool fromAppResume}) {
+    if (_isTabActive == isTabActive) {
+      if (isTabActive && fromAppResume) {
+        _handleScreenBecameVisible(fromAppResume: true);
+      }
+      return;
+    }
+
+    _isTabActive = isTabActive;
+    _runAfterBuild(() {
+      if (!mounted) {
+        return;
+      }
+
+      if (!isTabActive) {
+        _templatesController.setScreenVisible(false);
+        return;
+      }
+
+      _handleScreenBecameVisible(fromAppResume: fromAppResume);
+    });
   }
 
   bool _isRefreshStale(DateTime now) {
@@ -192,7 +198,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         },
         color: colors.accent,
         child: CustomScrollView(
-          scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
+          cacheExtent: _gridCacheExtent,
           controller: _scrollController,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
@@ -292,9 +298,15 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                   ),
                   itemBuilder: (context, index) {
                     final template = state.items[index];
+                    final templateIdentity = _templateCardIdentity(
+                      template: template,
+                      renderContextKey: state.query.cacheKey,
+                    );
                     final card = TemplateCard(
+                      key: ValueKey(templateIdentity),
                       template: template,
                       hasPremiumAccess: wallet?.isPremium ?? false,
+                      renderContextKey: state.query.cacheKey,
                       onPressed: () => _handleTemplateSelected(template),
                     );
                     if (index >= 6) {
@@ -302,7 +314,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     }
 
                     return TweenAnimationBuilder<double>(
-                      key: ValueKey('template-item-${template.templateId}'),
+                      key: ValueKey('template-item-$templateIdentity'),
                       tween: Tween(begin: 0, end: 1),
                       duration: Duration(milliseconds: 130 + (index % 6) * 20),
                       curve: Curves.easeOutCubic,
@@ -531,6 +543,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       maxWidth: 1800,
     );
   }
+}
+
+String _templateCardIdentity({
+  required TemplateItem template,
+  required String renderContextKey,
+}) {
+  return '${template.templateId}|${template.mediaIdentity}|$renderContextKey';
 }
 
 String _mapTemplatesError(AppLocalizations text, String raw) {

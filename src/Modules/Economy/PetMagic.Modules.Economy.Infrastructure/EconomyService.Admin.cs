@@ -120,33 +120,51 @@ public sealed partial class EconomyService
             }
         }
 
-        var items = await joined
+        var purchaseRows = await joined
             .OrderByDescending(x => x.order.CreatedAtUtc)
             .ThenByDescending(x => x.order.Id)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
-            .Select(x => new PurchaseHistoryItemResponse(
+            .Select(x => new
+            {
                 x.order.Id,
                 x.order.UserId,
                 x.order.PackId,
-                x.pack.Code,
-                x.pack.DisplayName,
+                PackCode = x.pack.Code,
+                PackDisplayName = x.pack.DisplayName,
                 x.order.PaymentProvider,
                 x.order.Status,
                 x.order.PriceAmount,
                 x.order.CurrencyCode,
                 x.order.SparkToGrant,
-                null,
+                x.order.ExternalPaymentId,
                 x.order.CreatedAtUtc,
-                x.order.ConfirmedAtUtc,
-                x.order.PaymentProvider == "stripe"
-                    && x.order.Status == PurchaseOrderStatus.Succeeded
-                    && x.order.ExternalPaymentId != null
-                    && x.order.ExternalPaymentId != string.Empty,
-                "TokenPack",
-                x.order.SparkToGrant,
-                x.order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
+                x.order.ConfirmedAtUtc
+            })
             .ToListAsync(cancellationToken);
+
+        var items = purchaseRows
+            .Select(x => new PurchaseHistoryItemResponse(
+                x.Id,
+                x.UserId,
+                x.PackId,
+                x.PackCode,
+                x.PackDisplayName,
+                x.PaymentProvider,
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.SparkToGrant,
+                null,
+                x.CreatedAtUtc,
+                x.ConfirmedAtUtc,
+                x.PaymentProvider == "stripe"
+                    && x.Status == PurchaseOrderStatus.Succeeded
+                    && !string.IsNullOrWhiteSpace(x.ExternalPaymentId),
+                "TokenPack",
+                x.SparkToGrant,
+                x.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
+            .ToList();
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
     }
@@ -361,32 +379,32 @@ public sealed partial class EconomyService
         }
 
         var items = await joined
-            .Select(x => new AdminUserSubscriptionResponse(
-                    x.subscription.Id,
-                    x.subscription.UserId,
-                    x.subscription.Provider,
-                    x.subscription.PurchaseChannel,
-                    x.subscription.Region,
-                    x.subscription.PlanId,
-                    x.plan != null ? x.plan.Name : null,
-                    x.subscription.Status,
-                    x.subscription.CurrentPeriodStartUtc,
-                    x.subscription.CurrentPeriodEndUtc,
-                    x.subscription.CancelAtPeriodEnd,
-                    x.subscription.MonthlyTokenLimit,
-                    x.subscription.MonthlyTokensGranted,
-                    x.subscription.LastTokenGrantAtUtc,
-                    x.subscription.CreatedAtUtc,
-                    x.subscription.UpdatedAtUtc,
-                    x.subscription.ProductId,
-                    !x.subscription.CancelAtPeriodEnd,
-                    x.subscription.CancelledAtUtc,
-                    x.subscription.ExpiredAtUtc,
-                    x.subscription.LastValidatedAtUtc))
-            .OrderByDescending(x => x.UpdatedAtUtc)
-            .ThenByDescending(x => x.SubscriptionId)
+            .OrderByDescending(x => x.subscription.UpdatedAtUtc)
+            .ThenByDescending(x => x.subscription.Id)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
+            .Select(x => new AdminUserSubscriptionResponse(
+            x.subscription.Id,
+            x.subscription.UserId,
+            x.subscription.Provider,
+            x.subscription.PurchaseChannel,
+            x.subscription.Region,
+            x.subscription.PlanId,
+            x.plan != null ? x.plan.Name : null,
+            x.subscription.Status,
+            x.subscription.CurrentPeriodStartUtc,
+            x.subscription.CurrentPeriodEndUtc,
+            x.subscription.CancelAtPeriodEnd,
+            x.subscription.MonthlyTokenLimit,
+            x.subscription.MonthlyTokensGranted,
+            x.subscription.LastTokenGrantAtUtc,
+            x.subscription.CreatedAtUtc,
+            x.subscription.UpdatedAtUtc,
+            x.subscription.ProductId,
+            !x.subscription.CancelAtPeriodEnd,
+            x.subscription.CancelledAtUtc,
+            x.subscription.ExpiredAtUtc,
+            x.subscription.LastValidatedAtUtc))
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));

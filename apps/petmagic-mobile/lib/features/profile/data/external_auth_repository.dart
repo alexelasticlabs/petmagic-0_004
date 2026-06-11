@@ -161,17 +161,13 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
       final authentication = await account.authentication;
       final idToken = authentication.idToken;
-      final serverAuthCode = account.serverAuthCode;
-      if (idToken == null ||
-          idToken.isEmpty ||
-          serverAuthCode == null ||
-          serverAuthCode.isEmpty) {
+      if (idToken == null || idToken.isEmpty) {
         throw const AppException(_genericFailedCode);
       }
 
       final response = await _dio.post<Map<String, dynamic>>(
-        '/api/auth/google',
-        data: {'idToken': idToken, 'serverAuthCode': serverAuthCode},
+        '/api/auth/external/google/native',
+        data: {'idToken': idToken},
         options: Options(headers: {'X-Client-Platform': 'mobile'}),
       );
 

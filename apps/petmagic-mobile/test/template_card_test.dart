@@ -152,6 +152,187 @@ void main() {
     expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('TemplateCard keeps video preview alive while tab is offstage', (
+    tester,
+  ) async {
+    final template = _videoTemplate(
+      id: 'video-template-hidden-tab',
+      previewUrl: 'https://cdn.example.com/templates/hidden-tab-preview.mp4',
+    );
+
+    await tester.pumpWidget(
+      _TickerModeHost(
+        child: _buildHost(
+          template,
+          previewControllerFactory: (previewUrl) async =>
+              VideoPlayerController.networkUrl(Uri.parse(previewUrl)),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    _showTemplateCard(tester);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(fakePlatform.createCalls, equals(1));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(1));
+
+    final hostState = tester.state<_TickerModeHostState>(
+      find.byType(_TickerModeHost),
+    );
+    hostState.setEnabled(false);
+    await tester.pump();
+
+    final detector = tester.widget<VisibilityDetector>(
+      find.byType(VisibilityDetector),
+    );
+    detector.onVisibilityChanged?.call(
+      VisibilityInfo(
+        key: detector.key!,
+        size: const Size(320, 240),
+        visibleBounds: Rect.zero,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 1000));
+
+    expect(fakePlatform.disposeCalls, equals(0));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(1));
+
+    hostState.setEnabled(true);
+    await tester.pump();
+    _showTemplateCard(tester);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(fakePlatform.createCalls, equals(1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(MediaLifecyclePolicy.activeVideoPreviews, equals(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TemplateCard resets stale preview state when media changes', (
+    tester,
+  ) async {
+    final firstTemplate = _videoTemplate(
+      id: 'video-template-stale',
+      previewUrl: 'https://cdn.example.com/templates/stale-preview.mp4',
+    );
+    final secondTemplate = _videoTemplate(
+      id: firstTemplate.templateId,
+      previewUrl: 'https://cdn.example.com/templates/recovered-preview.mp4',
+    );
+
+    await tester.pumpWidget(
+      _buildHost(
+        firstTemplate,
+        previewControllerFactory: (previewUrl) async =>
+            VideoPlayerController.networkUrl(Uri.parse(previewUrl)),
+      ),
+    );
+    await tester.pump();
+    _showTemplateCard(tester);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(fakePlatform.createCalls, equals(1));
+    expect(fakePlatform.createdUris, [firstTemplate.previewAsset!.url]);
+
+    await tester.pumpWidget(
+      _buildHost(
+        secondTemplate,
+        previewControllerFactory: (previewUrl) async =>
+            VideoPlayerController.networkUrl(Uri.parse(previewUrl)),
+      ),
+    );
+    await tester.pump();
+    _showTemplateCard(tester);
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(fakePlatform.createCalls, equals(2));
+    expect(fakePlatform.createdUris, [
+      firstTemplate.previewAsset!.url,
+      secondTemplate.previewAsset!.url,
+    ]);
+  });
+
+  testWidgets(
+    'TemplateCard image subtree identity changes with filter context',
+    (tester) async {
+      final template = _imageTemplate();
+
+      await tester.pumpWidget(
+        _buildHost(template, renderContextKey: 'all|all||20'),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey(
+            'template-image-${template.templateId}'
+            '-${template.mediaIdentity}'
+            '-all|all||20-0',
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pumpWidget(
+        _buildHost(template, renderContextKey: 'all|portrait||20'),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey(
+            'template-image-${template.templateId}'
+            '-${template.mediaIdentity}'
+            '-all|portrait||20-1',
+          ),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'TemplateCard resets media subtree token when filter context changes',
+    (tester) async {
+      final template = _imageTemplate();
+
+      await tester.pumpWidget(
+        _buildHost(template, renderContextKey: 'all|all||20'),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey(
+            'template-image-${template.templateId}'
+            '-${template.mediaIdentity}'
+            '-all|all||20-0',
+          ),
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pumpWidget(
+        _buildHost(template, renderContextKey: 'all|portrait||20'),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(
+          ValueKey(
+            'template-image-${template.templateId}'
+            '-${template.mediaIdentity}'
+            '-all|portrait||20-1',
+          ),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 }
 
 void _showTemplateCard(WidgetTester tester) {
@@ -172,6 +353,7 @@ Widget _buildHost(
   TemplateItem template, {
   Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory,
+  String renderContextKey = 'all|all||20',
 }) {
   return MaterialApp(
     theme: AppTheme.light(),
@@ -185,6 +367,7 @@ Widget _buildHost(
           child: TemplateCard(
             template: template,
             hasPremiumAccess: true,
+            renderContextKey: renderContextKey,
             previewControllerFactory: previewControllerFactory,
           ),
         ),
@@ -214,6 +397,29 @@ TemplateItem _videoTemplate({
       durationSeconds: 6,
     ),
     referenceVideoDurationSeconds: 6,
+  );
+}
+
+TemplateItem _imageTemplate({
+  String id = 'image-template-test',
+  String previewUrl = 'https://cdn.example.com/templates/test-preview.jpg',
+}) {
+  return TemplateItem(
+    templateId: id,
+    templateType: TemplateType.image,
+    title: 'Image Template',
+    shortDescription: 'Template card image lifecycle test',
+    petPhotoRequirements: const <String>['Clear pet photo'],
+    category: 'test',
+    tags: const <String>['viewport', 'image'],
+    isPremium: false,
+    tokenCost: 5,
+    thumbnailUrl: previewUrl,
+    previewAsset: TemplateAsset(
+      url: previewUrl,
+      fileName: 'test-preview.jpg',
+      contentType: 'image/jpeg',
+    ),
   );
 }
 
@@ -311,5 +517,29 @@ class _FakeVideoPlayerPlatform extends VideoPlayerPlatform {
   Future<void> dispose(int playerId) async {
     disposeCalls += 1;
     await _eventsByPlayerId.remove(playerId)?.close();
+  }
+}
+
+class _TickerModeHost extends StatefulWidget {
+  const _TickerModeHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_TickerModeHost> createState() => _TickerModeHostState();
+}
+
+class _TickerModeHostState extends State<_TickerModeHost> {
+  bool _enabled = true;
+
+  void setEnabled(bool enabled) {
+    setState(() {
+      _enabled = enabled;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TickerMode(enabled: _enabled, child: widget.child);
   }
 }

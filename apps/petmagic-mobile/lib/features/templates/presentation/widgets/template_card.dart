@@ -20,6 +20,7 @@ class TemplateCard extends StatefulWidget {
   const TemplateCard({
     required this.template,
     required this.hasPremiumAccess,
+    required this.renderContextKey,
     this.onPressed,
     this.showGuestPreview = false,
     this.previewControllerFactory,
@@ -28,6 +29,7 @@ class TemplateCard extends StatefulWidget {
 
   final TemplateItem template;
   final bool hasPremiumAccess;
+  final String renderContextKey;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
   final Future<VideoPlayerController> Function(String previewUrl)?
@@ -38,7 +40,7 @@ class TemplateCard extends StatefulWidget {
 }
 
 class _TemplateCardState extends State<TemplateCard> {
-  static const Duration _disposeDelay = Duration(milliseconds: 120);
+  static const Duration _disposeDelay = Duration(milliseconds: 900);
   static const double _prewarmVisibilityFraction = 0.28;
   static const double _playVisibilityFraction = 0.58;
 
@@ -56,8 +58,16 @@ class _TemplateCardState extends State<TemplateCard> {
   void didUpdateWidget(covariant TemplateCard oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.template.templateId != widget.template.templateId) {
+    final mediaChanged =
+        oldWidget.template.templateId != widget.template.templateId ||
+        oldWidget.template.mediaIdentity != widget.template.mediaIdentity;
+    final renderContextChanged =
+        oldWidget.renderContextKey != widget.renderContextKey;
+
+    if (mediaChanged || renderContextChanged) {
       _isPreviewActive = false;
+      _videoLoadFailed = false;
+      _previewRetryToken = renderContextChanged ? _previewRetryToken + 1 : 0;
       _disposeTimer?.cancel();
       unawaited(_disposeVideoController());
     }
@@ -97,7 +107,11 @@ class _TemplateCardState extends State<TemplateCard> {
       scale: _isPressed ? 0.986 : 1,
       child: RepaintBoundary(
         child: VisibilityDetector(
-          key: ValueKey('template-card-${widget.template.templateId}'),
+          key: ValueKey(
+            'template-card-${widget.template.templateId}'
+            '-${widget.template.mediaIdentity}'
+            '-${widget.renderContextKey}',
+          ),
           onVisibilityChanged: _handleVisibility,
           child: DecoratedBox(
             decoration: widget.template.isPremium
@@ -177,6 +191,7 @@ class _TemplateCardState extends State<TemplateCard> {
                         children: [
                           _TemplateMedia(
                             template: widget.template,
+                            renderContextKey: widget.renderContextKey,
                             controller: _videoController,
                             videoLoadFailed: _videoLoadFailed,
                             previewRetryToken: _previewRetryToken,
@@ -245,6 +260,10 @@ class _TemplateCardState extends State<TemplateCard> {
     if (visibleFraction <= 0) {
       _isPreviewActive = false;
       _disposeTimer?.cancel();
+      if (!TickerMode.of(context)) {
+        unawaited(_syncPlaybackState());
+        return;
+      }
       unawaited(_syncPlaybackState());
       unawaited(_disposeVideoController());
       return;
@@ -461,6 +480,7 @@ class _TemplateCardState extends State<TemplateCard> {
 class _TemplateMedia extends StatelessWidget {
   const _TemplateMedia({
     required this.template,
+    required this.renderContextKey,
     required this.controller,
     required this.videoLoadFailed,
     required this.previewRetryToken,
@@ -468,6 +488,7 @@ class _TemplateMedia extends StatelessWidget {
   });
 
   final TemplateItem template;
+  final String renderContextKey;
   final VideoPlayerController? controller;
   final bool videoLoadFailed;
   final int previewRetryToken;
@@ -513,7 +534,10 @@ class _TemplateMedia extends StatelessWidget {
             else if (imageUrl != null)
               _TemplateImageWithFallback(
                 key: ValueKey(
-                  'template-image-${template.templateId}-$previewRetryToken',
+                  'template-image-${template.templateId}'
+                  '-${template.mediaIdentity}'
+                  '-$renderContextKey'
+                  '-$previewRetryToken',
                 ),
                 imageUrl: imageUrl,
                 cacheWidth: cacheWidth,
@@ -558,26 +582,44 @@ class _TemplateImageWithFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: CachedNetworkImage(
-        imageUrl: imageUrl,
+    final cachedProvider = ResizeImage.resizeIfNeeded(
+      cacheWidth,
+      null,
+      CachedNetworkImageProvider(
+        imageUrl,
         cacheManager: TemplateMediaCache.thumbnailCache,
-        memCacheWidth: cacheWidth,
-        maxWidthDiskCache: cacheWidth,
-        placeholder: (context, url) => const _MediaSkeletonPlaceholder(),
-        fadeInDuration: const Duration(milliseconds: 260),
-        fadeOutDuration: const Duration(milliseconds: 100),
-        imageBuilder: (context, imageProvider) =>
-            _CoverImageFill(imageProvider: imageProvider),
-        errorWidget: (context, url, error) {
-          unawaited(TemplateMediaCache.thumbnailCache.removeFile(url));
-          return _CoverNetworkImageFill(
-            imageUrl: url,
-            cacheWidth: cacheWidth,
-            isVideoTemplate: isVideoTemplate,
-            onRetry: onRetry,
-          );
-        },
+        maxWidth: cacheWidth,
+      ),
+    );
+
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const _MediaSkeletonPlaceholder(),
+          Image(
+            image: cachedProvider,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+              final isReady = wasSynchronouslyLoaded || frame != null;
+              return AnimatedOpacity(
+                opacity: isReady ? 1 : 0,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                child: child,
+              );
+            },
+            errorBuilder: (context, error, stackTrace) =>
+                _TemplateNetworkImageFallback(
+                  imageUrl: imageUrl,
+                  cacheWidth: cacheWidth,
+                  isVideoTemplate: isVideoTemplate,
+                  onRetry: onRetry,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -605,8 +647,8 @@ class _CoverImageFill extends StatelessWidget {
   }
 }
 
-class _CoverNetworkImageFill extends StatelessWidget {
-  const _CoverNetworkImageFill({
+class _TemplateNetworkImageFallback extends StatelessWidget {
+  const _TemplateNetworkImageFallback({
     required this.imageUrl,
     required this.cacheWidth,
     required this.isVideoTemplate,
@@ -620,20 +662,31 @@ class _CoverNetworkImageFill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CachedNetworkImage(
-      imageUrl: imageUrl,
-      fit: BoxFit.cover,
-      alignment: Alignment.center,
-      width: double.infinity,
-      height: double.infinity,
-      memCacheWidth: cacheWidth,
-      maxWidthDiskCache: cacheWidth,
-      filterQuality: FilterQuality.medium,
-      placeholder: (context, url) => const _MediaSkeletonPlaceholder(),
-      fadeInDuration: const Duration(milliseconds: 220),
-      fadeOutDuration: const Duration(milliseconds: 100),
-      errorWidget: (context, url, error) =>
-          _MediaErrorPlaceholder(isVideo: isVideoTemplate, onRetry: onRetry),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const _MediaSkeletonPlaceholder(),
+        Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          cacheWidth: cacheWidth,
+          filterQuality: FilterQuality.medium,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            final isReady = wasSynchronouslyLoaded || frame != null;
+            return AnimatedOpacity(
+              opacity: isReady ? 1 : 0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              child: child,
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => _MediaErrorPlaceholder(
+            isVideo: isVideoTemplate,
+            onRetry: onRetry,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1072,7 +1125,7 @@ class _MediaErrorPlaceholder extends StatelessWidget {
       ),
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1093,24 +1146,36 @@ class _MediaErrorPlaceholder extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: colors.textSoft,
+                  fontSize: 12.4,
                   fontWeight: FontWeight.w700,
                 ),
               ),
               if (onRetry != null) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: onRetry,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(110, 34),
-                    side: BorderSide(
-                      color: colors.accent.withValues(alpha: 0.38),
+                const SizedBox(height: 6),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colors.surfaceGlass.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: colors.accent.withValues(alpha: 0.2),
                     ),
                   ),
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: Text(
-                    _isRu(context) ? 'Повторить' : text.retryAction,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                  child: TextButton.icon(
+                    onPressed: onRetry,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                    ),
+                    icon: const Icon(Icons.refresh_rounded, size: 16),
+                    label: Text(
+                      _isRu(context) ? 'Повторить' : text.retryAction,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: colors.textSoft,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),

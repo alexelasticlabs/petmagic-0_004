@@ -260,9 +260,6 @@ class TemplatesController extends Notifier<TemplatesState> {
     final requestVersion = ++_requestVersion;
     final query = state.query.copyWith(clearCursor: true, resetPage: true);
     final queryKey = query.cacheKey;
-    final isStaleVisibleItems = state.itemsQueryKey != null
-        ? state.itemsQueryKey != queryKey
-        : state.items.isNotEmpty;
 
     if (!forceRefresh) {
       final inMemoryCached = state.cachedPagesByQueryKey[queryKey];
@@ -281,21 +278,7 @@ class TemplatesController extends Notifier<TemplatesState> {
         _resumePendingRealtimeRefreshIfNeeded();
         return;
       }
-    }
 
-    state = state.copyWith(
-      query: query,
-      items: isStaleVisibleItems ? const [] : state.items,
-      clearItemsQueryKey: isStaleVisibleItems,
-      isLoading: !forceRefresh,
-      isRefreshing: forceRefresh,
-      loadedFromCache: false,
-      clearError: true,
-      currentPage: 1,
-      hasMore: true,
-    );
-
-    if (!forceRefresh) {
       final cached = await _repository.readCachedFirstPage(query);
       if (cached != null && requestVersion == _requestVersion) {
         final updatedCache = Map<String, TemplatesFeedPage>.from(
@@ -309,9 +292,32 @@ class TemplatesController extends Notifier<TemplatesState> {
           hasMore: cached.hasMore,
           loadedFromCache: true,
           isLoading: false,
+          isRefreshing: false,
+          clearError: true,
         );
+        if (state.categories.isEmpty) {
+          unawaited(_refreshCategories(requestVersion));
+        }
+        _resumePendingRealtimeRefreshIfNeeded();
+        return;
       }
     }
+
+    final isStaleVisibleItems = state.itemsQueryKey != null
+        ? state.itemsQueryKey != queryKey
+        : state.items.isNotEmpty;
+
+    state = state.copyWith(
+      query: query,
+      items: isStaleVisibleItems ? const [] : state.items,
+      clearItemsQueryKey: isStaleVisibleItems,
+      isLoading: !forceRefresh,
+      isRefreshing: forceRefresh,
+      loadedFromCache: false,
+      clearError: true,
+      currentPage: 1,
+      hasMore: true,
+    );
 
     try {
       final resolvedCatalogVersion = await _repository.syncCatalog(

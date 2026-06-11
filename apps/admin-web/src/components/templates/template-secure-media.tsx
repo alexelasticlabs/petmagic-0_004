@@ -33,6 +33,19 @@ function isLocalObjectUrl(url: string) {
   return url.startsWith("blob:") || url.startsWith("data:");
 }
 
+function shouldUseDirectMediaUrl(url: string) {
+  if (typeof globalThis.location === "undefined") {
+    return false;
+  }
+
+  try {
+    const candidate = new URL(url, globalThis.location.href);
+    return candidate.origin !== globalThis.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 export function TemplateSecureMedia({
   url,
   kind,
@@ -53,14 +66,16 @@ export function TemplateSecureMedia({
   logContext,
 }: TemplateSecureMediaProps) {
   const localObjectUrl = isLocalObjectUrl(url) ? url : null;
+  const directMediaUrl = !localObjectUrl && shouldUseDirectMediaUrl(url) ? url : null;
   const [remoteMedia, setRemoteMedia] = useState<{
     sourceUrl: string;
     objectUrl: string | null;
     failed: boolean;
   }>({ sourceUrl: "", objectUrl: null, failed: false });
-  const objectUrl =
-    localObjectUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
-  const loadFailed = !localObjectUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
+  const resolvedUrl =
+    localObjectUrl ?? directMediaUrl ?? (remoteMedia.sourceUrl === url ? remoteMedia.objectUrl : null);
+  const loadFailed =
+    !localObjectUrl && !directMediaUrl && remoteMedia.sourceUrl === url && remoteMedia.failed;
   const onLoadFailedRef = useRef(onLoadFailed);
 
   useEffect(() => {
@@ -68,7 +83,7 @@ export function TemplateSecureMedia({
   }, [onLoadFailed]);
 
   useEffect(() => {
-    if (localObjectUrl) {
+    if (localObjectUrl || directMediaUrl) {
       return;
     }
 
@@ -127,6 +142,7 @@ export function TemplateSecureMedia({
       }
     };
   }, [
+    directMediaUrl,
     kind,
     localObjectUrl,
     logContext?.contentType,
@@ -135,7 +151,7 @@ export function TemplateSecureMedia({
     url,
   ]);
 
-  if (!objectUrl) {
+  if (!resolvedUrl) {
     return (
       <span
         className={className}
@@ -150,7 +166,7 @@ export function TemplateSecureMedia({
   if (kind === "video") {
     return (
       <video
-        src={objectUrl}
+        src={resolvedUrl}
         className={className}
         controls={controls}
         muted={muted}
@@ -166,9 +182,9 @@ export function TemplateSecureMedia({
   }
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- Template media URLs may be signed; render only fetched blob URLs in the DOM.
+    // eslint-disable-next-line @next/next/no-img-element -- Signed/local template media stays behind blob URLs; public cross-origin media can render directly.
     <img
-      src={objectUrl}
+      src={resolvedUrl}
       alt={alt}
       className={className}
       width={width}

@@ -59,14 +59,14 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Results<Ok<OffsetPagedResponse<WalletLedgerItemResponse>>, ProblemHttpResult>> GetWalletLedgerAsync(
-        [FromQuery] int skip,
-        [FromQuery] int take,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         [FromQuery] string? source,
         [FromQuery] Guid? userId,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminWalletLedgerAsync(skip, take, source, userId, cancellationToken);
+        var result = await service.GetAdminWalletLedgerAsync(skip ?? 0, take ?? 50, source, userId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -84,8 +84,8 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Results<Ok<OffsetPagedResponse<PurchaseHistoryItemResponse>>, ProblemHttpResult>> GetPurchasesAsync(
-        [FromQuery] int skip,
-        [FromQuery] int take,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         [FromQuery] string? status,
         [FromQuery] string? provider,
         [FromQuery] string? search,
@@ -93,7 +93,7 @@ public static class AdminEconomyEndpoints
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminPurchaseHistoryAsync(skip, take, status, provider, search, userId, cancellationToken);
+        var result = await service.GetAdminPurchaseHistoryAsync(skip ?? 0, take ?? 50, status, provider, search, userId, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -190,15 +190,15 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Results<Ok<OffsetPagedResponse<AdminUserSubscriptionResponse>>, ProblemHttpResult>> GetSubscriptionsAsync(
-        [FromQuery] int skip,
-        [FromQuery] int take,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         [FromQuery] string? status,
         [FromQuery] string? provider,
         [FromQuery] string? search,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminSubscriptionsAsync(skip, take, status, provider, search, cancellationToken);
+        var result = await service.GetAdminSubscriptionsAsync(skip ?? 0, take ?? 50, status, provider, search, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
@@ -224,14 +224,14 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Results<Ok<OffsetPagedResponse<AdminSubscriptionEventResponse>>, ProblemHttpResult>> GetSubscriptionEventsAsync(
-        [FromQuery] int skip,
-        [FromQuery] int take,
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         [FromQuery] string? provider,
         [FromQuery] string? status,
         [FromServices] IEconomyService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.GetAdminSubscriptionEventsAsync(skip, take, provider, status, cancellationToken);
+        var result = await service.GetAdminSubscriptionEventsAsync(skip ?? 0, take ?? 50, provider, status, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);

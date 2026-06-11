@@ -25,6 +25,8 @@ void main() {
 
       expect(buildBody, contains('_isScreenVisible = false;'));
       expect(buildBody, contains('if (!ref.mounted)'));
+      expect(buildBody, isNot(contains('_startAutoRefresh();')));
+      expect(buildBody, contains('if (!_isScreenVisible)'));
       expect(loadBody, contains('if (!ref.mounted)'));
       expect(
         autoRefreshBody,
@@ -32,7 +34,7 @@ void main() {
       );
       expect(autoRefreshBody, contains('if (!ref.mounted)'));
       expect(offlineBannerBody, contains('if (!ref.mounted)'));
-      expect(unreadBody, contains('if (!ref.mounted)'));
+      expect(unreadBody, contains('if (!ref.mounted || !_isScreenVisible)'));
       expect(markReadBody, contains('if (!ref.mounted)'));
       expect(
         markReadBody.indexOf('await _repository.markGenerationRead'),

@@ -30,6 +30,7 @@ import {
 import { type Locale, getDictionary } from "@/lib/i18n";
 import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 import { useSupportRealtime } from "@/lib/support-realtime";
+import { getSupportUnreadCount } from "@/lib/support-unread-count";
 import {
   type AdminTheme,
   applyAdminTheme,
@@ -124,7 +125,7 @@ export function AdminShell({ locale, children }: AdminShellProps) {
       dedupeKey: `${event.conversationId}:${event.updatedAtUtc}`,
     });
   });
-  const supportUnreadCount = inboxMetricsQuery.data?.unreadForAdminConversations ?? 0;
+  const supportUnreadCount = getSupportUnreadCount(inboxMetricsQuery.data);
 
   /* Admin panel state */
   const [sidebarOpen, setSidebarOpen] = useState(false);

@@ -136,9 +136,13 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web build}"
         INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web build}"
+        ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
+        NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
     environment:
       NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:?NEXT_PUBLIC_API_BASE_URL is required for admin web runtime}"
       INTERNAL_API_BASE_URL: "${INTERNAL_API_BASE_URL:?INTERNAL_API_BASE_URL is required for admin web runtime}"
+      ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
+      NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION: "true"
     ports:
       - "${ADMIN_WEB_HOST_PORT:-3000}:3000"
     depends_on:

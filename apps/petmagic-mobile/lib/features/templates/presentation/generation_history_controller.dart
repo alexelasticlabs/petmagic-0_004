@@ -104,7 +104,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;
-  bool _isScreenVisible = true;
+  bool _isScreenVisible = false;
   bool _isRealtimeConnected = false;
   bool _isLoadInFlight = false;
   int _autoRefreshFailureStreak = 0;
@@ -113,7 +113,6 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   GenerationHistoryState build() {
     ref.watch(templateGenerationRepositoryProvider);
     ref.watch(realtimeClientProvider);
-    _startAutoRefresh();
     ref.onDispose(() {
       _isScreenVisible = false;
       _offlineBannerTimer?.cancel();
@@ -135,6 +134,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       if (cachedUnread != null) {
         state = state.copyWith(unreadCount: cachedUnread);
       }
+      if (!_isScreenVisible) {
+        return;
+      }
+
       await refreshUnreadCount();
     });
     return const GenerationHistoryState();
@@ -350,6 +353,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   Future<void> refreshUnreadCount() async {
+    if (!ref.mounted || !_isScreenVisible) {
+      return;
+    }
+
     try {
       final unreadCount = await _repository.fetchUnreadGenerationCount();
       if (!ref.mounted) {

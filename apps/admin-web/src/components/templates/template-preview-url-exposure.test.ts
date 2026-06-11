@@ -18,7 +18,9 @@ const analyticsHubPath = fileURLToPath(
 const previewAssetSectionPath = fileURLToPath(
   new URL("./template-preview-asset-section.tsx", import.meta.url)
 );
-const editorSectionsPath = fileURLToPath(new URL("./template-editor-sections.tsx", import.meta.url));
+const editorSectionsPath = fileURLToPath(
+  new URL("./template-editor-sections.tsx", import.meta.url)
+);
 const templateTestPath = fileURLToPath(new URL("./template-test-page.tsx", import.meta.url));
 const secureMediaPath = fileURLToPath(new URL("./template-secure-media.tsx", import.meta.url));
 
@@ -47,6 +49,8 @@ describe("template preview media URL exposure", () => {
     expect(sources).not.toContain("value={form.referenceUrl}");
     expect(sources).toContain("<TemplateSecureMedia");
     expect(secureMediaSource).toContain("URL.createObjectURL(blob)");
+    expect(secureMediaSource).toContain("function shouldUseDirectMediaUrl(url: string)");
+    expect(secureMediaSource).toContain("candidate.origin !== globalThis.location.origin");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
   });

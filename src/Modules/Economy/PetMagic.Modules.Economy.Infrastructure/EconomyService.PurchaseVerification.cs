@@ -22,7 +22,7 @@ public sealed partial class EconomyService
         var normalizedSkip = Math.Max(0, skip);
         var normalizedTake = NormalizeTake(take, 20, 100);
 
-        var items = await dbContext.PurchaseOrders
+        var purchaseRows = await dbContext.PurchaseOrders
             .AsNoTracking()
             .Where(x => x.UserId == userId)
             .Join(
@@ -34,25 +34,44 @@ public sealed partial class EconomyService
             .ThenByDescending(x => x.order.Id)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
-            .Select(x => new PurchaseHistoryItemResponse(
+            .Select(x => new
+            {
                 x.order.Id,
                 x.order.UserId,
                 x.order.PackId,
-                x.pack.Code,
-                x.pack.DisplayName,
+                PackCode = x.pack.Code,
+                PackDisplayName = x.pack.DisplayName,
                 x.order.PaymentProvider,
                 x.order.Status,
                 x.order.PriceAmount,
                 x.order.CurrencyCode,
                 x.order.SparkToGrant,
-                x.order.PaymentProvider == "stripe" ? x.order.ExternalPaymentId : null,
+                x.order.ExternalPaymentId,
                 x.order.CreatedAtUtc,
-                x.order.ConfirmedAtUtc,
+                x.order.ConfirmedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+
+        var items = purchaseRows
+            .Select(x => new PurchaseHistoryItemResponse(
+                x.Id,
+                x.UserId,
+                x.PackId,
+                x.PackCode,
+                x.PackDisplayName,
+                x.PaymentProvider,
+                x.Status,
+                x.PriceAmount,
+                x.CurrencyCode,
+                x.SparkToGrant,
+                x.PaymentProvider == "stripe" ? x.ExternalPaymentId : null,
+                x.CreatedAtUtc,
+                x.ConfirmedAtUtc,
                 false,
                 "TokenPack",
-                x.order.SparkToGrant,
-                x.order.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
-            .ToListAsync(cancellationToken);
+                x.SparkToGrant,
+                x.Status == PurchaseOrderStatus.Refunded ? "refunded" : "none"))
+            .ToList();
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
     }

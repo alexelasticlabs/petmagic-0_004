@@ -2,9 +2,16 @@ import type { NextConfig } from "next";
 
 type ImageRemotePatterns = NonNullable<NextConfig["images"]>["remotePatterns"];
 
+function shouldAllowLocalApiBaseUrlInProduction(
+  rawValue = process.env.ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
+): boolean {
+  return rawValue?.trim().toLowerCase() === "true";
+}
+
 function normalizeConfiguredApiBaseUrl(
   configuredApiBaseUrl: string | undefined,
-  nodeEnv = process.env.NODE_ENV
+  nodeEnv = process.env.NODE_ENV,
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
 ): URL | null {
   const normalized = configuredApiBaseUrl?.trim();
   if (!normalized) {
@@ -18,11 +25,13 @@ function normalizeConfiguredApiBaseUrl(
   const parsed = new URL(normalized);
   assertApiBaseUrlShape(parsed);
   if (nodeEnv === "production") {
-    if (isLocalDevelopmentHost(parsed.hostname)) {
+    const isLocalHost = isLocalDevelopmentHost(parsed.hostname);
+
+    if (isLocalHost && !allowLocalApiBaseUrlInProduction) {
       throw new Error("Admin production API base URL cannot point to localhost.");
     }
 
-    if (parsed.protocol !== "https:") {
+    if (parsed.protocol !== "https:" && !(allowLocalApiBaseUrlInProduction && isLocalHost)) {
       throw new Error("Admin production API base URL must use HTTPS.");
     }
   }
@@ -52,9 +61,14 @@ function isLocalDevelopmentHost(hostname: string): boolean {
 
 export function apiImageRemotePatterns(
   configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL,
-  nodeEnv = process.env.NODE_ENV
+  nodeEnv = process.env.NODE_ENV,
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction()
 ): ImageRemotePatterns {
-  const parsedApiBaseUrl = normalizeConfiguredApiBaseUrl(configuredApiBaseUrl, nodeEnv);
+  const parsedApiBaseUrl = normalizeConfiguredApiBaseUrl(
+    configuredApiBaseUrl,
+    nodeEnv,
+    allowLocalApiBaseUrlInProduction
+  );
   const patterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [];
 
   if (parsedApiBaseUrl) {

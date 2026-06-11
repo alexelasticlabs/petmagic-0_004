@@ -47,6 +47,8 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     with WidgetsBindingObserver {
   bool _readyExpanded = false;
   bool _isMediaActionInFlight = false;
+  bool _hasLoadedInitially = false;
+  bool? _isTabActive;
   CancelToken? _activeMediaActionCancelToken;
   late final GenerationHistoryController _historyController;
   late final WalletController _walletController;
@@ -56,9 +58,6 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     super.initState();
     _historyController = ref.read(generationHistoryControllerProvider.notifier);
     _walletController = ref.read(walletControllerProvider.notifier);
-    _historyController.setScreenVisible(
-      ref.read(appLaunchControllerProvider).isAuthenticated,
-    );
     WidgetsBinding.instance.addObserver(this);
     Future.microtask(() async {
       if (!mounted) {
@@ -70,15 +69,13 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       if (launch.isAuthenticated && !hasWallet) {
         unawaited(_walletController.load());
       }
-
-      if (!launch.isAuthenticated) {
-        _historyController.setScreenVisible(false);
-        return;
-      }
-
-      _historyController.setScreenVisible(true);
-      await _historyController.load();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTabVisibility(TickerMode.of(context), fromAppResume: false);
   }
 
   @override
@@ -92,31 +89,11 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     }
 
     if (state == AppLifecycleState.resumed) {
-      _historyController.setScreenVisible(true);
-      unawaited(_historyController.load(refresh: true));
+      _syncTabVisibility(TickerMode.of(context), fromAppResume: true);
       return;
     }
 
     _historyController.setScreenVisible(false);
-  }
-
-  @override
-  void deactivate() {
-    _cancelActiveMediaAction();
-    _historyController.setScreenVisible(false);
-    super.deactivate();
-  }
-
-  @override
-  void activate() {
-    super.activate();
-    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      _historyController.setScreenVisible(false);
-      return;
-    }
-
-    _historyController.setScreenVisible(true);
-    unawaited(_historyController.load(refresh: true));
   }
 
   @override
@@ -509,6 +486,51 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     }
     _activeMediaActionCancelToken = null;
     _isMediaActionInFlight = false;
+  }
+
+  void _syncTabVisibility(bool isTabActive, {required bool fromAppResume}) {
+    if (_isTabActive == isTabActive) {
+      if (isTabActive && fromAppResume) {
+        _handleScreenBecameVisible(fromAppResume: true);
+      }
+      return;
+    }
+
+    _isTabActive = isTabActive;
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
+      if (!isTabActive) {
+        _cancelActiveMediaAction();
+        _historyController.setScreenVisible(false);
+        return;
+      }
+
+      _handleScreenBecameVisible(fromAppResume: fromAppResume);
+    });
+  }
+
+  void _handleScreenBecameVisible({required bool fromAppResume}) {
+    final isAuthenticated = ref
+        .read(appLaunchControllerProvider)
+        .isAuthenticated;
+    if (!isAuthenticated) {
+      _historyController.setScreenVisible(false);
+      return;
+    }
+
+    _historyController.setScreenVisible(true);
+    if (!_hasLoadedInitially) {
+      _hasLoadedInitially = true;
+      unawaited(_historyController.load());
+      return;
+    }
+
+    if (fromAppResume) {
+      unawaited(_historyController.load(refresh: true));
+    }
   }
 
   Widget _sectionHeaderSliver(String title, int count) {

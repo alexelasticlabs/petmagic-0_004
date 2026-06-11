@@ -1,11 +1,16 @@
 using System;
 
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+
+using PetMagic.Modules.Economy.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 {
+    [DbContext(typeof(EconomyDbContext))]
+    [Migration("20260607154000_AddStoreBillingLedgerAndSubscriptionFields")]
     public partial class AddStoreBillingLedgerAndSubscriptionFields : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)

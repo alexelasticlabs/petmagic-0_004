@@ -4,10 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
-enum _AuthIconPreset { minimal, brand, contrast }
-
-const _authIconPreset = _AuthIconPreset.brand;
-
 class AuthBackdrop extends StatelessWidget {
   const AuthBackdrop({super.key});
 
@@ -199,31 +195,42 @@ class AuthWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-    final style = _resolveAuthIconStyle(colors, isLight: isLight);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        SizedBox(
           width: 58,
           height: 58,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: style.badgeGradient,
-            ),
-            border: Border.all(color: style.badgeBorder),
-            boxShadow: [
-              BoxShadow(
-                color: style.badgeShadow,
-                blurRadius: style.badgeShadowBlur,
-                offset: Offset(0, style.badgeShadowOffsetY),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: colors.accent.withValues(alpha: 0.22),
+                      width: 1.1,
+                    ),
+                  ),
+                ),
+              ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.accent.withValues(alpha: 0.08),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(11),
+                  child: Icon(
+                    Icons.pets_rounded,
+                    color: colors.accent,
+                    size: 26,
+                  ),
+                ),
               ),
             ],
           ),
-          child: Icon(Icons.pets_rounded, color: style.iconColor, size: 30),
         ),
         const SizedBox(height: 8),
         Text(
@@ -348,7 +355,6 @@ class AuthField extends StatelessWidget {
     final colors = context.petMagicColors;
     final labelStyle = Theme.of(context).textTheme.bodyMedium;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final style = _resolveAuthIconStyle(colors, isLight: !isDark);
 
     return TextField(
       controller: controller,
@@ -371,31 +377,15 @@ class AuthField extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 10, right: 6),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: style.badgeGradient,
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: style.badgeBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: style.badgeShadow.withValues(
-                    alpha: isDark ? 0.14 : 0.08,
-                  ),
-                  blurRadius: isDark ? style.badgeShadowBlur : 6,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Icon(prefixIcon, color: style.iconColor, size: 17),
+          padding: const EdgeInsets.only(left: 14, right: 6),
+          child: Icon(
+            prefixIcon,
+            color: enabled ? colors.textSoft : colors.textMuted,
+            size: 19,
           ),
         ),
         prefixIconConstraints: const BoxConstraints(
-          minWidth: 46,
+          minWidth: 42,
           minHeight: 40,
         ),
         suffixIcon: trailing,
@@ -452,77 +442,6 @@ class AuthField extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-typedef _GradientPair = List<Color>;
-
-class _AuthIconStyle {
-  const _AuthIconStyle({
-    required this.badgeGradient,
-    required this.badgeBorder,
-    required this.badgeShadow,
-    required this.badgeShadowBlur,
-    required this.badgeShadowOffsetY,
-    required this.iconColor,
-  });
-
-  final _GradientPair badgeGradient;
-  final Color badgeBorder;
-  final Color badgeShadow;
-  final double badgeShadowBlur;
-  final double badgeShadowOffsetY;
-  final Color iconColor;
-}
-
-_AuthIconStyle _resolveAuthIconStyle(
-  PetMagicColors colors, {
-  required bool isLight,
-}) {
-  switch (_authIconPreset) {
-    case _AuthIconPreset.minimal:
-      return _AuthIconStyle(
-        badgeGradient: isLight
-            ? const [Color(0xFFF4F7FB), Color(0xFFF1F5F9)]
-            : [
-                colors.surfaceStrong,
-                colors.surfaceStrong.withValues(alpha: 0.82),
-              ],
-        badgeBorder: isLight
-            ? const Color(0xFFD2DCE8)
-            : colors.border.withValues(alpha: 0.78),
-        badgeShadow: colors.shadow.withValues(alpha: isLight ? 0.08 : 0.14),
-        badgeShadowBlur: isLight ? 8 : 10,
-        badgeShadowOffsetY: isLight ? 4 : 5,
-        iconColor: isLight ? const Color(0xFF3B4E68) : colors.textSoft,
-      );
-    case _AuthIconPreset.contrast:
-      return _AuthIconStyle(
-        badgeGradient: isLight
-            ? const [Color(0xFFE3F7EC), Color(0xFFEFFBF4)]
-            : [colors.accentSoft.withValues(alpha: 0.95), colors.surfaceStrong],
-        badgeBorder: isLight ? const Color(0xFF8CCFAE) : colors.accent,
-        badgeShadow: colors.accent.withValues(alpha: isLight ? 0.16 : 0.22),
-        badgeShadowBlur: isLight ? 12 : 14,
-        badgeShadowOffsetY: isLight ? 6 : 7,
-        iconColor: isLight ? const Color(0xFF0B955A) : colors.accent,
-      );
-    case _AuthIconPreset.brand:
-      return _AuthIconStyle(
-        badgeGradient: isLight
-            ? const [Color(0xFFE9F7EF), Color(0xFFF5F9EE)]
-            : [
-                colors.accentSoft.withValues(alpha: 0.95),
-                colors.gold.withValues(alpha: 0.22),
-              ],
-        badgeBorder: isLight
-            ? const Color(0xFFBEDFCC)
-            : colors.border.withValues(alpha: 0.75),
-        badgeShadow: colors.shadow.withValues(alpha: isLight ? 0.12 : 0.2),
-        badgeShadowBlur: isLight ? 12 : 16,
-        badgeShadowOffsetY: isLight ? 6 : 8,
-        iconColor: isLight ? const Color(0xFF0EA764) : colors.accent,
-      );
   }
 }
 

@@ -65,6 +65,13 @@ class TemplateItem {
 
   bool get isVideo => templateType == TemplateType.video;
 
+  String get mediaIdentity {
+    final thumbnail = thumbnailUrl?.trim() ?? '';
+    final previewUrl = previewAsset?.url.trim() ?? '';
+    final previewContentType = previewAsset?.contentType.trim() ?? '';
+    return '$thumbnail|$previewUrl|$previewContentType';
+  }
+
   List<String> get effectivePetPhotoRequirements {
     final normalized = petPhotoRequirements
         .map((item) => item.trim())

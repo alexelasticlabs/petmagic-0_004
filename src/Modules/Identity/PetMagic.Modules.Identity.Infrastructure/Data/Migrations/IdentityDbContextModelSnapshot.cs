@@ -211,6 +211,9 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.Property<bool>("IsPremium")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastLoginAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -282,8 +285,6 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("CreatedAtUtc");
 
-                    b.HasIndex("AccountStatus", "AccountStatusUpdatedAtUtc", "CreatedAtUtc");
-
                     b.HasIndex("Email")
                         .IsUnique();
 
@@ -293,6 +294,8 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
+
+                    b.HasIndex("AccountStatus", "AccountStatusUpdatedAtUtc", "CreatedAtUtc");
 
                     b.ToTable("users", (string)null);
                 });
@@ -335,12 +338,12 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("OldValue")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("SubjectUserId")
                         .HasColumnType("uuid");
@@ -359,17 +362,49 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ActorUserId", "CreatedAtUtc");
-
                     b.HasIndex("CorrelationId");
 
                     b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("OccurredAtUtc");
 
+                    b.HasIndex("ActorUserId", "CreatedAtUtc");
+
                     b.HasIndex("SubjectUserId", "OccurredAtUtc");
 
                     b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.DeletedAccountBlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProviderUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("Provider", "ProviderUserId")
+                        .IsUnique();
+
+                    b.ToTable("deleted_account_blocks", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.EmailDispatchJob", b =>
@@ -439,13 +474,54 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
-
                     b.HasIndex("Status", "QueuedAtUtc");
 
                     b.HasIndex("Status", "UpdatedAtUtc");
 
+                    b.HasIndex("Status", "NextAttemptAtUtc", "QueuedAtUtc");
+
                     b.ToTable("email_dispatch_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.ExternalAuthProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTime>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("ProviderUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Provider", "ProviderUserId")
+                        .IsUnique();
+
+                    b.ToTable("external_auth_providers", (string)null);
                 });
 
             modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.RefreshTokenSession", b =>
@@ -584,6 +660,17 @@ namespace PetMagic.Modules.Identity.Infrastructure.Data.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Identity.Infrastructure.Entities.ExternalAuthProvider", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Identity.Infrastructure.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 #pragma warning restore 612, 618
         }

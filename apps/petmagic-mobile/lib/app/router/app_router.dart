@@ -16,7 +16,6 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
-import 'package:petmagic_mobile/features/startup/presentation/onboarding_page.dart';
 import 'package:petmagic_mobile/features/startup/presentation/startup_loading_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_assistant_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
@@ -75,7 +74,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final launchState = ref.read(appLaunchControllerProvider);
       final location = state.uri.path;
       final isStartupRoute = location == StartupLoadingPage.routePath;
-      final isOnboardingRoute = location == OnboardingPage.routePath;
       final isWelcomeRoute = location == GuestWelcomePage.routePath;
       final isAuthRoute = location == AuthEntryPage.routePath;
       final isRegisterRoute = location == RegisterEntryPage.routePath;
@@ -98,7 +96,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         }
 
         if (isStartupRoute ||
-            isOnboardingRoute ||
             isWelcomeRoute ||
             isPublicAuthRoute ||
             isLegalGateRoute) {
@@ -108,9 +105,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (!launchState.hasSeenOnboarding) {
-        return isOnboardingRoute || isPublicAuthRoute
+        return isWelcomeRoute || isPublicAuthRoute
             ? null
-            : OnboardingPage.routePath;
+            : GuestWelcomePage.routePath;
       }
 
       if (!launchState.guestSessionReady) {
@@ -119,7 +116,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             : GuestWelcomePage.routePath;
       }
 
-      if (isStartupRoute || isOnboardingRoute || isWelcomeRoute) {
+      if (isStartupRoute || isWelcomeRoute) {
         return TemplatesPage.routePath;
       }
 
@@ -130,11 +127,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: StartupLoadingPage.routePath,
         pageBuilder: (context, state) =>
             const NoTransitionPage(child: StartupLoadingPage()),
-      ),
-      GoRoute(
-        path: OnboardingPage.routePath,
-        pageBuilder: (context, state) =>
-            _buildFadeSlidePage(state: state, child: const OnboardingPage()),
       ),
       GoRoute(
         path: GuestWelcomePage.routePath,

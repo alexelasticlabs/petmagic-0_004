@@ -211,6 +211,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('support-route'), findsOneWidget);
   });
+
+  testWidgets('gallery does not force refresh when tab is hidden and shown', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness();
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(_GalleryTickerModeHost(child: harness.app()));
+    await tester.pumpAndSettle();
+
+    expect(harness.controller.refreshCalls, isEmpty);
+    expect(harness.controller.loadCalls, [GenerationHistoryFilter.all]);
+
+    final hostState = tester.state<_GalleryTickerModeHostState>(
+      find.byType(_GalleryTickerModeHost),
+    );
+
+    hostState.setEnabled(false);
+    await tester.pump();
+    await tester.pump();
+
+    hostState.setEnabled(true);
+    await tester.pump();
+    await tester.pump();
+
+    expect(harness.controller.refreshCalls, isEmpty);
+    expect(harness.controller.loadCalls, [GenerationHistoryFilter.all]);
+  });
 }
 
 AppLocalizations _text(WidgetTester tester) {
@@ -316,6 +347,7 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
 
   final List<TemplateGenerationResult> _allItems;
   final List<GenerationHistoryFilter> loadCalls = [];
+  final List<GenerationHistoryFilter> refreshCalls = [];
   final List<String> markReadCalls = [];
 
   @override
@@ -330,6 +362,9 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
     bool refresh = false,
   }) async {
     final nextFilter = filter ?? state.filter;
+    if (refresh) {
+      refreshCalls.add(nextFilter);
+    }
     loadCalls.add(nextFilter);
     final filtered = _applyFilter(nextFilter);
 
@@ -543,4 +578,28 @@ TemplateGenerationResult _generation({
     refundedAtUtc: refundedAtUtc,
     isUnread: isUnread,
   );
+}
+
+class _GalleryTickerModeHost extends StatefulWidget {
+  const _GalleryTickerModeHost({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_GalleryTickerModeHost> createState() => _GalleryTickerModeHostState();
+}
+
+class _GalleryTickerModeHostState extends State<_GalleryTickerModeHost> {
+  bool _enabled = true;
+
+  void setEnabled(bool enabled) {
+    setState(() {
+      _enabled = enabled;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TickerMode(enabled: _enabled, child: widget.child);
+  }
 }

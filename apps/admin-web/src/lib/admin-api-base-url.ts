@@ -5,20 +5,28 @@ type ResolveAdminApiBaseUrlOptions = {
   publicApiBaseUrl?: string | null;
   isServer: boolean;
   nodeEnv?: string;
+  allowLocalApiBaseUrlInProduction?: boolean;
 };
+
+function shouldAllowLocalApiBaseUrlInProduction(
+  rawValue = process.env.NEXT_PUBLIC_ALLOW_LOCALHOST_API_BASE_URL_IN_PRODUCTION
+): boolean {
+  return rawValue?.trim().toLowerCase() === "true";
+}
 
 export function resolveAdminApiBaseUrl({
   internalApiBaseUrl,
   publicApiBaseUrl,
   isServer,
   nodeEnv = process.env.NODE_ENV,
+  allowLocalApiBaseUrlInProduction = shouldAllowLocalApiBaseUrlInProduction(),
 }: ResolveAdminApiBaseUrlOptions): string {
   const configured = normalizeBaseUrl(
     (isServer ? internalApiBaseUrl || publicApiBaseUrl : publicApiBaseUrl)?.trim()
   );
 
   if (configured) {
-    assertProductionSafeApiBaseUrl(configured, nodeEnv);
+    assertProductionSafeApiBaseUrl(configured, nodeEnv, allowLocalApiBaseUrlInProduction);
     return configured;
   }
 
@@ -68,17 +76,23 @@ function assertApiBaseUrlShape(parsed: URL): void {
   }
 }
 
-function assertProductionSafeApiBaseUrl(value: string, nodeEnv: string | undefined): void {
+function assertProductionSafeApiBaseUrl(
+  value: string,
+  nodeEnv: string | undefined,
+  allowLocalApiBaseUrlInProduction: boolean
+): void {
   if (nodeEnv !== "production") {
     return;
   }
 
   const parsed = new URL(value);
-  if (isLocalDevelopmentHost(parsed.hostname)) {
+  const isLocalHost = isLocalDevelopmentHost(parsed.hostname);
+
+  if (isLocalHost && !allowLocalApiBaseUrlInProduction) {
     throw new Error("Admin production API base URL cannot point to localhost.");
   }
 
-  if (parsed.protocol !== "https:") {
+  if (parsed.protocol !== "https:" && !(allowLocalApiBaseUrlInProduction && isLocalHost)) {
     throw new Error("Admin production API base URL must use HTTPS.");
   }
 }

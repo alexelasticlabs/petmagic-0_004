@@ -70,7 +70,7 @@ void main() {
   );
 
   test(
-    'clears stale list immediately when switching to uncached filter',
+    'shows cached filter results immediately without clearing list',
     () async {
       final videoFetchCompleter = Completer<void>();
       final repository = _FakeTemplatesRepository(
@@ -105,14 +105,17 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       final interim = container.read(templatesControllerProvider);
-      expect(interim.items, isEmpty);
-      expect(interim.isLoading, isTrue);
+      expect(interim.items.map((item) => item.templateId), ['video-1']);
+      expect(interim.isLoading, isFalse);
+      expect(interim.loadedFromCache, isTrue);
+      expect(repository.fetchFeedCalls, 1);
 
       videoFetchCompleter.complete();
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
       final afterLoad = container.read(templatesControllerProvider);
       expect(afterLoad.items.map((item) => item.templateId), ['video-1']);
+      expect(repository.fetchFeedCalls, 1);
     },
   );
 
@@ -148,7 +151,7 @@ void main() {
 
       controller.setType(TemplateType.video);
       await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(repository.fetchFeedCalls, 2);
+      expect(repository.fetchFeedCalls, 1);
       expect(
         container
             .read(templatesControllerProvider)
@@ -160,7 +163,7 @@ void main() {
       controller.setType(null);
       await Future<void>.delayed(Duration.zero);
 
-      expect(repository.fetchFeedCalls, 2);
+      expect(repository.fetchFeedCalls, 1);
       expect(
         container
             .read(templatesControllerProvider)
@@ -170,6 +173,24 @@ void main() {
       );
     },
   );
+
+  test('uses remote fetch for cold load when no local cache exists', () async {
+    final repository = _FakeTemplatesRepository();
+    final realtimeClient = _FakeRealtimeClient();
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(realtimeClient),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(templatesControllerProvider.notifier);
+    await controller.loadInitial();
+
+    expect(repository.readCachedFirstPageCalls, 1);
+    expect(repository.fetchFeedCalls, 1);
+  });
 }
 
 class _FakeTemplatesRepository implements TemplatesRepository {
@@ -185,10 +206,12 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   int _catalogVersion = 0;
   int fetchFeedCalls = 0;
   int fetchCategoriesCalls = 0;
+  int readCachedFirstPageCalls = 0;
 
   @override
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query) async {
-    return null;
+    readCachedFirstPageCalls++;
+    return pagesByKey[query.cacheKey];
   }
 
   @override
