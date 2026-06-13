@@ -3,7 +3,7 @@ import 'package:petmagic_mobile/shared/notifications/petmagic_notification_cente
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_types.dart';
 
 export 'package:petmagic_mobile/shared/notifications/petmagic_notification_types.dart'
-    show PetMagicToastTone;
+    show PetMagicNotificationAction, PetMagicToastTone;
 
 final class PetMagicToast {
   const PetMagicToast._();

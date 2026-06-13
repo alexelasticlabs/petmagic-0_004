@@ -43,6 +43,16 @@ void main() {
       expect(
         manifest,
         contains(
+          'com.google.firebase.messaging.default_notification_channel_id',
+        ),
+      );
+      expect(manifest, contains('@string/default_notification_channel_id'));
+      expect(manifest, contains('android:host="generations"'));
+      expect(manifest, contains('android:host="support"'));
+      expect(manifest, contains('android:host="checkout"'));
+      expect(
+        manifest,
+        contains(
           '<uses-feature\n'
           '        android:name="android.hardware.camera"\n'
           '        android:required="false"/>',
@@ -74,4 +84,28 @@ void main() {
       expect(manifest, isNot(contains('com.yalantis.ucrop.UCropActivity')));
     },
   );
+
+  test('android creates the default FCM notification channel', () async {
+    final strings = await File(
+      'android/app/src/main/res/values/strings.xml',
+    ).readAsString();
+    final activity = await File(
+      'android/app/src/main/kotlin/app/petmagic/petmagic_mobile/MainActivity.kt',
+    ).readAsString();
+
+    expect(
+      strings,
+      contains(
+        '<string name="default_notification_channel_id">petmagic_updates</string>',
+      ),
+    );
+    expect(
+      strings,
+      contains('<string name="default_notification_channel_name">'),
+    );
+    expect(activity, contains('NotificationChannel('));
+    expect(activity, contains('NotificationManager.IMPORTANCE_HIGH'));
+    expect(activity, contains('createNotificationChannel(channel)'));
+    expect(activity, contains('Build.VERSION_CODES.O'));
+  });
 }

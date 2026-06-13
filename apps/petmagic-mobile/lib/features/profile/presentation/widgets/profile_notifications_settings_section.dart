@@ -1,14 +1,20 @@
+import 'dart:io';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 
 class ProfileNotificationsSettingsSection extends ConsumerStatefulWidget {
   const ProfileNotificationsSettingsSection({
@@ -180,6 +186,7 @@ class _ProfileNotificationsSettingsSectionState
       setState(() {
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
+      await _registerPushTokenIfAllowed(settings.authorizationStatus);
     } catch (error, stackTrace) {
       _logNotificationsFailure('refresh_push_permission', error, stackTrace);
       if (!mounted) {
@@ -216,6 +223,7 @@ class _ProfileNotificationsSettingsSectionState
         _isRequestingPermission = false;
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
+      await _registerPushTokenIfAllowed(settings.authorizationStatus);
     } catch (error, stackTrace) {
       _logNotificationsFailure('request_push_permission', error, stackTrace);
       if (!mounted) {
@@ -226,6 +234,60 @@ class _ProfileNotificationsSettingsSectionState
         _isRequestingPermission = false;
       });
     }
+  }
+
+  Future<void> _registerPushTokenIfAllowed(AuthorizationStatus status) async {
+    if (!_isPushPermissionAllowed(status) || !mounted) {
+      return;
+    }
+
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null || token.isEmpty || !mounted) {
+        return;
+      }
+
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .registerPushToken(
+            token: token,
+            platform: Platform.operatingSystem,
+            appVersion: AppConfig.appVersion,
+            locale: Platform.localeName,
+          );
+      if (!mounted) {
+        return;
+      }
+      await ref
+          .read(supportChatRepositoryProvider)
+          .registerPushToken(
+            token: token,
+            platform: Platform.operatingSystem,
+            appVersion: AppConfig.appVersion,
+            locale: Platform.localeName,
+          );
+      if (!mounted) {
+        return;
+      }
+      await ref
+          .read(walletRepositoryProvider)
+          .registerPushToken(
+            token: token,
+            platform: Platform.operatingSystem,
+            locale: Platform.localeName,
+          );
+    } catch (error, stackTrace) {
+      _logNotificationsFailure(
+        'register_push_token_after_permission',
+        error,
+        stackTrace,
+      );
+    }
+  }
+
+  bool _isPushPermissionAllowed(AuthorizationStatus status) {
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
   }
 
   Future<void> _openDeviceSettings() async {

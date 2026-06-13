@@ -63,11 +63,32 @@ void main() {
       isNot(contains('() => _permissionCoordinator.openSettings()')),
     );
   });
+
+  test('profile notification permission grant registers push token', () async {
+    final source = await File(
+      'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
+    ).readAsString();
+
+    final requestPushBody = _methodBody(source, '_requestPushPermission');
+    final refreshPushBody = _methodBody(source, '_refreshPushPermissionStatus');
+    final registerBody = _methodBody(source, '_registerPushTokenIfAllowed');
+
+    expect(requestPushBody, contains('_registerPushTokenIfAllowed'));
+    expect(refreshPushBody, contains('_registerPushTokenIfAllowed'));
+    expect(registerBody, contains('FirebaseMessaging.instance.getToken()'));
+    expect(registerBody, contains('templateGenerationRepositoryProvider'));
+    expect(registerBody, contains('supportChatRepositoryProvider'));
+    expect(registerBody, contains('walletRepositoryProvider'));
+    expect(registerBody, contains('AppConfig.appVersion'));
+    expect(registerBody, contains('Platform.operatingSystem'));
+    expect(registerBody, contains('Platform.localeName'));
+    expect(registerBody, contains('register_push_token_after_permission'));
+  });
 }
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:void|Future<[^>]+>)\s+' + methodName + r'\s*\(',
+    r'(?:void|bool|Future<[^>]+>)\s+' + methodName + r'\s*\(',
   ).firstMatch(source);
   if (methodMatch == null) {
     fail('Method $methodName was not found.');

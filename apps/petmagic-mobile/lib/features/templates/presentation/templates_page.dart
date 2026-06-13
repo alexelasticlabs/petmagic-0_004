@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -204,7 +205,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         },
         color: colors.accent,
         child: CustomScrollView(
-          cacheExtent: _gridCacheExtent,
+          scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
           controller: _scrollController,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),

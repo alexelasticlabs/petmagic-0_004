@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +37,7 @@ class _PushNotificationsBootstrapState
   NotificationCoordinator? _coordinator;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
+  String? _pendingRoute;
   bool _wasAuthenticated = false;
 
   @override
@@ -74,6 +74,8 @@ class _PushNotificationsBootstrapState
   }
 
   void _handleLaunchState(AppLaunchState launchState) {
+    _flushPendingRouteIfReady(launchState);
+
     if (launchState.isAuthenticated && !_wasAuthenticated) {
       _wasAuthenticated = true;
       Future.microtask(() {
@@ -109,7 +111,7 @@ class _PushNotificationsBootstrapState
   }
 
   Future<void> _handleInitialLinkOnce() async {
-    if (Firebase.apps.isEmpty || _deepLinkSubscription == null) {
+    if (_deepLinkSubscription == null) {
       return;
     }
 
@@ -151,9 +153,41 @@ class _PushNotificationsBootstrapState
         _isSupportRoute(route) ||
         _isWalletRoute(route) ||
         _isProfileRoute(route)) {
-      widget.router.go(route);
+      final launchState = ref.read(appLaunchControllerProvider);
+      if (_canOpenRouteNow(launchState)) {
+        widget.router.go(route);
+      } else {
+        _pendingRoute = route;
+      }
       return;
     }
+  }
+
+  void _flushPendingRouteIfReady(AppLaunchState launchState) {
+    final route = _pendingRoute;
+    if (route == null || !_canOpenRouteNow(launchState)) {
+      return;
+    }
+
+    _pendingRoute = null;
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+      widget.router.go(route);
+    });
+  }
+
+  bool _canOpenRouteNow(AppLaunchState launchState) {
+    if (launchState.isLoading) {
+      return false;
+    }
+
+    if (launchState.isAuthenticated) {
+      return !launchState.requiresLegalAcceptance;
+    }
+
+    return launchState.hasSeenOnboarding && launchState.guestSessionReady;
   }
 
   void _openDeepLink(Uri uri) {
@@ -166,13 +200,13 @@ class _PushNotificationsBootstrapState
     }
 
     if (uri.host == 'support') {
-      widget.router.go(SupportChatPage.routePath);
+      _openRoute(SupportChatPage.routePath);
       return;
     }
 
     if (uri.host == 'checkout') {
       final path = uri.pathSegments.isNotEmpty ? uri.pathSegments.first : '';
-      widget.router.go(WalletPage.routePath);
+      _openRoute(WalletPage.routePath);
       if (path == 'success') {
         final sessionId = uri.queryParameters['session_id'];
         if (sessionId != null && sessionId.isNotEmpty) {
@@ -205,7 +239,7 @@ class _PushNotificationsBootstrapState
     }
 
     if (uri.host == 'generations' && uri.pathSegments.isNotEmpty) {
-      widget.router.go(
+      _openRoute(
         '${GenerationStatusPage.routePrefix}/${uri.pathSegments.first}',
       );
       return;
@@ -213,7 +247,7 @@ class _PushNotificationsBootstrapState
 
     final generationId = uri.queryParameters['generationId'];
     if (generationId != null && generationId.isNotEmpty) {
-      widget.router.go('${GenerationStatusPage.routePrefix}/$generationId');
+      _openRoute('${GenerationStatusPage.routePrefix}/$generationId');
     }
   }
 

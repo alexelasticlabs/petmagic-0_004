@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Google.Apis.Auth.OAuth2;
 
@@ -135,7 +136,7 @@ internal sealed class FcmEconomyPushNotificationSender(
                 token.Token,
                 new FcmNotification(title, body),
                 data,
-                new FcmAndroidConfig("high"),
+                new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
 
         using var httpRequest = new HttpRequestMessage(
@@ -255,7 +256,9 @@ internal sealed class FcmEconomyPushNotificationSender(
 
     private sealed record FcmNotification(string Title, string Body);
 
-    private sealed record FcmAndroidConfig(string Priority);
+    private sealed record FcmAndroidConfig(string Priority, FcmAndroidNotification Notification);
+
+    private sealed record FcmAndroidNotification([property: JsonPropertyName("channel_id")] string ChannelId);
 
     private sealed record FcmApnsConfig(FcmApnsPayload Payload);
 

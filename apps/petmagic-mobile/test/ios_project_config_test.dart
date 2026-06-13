@@ -45,7 +45,7 @@ void main() {
     }
   });
 
-  test('iOS Runner target enables Sign in with Apple entitlement', () {
+  test('iOS Runner target enables required app entitlements', () {
     final entitlements = File('ios/Runner/Runner.entitlements');
     final project = File(
       'ios/Runner.xcodeproj/project.pbxproj',
@@ -53,8 +53,24 @@ void main() {
 
     expect(entitlements.existsSync(), isTrue);
     final plist = entitlements.readAsStringSync();
+    final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+    expect(plist, contains('aps-environment'));
+    expect(plist, contains('<string>\$(APS_ENVIRONMENT)</string>'));
     expect(plist, contains('com.apple.developer.applesignin'));
     expect(plist, contains('<string>Default</string>'));
-    expect(project, contains('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;'));
+    expect(infoPlist, contains('<key>UIBackgroundModes</key>'));
+    expect(infoPlist, contains('<string>remote-notification</string>'));
+    expect(
+      project,
+      contains('CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;'),
+    );
+    expect(
+      File('ios/Flutter/Debug.xcconfig').readAsStringSync(),
+      contains('APS_ENVIRONMENT = development'),
+    );
+    expect(
+      File('ios/Flutter/Release.xcconfig').readAsStringSync(),
+      contains('APS_ENVIRONMENT = production'),
+    );
   });
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -37,10 +38,12 @@ class NotificationCoordinator {
   };
   static final RegExp _routeControlCharacters = RegExp(r'[\x00-\x1F\x7F]');
   static final RegExp _safeGenerationId = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
+  static const Duration _handledInteractionWindow = Duration(minutes: 5);
 
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
   StreamSubscription<RemoteMessage>? _foregroundMessageSubscription;
+  final Map<String, DateTime> _handledInteractions = <String, DateTime>{};
   String? _lastRegisteredToken;
   bool _isDisposed = false;
   bool _initialMessageHandled = false;
@@ -60,6 +63,13 @@ class NotificationCoordinator {
     _initializing = true;
     try {
       await _ensureInitialized();
+      final permissionAllowed = await _ensureNotificationPermissionAllowed();
+      if (!permissionAllowed) {
+        await unregisterCurrentTokenOnSignOut();
+        _authenticatedReady = true;
+        return;
+      }
+
       await registerCurrentToken();
 
       final initialMessage = await FirebaseMessaging.instance
@@ -83,6 +93,14 @@ class NotificationCoordinator {
     }
 
     try {
+      final permissionAllowed = await _notificationsAllowed();
+      if (!permissionAllowed) {
+        if (_lastRegisteredToken != null) {
+          await unregisterCurrentTokenOnSignOut();
+        }
+        return;
+      }
+
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null || token.isEmpty) {
         return;
@@ -144,12 +162,19 @@ class NotificationCoordinator {
         message.data['dedupeKey'] as String? ??
         message.messageId ??
         '${type ?? 'update'}:${messageText.hashCode}:${title ?? ''}';
+    final route = _routeFromMap(message.data);
 
     PetMagicToast.show(
       null,
       title: title,
       message: messageText,
       tone: _foregroundMessageTone(message),
+      action: route == null
+          ? null
+          : PetMagicNotificationAction(
+              label: _openActionLabel(),
+              onPressed: () => _onRouteRequested(route),
+            ),
       dedupeKey: dedupeKey,
     );
   }
@@ -160,6 +185,7 @@ class NotificationCoordinator {
     await _tokenRefreshSubscription?.cancel();
     await _messageOpenedSubscription?.cancel();
     await _foregroundMessageSubscription?.cancel();
+    _handledInteractions.clear();
   }
 
   bool get _firebaseReady => Firebase.apps.isNotEmpty;
@@ -183,7 +209,7 @@ class NotificationCoordinator {
       }
       final epoch = _registrationEpoch;
       _lastRegisteredToken = token;
-      unawaited(_registerTokenWithRetry(token, epoch: epoch));
+      unawaited(_registerRefreshedToken(token, epoch: epoch));
     });
 
     _messageOpenedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
@@ -193,6 +219,48 @@ class NotificationCoordinator {
       handleForegroundMessage,
     );
     _initialized = true;
+  }
+
+  Future<bool> _ensureNotificationPermissionAllowed() async {
+    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    if (_isNotificationPermissionAllowed(settings.authorizationStatus)) {
+      return true;
+    }
+
+    if (settings.authorizationStatus == AuthorizationStatus.denied) {
+      return false;
+    }
+
+    final requested = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    return _isNotificationPermissionAllowed(requested.authorizationStatus);
+  }
+
+  Future<bool> _notificationsAllowed() async {
+    final settings = await FirebaseMessaging.instance.getNotificationSettings();
+    return _isNotificationPermissionAllowed(settings.authorizationStatus);
+  }
+
+  bool _isNotificationPermissionAllowed(AuthorizationStatus status) {
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+  }
+
+  Future<void> _registerRefreshedToken(
+    String token, {
+    required int epoch,
+  }) async {
+    try {
+      if (!await _notificationsAllowed()) {
+        return;
+      }
+      await _registerTokenWithRetry(token, epoch: epoch);
+    } catch (error, stackTrace) {
+      _logNotificationFailure('register_refreshed_token', error, stackTrace);
+    }
   }
 
   Future<bool> _registerTokenWithRetry(
@@ -256,9 +324,46 @@ class NotificationCoordinator {
   }
 
   void _handleRemoteMessageRoute(RemoteMessage message) {
+    if (!_markInteractionHandled(message)) {
+      return;
+    }
+
     final route = _routeFromMap(message.data);
     if (route != null) {
       _onRouteRequested(route);
+    }
+  }
+
+  bool _markInteractionHandled(RemoteMessage message) {
+    final key =
+        message.data['dedupe_key'] as String? ??
+        message.data['dedupeKey'] as String? ??
+        message.messageId ??
+        _routeFromMap(message.data) ??
+        message.data.toString();
+    final now = DateTime.now();
+    _pruneHandledInteractions(now);
+
+    final handledAt = _handledInteractions[key];
+    if (handledAt != null &&
+        now.difference(handledAt) <= _handledInteractionWindow) {
+      return false;
+    }
+
+    _handledInteractions[key] = now;
+    return true;
+  }
+
+  void _pruneHandledInteractions(DateTime now) {
+    final expiredKeys = <String>[];
+    for (final entry in _handledInteractions.entries) {
+      if (now.difference(entry.value) > _handledInteractionWindow) {
+        expiredKeys.add(entry.key);
+      }
+    }
+
+    for (final key in expiredKeys) {
+      _handledInteractions.remove(key);
     }
   }
 
@@ -280,6 +385,14 @@ class NotificationCoordinator {
     final type = payload['type'];
     if (type == 'support_chat') {
       return '/profile/support';
+    }
+
+    if (type == 'wallet') {
+      return '/profile/wallet';
+    }
+
+    if (type == 'premium') {
+      return '/profile';
     }
 
     final conversationId = payload['conversationId'];
@@ -365,6 +478,9 @@ class NotificationCoordinator {
           status == 'inactive' ||
           status == 'succeeded' ||
           status == 'success' ||
+          status == 'canceled' ||
+          status == 'cancelled' ||
+          status == 'expired' ||
           status == 'failed' ||
           status == 'error';
     }
@@ -415,7 +531,24 @@ class NotificationCoordinator {
     if (type == 'wallet') {
       return 'Open your wallet to review the latest balance update.';
     }
+    if (type == 'premium') {
+      return 'Open your profile to review the latest Premium update.';
+    }
     return '';
+  }
+
+  String _openActionLabel() {
+    final languageCode = PlatformDispatcher.instance.locale.languageCode
+        .toLowerCase();
+    return switch (languageCode) {
+      'ru' => 'Открыть',
+      'es' => 'Abrir',
+      'fr' => 'Ouvrir',
+      'it' => 'Apri',
+      'pl' => 'Otwórz',
+      'de' => 'Öffnen',
+      _ => 'Open',
+    };
   }
 
   void _logNotificationFailure(

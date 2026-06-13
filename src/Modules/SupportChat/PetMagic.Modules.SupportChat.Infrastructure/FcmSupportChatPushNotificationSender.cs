@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Google.Apis.Auth.OAuth2;
 
@@ -66,7 +67,8 @@ internal sealed class FcmSupportChatPushNotificationSender(
             ["type"] = "support_chat",
             ["conversationId"] = notification.ConversationId.ToString(),
             ["messageId"] = notification.MessageId.ToString(),
-            ["route"] = route
+            ["route"] = route,
+            ["dedupe_key"] = $"support_chat:{notification.ConversationId}:{notification.MessageId}"
         };
         var request = new FcmSendRequest(
             new FcmMessage(
@@ -75,7 +77,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
                     isRussian ? "Поддержка PetMagic ответила" : "PetMagic Support replied",
                     body),
                 data,
-                new FcmAndroidConfig("high"),
+                new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default", notification.UserUnreadCount)))));
 
         using var httpRequest = new HttpRequestMessage(
@@ -217,7 +219,9 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
     private sealed record FcmNotification(string Title, string Body);
 
-    private sealed record FcmAndroidConfig(string Priority);
+    private sealed record FcmAndroidConfig(string Priority, FcmAndroidNotification Notification);
+
+    private sealed record FcmAndroidNotification([property: JsonPropertyName("channel_id")] string ChannelId);
 
     private sealed record FcmApnsConfig(FcmApnsPayload Payload);
 

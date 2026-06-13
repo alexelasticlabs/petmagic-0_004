@@ -32,6 +32,7 @@ Future<void> main() async {
       }());
 
       TempMediaCleanup.scheduleTtlSweep();
+      _registerFirebaseMessagingBackgroundHandler();
       unawaited(_configureFirebaseMessagingAsync());
       AppLogger.info(
         feature: 'Startup',
@@ -79,7 +80,9 @@ Future<void> _configureFirebaseMessagingAsync() async {
   if (!await _initializeFirebase()) {
     return;
   }
+}
 
+void _registerFirebaseMessagingBackgroundHandler() {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 }
 

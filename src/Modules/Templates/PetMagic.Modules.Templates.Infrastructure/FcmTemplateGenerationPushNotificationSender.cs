@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Google.Apis.Auth.OAuth2;
 
@@ -67,7 +68,8 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
             ["type"] = "template_generation",
             ["generationId"] = eventId,
             ["route"] = route,
-            ["status"] = generation.Status
+            ["status"] = generation.Status,
+            ["dedupe_key"] = $"template_generation:{eventId}:{generation.Status}"
         };
         var request = new FcmSendRequest(
             new FcmMessage(
@@ -78,7 +80,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
                         ? "Мы сохранили статус генерации и вернули токены, если списание прошло."
                         : "Откройте Галерею, чтобы посмотреть результат."),
                 data,
-                new FcmAndroidConfig("high"),
+                new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
 
         using var httpRequest = new HttpRequestMessage(
@@ -203,7 +205,9 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
     private sealed record FcmNotification(string Title, string Body);
 
-    private sealed record FcmAndroidConfig(string Priority);
+    private sealed record FcmAndroidConfig(string Priority, FcmAndroidNotification Notification);
+
+    private sealed record FcmAndroidNotification([property: JsonPropertyName("channel_id")] string ChannelId);
 
     private sealed record FcmApnsConfig(FcmApnsPayload Payload);
 
