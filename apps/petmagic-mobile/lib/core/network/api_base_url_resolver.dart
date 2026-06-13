@@ -269,6 +269,8 @@ class ApiBaseUrlResolver {
       );
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set('X-PetMagic-Client', 'mobile-flutter');
+      request.headers.set('ngrok-skip-browser-warning', 'true');
+      request.headers.set('Bypass-Tunnel-Reminder', 'true');
 
       final response = await request.close().timeout(_probeReadTimeout);
       await response.drain<void>();

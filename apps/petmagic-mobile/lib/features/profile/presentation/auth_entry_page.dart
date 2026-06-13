@@ -1,13 +1,12 @@
 import 'dart:io' show Platform;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -17,7 +16,6 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_controller
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
-import 'package:petmagic_mobile/features/startup/presentation/guest_welcome_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -51,6 +49,15 @@ class RegisterEntryPage extends StatelessWidget {
 }
 
 enum _AuthMode { signIn, signUp }
+
+@visibleForTesting
+List<ExternalAuthProvider> authSocialProvidersForPlatform({
+  required bool isIOS,
+}) {
+  return isIOS
+      ? const [ExternalAuthProvider.apple, ExternalAuthProvider.google]
+      : const [ExternalAuthProvider.google];
+}
 
 class _AuthFlowPage extends ConsumerStatefulWidget {
   const _AuthFlowPage({
@@ -114,7 +121,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   Widget build(BuildContext context) {
     final state = ref.watch(profileControllerProvider);
     final controller = ref.read(profileControllerProvider.notifier);
-    final launchState = ref.watch(appLaunchControllerProvider);
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -122,6 +128,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final legalDocumentsAsync = ref.watch(
       currentLegalDocumentsProvider(locale),
     );
+    final legalDocumentsAvailable = legalDocumentsAsync.value != null;
+    final compactLayout = _isSignUp;
 
     final title = _isSignUp ? text.authRegisterTitle : text.authEntryTitle;
     final subtitle = _isSignUp
@@ -143,7 +151,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         _confirmPasswordController.text != _passwordController.text;
     final submitDisabled =
         state.isSaving || (_isSignUp && confirmPasswordMismatch);
-    final showAppleSignIn = !kIsWeb && Platform.isIOS;
+    final socialProviders = authSocialProvidersForPlatform(
+      isIOS: !kIsWeb && Platform.isIOS,
+    );
+    const heroBottomSpacing = 12.0;
 
     ref.listen(profileControllerProvider, (previous, next) {
       if (!mounted) {
@@ -189,40 +200,30 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
             const AuthBackdrop(),
             SafeArea(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                padding: EdgeInsets.fromLTRB(
+                  compactLayout ? 18 : 20,
+                  compactLayout ? 2 : 4,
+                  compactLayout ? 18 : 20,
+                  compactLayout ? 18 : 24,
+                ),
                 children: [
-                  Row(
-                    children: [
-                      IconButton.outlined(
-                        onPressed: () => _handleBack(launchState),
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.arrow_back_rounded),
-                      ),
-                    ],
+                  AuthHero(
+                    title: title,
+                    subtitle: subtitle,
+                    isDark: isDark,
+                    compact: false,
                   ),
-                  const SizedBox(height: 4),
-                  AuthHero(title: title, subtitle: subtitle, isDark: isDark),
-                  if (_isSignUp) ...[
-                    const SizedBox(height: 10),
-                    _SignUpHighlights(
-                      secureTitle: text.authSecurePrivateTitle,
-                      secureSubtitle: text.authSecurePrivateSubtitle,
-                      fastTitle: text.authFastEasyTitle,
-                      fastSubtitle: text.authFastEasySubtitle,
-                      lovedTitle: text.authLovedByPetsTitle,
-                      lovedSubtitle: text.authLovedByPetsSubtitle,
-                    ),
-                  ],
-                  const SizedBox(height: 2),
+                  const SizedBox(height: heroBottomSpacing),
                   if (_consentErrorMessage != null)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
+                      padding: EdgeInsets.only(bottom: compactLayout ? 8 : 12),
                       child: ErrorCard(
                         message: _mapErrorMessage(_consentErrorMessage!, text),
                       ),
                     ),
                   AuthFormCard(
                     isDark: isDark,
+                    compact: compactLayout,
                     child: Column(
                       children: [
                         if (_isSignUp) ...[
@@ -233,8 +234,9 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             textInputAction: TextInputAction.next,
                             onChanged: controller.updateDisplayName,
                             enabled: !state.isSaving,
+                            compact: compactLayout,
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: compactLayout ? 9 : 12),
                         ],
                         AuthField(
                           controller: _emailController,
@@ -244,8 +246,9 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                           textInputAction: TextInputAction.next,
                           onChanged: controller.updateEmail,
                           enabled: !state.isSaving,
+                          compact: compactLayout,
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: compactLayout ? 9 : 12),
                         AuthField(
                           controller: _passwordController,
                           hintText: text.profilePasswordLabel,
@@ -256,6 +259,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               : TextInputAction.done,
                           onChanged: controller.updatePassword,
                           enabled: !state.isSaving,
+                          compact: compactLayout,
                           trailing: IconButton(
                             onPressed: state.isSaving
                                 ? null
@@ -272,22 +276,22 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                           ),
                         ),
                         if (_isSignUp) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 5),
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Padding(
-                              padding: const EdgeInsets.only(left: 2),
+                              padding: const EdgeInsets.only(left: 4),
                               child: Text(
                                 text.authPasswordRulesHint,
                                 style: TextStyle(
                                   color: colors.textMuted,
-                                  fontSize: 10.8,
+                                  fontSize: 10.4,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 9),
                           AuthField(
                             controller: _confirmPasswordController,
                             hintText: text.authConfirmPasswordLabel,
@@ -296,6 +300,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                             textInputAction: TextInputAction.done,
                             onChanged: controller.updateConfirmPassword,
                             enabled: !state.isSaving,
+                            compact: compactLayout,
                             errorText: confirmPasswordMismatch
                                 ? text.authPasswordMismatch
                                 : null,
@@ -320,11 +325,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                     ),
                   ),
                   if (_isSignUp) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _TermsConsentOption(
                       value: _acceptedTerms,
                       label: text.authAcceptTermsLabel,
                       locale: Localizations.localeOf(context),
+                      enabled: legalDocumentsAvailable && !state.isSaving,
                       onOpenTerms: () => _openLegalDocument(
                         legalDocuments: legalDocumentsAsync.value,
                         documentSelector: (docs) => docs.termsOfUse,
@@ -343,16 +349,16 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                       },
                     ),
                     if (legalDocumentsAsync.hasError) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       _LegalStateLine(
                         message: text.authLegalUnavailable,
                         isError: true,
                       ),
                     ] else if (legalDocumentsAsync.isLoading) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       _LegalStateLine(message: text.authLegalLoading),
                     ],
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     _MarketingConsentOption(
                       value: _receiveUpdates,
                       title: text.authReceiveUpdatesLabel,
@@ -363,7 +369,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                       },
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  SizedBox(height: compactLayout ? 8 : 14),
                   _AuthInlineActions(
                     isSignUp: _isSignUp,
                     switchPrompt: switchPrompt,
@@ -377,68 +383,96 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                       context.go('${PasswordResetPage.routePath}$query');
                     },
                     onSwitchMode: () {
-                      context.go(
-                        _isSignUp
-                            ? AuthEntryPage.routePath
-                            : RegisterEntryPage.routePath,
-                      );
+                      if (_isSignUp) {
+                        if (GoRouter.of(context).canPop()) {
+                          context.pop();
+                          return;
+                        }
+                        context.go(AuthEntryPage.routePath);
+                        return;
+                      }
+
+                      context.push(RegisterEntryPage.routePath);
                     },
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: compactLayout ? 6 : 10),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: submitDisabled ? null : _submit,
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        minimumSize: Size.fromHeight(compactLayout ? 52 : 54),
+                        padding: EdgeInsets.symmetric(
+                          vertical: compactLayout ? 13 : 14,
+                        ),
+                        backgroundColor: colors.accent,
+                        foregroundColor: isDark
+                            ? const Color(0xFF03130C)
+                            : Colors.white,
+                        disabledBackgroundColor: isDark
+                            ? colors.surfaceStrong.withValues(alpha: 0.78)
+                            : const Color(0xFFD6E2DC),
+                        disabledForegroundColor: colors.textMuted,
+                        shadowColor: colors.accent.withValues(
+                          alpha: isDark ? 0.22 : 0.28,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        elevation: 0.6,
+                        elevation: state.isSaving ? 0 : 3,
+                        textStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(
+                              fontSize: 13.6,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0,
+                            ),
                       ),
-                      child: Text(
-                        state.isSaving
-                            ? text.profileLoadingAction
-                            : primaryAction,
-                      ),
+                      child: state.isSaving
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      colors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(text.profileLoadingAction),
+                              ],
+                            )
+                          : Text(primaryAction),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: compactLayout ? 12 : 18),
                   AuthDivider(label: text.authOrContinueWith),
-                  const SizedBox(height: 12),
+                  SizedBox(height: compactLayout ? 10 : 14),
                   Column(
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: SocialButton(
-                          icon: SocialGlyph.google(),
-                          label: text.authContinueWithGoogle,
-                          onPressed: state.isSaving
-                              ? null
-                              : () => _submitExternal(
-                                  ExternalAuthProvider.google,
-                                ),
-                        ),
-                      ),
-                      if (showAppleSignIn) ...[
-                        const SizedBox(height: 8),
+                      for (
+                        var index = 0;
+                        index < socialProviders.length;
+                        index++
+                      ) ...[
                         SizedBox(
                           width: double.infinity,
-                          child: SocialButton(
-                            icon: SocialGlyph.apple(),
-                            label: text.authContinueWithApple,
-                            onPressed: state.isSaving
-                                ? null
-                                : () => _submitExternal(
-                                    ExternalAuthProvider.apple,
-                                  ),
+                          child: _SocialProviderButton(
+                            provider: socialProviders[index],
+                            compact: compactLayout,
+                            isSaving: state.isSaving,
+                            onPressed: _submitExternal,
                           ),
                         ),
+                        if (index < socialProviders.length - 1)
+                          SizedBox(height: compactLayout ? 8 : 10),
                       ],
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: compactLayout ? 12 : 18),
                   LightPrivacyPanel(
                     title: text.authPrivacyTitle,
                     subtitle: text.authPrivacySubtitle,
@@ -539,20 +573,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     router.go(_resolvePostAuthRoute());
   }
 
-  void _handleBack(AppLaunchState launchState) {
-    if (_isSignUp) {
-      context.go(AuthEntryPage.routePath);
-      return;
-    }
-
-    if (launchState.guestSessionReady) {
-      context.go(TemplatesPage.routePath);
-      return;
-    }
-
-    context.go(GuestWelcomePage.routePath);
-  }
-
   void _syncControllers(ProfileState state) {
     _syncController(_displayNameController, state.displayName);
     _syncController(_emailController, state.email);
@@ -619,6 +639,32 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 }
 
+class _SocialProviderButton extends StatelessWidget {
+  const _SocialProviderButton({
+    required this.provider,
+    required this.compact,
+    required this.isSaving,
+    required this.onPressed,
+  });
+
+  final ExternalAuthProvider provider;
+  final bool compact;
+  final bool isSaving;
+  final ValueChanged<ExternalAuthProvider> onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final isApple = provider == ExternalAuthProvider.apple;
+    return SocialButton(
+      icon: isApple ? SocialGlyph.apple() : SocialGlyph.google(),
+      label: isApple ? text.authContinueWithApple : text.authContinueWithGoogle,
+      compact: compact,
+      onPressed: isSaving ? null : () => onPressed(provider),
+    );
+  }
+}
+
 class _LegalDocumentSheet extends StatelessWidget {
   const _LegalDocumentSheet({required this.document});
 
@@ -669,6 +715,7 @@ class _TermsConsentOption extends StatelessWidget {
     required this.value,
     required this.label,
     required this.locale,
+    required this.enabled,
     required this.onOpenTerms,
     required this.onOpenPrivacy,
     required this.onChanged,
@@ -678,6 +725,7 @@ class _TermsConsentOption extends StatelessWidget {
   final bool value;
   final String label;
   final Locale locale;
+  final bool enabled;
   final VoidCallback onOpenTerms;
   final VoidCallback onOpenPrivacy;
   final ValueChanged<bool?> onChanged;
@@ -686,6 +734,7 @@ class _TermsConsentOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final phrases = _LegalConsentPhrases.forLocale(locale);
     final split = _ConsentLabelSplit.tryParse(
       label: label,
@@ -693,73 +742,90 @@ class _TermsConsentOption extends StatelessWidget {
       privacyText: phrases.privacy,
     );
     final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: colors.textStrong,
+      color: enabled ? colors.textStrong : colors.textMuted,
       fontSize: 13,
       fontWeight: FontWeight.w600,
       height: 1.34,
     );
     final linkStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
-      color: colors.accent,
+      color: enabled ? colors.accent : colors.textMuted,
       fontSize: 13,
       fontWeight: FontWeight.w800,
       height: 1.34,
       decoration: TextDecoration.underline,
-      decorationColor: colors.accent.withValues(alpha: 0.7),
+      decorationColor: (enabled ? colors.accent : colors.textMuted).withValues(
+        alpha: 0.7,
+      ),
     );
 
-    return Container(
-      decoration: BoxDecoration(
-        color: value
-            ? colors.accentSoft.withValues(alpha: 0.44)
-            : colors.surfaceGlass,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: showError
-              ? colors.danger.withValues(alpha: 0.55)
-              : value
-              ? colors.accent.withValues(alpha: 0.58)
-              : colors.border.withValues(alpha: 0.8),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? () => onChanged(!value) : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: value
+                ? colors.accent.withValues(alpha: isDark ? 0.09 : 0.11)
+                : colors.surfaceGlass.withValues(alpha: isDark ? 0.54 : 0.8),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: showError
+                  ? colors.danger.withValues(alpha: 0.48)
+                  : value
+                  ? colors.accent.withValues(alpha: 0.52)
+                  : colors.border.withValues(alpha: isDark ? 0.58 : 0.62),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(4, 5, 10, 5),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: value,
+                onChanged: enabled ? onChanged : null,
+                activeColor: colors.accent,
+                checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                side: BorderSide(
+                  color: showError
+                      ? colors.danger.withValues(alpha: 0.72)
+                      : colors.border.withValues(alpha: 0.86),
+                  width: 1.2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              const SizedBox(width: 2),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 8),
+                  child: split == null
+                      ? Text(label, style: textStyle)
+                      : Wrap(
+                          children: [
+                            Text(split.prefix, style: textStyle),
+                            _InlineLegalLink(
+                              text: split.terms,
+                              style: linkStyle,
+                              onTap: enabled ? onOpenTerms : null,
+                            ),
+                            Text(split.between, style: textStyle),
+                            _InlineLegalLink(
+                              text: split.privacy,
+                              style: linkStyle,
+                              onTap: enabled ? onOpenPrivacy : null,
+                            ),
+                            Text(split.suffix, style: textStyle),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      padding: const EdgeInsets.fromLTRB(4, 3, 8, 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Checkbox(
-            value: value,
-            onChanged: onChanged,
-            activeColor: colors.accent,
-            visualDensity: VisualDensity.compact,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(6),
-            ),
-          ),
-          const SizedBox(width: 2),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 8),
-              child: split == null
-                  ? Text(label, style: textStyle)
-                  : Wrap(
-                      children: [
-                        Text(split.prefix, style: textStyle),
-                        _InlineLegalLink(
-                          text: split.terms,
-                          style: linkStyle,
-                          onTap: onOpenTerms,
-                        ),
-                        Text(split.between, style: textStyle),
-                        _InlineLegalLink(
-                          text: split.privacy,
-                          style: linkStyle,
-                          onTap: onOpenPrivacy,
-                        ),
-                        Text(split.suffix, style: textStyle),
-                      ],
-                    ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -779,33 +845,52 @@ class _MarketingConsentOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Checkbox(
-          value: value,
-          onChanged: onChanged,
-          activeColor: colors.accent,
-          visualDensity: VisualDensity.compact,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        const SizedBox(width: 2),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.textSoft,
-                fontSize: 12.2,
-                fontWeight: FontWeight.w600,
-                height: 1.32,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onChanged(!value),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: value,
+                onChanged: onChanged,
+                activeColor: colors.accent,
+                checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                side: BorderSide(
+                  color: colors.border.withValues(alpha: 0.86),
+                  width: 1.2,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
-            ),
+              const SizedBox(width: 3),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textSoft,
+                      fontSize: 12.2,
+                      fontWeight: FontWeight.w600,
+                      height: 1.32,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -819,31 +904,50 @@ class _LegalStateLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 1),
-          child: Icon(
-            isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
-            size: 14,
-            color: isError ? colors.danger : colors.textMuted,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isError
+            ? colors.danger.withValues(alpha: isDark ? 0.1 : 0.07)
+            : colors.surfaceGlass.withValues(alpha: isDark ? 0.46 : 0.62),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isError
+              ? colors.danger.withValues(alpha: 0.2)
+              : colors.border.withValues(alpha: 0.45),
         ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            message,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: isError ? colors.danger : colors.textMuted,
-              fontSize: 11.6,
-              fontWeight: FontWeight.w600,
-              height: 1.34,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              Icons.info_outline_rounded,
+              size: 13,
+              color: isError
+                  ? colors.danger.withValues(alpha: 0.86)
+                  : colors.textMuted,
             ),
           ),
-        ),
-      ],
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: isError
+                    ? colors.danger.withValues(alpha: isDark ? 0.92 : 0.86)
+                    : colors.textMuted,
+                fontSize: 11.2,
+                fontWeight: FontWeight.w600,
+                height: 1.32,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -857,7 +961,7 @@ class _InlineLegalLink extends StatelessWidget {
 
   final String text;
   final TextStyle? style;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -907,113 +1011,6 @@ class _ConsentLabelSplit {
       between: label.substring(termsStart + termsText.length, privacyStart),
       privacy: label.substring(privacyStart, privacyStart + privacyText.length),
       suffix: label.substring(privacyStart + privacyText.length),
-    );
-  }
-}
-
-class _SignUpHighlights extends StatelessWidget {
-  const _SignUpHighlights({
-    required this.secureTitle,
-    required this.secureSubtitle,
-    required this.fastTitle,
-    required this.fastSubtitle,
-    required this.lovedTitle,
-    required this.lovedSubtitle,
-  });
-
-  final String secureTitle;
-  final String secureSubtitle;
-  final String fastTitle;
-  final String fastSubtitle;
-  final String lovedTitle;
-  final String lovedSubtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    Widget item({
-      required IconData icon,
-      required String title,
-      required String subtitle,
-    }) {
-      return Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            color: colors.surface.withValues(alpha: isDark ? 0.4 : 0.88),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 16, color: colors.accent),
-              const SizedBox(height: 5),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontSize: 11.4,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 10.6,
-                  height: 1.25,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.accentSoft.withValues(alpha: isDark ? 0.18 : 0.52),
-            colors.surfaceGlass.withValues(alpha: isDark ? 0.5 : 0.9),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.border.withValues(alpha: 0.85)),
-      ),
-      child: Row(
-        children: [
-          item(
-            icon: Icons.verified_user_outlined,
-            title: secureTitle,
-            subtitle: secureSubtitle,
-          ),
-          const SizedBox(width: 8),
-          item(
-            icon: Icons.bolt_rounded,
-            title: fastTitle,
-            subtitle: fastSubtitle,
-          ),
-          const SizedBox(width: 8),
-          item(
-            icon: Icons.favorite_border_rounded,
-            title: lovedTitle,
-            subtitle: lovedSubtitle,
-          ),
-        ],
-      ),
     );
   }
 }

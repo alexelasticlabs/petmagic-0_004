@@ -10,32 +10,33 @@ class AuthBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return IgnorePointer(
       child: Stack(
         children: [
           Positioned(
-            left: -40,
-            top: 72,
+            left: -56,
+            top: 76,
             child: BlurOrb(
-              size: 140,
-              color: colors.accent.withValues(alpha: 0.08),
+              size: 150,
+              color: colors.accent.withValues(alpha: isDark ? 0.06 : 0.07),
             ),
           ),
           Positioned(
-            right: -50,
-            top: 118,
+            right: -64,
+            top: 126,
             child: BlurOrb(
               size: 170,
-              color: colors.gold.withValues(alpha: 0.08),
+              color: colors.gold.withValues(alpha: isDark ? 0.05 : 0.06),
             ),
           ),
           Positioned(
             right: 24,
-            top: 92,
+            top: 98,
             child: Icon(
               Icons.pets_rounded,
-              size: 26,
-              color: colors.accent.withValues(alpha: 0.35),
+              size: 22,
+              color: colors.accent.withValues(alpha: isDark ? 0.18 : 0.22),
             ),
           ),
           Positioned(
@@ -44,7 +45,7 @@ class AuthBackdrop extends StatelessWidget {
             child: Icon(
               Icons.auto_awesome_rounded,
               size: 16,
-              color: colors.gold.withValues(alpha: 0.45),
+              color: colors.gold.withValues(alpha: isDark ? 0.22 : 0.3),
             ),
           ),
         ],
@@ -59,11 +60,13 @@ class AuthHero extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.isDark,
+    this.compact = false,
   });
 
   final String title;
   final String subtitle;
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -71,126 +74,140 @@ class AuthHero extends StatelessWidget {
     final titleStyle = Theme.of(context).textTheme.headlineMedium;
     final subtitleStyle = Theme.of(context).textTheme.bodyMedium;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          flex: 11,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AuthWordmark(isDark: isDark),
-                const SizedBox(height: 10),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: titleStyle?.copyWith(
-                    fontSize: isDark ? 23 : 21,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.25,
-                    color: colors.textStrong,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: subtitleStyle?.copyWith(
-                    fontSize: 12.4,
-                    height: 1.28,
-                    fontWeight: FontWeight.w500,
-                    color: colors.textSoft,
-                  ),
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 360;
+        final imageHeight = compact
+            ? (narrow ? 126.0 : 140.0)
+            : (narrow ? 172.0 : 196.0);
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: compact ? 152 : (narrow ? 190 : 214),
           ),
-        ),
-        const SizedBox(width: 4),
-        Expanded(
-          flex: 9,
-          child: SizedBox(
-            height: isDark ? 222 : 198,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          colors.gold.withValues(alpha: 0.16),
-                          colors.accent.withValues(alpha: 0.28),
-                          colors.accent.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.08, 0.4, 0.75, 1],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                flex: compact ? 13 : (narrow ? 12 : 11),
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    bottom: compact ? 6 : (narrow ? 12 : 20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AuthWordmark(isDark: isDark, compact: compact),
+                      SizedBox(height: compact ? 6 : 10),
+                      Text(
+                        title,
+                        maxLines: 2,
+                        softWrap: true,
+                        overflow: TextOverflow.visible,
+                        style: titleStyle?.copyWith(
+                          fontSize: compact ? 18.5 : (narrow ? 20 : 22),
+                          height: compact ? 1.04 : 1.08,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0,
+                          color: colors.textStrong,
+                        ),
                       ),
-                    ),
+                      SizedBox(height: compact ? 5 : 8),
+                      Text(
+                        subtitle,
+                        maxLines: compact ? 2 : 3,
+                        overflow: TextOverflow.visible,
+                        style: subtitleStyle?.copyWith(
+                          fontSize: compact ? 11.1 : (narrow ? 11.8 : 12.6),
+                          height: compact ? 1.28 : 1.36,
+                          fontWeight: FontWeight.w600,
+                          color: colors.textSoft,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  left: 20,
-                  right: 18,
-                  top: 54,
-                  bottom: 4,
-                  child: Transform.rotate(
-                    angle: -0.14,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            colors.surfaceGlass.withValues(
-                              alpha: isDark ? 0.3 : 0.88,
+              ),
+              SizedBox(width: compact ? 2 : (narrow ? 0 : 6)),
+              Expanded(
+                flex: compact ? 7 : (narrow ? 8 : 9),
+                child: SizedBox(
+                  height: imageHeight,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                colors.gold.withValues(
+                                  alpha: isDark ? 0.1 : 0.13,
+                                ),
+                                colors.accent.withValues(
+                                  alpha: isDark ? 0.18 : 0.22,
+                                ),
+                                colors.accent.withValues(alpha: 0.06),
+                                Colors.transparent,
+                              ],
+                              stops: const [0.08, 0.42, 0.76, 1],
                             ),
-                            colors.surface.withValues(
-                              alpha: isDark ? 0.14 : 0.55,
-                            ),
-                          ],
-                        ),
-                        border: Border.all(
-                          color: colors.border.withValues(
-                            alpha: isDark ? 0.7 : 1,
                           ),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        left: compact ? 8 : (narrow ? 12 : 18),
+                        right: compact ? 8 : (narrow ? 12 : 18),
+                        top: compact ? 34 : (narrow ? 48 : 52),
+                        bottom: compact ? 4 : 8,
+                        child: Transform.rotate(
+                          angle: -0.1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30),
+                              color: colors.surfaceGlass.withValues(
+                                alpha: isDark ? 0.24 : 0.68,
+                              ),
+                              border: Border.all(
+                                color: colors.border.withValues(
+                                  alpha: isDark ? 0.45 : 0.55,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: compact ? -8 : (narrow ? -12 : -16),
+                        right: compact ? -8 : (narrow ? -12 : -16),
+                        top: compact ? 26 : (narrow ? 38 : 42),
+                        bottom: compact ? -36 : (narrow ? -46 : -68),
+                        child: Transform.scale(
+                          scale: compact ? 1.0 : (narrow ? 1.06 : 1.12),
+                          alignment: Alignment.bottomCenter,
+                          child: Image.asset(
+                            'assets/auth/petmagic-auth-hero.png',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Positioned(
-                  left: -14,
-                  right: -14,
-                  top: 46,
-                  bottom: -80,
-                  child: Transform.scale(
-                    scale: 1.14,
-                    alignment: Alignment.bottomCenter,
-                    child: Image.asset(
-                      'assets/auth/petmagic-auth-hero.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
 class AuthWordmark extends StatelessWidget {
-  const AuthWordmark({super.key, required this.isDark});
+  const AuthWordmark({super.key, required this.isDark, this.compact = false});
 
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -199,8 +216,8 @@ class AuthWordmark extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 58,
-          height: 58,
+          width: compact ? 42 : 58,
+          height: compact ? 42 : 58,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -221,24 +238,24 @@ class AuthWordmark extends StatelessWidget {
                   color: colors.accent.withValues(alpha: 0.08),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(11),
+                  padding: EdgeInsets.all(compact ? 8 : 11),
                   child: Icon(
                     Icons.pets_rounded,
                     color: colors.accent,
-                    size: 26,
+                    size: compact ? 20 : 26,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: compact ? 5 : 8),
         Text(
           'PetMagic',
           style: GoogleFonts.comfortaa(
-            fontSize: 24,
+            fontSize: compact ? 20 : 24,
             fontWeight: FontWeight.w700,
-            letterSpacing: -0.45,
+            letterSpacing: 0,
             color: isDark ? colors.textStrong : const Color(0xFF10234A),
           ),
         ),
@@ -248,76 +265,43 @@ class AuthWordmark extends StatelessWidget {
 }
 
 class AuthFormCard extends StatelessWidget {
-  const AuthFormCard({super.key, required this.child, required this.isDark});
+  const AuthFormCard({
+    super.key,
+    required this.child,
+    required this.isDark,
+    this.compact = false,
+  });
 
   final Widget child;
   final bool isDark;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: isDark ? 12 : 8,
-          sigmaY: isDark ? 12 : 8,
-        ),
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(14),
+          padding: EdgeInsets.all(compact ? 12 : 16),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.surfaceGlass.withValues(alpha: isDark ? 0.95 : 1),
-                colors.surface.withValues(alpha: isDark ? 0.86 : 0.96),
-                colors.accentSoft.withValues(alpha: isDark ? 0.06 : 0.32),
-              ],
-              stops: const [0.0, 0.68, 1.0],
-            ),
+            color: isDark ? const Color(0xB8181F26) : const Color(0xB8FFFFFF),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: colors.border.withValues(alpha: isDark ? 0.95 : 0.85),
+              color: isDark ? const Color(0x40789687) : const Color(0x8CB4C8BE),
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow,
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: colors.gold.withValues(alpha: isDark ? 0.04 : 0.08),
-                blurRadius: 26,
-                offset: const Offset(0, 8),
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.35)
+                    : const Color(0x1A1F2D3D),
+                blurRadius: compact ? 24 : 32,
+                offset: Offset(0, compact ? 8 : 12),
               ),
             ],
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -6,
-                top: -8,
-                child: Icon(
-                  Icons.auto_awesome_rounded,
-                  size: 24,
-                  color: colors.gold.withValues(alpha: isDark ? 0.14 : 0.24),
-                ),
-              ),
-              Positioned(
-                left: -4,
-                bottom: -2,
-                child: Icon(
-                  Icons.pets_rounded,
-                  size: 22,
-                  color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.18),
-                ),
-              ),
-              child,
-            ],
-          ),
+          child: child,
         ),
       ),
     );
@@ -337,6 +321,7 @@ class AuthField extends StatelessWidget {
     this.obscureText = false,
     this.enabled = true,
     this.errorText,
+    this.compact = false,
   });
 
   final TextEditingController controller;
@@ -349,12 +334,17 @@ class AuthField extends StatelessWidget {
   final bool obscureText;
   final bool enabled;
   final String? errorText;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final labelStyle = Theme.of(context).textTheme.bodyMedium;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputFill = enabled
+        ? (isDark ? const Color(0xFF141C24) : const Color(0xFFFCFEFF))
+        : colors.surfaceStrong.withValues(alpha: isDark ? 0.62 : 0.5);
+    final iconColor = enabled ? colors.textSoft : colors.textMuted;
 
     return TextField(
       controller: controller,
@@ -365,34 +355,30 @@ class AuthField extends StatelessWidget {
       obscureText: obscureText,
       style: labelStyle?.copyWith(
         color: enabled ? colors.textStrong : colors.textMuted,
-        fontSize: 13.4,
+        fontSize: compact ? 13.2 : 13.6,
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
+        constraints: BoxConstraints(minHeight: compact ? 50 : 54),
         errorText: errorText,
         hintText: hintText,
         hintStyle: labelStyle?.copyWith(
-          color: colors.textMuted,
-          fontSize: 12.6,
+          color: colors.textMuted.withValues(alpha: isDark ? 0.82 : 0.72),
+          fontSize: compact ? 12.6 : 13,
           fontWeight: FontWeight.w600,
         ),
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 14, right: 6),
-          child: Icon(
-            prefixIcon,
-            color: enabled ? colors.textSoft : colors.textMuted,
-            size: 19,
-          ),
+          child: Icon(prefixIcon, color: iconColor, size: 20),
         ),
-        prefixIconConstraints: const BoxConstraints(
-          minWidth: 42,
-          minHeight: 40,
+        prefixIconConstraints: BoxConstraints(
+          minWidth: 44,
+          minHeight: compact ? 50 : 54,
         ),
         suffixIcon: trailing,
+        suffixIconColor: iconColor,
         filled: true,
-        fillColor: enabled
-            ? colors.surface.withValues(alpha: isDark ? 0.92 : 0.98)
-            : colors.surface.withValues(alpha: isDark ? 0.64 : 0.92),
+        fillColor: inputFill,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
@@ -400,26 +386,23 @@ class AuthField extends StatelessWidget {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: colors.border.withValues(alpha: isDark ? 0.82 : 0.7),
+            color: isDark ? const Color(0x665F7D70) : const Color(0xB6BAC8D2),
           ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: colors.accent.withValues(alpha: 0.82),
-            width: 1.4,
-          ),
+          borderSide: BorderSide(color: colors.accent, width: 1.55),
         ),
         disabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: colors.border.withValues(alpha: isDark ? 0.48 : 0.55),
+            color: colors.border.withValues(alpha: isDark ? 0.38 : 0.45),
           ),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(
-            color: colors.danger.withValues(alpha: 0.72),
+            color: colors.danger.withValues(alpha: 0.64),
             width: 1.2,
           ),
         ),
@@ -431,14 +414,14 @@ class AuthField extends StatelessWidget {
           ),
         ),
         errorStyle: TextStyle(
-          color: colors.danger,
-          fontSize: 11.2,
+          color: colors.danger.withValues(alpha: isDark ? 0.92 : 0.86),
+          fontSize: 11,
           fontWeight: FontWeight.w600,
-          height: 1.2,
+          height: 1.25,
         ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 14,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: compact ? 13 : 15,
         ),
       ),
     );
@@ -456,19 +439,29 @@ class AuthDivider extends StatelessWidget {
 
     return Row(
       children: [
-        Expanded(child: Divider(color: colors.border)),
+        Expanded(
+          child: Divider(
+            color: colors.border.withValues(alpha: 0.58),
+            thickness: 0.8,
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
             label,
             style: TextStyle(
-              color: colors.textMuted,
-              fontSize: 12,
+              color: colors.textMuted.withValues(alpha: 0.86),
+              fontSize: 11.6,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
-        Expanded(child: Divider(color: colors.border)),
+        Expanded(
+          child: Divider(
+            color: colors.border.withValues(alpha: 0.58),
+            thickness: 0.8,
+          ),
+        ),
       ],
     );
   }
@@ -480,25 +473,40 @@ class SocialButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.compact = false,
   });
 
   final Widget icon;
   final String label;
   final VoidCallback? onPressed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return OutlinedButton(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        side: BorderSide(color: colors.border),
+        minimumSize: Size.fromHeight(compact ? 48 : 52),
+        padding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: compact ? 11 : 13,
+        ),
+        side: BorderSide(
+          color: isDark
+              ? colors.border.withValues(alpha: 0.9)
+              : colors.border.withValues(alpha: 0.72),
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         foregroundColor: colors.textStrong,
-        backgroundColor: colors.surfaceGlass,
+        disabledForegroundColor: colors.textMuted,
+        backgroundColor: isDark
+            ? const Color(0xCC111922)
+            : colors.surface.withValues(alpha: 0.92),
+        disabledBackgroundColor: colors.surfaceStrong.withValues(alpha: 0.56),
+        overlayColor: colors.accent.withValues(alpha: isDark ? 0.12 : 0.08),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -507,7 +515,11 @@ class SocialButton extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontSize: 13.6,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
           ),
         ],
       ),
@@ -622,23 +634,23 @@ class LightPrivacyPanel extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.accentSoft.withValues(alpha: isDark ? 0.26 : 0.86),
-            colors.surface.withValues(alpha: isDark ? 0.78 : 0.98),
-          ],
+        color: isDark
+            ? colors.accent.withValues(alpha: 0.08)
+            : colors.accentSoft.withValues(alpha: 0.34),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? colors.accent.withValues(alpha: 0.16)
+              : colors.accent.withValues(alpha: 0.18),
         ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colors.border.withValues(alpha: 0.9)),
         boxShadow: [
           BoxShadow(
-            color: colors.shadow.withValues(alpha: isDark ? 0.2 : 0.1),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: colors.shadow.withValues(alpha: isDark ? 0.16 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -649,14 +661,10 @@ class LightPrivacyPanel extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: colors.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(10),
+              color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.16),
+              borderRadius: BorderRadius.circular(11),
             ),
-            child: Icon(
-              Icons.verified_user_outlined,
-              color: colors.accent,
-              size: 18,
-            ),
+            child: Icon(Icons.shield_outlined, color: colors.accent, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -665,11 +673,9 @@ class LightPrivacyPanel extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 14,
+                    fontSize: 13.4,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -678,7 +684,7 @@ class LightPrivacyPanel extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     color: colors.textSoft,
-                    fontSize: 12,
+                    fontSize: 11.8,
                     height: 1.35,
                     fontWeight: FontWeight.w600,
                   ),
@@ -759,19 +765,33 @@ class ErrorCard extends StatelessWidget {
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.danger.withValues(alpha: 0.12),
+        color: colors.danger.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.danger.withValues(alpha: 0.28)),
+        border: Border.all(color: colors.danger.withValues(alpha: 0.22)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Text(
-          message,
-          style: TextStyle(
-            color: colors.textStrong,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline_rounded,
+              size: 15,
+              color: colors.danger.withValues(alpha: 0.9),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  height: 1.28,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

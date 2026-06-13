@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
@@ -466,8 +467,14 @@ class _LinkedAccountEmailRow extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               FilledButton.tonal(
-                onPressed: null,
-                child: Text(text.profileLinkedAccountsDisconnectAction),
+                onPressed: (email ?? '').trim().isEmpty
+                    ? null
+                    : () {
+                        context.push(
+                          '${PasswordChangePage.routePath}?email=${Uri.encodeComponent(email!.trim())}',
+                        );
+                      },
+                child: Text(text.profileSettingsPasswordTitle),
               ),
             ],
           ),

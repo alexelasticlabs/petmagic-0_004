@@ -97,6 +97,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     final subtitle = state.codeRequested
         ? text.authPasswordResetCodeSubtitle
         : text.authPasswordResetSubtitle;
+    final isCompact = state.codeRequested;
 
     return Scaffold(
       body: DecoratedBox(
@@ -112,22 +113,23 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
             const AuthBackdrop(),
             SafeArea(
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                padding: EdgeInsets.fromLTRB(
+                  isCompact ? 18 : 20,
+                  isCompact ? 2 : 4,
+                  isCompact ? 18 : 20,
+                  isCompact ? 18 : 24,
+                ),
                 children: [
-                  Row(
-                    children: [
-                      IconButton.outlined(
-                        onPressed: _goToAuth,
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(Icons.arrow_back_rounded),
-                      ),
-                    ],
+                  AuthHero(
+                    title: title,
+                    subtitle: subtitle,
+                    isDark: isDark,
+                    compact: false,
                   ),
-                  const SizedBox(height: 4),
-                  AuthHero(title: title, subtitle: subtitle, isDark: isDark),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   AuthFormCard(
                     isDark: isDark,
+                    compact: isCompact,
                     child: Column(
                       children: [
                         AuthField(
@@ -139,17 +141,21 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                               ? TextInputAction.next
                               : TextInputAction.done,
                           onChanged: controller.updateEmail,
+                          enabled: !state.isSaving,
+                          compact: isCompact,
                         ),
                         if (state.codeRequested) ...[
-                          const SizedBox(height: 8),
+                          SizedBox(height: isCompact ? 9 : 12),
                           AuthField(
                             controller: _codeController,
                             hintText: text.authPasswordResetCodeLabel,
                             prefixIcon: Icons.mark_email_read_outlined,
                             textInputAction: TextInputAction.next,
                             onChanged: controller.updateCode,
+                            enabled: !state.isSaving,
+                            compact: isCompact,
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: isCompact ? 9 : 12),
                           AuthField(
                             controller: _passwordController,
                             hintText: text.profilePasswordLabel,
@@ -157,12 +163,16 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.next,
                             onChanged: controller.updateNewPassword,
+                            enabled: !state.isSaving,
+                            compact: isCompact,
                             trailing: IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
+                              onPressed: state.isSaving
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _obscurePassword = !_obscurePassword;
+                                      });
+                                    },
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_outlined
@@ -170,7 +180,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: isCompact ? 9 : 12),
                           AuthField(
                             controller: _confirmPasswordController,
                             hintText: text.authConfirmPasswordLabel,
@@ -178,13 +188,17 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                             obscureText: _obscureConfirmPassword,
                             textInputAction: TextInputAction.done,
                             onChanged: controller.updateConfirmPassword,
+                            enabled: !state.isSaving,
+                            compact: isCompact,
                             trailing: IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _obscureConfirmPassword =
-                                      !_obscureConfirmPassword;
-                                });
-                              },
+                              onPressed: state.isSaving
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _obscureConfirmPassword =
+                                            !_obscureConfirmPassword;
+                                      });
+                                    },
                               icon: Icon(
                                 _obscureConfirmPassword
                                     ? Icons.visibility_outlined
@@ -192,7 +206,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 5),
                           Align(
                             alignment: Alignment.centerLeft,
                             child: Text(
@@ -200,7 +214,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                               style: TextStyle(
                                 color: colors.textMuted,
                                 fontSize: 10.4,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -208,29 +222,62 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isCompact ? 10 : 12),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: state.isSaving ? null : _submit,
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        minimumSize: const Size.fromHeight(54),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: colors.accent,
+                        foregroundColor: isDark
+                            ? const Color(0xFF03130C)
+                            : Colors.white,
+                        disabledBackgroundColor: isDark
+                            ? colors.surfaceStrong.withValues(alpha: 0.78)
+                            : const Color(0xFFD6E2DC),
+                        disabledForegroundColor: colors.textMuted,
+                        shadowColor: colors.accent.withValues(
+                          alpha: isDark ? 0.22 : 0.28,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        elevation: 0.6,
+                        elevation: state.isSaving ? 0 : 3,
+                        textStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(
+                              fontSize: 13.6,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0,
+                            ),
                       ),
-                      child: Text(
-                        state.isSaving
-                            ? text.profileLoadingAction
-                            : state.codeRequested
-                            ? text.authPasswordResetConfirmAction
-                            : text.authPasswordResetRequestAction,
-                      ),
+                      child: state.isSaving
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      colors.textMuted,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(text.profileLoadingAction),
+                              ],
+                            )
+                          : Text(
+                              state.codeRequested
+                                  ? text.authPasswordResetConfirmAction
+                                  : text.authPasswordResetRequestAction,
+                            ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isCompact ? 8 : 10),
                   Center(
                     child: TextButton(
                       onPressed: state.isSaving

@@ -496,12 +496,10 @@ class ProfileController extends Notifier<ProfileState> {
       if (!ref.mounted) {
         return;
       }
-      try {
-        await externalAuthRepository.clearSession(ExternalAuthProvider.google);
-      } catch (error, stackTrace) {
-        _logProfileFailure('logout_google_cleanup', error, stackTrace);
-        // Logout must still complete even if provider cleanup fails.
-      }
+      await _clearExternalAuthSessions(
+        externalAuthRepository,
+        failureStage: 'logout_external_cleanup',
+      );
       if (!ref.mounted) {
         return;
       }
@@ -541,12 +539,10 @@ class ProfileController extends Notifier<ProfileState> {
       if (!ref.mounted) {
         return;
       }
-      try {
-        await externalAuthRepository.clearSession(ExternalAuthProvider.google);
-      } catch (error, stackTrace) {
-        _logProfileFailure('delete_account_google_cleanup', error, stackTrace);
-        // Account deletion must still complete even if provider cleanup fails.
-      }
+      await _clearExternalAuthSessions(
+        externalAuthRepository,
+        failureStage: 'delete_account_external_cleanup',
+      );
 
       if (!ref.mounted) {
         return;
@@ -579,6 +575,25 @@ class ProfileController extends Notifier<ProfileState> {
       maxWidth: 1600,
       imageQuality: 90,
     );
+  }
+
+  Future<void> _clearExternalAuthSessions(
+    ExternalAuthRepository externalAuthRepository, {
+    required String failureStage,
+  }) async {
+    for (final provider in ExternalAuthProvider.values) {
+      try {
+        await externalAuthRepository.clearSession(provider);
+      } catch (error, stackTrace) {
+        _logProfileFailure(
+          failureStage,
+          error,
+          stackTrace,
+          context: {'provider': provider.apiValue},
+        );
+        // Local provider cleanup is best-effort; app logout/delete must finish.
+      }
+    }
   }
 
   Future<void> uploadAvatarFromPath(String filePath) async {

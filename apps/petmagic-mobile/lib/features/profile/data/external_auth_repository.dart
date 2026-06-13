@@ -139,15 +139,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     GoogleSignIn? googleSignIn;
 
     try {
-      final configResponse = await _dio.get<Map<String, dynamic>>(
-        '/api/auth/external/google/mobile-config',
-      );
-      final serverClientId =
-          configResponse.data?['serverClientId'] as String? ??
-          configResponse.data?['ServerClientId'] as String?;
-      if (serverClientId == null || serverClientId.isEmpty) {
-        throw const AppException(_genericFailedCode);
-      }
+      final serverClientId = await _resolveGoogleServerClientId();
 
       googleSignIn = GoogleSignIn(
         scopes: const ['email'],
@@ -208,6 +200,37 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       await _resetGoogleSession(googleSignIn);
       throw const AppException(_genericFailedCode);
     }
+  }
+
+  Future<String?> _resolveGoogleServerClientId() async {
+    try {
+      final configResponse = await _dio.get<Map<String, dynamic>>(
+        '/api/auth/external/google/mobile-config',
+      );
+      final serverClientId =
+          configResponse.data?['serverClientId'] as String? ??
+          configResponse.data?['ServerClientId'] as String?;
+      if (serverClientId == null || serverClientId.isEmpty) {
+        throw const AppException(_genericFailedCode);
+      }
+
+      return serverClientId;
+    } on DioException catch (error) {
+      if (_canContinueGoogleWithoutMobileConfig(error)) {
+        _trackSocialAuthEvent(
+          'google_mobile_config_unavailable',
+          provider: ExternalAuthProvider.google,
+          status: 'native_sdk_fallback',
+        );
+        return null;
+      }
+
+      rethrow;
+    }
+  }
+
+  bool _canContinueGoogleWithoutMobileConfig(DioException error) {
+    return error.response?.statusCode == 403;
   }
 
   Future<AuthSession> _authenticateWithNativeApple() async {
@@ -459,6 +482,10 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (NetworkErrorMapper.isConnectivityIssue(error)) {
+      return NetworkErrorMapper.fromMessage(error, 'network.unavailable');
+    }
+
     final payload = NetworkErrorMapper.parseApiPayload(error);
     final safeMessage = NetworkErrorMapper.safePayloadMessage(payload);
     if (safeMessage != null) {

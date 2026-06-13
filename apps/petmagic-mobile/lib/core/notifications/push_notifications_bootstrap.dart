@@ -33,10 +33,13 @@ class PushNotificationsBootstrap extends ConsumerStatefulWidget {
 class _PushNotificationsBootstrapState
     extends ConsumerState<PushNotificationsBootstrap> {
   static const _initialLinkTimeout = Duration(seconds: 3);
+  static final Object _disposedLinkReadSentinel = Object();
   final AppLinks _appLinks = AppLinks();
+  final Completer<void> _disposed = Completer<void>();
   NotificationCoordinator? _coordinator;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   StreamSubscription<Uri>? _deepLinkSubscription;
+  Timer? _initialLinkTimeoutTimer;
   String? _pendingRoute;
   bool _wasAuthenticated = false;
 
@@ -61,6 +64,11 @@ class _PushNotificationsBootstrapState
   @override
   void dispose() {
     _launchSubscription?.close();
+    _initialLinkTimeoutTimer?.cancel();
+    _initialLinkTimeoutTimer = null;
+    if (!_disposed.isCompleted) {
+      _disposed.complete();
+    }
     final coordinator = _coordinator;
     _coordinator = null;
     unawaited(coordinator?.dispose());
@@ -116,10 +124,12 @@ class _PushNotificationsBootstrapState
     }
 
     try {
-      final initialLink = await _appLinks.getInitialLink().timeout(
-        _initialLinkTimeout,
-      );
-      if (mounted && initialLink != null) {
+      final initialLink = await _readInitialLinkWithTimeout();
+      if (!mounted || initialLink == null) {
+        return;
+      }
+
+      if (mounted) {
         _openDeepLink(initialLink);
       }
     } on TimeoutException catch (error, stackTrace) {
@@ -141,6 +151,37 @@ class _PushNotificationsBootstrapState
         error: error,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  Future<Uri?> _readInitialLinkWithTimeout() async {
+    final timeout = Completer<Never>();
+    _initialLinkTimeoutTimer?.cancel();
+    _initialLinkTimeoutTimer = Timer(_initialLinkTimeout, () {
+      if (!timeout.isCompleted) {
+        timeout.completeError(
+          TimeoutException(
+            'Timed out reading initial deep link.',
+            _initialLinkTimeout,
+          ),
+        );
+      }
+    });
+
+    try {
+      final result = await Future.any<Object?>([
+        _appLinks.getInitialLink(),
+        timeout.future,
+        _disposed.future.then((_) => _disposedLinkReadSentinel),
+      ]);
+      if (identical(result, _disposedLinkReadSentinel)) {
+        return null;
+      }
+
+      return result as Uri?;
+    } finally {
+      _initialLinkTimeoutTimer?.cancel();
+      _initialLinkTimeoutTimer = null;
     }
   }
 

@@ -919,7 +919,7 @@
   "authReviewPrivacyAction": "Review Privacy",
   "authLegalLoading": "Loading the current Terms and Privacy documents...",
   "authLegalReady": "Current legal documents are ready to review and accept.",
-  "authLegalUnavailable": "Current legal documents are temporarily unavailable. Try again in a moment.",
+  "authLegalUnavailable": "Legal documents are temporarily unavailable.",
   "authGoogleShortLabel": "Google",
   "authAppleShortLabel": "Apple",
   "authContinueWithGoogle": "Continue with Google",

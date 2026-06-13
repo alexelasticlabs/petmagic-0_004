@@ -2471,7 +2471,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authLegalUnavailable =>
-      'Current legal documents are temporarily unavailable. Try again in a moment.';
+      'Legal documents are temporarily unavailable.';
 
   @override
   String get authGoogleShortLabel => 'Google';

@@ -4467,7 +4467,7 @@ abstract class AppLocalizations {
   /// No description provided for @authLegalUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Current legal documents are temporarily unavailable. Try again in a moment.'**
+  /// **'Legal documents are temporarily unavailable.'**
   String get authLegalUnavailable;
 
   /// No description provided for @authGoogleShortLabel.

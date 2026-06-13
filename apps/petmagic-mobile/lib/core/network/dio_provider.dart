@@ -30,6 +30,8 @@ final dioProvider = Provider<Dio>((ref) {
       headers: const {
         'Accept': 'application/json',
         'X-PetMagic-Client': 'mobile-flutter',
+        'ngrok-skip-browser-warning': 'true',
+        'Bypass-Tunnel-Reminder': 'true',
       },
     ),
   );

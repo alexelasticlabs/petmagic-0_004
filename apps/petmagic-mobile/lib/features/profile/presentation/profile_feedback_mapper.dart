@@ -24,6 +24,12 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authExternalTimedOut;
     case 'auth.external_ticket_invalid':
       return text.authExternalSessionExpired;
+    case 'auth.external_already_linked':
+    case 'auth.external_provider_already_linked':
+      return text.authExternalFailed;
+    case 'auth.external_email_missing':
+    case 'auth.external_email_not_verified':
+      return text.authExternalFailed;
     case 'auth.external_not_configured':
     case 'auth.external_token_invalid':
     case 'auth.external_invalid':
@@ -48,6 +54,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authRequestFailed;
     case 'auth.request_failed':
       return text.authRequestFailed;
+    case 'network.unavailable':
+    case 'network.timeout':
     case 'templates.network_unavailable':
       return text.templateFlowNetworkError;
     case 'profile.action_failed':

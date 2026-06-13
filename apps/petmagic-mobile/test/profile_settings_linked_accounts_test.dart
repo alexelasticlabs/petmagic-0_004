@@ -32,9 +32,23 @@ void main() {
       expect(find.text('pet@example.com'), findsOneWidget);
 
       expect(find.text('Connect'), findsNWidgets(2));
-      expect(find.text('Disconnect'), findsOneWidget);
+      expect(find.text('Change password'), findsOneWidget);
     },
   );
+
+  testWidgets('linked accounts email row opens password setup flow', (
+    tester,
+  ) async {
+    await _pumpLinkedAccountsPage(
+      tester,
+      linkedAccounts: const <MobileLinkedAccount>[],
+    );
+
+    await tester.tap(find.text('Change password'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('password-change-screen'), findsOneWidget);
+  });
 
   testWidgets('linked accounts screen reflects connected provider state', (
     tester,
@@ -52,7 +66,8 @@ void main() {
 
     expect(find.text('alex@gmail.com'), findsOneWidget);
     expect(find.text('Connected and ready to sign in.'), findsNWidgets(2));
-    expect(find.text('Disconnect'), findsNWidgets(2));
+    expect(find.text('Disconnect'), findsOneWidget);
+    expect(find.text('Change password'), findsOneWidget);
     expect(find.text('Connect'), findsOneWidget);
   });
 
@@ -138,7 +153,14 @@ Future<void> _pumpLinkedAccountsPageWithError(WidgetTester tester) async {
 
 GoRouter _testRouter(Widget home) {
   return GoRouter(
-    routes: [GoRoute(path: '/', builder: (context, state) => home)],
+    routes: [
+      GoRoute(path: '/', builder: (context, state) => home),
+      GoRoute(
+        path: '/profile/settings/password-change',
+        builder: (context, state) =>
+            const Scaffold(body: Text('password-change-screen')),
+      ),
+    ],
   );
 }
 

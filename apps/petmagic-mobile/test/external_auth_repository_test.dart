@@ -63,6 +63,83 @@ void main() {
   );
 
   test(
+    'native google auth maps connectivity failures to retryable copy',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          throw DioException.connectionError(
+            requestOptions: options,
+            reason: 'offline',
+          );
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'network.unavailable',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'google auth continues to native picker when mobile config is forbidden',
+    () async {
+      var googleSignInCalls = 0;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/external/google/mobile-config') {
+            return ResponseBody.fromString(
+              jsonEncode(const {
+                'title': 'auth.forbidden',
+                'detail': 'Forbidden',
+              }),
+              403,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInDelegate: (googleSignIn) async {
+          googleSignInCalls++;
+          return null;
+        },
+      );
+
+      await expectLater(
+        repository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_cancelled',
+          ),
+        ),
+      );
+
+      expect(googleSignInCalls, 1);
+    },
+  );
+
+  test(
     'browser callback error is allowlisted before reaching app state',
     () async {
       final callbacks = StreamController<Uri>();

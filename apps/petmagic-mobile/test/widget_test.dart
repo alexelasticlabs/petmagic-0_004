@@ -20,6 +20,7 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
@@ -48,11 +49,25 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
   });
 
-  testWidgets('shows onboarding for first-time guest', (tester) async {
+  testWidgets('shows welcome screen for first-time guest', (tester) async {
     await _pumpApp(tester);
 
-    expect(find.text('Create magic moments with your pet'), findsOneWidget);
-    expect(find.text('Continue as guest'), findsOneWidget);
+    final text = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).first),
+    );
+
+    expect(find.text(text.startupWelcomeTitle), findsOneWidget);
+    expect(find.text(text.startupWelcomeContinueGuest), findsOneWidget);
+  });
+
+  test('auth social providers are platform-specific and ordered', () {
+    expect(authSocialProvidersForPlatform(isIOS: false), [
+      ExternalAuthProvider.google,
+    ]);
+    expect(authSocialProvidersForPlatform(isIOS: true), [
+      ExternalAuthProvider.apple,
+      ExternalAuthProvider.google,
+    ]);
   });
 
   testWidgets('onboarding guest action resets after startup failure', (
@@ -480,6 +495,10 @@ void main() {
       contains(ExternalAuthProvider.google),
     );
     expect(
+      externalAuthRepository.clearedProviders,
+      contains(ExternalAuthProvider.apple),
+    );
+    expect(
       container.read(appLaunchControllerProvider).isAuthenticated,
       isFalse,
     );
@@ -549,7 +568,7 @@ void main() {
     await tester.pump();
   });
 
-  testWidgets('profile tab sends guest to auth flow', (tester) async {
+  testWidgets('profile tab shows sign-in gate for guest', (tester) async {
     SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
 
     final authStorage = _TestAuthSessionStorage();
@@ -608,8 +627,12 @@ void main() {
       tester.element(find.byType(Scaffold).first),
     );
 
-    expect(find.text(text.authEntryTitle), findsOneWidget);
-    expect(find.text(text.authEntrySubtitle), findsOneWidget);
+    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredMessage), findsOneWidget);
+    expect(
+      find.widgetWithText(FilledButton, text.profileSignInAction),
+      findsOneWidget,
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     container.dispose();

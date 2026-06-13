@@ -57,10 +57,7 @@ void main() {
       ),
     );
 
-    final mapped = mapProfileFeedbackMessage(
-      'templates.network_unavailable',
-      text,
-    );
+    final mapped = mapProfileFeedbackMessage('network.unavailable', text);
 
     expect(mapped, text.templateFlowNetworkError);
   });

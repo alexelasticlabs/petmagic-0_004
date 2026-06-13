@@ -336,6 +336,52 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task ConfirmCurrentPasswordChangeAsync_ShouldSetPassword_ForAppleOnlyAccount()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var appleLogin = await service.ExternalLoginAsync(
+            new ExternalLoginCallbackCommand(
+                "Apple",
+                "apple-password-link-sub",
+                "apple.password@petmagic.app",
+                "Apple User",
+                true),
+            CancellationToken.None);
+        Assert.True(appleLogin.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        Assert.Null(user.PasswordHash);
+        Assert.Single(await dbContext.ExternalAuthProviders.Where(x => x.Provider == "Apple").ToListAsync());
+
+        var requestCode = await service.RequestCurrentPasswordChangeCodeAsync(user.Id, CancellationToken.None);
+        Assert.True(requestCode.IsSuccess);
+
+        var resetCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id && x.Purpose == EmailCodePurpose.PasswordReset)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstAsync();
+        resetCode.CodeHash = HashValue("789123");
+        await dbContext.SaveChangesAsync();
+
+        var confirmChange = await service.ConfirmCurrentPasswordChangeAsync(
+            user.Id,
+            new ConfirmCurrentPasswordChangeCommand("789123", "StrongLinked123", appleLogin.Value.RefreshToken),
+            CancellationToken.None);
+
+        Assert.True(confirmChange.IsSuccess);
+        Assert.NotNull((await dbContext.Users.SingleAsync()).PasswordHash);
+
+        var passwordLogin = await service.LoginAsync(
+            new LoginCommand("apple.password@petmagic.app", "StrongLinked123"),
+            CancellationToken.None);
+
+        Assert.True(passwordLogin.IsSuccess);
+        Assert.Equal(user.Id, passwordLogin.Value.User.UserId);
+    }
+
+    [Fact]
     public async Task SendBulkEmailAsync_ShouldQueueOnlyMatchingConfirmedRecipients()
     {
         await using var dbContext = CreateDbContext();
