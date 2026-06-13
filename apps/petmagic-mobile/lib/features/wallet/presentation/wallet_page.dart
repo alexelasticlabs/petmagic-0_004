@@ -19,6 +19,7 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
@@ -220,10 +221,10 @@ class _WalletPageState extends ConsumerState<WalletPage>
       return ProfileScreenBackground(
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(16, 24, 16, bottomNavInset),
-            child: _WalletUnavailableCard(
-              message: text.authSignInRequired,
-              onRetry: () => showAuthRequiredSheet(
+            padding: EdgeInsets.only(bottom: bottomNavInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
                 context,
                 redirectPath: WalletPage.routePath,
               ),

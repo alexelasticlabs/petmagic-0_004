@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 ARG TARGETARCH
 WORKDIR /src
 COPY ["src/", "src/"]
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-generation-worker,sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \
       amd64) RID=linux-x64 ;; \
       arm64) RID=linux-arm64 ;; \
@@ -13,7 +13,7 @@ RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
       -r "$RID" \
       -p:PublishReadyToRun=true \
       --verbosity normal
-RUN --mount=type=cache,id=nuget,target=/root/.nuget/packages \
+RUN --mount=type=cache,id=nuget-generation-worker,sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \
       amd64) RID=linux-x64 ;; \
       arm64) RID=linux-arm64 ;; \

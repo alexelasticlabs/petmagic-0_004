@@ -16,6 +16,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -51,6 +52,23 @@ void main() {
     );
 
     expect(find.text('Hidden Ready'), findsNothing);
+  });
+
+  testWidgets('gallery shows unified auth gate for guests', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness(authenticated: false);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
+    expect(find.text(text.profileSignInAction), findsOneWidget);
   });
 
   testWidgets('filter chips call load and show filtered items', (tester) async {
@@ -250,50 +268,58 @@ AppLocalizations _text(WidgetTester tester) {
 }
 
 class _GalleryHarness {
-  _GalleryHarness({List<TemplateGenerationResult>? items, this.mediaActions})
-    : controller = _FakeGenerationHistoryController(items ?? _sampleItems()),
-      router = GoRouter(
-        initialLocation: GenerationsGalleryPage.routePath,
-        routes: [
-          GoRoute(
-            path: GenerationsGalleryPage.routePath,
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: GenerationsGalleryPage()),
-          ),
-          GoRoute(
-            path: '${GenerationStatusPage.routePrefix}/:generationId',
-            pageBuilder: (context, state) => NoTransitionPage(
-              child: Scaffold(
-                body: Center(
-                  child: Text('status:${state.pathParameters['generationId']}'),
-                ),
-              ),
-            ),
-          ),
-          GoRoute(
-            path: TemplatesPage.routePath,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: Scaffold(body: Center(child: Text('templates-route'))),
-            ),
-          ),
-          GoRoute(
-            path: SupportChatPage.routePath,
-            pageBuilder: (context, state) => const NoTransitionPage(
-              child: Scaffold(body: Center(child: Text('support-route'))),
-            ),
-          ),
-        ],
-      );
+  _GalleryHarness({
+    List<TemplateGenerationResult>? items,
+    this.mediaActions,
+    this.authenticated = true,
+  }) : controller = _FakeGenerationHistoryController(items ?? _sampleItems()),
+       router = GoRouter(
+         initialLocation: GenerationsGalleryPage.routePath,
+         routes: [
+           GoRoute(
+             path: GenerationsGalleryPage.routePath,
+             pageBuilder: (context, state) =>
+                 const NoTransitionPage(child: GenerationsGalleryPage()),
+           ),
+           GoRoute(
+             path: '${GenerationStatusPage.routePrefix}/:generationId',
+             pageBuilder: (context, state) => NoTransitionPage(
+               child: Scaffold(
+                 body: Center(
+                   child: Text(
+                     'status:${state.pathParameters['generationId']}',
+                   ),
+                 ),
+               ),
+             ),
+           ),
+           GoRoute(
+             path: TemplatesPage.routePath,
+             pageBuilder: (context, state) => const NoTransitionPage(
+               child: Scaffold(body: Center(child: Text('templates-route'))),
+             ),
+           ),
+           GoRoute(
+             path: SupportChatPage.routePath,
+             pageBuilder: (context, state) => const NoTransitionPage(
+               child: Scaffold(body: Center(child: Text('support-route'))),
+             ),
+           ),
+         ],
+       );
 
   final _FakeGenerationHistoryController controller;
   final GoRouter router;
   final GenerationStatusMediaActions? mediaActions;
+  final bool authenticated;
 
   Widget app() {
     return ProviderScope(
       overrides: [
         appLaunchControllerProvider.overrideWith(
-          _AuthenticatedAppLaunchController.new,
+          authenticated
+              ? _AuthenticatedAppLaunchController.new
+              : _UnauthenticatedAppLaunchController.new,
         ),
         generationHistoryControllerProvider.overrideWith(() => controller),
         walletControllerProvider.overrideWith(_IdleWalletController.new),
@@ -325,6 +351,19 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
     return const AppLaunchState(
       isLoading: false,
       isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
       requiresLegalAcceptance: false,
       hasSeenOnboarding: true,
       guestSessionReady: true,

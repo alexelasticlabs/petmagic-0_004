@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
   testWidgets('templates page does not reload when tab is hidden and shown', (
@@ -51,6 +52,48 @@ void main() {
 
     expect(controller.loadInitialCalls, [false]);
     expect(controller.setScreenVisibleCalls, [true, false, true]);
+  });
+
+  testWidgets('templates page keeps guest browsing UI without auth gate', (
+    tester,
+  ) async {
+    final controller = _FakeTemplatesController();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _UnauthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(find.text(text.createMagicTitle), findsOneWidget);
+    expect(find.byType(ProtectedAuthGate), findsNothing);
+    expect(find.text(text.authSignInRequired), findsNothing);
   });
 }
 
@@ -97,6 +140,19 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
     return const AppLaunchState(
       isLoading: false,
       isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
       requiresLegalAcceptance: false,
       hasSeenOnboarding: true,
       guestSessionReady: true,

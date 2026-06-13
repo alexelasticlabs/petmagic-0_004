@@ -17,6 +17,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
@@ -363,29 +364,13 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
       return _RewardsBackdrop(
         child: SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              bottomNavInset + keyboardInset + 8,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _WarningBanner(
-                  message: text.authSignInRequired,
-                  tone: colors.gold,
-                ),
-                const SizedBox(height: 14),
-                FilledButton.icon(
-                  onPressed: () => showAuthRequiredSheet(
-                    context,
-                    redirectPath: RewardsPage.routePath,
-                  ),
-                  icon: const Icon(Icons.login_rounded, size: 18),
-                  label: Text(text.profileSignInAction),
-                ),
-              ],
+            padding: EdgeInsets.only(bottom: bottomNavInset + keyboardInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: RewardsPage.routePath,
+              ),
             ),
           ),
         ),

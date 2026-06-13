@@ -8,11 +8,11 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
-import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
@@ -20,6 +20,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
@@ -39,17 +40,11 @@ class ProfilePage extends ConsumerStatefulWidget {
 }
 
 class _ProfilePageState extends ConsumerState<ProfilePage> {
-  ProviderSubscription<ProfileState>? _profileSubscription;
   bool _isOpeningSubscription = false;
 
   @override
   void initState() {
     super.initState();
-    _profileSubscription = ref.listenManual<ProfileState>(
-      profileControllerProvider,
-      (_, next) => _redirectUnauthenticated(next),
-      fireImmediately: true,
-    );
     Future.microtask(() {
       if (!mounted) {
         return;
@@ -63,7 +58,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   void dispose() {
-    _profileSubscription?.close();
     super.dispose();
   }
 
@@ -85,8 +79,19 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final bottomNavInset = petMagicScrollableBottomInset(context);
 
     if (!state.isLoading && !state.isAuthenticated) {
-      return const SizedBox.expand(
-        child: Center(child: CircularProgressIndicator.adaptive()),
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomNavInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: ProfilePage.routePath,
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -310,14 +315,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     if (mounted) {
       setState(() => _isOpeningSubscription = false);
     }
-  }
-
-  void _redirectUnauthenticated(ProfileState state) {
-    if (!mounted || state.isLoading || state.isAuthenticated) {
-      return;
-    }
-
-    context.go(AuthEntryPage.routePath);
   }
 }
 

@@ -21,6 +21,7 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
   testWidgets(
@@ -90,6 +91,49 @@ void main() {
       }),
       findsOneWidget,
     );
+  });
+
+  testWidgets('wallet page shows unified auth gate for guests', (tester) async {
+    await _pumpWalletPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+      authenticated: false,
+    );
+
+    final walletContext = tester.element(find.byType(WalletPage));
+    final text = AppLocalizations.of(walletContext);
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredMessage), findsOneWidget);
+    expect(find.text(text.walletUnavailableTitle), findsNothing);
+  });
+
+  testWidgets('authenticated wallet unavailable state still shows retry card', (
+    tester,
+  ) async {
+    await _pumpWalletPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+        failWallet: true,
+      ),
+    );
+
+    final walletContext = tester.element(find.byType(WalletPage));
+    final text = AppLocalizations.of(walletContext);
+
+    expect(find.byType(ProtectedAuthGate), findsNothing);
+    expect(find.text(text.walletUnavailableTitle), findsOneWidget);
+    expect(find.text(text.walletTryAgainAction), findsOneWidget);
   });
 
   testWidgets('all transactions renders ledger rows lazily', (tester) async {
@@ -299,6 +343,28 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Rewards route'), findsOneWidget);
+  });
+
+  testWidgets('rewards page shows unified auth gate for guests', (
+    tester,
+  ) async {
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+      authenticated: false,
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredMessage), findsOneWidget);
   });
 
   testWidgets('wallet navigation hides while keyboard is open', (tester) async {
@@ -578,6 +644,19 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
   }
 }
 
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
 Future<void> _pumpAllTransactionsPage(
   WidgetTester tester, {
   required WalletRepository repository,
@@ -626,6 +705,7 @@ Future<void> _pumpAllTransactionsPage(
 Future<void> _pumpWalletPage(
   WidgetTester tester, {
   required WalletRepository repository,
+  bool authenticated = true,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -633,7 +713,9 @@ Future<void> _pumpWalletPage(
     ProviderScope(
       overrides: [
         appLaunchControllerProvider.overrideWith(
-          _AuthenticatedAppLaunchController.new,
+          authenticated
+              ? _AuthenticatedAppLaunchController.new
+              : _UnauthenticatedAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
       ],
@@ -670,6 +752,7 @@ Future<void> _pumpWalletPage(
 Future<void> _pumpRewardsPage(
   WidgetTester tester, {
   required WalletRepository repository,
+  bool authenticated = true,
 }) async {
   addTearDown(() => PetMagicNotificationCenter.instance.clearQueue());
 
@@ -677,7 +760,9 @@ Future<void> _pumpRewardsPage(
     ProviderScope(
       overrides: [
         appLaunchControllerProvider.overrideWith(
-          _AuthenticatedAppLaunchController.new,
+          authenticated
+              ? _AuthenticatedAppLaunchController.new
+              : _UnauthenticatedAppLaunchController.new,
         ),
         walletRepositoryProvider.overrideWithValue(repository),
       ],
@@ -752,6 +837,7 @@ class _FakeWalletRepository extends WalletRepository {
     required this.ledger,
     required this.packs,
     required this.purchases,
+    this.failWallet = false,
     this.failLedger = false,
     this.failPurchases = false,
     this.redeemError,
@@ -762,14 +848,20 @@ class _FakeWalletRepository extends WalletRepository {
   final List<WalletLedgerItem> ledger;
   final List<CurrencyPackModel> packs;
   final List<PurchaseHistoryItem> purchases;
+  final bool failWallet;
   final bool failLedger;
   final bool failPurchases;
   final AppException? redeemError;
   final List<WalletPaymentMethodModel> paymentMethods;
 
   @override
-  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async =>
-      wallet;
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    if (failWallet) {
+      throw Exception('wallet failed');
+    }
+
+    return wallet;
+  }
 
   @override
   Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({

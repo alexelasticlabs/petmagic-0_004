@@ -26,6 +26,7 @@ import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
@@ -282,8 +283,9 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: _GuestAccessState(
-            onOpenSignIn: () {
+          child: ProtectedAuthGate(
+            subtitle: text.generationStatusEmptyMessage,
+            onSignIn: () {
               unawaited(
                 showAuthRequiredSheet(
                   context,

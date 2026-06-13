@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +8,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
@@ -17,23 +16,76 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_p
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
-  test('profile page keeps unauthenticated redirect out of build', () {
-    final source = File(
-      'lib/features/profile/presentation/profile_page.dart',
-    ).readAsStringSync();
+  testWidgets('profile page shows unified auth gate for guests', (
+    tester,
+  ) async {
+    final router = GoRouter(
+      initialLocation: ProfilePage.routePath,
+      routes: [
+        GoRoute(
+          path: ProfilePage.routePath,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ProfilePage()),
+        ),
+        GoRoute(
+          path: AuthEntryPage.routePath,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: Scaffold(body: Text('Auth route'))),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
 
-    expect(source, contains('ref.listenManual<ProfileState>'));
-    expect(source, contains('_redirectUnauthenticated(next)'));
-    expect(
-      source,
-      contains('void _redirectUnauthenticated(ProfileState state)'),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileControllerProvider.overrideWith(_GuestProfileController.new),
+          walletControllerProvider.overrideWith(_FakeWalletController.new),
+          premiumSubscriptionSummaryProvider.overrideWith(
+            (ref) async => const PremiumSubscriptionSummaryView(
+              isPremium: false,
+              canManageSubscription: false,
+              status: 'inactive',
+              manageSubscriptionAction: '',
+              provider: PremiumSubscriptionProviderView.unknown,
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
+      ),
     );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final profileContext = tester.element(find.byType(ProfilePage));
+    final text = AppLocalizations.of(profileContext);
+
     expect(
-      source,
-      isNot(contains('WidgetsBinding.instance.addPostFrameCallback')),
+      router.routeInformationProvider.value.uri.path,
+      ProfilePage.routePath,
     );
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text(text.authSignInRequired), findsOneWidget);
+    expect(find.text(text.authRequiredMessage), findsOneWidget);
+    expect(find.text('Auth route'), findsNothing);
   });
 
   testWidgets('profile legal shortcut opens legal detail route', (
@@ -227,6 +279,26 @@ class _FakeProfileController extends ProfileController {
   Future<void> initialize({String initialEmail = ''}) async {
     initializeCalls++;
   }
+
+  @override
+  Future<void> logout() async {}
+}
+
+class _GuestProfileController extends ProfileController {
+  @override
+  ProfileState build() {
+    return const ProfileState(
+      isLoading: false,
+      isSaving: false,
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    );
+  }
+
+  @override
+  Future<void> initialize({String initialEmail = ''}) async {}
 
   @override
   Future<void> logout() async {}
