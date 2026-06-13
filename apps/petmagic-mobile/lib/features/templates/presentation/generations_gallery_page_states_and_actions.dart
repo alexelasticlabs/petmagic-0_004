@@ -349,10 +349,12 @@ Future<void> _showReadyCardActions(
 
   await showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
       final bottomInset = petMagicScrollableBottomInset(sheetContext);
+      final maxSheetHeight = MediaQuery.sizeOf(sheetContext).height * 0.8;
       return SafeArea(
         top: false,
         child: Padding(
@@ -364,85 +366,94 @@ Future<void> _showReadyCardActions(
               borderRadius: BorderRadius.circular(22),
               side: BorderSide(color: colors.border.withValues(alpha: 0.85)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.open_in_new_rounded),
-                  title: Text(text.generationStatusOpenStatusAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    if (generation.isUnread) {
-                      ref
-                          .read(generationHistoryControllerProvider.notifier)
-                          .markRead(generation.generationId);
-                    }
-                    context.push(
-                      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-                    );
-                  },
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.open_in_new_rounded),
+                      title: Text(text.generationStatusOpenStatusAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        if (generation.isUnread) {
+                          ref
+                              .read(
+                                generationHistoryControllerProvider.notifier,
+                              )
+                              .markRead(generation.generationId);
+                        }
+                        context.push(
+                          '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.download_rounded),
+                      title: Text(text.generationStatusSaveAction),
+                      onTap: isMediaActionInFlight
+                          ? null
+                          : () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(
+                                _saveGenerationToGallery(
+                                  context,
+                                  text,
+                                  ref,
+                                  generation,
+                                ),
+                              );
+                            },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.share_rounded),
+                      title: Text(text.supportChatShareAction),
+                      onTap: isMediaActionInFlight
+                          ? null
+                          : () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(
+                                _shareGenerationFile(
+                                  context,
+                                  text,
+                                  ref,
+                                  generation,
+                                ),
+                              );
+                            },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.link_rounded),
+                      title: Text(text.generationStatusCopyLinkAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        unawaited(
+                          _copyGenerationLink(context, text, generation),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.delete_outline_rounded),
+                      title: Text(text.generationStatusDeleteAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        unawaited(
+                          _deleteGeneration(context, text, ref, generation),
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.flag_outlined),
+                      title: Text(text.generationStatusReportProblemAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        context.push(SupportChatPage.routePath);
+                      },
+                    ),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.download_rounded),
-                  title: Text(text.generationStatusSaveAction),
-                  onTap: isMediaActionInFlight
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(
-                            _saveGenerationToGallery(
-                              context,
-                              text,
-                              ref,
-                              generation,
-                            ),
-                          );
-                        },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.share_rounded),
-                  title: Text(text.supportChatShareAction),
-                  onTap: isMediaActionInFlight
-                      ? null
-                      : () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(
-                            _shareGenerationFile(
-                              context,
-                              text,
-                              ref,
-                              generation,
-                            ),
-                          );
-                        },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.link_rounded),
-                  title: Text(text.generationStatusCopyLinkAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(_copyGenerationLink(context, text, generation));
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: Text(text.generationStatusDeleteAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    unawaited(
-                      _deleteGeneration(context, text, ref, generation),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.flag_outlined),
-                  title: Text(text.generationStatusReportProblemAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.push(SupportChatPage.routePath);
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -460,10 +471,12 @@ Future<void> _showFailedCardActions(
   final colors = context.petMagicColors;
   await showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
       final bottomInset = petMagicScrollableBottomInset(sheetContext);
+      final maxSheetHeight = MediaQuery.sizeOf(sheetContext).height * 0.8;
       return SafeArea(
         top: false,
         child: Padding(
@@ -475,41 +488,48 @@ Future<void> _showFailedCardActions(
               borderRadius: BorderRadius.circular(22),
               side: BorderSide(color: colors.border.withValues(alpha: 0.85)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.open_in_new_rounded),
-                  title: Text(text.generationStatusOpenStatusAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    if (generation.isUnread) {
-                      ref
-                          .read(generationHistoryControllerProvider.notifier)
-                          .markRead(generation.generationId);
-                    }
-                    context.push(
-                      '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-                    );
-                  },
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.open_in_new_rounded),
+                      title: Text(text.generationStatusOpenStatusAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        if (generation.isUnread) {
+                          ref
+                              .read(
+                                generationHistoryControllerProvider.notifier,
+                              )
+                              .markRead(generation.generationId);
+                        }
+                        context.push(
+                          '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                        );
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.image_search_rounded),
+                      title: Text(text.generationStatusPickAnotherPhotoAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        context.go(TemplatesPage.routePath);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.support_agent_rounded),
+                      title: Text(text.generationStatusContactSupportAction),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        context.push(SupportChatPage.routePath);
+                      },
+                    ),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.image_search_rounded),
-                  title: Text(text.generationStatusPickAnotherPhotoAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.go(TemplatesPage.routePath);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.support_agent_rounded),
-                  title: Text(text.generationStatusContactSupportAction),
-                  onTap: () {
-                    Navigator.of(sheetContext).pop();
-                    context.push(SupportChatPage.routePath);
-                  },
-                ),
-              ],
+              ),
             ),
           ),
         ),

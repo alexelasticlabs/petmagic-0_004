@@ -133,6 +133,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profileAvatarCropSaveAction => 'Сохранить';
 
   @override
+  String get profileAvatarCropResetAction => 'Сбросить';
+
+  @override
+  String get profileAvatarCropFitAction => 'Подогнать';
+
+  @override
   String get profileAvatarCropLoading => 'Подготавливаем фото...';
 
   @override

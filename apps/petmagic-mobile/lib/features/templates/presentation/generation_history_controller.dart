@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 
@@ -100,6 +101,8 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
   TemplateGenerationRepository get _repository =>
       ref.read(templateGenerationRepositoryProvider);
+  GenerationGalleryStore get _galleryStore =>
+      ref.read(generationGalleryStoreProvider);
   RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Timer? _offlineBannerTimer;
@@ -112,6 +115,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   @override
   GenerationHistoryState build() {
     ref.watch(templateGenerationRepositoryProvider);
+    ref.watch(generationGalleryStoreProvider);
     ref.watch(realtimeClientProvider);
     ref.onDispose(() {
       _isScreenVisible = false;
@@ -175,15 +179,23 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       }
 
       final nextFilter = filter ?? state.filter;
+      final deletedGenerationIds = await _galleryStore
+          .loadDeletedGenerationIds();
+      final localReadyRecords = await _galleryStore.loadLocalReadyItems();
       if (state.isLoading && !refresh && nextFilter == state.filter) {
         return;
       }
 
       final cachedItems = state.cachedItemsByFilter[nextFilter];
       if (!refresh && cachedItems != null) {
+        final localizedCachedItems = _decorateWithLocalMedia(
+          cachedItems,
+          deletedGenerationIds,
+          localReadyRecords,
+        );
         state = state.copyWith(
           filter: nextFilter,
-          items: cachedItems,
+          items: localizedCachedItems,
           isLoading: false,
           clearError: true,
         );
@@ -203,9 +215,14 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       final seedItems = refresh
           ? (cachedItems ?? state.items)
           : (persistedItems ?? const []);
+      final localizedSeedItems = _decorateWithLocalMedia(
+        seedItems,
+        deletedGenerationIds,
+        localReadyRecords,
+      );
 
       state = state.copyWith(
-        items: seedItems,
+        items: localizedSeedItems,
         filter: nextFilter,
         isLoading: true,
         syncFailed: false,
@@ -215,16 +232,27 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       if (persistedItems != null) {
         final persistedCache =
             Map<GenerationHistoryFilter, List<TemplateGenerationResult>>.from(
-              state.cachedItemsByFilter,
-            )..[nextFilter] = persistedItems;
+                state.cachedItemsByFilter,
+              )
+              ..[nextFilter] = _decorateWithLocalMedia(
+                persistedItems,
+                deletedGenerationIds,
+                localReadyRecords,
+              );
         state = state.copyWith(cachedItemsByFilter: persistedCache);
       }
 
       try {
+        await _flushPendingServerDeletes();
         final wasOffline = state.syncFailed;
-        final items = await _repository.fetchGenerations(
+        final remoteItems = await _repository.fetchGenerations(
           status: nextFilter.apiStatus,
           take: 50,
+        );
+        final items = _decorateWithLocalMedia(
+          remoteItems,
+          deletedGenerationIds,
+          localReadyRecords,
         );
         final unreadCount = await _repository.fetchUnreadGenerationCount();
         if (!ref.mounted) {
@@ -252,6 +280,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         if (wasOffline && items.isNotEmpty) {
           _scheduleOfflineBannerHide();
         }
+        unawaited(_syncCompletedMedia(items));
       } catch (error) {
         _registerAutoRefreshFailure();
         if (state.items.isNotEmpty) {
@@ -386,11 +415,6 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   Future<void> deleteGeneration(String generationId) async {
-    await _repository.deleteGeneration(generationId);
-    if (!ref.mounted) {
-      return;
-    }
-
     final wasUnread = state.items.any(
       (item) => item.generationId == generationId && item.isUnread,
     );
@@ -409,6 +433,15 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           : state.unreadCount,
       clearError: true,
     );
+
+    await _galleryStore.markDeletedLocally(generationId);
+
+    try {
+      await _repository.deleteGeneration(generationId);
+      await _galleryStore.clearPendingServerDelete(generationId);
+    } on Object {
+      rethrow;
+    }
   }
 
   Future<void> submitFeedback({
@@ -440,6 +473,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         Map<String, dynamic>.from(event.payload),
       ).toDomain();
       _upsertGeneration(generation);
+      if (generation.isCompleted) {
+        unawaited(_syncCompletedMedia([generation]));
+      }
       unawaited(refreshUnreadCount());
     } catch (_) {}
   }
@@ -515,13 +551,24 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     TemplateGenerationResult generation,
     GenerationHistoryFilter filter,
   ) {
+    final previous = source.where(
+      (item) => item.generationId == generation.generationId,
+    );
+    final existing = previous.isEmpty ? null : previous.first;
+    final localizedGeneration = existing == null
+        ? generation
+        : generation.copyWith(
+            localPreviewPath: existing.localPreviewPath,
+            localOutputPath: existing.localOutputPath,
+            isLocalMediaReady: existing.isLocalMediaReady,
+          );
     final next = [
       for (final item in source)
         if (item.generationId != generation.generationId) item,
     ];
 
-    if (_matchesFilter(generation, filter)) {
-      next.insert(0, generation);
+    if (_matchesFilter(localizedGeneration, filter)) {
+      next.insert(0, localizedGeneration);
     }
 
     next.sort((left, right) => right.updatedAtUtc.compareTo(left.updatedAtUtc));
@@ -547,7 +594,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     return [
       for (final item in source)
         if (item.generationId == generationId)
-          _copyWithUnread(item, isUnread: false)
+          item.copyWith(isUnread: false)
         else
           item,
     ];
@@ -575,42 +622,100 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     ];
   }
 
-  TemplateGenerationResult _copyWithUnread(
-    TemplateGenerationResult item, {
-    required bool isUnread,
-  }) {
-    return TemplateGenerationResult(
-      generationId: item.generationId,
-      userId: item.userId,
-      templateId: item.templateId,
-      status: item.status,
-      tokenCost: item.tokenCost,
-      attemptCount: item.attemptCount,
-      createdAtUtc: item.createdAtUtc,
-      updatedAtUtc: item.updatedAtUtc,
-      userMediaExpired: item.userMediaExpired,
-      templateTitle: item.templateTitle,
-      templateType: item.templateType,
-      stage: item.stage,
-      progressPercent: item.progressPercent,
-      estimatedDurationLabel: item.estimatedDurationLabel,
-      sourceImageAsset: item.sourceImageAsset,
-      normalizedImageUrl: item.normalizedImageUrl,
-      referenceMotionUrl: item.referenceMotionUrl,
-      outputUrl: item.outputUrl,
-      usedPreprocessingModel: item.usedPreprocessingModel,
-      usedKlingModel: item.usedKlingModel,
-      outputVideoDurationSeconds: item.outputVideoDurationSeconds,
-      failureCode: item.failureCode,
-      failureMessage: item.failureMessage,
-      startedAtUtc: item.startedAtUtc,
-      preprocessingCompletedAtUtc: item.preprocessingCompletedAtUtc,
-      motionGenerationCompletedAtUtc: item.motionGenerationCompletedAtUtc,
-      mediaImportCompletedAtUtc: item.mediaImportCompletedAtUtc,
-      completedAtUtc: item.completedAtUtc,
-      chargedAtUtc: item.chargedAtUtc,
-      refundedAtUtc: item.refundedAtUtc,
-      isUnread: isUnread,
+  List<TemplateGenerationResult> _decorateWithLocalMedia(
+    List<TemplateGenerationResult> source,
+    Set<String> deletedGenerationIds,
+    List<GenerationGalleryMediaRecord> localReadyRecords,
+  ) {
+    if (source.isEmpty) {
+      return const [];
+    }
+
+    final localById = {
+      for (final record in localReadyRecords) record.generationId: record,
+    };
+
+    return source
+        .where((item) => !deletedGenerationIds.contains(item.generationId))
+        .map((item) {
+          final localRecord = localById[item.generationId];
+          if (localRecord == null || localRecord.isDeletedLocally) {
+            return item.copyWith(
+              clearLocalPreviewPath: true,
+              clearLocalOutputPath: true,
+              isLocalMediaReady: false,
+            );
+          }
+
+          return item.copyWith(
+            localPreviewPath: localRecord.previewLocalPath,
+            localOutputPath: localRecord.outputLocalPath,
+            isLocalMediaReady: localRecord.isDownloadComplete,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<void> _flushPendingServerDeletes() async {
+    final pendingDeletes = await _galleryStore.loadPendingServerDeleteIds();
+    for (final generationId in pendingDeletes) {
+      try {
+        await _repository.deleteGeneration(generationId);
+        await _galleryStore.clearPendingServerDelete(generationId);
+      } on Object {
+        // Keep tombstone locally and retry on a later sync.
+      }
+    }
+  }
+
+  Future<void> _syncCompletedMedia(List<TemplateGenerationResult> items) async {
+    for (final generation in items) {
+      if (!generation.isCompleted) {
+        continue;
+      }
+
+      final localRecord = await _galleryStore.materializeGenerationMedia(
+        generation,
+      );
+      if (!ref.mounted || localRecord == null || localRecord.isDeletedLocally) {
+        continue;
+      }
+
+      _applyLocalRecord(localRecord);
+    }
+  }
+
+  void _applyLocalRecord(GenerationGalleryMediaRecord record) {
+    final updatedItems = [
+      for (final item in state.items)
+        if (item.generationId == record.generationId)
+          item.copyWith(
+            localPreviewPath: record.previewLocalPath,
+            localOutputPath: record.outputLocalPath,
+            isLocalMediaReady: record.isDownloadComplete,
+          )
+        else
+          item,
+    ];
+    final updatedCache =
+        <GenerationHistoryFilter, List<TemplateGenerationResult>>{
+          for (final entry in state.cachedItemsByFilter.entries)
+            entry.key: [
+              for (final item in entry.value)
+                if (item.generationId == record.generationId)
+                  item.copyWith(
+                    localPreviewPath: record.previewLocalPath,
+                    localOutputPath: record.outputLocalPath,
+                    isLocalMediaReady: record.isDownloadComplete,
+                  )
+                else
+                  item,
+            ],
+        };
+
+    state = state.copyWith(
+      items: updatedItems,
+      cachedItemsByFilter: updatedCache,
     );
   }
 

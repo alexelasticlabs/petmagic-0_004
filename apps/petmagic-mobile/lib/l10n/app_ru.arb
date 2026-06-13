@@ -40,6 +40,8 @@
   "profileAvatarCropHint": "Переместите и увеличьте фото",
   "profileAvatarCropCancelAction": "Отмена",
   "profileAvatarCropSaveAction": "Сохранить",
+  "profileAvatarCropResetAction": "Сбросить",
+  "profileAvatarCropFitAction": "Подогнать",
   "profileAvatarCropLoading": "Подготавливаем фото...",
   "profileAvatarCropError": "Не удалось обработать фото. Попробуйте другое изображение.",
   "profileEmailConfirmed": "Email подтвержден",

@@ -1,5 +1,18 @@
 part of 'generations_gallery_page.dart';
 
+File? _localMediaFile(String? path) {
+  final normalized = path?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final file = File(normalized);
+  if (!file.existsSync()) {
+    return null;
+  }
+  return file;
+}
+
 class _ActiveCard extends ConsumerWidget {
   const _ActiveCard({required this.generation});
 
@@ -14,6 +27,7 @@ class _ActiveCard extends ConsumerWidget {
       previewImageUrl,
     )?.toString();
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
+    final localPreviewFile = _localMediaFile(generation.localPreviewPath);
 
     void openGeneration() {
       if (generation.isUnread) {
@@ -61,7 +75,12 @@ class _ActiveCard extends ConsumerWidget {
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(16),
-                            child: !canRenderPreview
+                            child: localPreviewFile != null
+                                ? Image.file(
+                                    localPreviewFile,
+                                    fit: BoxFit.cover,
+                                  )
+                                : !canRenderPreview
                                 ? _ThumbnailPlaceholder(generation: generation)
                                 : CachedNetworkImage(
                                     imageUrl: safePreviewImageUrl!,
@@ -201,6 +220,7 @@ class _ReadyGridCard extends ConsumerWidget {
       previewImageUrl,
     )?.toString();
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
+    final localPreviewFile = _localMediaFile(generation.localPreviewPath);
 
     Future<void> openGeneration() async {
       if (generation.isUnread) {
@@ -245,7 +265,9 @@ class _ReadyGridCard extends ConsumerWidget {
                           borderRadius: const BorderRadius.vertical(
                             top: Radius.circular(16),
                           ),
-                          child: !canRenderPreview
+                          child: localPreviewFile != null
+                              ? Image.file(localPreviewFile, fit: BoxFit.cover)
+                              : !canRenderPreview
                               ? _ThumbnailPlaceholder(generation: generation)
                               : CachedNetworkImage(
                                   imageUrl: safePreviewImageUrl!,
@@ -360,6 +382,7 @@ class _FailedCard extends ConsumerWidget {
       previewImageUrl,
     )?.toString();
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
+    final localPreviewFile = _localMediaFile(generation.localPreviewPath);
     final failureReason = failureReasonMessage(text, generation);
 
     void openGeneration() {
@@ -412,7 +435,12 @@ class _FailedCard extends ConsumerWidget {
                           Positioned.fill(
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(16),
-                              child: !canRenderPreview
+                              child: localPreviewFile != null
+                                  ? Image.file(
+                                      localPreviewFile,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : !canRenderPreview
                                   ? _ThumbnailPlaceholder(
                                       generation: generation,
                                     )

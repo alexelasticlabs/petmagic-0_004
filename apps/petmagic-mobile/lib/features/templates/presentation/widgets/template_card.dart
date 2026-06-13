@@ -260,7 +260,7 @@ class _TemplateCardState extends State<TemplateCard> {
     if (visibleFraction <= 0) {
       _isPreviewActive = false;
       _disposeTimer?.cancel();
-      if (!TickerMode.of(context)) {
+      if (!TickerMode.valuesOf(context).enabled) {
         unawaited(_syncPlaybackState());
         return;
       }
@@ -620,28 +620,6 @@ class _TemplateImageWithFallback extends StatelessWidget {
                 ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CoverImageFill extends StatelessWidget {
-  const _CoverImageFill({required this.imageProvider});
-
-  final ImageProvider imageProvider;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.expand(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          image: DecorationImage(
-            image: imageProvider,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.medium,
-          ),
-        ),
       ),
     );
   }

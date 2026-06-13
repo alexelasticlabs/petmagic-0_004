@@ -60,6 +60,7 @@ dependencies:
   signalr_netcore: ^1.4.4
   permission_handler: ^11.4.0
   connectivity_plus: ^6.1.5
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -75,7 +76,10 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _syncTabVisibility(TickerMode.of(context), fromAppResume: false);
+    _syncTabVisibility(
+      TickerMode.valuesOf(context).enabled,
+      fromAppResume: false,
+    );
   }
 
   @override
@@ -89,7 +93,10 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     }
 
     if (state == AppLifecycleState.resumed) {
-      _syncTabVisibility(TickerMode.of(context), fromAppResume: true);
+      _syncTabVisibility(
+        TickerMode.valuesOf(context).enabled,
+        fromAppResume: true,
+      );
       return;
     }
 

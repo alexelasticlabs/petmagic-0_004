@@ -61,6 +61,9 @@ class TemplateGenerationResult {
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
+    this.localPreviewPath,
+    this.localOutputPath,
+    this.isLocalMediaReady = false,
   });
 
   final String generationId;
@@ -96,6 +99,99 @@ class TemplateGenerationResult {
   final bool isUnread;
   final int? queuePosition;
   final int? estimatedWaitSeconds;
+  final String? localPreviewPath;
+  final String? localOutputPath;
+  final bool isLocalMediaReady;
+
+  TemplateGenerationResult copyWith({
+    String? generationId,
+    String? userId,
+    String? templateId,
+    TemplateGenerationStatus? status,
+    int? tokenCost,
+    TemplateAsset? sourceImageAsset,
+    String? normalizedImageUrl,
+    String? referenceMotionUrl,
+    String? outputUrl,
+    int? attemptCount,
+    String? usedPreprocessingModel,
+    String? usedKlingModel,
+    double? outputVideoDurationSeconds,
+    String? failureCode,
+    String? failureMessage,
+    DateTime? createdAtUtc,
+    DateTime? updatedAtUtc,
+    String? templateTitle,
+    String? templateType,
+    String? stage,
+    int? progressPercent,
+    String? estimatedDurationLabel,
+    DateTime? startedAtUtc,
+    DateTime? preprocessingCompletedAtUtc,
+    DateTime? motionGenerationCompletedAtUtc,
+    DateTime? mediaImportCompletedAtUtc,
+    DateTime? completedAtUtc,
+    DateTime? chargedAtUtc,
+    DateTime? refundedAtUtc,
+    bool? userMediaExpired,
+    bool? isUnread,
+    int? queuePosition,
+    int? estimatedWaitSeconds,
+    String? localPreviewPath,
+    bool clearLocalPreviewPath = false,
+    String? localOutputPath,
+    bool clearLocalOutputPath = false,
+    bool? isLocalMediaReady,
+  }) {
+    return TemplateGenerationResult(
+      generationId: generationId ?? this.generationId,
+      userId: userId ?? this.userId,
+      templateId: templateId ?? this.templateId,
+      status: status ?? this.status,
+      tokenCost: tokenCost ?? this.tokenCost,
+      sourceImageAsset: sourceImageAsset ?? this.sourceImageAsset,
+      normalizedImageUrl: normalizedImageUrl ?? this.normalizedImageUrl,
+      referenceMotionUrl: referenceMotionUrl ?? this.referenceMotionUrl,
+      outputUrl: outputUrl ?? this.outputUrl,
+      attemptCount: attemptCount ?? this.attemptCount,
+      usedPreprocessingModel:
+          usedPreprocessingModel ?? this.usedPreprocessingModel,
+      usedKlingModel: usedKlingModel ?? this.usedKlingModel,
+      outputVideoDurationSeconds:
+          outputVideoDurationSeconds ?? this.outputVideoDurationSeconds,
+      failureCode: failureCode ?? this.failureCode,
+      failureMessage: failureMessage ?? this.failureMessage,
+      createdAtUtc: createdAtUtc ?? this.createdAtUtc,
+      updatedAtUtc: updatedAtUtc ?? this.updatedAtUtc,
+      templateTitle: templateTitle ?? this.templateTitle,
+      templateType: templateType ?? this.templateType,
+      stage: stage ?? this.stage,
+      progressPercent: progressPercent ?? this.progressPercent,
+      estimatedDurationLabel:
+          estimatedDurationLabel ?? this.estimatedDurationLabel,
+      startedAtUtc: startedAtUtc ?? this.startedAtUtc,
+      preprocessingCompletedAtUtc:
+          preprocessingCompletedAtUtc ?? this.preprocessingCompletedAtUtc,
+      motionGenerationCompletedAtUtc:
+          motionGenerationCompletedAtUtc ?? this.motionGenerationCompletedAtUtc,
+      mediaImportCompletedAtUtc:
+          mediaImportCompletedAtUtc ?? this.mediaImportCompletedAtUtc,
+      completedAtUtc: completedAtUtc ?? this.completedAtUtc,
+      chargedAtUtc: chargedAtUtc ?? this.chargedAtUtc,
+      refundedAtUtc: refundedAtUtc ?? this.refundedAtUtc,
+      userMediaExpired: userMediaExpired ?? this.userMediaExpired,
+      isUnread: isUnread ?? this.isUnread,
+      queuePosition: queuePosition ?? this.queuePosition,
+      estimatedWaitSeconds: estimatedWaitSeconds ?? this.estimatedWaitSeconds,
+      localPreviewPath: clearLocalPreviewPath
+          ? null
+          : localPreviewPath ?? this.localPreviewPath,
+      localOutputPath: clearLocalOutputPath
+          ? null
+          : localOutputPath ?? this.localOutputPath,
+      isLocalMediaReady: isLocalMediaReady ?? this.isLocalMediaReady,
+    );
+  }
 
   bool get isTerminal =>
       status == TemplateGenerationStatus.succeeded ||

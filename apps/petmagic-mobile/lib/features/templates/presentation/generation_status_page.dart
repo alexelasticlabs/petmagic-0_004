@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +12,7 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -387,10 +389,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final colors = context.petMagicColors;
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         final bottomInset = petMagicScrollableBottomInset(sheetContext);
+        final maxSheetHeight = MediaQuery.sizeOf(sheetContext).height * 0.8;
         return SafeArea(
           top: false,
           child: Padding(
@@ -412,82 +416,87 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
               ),
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (generation.isCompleted) ...[
-                      _StatusSheetActionTile(
-                        icon: Icons.link_rounded,
-                        label: text.generationStatusCopyLinkAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          unawaited(_copyResultLink(generation));
-                        },
-                      ),
-                      _StatusSheetActionTile(
-                        icon: Icons.delete_outline_rounded,
-                        label: text.generationStatusDeleteAction,
-                        onTap: _isDeleting
-                            ? null
-                            : () {
-                                Navigator.of(sheetContext).pop();
-                                unawaited(_deleteGeneration(generation));
-                              },
-                        isDestructive: true,
-                      ),
-                      _StatusSheetActionTile(
-                        icon: Icons.flag_outlined,
-                        label: text.generationStatusReportProblemAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          context.push(SupportChatPage.routePath);
-                        },
-                      ),
-                    ] else if (generation.isFailed) ...[
-                      _StatusSheetActionTile(
-                        icon: Icons.image_search_rounded,
-                        label: text.generationStatusPickAnotherPhotoAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          context.go(TemplatesPage.routePath);
-                        },
-                      ),
-                      _StatusSheetActionTile(
-                        icon: Icons.refresh_rounded,
-                        label: text.generationStatusRetryAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          _retrySoon();
-                        },
-                      ),
-                      _StatusSheetActionTile(
-                        icon: Icons.support_agent_rounded,
-                        label: text.generationStatusContactSupportAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          context.push(SupportChatPage.routePath);
-                        },
-                      ),
-                    ] else ...[
-                      _StatusSheetActionTile(
-                        icon: Icons.photo_library_outlined,
-                        label: text.generationStatusOpenGalleryAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          context.go('/creations');
-                        },
-                      ),
-                      _StatusSheetActionTile(
-                        icon: Icons.close_rounded,
-                        label: text.generationStatusCancelGenerationAction,
-                        onTap: () {
-                          Navigator.of(sheetContext).pop();
-                          _cancelSoon();
-                        },
-                        isDestructive: true,
-                      ),
-                    ],
-                  ],
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxSheetHeight),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (generation.isCompleted) ...[
+                          _StatusSheetActionTile(
+                            icon: Icons.link_rounded,
+                            label: text.generationStatusCopyLinkAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              unawaited(_copyResultLink(generation));
+                            },
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.delete_outline_rounded,
+                            label: text.generationStatusDeleteAction,
+                            onTap: _isDeleting
+                                ? null
+                                : () {
+                                    Navigator.of(sheetContext).pop();
+                                    unawaited(_deleteGeneration(generation));
+                                  },
+                            isDestructive: true,
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.flag_outlined,
+                            label: text.generationStatusReportProblemAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              context.push(SupportChatPage.routePath);
+                            },
+                          ),
+                        ] else if (generation.isFailed) ...[
+                          _StatusSheetActionTile(
+                            icon: Icons.image_search_rounded,
+                            label: text.generationStatusPickAnotherPhotoAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              context.go(TemplatesPage.routePath);
+                            },
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.refresh_rounded,
+                            label: text.generationStatusRetryAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              _retrySoon();
+                            },
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.support_agent_rounded,
+                            label: text.generationStatusContactSupportAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              context.push(SupportChatPage.routePath);
+                            },
+                          ),
+                        ] else ...[
+                          _StatusSheetActionTile(
+                            icon: Icons.photo_library_outlined,
+                            label: text.generationStatusOpenGalleryAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              context.go('/creations');
+                            },
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.close_rounded,
+                            label: text.generationStatusCancelGenerationAction,
+                            onTap: () {
+                              Navigator.of(sheetContext).pop();
+                              _cancelSoon();
+                            },
+                            isDestructive: true,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -715,6 +724,20 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   Future<void> _openFullscreenPreview(
     TemplateGenerationResult generation,
   ) async {
+    final localOutputFile = _localMediaFile(generation.localOutputPath);
+    if (localOutputFile != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _FullscreenResultViewer(
+            generation: generation,
+            mediaUrl: generation.outputUrl ?? '',
+            localFilePath: localOutputFile.path,
+          ),
+        ),
+      );
+      return;
+    }
+
     final outputUrl = generation.outputUrl;
     if (outputUrl == null || outputUrl.isEmpty) {
       _showInfo(AppLocalizations.of(context).templateFlowResultUnavailable);
@@ -732,6 +755,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         builder: (_) => _FullscreenResultViewer(
           generation: generation,
           mediaUrl: safeUri.toString(),
+          localFilePath: null,
         ),
       ),
     );
@@ -777,10 +801,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
 
     try {
       final previousGeneration = _generation;
-      final generation = await repository.fetchGeneration(
+      final fetchedGeneration = await repository.fetchGeneration(
         widget.generationId,
         cancelToken: loadCancelToken,
       );
+      final generation = await _decorateWithLocalMedia(fetchedGeneration);
       if (!mounted) {
         return;
       }
@@ -797,6 +822,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
               .read(generationHistoryControllerProvider.notifier)
               .markRead(generation.generationId),
         );
+      }
+
+      if (generation.isCompleted) {
+        unawaited(_materializeLocalMediaAndRefresh(generation));
       }
 
       if (generation.isTerminal) {
@@ -829,23 +858,82 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final cachedGeneration = await repository.readCachedGeneration(
       widget.generationId,
     );
+    final localizedCachedGeneration = cachedGeneration == null
+        ? null
+        : await _decorateWithLocalMedia(cachedGeneration);
 
     if (!mounted) {
       return;
     }
 
-    if (cachedGeneration != null) {
+    if (localizedCachedGeneration != null) {
       setState(() {
-        _generation = cachedGeneration;
+        _generation = localizedCachedGeneration;
         _isLoading = false;
         _errorMessage = null;
       });
+      if (localizedCachedGeneration.isCompleted) {
+        unawaited(_materializeLocalMediaAndRefresh(localizedCachedGeneration));
+      }
       return;
     }
 
     setState(() {
       _isLoading = false;
       _errorMessage = _mapStatusLoadError(error);
+    });
+  }
+
+  Future<TemplateGenerationResult> _decorateWithLocalMedia(
+    TemplateGenerationResult generation,
+  ) async {
+    if (!generation.isCompleted) {
+      return generation.copyWith(
+        clearLocalPreviewPath: true,
+        clearLocalOutputPath: true,
+        isLocalMediaReady: false,
+      );
+    }
+
+    final localRecord = await ref
+        .read(generationGalleryStoreProvider)
+        .readLocalRecord(generation.generationId);
+    if (localRecord == null || localRecord.isDeletedLocally) {
+      return generation.copyWith(
+        clearLocalPreviewPath: true,
+        clearLocalOutputPath: true,
+        isLocalMediaReady: false,
+      );
+    }
+
+    return generation.copyWith(
+      localPreviewPath: localRecord.previewLocalPath,
+      localOutputPath: localRecord.outputLocalPath,
+      isLocalMediaReady: localRecord.isDownloadComplete,
+    );
+  }
+
+  Future<void> _materializeLocalMediaAndRefresh(
+    TemplateGenerationResult generation,
+  ) async {
+    final localRecord = await ref
+        .read(generationGalleryStoreProvider)
+        .materializeGenerationMedia(generation);
+    if (!mounted || localRecord == null || localRecord.isDeletedLocally) {
+      return;
+    }
+
+    final current = _generation;
+    if (current == null || current.generationId != generation.generationId) {
+      return;
+    }
+
+    setState(() {
+      _generation = current.copyWith(
+        localPreviewPath: localRecord.previewLocalPath,
+        localOutputPath: localRecord.outputLocalPath,
+        isLocalMediaReady: localRecord.isDownloadComplete,
+      );
     });
   }
 

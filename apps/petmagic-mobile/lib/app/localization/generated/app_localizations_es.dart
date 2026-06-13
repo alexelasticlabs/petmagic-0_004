@@ -133,6 +133,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get profileAvatarCropSaveAction => 'Save';
 
   @override
+  String get profileAvatarCropResetAction => 'Reset';
+
+  @override
+  String get profileAvatarCropFitAction => 'Fit';
+
+  @override
   String get profileAvatarCropLoading => 'Preparing photo...';
 
   @override

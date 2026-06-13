@@ -3,16 +3,28 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/profile/presentation/avatar_crop_viewport.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
-import 'package:image/image.dart' as img;
+
+@visibleForTesting
+const profileAvatarCropViewportKey = ValueKey('profile-avatar-crop-viewport');
+
+@visibleForTesting
+const profileAvatarCropImageKey = ValueKey('profile-avatar-crop-image');
 
 class ProfileAvatarCropperPage extends StatefulWidget {
-  const ProfileAvatarCropperPage({required this.sourceImagePath, super.key});
+  const ProfileAvatarCropperPage({
+    required this.sourceImagePath,
+    this.debugImageData,
+    super.key,
+  });
 
   final String sourceImagePath;
+  final ProfileAvatarCropperDebugImageData? debugImageData;
 
   @override
   State<ProfileAvatarCropperPage> createState() =>
@@ -20,31 +32,29 @@ class ProfileAvatarCropperPage extends StatefulWidget {
 }
 
 class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
-  static const double _minZoom = 1;
-  static const double _maxZoom = 3.2;
-
-  final TransformationController _transformationController =
-      TransformationController();
-
   Uint8List? _sourceImageBytes;
   Uint8List? _displayImageBytes;
   bool _isPreparing = true;
   bool _isSaving = false;
-  double _zoom = _minZoom;
-  double _cropSize = 0;
   Size _imageSize = Size.zero;
-  double _baseScale = 1;
+  AvatarCropViewport? _viewport;
+  double _gestureStartScale = 1;
+  Offset _gestureStartOffset = Offset.zero;
+  Offset _gestureStartFocalPoint = Offset.zero;
 
   @override
   void initState() {
     super.initState();
-    _loadSourceImage();
-  }
+    final debugImageData = widget.debugImageData;
+    if (debugImageData != null) {
+      _sourceImageBytes = debugImageData.sourceBytes;
+      _displayImageBytes = debugImageData.previewBytes;
+      _imageSize = debugImageData.imageSize;
+      _isPreparing = false;
+      return;
+    }
 
-  @override
-  void dispose() {
-    _transformationController.dispose();
-    super.dispose();
+    _loadSourceImage();
   }
 
   Future<void> _loadSourceImage() async {
@@ -71,6 +81,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
           (prepared['width']! as int).toDouble(),
           (prepared['height']! as int).toDouble(),
         );
+        _viewport = null;
         _isPreparing = false;
       });
     } catch (_) {
@@ -81,161 +92,99 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       setState(() {
         _sourceImageBytes = null;
         _displayImageBytes = null;
+        _viewport = null;
         _isPreparing = false;
       });
     }
   }
 
-  void _configureBaseTransformIfNeeded(double cropSize) {
-    if (_displayImageBytes == null || _imageSize == Size.zero) {
-      return;
+  AvatarCropViewport _viewportFor(double cropSize) {
+    final current = _viewport;
+    if (current == null ||
+        current.imageSize != _imageSize ||
+        (current.viewportSize - cropSize).abs() >= 0.5) {
+      _viewport = current == null || current.imageSize != _imageSize
+          ? AvatarCropViewport.initial(
+              imageSize: _imageSize,
+              viewportSize: cropSize,
+            )
+          : current.withViewportSize(cropSize);
     }
 
-    if ((_cropSize - cropSize).abs() < 0.5) {
-      return;
-    }
-
-    _cropSize = cropSize;
-
-    final imageWidth = _imageSize.width;
-    final imageHeight = _imageSize.height;
-    _baseScale = math.max(cropSize / imageWidth, cropSize / imageHeight);
-
-    final displayWidth = imageWidth * _baseScale;
-    final displayHeight = imageHeight * _baseScale;
-
-    final initialTranslateX = (cropSize - displayWidth) / 2;
-    final initialTranslateY = (cropSize - displayHeight) / 2;
-
-    final matrix = Matrix4.identity()
-      ..setEntry(0, 0, _baseScale)
-      ..setEntry(1, 1, _baseScale)
-      ..setEntry(2, 2, 1)
-      ..setTranslationRaw(initialTranslateX, initialTranslateY, 0);
-
-    _applyClampedMatrix(matrix, updateZoom: false);
-    _zoom = _currentScale;
+    return _viewport!;
   }
 
-  void _handleScaleChanged(double nextScale) {
-    final currentScale = _currentScale;
-    if ((nextScale - currentScale).abs() < 0.001 || _cropSize <= 0) {
+  void _onScaleStart(ScaleStartDetails details) {
+    final viewport = _viewport;
+    if (viewport == null || _isSaving) {
       return;
     }
 
-    final matrix = _transformationController.value;
-    final currentAbsoluteScale = matrix.getMaxScaleOnAxis();
-    final currentTx = matrix.storage[12];
-    final currentTy = matrix.storage[13];
-    final targetAbsoluteScale = _baseScale * nextScale;
+    _gestureStartScale = viewport.scale;
+    _gestureStartOffset = viewport.offset;
+    _gestureStartFocalPoint = details.localFocalPoint;
+  }
 
-    if (currentAbsoluteScale <= 0 || currentAbsoluteScale.isNaN) {
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    final viewport = _viewport;
+    if (viewport == null || _isSaving) {
       return;
     }
 
-    final focalPoint = Offset(_cropSize / 2, _cropSize / 2);
-    final imagePointX = (focalPoint.dx - currentTx) / currentAbsoluteScale;
-    final imagePointY = (focalPoint.dy - currentTy) / currentAbsoluteScale;
-
-    final nextTx = focalPoint.dx - imagePointX * targetAbsoluteScale;
-    final nextTy = focalPoint.dy - imagePointY * targetAbsoluteScale;
-
-    final nextMatrix = _matrixWithScaleAndTranslation(
-      targetAbsoluteScale,
-      nextTx,
-      nextTy,
+    final focalDelta = details.localFocalPoint - _gestureStartFocalPoint;
+    final pannedOffset = _gestureStartOffset + focalDelta;
+    final nextViewport = viewport.zoomAroundFocalPoint(
+      startScale: _gestureStartScale,
+      startOffset: pannedOffset,
+      gestureScale: details.scale,
+      focalPoint: details.localFocalPoint,
     );
 
-    _applyClampedMatrix(nextMatrix, updateZoom: true);
+    setState(() => _viewport = nextViewport);
   }
 
-  void _onInteractionUpdate(ScaleUpdateDetails details) {
-    if (!mounted) {
+  void _handleZoomChanged(double nextZoom) {
+    final viewport = _viewport;
+    if (viewport == null || _isSaving) {
       return;
     }
 
-    final liveZoom = _currentScale;
-    if ((_zoom - liveZoom).abs() < 0.001) {
+    setState(() {
+      _viewport = viewport.zoomTo(
+        nextZoom,
+        focalPoint: Offset(
+          viewport.viewportSize / 2,
+          viewport.viewportSize / 2,
+        ),
+      );
+    });
+  }
+
+  void _resetCrop() {
+    final viewport = _viewport;
+    if (viewport == null || _isSaving) {
       return;
     }
 
-    setState(() => _zoom = liveZoom);
+    setState(() => _viewport = viewport.reset());
   }
 
-  void _onInteractionEnd(ScaleEndDetails details) {
-    _applyClampedMatrix(
-      Matrix4.copy(_transformationController.value),
-      updateZoom: true,
-    );
-  }
-
-  double get _currentScale {
-    final absoluteScale = _transformationController.value.getMaxScaleOnAxis();
-    if (absoluteScale.isNaN || absoluteScale.isInfinite || _baseScale <= 0) {
-      return _minZoom;
-    }
-
-    final zoom = absoluteScale / _baseScale;
-    return zoom.clamp(_minZoom, _maxZoom);
-  }
-
-  void _applyClampedMatrix(Matrix4 input, {required bool updateZoom}) {
-    if (_cropSize <= 0 || _imageSize == Size.zero || _baseScale <= 0) {
-      _transformationController.value = input;
-      if (updateZoom) {
-        setState(() => _zoom = _currentScale);
-      }
+  void _fitCrop() {
+    final viewport = _viewport;
+    if (viewport == null || _isSaving) {
       return;
     }
 
-    final absoluteScale = input.getMaxScaleOnAxis().clamp(
-      _baseScale * _minZoom,
-      _baseScale * _maxZoom,
-    );
-    final zoom = (absoluteScale / _baseScale).clamp(_minZoom, _maxZoom);
-    final clampedScale = _baseScale * zoom;
-
-    var tx = input.storage[12];
-    var ty = input.storage[13];
-
-    final scaledWidth = _imageSize.width * clampedScale;
-    final scaledHeight = _imageSize.height * clampedScale;
-
-    final minTx = scaledWidth <= _cropSize
-        ? (_cropSize - scaledWidth) / 2
-        : _cropSize - scaledWidth;
-    final maxTx = scaledWidth <= _cropSize ? minTx : 0.0;
-    final minTy = scaledHeight <= _cropSize
-        ? (_cropSize - scaledHeight) / 2
-        : _cropSize - scaledHeight;
-    final maxTy = scaledHeight <= _cropSize ? minTy : 0.0;
-
-    tx = tx.clamp(minTx, maxTx);
-    ty = ty.clamp(minTy, maxTy);
-
-    _transformationController.value = _matrixWithScaleAndTranslation(
-      clampedScale,
-      tx,
-      ty,
-    );
-
-    if (updateZoom && mounted) {
-      setState(() => _zoom = zoom);
-    }
-  }
-
-  Matrix4 _matrixWithScaleAndTranslation(double scale, double tx, double ty) {
-    return Matrix4.identity()
-      ..setEntry(0, 0, scale)
-      ..setEntry(1, 1, scale)
-      ..setEntry(2, 2, 1)
-      ..setTranslationRaw(tx, ty, 0);
+    setState(() => _viewport = viewport.fitToViewport());
   }
 
   Future<void> _saveCrop() async {
     final text = AppLocalizations.of(context);
     final sourceImageBytes = _sourceImageBytes;
-    if (sourceImageBytes == null || _cropSize <= 0 || _imageSize == Size.zero) {
+    final viewport = _viewport;
+    if (sourceImageBytes == null ||
+        viewport == null ||
+        _imageSize == Size.zero) {
       _showError(text.profileAvatarCropError);
       return;
     }
@@ -243,28 +192,17 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
     setState(() => _isSaving = true);
 
     try {
-      final matrix = _transformationController.value;
-      final scale = matrix.getMaxScaleOnAxis().clamp(
-        _baseScale * _minZoom,
-        _baseScale * _maxZoom,
-      );
-      final tx = matrix.storage[12];
-      final ty = matrix.storage[13];
-
-      final leftPx = ((-tx) / scale).round();
-      final topPx = ((-ty) / scale).round();
-      final sizePx = (_cropSize / scale).round();
-
+      final cropRect = viewport.cropRect;
       final imageWidth = _imageSize.width.round();
       final imageHeight = _imageSize.height.round();
-      final clampedLeft = leftPx.clamp(0, imageWidth - 1);
-      final clampedTop = topPx.clamp(0, imageHeight - 1);
+      final clampedLeft = cropRect.left.round().clamp(0, imageWidth - 1);
+      final clampedTop = cropRect.top.round().clamp(0, imageHeight - 1);
 
       final maxWidth = imageWidth - clampedLeft;
       final maxHeight = imageHeight - clampedTop;
       final cropSizePx = math.max(
         1,
-        math.min(sizePx, math.min(maxWidth, maxHeight)),
+        math.min(cropRect.width.round(), math.min(maxWidth, maxHeight)),
       );
 
       final jpgBytes = await compute(_cropAvatarImage, <String, Object>{
@@ -371,7 +309,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                       220.0,
                       constraints.maxWidth - 20,
                     );
-                    _configureBaseTransformIfNeeded(cropSize);
+                    final viewport = _viewportFor(cropSize);
 
                     return Column(
                       children: [
@@ -385,61 +323,22 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                           ),
                         ),
                         const SizedBox(height: 18),
-                        SizedBox(
-                          width: cropSize,
-                          height: cropSize,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ClipRect(
-                                child: InteractiveViewer(
-                                  transformationController:
-                                      _transformationController,
-                                  constrained: false,
-                                  minScale: 0.01,
-                                  maxScale: 100,
-                                  boundaryMargin: EdgeInsets.zero,
-                                  clipBehavior: Clip.none,
-                                  onInteractionUpdate: _onInteractionUpdate,
-                                  onInteractionEnd: _onInteractionEnd,
-                                  child: SizedBox(
-                                    width: _imageSize.width,
-                                    height: _imageSize.height,
-                                    child: _displayImageBytes == null
-                                        ? const SizedBox.shrink()
-                                        : Image.memory(
-                                            _displayImageBytes!,
-                                            fit: BoxFit.fill,
-                                          ),
-                                  ),
-                                ),
-                              ),
-                              IgnorePointer(
-                                child: CustomPaint(
-                                  painter: _AvatarCropOverlayPainter(
-                                    overlayColor: Colors.black.withValues(
-                                      alpha: 0.46,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              IgnorePointer(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.96,
-                                      ),
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        _AvatarCropViewportView(
+                          cropSize: cropSize,
+                          viewport: viewport,
+                          imageBytes: _displayImageBytes!,
+                          onScaleStart: _onScaleStart,
+                          onScaleUpdate: _onScaleUpdate,
                         ),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 16),
+                        _AvatarCropActions(
+                          isSaving: _isSaving,
+                          resetLabel: text.profileAvatarCropResetAction,
+                          fitLabel: text.profileAvatarCropFitAction,
+                          onReset: _resetCrop,
+                          onFit: _fitCrop,
+                        ),
+                        const SizedBox(height: 14),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: DecoratedBox(
@@ -460,12 +359,12 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
                                   ),
                                   Expanded(
                                     child: Slider(
-                                      value: _zoom,
-                                      min: _minZoom,
-                                      max: _maxZoom,
+                                      value: viewport.zoom,
+                                      min: avatarCropMinZoom,
+                                      max: avatarCropMaxZoom,
                                       onChanged: _isSaving
                                           ? null
-                                          : _handleScaleChanged,
+                                          : _handleZoomChanged,
                                     ),
                                   ),
                                   Icon(
@@ -489,6 +388,124 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
       ),
     );
   }
+}
+
+class _AvatarCropViewportView extends StatelessWidget {
+  const _AvatarCropViewportView({
+    required this.cropSize,
+    required this.viewport,
+    required this.imageBytes,
+    required this.onScaleStart,
+    required this.onScaleUpdate,
+  });
+
+  final double cropSize;
+  final AvatarCropViewport viewport;
+  final Uint8List imageBytes;
+  final GestureScaleStartCallback onScaleStart;
+  final GestureScaleUpdateCallback onScaleUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: cropSize,
+      height: cropSize,
+      child: GestureDetector(
+        key: profileAvatarCropViewportKey,
+        behavior: HitTestBehavior.opaque,
+        onScaleStart: onScaleStart,
+        onScaleUpdate: onScaleUpdate,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ClipRect(
+              child: Stack(
+                clipBehavior: Clip.hardEdge,
+                children: [
+                  Positioned(
+                    key: profileAvatarCropImageKey,
+                    left: viewport.offset.dx,
+                    top: viewport.offset.dy,
+                    width: viewport.imageSize.width * viewport.scale,
+                    height: viewport.imageSize.height * viewport.scale,
+                    child: Image.memory(imageBytes, fit: BoxFit.fill),
+                  ),
+                ],
+              ),
+            ),
+            IgnorePointer(
+              child: CustomPaint(
+                painter: _AvatarCropOverlayPainter(
+                  overlayColor: Colors.black.withValues(alpha: 0.46),
+                ),
+              ),
+            ),
+            IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.96),
+                    width: 2,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvatarCropActions extends StatelessWidget {
+  const _AvatarCropActions({
+    required this.isSaving,
+    required this.resetLabel,
+    required this.fitLabel,
+    required this.onReset,
+    required this.onFit,
+  });
+
+  final bool isSaving;
+  final String resetLabel;
+  final String fitLabel;
+  final VoidCallback onReset;
+  final VoidCallback onFit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: isSaving ? null : onReset,
+          icon: const Icon(Icons.restart_alt_rounded, size: 18),
+          label: Text(resetLabel),
+        ),
+        OutlinedButton.icon(
+          onPressed: isSaving ? null : onFit,
+          icon: const Icon(Icons.fit_screen_rounded, size: 18),
+          label: Text(fitLabel),
+        ),
+      ],
+    );
+  }
+}
+
+@visibleForTesting
+class ProfileAvatarCropperDebugImageData {
+  const ProfileAvatarCropperDebugImageData({
+    required this.sourceBytes,
+    required this.previewBytes,
+    required this.imageSize,
+  });
+
+  final Uint8List sourceBytes;
+  final Uint8List previewBytes;
+  final Size imageSize;
 }
 
 class _AvatarCropOverlayPainter extends CustomPainter {

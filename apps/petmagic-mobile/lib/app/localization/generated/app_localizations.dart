@@ -348,6 +348,18 @@ abstract class AppLocalizations {
   /// **'Save'**
   String get profileAvatarCropSaveAction;
 
+  /// No description provided for @profileAvatarCropResetAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get profileAvatarCropResetAction;
+
+  /// No description provided for @profileAvatarCropFitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit'**
+  String get profileAvatarCropFitAction;
+
   /// No description provided for @profileAvatarCropLoading.
   ///
   /// In en, this message translates to:

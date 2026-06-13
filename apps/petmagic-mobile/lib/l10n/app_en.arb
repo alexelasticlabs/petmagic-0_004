@@ -40,6 +40,8 @@
   "profileAvatarCropHint": "Move and zoom photo",
   "profileAvatarCropCancelAction": "Cancel",
   "profileAvatarCropSaveAction": "Save",
+  "profileAvatarCropResetAction": "Reset",
+  "profileAvatarCropFitAction": "Fit",
   "profileAvatarCropLoading": "Preparing photo...",
   "profileAvatarCropError": "Could not process photo. Try another image.",
   "profileEmailConfirmed": "Email confirmed",

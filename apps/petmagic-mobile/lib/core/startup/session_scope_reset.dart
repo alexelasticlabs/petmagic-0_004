@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -47,10 +48,13 @@ final sessionScopeResetProvider = Provider<void>((ref) {
       final templateGenerationRepository = ref.read(
         templateGenerationRepositoryProvider,
       );
+      final generationGalleryStore = ref.read(generationGalleryStoreProvider);
       final clearMediaCaches = ref.read(sessionMediaCacheCleanerProvider);
       unawaited(
         Future.wait<void>([
           templateGenerationRepository.clearLocalCache(),
+          generationGalleryStore.cancelActiveDownloads(),
+          generationGalleryStore.purgeAllScopes(),
           clearMediaCaches(),
         ]),
       );

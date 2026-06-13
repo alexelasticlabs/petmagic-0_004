@@ -74,7 +74,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _syncTabVisibility(TickerMode.of(context), fromAppResume: false);
+    _syncTabVisibility(
+      TickerMode.valuesOf(context).enabled,
+      fromAppResume: false,
+    );
   }
 
   @override
@@ -97,7 +100,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         if (!mounted) {
           return;
         }
-        _syncTabVisibility(TickerMode.of(context), fromAppResume: true);
+        _syncTabVisibility(
+          TickerMode.valuesOf(context).enabled,
+          fromAppResume: true,
+        );
       });
       return;
     }

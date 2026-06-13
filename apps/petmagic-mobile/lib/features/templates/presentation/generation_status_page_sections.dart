@@ -1,5 +1,18 @@
 part of 'generation_status_page.dart';
 
+File? _localMediaFile(String? path) {
+  final normalized = path?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final file = File(normalized);
+  if (!file.existsSync()) {
+    return null;
+  }
+  return file;
+}
+
 class _Header extends StatelessWidget {
   const _Header({
     required this.title,
@@ -310,6 +323,8 @@ class _ResultCardState extends State<_ResultCard> {
     final wasVideo = isVideoGeneration(oldWidget.generation);
     final isVideo = isVideoGeneration(widget.generation);
     if (oldWidget.generation.outputUrl != widget.generation.outputUrl ||
+        oldWidget.generation.localOutputPath !=
+            widget.generation.localOutputPath ||
         wasVideo != isVideo) {
       _detachAspectRatioListener();
       _aspectRatio = null;
@@ -326,15 +341,26 @@ class _ResultCardState extends State<_ResultCard> {
   }
 
   void _resolveImageAspectRatio() {
-    final url = widget.generation.outputUrl ?? '';
-    if (url.isEmpty) return;
-    final safeUri = parseSafeGenerationMediaUri(url);
-    if (safeUri == null) return;
+    final localOutputFile = _localMediaFile(widget.generation.localOutputPath);
+    late final ImageProvider provider;
+    if (localOutputFile != null) {
+      provider = FileImage(localOutputFile);
+    } else {
+      final url = widget.generation.outputUrl ?? '';
+      if (url.isEmpty) {
+        return;
+      }
+      final safeUri = parseSafeGenerationMediaUri(url);
+      if (safeUri == null) {
+        return;
+      }
+      provider = CachedNetworkImageProvider(
+        safeUri.toString(),
+        maxWidth: _aspectRatioProbeCacheWidth,
+      );
+    }
 
-    final stream = CachedNetworkImageProvider(
-      safeUri.toString(),
-      maxWidth: _aspectRatioProbeCacheWidth,
-    ).resolve(const ImageConfiguration());
+    final stream = provider.resolve(const ImageConfiguration());
     _aspectRatioStream = stream;
     _aspectRatioListener = ImageStreamListener((info, _) {
       if (!mounted) return;
@@ -362,6 +388,7 @@ class _ResultCardState extends State<_ResultCard> {
     final outputUrl = widget.generation.outputUrl ?? '';
     final safeMediaUri = parseSafeGenerationMediaUri(outputUrl);
     final safeMediaUrl = safeMediaUri?.toString() ?? '';
+    final localOutputFile = _localMediaFile(widget.generation.localOutputPath);
     final isVideo = isVideoGeneration(widget.generation);
     final aspectRatio = _aspectRatio ?? (isVideo ? 9.0 / 16.0 : 3.0 / 4.0);
     final borderRadius = BorderRadius.circular(22);
@@ -383,7 +410,7 @@ class _ResultCardState extends State<_ResultCard> {
               onTap: safeMediaUrl.isEmpty ? null : widget.onOpenViewer,
               child: AspectRatio(
                 aspectRatio: aspectRatio,
-                child: safeMediaUrl.isEmpty
+                child: safeMediaUrl.isEmpty && localOutputFile == null
                     ? _MediaPlaceholder(
                         label: text.templateFlowResultUnavailable,
                       )
@@ -395,12 +422,15 @@ class _ResultCardState extends State<_ResultCard> {
                             child: isVideo
                                 ? _InlineVideoPreview(
                                     url: safeMediaUrl,
+                                    localFilePath: localOutputFile?.path,
                                     onAspectRatioResolved: (ar) {
                                       if (mounted) {
                                         setState(() => _aspectRatio = ar);
                                       }
                                     },
                                   )
+                                : localOutputFile != null
+                                ? Image.file(localOutputFile, fit: BoxFit.cover)
                                 : CachedNetworkImage(
                                     imageUrl: safeMediaUrl,
                                     fit: BoxFit.cover,
@@ -716,9 +746,14 @@ class _DetailsCard extends StatelessWidget {
 }
 
 class _InlineVideoPreview extends StatefulWidget {
-  const _InlineVideoPreview({required this.url, this.onAspectRatioResolved});
+  const _InlineVideoPreview({
+    required this.url,
+    required this.localFilePath,
+    this.onAspectRatioResolved,
+  });
 
   final String url;
+  final String? localFilePath;
   final ValueChanged<double>? onAspectRatioResolved;
 
   @override
@@ -740,7 +775,8 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
   @override
   void didUpdateWidget(covariant _InlineVideoPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.url != widget.url ||
+        oldWidget.localFilePath != widget.localFilePath) {
       final previous = _controller;
       _controller = null;
       _failedToLoad = false;
@@ -781,22 +817,43 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
 
   Future<void> _initialize(int requestVersion, String url) async {
     setState(() => _failedToLoad = false);
-    final safeUri = parseSafeGenerationMediaUri(url);
-    if (safeUri == null) {
-      _releasePreviewSlot();
-      if (mounted && requestVersion == _initializeRequestVersion) {
-        setState(() {
-          _controller = null;
-          _failedToLoad = true;
-        });
+    final localFile = _localMediaFile(widget.localFilePath);
+    if (localFile == null) {
+      final safeUri = parseSafeGenerationMediaUri(url);
+      if (safeUri == null) {
+        _releasePreviewSlot();
+        if (mounted && requestVersion == _initializeRequestVersion) {
+          setState(() {
+            _controller = null;
+            _failedToLoad = true;
+          });
+        }
+        return;
       }
+
+      final controller = VideoPlayerController.networkUrl(safeUri);
+      _controller = controller;
+      controller.setLooping(true);
+      controller.setVolume(0);
+      await _initializeController(requestVersion, url, controller);
       return;
     }
 
-    final controller = VideoPlayerController.networkUrl(safeUri);
+    final controller = VideoPlayerController.file(localFile);
     _controller = controller;
     controller.setLooping(true);
     controller.setVolume(0);
+    await _initializeController(requestVersion, url, controller);
+  }
+
+  Future<void> _initializeController(
+    int requestVersion,
+    String url,
+    VideoPlayerController controller,
+  ) async {
+    if (_controller != controller) {
+      return;
+    }
 
     try {
       await controller.initialize();
@@ -880,10 +937,12 @@ class _FullscreenResultViewer extends StatefulWidget {
   const _FullscreenResultViewer({
     required this.generation,
     required this.mediaUrl,
+    required this.localFilePath,
   });
 
   final TemplateGenerationResult generation;
   final String mediaUrl;
+  final String? localFilePath;
 
   @override
   State<_FullscreenResultViewer> createState() =>
@@ -922,18 +981,38 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
   Future<void> _initializeVideo() async {
     final requestVersion = ++_videoInitializeRequestVersion;
     final mediaUrl = widget.mediaUrl;
-    final safeUri = parseSafeGenerationMediaUri(mediaUrl);
-    if (safeUri == null) {
-      setState(() {
-        _videoController = null;
-        _videoFailed = true;
-      });
+    final localFile = _localMediaFile(widget.localFilePath);
+    if (localFile == null) {
+      final safeUri = parseSafeGenerationMediaUri(mediaUrl);
+      if (safeUri == null) {
+        setState(() {
+          _videoController = null;
+          _videoFailed = true;
+        });
+        return;
+      }
+
+      final controller = VideoPlayerController.networkUrl(safeUri);
+      _videoController = controller;
+      controller.setLooping(true);
+      await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
       return;
     }
 
-    final controller = VideoPlayerController.networkUrl(safeUri);
+    final controller = VideoPlayerController.file(localFile);
     _videoController = controller;
     controller.setLooping(true);
+    await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
+  }
+
+  Future<void> _initializeFullscreenVideo(
+    int requestVersion,
+    String mediaUrl,
+    VideoPlayerController controller,
+  ) async {
+    if (_videoController != controller) {
+      return;
+    }
 
     try {
       await controller.initialize();
@@ -985,7 +1064,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
       if (!mounted) {
         return;
       }
-      setState(() => _showControls = false);
+      setState(() {
+        _showControls = false;
+      });
     });
   }
 
@@ -1003,6 +1084,7 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
     final safeMediaUrl = parseSafeGenerationMediaUri(
       widget.mediaUrl,
     )?.toString();
+    final localMediaFile = _localMediaFile(widget.localFilePath);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -1014,6 +1096,12 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
             Center(
               child: _isVideo
                   ? _buildVideoMedia(text, controller)
+                  : localMediaFile != null
+                  ? InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: Image.file(localMediaFile, fit: BoxFit.contain),
+                    )
                   : safeMediaUrl == null
                   ? _MediaPlaceholder(label: text.templateFlowResultLoadFailed)
                   : InteractiveViewer(
