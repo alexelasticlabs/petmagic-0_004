@@ -44,6 +44,11 @@ describe("templates catalog actions", () => {
     expect(source).toContain("totalCount");
     expect(source).toContain("shownStart");
     expect(source).toContain("shownEnd");
+    expect(source).toContain("hasSecondaryError,");
+    expect(source).toContain("title={copy.analyticsUnavailableTitle}");
+    expect(source).toContain("description={copy.analyticsUnavailableDescription}");
+    expect(source).toContain("analyticsUnavailableTitle:");
+    expect(source).toContain("analyticsUnavailableDescription:");
     expect(source).toContain("Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}");
     expect(source).toContain("currentPage >= totalPages");
     expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
@@ -56,6 +61,9 @@ describe("templates catalog actions", () => {
       "href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}"
     );
     expect(source).toContain("href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.views),");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.generationStarts),");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.failedGenerations),");
     expect(source).toContain("void handleStatusChange(templatePendingArchiveId, \"Archived\").then((succeeded) => {");
     expect(source).toContain("if (succeeded) {\n              setTemplatePendingArchiveId(null);");
     expect(source).toContain("void handleDelete(templatePendingDeleteId).then((succeeded) => {");
@@ -73,6 +81,9 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("href={`${analyticsBasePath}/${template.templateId}`}");
     expect(source).not.toContain("href={`${editorBasePath}?templateId=${template.templateId}`}");
     expect(source).not.toContain("href={`${testBasePath}/${template.templateId}`}");
+    expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.views ?? 0)");
+    expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.generationStarts ?? 0)");
+    expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.failedGenerations ?? 0)");
     expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
   });

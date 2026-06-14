@@ -148,6 +148,7 @@ export function TemplatesCatalogView({
     getAnalyticsRow,
     hasError,
     hasMore,
+    hasSecondaryError,
     isFetching,
     isLoading,
     pageSkip,
@@ -407,6 +408,31 @@ export function TemplatesCatalogView({
           tone="danger"
           className={styles.error}
           title={error}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!session || isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void refresh().catch(() => undefined);
+              }}
+            >
+              {isRu ? "Повторить" : "Retry"}
+            </Button>
+          }
+        />
+      ) : null}
+
+      {hasSecondaryError ? (
+        <AdminStateCard
+          tone="warning"
+          className={styles.error}
+          title={copy.analyticsUnavailableTitle}
+          description={copy.analyticsUnavailableDescription}
           action={
             <Button
               type="button"
@@ -1137,17 +1163,17 @@ function getTemplateCardMetrics(
     },
     {
       label: isRu ? "Просмотры" : "Views",
-      value: formatAnalyticsInteger(analytics?.views ?? 0),
+      value: formatAnalyticsInteger(analytics?.views),
       tone: "cardMetric_info",
     },
     {
       label: isRu ? "Генерации" : "Generations",
-      value: formatAnalyticsInteger(analytics?.generationStarts ?? 0),
+      value: formatAnalyticsInteger(analytics?.generationStarts),
       tone: "cardMetric_success",
     },
     {
       label: isRu ? "Ошибки" : "Errors",
-      value: formatAnalyticsInteger(analytics?.failedGenerations ?? 0),
+      value: formatAnalyticsInteger(analytics?.failedGenerations),
       tone: "cardMetric_danger",
     },
   ];
@@ -1186,6 +1212,12 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
     templateActionsAdminOnly: isRu
       ? "Управление шаблонами доступно только Admin."
       : "Template management actions are available to Admin only.",
+    analyticsUnavailableTitle: isRu
+      ? "Метрики шаблонов временно недоступны"
+      : "Template metrics are temporarily unavailable",
+    analyticsUnavailableDescription: isRu
+      ? "Каталог остается доступным, но просмотры, генерации и ошибки могут быть неполными."
+      : "The catalog is still available, but views, generations, and error metrics may be incomplete.",
     archiveTabsLabel: isRu ? "Фильтр архива" : "Archive filter",
     allTemplates: isRu ? "Все шаблоны" : "All templates",
     archivedTemplates: isRu ? "Архив" : "Archive",
