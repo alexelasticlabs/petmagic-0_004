@@ -12,7 +12,7 @@
 *.swp
 
 # Documentation
-docs/
+docs//Users/elasticlabs/Desktop/petmagic-0_004/.dockerignore
 README.md
 SECURITY.md
 

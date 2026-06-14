@@ -58,6 +58,7 @@ pnpm-debug.log*
 # Database
 *.db
 *.sqlite
+backups/
 
 # OS
 Thumbs.db
@@ -68,6 +69,8 @@ temp/
 tmp/
 artifacts/load/
 artifacts/query-plans/
+artifacts/watermark-*.json
+artifacts/watermark-*.env
 
 # Docker Compose volumes
 postgres_data/
