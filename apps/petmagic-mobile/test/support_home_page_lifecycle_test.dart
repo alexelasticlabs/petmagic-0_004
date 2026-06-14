@@ -55,6 +55,7 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) {
     lastCancelToken = cancelToken;

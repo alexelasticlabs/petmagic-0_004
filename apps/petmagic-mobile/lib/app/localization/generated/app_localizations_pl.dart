@@ -34,6 +34,47 @@ class AppLocalizationsPl extends AppLocalizations {
   String get searchTemplates => 'Szukaj szablonow';
 
   @override
+  String get randomTemplateAction => 'Random template';
+
+  @override
+  String get randomTemplateAny => 'Any template';
+
+  @override
+  String get randomTemplateImage => 'Image template';
+
+  @override
+  String get randomTemplateVideo => 'Video template';
+
+  @override
+  String get randomTemplateNoTemplates => 'No templates available.';
+
+  @override
+  String get randomTemplateNoAvailableForType =>
+      'No available templates for this type.';
+
+  @override
+  String get randomTemplateNoImageTemplates => 'No image templates available.';
+
+  @override
+  String get randomTemplateNoVideoTemplates => 'No video templates available.';
+
+  @override
+  String get randomTemplateLoadFailed =>
+      'Could not load templates. Please try again.';
+
+  @override
+  String get templateOfTheDayTitle => 'Template of the Day';
+
+  @override
+  String get templateOfTheDaySubtitle => 'Today\'s magic idea';
+
+  @override
+  String get templateOfTheDayTryAction => 'Try this template';
+
+  @override
+  String get templateOfTheDayFeedBadge => 'Today\'s pick';
+
+  @override
   String get allFilter => 'Wszystkie';
 
   @override
@@ -3395,6 +3436,54 @@ class AppLocalizationsPl extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Roczny';
 
   @override
+  String get generationStatusWatermarkRemoved => 'Znak wodny usunięty';
+
+  @override
+  String get generationStatusWatermarkAddedFreePlan =>
+      'Znak wodny dodany w planie darmowym';
+
+  @override
+  String get generationStatusShareWithWatermark =>
+      'Udostępnij ze znakiem wodnym';
+
+  @override
+  String get generationStatusDownloadWithoutWatermark =>
+      'Pobierz bez znaku wodnego';
+
+  @override
+  String get generationStatusSaveWithWatermark => 'Zapisz ze znakiem wodnym';
+
+  @override
+  String get generationStatusRemoveWatermark => 'Usuń znak wodny';
+
+  @override
+  String get generationStatusRemovingWatermark => 'Usuwanie...';
+
+  @override
+  String get generationStatusUpgradePremium => 'Przejdź na Premium';
+
+  @override
+  String get generationStatusRemoveWatermarkSheetTitle => 'Usuń znak wodny';
+
+  @override
+  String generationStatusRemoveWatermarkSheetBody(int cost) {
+    return 'Użyj $cost kredytu dla tego wyniku albo przejdź na Premium, aby pobierać bez znaku wodnego.';
+  }
+
+  @override
+  String generationStatusRemoveWatermarkUseCredit(int cost) {
+    return 'Użyj $cost kredytu';
+  }
+
+  @override
+  String get generationStatusRemoveWatermarkFailed =>
+      'Nie udało się usunąć znaku wodnego. Spróbuj ponownie.';
+
+  @override
+  String get generationStatusRemoveWatermarkNoCredits =>
+      'Za mało kredytów. Kup kredyty albo przejdź na Premium.';
+
+  @override
   String get globalOfflineBannerTitle => 'Brak połączenia z internetem';
 
   @override
@@ -3406,4 +3495,24 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get globalOnlineRestoredBannerMessage => 'Znów jesteś online.';
+
+  @override
+  String get generationStatusCompareAction => 'Compare';
+
+  @override
+  String get generationStatusCompareBeforeLabel => 'Before';
+
+  @override
+  String get generationStatusCompareAfterLabel => 'After';
+
+  @override
+  String get generationStatusCompareBeforeUnavailable =>
+      'Original photo is no longer available.';
+
+  @override
+  String get generationStatusCompareResultUnavailable =>
+      'Result is unavailable.';
+
+  @override
+  String get generationStatusCompareOpenFailed => 'Could not open comparison.';
 }

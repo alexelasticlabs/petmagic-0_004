@@ -37,9 +37,7 @@ void main() {
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:NetworkStatusState|Future<void>|void)\s+' +
-        methodName +
-        r'\s*\(',
+    r'(?:NetworkStatusState|Future<void>|void)\s+' + methodName + r'\s*\(',
   ).firstMatch(source);
   if (methodMatch == null) {
     fail('Method $methodName was not found.');

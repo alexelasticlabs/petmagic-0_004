@@ -25,6 +25,7 @@ class TemplateCard extends StatefulWidget {
     required this.renderContextKey,
     this.onPressed,
     this.showGuestPreview = false,
+    this.highlightBadgeLabel,
     this.previewControllerFactory,
     super.key,
   });
@@ -34,6 +35,7 @@ class TemplateCard extends StatefulWidget {
   final String renderContextKey;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
+  final String? highlightBadgeLabel;
   final Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory;
 
@@ -208,6 +210,10 @@ class _TemplateCardState extends State<TemplateCard> {
                               alignment: WrapAlignment.spaceBetween,
                               runSpacing: 6,
                               children: [
+                                if (widget.highlightBadgeLabel != null)
+                                  _HighlightBadge(
+                                    label: widget.highlightBadgeLabel!,
+                                  ),
                                 if (widget.template.effectivePromoBadge != null)
                                   _PromoBadge(
                                     value: widget.template.effectivePromoBadge!,
@@ -1034,16 +1040,88 @@ class _MediaErrorPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final isRu = _isRu(context);
 
-    return PetMagicImageError(
-      title: _isRu(context)
-          ? 'Не удалось загрузить превью'
-          : 'Failed to load preview',
-      retryLabel: onRetry == null
-          ? null
-          : (_isRu(context) ? 'Повторить' : text.retryAction),
-      onRetry: onRetry,
-      icon: isVideo ? Icons.videocam_off_rounded : Icons.broken_image_outlined,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceStrong.withValues(alpha: 0.92),
+            colors.surface.withValues(alpha: 0.92),
+          ],
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final detailsReserve = constraints.maxHeight < 250 ? 118.0 : 132.0;
+          final mediaHeight = (constraints.maxHeight - detailsReserve).clamp(
+            76.0,
+            constraints.maxHeight,
+          );
+
+          return Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: mediaHeight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isVideo
+                            ? Icons.videocam_off_rounded
+                            : Icons.broken_image_outlined,
+                        color: colors.textMuted,
+                        size: 24,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isRu ? 'Превью недоступно' : 'Preview unavailable',
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: colors.textSoft,
+                              fontSize: 11.6,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      if (onRetry != null) ...[
+                        const SizedBox(height: 4),
+                        TextButton.icon(
+                          onPressed: onRetry,
+                          icon: const Icon(Icons.refresh_rounded, size: 14),
+                          label: Text(
+                            isRu ? 'Повторить' : text.retryAction,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: TextButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            minimumSize: Size.zero,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1084,6 +1162,55 @@ class _PromoBadge extends StatelessWidget {
             fontSize: 9,
             fontWeight: FontWeight.w700,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HighlightBadge extends StatelessWidget {
+  const _HighlightBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFF12D784).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF12D784).withValues(alpha: 0.28),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.auto_awesome_rounded,
+              size: 11,
+              color: Color(0xFF052317),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF052317),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ],
         ),
       ),
     );

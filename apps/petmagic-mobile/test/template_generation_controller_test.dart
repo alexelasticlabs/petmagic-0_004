@@ -607,6 +607,42 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
+  Future<RemoveGenerationWatermarkResult> removeWatermark(
+    String generationId, {
+    String paymentMethod = 'credit',
+    CancelToken? cancelToken,
+  }) async {
+    return const RemoveGenerationWatermarkResult(
+      watermarkRemoved: true,
+      creditsSpent: 0,
+    );
+  }
+
+  @override
+  Future<GenerationMediaAccessResult> fetchDownloadUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const GenerationMediaAccessResult(
+      mediaUrl: 'https://cdn.example.com/result.jpg',
+      hasWatermark: false,
+      fileName: 'result.jpg',
+    );
+  }
+
+  @override
+  Future<GenerationMediaAccessResult> fetchShareUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const GenerationMediaAccessResult(
+      mediaUrl: 'https://cdn.example.com/result.jpg',
+      hasWatermark: false,
+      fileName: 'result.jpg',
+    );
+  }
+
+  @override
   Future<void> clearLocalCache() async {}
 
   @override
@@ -639,6 +675,22 @@ class _FakeTemplateGenerationRepository
   }) async {}
 
   @override
+  Future<String> submitFeedback({
+    required String type,
+    required String category,
+    int? rating,
+    String? message,
+    String? generationId,
+    String? templateId,
+    String? petId,
+    String sourceScreen = 'settings',
+    CancelToken? cancelToken,
+    bool retryTransientFailures = false,
+  }) async {
+    return 'feedback-1';
+  }
+
+  @override
   Future<void> registerPushToken({
     required String token,
     required String platform,
@@ -649,6 +701,199 @@ class _FakeTemplateGenerationRepository
 
   @override
   Future<void> unregisterPushToken(String token) async {}
+
+  @override
+  Future<void> recordTemplateAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String source = 'mobile',
+    String? generationId,
+    Map<String, Object?>? metadata,
+    CancelToken? cancelToken,
+  }) async {}
+
+  @override
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? generationId,
+    Map<String, Object?> metadata = const {},
+    CancelToken? cancelToken,
+  }) async {}
+
+  @override
+  Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
+    String resultId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const CompatibleGenerationTemplates(
+      resultId: 'result-1',
+      inputMediaType: TemplateType.image,
+      templates: [],
+    );
+  }
+
+  @override
+  Future<TemplateGenerationResult> startGenerationFromResult({
+    required String parentGenerationResultId,
+    required String templateId,
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    return startResult ?? _generation(status: TemplateGenerationStatus.queued);
+  }
+
+  @override
+  Future<TemplateGenerationResult> startGenerationFromPet({
+    required String petId,
+    String? petPhotoId,
+    required String templateId,
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    return startResult ?? _generation(status: TemplateGenerationStatus.queued);
+  }
+
+  @override
+  Future<TemplateGenerationResult> generateSimilar({
+    required String sourceGenerationId,
+    String variationStrength = 'medium',
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    return startResult ?? _generation(status: TemplateGenerationStatus.queued);
+  }
+
+  @override
+  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+    return const [];
+  }
+
+  @override
+  Future<PetProfile> createPet({
+    required String name,
+    required String type,
+    String? breed,
+    CancelToken? cancelToken,
+  }) async {
+    return PetProfile(
+      id: 'pet-1',
+      name: name,
+      type: type,
+      breed: breed,
+      photosCount: 0,
+      generationsCount: 0,
+      createdAtUtc: DateTime(2026),
+      updatedAtUtc: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<PetProfile> updatePet({
+    required String petId,
+    required String name,
+    required String type,
+    String? breed,
+    CancelToken? cancelToken,
+  }) async {
+    return PetProfile(
+      id: petId,
+      name: name,
+      type: type,
+      breed: breed,
+      photosCount: 0,
+      generationsCount: 0,
+      createdAtUtc: DateTime(2026),
+      updatedAtUtc: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {}
+
+  @override
+  Future<PetPhoto> uploadPetPhoto({
+    required String petId,
+    required XFile photo,
+    CancelToken? cancelToken,
+  }) async {
+    return PetPhoto(
+      id: 'photo-1',
+      petId: petId,
+      mediaAssetId: 'media-1',
+      url: photo.path,
+      fileName: photo.name,
+      contentType: 'image/jpeg',
+      isFavorite: false,
+      isAvatar: true,
+      sortOrder: 1,
+      createdAtUtc: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<List<PetPhoto>> fetchPetPhotos(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<PetPhoto> setPetPhotoAsAvatar({
+    required String petId,
+    required String photoId,
+    CancelToken? cancelToken,
+  }) async {
+    return PetPhoto(
+      id: photoId,
+      petId: petId,
+      mediaAssetId: 'media-1',
+      url: 'https://cdn.example.com/pet.jpg',
+      fileName: 'pet.jpg',
+      contentType: 'image/jpeg',
+      isFavorite: false,
+      isAvatar: true,
+      sortOrder: 1,
+      createdAtUtc: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<PetPhoto> setPetPhotoFavorite({
+    required String petId,
+    required String photoId,
+    required bool isFavorite,
+    CancelToken? cancelToken,
+  }) async {
+    return PetPhoto(
+      id: photoId,
+      petId: petId,
+      mediaAssetId: 'media-1',
+      url: 'https://cdn.example.com/pet.jpg',
+      fileName: 'pet.jpg',
+      contentType: 'image/jpeg',
+      isFavorite: isFavorite,
+      isAvatar: false,
+      sortOrder: 1,
+      createdAtUtc: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<void> deletePetPhoto({
+    required String petId,
+    required String photoId,
+    CancelToken? cancelToken,
+  }) async {}
+
+  @override
+  Future<List<TemplateGenerationResult>> fetchPetGenerations(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const [];
+  }
 }
 
 class _FakeImageUploadOptimizer extends ImageUploadOptimizer {

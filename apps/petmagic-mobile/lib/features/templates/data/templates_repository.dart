@@ -18,6 +18,18 @@ abstract interface class TemplatesRepository {
 
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query);
 
+  Future<List<TemplateItem>> readSyncedCatalogItems();
+
+  Future<TemplateOfTheDayItem?> fetchTemplateOfTheDay();
+
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? source,
+    String? generationId,
+    Map<String, Object?>? metadata,
+  });
+
   Future<List<String>> fetchCategories();
 
   Future<int> readLocalCatalogVersion();
@@ -69,6 +81,36 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     }
 
     return const TemplatesFeedPage(items: [], hasMore: false, page: 1);
+  }
+
+  @override
+  Future<List<TemplateItem>> readSyncedCatalogItems() async {
+    await syncCatalog();
+    final items = await _cacheDataSource.readCatalogItems();
+    return items.map((item) => item.toDomain()).toList(growable: false);
+  }
+
+  @override
+  Future<TemplateOfTheDayItem?> fetchTemplateOfTheDay() async {
+    final dto = await _remoteDataSource.fetchTemplateOfTheDay();
+    return dto.toDomain();
+  }
+
+  @override
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? source,
+    String? generationId,
+    Map<String, Object?>? metadata,
+  }) {
+    return _remoteDataSource.recordAnalyticsEvent(
+      templateId: templateId,
+      eventType: eventType,
+      source: source,
+      generationId: generationId,
+      metadata: metadata,
+    );
   }
 
   @override
@@ -132,17 +174,23 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     final targetVersion = knownRemoteVersion ?? await fetchCatalogVersion();
     final previousItems = await _cacheDataSource.readCatalogItems();
     final allItems = <TemplateItemDto>[];
-    var page = 1;
+    String? cursor;
 
     while (true) {
       final response = await _remoteDataSource.fetchFeed(
-        TemplatesQuery(page: page, pageSize: _fullResyncPageSize),
+        TemplatesQuery(cursor: cursor, pageSize: _fullResyncPageSize),
       );
       allItems.addAll(response.items);
       if (!response.hasMore) {
         break;
       }
-      page += 1;
+
+      final nextCursor = response.nextCursor;
+      if (nextCursor == null || nextCursor.trim().isEmpty) {
+        break;
+      }
+
+      cursor = nextCursor;
     }
 
     final incomingIds = allItems.map((item) => item.templateId).toSet();

@@ -50,7 +50,7 @@
 	<key>CFBundleName</key>
 	<string>PetMagic</string>
 	<key>GIDClientID</key>
-	<string>288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com</string>
+	<string>replace-with-ios-oauth-client-id.apps.googleusercontent.com</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>PetMagic needs photo library access so you can choose media for templates and support, and save generation results on request.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -118,7 +119,7 @@ class TemplateGenerationRepository {
   }) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
-        '/api/templates/generations/$generationId',
+        '/api/generations/$generationId',
         options: authenticatedRequestOptions(
           session.accessToken,
           correlationId: correlationId,
@@ -128,6 +129,413 @@ class TemplateGenerationRepository {
     );
 
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
+  }
+
+  Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
+    String resultId, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.get<Map<String, dynamic>>(
+        '/api/generation-results/$resultId/compatible-templates',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+    );
+
+    return CompatibleGenerationTemplatesDto.fromJson(
+      response.data ?? const {},
+    ).toDomain();
+  }
+
+  Future<TemplateGenerationResult> startGenerationFromResult({
+    required String parentGenerationResultId,
+    required String templateId,
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/generations/from-result',
+        data: {
+          'parentGenerationResultId': parentGenerationResultId,
+          'templateId': templateId,
+        },
+        options: authenticatedRequestOptions(
+          session.accessToken,
+          correlationId: correlationId,
+        ),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
+  }
+
+  Future<TemplateGenerationResult> generateSimilar({
+    required String sourceGenerationId,
+    String variationStrength = 'medium',
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    final idempotencyKey =
+        'similar-$sourceGenerationId-${DateTime.now().microsecondsSinceEpoch}';
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/generations/$sourceGenerationId/generate-similar',
+        data: {'variationStrength': variationStrength},
+        options: authenticatedRequestOptions(
+          session.accessToken,
+          correlationId: correlationId,
+          extraHeaders: {'Idempotency-Key': idempotencyKey},
+        ),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    final newGenerationId = response.data?['generationId'] as String? ?? '';
+    if (newGenerationId.isEmpty) {
+      throw const AppException('templates.generate_similar_empty_response');
+    }
+
+    return fetchGeneration(
+      newGenerationId,
+      correlationId: correlationId,
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<TemplateGenerationResult> startGenerationFromPet({
+    required String petId,
+    String? petPhotoId,
+    required String templateId,
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    final idempotencyKey =
+        'pet-$petId-${petPhotoId ?? 'auto'}-$templateId-${DateTime.now().microsecondsSinceEpoch}';
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/generations/from-pet',
+        data: {
+          'petId': petId,
+          if (petPhotoId != null && petPhotoId.isNotEmpty)
+            'petPhotoId': petPhotoId,
+          'templateId': templateId,
+        },
+        options: authenticatedRequestOptions(
+          session.accessToken,
+          correlationId: correlationId,
+          extraHeaders: {'Idempotency-Key': idempotencyKey},
+        ),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
+  }
+
+  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/pets',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+    );
+
+    return (response.data ?? const [])
+        .whereType<Map>()
+        .map((item) => PetProfile.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+  }
+
+  Future<PetProfile> createPet({
+    required String name,
+    required String type,
+    String? breed,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/pets',
+        data: {'name': name, 'type': type, 'breed': ?breed},
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return PetProfile.fromJson(response.data ?? const {});
+  }
+
+  Future<PetProfile> updatePet({
+    required String petId,
+    required String name,
+    required String type,
+    String? breed,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.put<Map<String, dynamic>>(
+        '/api/pets/$petId',
+        data: {'name': name, 'type': type, 'breed': ?breed},
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return PetProfile.fromJson(response.data ?? const {});
+  }
+
+  Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.delete<void>(
+        '/api/pets/$petId',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+  }
+
+  Future<PetPhoto> uploadPetPhoto({
+    required String petId,
+    required XFile photo,
+    CancelToken? cancelToken,
+  }) async {
+    final rawFileName = photo.name.isNotEmpty
+        ? photo.name
+        : photo.path.split(Platform.pathSeparator).last;
+    final fileName = _safeSourceImageFileName(rawFileName);
+    final contentType = await _detectSourceImageContentType(photo.path);
+    if (contentType == null) {
+      throw const AppException('pets.photo_type_not_allowed');
+    }
+
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) async => _dio.post<Map<String, dynamic>>(
+        '/api/pets/$petId/photos',
+        data: FormData.fromMap({
+          'photo': await MultipartFile.fromFile(
+            photo.path,
+            filename: fileName,
+            contentType: MediaType.parse(contentType),
+          ),
+        }),
+        options: authenticatedMultipartRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return PetPhoto.fromJson(response.data ?? const {});
+  }
+
+  Future<List<PetPhoto>> fetchPetPhotos(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/pets/$petId/photos',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+    );
+
+    return (response.data ?? const [])
+        .whereType<Map>()
+        .map((item) => PetPhoto.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+  }
+
+  Future<PetPhoto> setPetPhotoAsAvatar({
+    required String petId,
+    required String photoId,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/pets/$petId/photos/$photoId/set-avatar',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return PetPhoto.fromJson(response.data ?? const {});
+  }
+
+  Future<PetPhoto> setPetPhotoFavorite({
+    required String petId,
+    required String photoId,
+    required bool isFavorite,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/pets/$petId/photos/$photoId/favorite',
+        data: {'isFavorite': isFavorite},
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return PetPhoto.fromJson(response.data ?? const {});
+  }
+
+  Future<void> deletePetPhoto({
+    required String petId,
+    required String photoId,
+    CancelToken? cancelToken,
+  }) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.delete<void>(
+        '/api/pets/$petId/photos/$photoId',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+  }
+
+  Future<List<TemplateGenerationResult>> fetchPetGenerations(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<List<dynamic>>(
+      (session) => _dio.get<List<dynamic>>(
+        '/api/pets/$petId/generations',
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+    );
+
+    return (response.data ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => TemplateGenerationDto.fromJson(
+            Map<String, dynamic>.from(item),
+          ).toDomain(),
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> recordTemplateAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String source = 'mobile',
+    String? generationId,
+    Map<String, Object?>? metadata,
+    CancelToken? cancelToken,
+  }) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.post<void>(
+        '/api/templates/$templateId/analytics/events',
+        data: {
+          'eventType': eventType,
+          'source': source,
+          if (generationId != null && generationId.isNotEmpty)
+            'generationId': generationId,
+          if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
+        },
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+  }
+
+  Future<RemoveGenerationWatermarkResult> removeWatermark(
+    String generationId, {
+    String paymentMethod = 'credit',
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/generations/$generationId/remove-watermark',
+        data: {'paymentMethod': paymentMethod},
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return RemoveGenerationWatermarkResult.fromJson(response.data ?? const {});
+  }
+
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? generationId,
+    Map<String, Object?> metadata = const {},
+    CancelToken? cancelToken,
+  }) async {
+    await _authorizedRequest<void>(
+      (session) => _dio.post<void>(
+        '/api/templates/$templateId/analytics/events',
+        data: {
+          'eventType': eventType,
+          'source': 'mobile',
+          if (generationId != null && generationId.isNotEmpty)
+            'generationId': generationId,
+          if (metadata.isNotEmpty) 'metadata': metadata,
+        },
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+  }
+
+  Future<GenerationMediaAccessResult> fetchDownloadUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) {
+    return _fetchMediaAccess(
+      generationId,
+      '/api/generations/$generationId/download',
+      method: 'GET',
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<GenerationMediaAccessResult> fetchShareUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) {
+    return _fetchMediaAccess(
+      generationId,
+      '/api/generations/$generationId/share',
+      method: 'POST',
+      cancelToken: cancelToken,
+    );
+  }
+
+  Future<GenerationMediaAccessResult> _fetchMediaAccess(
+    String generationId,
+    String path, {
+    required String method,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.request<Map<String, dynamic>>(
+        path,
+        options: authenticatedRequestOptions(
+          session.accessToken,
+        ).copyWith(method: method),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    return GenerationMediaAccessResult.fromJson(response.data ?? const {});
   }
 
   Future<List<TemplateGenerationResult>?> readCachedGenerations({
@@ -353,25 +761,86 @@ class TemplateGenerationRepository {
     String? comment,
     double? inputPhotoQualityScore,
   }) async {
-    final data = <String, Object?>{
-      'rating': rating,
-      'selectedReasons': selectedReasons,
-    };
-    if (comment != null && comment.isNotEmpty) {
-      data['comment'] = comment;
-    }
-    if (inputPhotoQualityScore != null) {
-      data['inputPhotoQualityScore'] = inputPhotoQualityScore;
-    }
+    final category = selectedReasons.isNotEmpty
+        ? selectedReasons.first
+        : switch (rating) {
+            3 => 'good',
+            2 => 'okay',
+            _ => 'bad',
+          };
 
-    await _authorizedRequest<void>(
-      (session) => _dio.post<void>(
-        '/api/templates/generations/$generationId/feedback',
-        data: data,
-        options: authenticatedRequestOptions(session.accessToken),
-      ),
+    await submitFeedback(
+      type: 'GenerationResult',
+      category: category,
+      rating: switch (rating) {
+        3 => 1,
+        2 => 0,
+        _ => -1,
+      },
+      message: comment,
+      generationId: generationId,
+      sourceScreen: 'generation_status',
       retryTransientFailures: false,
     );
+  }
+
+  Future<String> submitFeedback({
+    required String type,
+    required String category,
+    int? rating,
+    String? message,
+    String? generationId,
+    String? templateId,
+    String? petId,
+    String sourceScreen = 'settings',
+    CancelToken? cancelToken,
+    bool retryTransientFailures = false,
+  }) async {
+    final feedbackMessage = _nonEmptyOptional(message);
+    final feedbackGenerationId = _nonEmptyOptional(generationId);
+    final feedbackTemplateId = _nonEmptyOptional(templateId);
+    final feedbackPetId = _nonEmptyOptional(petId);
+    final data = <String, Object?>{
+      'type': type,
+      'category': category,
+      'sourceScreen': sourceScreen,
+      'appVersion': '1.0.0',
+      'platform': Platform.operatingSystem,
+      'deviceModel': Platform.operatingSystemVersion,
+      'locale': Platform.localeName,
+    };
+    if (rating != null) {
+      data['rating'] = rating;
+    }
+    if (feedbackMessage != null) {
+      data['message'] = feedbackMessage;
+    }
+    if (feedbackGenerationId != null) {
+      data['generationId'] = feedbackGenerationId;
+    }
+    if (feedbackTemplateId != null) {
+      data['templateId'] = feedbackTemplateId;
+    }
+    if (feedbackPetId != null) {
+      data['petId'] = feedbackPetId;
+    }
+
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/feedback',
+        data: data,
+        options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: retryTransientFailures,
+    );
+
+    return response.data?['feedbackId'] as String? ?? '';
+  }
+
+  String? _nonEmptyOptional(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   Future<void> registerPushToken({
@@ -607,10 +1076,16 @@ class TemplateGenerationRepository {
     if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
       return 'image/jpeg';
     }
-    if (_startsWith(
-      header,
-      const [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
-    )) {
+    if (_startsWith(header, const [
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+    ])) {
       return 'image/png';
     }
     if (header.length >= 12 &&
@@ -675,6 +1150,175 @@ class TemplateGenerationRepository {
   }
 }
 
+class CompatibleGenerationTemplateDto {
+  const CompatibleGenerationTemplateDto({
+    required this.id,
+    required this.title,
+    required this.type,
+    required this.isPremium,
+    required this.isRecommended,
+    required this.tokenCost,
+    this.thumbnailUrl,
+  });
+
+  final String id;
+  final String title;
+  final String type;
+  final String? thumbnailUrl;
+  final bool isPremium;
+  final bool isRecommended;
+  final int tokenCost;
+
+  factory CompatibleGenerationTemplateDto.fromJson(Map<String, Object?> json) {
+    return CompatibleGenerationTemplateDto(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      type: json['type'] as String? ?? 'Image',
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      isPremium: json['isPremium'] as bool? ?? false,
+      isRecommended: json['isRecommended'] as bool? ?? false,
+      tokenCost: (json['tokenCost'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  CompatibleGenerationTemplate toDomain() => CompatibleGenerationTemplate(
+    id: id,
+    title: title,
+    templateType: templateTypeFromApi(type),
+    thumbnailUrl: thumbnailUrl,
+    isPremium: isPremium,
+    isRecommended: isRecommended,
+    tokenCost: tokenCost,
+  );
+}
+
+class CompatibleGenerationTemplatesDto {
+  const CompatibleGenerationTemplatesDto({
+    required this.resultId,
+    required this.inputMediaType,
+    required this.templates,
+  });
+
+  final String resultId;
+  final String inputMediaType;
+  final List<CompatibleGenerationTemplateDto> templates;
+
+  factory CompatibleGenerationTemplatesDto.fromJson(Map<String, Object?> json) {
+    return CompatibleGenerationTemplatesDto(
+      resultId: json['resultId'] as String? ?? '',
+      inputMediaType: json['inputMediaType'] as String? ?? 'image',
+      templates: (json['templates'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => CompatibleGenerationTemplateDto.fromJson(
+              Map<String, Object?>.from(item),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  CompatibleGenerationTemplates toDomain() => CompatibleGenerationTemplates(
+    resultId: resultId,
+    inputMediaType: templateTypeFromApi(inputMediaType),
+    templates: templates.map((item) => item.toDomain()).toList(growable: false),
+  );
+}
+
+class PetProfile {
+  const PetProfile({
+    required this.id,
+    required this.name,
+    required this.type,
+    required this.photosCount,
+    required this.generationsCount,
+    required this.createdAtUtc,
+    required this.updatedAtUtc,
+    this.breed,
+    this.avatarMediaAssetId,
+    this.avatarUrl,
+  });
+
+  final String id;
+  final String name;
+  final String type;
+  final String? breed;
+  final String? avatarMediaAssetId;
+  final String? avatarUrl;
+  final int photosCount;
+  final int generationsCount;
+  final DateTime createdAtUtc;
+  final DateTime updatedAtUtc;
+
+  factory PetProfile.fromJson(Map<String, dynamic> json) {
+    return PetProfile(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String? ?? 'other',
+      breed: json['breed'] as String?,
+      avatarMediaAssetId: json['avatarMediaAssetId'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      photosCount: (json['photosCount'] as num?)?.toInt() ?? 0,
+      generationsCount: (json['generationsCount'] as num?)?.toInt() ?? 0,
+      createdAtUtc:
+          TemplateGenerationDto._dateTime(json['createdAtUtc']) ??
+          DateTime.now().toUtc(),
+      updatedAtUtc:
+          TemplateGenerationDto._dateTime(json['updatedAtUtc']) ??
+          DateTime.now().toUtc(),
+    );
+  }
+}
+
+class PetPhoto {
+  const PetPhoto({
+    required this.id,
+    required this.petId,
+    required this.mediaAssetId,
+    required this.url,
+    required this.fileName,
+    required this.contentType,
+    required this.isFavorite,
+    required this.isAvatar,
+    required this.sortOrder,
+    required this.createdAtUtc,
+    this.thumbnailUrl,
+    this.fileSizeBytes,
+  });
+
+  final String id;
+  final String petId;
+  final String mediaAssetId;
+  final String url;
+  final String? thumbnailUrl;
+  final String fileName;
+  final String contentType;
+  final int? fileSizeBytes;
+  final bool isFavorite;
+  final bool isAvatar;
+  final int sortOrder;
+  final DateTime createdAtUtc;
+
+  factory PetPhoto.fromJson(Map<String, dynamic> json) {
+    return PetPhoto(
+      id: json['id'] as String? ?? '',
+      petId: json['petId'] as String? ?? '',
+      mediaAssetId: json['mediaAssetId'] as String? ?? '',
+      url: json['url'] as String? ?? '',
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      fileName: json['fileName'] as String? ?? '',
+      contentType: json['contentType'] as String? ?? '',
+      fileSizeBytes: (json['fileSizeBytes'] as num?)?.toInt(),
+      isFavorite: json['isFavorite'] as bool? ?? false,
+      isAvatar: json['isAvatar'] as bool? ?? false,
+      sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      createdAtUtc:
+          TemplateGenerationDto._dateTime(json['createdAtUtc']) ??
+          DateTime.now().toUtc(),
+    );
+  }
+}
+
 class TemplateGenerationDto {
   const TemplateGenerationDto({
     required this.generationId,
@@ -710,6 +1354,21 @@ class TemplateGenerationDto {
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
+    this.hasWatermark = false,
+    this.canRemoveWatermark = false,
+    this.isWatermarkRemoved = false,
+    this.removeWatermarkCostCredits = 1,
+    this.userPlan = 'free',
+    this.watermarkMessage,
+    this.supportsGenerateSimilar = false,
+    this.inputSourceType = 'user_upload',
+    this.inputMediaAssetId,
+    this.resultMediaAssetId,
+    this.inputPreviewUrl,
+    this.resultPreviewUrl,
+    this.canCompareBeforeAfter = false,
+    this.petId,
+    this.petPhotoId,
   });
 
   final String generationId;
@@ -745,6 +1404,21 @@ class TemplateGenerationDto {
   final bool isUnread;
   final int? queuePosition;
   final int? estimatedWaitSeconds;
+  final bool hasWatermark;
+  final bool canRemoveWatermark;
+  final bool isWatermarkRemoved;
+  final int removeWatermarkCostCredits;
+  final String userPlan;
+  final String? watermarkMessage;
+  final bool supportsGenerateSimilar;
+  final String inputSourceType;
+  final String? inputMediaAssetId;
+  final String? resultMediaAssetId;
+  final String? inputPreviewUrl;
+  final String? resultPreviewUrl;
+  final bool canCompareBeforeAfter;
+  final String? petId;
+  final String? petPhotoId;
 
   factory TemplateGenerationDto.fromJson(Map<String, dynamic> json) {
     final rawSourceImageAsset = json['sourceImageAsset'];
@@ -762,7 +1436,8 @@ class TemplateGenerationDto {
           : null,
       normalizedImageUrl: json['normalizedImageUrl'] as String?,
       referenceMotionUrl: json['referenceMotionUrl'] as String?,
-      outputUrl: json['outputUrl'] as String?,
+      outputUrl:
+          (json['outputUrl'] as String?) ?? (json['mediaUrl'] as String?),
       attemptCount: (json['attemptCount'] as num?)?.toInt() ?? 0,
       usedPreprocessingModel: json['usedPreprocessingModel'] as String?,
       usedKlingModel: json['usedKlingModel'] as String?,
@@ -792,6 +1467,23 @@ class TemplateGenerationDto {
       isUnread: json['isUnread'] as bool? ?? false,
       queuePosition: (json['queuePosition'] as num?)?.toInt(),
       estimatedWaitSeconds: (json['estimatedWaitSeconds'] as num?)?.toInt(),
+      hasWatermark: json['hasWatermark'] as bool? ?? false,
+      canRemoveWatermark: json['canRemoveWatermark'] as bool? ?? false,
+      isWatermarkRemoved: json['isWatermarkRemoved'] as bool? ?? false,
+      removeWatermarkCostCredits:
+          (json['removeWatermarkCostCredits'] as num?)?.toInt() ?? 1,
+      userPlan: json['userPlan'] as String? ?? 'free',
+      watermarkMessage: json['watermarkMessage'] as String?,
+      supportsGenerateSimilar:
+          json['supportsGenerateSimilar'] as bool? ?? false,
+      inputSourceType: json['inputSourceType'] as String? ?? 'user_upload',
+      inputMediaAssetId: json['inputMediaAssetId'] as String?,
+      resultMediaAssetId: json['resultMediaAssetId'] as String?,
+      inputPreviewUrl: json['inputPreviewUrl'] as String?,
+      resultPreviewUrl: json['resultPreviewUrl'] as String?,
+      canCompareBeforeAfter: json['canCompareBeforeAfter'] as bool? ?? false,
+      petId: json['petId'] as String?,
+      petPhotoId: json['petPhotoId'] as String?,
     );
   }
 
@@ -830,6 +1522,21 @@ class TemplateGenerationDto {
       isUnread: isUnread,
       queuePosition: queuePosition,
       estimatedWaitSeconds: estimatedWaitSeconds,
+      hasWatermark: hasWatermark,
+      canRemoveWatermark: canRemoveWatermark,
+      isWatermarkRemoved: isWatermarkRemoved,
+      removeWatermarkCostCredits: removeWatermarkCostCredits,
+      userPlan: userPlan,
+      watermarkMessage: watermarkMessage,
+      supportsGenerateSimilar: supportsGenerateSimilar,
+      inputSourceType: inputSourceType,
+      inputMediaAssetId: inputMediaAssetId,
+      resultMediaAssetId: resultMediaAssetId,
+      inputPreviewUrl: inputPreviewUrl,
+      resultPreviewUrl: resultPreviewUrl,
+      canCompareBeforeAfter: canCompareBeforeAfter,
+      petId: petId,
+      petPhotoId: petPhotoId,
     );
   }
 
@@ -839,5 +1546,48 @@ class TemplateGenerationDto {
     }
 
     return DateTime.tryParse(value)?.toUtc();
+  }
+}
+
+class RemoveGenerationWatermarkResult {
+  const RemoveGenerationWatermarkResult({
+    required this.watermarkRemoved,
+    required this.creditsSpent,
+    this.remainingCredits,
+    this.mediaUrl,
+  });
+
+  final bool watermarkRemoved;
+  final int creditsSpent;
+  final int? remainingCredits;
+  final String? mediaUrl;
+
+  factory RemoveGenerationWatermarkResult.fromJson(Map<String, dynamic> json) {
+    return RemoveGenerationWatermarkResult(
+      watermarkRemoved: json['watermarkRemoved'] as bool? ?? false,
+      creditsSpent: (json['creditsSpent'] as num?)?.toInt() ?? 0,
+      remainingCredits: (json['remainingCredits'] as num?)?.toInt(),
+      mediaUrl: json['mediaUrl'] as String?,
+    );
+  }
+}
+
+class GenerationMediaAccessResult {
+  const GenerationMediaAccessResult({
+    required this.mediaUrl,
+    required this.hasWatermark,
+    required this.fileName,
+  });
+
+  final String mediaUrl;
+  final bool hasWatermark;
+  final String fileName;
+
+  factory GenerationMediaAccessResult.fromJson(Map<String, dynamic> json) {
+    return GenerationMediaAccessResult(
+      mediaUrl: json['mediaUrl'] as String? ?? '',
+      hasWatermark: json['hasWatermark'] as bool? ?? false,
+      fileName: json['fileName'] as String? ?? 'petmagic-result',
+    );
   }
 }

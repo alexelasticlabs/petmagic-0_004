@@ -191,22 +191,159 @@ void main() {
     expect(repository.readCachedFirstPageCalls, 1);
     expect(repository.fetchFeedCalls, 1);
   });
+
+  testWidgets('does not update categories after provider disposal', (
+    tester,
+  ) async {
+    final categoriesCompleter = Completer<List<String>>();
+    final repository = _FakeTemplatesRepository(
+      categoriesCompleter: categoriesCompleter,
+    );
+    final realtimeClient = _FakeRealtimeClient();
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(realtimeClient),
+      ],
+    );
+
+    final controller = container.read(templatesControllerProvider.notifier);
+    await controller.loadInitial(forceRefresh: true);
+
+    container.dispose();
+    categoriesCompleter.complete(const ['Portrait']);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'disconnects realtime client when connect finishes after disposal',
+    () async {
+      final repository = _FakeTemplatesRepository();
+      final connectCompleter = Completer<void>();
+      final realtimeClient = _FakeRealtimeClient(
+        connectCompleter: connectCompleter,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+
+      container.read(templatesControllerProvider);
+      container.dispose();
+      connectCompleter.complete();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+    },
+  );
+
+  test('loads template of the day without blocking feed state', () async {
+    final today = DateTime.utc(2026, 6, 14);
+    final repository = _FakeTemplatesRepository(
+      templateOfTheDay: TemplateOfTheDayItem(
+        templateId: 'featured-1',
+        title: 'Featured pet',
+        subtitle: 'Daily idea',
+        badgeText: 'Template of the Day',
+        templateType: TemplateType.image,
+        isPremium: false,
+        requiredPlan: 'free',
+        date: today,
+        source: 'auto',
+      ),
+      pagesByKey: {
+        const TemplatesQuery().cacheKey: TemplatesFeedPage(
+          items: [_template('featured-1', TemplateType.image)],
+          hasMore: false,
+        ),
+      },
+    );
+    final container = ProviderContainer(
+      overrides: [
+        templatesRepositoryProvider.overrideWithValue(repository),
+        realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(templatesControllerProvider.notifier)
+        .loadInitial(forceRefresh: true);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(templatesControllerProvider);
+    expect(state.items.map((item) => item.templateId), ['featured-1']);
+    expect(state.templateOfTheDay?.templateId, 'featured-1');
+    expect(state.templateOfTheDay?.source, 'auto');
+    expect(state.isTemplateOfTheDayLoading, isFalse);
+    expect(state.templateOfTheDayError, isNull);
+    expect(repository.fetchTemplateOfTheDayCalls, 1);
+  });
+
+  test(
+    'hides template of the day and keeps feed usable when feature load fails',
+    () async {
+      final repository = _FakeTemplatesRepository(
+        throwOnTemplateOfTheDay: true,
+        pagesByKey: {
+          const TemplatesQuery().cacheKey: TemplatesFeedPage(
+            items: [_template('feed-1', TemplateType.image)],
+            hasMore: false,
+          ),
+        },
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templatesRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(templatesControllerProvider.notifier)
+          .loadInitial(forceRefresh: true);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(templatesControllerProvider);
+      expect(state.items.map((item) => item.templateId), ['feed-1']);
+      expect(state.templateOfTheDay, isNull);
+      expect(state.isTemplateOfTheDayLoading, isFalse);
+      expect(
+        state.templateOfTheDayError,
+        'templates.template_of_the_day_load_failed',
+      );
+      expect(state.errorMessage, isNull);
+      expect(repository.fetchTemplateOfTheDayCalls, 1);
+    },
+  );
 }
 
 class _FakeTemplatesRepository implements TemplatesRepository {
   _FakeTemplatesRepository({
     this.firstFetchCompleter,
     this.videoFetchCompleter,
+    this.categoriesCompleter,
     this.pagesByKey = const {},
+    this.templateOfTheDay,
+    this.throwOnTemplateOfTheDay = false,
   });
 
   final Completer<void>? firstFetchCompleter;
   final Completer<void>? videoFetchCompleter;
+  final Completer<List<String>>? categoriesCompleter;
   final Map<String, TemplatesFeedPage> pagesByKey;
+  final TemplateOfTheDayItem? templateOfTheDay;
+  final bool throwOnTemplateOfTheDay;
   int _catalogVersion = 0;
   int fetchFeedCalls = 0;
   int fetchCategoriesCalls = 0;
   int readCachedFirstPageCalls = 0;
+  int fetchTemplateOfTheDayCalls = 0;
 
   @override
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query) async {
@@ -230,8 +367,38 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   }
 
   @override
+  Future<List<TemplateItem>> readSyncedCatalogItems() async {
+    return pagesByKey.values
+        .expand((page) => page.items)
+        .toList(growable: false);
+  }
+
+  @override
+  Future<TemplateOfTheDayItem?> fetchTemplateOfTheDay() async {
+    fetchTemplateOfTheDayCalls++;
+    if (throwOnTemplateOfTheDay) {
+      throw StateError('template of the day unavailable');
+    }
+
+    return templateOfTheDay;
+  }
+
+  @override
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? source,
+    String? generationId,
+    Map<String, Object?>? metadata,
+  }) async {}
+
+  @override
   Future<List<String>> fetchCategories() async {
     fetchCategoriesCalls++;
+    if (categoriesCompleter != null) {
+      return categoriesCompleter!.future;
+    }
+
     return const ['Portrait'];
   }
 
@@ -290,18 +457,27 @@ TemplateItem _template(String id, TemplateType type) {
 }
 
 class _FakeRealtimeClient implements RealtimeClient {
+  _FakeRealtimeClient({this.connectCompleter});
+
+  final Completer<void>? connectCompleter;
   final StreamController<RealtimeEvent> _controller =
       StreamController<RealtimeEvent>.broadcast();
+  int disconnectCalls = 0;
 
   @override
   Stream<RealtimeEvent> get events => _controller.stream;
 
   @override
-  Future<void> connect() async {}
+  Future<void> connect() async {
+    await connectCompleter?.future;
+  }
 
   @override
   Future<void> disconnect() async {
-    await _controller.close();
+    disconnectCalls++;
+    if (!_controller.isClosed) {
+      await _controller.close();
+    }
   }
 
   void emitTemplatesFeedInvalidated() {

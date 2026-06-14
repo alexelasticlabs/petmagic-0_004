@@ -3,23 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b.apps.googleusercontent.com</string>
+	<string>replace-with-ios-oauth-client-id.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b</string>
+	<string>com.googleusercontent.apps.replace-with-ios-oauth-client-id</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>288623941469-3pq3f1kq4ec3d2n8fj091317ke7ufks7.apps.googleusercontent.com</string>
+	<string>replace-with-android-oauth-client-id.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCJQ-tS18twJyi7h4ADar3Pq3KI8m7n-Jw</string>
+	<string>replace-with-firebase-api-key</string>
 	<key>GCM_SENDER_ID</key>
-	<string>288623941469</string>
+	<string>000000000000</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.petmagic.app</string>
 	<key>PROJECT_ID</key>
-	<string>petmagic-f036b</string>
+	<string>petmagic-placeholder</string>
 	<key>STORAGE_BUCKET</key>
-	<string>petmagic-f036b.firebasestorage.app</string>
+	<string>petmagic-placeholder.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false/>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true/>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:288623941469:ios:028da7172892fdf964bab4</string>
+	<string>1:000000000000:ios:0000000000000000000000</string>
 </dict>
 </plist>

@@ -8,6 +8,19 @@
   "createMagicTitle": "Create Magic",
   "pickTemplateSubtitle": "Pick a template for your pet",
   "searchTemplates": "Search templates",
+  "randomTemplateAction": "Random template",
+  "randomTemplateAny": "Any template",
+  "randomTemplateImage": "Image template",
+  "randomTemplateVideo": "Video template",
+  "randomTemplateNoTemplates": "No templates available.",
+  "randomTemplateNoAvailableForType": "No available templates for this type.",
+  "randomTemplateNoImageTemplates": "No image templates available.",
+  "randomTemplateNoVideoTemplates": "No video templates available.",
+  "randomTemplateLoadFailed": "Could not load templates. Please try again.",
+  "templateOfTheDayTitle": "Template of the Day",
+  "templateOfTheDaySubtitle": "Today's magic idea",
+  "templateOfTheDayTryAction": "Try this template",
+  "templateOfTheDayFeedBadge": "Today's pick",
   "allFilter": "All",
   "videosFilter": "Videos",
   "imagesFilter": "Images",
@@ -1265,8 +1278,37 @@
   "subscriptionBillingPeriodLabel": "Billing period",
   "subscriptionBillingPeriodMonthly": "Monthly",
   "subscriptionBillingPeriodYearly": "Yearly",
+  "generationStatusWatermarkRemoved": "Watermark removed",
+  "generationStatusWatermarkAddedFreePlan": "Watermark added on the free plan",
+  "generationStatusShareWithWatermark": "Share with watermark",
+  "generationStatusDownloadWithoutWatermark": "Download without watermark",
+  "generationStatusSaveWithWatermark": "Save with watermark",
+  "generationStatusRemoveWatermark": "Remove watermark",
+  "generationStatusRemovingWatermark": "Removing...",
+  "generationStatusUpgradePremium": "Upgrade to Premium",
+  "generationStatusRemoveWatermarkSheetTitle": "Remove watermark",
+  "generationStatusRemoveWatermarkSheetBody": "Use {cost} credit for this result, or upgrade to Premium for clean downloads.",
+  "@generationStatusRemoveWatermarkSheetBody": {
+    "placeholders": {
+      "cost": { "type": "int" }
+    }
+  },
+  "generationStatusRemoveWatermarkUseCredit": "Use {cost} credit",
+  "@generationStatusRemoveWatermarkUseCredit": {
+    "placeholders": {
+      "cost": { "type": "int" }
+    }
+  },
+  "generationStatusRemoveWatermarkFailed": "Could not remove watermark. Please try again.",
+  "generationStatusRemoveWatermarkNoCredits": "Not enough credits. Buy credits or upgrade to Premium.",
   "globalOfflineBannerTitle": "No internet connection",
   "globalOfflineBannerMessage": "Some features are unavailable until your connection is restored.",
   "globalOnlineRestoredBannerTitle": "Connection restored",
-  "globalOnlineRestoredBannerMessage": "You're back online."
+  "globalOnlineRestoredBannerMessage": "You're back online.",
+  "generationStatusCompareAction": "Compare",
+  "generationStatusCompareBeforeLabel": "Before",
+  "generationStatusCompareAfterLabel": "After",
+  "generationStatusCompareBeforeUnavailable": "Original photo is no longer available.",
+  "generationStatusCompareResultUnavailable": "Result is unavailable.",
+  "generationStatusCompareOpenFailed": "Could not open comparison."
 }

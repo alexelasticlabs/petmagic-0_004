@@ -1,0 +1,709 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+
+class GenerationResultInputPage extends ConsumerStatefulWidget {
+  const GenerationResultInputPage({required this.generationId, super.key});
+
+  static const routePrefix = '/generation-results';
+  static String routeFor(String generationId) =>
+      '$routePrefix/$generationId/use-input';
+
+  final String generationId;
+
+  @override
+  ConsumerState<GenerationResultInputPage> createState() =>
+      _GenerationResultInputPageState();
+}
+
+enum _ResultTemplateFilter { all, image, video }
+
+class _GenerationResultInputPageState
+    extends ConsumerState<GenerationResultInputPage> {
+  TemplateGenerationResult? _parent;
+  CompatibleGenerationTemplates? _compatible;
+  _ResultTemplateFilter _filter = _ResultTemplateFilter.all;
+  bool _isLoading = true;
+  bool _isStarting = false;
+  String? _error;
+  CancelToken? _cancelToken;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _cancelToken?.cancel('generation_result_input_disposed');
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    _cancelToken?.cancel('generation_result_input_reload');
+    final cancelToken = CancelToken();
+    _cancelToken = cancelToken;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final repository = ref.read(templateGenerationRepositoryProvider);
+      final results = await Future.wait([
+        repository.fetchGeneration(
+          widget.generationId,
+          cancelToken: cancelToken,
+        ),
+        repository.fetchCompatibleTemplates(
+          widget.generationId,
+          cancelToken: cancelToken,
+        ),
+      ]);
+      if (!mounted || cancelToken.isCancelled) {
+        return;
+      }
+      setState(() {
+        _parent = results[0] as TemplateGenerationResult;
+        _compatible = results[1] as CompatibleGenerationTemplates;
+        _isLoading = false;
+      });
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _error = _copy.error;
+      });
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isLoading = false;
+        _error = _copy.error;
+      });
+    }
+  }
+
+  _GenerationResultInputCopy get _copy =>
+      _GenerationResultInputCopy.forLocale(AppLocalizations.of(context));
+
+  List<CompatibleGenerationTemplate> get _visibleTemplates {
+    final templates = _compatible?.templates ?? const [];
+    return templates
+        .where((template) {
+          return switch (_filter) {
+            _ResultTemplateFilter.all => true,
+            _ResultTemplateFilter.image =>
+              template.templateType == TemplateType.image,
+            _ResultTemplateFilter.video =>
+              template.templateType == TemplateType.video,
+          };
+        })
+        .toList(growable: false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final copy = _copy;
+    final parent = _parent;
+    final visibleTemplates = _visibleTemplates;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [colors.backgroundTop, colors.backgroundBottom],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: RefreshIndicator.adaptive(
+            color: colors.accent,
+            onRefresh: () async {
+              await PetMagicHaptics.medium();
+              await _load();
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                18,
+                12,
+                18,
+                petMagicScrollableBottomInset(context),
+              ),
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => context.pop(),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      color: colors.textStrong,
+                    ),
+                    Expanded(
+                      child: Text(
+                        copy.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colors.textStrong,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_isLoading)
+                  const _ResultInputLoadingCard()
+                else if (_error != null)
+                  _ResultInputErrorCard(message: _error!, onRetry: _load)
+                else if (parent != null) ...[
+                  _ParentPreviewCard(generation: parent, copy: copy),
+                  const SizedBox(height: 14),
+                  _FilterChips(
+                    value: _filter,
+                    onChanged: (value) => setState(() => _filter = value),
+                    copy: copy,
+                  ),
+                  const SizedBox(height: 12),
+                  if (visibleTemplates.isEmpty)
+                    _ResultInputErrorCard(message: copy.empty, onRetry: _load)
+                  else
+                    ...visibleTemplates.map(
+                      (template) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _CompatibleTemplateTile(
+                          template: template,
+                          isBusy: _isStarting,
+                          copy: copy,
+                          onTap: () => unawaited(_start(template)),
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _start(CompatibleGenerationTemplate template) async {
+    if (_isStarting) {
+      return;
+    }
+    final copy = _copy;
+    final wallet = ref.read(walletControllerProvider).wallet;
+    if ((wallet?.balance ?? 0) < template.tokenCost) {
+      _showInfo(copy.noCredits);
+      context.push(WalletPage.routePath);
+      return;
+    }
+
+    final confirmed = await showPetMagicModalBottomSheet<bool>(
+      context: context,
+      builder: (context, _) => _ConfirmStartSheet(
+        title: template.title,
+        cost: template.tokenCost,
+        copy: copy,
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _isStarting = true);
+    try {
+      await _recordEvent(template, 'template_selected');
+      final generation = await ref
+          .read(templateGenerationRepositoryProvider)
+          .startGenerationFromResult(
+            parentGenerationResultId: widget.generationId,
+            templateId: template.id,
+          );
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .rememberActiveGeneration(generationId: generation.generationId);
+      await _recordEvent(
+        template,
+        'generation_started',
+        generation.generationId,
+      );
+      if (!mounted) {
+        return;
+      }
+      context.go(
+        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      _showInfo(copy.error);
+    } finally {
+      if (mounted) {
+        setState(() => _isStarting = false);
+      }
+    }
+  }
+
+  Future<void> _recordEvent(
+    CompatibleGenerationTemplate template,
+    String eventType, [
+    String? generationId,
+  ]) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordTemplateAnalyticsEvent(
+            templateId: template.id,
+            eventType: eventType,
+            generationId: generationId ?? widget.generationId,
+          );
+    } on Object {
+      // Best-effort analytics must not block generation.
+    }
+  }
+
+  void _showInfo(String message) {
+    if (!mounted) {
+      return;
+    }
+    PetMagicToast.show(context, message: message);
+  }
+}
+
+class _ParentPreviewCard extends StatelessWidget {
+  const _ParentPreviewCard({required this.generation, required this.copy});
+
+  final TemplateGenerationResult generation;
+  final _GenerationResultInputCopy copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final mediaUrl = parseSafeGenerationMediaUri(generation.outputUrl ?? '');
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: mediaUrl == null
+                    ? ColoredBox(
+                        color: colors.surfaceStrong,
+                        child: Center(child: Text(copy.mediaUnavailable)),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: mediaUrl.toString(),
+                        fit: BoxFit.cover,
+                        memCacheWidth: 900,
+                      ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              generation.templateTitle ?? copy.parentTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              copy.parentHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textSoft,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChips extends StatelessWidget {
+  const _FilterChips({
+    required this.value,
+    required this.onChanged,
+    required this.copy,
+  });
+
+  final _ResultTemplateFilter value;
+  final ValueChanged<_ResultTemplateFilter> onChanged;
+  final _GenerationResultInputCopy copy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<_ResultTemplateFilter>(
+      segments: [
+        ButtonSegment(value: _ResultTemplateFilter.all, label: Text(copy.all)),
+        ButtonSegment(
+          value: _ResultTemplateFilter.image,
+          label: Text(copy.image),
+        ),
+        ButtonSegment(
+          value: _ResultTemplateFilter.video,
+          label: Text(copy.video),
+        ),
+      ],
+      selected: {value},
+      onSelectionChanged: (selection) => onChanged(selection.first),
+    );
+  }
+}
+
+class _CompatibleTemplateTile extends StatelessWidget {
+  const _CompatibleTemplateTile({
+    required this.template,
+    required this.isBusy,
+    required this.copy,
+    required this.onTap,
+  });
+
+  final CompatibleGenerationTemplate template;
+  final bool isBusy;
+  final _GenerationResultInputCopy copy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final safeThumb = parseSafeGenerationMediaUri(template.thumbnailUrl ?? '');
+    return Material(
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: isBusy ? null : onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox.square(
+                  dimension: 74,
+                  child: safeThumb == null
+                      ? ColoredBox(
+                          color: colors.surfaceStrong,
+                          child: Icon(
+                            template.isVideo
+                                ? Icons.movie_creation_rounded
+                                : Icons.image_rounded,
+                            color: colors.textMuted,
+                          ),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: safeThumb.toString(),
+                          fit: BoxFit.cover,
+                          memCacheWidth: 240,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          template.isVideo
+                              ? Icons.play_circle_rounded
+                              : Icons.auto_awesome_rounded,
+                          size: 16,
+                          color: colors.accent,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            template.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(
+                                  color: colors.textStrong,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _MiniBadge(
+                          label: template.isVideo ? copy.video : copy.image,
+                        ),
+                        if (template.isRecommended)
+                          _MiniBadge(label: copy.recommended),
+                        if (template.isPremium) _MiniBadge(label: 'Premium'),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${template.tokenCost} PawSpark',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.chevron_right_rounded, color: colors.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  const _MiniBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colors.textSoft,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfirmStartSheet extends StatelessWidget {
+  const _ConfirmStartSheet({
+    required this.title,
+    required this.cost,
+    required this.copy,
+  });
+
+  final String title;
+  final int cost;
+  final _GenerationResultInputCopy copy;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        18,
+        8,
+        18,
+        petMagicScrollableBottomInset(context),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: colors.textStrong,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            copy.cost(cost),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.textSoft,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(copy.start),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ResultInputLoadingCard extends StatelessWidget {
+  const _ResultInputLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator.adaptive()),
+      ),
+    );
+  }
+}
+
+class _ResultInputErrorCard extends StatelessWidget {
+  const _ResultInputErrorCard({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(message, style: TextStyle(color: colors.textSoft)),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => unawaited(onRetry()),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GenerationResultInputCopy {
+  const _GenerationResultInputCopy({
+    required this.title,
+    required this.parentTitle,
+    required this.parentHint,
+    required this.mediaUnavailable,
+    required this.all,
+    required this.image,
+    required this.video,
+    required this.recommended,
+    required this.empty,
+    required this.error,
+    required this.noCredits,
+    required this.start,
+    required this.costPrefix,
+    required this.costSuffix,
+  });
+
+  final String title;
+  final String parentTitle;
+  final String parentHint;
+  final String mediaUnavailable;
+  final String all;
+  final String image;
+  final String video;
+  final String recommended;
+  final String empty;
+  final String error;
+  final String noCredits;
+  final String start;
+  final String costPrefix;
+  final String costSuffix;
+
+  String cost(int credits) => '$costPrefix $credits $costSuffix';
+
+  static _GenerationResultInputCopy forLocale(AppLocalizations text) {
+    final isRu = text.localeName.startsWith('ru');
+    if (isRu) {
+      return const _GenerationResultInputCopy(
+        title: 'Использовать результат',
+        parentTitle: 'Готовый результат',
+        parentHint: 'Этот результат будет использован как основа',
+        mediaUnavailable: 'Медиа недоступно',
+        all: 'Все',
+        image: 'Фото',
+        video: 'Видео',
+        recommended: 'Рекомендуем',
+        empty: 'Нет совместимых шаблонов.',
+        error: 'Не удалось использовать этот результат. Попробуйте ещё раз.',
+        noCredits: 'Недостаточно PawSpark для новой генерации.',
+        start: 'Запустить',
+        costPrefix: 'Генерация будет стоить',
+        costSuffix: 'PawSpark.',
+      );
+    }
+
+    return const _GenerationResultInputCopy(
+      title: 'Use result',
+      parentTitle: 'Completed result',
+      parentHint: 'This result will be used as the base',
+      mediaUnavailable: 'Media unavailable',
+      all: 'All',
+      image: 'Image',
+      video: 'Video',
+      recommended: 'Recommended',
+      empty: 'No compatible templates.',
+      error: 'Could not use this result. Please try again.',
+      noCredits: 'Not enough PawSpark for the new generation.',
+      start: 'Start',
+      costPrefix: 'Generation will cost',
+      costSuffix: 'PawSpark.',
+    );
+  }
+}

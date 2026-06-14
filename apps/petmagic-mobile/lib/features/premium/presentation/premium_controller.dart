@@ -1074,7 +1074,11 @@ class PremiumController extends Notifier<PremiumState> {
   }
 
   Future<
-    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+    ({
+      bool isAvailable,
+      Set<String> productIds,
+      Map<String, String> productPrices,
+    })
   >
   _resolveStoreAvailability(
     List<PremiumPlanModel> plans,

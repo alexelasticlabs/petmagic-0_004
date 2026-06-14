@@ -12,6 +12,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_settings_d
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
@@ -211,8 +212,38 @@ class ProfileSettingsPage extends ConsumerWidget {
                     icon: Icons.support_agent_rounded,
                     title: text.profileSettingsSupportTitle,
                     subtitle: text.profileSettingsSupportSubtitle,
-                    showDivider: false,
                     onTap: () => context.push(SupportChatPage.routePath),
+                  ),
+                  ProfileSettingsRow(
+                    icon: Icons.feedback_outlined,
+                    title: _settingsFeedbackCopy(context).title,
+                    subtitle: _settingsFeedbackCopy(context).subtitle,
+                    showDivider: false,
+                    onTap: () async {
+                      final draft = await _showSettingsFeedbackSheet(context);
+                      if (draft == null || !context.mounted) {
+                        return;
+                      }
+
+                      await ref
+                          .read(templateGenerationRepositoryProvider)
+                          .submitFeedback(
+                            type: draft.type,
+                            category: draft.category,
+                            message: draft.message,
+                            sourceScreen: 'settings',
+                          );
+
+                      if (!context.mounted) {
+                        return;
+                      }
+
+                      PetMagicToast.show(
+                        context,
+                        message: _settingsFeedbackCopy(context).thanks,
+                        tone: PetMagicToastTone.success,
+                      );
+                    },
                   ),
                 ],
               ),
@@ -369,4 +400,170 @@ class ProfileSettingsPage extends ConsumerWidget {
       ThemeMode.dark => text.profileSettingsThemeDark,
     };
   }
+}
+
+class _SettingsFeedbackCopy {
+  const _SettingsFeedbackCopy({
+    required this.title,
+    required this.subtitle,
+    required this.sheetTitle,
+    required this.messageLabel,
+    required this.messageHint,
+    required this.submit,
+    required this.thanks,
+    required this.options,
+  });
+
+  final String title;
+  final String subtitle;
+  final String sheetTitle;
+  final String messageLabel;
+  final String messageHint;
+  final String submit;
+  final String thanks;
+  final List<(String, String, String)> options;
+}
+
+class _SettingsFeedbackDraft {
+  const _SettingsFeedbackDraft({
+    required this.type,
+    required this.category,
+    this.message,
+  });
+
+  final String type;
+  final String category;
+  final String? message;
+}
+
+_SettingsFeedbackCopy _settingsFeedbackCopy(BuildContext context) {
+  final isRu = Localizations.localeOf(context).languageCode == 'ru';
+  if (isRu) {
+    return const _SettingsFeedbackCopy(
+      title: 'Send feedback',
+      subtitle: 'Идея, баг, оплата или общий комментарий',
+      sheetTitle: 'Send feedback',
+      messageLabel: 'Комментарий',
+      messageHint: 'Текст optional',
+      submit: 'Отправить',
+      thanks: 'Спасибо за feedback',
+      options: [
+        ('General', 'general', 'Общее'),
+        ('FeatureRequest', 'suggestion', 'Пожелание'),
+        ('BugReport', 'bug', 'Баг'),
+        ('PaymentIssue', 'payment', 'Оплата'),
+      ],
+    );
+  }
+
+  return const _SettingsFeedbackCopy(
+    title: 'Send feedback',
+    subtitle: 'Idea, bug, payment, or general comment',
+    sheetTitle: 'Send feedback',
+    messageLabel: 'Comment',
+    messageHint: 'Optional',
+    submit: 'Send',
+    thanks: 'Thanks for the feedback',
+    options: [
+      ('General', 'general', 'General'),
+      ('FeatureRequest', 'suggestion', 'Feature request'),
+      ('BugReport', 'bug', 'Bug'),
+      ('PaymentIssue', 'payment', 'Payment'),
+    ],
+  );
+}
+
+Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
+  BuildContext context,
+) {
+  final copy = _settingsFeedbackCopy(context);
+  final colors = context.petMagicColors;
+  final controller = TextEditingController();
+  var selected = copy.options.first;
+
+  return showModalBottomSheet<_SettingsFeedbackDraft>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.backgroundBottom,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        copy.sheetTitle,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: colors.textStrong,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final option in copy.options)
+                            ChoiceChip(
+                              selected: selected == option,
+                              label: Text(option.$3),
+                              onSelected: (_) =>
+                                  setState(() => selected = option),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: controller,
+                        minLines: 3,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          labelText: copy.messageLabel,
+                          hintText: copy.messageHint,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(
+                            _SettingsFeedbackDraft(
+                              type: selected.$1,
+                              category: selected.$2,
+                              message: controller.text.trim().isEmpty
+                                  ? null
+                                  : controller.text.trim(),
+                            ),
+                          );
+                        },
+                        child: Text(copy.submit),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).whenComplete(controller.dispose);
 }

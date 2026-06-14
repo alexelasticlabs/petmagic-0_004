@@ -87,3 +87,30 @@ class _Panel extends StatelessWidget {
     );
   }
 }
+
+class _CompareActionCard extends StatelessWidget {
+  const _CompareActionCard({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return _Panel(
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.compare_rounded),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colors.textStrong,
+          side: BorderSide(color: colors.border.withValues(alpha: 0.9)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          textStyle: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}

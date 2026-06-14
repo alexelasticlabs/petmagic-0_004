@@ -10,12 +10,14 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 part 'premium_page_content.part.dart';
 
@@ -52,6 +54,10 @@ class PremiumPage extends ConsumerStatefulWidget {
 
 class _PremiumPageState extends ConsumerState<PremiumPage>
     with WidgetsBindingObserver {
+  static const _paywallFeedbackLastShownKey =
+      'feedback_paywall_last_shown_utc_v1';
+  static const _paywallFeedbackCooldown = Duration(days: 3);
+
   bool _shouldReloadOnResume = false;
   bool _didAutoCloseAfterActivation = false;
 
@@ -83,6 +89,69 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
     if (context.mounted) {
       context.go(TemplatesPage.routePath);
     }
+  }
+
+  Future<void> _closePaywall() async {
+    await _maybeAskPaywallFeedback();
+    if (!mounted) {
+      return;
+    }
+
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    context.go(TemplatesPage.routePath);
+  }
+
+  Future<void> _maybeAskPaywallFeedback() async {
+    final preferences = SharedPreferencesAsync();
+    final now = DateTime.now().toUtc();
+    final lastShownRaw = await preferences.getString(
+      _paywallFeedbackLastShownKey,
+    );
+    final lastShown = lastShownRaw == null
+        ? null
+        : DateTime.tryParse(lastShownRaw)?.toUtc();
+    if (lastShown != null &&
+        now.difference(lastShown) < _paywallFeedbackCooldown) {
+      return;
+    }
+
+    await preferences.setString(
+      _paywallFeedbackLastShownKey,
+      now.toIso8601String(),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final result = await _showPaywallFeedbackSheet(context);
+    if (!mounted || result == null) {
+      return;
+    }
+
+    await ref
+        .read(templateGenerationRepositoryProvider)
+        .submitFeedback(
+          type: result.category == 'payment_problem'
+              ? 'PaymentIssue'
+              : 'General',
+          category: result.category,
+          message: result.message,
+          sourceScreen: 'paywall_close',
+        );
+    if (!mounted) {
+      return;
+    }
+
+    PetMagicToast.show(
+      context,
+      message: _paywallFeedbackCopy(context).thanks,
+      tone: PetMagicToastTone.success,
+    );
   }
 
   @override
@@ -533,6 +602,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
                       isDark: isDark,
                       onOpenUrl: _openExternalUrl,
                       onStartCheckout: _openPaymentMethodSheetAndCheckout,
+                      onClose: _closePaywall,
                     ),
             ),
           ],
@@ -540,4 +610,163 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       ),
     );
   }
+}
+
+class _PaywallFeedbackResult {
+  const _PaywallFeedbackResult(this.category, this.message);
+
+  final String category;
+  final String? message;
+}
+
+class _PaywallFeedbackCopy {
+  const _PaywallFeedbackCopy({
+    required this.title,
+    required this.commentLabel,
+    required this.commentHint,
+    required this.submit,
+    required this.thanks,
+    required this.options,
+  });
+
+  final String title;
+  final String commentLabel;
+  final String commentHint;
+  final String submit;
+  final String thanks;
+  final List<(String, String)> options;
+}
+
+_PaywallFeedbackCopy _paywallFeedbackCopy(BuildContext context) {
+  final isRu = Localizations.localeOf(context).languageCode == 'ru';
+  if (isRu) {
+    return const _PaywallFeedbackCopy(
+      title: 'Что остановило?',
+      commentLabel: 'Комментарий',
+      commentHint: 'Можно оставить пустым',
+      submit: 'Отправить',
+      thanks: 'Спасибо за feedback',
+      options: [
+        ('expensive', 'Дорого'),
+        ('low_value', 'Мало пользы'),
+        ('payment_problem', 'Проблема с оплатой'),
+        ('just_browsing', 'Просто смотрю'),
+        ('other', 'Другое'),
+      ],
+    );
+  }
+
+  return const _PaywallFeedbackCopy(
+    title: 'What stopped you?',
+    commentLabel: 'Comment',
+    commentHint: 'Optional',
+    submit: 'Send',
+    thanks: 'Thanks for the feedback',
+    options: [
+      ('expensive', 'Too expensive'),
+      ('low_value', 'Not useful enough'),
+      ('payment_problem', 'Payment problem'),
+      ('just_browsing', 'Just browsing'),
+      ('other', 'Other'),
+    ],
+  );
+}
+
+Future<_PaywallFeedbackResult?> _showPaywallFeedbackSheet(
+  BuildContext context,
+) {
+  final copy = _paywallFeedbackCopy(context);
+  final controller = TextEditingController();
+  var selected = copy.options.first;
+
+  return showModalBottomSheet<_PaywallFeedbackResult>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final brightness = Theme.of(context).brightness;
+          final isDark = brightness == Brightness.dark;
+          final surface = isDark ? _kDarkSurface : _kLightSurface;
+          final textColor = isDark ? _kDarkText : _kLightText;
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(28),
+                ),
+                border: Border.all(
+                  color: isDark ? _kDarkBorder : _kLightBorder,
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        copy.title,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: textColor,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final option in copy.options)
+                            ChoiceChip(
+                              selected: selected == option,
+                              label: Text(option.$2),
+                              onSelected: (_) =>
+                                  setState(() => selected = option),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: controller,
+                        minLines: 2,
+                        maxLines: 4,
+                        decoration: InputDecoration(
+                          labelText: copy.commentLabel,
+                          hintText: copy.commentHint,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(context).pop(
+                            _PaywallFeedbackResult(
+                              selected.$1,
+                              controller.text.trim().isEmpty
+                                  ? null
+                                  : controller.text.trim(),
+                            ),
+                          );
+                        },
+                        child: Text(copy.submit),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  ).whenComplete(controller.dispose);
 }

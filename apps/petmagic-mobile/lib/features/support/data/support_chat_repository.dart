@@ -80,6 +80,7 @@ class SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
     final query = <String, dynamic>{'take': take};
@@ -87,6 +88,9 @@ class SupportChatRepository {
       query['beforeMessageCreatedAtUtc'] = beforeMessageCreatedAtUtc
           .toUtc()
           .toIso8601String();
+    }
+    if (beforeMessageId?.trim().isNotEmpty == true) {
+      query['beforeMessageId'] = beforeMessageId!.trim();
     }
 
     final response = await _authorizedRequest<Map<String, dynamic>>(

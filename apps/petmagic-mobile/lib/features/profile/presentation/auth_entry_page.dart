@@ -1180,7 +1180,7 @@ class _AuthInlineActions extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 340) {
+        if (constraints.maxWidth < 400) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1216,19 +1216,27 @@ class _AuthInlineActions extends StatelessWidget {
           );
         }
 
-        return Row(
+        return Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runSpacing: 4,
           children: [
             TextButton(
               onPressed: onForgotPassword,
               style: compactButtonStyle,
               child: Text(forgotPasswordAction),
             ),
-            const Spacer(),
-            Text(switchPrompt, style: promptStyle),
-            TextButton(
-              onPressed: onSwitchMode,
-              style: compactButtonStyle,
-              child: Text(switchAction),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
+              children: [
+                Text(switchPrompt, style: promptStyle),
+                TextButton(
+                  onPressed: onSwitchMode,
+                  style: compactButtonStyle,
+                  child: Text(switchAction),
+                ),
+              ],
             ),
           ],
         );

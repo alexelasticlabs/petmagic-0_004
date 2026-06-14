@@ -192,7 +192,11 @@ class WalletRepository {
   }
 
   Future<
-    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+    ({
+      bool isAvailable,
+      Set<String> productIds,
+      Map<String, String> productPrices,
+    })
   >
   fetchStoreAvailability(
     List<CurrencyPackModel> packs,
@@ -238,7 +242,8 @@ class WalletRepository {
       isAvailable: true,
       productIds: response.productDetails.map((product) => product.id).toSet(),
       productPrices: {
-        for (final product in response.productDetails) product.id: product.price,
+        for (final product in response.productDetails)
+          product.id: product.price,
       },
     );
   }

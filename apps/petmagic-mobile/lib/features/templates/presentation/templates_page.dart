@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,13 +9,19 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_random_selector.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
@@ -25,12 +32,24 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+
+final _templateHomePetsProvider = FutureProvider.autoDispose<List<PetProfile>>((
+  ref,
+) {
+  return ref.watch(templateGenerationRepositoryProvider).fetchPets();
+});
+
+enum _TemplateInputChoice { upload, myPets }
+
+enum _PetGenerationConfirmAction { start, change }
 
 class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
@@ -54,7 +73,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
   bool _disposed = false;
+  bool _isRandomTemplateLoading = false;
   bool? _isTabActive;
+  final Set<String> _trackedTemplateOfTheDayViews = <String>{};
 
   @override
   void initState() {
@@ -191,6 +212,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
     final bottomInset = petMagicScrollableBottomInset(context);
+    final templateOfTheDay = state.templateOfTheDay;
+    final selectedPetId = _routeQueryParameter(context, 'petId');
+    _trackTemplateOfTheDayViewed(templateOfTheDay);
+    final visibleItems = _promoteTemplateOfTheDay(
+      state.items,
+      templateOfTheDay?.templateId,
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -252,10 +280,31 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      _CreateWithPetBlock(
+                        pets: ref.watch(_templateHomePetsProvider),
+                        selectedPetId: selectedPetId,
+                      ),
+                      _TemplateOfTheDaySlot(
+                        template: templateOfTheDay,
+                        isLoading: state.isTemplateOfTheDayLoading,
+                        hasPremiumAccess: wallet?.isPremium ?? false,
+                        onPressed: templateOfTheDay == null
+                            ? null
+                            : () => _handleTemplateOfTheDaySelected(
+                                templateOfTheDay,
+                              ),
+                      ),
                       const SizedBox(height: 5),
                       _SearchField(
                         controller: _searchController,
                         onChanged: _handleSearchChanged,
+                      ),
+                      const SizedBox(height: 6),
+                      _RandomTemplateButton(
+                        isLoading: _isRandomTemplateLoading,
+                        isEnabled: !state.isInitialLoading,
+                        onPressed: _handleRandomTemplatePressed,
                       ),
                       const SizedBox(height: 6),
                       TemplateTypeFilters(
@@ -298,7 +347,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
                 sliver: SliverGrid.builder(
-                  itemCount: state.items.length,
+                  itemCount: visibleItems.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 5,
@@ -306,7 +355,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     childAspectRatio: 0.72,
                   ),
                   itemBuilder: (context, index) {
-                    final template = state.items[index];
+                    final template = visibleItems[index];
+                    final isTodayPick =
+                        templateOfTheDay?.templateId == template.templateId;
                     final templateIdentity = _templateCardIdentity(
                       template: template,
                       renderContextKey: state.query.cacheKey,
@@ -316,6 +367,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                       template: template,
                       hasPremiumAccess: wallet?.isPremium ?? false,
                       renderContextKey: state.query.cacheKey,
+                      highlightBadgeLabel: isTodayPick
+                          ? text.templateOfTheDayFeedBadge
+                          : null,
                       onPressed: () => _handleTemplateSelected(template),
                     );
                     if (index >= 6) {
@@ -399,7 +453,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     await _templatesController.loadInitial(forceRefresh: forceRefresh);
   }
 
-  Future<void> _handleTemplateSelected(TemplateItem template) async {
+  Future<void> _handleTemplateSelected(
+    TemplateItem template, {
+    TemplateOfTheDayItem? templateOfTheDay,
+  }) async {
     final isAuthenticated = ref
         .read(appLaunchControllerProvider)
         .isAuthenticated;
@@ -417,13 +474,147 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       return;
     }
 
-    await _startTemplateUploadFlow(template);
+    await _startTemplateUploadFlow(
+      template,
+      templateOfTheDay: templateOfTheDay,
+    );
   }
 
-  Future<void> _startTemplateUploadFlow(TemplateItem template) async {
+  Future<void> _handleTemplateOfTheDaySelected(
+    TemplateOfTheDayItem featured,
+  ) async {
+    unawaited(_recordTemplateOfTheDayAnalytics(featured, 'clicked'));
+
+    final visibleTemplate = _findTemplateById(
+      ref.read(templatesControllerProvider).items,
+      featured.templateId,
+    );
+    if (visibleTemplate != null) {
+      await _openTemplateOfTheDayTemplate(featured, visibleTemplate);
+      return;
+    }
+
+    try {
+      final catalogItems = await ref
+          .read(templatesRepositoryProvider)
+          .readSyncedCatalogItems();
+      if (!mounted) {
+        return;
+      }
+
+      await _openTemplateOfTheDayTemplate(
+        featured,
+        _findTemplateById(catalogItems, featured.templateId) ??
+            featured.toFallbackTemplateItem(),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      await _openTemplateOfTheDayTemplate(
+        featured,
+        featured.toFallbackTemplateItem(),
+      );
+    }
+  }
+
+  Future<void> _openTemplateOfTheDayTemplate(
+    TemplateOfTheDayItem featured,
+    TemplateItem template,
+  ) async {
+    unawaited(_recordTemplateOfTheDayAnalytics(featured, 'opened'));
+    await _handleTemplateSelected(template, templateOfTheDay: featured);
+  }
+
+  Future<void> _handleRandomTemplatePressed() async {
+    final mode = await _showRandomTemplateModeSheet(context);
+    if (!mounted || mode == null) {
+      return;
+    }
+
+    setState(() {
+      _isRandomTemplateLoading = true;
+    });
+
+    final text = AppLocalizations.of(context);
+    final hasPremiumAccess =
+        ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+
+    try {
+      final templates = await ref
+          .read(templatesRepositoryProvider)
+          .readSyncedCatalogItems();
+      if (!mounted) {
+        return;
+      }
+
+      final template = selectRandomTemplate(
+        templates,
+        mode: mode,
+        hasPremiumAccess: hasPremiumAccess,
+      );
+      if (template == null) {
+        PetMagicToast.show(
+          context,
+          message: _randomTemplateEmptyMessage(text, mode),
+          tone: PetMagicToastTone.info,
+        );
+        return;
+      }
+
+      await _handleTemplateSelected(template);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: text.randomTemplateLoadFailed,
+        tone: PetMagicToastTone.warning,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRandomTemplateLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _startTemplateUploadFlow(
+    TemplateItem template, {
+    TemplateOfTheDayItem? templateOfTheDay,
+  }) async {
+    final petId = _routeQueryParameter(context, 'petId');
+    final petPhotoId = _routeQueryParameter(context, 'petPhotoId');
+    if (petId != null && petId.isNotEmpty) {
+      await _startTemplateFromPetFlow(
+        template,
+        petId,
+        petPhotoId: petPhotoId,
+        templateOfTheDay: templateOfTheDay,
+      );
+      return;
+    }
+
     while (mounted) {
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         await showAuthRequiredSheet(context);
+        return;
+      }
+
+      final inputChoice = await _showTemplateInputChoiceSheet(context);
+      if (!mounted || inputChoice == null) {
+        return;
+      }
+
+      if (inputChoice == _TemplateInputChoice.myPets) {
+        await _startFromMyPetsChoice(
+          template,
+          templateOfTheDay: templateOfTheDay,
+        );
         return;
       }
 
@@ -500,6 +691,20 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
           return;
         }
 
+        final featured = templateOfTheDay;
+        if (featured != null) {
+          unawaited(
+            _recordTemplateOfTheDayAnalytics(
+              featured,
+              'generation_failed',
+              extraMetadata: <String, Object?>{
+                if (errorMessage != null && errorMessage.isNotEmpty)
+                  'error': errorMessage,
+              },
+            ),
+          );
+        }
+
         PetMagicToast.show(
           context,
           message: errorMessage == null || errorMessage.isEmpty
@@ -510,10 +715,201 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         return;
       }
 
+      final featured = templateOfTheDay;
+      if (featured != null) {
+        unawaited(
+          _recordTemplateOfTheDayAnalytics(
+            featured,
+            'generation_started',
+            generationId: generation.generationId,
+          ),
+        );
+      }
+
       router.push(
         '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+        extra: featured,
       );
       return;
+    }
+  }
+
+  Future<void> _startTemplateFromPetFlow(
+    TemplateItem template,
+    String petId, {
+    String? petPhotoId,
+    String? petName,
+    bool showChangeAction = false,
+    TemplateOfTheDayItem? templateOfTheDay,
+  }) async {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      await showAuthRequiredSheet(context);
+      return;
+    }
+
+    final generationController = ref.read(
+      templateGenerationControllerProvider.notifier,
+    );
+    final gate = await generationController.checkGate(template);
+    if (!mounted) {
+      return;
+    }
+
+    if (!gate.isAllowed) {
+      final hasPremiumAccess =
+          ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+      final blockerAction = await showTemplateBlockedSheet(
+        context: context,
+        template: template,
+        gate: gate,
+        hasPremiumAccess: hasPremiumAccess,
+      );
+      if (!mounted || blockerAction == null) {
+        return;
+      }
+
+      switch (blockerAction) {
+        case TemplateBlockedAction.wallet:
+          context.push(WalletPage.routePath);
+        case TemplateBlockedAction.premium:
+          context.push(PremiumPage.routePath);
+        case TemplateBlockedAction.chooseAnother:
+          break;
+      }
+      return;
+    }
+
+    final action = await showDialog<_PetGenerationConfirmAction>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          petName == null || petName.isEmpty
+              ? 'Generate with pet'
+              : 'Generate with $petName',
+        ),
+        content: Text('This generation costs ${template.tokenCost} PawSpark.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          if (showChangeAction)
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(context).pop(_PetGenerationConfirmAction.change),
+              child: const Text('Change'),
+            ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_PetGenerationConfirmAction.start),
+            child: const Text('Start'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) {
+      return;
+    }
+
+    if (action == _PetGenerationConfirmAction.change) {
+      context.push('/profile/pets');
+      return;
+    }
+
+    if (action != _PetGenerationConfirmAction.start) {
+      return;
+    }
+
+    try {
+      final generation = await ref
+          .read(templateGenerationRepositoryProvider)
+          .startGenerationFromPet(
+            petId: petId,
+            petPhotoId: petPhotoId,
+            templateId: template.templateId,
+          );
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .rememberActiveGeneration(generationId: generation.generationId);
+      ref.invalidate(walletControllerProvider);
+      if (!mounted) {
+        return;
+      }
+
+      final featured = templateOfTheDay;
+      if (featured != null) {
+        unawaited(
+          _recordTemplateOfTheDayAnalytics(
+            featured,
+            'generation_started',
+            generationId: generation.generationId,
+          ),
+        );
+      }
+
+      context.go(
+        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+        extra: featured,
+      );
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: 'Добавьте фото питомца, чтобы начать',
+        tone: PetMagicToastTone.warning,
+      );
+    }
+  }
+
+  Future<void> _startFromMyPetsChoice(
+    TemplateItem template, {
+    TemplateOfTheDayItem? templateOfTheDay,
+  }) async {
+    try {
+      final pets = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchPets();
+      if (!mounted) {
+        return;
+      }
+
+      if (pets.isEmpty) {
+        PetMagicToast.show(
+          context,
+          message: 'Добавьте первого питомца',
+          tone: PetMagicToastTone.info,
+        );
+        context.push('/profile/pets');
+        return;
+      }
+
+      final selectedPet = pets.length == 1
+          ? pets.first
+          : await _showPetPickerSheet(context, pets);
+      if (!mounted || selectedPet == null) {
+        return;
+      }
+
+      await _startTemplateFromPetFlow(
+        template,
+        selectedPet.id,
+        petName: selectedPet.name,
+        showChangeAction: pets.length == 1,
+        templateOfTheDay: templateOfTheDay,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: 'Could not load pets',
+        tone: PetMagicToastTone.warning,
+      );
     }
   }
 
@@ -551,6 +947,294 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       imageQuality: 92,
       maxWidth: 1800,
     );
+  }
+
+  void _trackTemplateOfTheDayViewed(TemplateOfTheDayItem? featured) {
+    if (featured == null) {
+      return;
+    }
+
+    final key =
+        '${featured.templateId}:${_templateOfTheDayDateValue(featured)}:templates';
+    if (!_trackedTemplateOfTheDayViews.add(key)) {
+      return;
+    }
+
+    _runAfterBuild(() {
+      unawaited(_recordTemplateOfTheDayAnalytics(featured, 'viewed'));
+    });
+  }
+
+  Future<void> _recordTemplateOfTheDayAnalytics(
+    TemplateOfTheDayItem featured,
+    String eventType, {
+    String? generationId,
+    Map<String, Object?>? extraMetadata,
+  }) async {
+    try {
+      final wallet = ref.read(walletControllerProvider).wallet;
+      await ref
+          .read(templatesRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: featured.templateId,
+            eventType: eventType,
+            source: featured.source,
+            generationId: generationId,
+            metadata: <String, Object?>{
+              'templateId': featured.templateId,
+              'type': featured.templateType.apiValue.toLowerCase(),
+              'source': featured.source,
+              'isPremium': featured.isPremium,
+              'userPlan': wallet?.isPremium == true ? 'premium' : 'free',
+              'date': _templateOfTheDayDateValue(featured),
+              'screen': 'templates',
+              ...?extraMetadata,
+            },
+          );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateOfTheDay',
+        operation: 'analytics',
+        message: 'Could not record Template of the Day analytics event.',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, Object?>{
+          'eventType': eventType,
+          'templateId': featured.templateId,
+        },
+      );
+    }
+  }
+}
+
+Future<_TemplateInputChoice?> _showTemplateInputChoiceSheet(
+  BuildContext context,
+) {
+  final colors = context.petMagicColors;
+  return showPetMagicModalBottomSheet<_TemplateInputChoice>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext, bottomInset) => SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colors.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(height: 6),
+              ListTile(
+                leading: Icon(Icons.upload_file_rounded, color: colors.accent),
+                title: Text(
+                  'Upload',
+                  style: TextStyle(color: colors.textStrong),
+                ),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TemplateInputChoice.upload),
+              ),
+              ListTile(
+                leading: Icon(Icons.pets_rounded, color: colors.accent),
+                title: Text(
+                  'Choose from My Pets',
+                  style: TextStyle(color: colors.textStrong),
+                ),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_TemplateInputChoice.myPets),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<PetProfile?> _showPetPickerSheet(
+  BuildContext context,
+  List<PetProfile> pets,
+) {
+  final colors = context.petMagicColors;
+  return showPetMagicModalBottomSheet<PetProfile>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext, bottomInset) => SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.border.withValues(alpha: 0.8)),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 420),
+            child: ListView(
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                for (final pet in pets)
+                  ListTile(
+                    leading: _PetShortcutAvatar(avatarUrl: pet.avatarUrl),
+                    title: Text(
+                      pet.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: Text(
+                      [pet.type, pet.breed].whereType<String>().join(' • '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colors.textSoft),
+                    ),
+                    onTap: () => Navigator.of(sheetContext).pop(pet),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Future<TemplateRandomMode?> _showRandomTemplateModeSheet(BuildContext context) {
+  final text = AppLocalizations.of(context);
+  final colors = context.petMagicColors;
+
+  return showPetMagicModalBottomSheet<TemplateRandomMode>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext, bottomInset) {
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(18, 6, 18, bottomInset + 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                text.randomTemplateAction,
+                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              _RandomTemplateModeTile(
+                icon: Icons.auto_awesome_rounded,
+                title: text.randomTemplateAny,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(TemplateRandomMode.any),
+              ),
+              _RandomTemplateModeTile(
+                icon: Icons.image_outlined,
+                title: text.randomTemplateImage,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(TemplateRandomMode.image),
+              ),
+              _RandomTemplateModeTile(
+                icon: Icons.play_circle_outline_rounded,
+                title: text.randomTemplateVideo,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(TemplateRandomMode.video),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+String _randomTemplateEmptyMessage(
+  AppLocalizations text,
+  TemplateRandomMode mode,
+) {
+  return switch (mode) {
+    TemplateRandomMode.any => text.randomTemplateNoTemplates,
+    TemplateRandomMode.image => text.randomTemplateNoImageTemplates,
+    TemplateRandomMode.video => text.randomTemplateNoVideoTemplates,
+  };
+}
+
+List<TemplateItem> _promoteTemplateOfTheDay(
+  List<TemplateItem> items,
+  String? templateId,
+) {
+  final normalizedId = templateId?.trim();
+  if (normalizedId == null || normalizedId.isEmpty || items.length < 2) {
+    return items;
+  }
+
+  final index = items.indexWhere((item) => item.templateId == normalizedId);
+  if (index <= 0) {
+    return items;
+  }
+
+  final promoted = items[index];
+  return [
+    promoted,
+    for (var itemIndex = 0; itemIndex < items.length; itemIndex++)
+      if (itemIndex != index) items[itemIndex],
+  ];
+}
+
+TemplateItem? _findTemplateById(Iterable<TemplateItem> items, String id) {
+  final normalizedId = id.trim();
+  if (normalizedId.isEmpty) {
+    return null;
+  }
+
+  for (final item in items) {
+    if (item.templateId == normalizedId) {
+      return item;
+    }
+  }
+
+  return null;
+}
+
+String? _routeQueryParameter(BuildContext context, String key) {
+  try {
+    final value = GoRouterState.of(context).uri.queryParameters[key];
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    return value;
+  } catch (_) {
+    return null;
   }
 }
 
@@ -622,6 +1306,13 @@ bool _isAuthRequiredError(String? raw) {
 
   return raw.contains('auth.sign_in_required') ||
       raw.contains('auth.session_expired');
+}
+
+String _templateOfTheDayDateValue(TemplateOfTheDayItem featured) {
+  final date = featured.date.toUtc();
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '${date.year}-$month-$day';
 }
 
 class _TemplatesLifecycleObserver with WidgetsBindingObserver {
@@ -851,6 +1542,629 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
+class _TemplateOfTheDaySlot extends StatelessWidget {
+  const _TemplateOfTheDaySlot({
+    required this.template,
+    required this.isLoading,
+    required this.hasPremiumAccess,
+    required this.onPressed,
+  });
+
+  final TemplateOfTheDayItem? template;
+  final bool isLoading;
+  final bool hasPremiumAccess;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final featured = template;
+    if (!isLoading && featured == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: AnimatedSwitcher(
+        duration: AppTheme.motionFast,
+        child: featured == null
+            ? const _TemplateOfTheDaySkeleton(
+                key: ValueKey('template-of-the-day-skeleton'),
+              )
+            : _TemplateOfTheDayCard(
+                key: ValueKey('template-of-the-day-${featured.templateId}'),
+                template: featured,
+                hasPremiumAccess: hasPremiumAccess,
+                onPressed: onPressed,
+              ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDaySkeleton extends StatelessWidget {
+  const _TemplateOfTheDaySkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    return SizedBox(
+      height: 118,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceGlass.withValues(alpha: isLight ? 0.64 : 0.34),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: colors.accent.withValues(alpha: 0.28)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 84,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  color: colors.surfaceStrong.withValues(alpha: 0.48),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 112,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.52),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.62),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 150,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong.withValues(alpha: 0.44),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayCard extends StatelessWidget {
+  const _TemplateOfTheDayCard({
+    required this.template,
+    required this.hasPremiumAccess,
+    required this.onPressed,
+    super.key,
+  });
+
+  final TemplateOfTheDayItem template;
+  final bool hasPremiumAccess;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    final imageUrl = _normalizeTemplateOfTheDayMediaUrl(
+      template.thumbnailUrl ??
+          (!template.isVideo ? template.previewMediaUrl : null),
+    );
+    final isPremiumLocked = template.isPremium && !hasPremiumAccess;
+    return PetMagicInteractiveSurface(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(22),
+      scaleDown: 0.985,
+      child: SizedBox(
+        height: 164,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: colors.accent.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: colors.accent.withValues(alpha: isLight ? 0.12 : 0.18),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.surfaceGlass.withValues(alpha: isLight ? 0.8 : 0.42),
+                colors.surfaceStrong.withValues(alpha: isLight ? 0.56 : 0.2),
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(21),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (imageUrl != null)
+                  Positioned.fill(
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      cacheManager: TemplateMediaCache.thumbnailCache,
+                      fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
+                      fadeInDuration: AppTheme.motionFast,
+                      errorWidget: (context, url, error) =>
+                          const _TemplateOfTheDayMediaFallback(),
+                    ),
+                  )
+                else
+                  const _TemplateOfTheDayMediaFallback(),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        colors.backgroundBottom.withValues(
+                          alpha: isLight ? 0.93 : 0.9,
+                        ),
+                        colors.backgroundBottom.withValues(
+                          alpha: isLight ? 0.74 : 0.72,
+                        ),
+                        colors.backgroundBottom.withValues(alpha: 0.26),
+                      ],
+                      stops: const [0, 0.58, 1],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(13, 11, 12, 11),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 5,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                _TemplateOfTheDayBadge(
+                                  icon: Icons.auto_awesome_rounded,
+                                  label: template.badgeText.trim().isEmpty
+                                      ? text.templateOfTheDayTitle
+                                      : template.badgeText,
+                                ),
+                                _TemplateOfTheDayBadge(
+                                  icon: template.isVideo
+                                      ? Icons.play_circle_outline_rounded
+                                      : Icons.image_outlined,
+                                  label: template.isVideo
+                                      ? text.videoLabel
+                                      : text.imageLabel,
+                                  isSubtle: true,
+                                ),
+                                if (template.isPremium)
+                                  _TemplateOfTheDayBadge(
+                                    icon: Icons.workspace_premium_rounded,
+                                    label: text.premiumLabel,
+                                    isPremium: true,
+                                  ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Text(
+                              template.title.trim().isEmpty
+                                  ? text.templateOfTheDaySubtitle
+                                  : template.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: colors.textStrong,
+                                    fontSize: 15,
+                                    height: 1.05,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              template.subtitle.trim().isEmpty
+                                  ? text.templateOfTheDaySubtitle
+                                  : template.subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colors.textSoft,
+                                    fontSize: 10.5,
+                                    height: 1.15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            _TemplateOfTheDayAction(
+                              label: isPremiumLocked
+                                  ? text.templateUnlockPremiumAction
+                                  : text.templateOfTheDayTryAction,
+                              isPremium: template.isPremium,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 82),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayMediaFallback extends StatelessWidget {
+  const _TemplateOfTheDayMediaFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.accent.withValues(alpha: 0.26),
+            colors.surfaceStrong.withValues(alpha: 0.4),
+          ],
+        ),
+      ),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 28),
+          child: Icon(
+            Icons.auto_awesome_rounded,
+            color: colors.accent.withValues(alpha: 0.72),
+            size: 42,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayBadge extends StatelessWidget {
+  const _TemplateOfTheDayBadge({
+    required this.icon,
+    required this.label,
+    this.isSubtle = false,
+    this.isPremium = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isSubtle;
+  final bool isPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final background = isPremium
+        ? const Color(0xFFEFC35C).withValues(alpha: 0.9)
+        : isSubtle
+        ? colors.surfaceStrong.withValues(alpha: 0.72)
+        : colors.accent.withValues(alpha: 0.9);
+    final foreground = isPremium || !isSubtle
+        ? const Color(0xFF062316)
+        : colors.textStrong;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.48)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: foreground),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: foreground,
+                fontSize: 9.5,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayAction extends StatelessWidget {
+  const _TemplateOfTheDayAction({required this.label, required this.isPremium});
+
+  final String label;
+  final bool isPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final textColor = isPremium ? const Color(0xFF251102) : Colors.white;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: isPremium ? const Color(0xFFEFC35C) : colors.accent,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.arrow_forward_rounded, size: 13, color: textColor),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {
+  final trimmed = rawUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+
+  final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
+  final parsed = Uri.tryParse(sanitized);
+  final candidate = parsed?.hasScheme == true
+      ? parsed.toString()
+      : Uri.tryParse(AppConfig.apiBaseUrl)
+            ?.resolve(sanitized.startsWith('/') ? sanitized : '/$sanitized')
+            .toString();
+  if (candidate == null) {
+    return null;
+  }
+
+  return parseSafeGenerationMediaUri(candidate)?.toString();
+}
+
+class _CreateWithPetBlock extends StatelessWidget {
+  const _CreateWithPetBlock({required this.pets, required this.selectedPetId});
+
+  final AsyncValue<List<PetProfile>> pets;
+  final String? selectedPetId;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
+      color: colors.textStrong,
+      fontSize: 12,
+      fontWeight: FontWeight.w800,
+    );
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.76),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border.withValues(alpha: 0.62)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Создать с питомцем', style: labelStyle),
+            const SizedBox(height: 8),
+            pets.when(
+              loading: () => const SizedBox(
+                height: 34,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+                  ),
+                ),
+              ),
+              error: (_, _) => _PetShortcutButton(
+                label: 'Add pet',
+                isSelected: false,
+                onPressed: () => context.push('/profile/pets'),
+              ),
+              data: (items) {
+                final visiblePets = items.take(2).toList(growable: false);
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: [
+                      for (final pet in visiblePets) ...[
+                        _PetShortcutButton(
+                          label: pet.name,
+                          avatarUrl: pet.avatarUrl,
+                          isSelected: selectedPetId == pet.id,
+                          onPressed: () => context.go(
+                            '${TemplatesPage.routePath}?petId=${Uri.encodeComponent(pet.id)}',
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      _PetShortcutButton(
+                        label: 'Add pet',
+                        isSelected: false,
+                        icon: Icons.add_rounded,
+                        onPressed: () => context.push('/profile/pets'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PetShortcutButton extends StatelessWidget {
+  const _PetShortcutButton({
+    required this.label,
+    required this.isSelected,
+    required this.onPressed,
+    this.avatarUrl,
+    this.icon,
+  });
+
+  final String label;
+  final String? avatarUrl;
+  final IconData? icon;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final background = isSelected
+        ? colors.accent.withValues(alpha: 0.18)
+        : colors.surface.withValues(alpha: 0.82);
+    final border = isSelected
+        ? colors.accent
+        : colors.border.withValues(alpha: 0.56);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onPressed,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.fromLTRB(4, 3, 11, 3),
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PetShortcutAvatar(avatarUrl: avatarUrl, icon: icon),
+            const SizedBox(width: 7),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 96),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colors.textStrong,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PetShortcutAvatar extends StatelessWidget {
+  const _PetShortcutAvatar({this.avatarUrl, this.icon});
+
+  final String? avatarUrl;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final iconData = icon ?? Icons.pets_rounded;
+    final url = avatarUrl;
+
+    if (url != null && url.isNotEmpty) {
+      return ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: 26,
+          height: 26,
+          fit: BoxFit.cover,
+          errorWidget: (_, _, _) => _PetShortcutIcon(iconData: iconData),
+        ),
+      );
+    }
+
+    return _PetShortcutIcon(iconData: iconData, color: colors.accent);
+  }
+}
+
+class _PetShortcutIcon extends StatelessWidget {
+  const _PetShortcutIcon({required this.iconData, this.color});
+
+  final IconData iconData;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.accent.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(iconData, size: 15, color: color ?? colors.textStrong),
+    );
+  }
+}
+
 class _SearchField extends StatelessWidget {
   const _SearchField({required this.controller, required this.onChanged});
 
@@ -885,6 +2199,123 @@ class _SearchField extends StatelessWidget {
         ),
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      ),
+    );
+  }
+}
+
+class _RandomTemplateButton extends StatelessWidget {
+  const _RandomTemplateButton({
+    required this.isLoading,
+    required this.isEnabled,
+    required this.onPressed,
+  });
+
+  final bool isLoading;
+  final bool isEnabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final enabled = isEnabled && !isLoading;
+
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: OutlinedButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: AnimatedSwitcher(
+          duration: AppTheme.motionFast,
+          child: isLoading
+              ? SizedBox(
+                  key: const ValueKey('random-template-loading'),
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator.adaptive(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+                  ),
+                )
+              : const Icon(
+                  Icons.casino_rounded,
+                  key: ValueKey('random-template-icon'),
+                  size: 17,
+                ),
+        ),
+        label: Text(text.randomTemplateAction),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          foregroundColor: colors.accent,
+          disabledForegroundColor: colors.textMuted,
+          side: BorderSide(
+            color: enabled
+                ? colors.accent.withValues(alpha: 0.42)
+                : colors.border,
+          ),
+          textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RandomTemplateModeTile extends StatelessWidget {
+  const _RandomTemplateModeTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: PetMagicInteractiveSurface(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceGlass,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(icon, color: colors.accent, size: 21),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.textMuted,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

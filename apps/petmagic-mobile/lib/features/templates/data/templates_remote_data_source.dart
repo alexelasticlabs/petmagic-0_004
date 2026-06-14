@@ -28,7 +28,7 @@ class TemplatesRemoteDataSource {
 
     try {
       final response = await _dio.get<Map<String, Object?>>(
-        '/api/templates',
+        '/api/templates/feed',
         queryParameters: query.toQueryParameters(),
         cancelToken: cancelToken,
       );
@@ -78,6 +78,64 @@ class TemplatesRemoteDataSource {
             ..sort();
 
       return categories;
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+  }
+
+  Future<PublicTemplateOfTheDayDto> fetchTemplateOfTheDay() async {
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates/template-of-the-day',
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const AppException(
+          'templates.template_of_the_day_response_empty',
+        );
+      }
+
+      return PublicTemplateOfTheDayDto.fromJson(data);
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+  }
+
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? source,
+    String? generationId,
+    Map<String, Object?>? metadata,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/api/templates/$templateId/analytics/events',
+        data: <String, Object?>{
+          'eventType': eventType,
+          if (source != null && source.trim().isNotEmpty)
+            'source': source.trim(),
+          if (generationId != null && generationId.trim().isNotEmpty)
+            'generationId': generationId.trim(),
+          if (metadata != null && metadata.isNotEmpty) 'metadata': metadata,
+        },
+      );
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();

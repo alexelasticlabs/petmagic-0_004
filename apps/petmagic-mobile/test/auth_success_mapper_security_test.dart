@@ -25,10 +25,7 @@ void main() {
     ).readAsStringSync();
 
     for (final source in [resetSource, changeSource]) {
-      expect(
-        source,
-        contains('final successMessage = _mapSuccessMessage'),
-      );
+      expect(source, contains('final successMessage = _mapSuccessMessage'));
       expect(source, contains('if (successMessage != null)'));
       expect(source, contains('String? _mapSuccessMessage'));
     }

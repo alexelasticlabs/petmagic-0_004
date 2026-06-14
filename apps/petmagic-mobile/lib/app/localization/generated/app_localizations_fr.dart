@@ -34,6 +34,47 @@ class AppLocalizationsFr extends AppLocalizations {
   String get searchTemplates => 'Rechercher des modeles';
 
   @override
+  String get randomTemplateAction => 'Random template';
+
+  @override
+  String get randomTemplateAny => 'Any template';
+
+  @override
+  String get randomTemplateImage => 'Image template';
+
+  @override
+  String get randomTemplateVideo => 'Video template';
+
+  @override
+  String get randomTemplateNoTemplates => 'No templates available.';
+
+  @override
+  String get randomTemplateNoAvailableForType =>
+      'No available templates for this type.';
+
+  @override
+  String get randomTemplateNoImageTemplates => 'No image templates available.';
+
+  @override
+  String get randomTemplateNoVideoTemplates => 'No video templates available.';
+
+  @override
+  String get randomTemplateLoadFailed =>
+      'Could not load templates. Please try again.';
+
+  @override
+  String get templateOfTheDayTitle => 'Template of the Day';
+
+  @override
+  String get templateOfTheDaySubtitle => 'Today\'s magic idea';
+
+  @override
+  String get templateOfTheDayTryAction => 'Try this template';
+
+  @override
+  String get templateOfTheDayFeedBadge => 'Today\'s pick';
+
+  @override
   String get allFilter => 'Tous';
 
   @override
@@ -3433,6 +3474,54 @@ class AppLocalizationsFr extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Annuel';
 
   @override
+  String get generationStatusWatermarkRemoved => 'Filigrane supprimé';
+
+  @override
+  String get generationStatusWatermarkAddedFreePlan =>
+      'Filigrane ajouté sur le forfait gratuit';
+
+  @override
+  String get generationStatusShareWithWatermark => 'Partager avec filigrane';
+
+  @override
+  String get generationStatusDownloadWithoutWatermark =>
+      'Télécharger sans filigrane';
+
+  @override
+  String get generationStatusSaveWithWatermark => 'Enregistrer avec filigrane';
+
+  @override
+  String get generationStatusRemoveWatermark => 'Supprimer le filigrane';
+
+  @override
+  String get generationStatusRemovingWatermark => 'Suppression...';
+
+  @override
+  String get generationStatusUpgradePremium => 'Passer à Premium';
+
+  @override
+  String get generationStatusRemoveWatermarkSheetTitle =>
+      'Supprimer le filigrane';
+
+  @override
+  String generationStatusRemoveWatermarkSheetBody(int cost) {
+    return 'Utilisez $cost crédit pour ce résultat ou passez à Premium pour des téléchargements sans filigrane.';
+  }
+
+  @override
+  String generationStatusRemoveWatermarkUseCredit(int cost) {
+    return 'Utiliser $cost crédit';
+  }
+
+  @override
+  String get generationStatusRemoveWatermarkFailed =>
+      'Impossible de supprimer le filigrane. Réessayez.';
+
+  @override
+  String get generationStatusRemoveWatermarkNoCredits =>
+      'Crédits insuffisants. Achetez des crédits ou passez à Premium.';
+
+  @override
   String get globalOfflineBannerTitle => 'Pas de connexion internet';
 
   @override
@@ -3445,4 +3534,24 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get globalOnlineRestoredBannerMessage =>
       'Vous êtes de nouveau en ligne.';
+
+  @override
+  String get generationStatusCompareAction => 'Compare';
+
+  @override
+  String get generationStatusCompareBeforeLabel => 'Before';
+
+  @override
+  String get generationStatusCompareAfterLabel => 'After';
+
+  @override
+  String get generationStatusCompareBeforeUnavailable =>
+      'Original photo is no longer available.';
+
+  @override
+  String get generationStatusCompareResultUnavailable =>
+      'Result is unavailable.';
+
+  @override
+  String get generationStatusCompareOpenFailed => 'Could not open comparison.';
 }

@@ -64,6 +64,21 @@ class TemplateGenerationResult {
     this.localPreviewPath,
     this.localOutputPath,
     this.isLocalMediaReady = false,
+    this.hasWatermark = false,
+    this.canRemoveWatermark = false,
+    this.isWatermarkRemoved = false,
+    this.removeWatermarkCostCredits = 1,
+    this.userPlan = 'free',
+    this.watermarkMessage,
+    this.supportsGenerateSimilar = false,
+    this.inputSourceType = 'user_upload',
+    this.inputMediaAssetId,
+    this.resultMediaAssetId,
+    this.inputPreviewUrl,
+    this.resultPreviewUrl,
+    this.canCompareBeforeAfter = false,
+    this.petId,
+    this.petPhotoId,
   });
 
   final String generationId;
@@ -102,6 +117,21 @@ class TemplateGenerationResult {
   final String? localPreviewPath;
   final String? localOutputPath;
   final bool isLocalMediaReady;
+  final bool hasWatermark;
+  final bool canRemoveWatermark;
+  final bool isWatermarkRemoved;
+  final int removeWatermarkCostCredits;
+  final String userPlan;
+  final String? watermarkMessage;
+  final bool supportsGenerateSimilar;
+  final String inputSourceType;
+  final String? inputMediaAssetId;
+  final String? resultMediaAssetId;
+  final String? inputPreviewUrl;
+  final String? resultPreviewUrl;
+  final bool canCompareBeforeAfter;
+  final String? petId;
+  final String? petPhotoId;
 
   TemplateGenerationResult copyWith({
     String? generationId,
@@ -142,6 +172,21 @@ class TemplateGenerationResult {
     String? localOutputPath,
     bool clearLocalOutputPath = false,
     bool? isLocalMediaReady,
+    bool? hasWatermark,
+    bool? canRemoveWatermark,
+    bool? isWatermarkRemoved,
+    int? removeWatermarkCostCredits,
+    String? userPlan,
+    String? watermarkMessage,
+    bool? supportsGenerateSimilar,
+    String? inputSourceType,
+    String? inputMediaAssetId,
+    String? resultMediaAssetId,
+    String? inputPreviewUrl,
+    String? resultPreviewUrl,
+    bool? canCompareBeforeAfter,
+    String? petId,
+    String? petPhotoId,
   }) {
     return TemplateGenerationResult(
       generationId: generationId ?? this.generationId,
@@ -190,6 +235,24 @@ class TemplateGenerationResult {
           ? null
           : localOutputPath ?? this.localOutputPath,
       isLocalMediaReady: isLocalMediaReady ?? this.isLocalMediaReady,
+      hasWatermark: hasWatermark ?? this.hasWatermark,
+      canRemoveWatermark: canRemoveWatermark ?? this.canRemoveWatermark,
+      isWatermarkRemoved: isWatermarkRemoved ?? this.isWatermarkRemoved,
+      removeWatermarkCostCredits:
+          removeWatermarkCostCredits ?? this.removeWatermarkCostCredits,
+      userPlan: userPlan ?? this.userPlan,
+      watermarkMessage: watermarkMessage ?? this.watermarkMessage,
+      supportsGenerateSimilar:
+          supportsGenerateSimilar ?? this.supportsGenerateSimilar,
+      inputSourceType: inputSourceType ?? this.inputSourceType,
+      inputMediaAssetId: inputMediaAssetId ?? this.inputMediaAssetId,
+      resultMediaAssetId: resultMediaAssetId ?? this.resultMediaAssetId,
+      inputPreviewUrl: inputPreviewUrl ?? this.inputPreviewUrl,
+      resultPreviewUrl: resultPreviewUrl ?? this.resultPreviewUrl,
+      canCompareBeforeAfter:
+          canCompareBeforeAfter ?? this.canCompareBeforeAfter,
+      petId: petId ?? this.petId,
+      petPhotoId: petPhotoId ?? this.petPhotoId,
     );
   }
 
@@ -222,4 +285,38 @@ class TemplateGenerationResult {
       TemplateGenerationStatus.queued => 10,
     };
   }
+}
+
+class CompatibleGenerationTemplate {
+  const CompatibleGenerationTemplate({
+    required this.id,
+    required this.title,
+    required this.templateType,
+    required this.isPremium,
+    required this.isRecommended,
+    required this.tokenCost,
+    this.thumbnailUrl,
+  });
+
+  final String id;
+  final String title;
+  final TemplateType templateType;
+  final String? thumbnailUrl;
+  final bool isPremium;
+  final bool isRecommended;
+  final int tokenCost;
+
+  bool get isVideo => templateType == TemplateType.video;
+}
+
+class CompatibleGenerationTemplates {
+  const CompatibleGenerationTemplates({
+    required this.resultId,
+    required this.inputMediaType,
+    required this.templates,
+  });
+
+  final String resultId;
+  final TemplateType inputMediaType;
+  final List<CompatibleGenerationTemplate> templates;
 }

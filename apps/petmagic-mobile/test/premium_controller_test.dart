@@ -382,7 +382,11 @@ class _FakePremiumRepository extends PremiumRepository {
 
   @override
   Future<
-    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+    ({
+      bool isAvailable,
+      Set<String> productIds,
+      Map<String, String> productPrices,
+    })
   >
   fetchStoreAvailability(
     List<PremiumPlanModel> plans,

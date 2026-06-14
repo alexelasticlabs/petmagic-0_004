@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/stripe_paymentsheet_smoke_test_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
@@ -22,6 +23,7 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_page.
 import 'package:petmagic_mobile/features/support/presentation/support_home_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
@@ -239,6 +241,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: MyPetsPage.routePath,
+        pageBuilder: (context, state) =>
+            _buildFadeSlidePage(state: state, child: const MyPetsPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: PetDetailsPage.routePath,
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: PetDetailsPage(petId: state.pathParameters['petId'] ?? ''),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: TemplatePreviewPage.routePath,
         redirect: (context, state) =>
             state.extra is TemplateItem ||
@@ -275,6 +291,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: GenerationStatusPage(
+            generationId: state.pathParameters['generationId'] ?? '',
+            templateOfTheDay: state.extra is TemplateOfTheDayItem
+                ? state.extra! as TemplateOfTheDayItem
+                : null,
+          ),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path:
+            '${GenerationResultInputPage.routePrefix}/:generationId/use-input',
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: GenerationResultInputPage(
             generationId: state.pathParameters['generationId'] ?? '',
           ),
         ),

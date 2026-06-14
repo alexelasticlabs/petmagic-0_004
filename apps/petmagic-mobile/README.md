@@ -66,6 +66,13 @@ Do not use the insecure override for production artifacts.
 ## External auth and password reset
 
 Google and Apple sign-in use native provider SDKs and send provider tokens to the backend for validation.
+Tracked Firebase files in this repository are placeholders only. For local or CI mobile builds, inject environment-specific Firebase config outside git:
+
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+- root-level `GoogleService-Info.plist` only when a local tool explicitly needs it
+
+Do not commit real Firebase API keys, Google OAuth client IDs, signing keystores, or backend OAuth secrets.
 
 For Google sign-in to work end-to-end:
 
@@ -103,4 +110,6 @@ lib/
 	shared/               Navigation shell and reusable app-level UI
 ```
 
-Templates are loaded from `GET /api/templates/feed`; users can browse without authentication. Purchase, generation, creations, and profile flows are intentionally left as next-stage feature modules.
+Templates are loaded from `GET /api/templates/feed`; users can browse without authentication. Feed pagination uses the `nextCursor` value from the previous response as the next request's `cursor` query parameter. Malformed or hand-built cursors are rejected by the backend with `400` and `templates.invalid_cursor`.
+
+Purchase, generation, creations, and profile flows are intentionally left as next-stage feature modules.

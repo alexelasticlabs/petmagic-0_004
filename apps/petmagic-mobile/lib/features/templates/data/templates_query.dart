@@ -52,8 +52,9 @@ class TemplatesQuery {
       if (type != null) 'type': type!.apiValue,
       if (category != null && category!.trim().isNotEmpty)
         'category': category!.trim(),
-      'page': page,
-      'pageSize': pageSize,
+      if (search != null && search!.trim().isNotEmpty) 'search': search!.trim(),
+      if (cursor != null && cursor!.trim().isNotEmpty) 'cursor': cursor!.trim(),
+      'take': pageSize,
     };
   }
 }

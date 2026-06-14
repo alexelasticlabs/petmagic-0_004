@@ -13,6 +13,8 @@ import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 
+const bool _skipFirebase = bool.fromEnvironment('PETMAGIC_SKIP_FIREBASE');
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await _initializeFirebase();
@@ -34,8 +36,10 @@ Future<void> main() async {
       }());
 
       TempMediaCleanup.scheduleTtlSweep();
-      _registerFirebaseMessagingBackgroundHandler();
-      unawaited(_configureFirebaseMessagingAsync());
+      if (!_skipFirebase) {
+        _registerFirebaseMessagingBackgroundHandler();
+        unawaited(_configureFirebaseMessagingAsync());
+      }
       AppLogger.info(
         feature: 'Startup',
         operation: 'app_startup',
@@ -105,6 +109,10 @@ Widget _buildSafeErrorWidget(FlutterErrorDetails details) {
 }
 
 Future<bool> _initializeFirebase() async {
+  if (_skipFirebase) {
+    return false;
+  }
+
   if (Firebase.apps.isNotEmpty) {
     return true;
   }

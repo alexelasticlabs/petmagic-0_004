@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
@@ -14,6 +15,8 @@ final templatesControllerProvider =
     NotifierProvider<TemplatesController, TemplatesState>(
       TemplatesController.new,
     );
+
+const Object _templateOfTheDayUnchanged = Object();
 
 class TemplatesState {
   const TemplatesState({
@@ -29,6 +32,9 @@ class TemplatesState {
     this.isRefreshing = false,
     this.isLoadingMore = false,
     this.loadedFromCache = false,
+    this.templateOfTheDay,
+    this.isTemplateOfTheDayLoading = false,
+    this.templateOfTheDayError,
     this.errorMessage,
   });
 
@@ -44,6 +50,9 @@ class TemplatesState {
   final bool isRefreshing;
   final bool isLoadingMore;
   final bool loadedFromCache;
+  final TemplateOfTheDayItem? templateOfTheDay;
+  final bool isTemplateOfTheDayLoading;
+  final String? templateOfTheDayError;
   final String? errorMessage;
 
   bool get isInitialLoading => isLoading && items.isEmpty;
@@ -64,6 +73,10 @@ class TemplatesState {
     bool? isRefreshing,
     bool? isLoadingMore,
     bool? loadedFromCache,
+    Object? templateOfTheDay = _templateOfTheDayUnchanged,
+    bool? isTemplateOfTheDayLoading,
+    String? templateOfTheDayError,
+    bool clearTemplateOfTheDayError = false,
     String? errorMessage,
     bool clearError = false,
   }) {
@@ -83,6 +96,14 @@ class TemplatesState {
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       loadedFromCache: loadedFromCache ?? this.loadedFromCache,
+      templateOfTheDay: identical(templateOfTheDay, _templateOfTheDayUnchanged)
+          ? this.templateOfTheDay
+          : templateOfTheDay as TemplateOfTheDayItem?,
+      isTemplateOfTheDayLoading:
+          isTemplateOfTheDayLoading ?? this.isTemplateOfTheDayLoading,
+      templateOfTheDayError: clearTemplateOfTheDayError
+          ? null
+          : templateOfTheDayError ?? this.templateOfTheDayError,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
@@ -90,7 +111,7 @@ class TemplatesState {
 
 class TemplatesController extends Notifier<TemplatesState> {
   static const _realtimeRefreshDebounce = Duration(milliseconds: 350);
-  static const _warmupPreviewLimit = 10;
+  static const _warmupPreviewLimit = 6;
 
   TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
   RealtimeClient? _activeRealtimeClient;
@@ -234,6 +255,12 @@ class TemplatesController extends Notifier<TemplatesState> {
 
     try {
       await realtimeClient.connect();
+      if (!ref.mounted ||
+          !_isScreenVisible ||
+          !identical(_activeRealtimeClient, realtimeClient)) {
+        unawaited(realtimeClient.disconnect());
+        return;
+      }
       _isRealtimeConnected = true;
     } on Object {
       // Realtime is best-effort; templates feed still works via pull refresh.
@@ -260,6 +287,7 @@ class TemplatesController extends Notifier<TemplatesState> {
     final requestVersion = ++_requestVersion;
     final query = state.query.copyWith(clearCursor: true, resetPage: true);
     final queryKey = query.cacheKey;
+    unawaited(_loadTemplateOfTheDay(requestVersion));
 
     if (!forceRefresh) {
       final inMemoryCached = state.cachedPagesByQueryKey[queryKey];
@@ -373,17 +401,60 @@ class TemplatesController extends Notifier<TemplatesState> {
       final categories = _normalizeCategories(
         await _repository.fetchCategories(),
       );
-      if (requestVersion != _requestVersion) {
+      if (!ref.mounted || requestVersion != _requestVersion) {
         return;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (requestVersion != _requestVersion) {
+        if (!ref.mounted || requestVersion != _requestVersion) {
           return;
         }
         state = state.copyWith(categories: categories);
       });
     } catch (_) {
       // Categories are secondary for first paint.
+    }
+  }
+
+  Future<void> _loadTemplateOfTheDay(int requestVersion) async {
+    state = state.copyWith(
+      isTemplateOfTheDayLoading: state.templateOfTheDay == null,
+      clearTemplateOfTheDayError: true,
+    );
+
+    try {
+      final template = await _repository.fetchTemplateOfTheDay();
+      if (!ref.mounted || requestVersion != _requestVersion) {
+        return;
+      }
+
+      state = state.copyWith(
+        templateOfTheDay: template,
+        isTemplateOfTheDayLoading: false,
+        clearTemplateOfTheDayError: true,
+      );
+      final previewUrl = _normalizeMediaUrl(
+        template?.thumbnailUrl ?? template?.previewMediaUrl,
+      );
+      if (previewUrl != null && !isVideoUrl(previewUrl)) {
+        unawaited(TemplateMediaCache.thumbnailCache.getSingleFile(previewUrl));
+      }
+    } on Object catch (error, stackTrace) {
+      if (!ref.mounted || requestVersion != _requestVersion) {
+        return;
+      }
+
+      AppLogger.warn(
+        feature: 'Templates.TemplateOfTheDay',
+        operation: 'load',
+        message: 'Template of the Day load failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      state = state.copyWith(
+        templateOfTheDay: null,
+        isTemplateOfTheDayLoading: false,
+        templateOfTheDayError: 'templates.template_of_the_day_load_failed',
+      );
     }
   }
 
@@ -527,6 +598,10 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     for (final url in uniqueUrls) {
+      if (!ref.mounted || !_isScreenVisible) {
+        return;
+      }
+
       try {
         await TemplateMediaCache.thumbnailCache.getSingleFile(url);
       } catch (_) {

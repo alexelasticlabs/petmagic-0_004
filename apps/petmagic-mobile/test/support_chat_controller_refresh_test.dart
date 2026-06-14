@@ -55,6 +55,7 @@ class _FlakyRefreshSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
     getConversationCalls += 1;

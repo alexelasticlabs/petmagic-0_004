@@ -150,6 +150,7 @@ class _DelayedInitialLoadSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) {
     if (!loadStarted.isCompleted) {

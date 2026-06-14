@@ -54,10 +54,7 @@ class _SubscriptionManagementPageState
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    text.premiumManageFailed,
-                    textAlign: TextAlign.center,
-                  ),
+                  Text(text.premiumManageFailed, textAlign: TextAlign.center),
                   const SizedBox(height: 14),
                   FilledButton.icon(
                     onPressed: () =>

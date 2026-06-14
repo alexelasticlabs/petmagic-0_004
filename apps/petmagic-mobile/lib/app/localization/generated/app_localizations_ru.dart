@@ -34,6 +34,48 @@ class AppLocalizationsRu extends AppLocalizations {
   String get searchTemplates => 'Поиск шаблонов';
 
   @override
+  String get randomTemplateAction => 'Случайный шаблон';
+
+  @override
+  String get randomTemplateAny => 'Любой шаблон';
+
+  @override
+  String get randomTemplateImage => 'Шаблон изображения';
+
+  @override
+  String get randomTemplateVideo => 'Видео-шаблон';
+
+  @override
+  String get randomTemplateNoTemplates => 'Нет доступных шаблонов.';
+
+  @override
+  String get randomTemplateNoAvailableForType =>
+      'Нет доступных шаблонов этого типа.';
+
+  @override
+  String get randomTemplateNoImageTemplates =>
+      'Нет доступных шаблонов изображений.';
+
+  @override
+  String get randomTemplateNoVideoTemplates => 'Нет доступных видео-шаблонов.';
+
+  @override
+  String get randomTemplateLoadFailed =>
+      'Не удалось загрузить шаблоны. Попробуйте ещё раз.';
+
+  @override
+  String get templateOfTheDayTitle => 'Шаблон дня';
+
+  @override
+  String get templateOfTheDaySubtitle => 'Магическая идея дня';
+
+  @override
+  String get templateOfTheDayTryAction => 'Попробовать шаблон';
+
+  @override
+  String get templateOfTheDayFeedBadge => 'Выбор дня';
+
+  @override
   String get allFilter => 'Все';
 
   @override
@@ -3380,6 +3422,53 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Годовой';
 
   @override
+  String get generationStatusWatermarkRemoved => 'Watermark убран';
+
+  @override
+  String get generationStatusWatermarkAddedFreePlan =>
+      'Watermark добавлен на бесплатном плане';
+
+  @override
+  String get generationStatusShareWithWatermark => 'Поделиться с watermark';
+
+  @override
+  String get generationStatusDownloadWithoutWatermark =>
+      'Скачать без watermark';
+
+  @override
+  String get generationStatusSaveWithWatermark => 'Сохранить с watermark';
+
+  @override
+  String get generationStatusRemoveWatermark => 'Убрать watermark';
+
+  @override
+  String get generationStatusRemovingWatermark => 'Убираем...';
+
+  @override
+  String get generationStatusUpgradePremium => 'Перейти на Premium';
+
+  @override
+  String get generationStatusRemoveWatermarkSheetTitle => 'Убрать watermark';
+
+  @override
+  String generationStatusRemoveWatermarkSheetBody(int cost) {
+    return 'Используйте $cost credit для этого результата или перейдите на Premium для чистых скачиваний.';
+  }
+
+  @override
+  String generationStatusRemoveWatermarkUseCredit(int cost) {
+    return 'Использовать $cost credit';
+  }
+
+  @override
+  String get generationStatusRemoveWatermarkFailed =>
+      'Не удалось убрать watermark. Попробуйте ещё раз.';
+
+  @override
+  String get generationStatusRemoveWatermarkNoCredits =>
+      'Недостаточно credits. Купите credits или Premium.';
+
+  @override
   String get globalOfflineBannerTitle => 'Нет подключения к интернету';
 
   @override
@@ -3391,4 +3480,25 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get globalOnlineRestoredBannerMessage => 'Вы снова в сети.';
+
+  @override
+  String get generationStatusCompareAction => 'Сравнить';
+
+  @override
+  String get generationStatusCompareBeforeLabel => 'До';
+
+  @override
+  String get generationStatusCompareAfterLabel => 'После';
+
+  @override
+  String get generationStatusCompareBeforeUnavailable =>
+      'Исходное фото больше недоступно.';
+
+  @override
+  String get generationStatusCompareResultUnavailable =>
+      'Результат недоступен.';
+
+  @override
+  String get generationStatusCompareOpenFailed =>
+      'Не удалось открыть сравнение.';
 }

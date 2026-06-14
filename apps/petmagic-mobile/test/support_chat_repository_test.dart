@@ -205,6 +205,10 @@ void main() {
       expect(source, contains('await File(filePath).length()'));
       expect(source, contains('await MultipartFile.fromFile('));
       expect(source, contains('authenticatedMultipartRequestOptions'));
+      expect(
+        source,
+        contains("query['beforeMessageId'] = beforeMessageId!.trim();"),
+      );
     },
   );
 }

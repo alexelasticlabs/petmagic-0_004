@@ -32,6 +32,48 @@ void main() {
     expect(startBody, contains('authenticatedMultipartRequestOptions('));
   });
 
+  test('keeps pet generation and pet profile request contracts stable', () {
+    final source = File(
+      'lib/features/templates/data/template_generation_repository.dart',
+    ).readAsStringSync();
+    final fromPetBody = _methodBody(source, 'startGenerationFromPet');
+    final createPetBody = _methodBody(source, 'createPet');
+    final updatePetBody = _methodBody(source, 'updatePet');
+
+    expect(fromPetBody, contains("'/api/generations/from-pet'"));
+    expect(fromPetBody, contains("'Idempotency-Key': idempotencyKey"));
+    expect(fromPetBody, contains("'petId': petId"));
+    expect(fromPetBody, contains("'templateId': templateId"));
+    expect(
+      fromPetBody,
+      contains("if (petPhotoId != null && petPhotoId.isNotEmpty)"),
+    );
+    expect(fromPetBody, contains("'petPhotoId': petPhotoId"));
+    expect(fromPetBody, contains('retryTransientFailures: false'));
+
+    expect(createPetBody, contains("'breed': ?breed"));
+    expect(updatePetBody, contains("'breed': ?breed"));
+  });
+
+  test('maps canonical mediaUrl generation field to outputUrl', () {
+    final dto = TemplateGenerationDto.fromJson({
+      'generationId': 'generation-1',
+      'userId': 'user-1',
+      'templateId': 'template-1',
+      'status': 'Succeeded',
+      'tokenCost': 1,
+      'attemptCount': 1,
+      'createdAtUtc': '2026-06-14T12:00:00Z',
+      'updatedAtUtc': '2026-06-14T12:01:00Z',
+      'mediaUrl': 'https://cdn.petmagic.test/result.png?signature=test',
+    });
+
+    expect(
+      dto.toDomain().outputUrl,
+      'https://cdn.petmagic.test/result.png?signature=test',
+    );
+  });
+
   test(
     'rejects missing source image without exposing local file path',
     () async {

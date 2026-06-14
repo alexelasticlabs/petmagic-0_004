@@ -34,6 +34,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchTemplates => 'Search templates';
 
   @override
+  String get randomTemplateAction => 'Random template';
+
+  @override
+  String get randomTemplateAny => 'Any template';
+
+  @override
+  String get randomTemplateImage => 'Image template';
+
+  @override
+  String get randomTemplateVideo => 'Video template';
+
+  @override
+  String get randomTemplateNoTemplates => 'No templates available.';
+
+  @override
+  String get randomTemplateNoAvailableForType =>
+      'No available templates for this type.';
+
+  @override
+  String get randomTemplateNoImageTemplates => 'No image templates available.';
+
+  @override
+  String get randomTemplateNoVideoTemplates => 'No video templates available.';
+
+  @override
+  String get randomTemplateLoadFailed =>
+      'Could not load templates. Please try again.';
+
+  @override
+  String get templateOfTheDayTitle => 'Template of the Day';
+
+  @override
+  String get templateOfTheDaySubtitle => 'Today\'s magic idea';
+
+  @override
+  String get templateOfTheDayTryAction => 'Try this template';
+
+  @override
+  String get templateOfTheDayFeedBadge => 'Today\'s pick';
+
+  @override
   String get allFilter => 'All';
 
   @override
@@ -3365,6 +3406,53 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Yearly';
 
   @override
+  String get generationStatusWatermarkRemoved => 'Watermark removed';
+
+  @override
+  String get generationStatusWatermarkAddedFreePlan =>
+      'Watermark added on the free plan';
+
+  @override
+  String get generationStatusShareWithWatermark => 'Share with watermark';
+
+  @override
+  String get generationStatusDownloadWithoutWatermark =>
+      'Download without watermark';
+
+  @override
+  String get generationStatusSaveWithWatermark => 'Save with watermark';
+
+  @override
+  String get generationStatusRemoveWatermark => 'Remove watermark';
+
+  @override
+  String get generationStatusRemovingWatermark => 'Removing...';
+
+  @override
+  String get generationStatusUpgradePremium => 'Upgrade to Premium';
+
+  @override
+  String get generationStatusRemoveWatermarkSheetTitle => 'Remove watermark';
+
+  @override
+  String generationStatusRemoveWatermarkSheetBody(int cost) {
+    return 'Use $cost credit for this result, or upgrade to Premium for clean downloads.';
+  }
+
+  @override
+  String generationStatusRemoveWatermarkUseCredit(int cost) {
+    return 'Use $cost credit';
+  }
+
+  @override
+  String get generationStatusRemoveWatermarkFailed =>
+      'Could not remove watermark. Please try again.';
+
+  @override
+  String get generationStatusRemoveWatermarkNoCredits =>
+      'Not enough credits. Buy credits or upgrade to Premium.';
+
+  @override
   String get globalOfflineBannerTitle => 'No internet connection';
 
   @override
@@ -3376,4 +3464,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get globalOnlineRestoredBannerMessage => 'You\'re back online.';
+
+  @override
+  String get generationStatusCompareAction => 'Compare';
+
+  @override
+  String get generationStatusCompareBeforeLabel => 'Before';
+
+  @override
+  String get generationStatusCompareAfterLabel => 'After';
+
+  @override
+  String get generationStatusCompareBeforeUnavailable =>
+      'Original photo is no longer available.';
+
+  @override
+  String get generationStatusCompareResultUnavailable =>
+      'Result is unavailable.';
+
+  @override
+  String get generationStatusCompareOpenFailed => 'Could not open comparison.';
 }

@@ -244,6 +244,7 @@ class _PremiumBody extends StatelessWidget {
     required this.isDark,
     required this.onOpenUrl,
     required this.onStartCheckout,
+    required this.onClose,
   });
 
   final PremiumState state;
@@ -251,13 +252,19 @@ class _PremiumBody extends StatelessWidget {
   final bool isDark;
   final Future<void> Function(String) onOpenUrl;
   final Future<void> Function() onStartCheckout;
+  final Future<void> Function() onClose;
 
   @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       physics: const ClampingScrollPhysics(),
       slivers: [
-        _Header(state: state, controller: controller, isDark: isDark),
+        _Header(
+          state: state,
+          controller: controller,
+          isDark: isDark,
+          onClose: onClose,
+        ),
         SliverToBoxAdapter(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -327,11 +334,13 @@ class _Header extends StatelessWidget {
     required this.state,
     required this.controller,
     required this.isDark,
+    required this.onClose,
   });
 
   final PremiumState state;
   final PremiumController controller;
   final bool isDark;
+  final Future<void> Function() onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -362,7 +371,7 @@ class _Header extends StatelessWidget {
                       size: 16,
                     ),
                   ),
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: () => unawaited(onClose()),
                 ),
                 const Spacer(),
                 TextButton.icon(

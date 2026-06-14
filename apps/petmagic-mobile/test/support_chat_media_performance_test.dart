@@ -42,7 +42,7 @@ void main() {
     ).readAsString();
     final composerSource = await File(
       'lib/features/support/presentation/widgets/support_chat_composer.part.dart',
-    ).readAsString();
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
     final messagesSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsString();
@@ -150,7 +150,7 @@ void main() {
     ).readAsString();
     final composerSource = await File(
       'lib/features/support/presentation/widgets/support_chat_composer.part.dart',
-    ).readAsString();
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
 
     expect(
       pageSource,

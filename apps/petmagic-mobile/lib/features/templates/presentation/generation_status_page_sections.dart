@@ -590,35 +590,256 @@ class _BackgroundHintCard extends StatelessWidget {
 }
 
 class _ReadyActionsRow extends StatelessWidget {
-  const _ReadyActionsRow({required this.onSave, required this.onShare});
+  const _ReadyActionsRow({
+    required this.onGenerateSimilar,
+    required this.onUseAsInput,
+    required this.onSave,
+    required this.onShare,
+    required this.hasWatermark,
+    required this.isWatermarkRemoved,
+    required this.canRemoveWatermark,
+    required this.removeWatermarkCostCredits,
+    required this.isRemovingWatermark,
+    required this.isGeneratingSimilar,
+    required this.onUpgrade,
+    this.watermarkMessage,
+    this.onRemoveWatermark,
+  });
 
+  final VoidCallback? onGenerateSimilar;
+  final VoidCallback? onUseAsInput;
   final VoidCallback? onSave;
   final VoidCallback? onShare;
+  final bool hasWatermark;
+  final bool isWatermarkRemoved;
+  final bool canRemoveWatermark;
+  final int removeWatermarkCostCredits;
+  final bool isRemovingWatermark;
+  final bool isGeneratingSimilar;
+  final String? watermarkMessage;
+  final VoidCallback? onRemoveWatermark;
+  final VoidCallback onUpgrade;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    return Row(
+    final colors = context.petMagicColors;
+    final message = watermarkMessage?.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: FilledButton.icon(
-            onPressed: onShare,
-            icon: const Icon(Icons.share_rounded, size: 18),
-            label: Text(text.supportChatShareAction),
+        if (message != null && message.isNotEmpty) ...[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceStrong.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    isWatermarkRemoved
+                        ? Icons.verified_rounded
+                        : Icons.auto_awesome_motion_rounded,
+                    size: 18,
+                    color: colors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isWatermarkRemoved
+                          ? text.generationStatusWatermarkRemoved
+                          : hasWatermark
+                          ? text.generationStatusWatermarkAddedFreePlan
+                          : message,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textSoft,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: isGeneratingSimilar ? null : onGenerateSimilar,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: Text(
+                  isGeneratingSimilar
+                      ? _similarLoadingLabel(text)
+                      : _similarActionLabel(text),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onUseAsInput,
+                icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+                label: Text(_useAsInputLabel(text)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: onShare,
+                icon: const Icon(Icons.share_rounded, size: 18),
+                label: Text(
+                  hasWatermark
+                      ? text.generationStatusShareWithWatermark
+                      : text.supportChatShareAction,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onSave,
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: Text(
+                  isWatermarkRemoved
+                      ? text.generationStatusDownloadWithoutWatermark
+                      : hasWatermark
+                      ? text.generationStatusSaveWithWatermark
+                      : text.generationStatusDownloadAction,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (canRemoveWatermark) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isRemovingWatermark ? null : onRemoveWatermark,
+                  icon: const Icon(Icons.cleaning_services_rounded, size: 18),
+                  label: Text(
+                    isRemovingWatermark
+                        ? text.generationStatusRemovingWatermark
+                        : text.generationStatusRemoveWatermark,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onUpgrade,
+                  icon: const Icon(Icons.workspace_premium_rounded, size: 18),
+                  label: Text(text.generationStatusUpgradePremium),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ResultInputActions extends StatelessWidget {
+  const _ResultInputActions({
+    required this.onCreateVideo,
+    required this.onUseAsInput,
+    required this.hasWatermark,
+    required this.isWatermarkRemoved,
+    this.watermarkMessage,
+  });
+
+  final VoidCallback? onCreateVideo;
+  final VoidCallback? onUseAsInput;
+  final bool hasWatermark;
+  final bool isWatermarkRemoved;
+  final String? watermarkMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final isRu = text.localeName.startsWith('ru');
+    final colors = context.petMagicColors;
+    final message = watermarkMessage?.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (message != null && message.isNotEmpty) ...[
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceStrong.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: colors.border.withValues(alpha: 0.75)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    isWatermarkRemoved
+                        ? Icons.verified_rounded
+                        : Icons.auto_awesome_motion_rounded,
+                    size: 18,
+                    color: colors.accent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      isWatermarkRemoved
+                          ? text.generationStatusWatermarkRemoved
+                          : hasWatermark
+                          ? text.generationStatusWatermarkAddedFreePlan
+                          : message,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textSoft,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        FilledButton.icon(
+          onPressed: onCreateVideo,
+          icon: const Icon(Icons.movie_creation_rounded, size: 18),
+          label: Text(
+            isRu ? 'Создать видео из этого' : 'Create video from this',
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: onSave,
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: Text(text.generationStatusDownloadAction),
-          ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: onUseAsInput,
+          icon: const Icon(Icons.add_photo_alternate_rounded, size: 18),
+          label: Text(_useAsInputLabel(text)),
         ),
       ],
     );
   }
 }
+
+String _similarActionLabel(AppLocalizations text) =>
+    text.localeName.startsWith('ru') ? 'Похожий вариант' : 'Generate similar';
+
+String _similarLoadingLabel(AppLocalizations text) =>
+    text.localeName.startsWith('ru')
+    ? 'Создаём похожий вариант...'
+    : 'Creating a similar version...';
+
+String _useAsInputLabel(AppLocalizations text) =>
+    text.localeName.startsWith('ru') ? 'Взять за основу' : 'Use as input';
 
 class _FailedActions extends StatelessWidget {
   const _FailedActions({
@@ -1224,6 +1445,434 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
   }
 }
 
+class _BeforeAfterCompareViewer extends StatefulWidget {
+  const _BeforeAfterCompareViewer({
+    required this.generation,
+    required this.beforeUrl,
+    required this.afterUrl,
+    this.onViewed,
+    this.onSliderMoved,
+    this.onClosed,
+    this.onShare,
+  });
+
+  final TemplateGenerationResult generation;
+  final String beforeUrl;
+  final String afterUrl;
+  final Future<void> Function()? onViewed;
+  final Future<void> Function()? onSliderMoved;
+  final Future<void> Function()? onClosed;
+  final Future<void> Function()? onShare;
+
+  @override
+  State<_BeforeAfterCompareViewer> createState() =>
+      _BeforeAfterCompareViewerState();
+}
+
+class _BeforeAfterCompareViewerState extends State<_BeforeAfterCompareViewer> {
+  static const double _handleSize = 42;
+
+  ImageStream? _beforeStream;
+  ImageStreamListener? _beforeListener;
+  ImageStream? _afterStream;
+  ImageStreamListener? _afterListener;
+  ImageProvider<Object>? _beforeProvider;
+  ImageProvider<Object>? _afterProvider;
+  double? _beforeAspectRatio;
+  double? _afterAspectRatio;
+  bool _beforeLoaded = false;
+  bool _afterLoaded = false;
+  bool _beforeFailed = false;
+  bool _afterFailed = false;
+  bool _trackedSliderMove = false;
+  bool _triggeredHaptic = false;
+  double _sliderPosition = 0.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _beforeProvider = CachedNetworkImageProvider(
+      widget.beforeUrl,
+      maxWidth: 1024,
+    );
+    _afterProvider = CachedNetworkImageProvider(
+      widget.afterUrl,
+      maxWidth: 1024,
+    );
+    _attachBeforeListener();
+    _attachAfterListener();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(widget.onViewed?.call());
+    });
+  }
+
+  @override
+  void dispose() {
+    _detachBeforeListener();
+    _detachAfterListener();
+    unawaited(widget.onClosed?.call());
+    super.dispose();
+  }
+
+  void _attachBeforeListener() {
+    final provider = _beforeProvider;
+    if (provider == null) {
+      return;
+    }
+
+    final stream = provider.resolve(const ImageConfiguration());
+    _beforeStream = stream;
+    _beforeListener = ImageStreamListener(
+      (info, _) {
+        if (!mounted) {
+          return;
+        }
+        final aspectRatio = info.image.height == 0
+            ? null
+            : info.image.width / info.image.height;
+        setState(() {
+          _beforeLoaded = true;
+          _beforeFailed = false;
+          _beforeAspectRatio = aspectRatio;
+        });
+      },
+      onError: (Object error, StackTrace? stackTrace) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _beforeFailed = true;
+        });
+      },
+    );
+    stream.addListener(_beforeListener!);
+  }
+
+  void _attachAfterListener() {
+    final provider = _afterProvider;
+    if (provider == null) {
+      return;
+    }
+
+    final stream = provider.resolve(const ImageConfiguration());
+    _afterStream = stream;
+    _afterListener = ImageStreamListener(
+      (info, _) {
+        if (!mounted) {
+          return;
+        }
+        final aspectRatio = info.image.height == 0
+            ? null
+            : info.image.width / info.image.height;
+        setState(() {
+          _afterLoaded = true;
+          _afterFailed = false;
+          _afterAspectRatio = aspectRatio;
+        });
+      },
+      onError: (Object error, StackTrace? stackTrace) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _afterFailed = true;
+        });
+      },
+    );
+    stream.addListener(_afterListener!);
+  }
+
+  void _detachBeforeListener() {
+    final listener = _beforeListener;
+    final stream = _beforeStream;
+    if (listener != null && stream != null) {
+      stream.removeListener(listener);
+    }
+    _beforeListener = null;
+    _beforeStream = null;
+  }
+
+  void _detachAfterListener() {
+    final listener = _afterListener;
+    final stream = _afterStream;
+    if (listener != null && stream != null) {
+      stream.removeListener(listener);
+    }
+    _afterListener = null;
+    _afterStream = null;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details, double width) {
+    if (!_triggeredHaptic) {
+      _triggeredHaptic = true;
+      unawaited(PetMagicHaptics.light());
+    }
+    if (!_trackedSliderMove) {
+      _trackedSliderMove = true;
+      unawaited(widget.onSliderMoved?.call());
+    }
+
+    final next = (details.localPosition.dx / width).clamp(0.0, 1.0);
+    setState(() {
+      _sliderPosition = next;
+    });
+  }
+
+  BoxFit _resolveImageFit() {
+    final before = _beforeAspectRatio;
+    final after = _afterAspectRatio;
+    if (before == null || after == null) {
+      return BoxFit.contain;
+    }
+
+    return (before - after).abs() <= 0.14 ? BoxFit.cover : BoxFit.contain;
+  }
+
+  double _resolveContainerAspectRatio() {
+    final before = _beforeAspectRatio;
+    final after = _afterAspectRatio;
+    if (before != null && after != null) {
+      return ((before + after) / 2).clamp(0.6, 1.8);
+    }
+    return (before ?? after ?? 1).clamp(0.6, 1.8);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final fit = _resolveImageFit();
+    final aspectRatio = _resolveContainerAspectRatio();
+    final isReady = _beforeLoaded && _afterLoaded;
+    final errorMessage = _beforeFailed
+        ? text.generationStatusCompareBeforeUnavailable
+        : _afterFailed
+        ? text.generationStatusCompareResultUnavailable
+        : null;
+
+    return Scaffold(
+      backgroundColor: colors.surface,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                    color: colors.textStrong,
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.generation.templateTitle ??
+                          text.generationStatusCompareAction,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: widget.onShare == null
+                        ? null
+                        : () => unawaited(widget.onShare!.call()),
+                    icon: const Icon(Icons.share_rounded),
+                    color: colors.textStrong,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: aspectRatio,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colors.surfaceStrong,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: colors.border.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: errorMessage != null
+                            ? _MediaPlaceholder(label: errorMessage)
+                            : !isReady
+                            ? const _CompareViewerSkeleton()
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final width = constraints.maxWidth;
+                                  final sliderX = width * _sliderPosition;
+                                  return GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onHorizontalDragUpdate: (details) =>
+                                        _handleDragUpdate(details, width),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        _CompareImageLayer(
+                                          provider: _afterProvider!,
+                                          fit: fit,
+                                        ),
+                                        ClipRect(
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            widthFactor: _sliderPosition,
+                                            child: SizedBox(
+                                              width: constraints.maxWidth,
+                                              height: constraints.maxHeight,
+                                              child: _CompareImageLayer(
+                                                provider: _beforeProvider!,
+                                                fit: fit,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 14,
+                                          left: 14,
+                                          child: _ComparePillLabel(
+                                            label: text
+                                                .generationStatusCompareBeforeLabel,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: 14,
+                                          right: 14,
+                                          child: _ComparePillLabel(
+                                            label: text
+                                                .generationStatusCompareAfterLabel,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          left: sliderX - 1.25,
+                                          top: 0,
+                                          bottom: 0,
+                                          child: Container(
+                                            width: 2.5,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.92,
+                                            ),
+                                          ),
+                                        ),
+                                        Positioned(
+                                          left: sliderX - (_handleSize / 2),
+                                          top:
+                                              (constraints.maxHeight / 2) -
+                                              (_handleSize / 2),
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.2),
+                                                  blurRadius: 18,
+                                                  offset: const Offset(0, 10),
+                                                ),
+                                              ],
+                                            ),
+                                            child: SizedBox(
+                                              width: _handleSize,
+                                              height: _handleSize,
+                                              child: const Icon(
+                                                Icons.drag_indicator_rounded,
+                                                color: Color(0xFF1F2937),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompareImageLayer extends StatelessWidget {
+  const _CompareImageLayer({required this.provider, required this.fit});
+
+  final ImageProvider<Object> provider;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: context.petMagicColors.surfaceStrong,
+      child: Image(
+        image: provider,
+        fit: fit,
+        filterQuality: FilterQuality.medium,
+      ),
+    );
+  }
+}
+
+class _ComparePillLabel extends StatelessWidget {
+  const _ComparePillLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.36),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompareViewerSkeleton extends StatelessWidget {
+  const _CompareViewerSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0x1AFFFFFF), Color(0x08FFFFFF), Color(0x14000000)],
+        ),
+      ),
+      child: const Center(child: CircularProgressIndicator.adaptive()),
+    );
+  }
+}
+
 class _FullscreenVideoControls extends StatelessWidget {
   const _FullscreenVideoControls({
     required this.controller,
@@ -1415,6 +2064,217 @@ class _RatingButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _FailedFeedbackCard extends StatelessWidget {
+  const _FailedFeedbackCard({
+    required this.isSubmitting,
+    required this.onSubmit,
+  });
+
+  final bool isSubmitting;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = _feedbackText(context);
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            text.failedTitle,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: colors.textStrong,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final reason in text.failedReasons)
+                ActionChip(
+                  label: Text(reason.$2),
+                  onPressed: isSubmitting ? null : () => onSubmit(reason.$1),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProblemFeedbackSheet extends StatefulWidget {
+  const _ProblemFeedbackSheet({required this.title, required this.reasons});
+
+  final String title;
+  final List<(String, String)> reasons;
+
+  @override
+  State<_ProblemFeedbackSheet> createState() => _ProblemFeedbackSheetState();
+}
+
+class _ProblemFeedbackSheetState extends State<_ProblemFeedbackSheet> {
+  final _commentController = TextEditingController();
+  String? _selectedReason;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final text = _feedbackText(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.backgroundBottom,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  widget.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colors.textStrong,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final reason in widget.reasons)
+                      ChoiceChip(
+                        selected: _selectedReason == reason.$1,
+                        label: Text(reason.$2),
+                        onSelected: (_) =>
+                            setState(() => _selectedReason = reason.$1),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _commentController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: text.commentLabel,
+                    hintText: text.commentHint,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: _selectedReason == null
+                      ? null
+                      : () => Navigator.of(context).pop(
+                          _FeedbackResult(
+                            [_selectedReason!],
+                            _commentController.text.trim().isEmpty
+                                ? null
+                                : _commentController.text.trim(),
+                          ),
+                        ),
+                  child: Text(text.submit),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackText {
+  const _FeedbackText({
+    required this.failedTitle,
+    required this.failedReasons,
+    required this.reportTitle,
+    required this.reportReasons,
+    required this.commentLabel,
+    required this.commentHint,
+    required this.submit,
+  });
+
+  final String failedTitle;
+  final List<(String, String)> failedReasons;
+  final String reportTitle;
+  final List<(String, String)> reportReasons;
+  final String commentLabel;
+  final String commentHint;
+  final String submit;
+}
+
+_FeedbackText _feedbackText(BuildContext context) {
+  final isRu = AppLocalizations.of(context).localeName.startsWith('ru');
+  if (isRu) {
+    return const _FeedbackText(
+      failedTitle: 'Что произошло?',
+      failedReasons: [
+        ('not_completed', 'Не завершилась'),
+        ('too_long', 'Слишком долго'),
+        ('credits_charged', 'Списались credits'),
+        ('stuck', 'Зависло'),
+        ('other', 'Другое'),
+      ],
+      reportTitle: 'Что не так с результатом?',
+      reportReasons: [
+        ('low_quality', 'Плохое качество'),
+        ('wrong_pet', 'Не тот питомец'),
+        ('distortion', 'Искажение'),
+        ('inappropriate', 'Неподходящий'),
+        ('wrong_template', 'Не тот шаблон'),
+        ('watermark', 'Watermark'),
+        ('payment', 'Оплата'),
+        ('other', 'Другое'),
+      ],
+      commentLabel: 'Комментарий',
+      commentHint: 'Можно оставить пустым',
+      submit: 'Отправить',
+    );
+  }
+
+  return const _FeedbackText(
+    failedTitle: 'What happened?',
+    failedReasons: [
+      ('not_completed', 'Did not finish'),
+      ('too_long', 'Too long'),
+      ('credits_charged', 'Credits charged'),
+      ('stuck', 'Stuck'),
+      ('other', 'Other'),
+    ],
+    reportTitle: 'What is wrong with the result?',
+    reportReasons: [
+      ('low_quality', 'Low quality'),
+      ('wrong_pet', 'Wrong pet'),
+      ('distortion', 'Distortion'),
+      ('inappropriate', 'Inappropriate'),
+      ('wrong_template', 'Wrong template'),
+      ('watermark', 'Watermark'),
+      ('payment', 'Payment'),
+      ('other', 'Other'),
+    ],
+    commentLabel: 'Comment',
+    commentHint: 'Optional',
+    submit: 'Send',
+  );
 }
 
 class _NegativeFeedbackSheet extends StatefulWidget {

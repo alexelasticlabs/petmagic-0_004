@@ -333,9 +333,51 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'TemplateCard keeps preview error above details on narrow dark cards',
+    (tester) async {
+      final template = _videoTemplate(id: 'video-template-error-layout');
+
+      await tester.pumpWidget(
+        _buildHost(
+          template,
+          theme: AppTheme.dark(),
+          hasPremiumAccess: false,
+          size: const Size(188, 260),
+          previewControllerFactory: (_) async =>
+              throw StateError('preview unavailable'),
+        ),
+      );
+      await tester.pump();
+
+      _showTemplateCard(tester, size: const Size(188, 260));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      final errorText = find.text('Preview unavailable');
+      final retryText = find.text('Retry');
+      final titleText = find.text('Video Template');
+
+      expect(errorText, findsOneWidget);
+      expect(retryText, findsOneWidget);
+      expect(titleText, findsOneWidget);
+      expect(
+        tester.getRect(errorText).bottom,
+        lessThan(tester.getRect(titleText).top),
+      );
+      expect(
+        tester.getRect(retryText).bottom,
+        lessThan(tester.getRect(titleText).top),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
-void _showTemplateCard(WidgetTester tester) {
+void _showTemplateCard(
+  WidgetTester tester, {
+  Size size = const Size(320, 240),
+}) {
   final detector = tester.widget<VisibilityDetector>(
     find.byType(VisibilityDetector),
   );
@@ -343,8 +385,8 @@ void _showTemplateCard(WidgetTester tester) {
   detector.onVisibilityChanged?.call(
     VisibilityInfo(
       key: detector.key!,
-      size: const Size(320, 240),
-      visibleBounds: const Rect.fromLTWH(0, 0, 320, 240),
+      size: size,
+      visibleBounds: Offset.zero & size,
     ),
   );
 }
@@ -354,19 +396,22 @@ Widget _buildHost(
   Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory,
   String renderContextKey = 'all|all||20',
+  ThemeData? theme,
+  bool hasPremiumAccess = true,
+  Size size = const Size(320, 240),
 }) {
   return MaterialApp(
-    theme: AppTheme.light(),
+    theme: theme ?? AppTheme.light(),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: Center(
         child: SizedBox(
-          width: 320,
-          height: 240,
+          width: size.width,
+          height: size.height,
           child: TemplateCard(
             template: template,
-            hasPremiumAccess: true,
+            hasPremiumAccess: hasPremiumAccess,
             renderContextKey: renderContextKey,
             previewControllerFactory: previewControllerFactory,
           ),

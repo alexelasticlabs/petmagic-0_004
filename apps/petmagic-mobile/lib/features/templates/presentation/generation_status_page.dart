@@ -10,14 +10,19 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
@@ -81,11 +86,16 @@ class GenerationStatusMediaActions {
 }
 
 class GenerationStatusPage extends ConsumerStatefulWidget {
-  const GenerationStatusPage({required this.generationId, super.key});
+  const GenerationStatusPage({
+    required this.generationId,
+    this.templateOfTheDay,
+    super.key,
+  });
 
   static const routePrefix = '/generations';
 
   final String generationId;
+  final TemplateOfTheDayItem? templateOfTheDay;
 
   @override
   ConsumerState<GenerationStatusPage> createState() =>
@@ -100,10 +110,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isSubmittingFeedback = false;
   bool _isDeleting = false;
   bool _isMediaActionInFlight = false;
+  bool _isRemovingWatermark = false;
+  bool _isGeneratingSimilar = false;
   String? _errorMessage;
   bool _isPollInFlight = false;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeMediaActionCancelToken;
+  final Set<String> _recordedTemplateOfTheDayTerminalEvents = <String>{};
+  final Set<String> _recordedFeedbackPromptEvents = <String>{};
 
   @override
   void initState() {
@@ -267,14 +281,66 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       onOpenViewer: () => _openFullscreenPreview(generation),
                     ),
                     const SizedBox(height: 10),
-                    _ReadyActionsRow(
-                      onSave: _isMediaActionInFlight
-                          ? null
-                          : () => unawaited(_saveToGallery(generation)),
-                      onShare: _isMediaActionInFlight
-                          ? null
-                          : () => unawaited(_shareResult(generation)),
-                    ),
+                    if (!isVideoGeneration(generation) &&
+                        generation.canCompareBeforeAfter) ...[
+                      _CompareActionCard(
+                        label: text.generationStatusCompareAction,
+                        onTap: () => unawaited(_openCompareViewer(generation)),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (!isVideoGeneration(generation))
+                      _ResultInputActions(
+                        onCreateVideo:
+                            (generation.outputUrl?.trim().isNotEmpty ?? false)
+                            ? () => unawaited(
+                                _openUseResultFlow(generation, true),
+                              )
+                            : null,
+                        onUseAsInput:
+                            (generation.outputUrl?.trim().isNotEmpty ?? false)
+                            ? () => unawaited(
+                                _openUseResultFlow(generation, false),
+                              )
+                            : null,
+                        hasWatermark: generation.hasWatermark,
+                        isWatermarkRemoved: generation.isWatermarkRemoved,
+                        watermarkMessage: generation.watermarkMessage,
+                      )
+                    else
+                      _ReadyActionsRow(
+                        onGenerateSimilar: _canGenerateSimilar(generation)
+                            ? () => unawaited(_generateSimilar(generation))
+                            : null,
+                        onUseAsInput:
+                            !isVideoGeneration(generation) &&
+                                (generation.outputUrl?.trim().isNotEmpty ??
+                                    false)
+                            ? () => unawaited(
+                                _openUseResultFlow(generation, false),
+                              )
+                            : null,
+                        onSave: _isMediaActionInFlight
+                            ? null
+                            : () => unawaited(_saveToGallery(generation)),
+                        onShare: _isMediaActionInFlight
+                            ? null
+                            : () => unawaited(_shareResult(generation)),
+                        hasWatermark: generation.hasWatermark,
+                        isWatermarkRemoved: generation.isWatermarkRemoved,
+                        canRemoveWatermark: generation.canRemoveWatermark,
+                        watermarkMessage: generation.watermarkMessage,
+                        removeWatermarkCostCredits:
+                            generation.removeWatermarkCostCredits,
+                        isRemovingWatermark: _isRemovingWatermark,
+                        onRemoveWatermark: generation.canRemoveWatermark
+                            ? () => unawaited(
+                                _showRemoveWatermarkSheet(generation),
+                              )
+                            : null,
+                        onUpgrade: () => context.push(PremiumPage.routePath),
+                        isGeneratingSimilar: _isGeneratingSimilar,
+                      ),
                     const SizedBox(height: 10),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,
@@ -318,6 +384,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                           context.go(TemplatesPage.routePath),
                       onRetry: _retrySoon,
                       onSupport: () => context.push(SupportChatPage.routePath),
+                    ),
+                    const SizedBox(height: 14),
+                    _FailedFeedbackCard(
+                      isSubmitting: _isSubmittingFeedback,
+                      onSubmit: (category) => unawaited(
+                        _submitStructuredFeedback(
+                          generation: generation,
+                          type: 'GenerationFailure',
+                          category: category,
+                          rating: -1,
+                          sourceScreen: 'generation_status_failed',
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     _DetailsCard(
@@ -424,6 +503,66 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       children: [
                         if (generation.isCompleted) ...[
                           _StatusSheetActionTile(
+                            icon: Icons.download_rounded,
+                            label: generation.isWatermarkRemoved
+                                ? text.generationStatusDownloadWithoutWatermark
+                                : generation.hasWatermark
+                                ? text.generationStatusSaveWithWatermark
+                                : text.generationStatusSaveAction,
+                            onTap: _isMediaActionInFlight
+                                ? null
+                                : () {
+                                    Navigator.of(sheetContext).pop();
+                                    unawaited(_saveToGallery(generation));
+                                  },
+                          ),
+                          _StatusSheetActionTile(
+                            icon: Icons.share_rounded,
+                            label: generation.hasWatermark
+                                ? text.generationStatusShareWithWatermark
+                                : text.supportChatShareAction,
+                            onTap: _isMediaActionInFlight
+                                ? null
+                                : () {
+                                    Navigator.of(sheetContext).pop();
+                                    unawaited(_shareResult(generation));
+                                  },
+                          ),
+                          if (generation.canRemoveWatermark) ...[
+                            _StatusSheetActionTile(
+                              icon: Icons.cleaning_services_rounded,
+                              label: _isRemovingWatermark
+                                  ? text.generationStatusRemovingWatermark
+                                  : text.generationStatusRemoveWatermark,
+                              onTap: _isRemovingWatermark
+                                  ? null
+                                  : () {
+                                      Navigator.of(sheetContext).pop();
+                                      unawaited(
+                                        _showRemoveWatermarkSheet(generation),
+                                      );
+                                    },
+                            ),
+                            _StatusSheetActionTile(
+                              icon: Icons.workspace_premium_rounded,
+                              label: text.generationStatusUpgradePremium,
+                              onTap: () {
+                                Navigator.of(sheetContext).pop();
+                                context.push(PremiumPage.routePath);
+                              },
+                            ),
+                          ],
+                          _StatusSheetActionTile(
+                            icon: Icons.auto_awesome_rounded,
+                            label: _similarActionLabel(text),
+                            onTap: !_canGenerateSimilar(generation)
+                                ? null
+                                : () {
+                                    Navigator.of(sheetContext).pop();
+                                    unawaited(_generateSimilar(generation));
+                                  },
+                          ),
+                          _StatusSheetActionTile(
                             icon: Icons.link_rounded,
                             label: text.generationStatusCopyLinkAction,
                             onTap: () {
@@ -447,7 +586,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                             label: text.generationStatusReportProblemAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              context.push(SupportChatPage.routePath);
+                              unawaited(_showReportProblemSheet(generation));
                             },
                           ),
                         ] else if (generation.isFailed) ...[
@@ -513,21 +652,27 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     }
 
     final text = AppLocalizations.of(context);
-    final outputUrl = generation.outputUrl;
-    if (outputUrl == null || outputUrl.isEmpty) {
-      _showInfo(text.generationStatusResultUnavailableForSave);
-      _completeMediaAction(mediaActionCancelToken);
-      return;
-    }
-
-    final fileName = _buildOutputFileName(generation, outputUrl);
 
     try {
+      final access = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchDownloadUrl(
+            generation.generationId,
+            cancelToken: mediaActionCancelToken,
+          );
+      final outputUrl = access.mediaUrl;
+      if (outputUrl.isEmpty) {
+        _showInfo(text.generationStatusResultUnavailableForSave);
+        return;
+      }
+
       final wasSaved = await ref
           .read(generationStatusMediaActionsProvider)
           .saveToGallery(
             mediaUrl: outputUrl,
-            fileName: fileName,
+            fileName: access.fileName.isEmpty
+                ? _buildOutputFileName(generation, outputUrl)
+                : access.fileName,
             isVideo: isVideoGeneration(generation),
             albumName: 'PetMagic',
             cancelToken: mediaActionCancelToken,
@@ -601,6 +746,181 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     context.go(TemplatesPage.routePath);
   }
 
+  bool _canGenerateSimilar(TemplateGenerationResult generation) {
+    return generation.isCompleted &&
+        generation.supportsGenerateSimilar &&
+        !generation.userMediaExpired &&
+        !_isGeneratingSimilar;
+  }
+
+  Future<void> _generateSimilar(TemplateGenerationResult generation) async {
+    if (!_canGenerateSimilar(generation)) {
+      _showInfo(_sourceUnavailableMessage(AppLocalizations.of(context)));
+      return;
+    }
+
+    final text = AppLocalizations.of(context);
+    unawaited(
+      _recordGenerateSimilarAnalytics(generation, 'generate_similar_clicked'),
+    );
+    if (isVideoGeneration(generation)) {
+      final confirmed = await _showGenerateSimilarVideoSheet(generation);
+      if (confirmed != true) {
+        return;
+      }
+      unawaited(
+        _recordGenerateSimilarAnalytics(
+          generation,
+          'generate_similar_confirmed',
+        ),
+      );
+    } else {
+      _showInfo(_generateSimilarImageCostMessage(text));
+    }
+
+    setState(() => _isGeneratingSimilar = true);
+    _showInfo(_similarLoadingLabel(text));
+    try {
+      final next = await ref
+          .read(templateGenerationRepositoryProvider)
+          .generateSimilar(sourceGenerationId: generation.generationId);
+
+      if (!mounted) {
+        return;
+      }
+
+      context.go('${GenerationStatusPage.routePrefix}/${next.generationId}');
+    } on AppException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showInfo(_generateSimilarErrorMessage(text, error));
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+      _showInfo(_generateSimilarGenericErrorMessage(text));
+    } finally {
+      if (mounted) {
+        setState(() => _isGeneratingSimilar = false);
+      }
+    }
+  }
+
+  Future<void> _recordGenerateSimilarAnalytics(
+    TemplateGenerationResult generation,
+    String eventType,
+  ) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: eventType,
+            generationId: generation.generationId,
+            metadata: {
+              'sourceGenerationId': generation.generationId,
+              'templateId': generation.templateId,
+              'templateType': generation.templateType,
+              'petId': generation.petId,
+              'variationStrength': 'medium',
+              'creditsCost': isVideoGeneration(generation) ? 5 : 1,
+              'userPlan': generation.userPlan,
+            },
+          );
+    } on Object {
+      // Best-effort analytics must not block generation.
+    }
+  }
+
+  Future<bool?> _showGenerateSimilarVideoSheet(
+    TemplateGenerationResult generation,
+  ) {
+    final text = AppLocalizations.of(context);
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = sheetContext.petMagicColors;
+        final bottomInset = petMagicScrollableBottomInset(sheetContext);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _similarActionLabel(text),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colors.textStrong,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _generateSimilarVideoCostMessage(text),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: colors.textSoft),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(true),
+                      child: Text(_generateSimilarConfirmLabel(text)),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(sheetContext).pop(false),
+                      child: Text(_cancelLabel(text)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openUseResultFlow(
+    TemplateGenerationResult generation,
+    bool createVideo,
+  ) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: createVideo
+                ? 'create_video_clicked'
+                : 'use_as_input_clicked',
+            generationId: generation.generationId,
+          );
+    } on Object {
+      // Best-effort analytics must not block navigation.
+    }
+
+    if (!mounted) {
+      return;
+    }
+    context.push(GenerationResultInputPage.routeFor(generation.generationId));
+  }
+
   Future<void> _shareResult(TemplateGenerationResult generation) async {
     final mediaActionCancelToken = _startMediaAction();
     if (mediaActionCancelToken == null) {
@@ -608,19 +928,27 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     }
 
     final text = AppLocalizations.of(context);
-    final outputUrl = generation.outputUrl;
-    if (outputUrl == null || outputUrl.isEmpty) {
-      _showInfo(text.generationStatusResultUnavailableForShare);
-      _completeMediaAction(mediaActionCancelToken);
-      return;
-    }
 
     try {
+      final access = await ref
+          .read(templateGenerationRepositoryProvider)
+          .fetchShareUrl(
+            generation.generationId,
+            cancelToken: mediaActionCancelToken,
+          );
+      final outputUrl = access.mediaUrl;
+      if (outputUrl.isEmpty) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
+      }
+
       await ref
           .read(generationStatusMediaActionsProvider)
           .share(
             mediaUrl: outputUrl,
-            fileName: _buildOutputFileName(generation, outputUrl),
+            fileName: access.fileName.isEmpty
+                ? _buildOutputFileName(generation, outputUrl)
+                : access.fileName,
             title: generation.templateTitle ?? text.generationStatusResultTitle,
             cancelToken: mediaActionCancelToken,
           );
@@ -638,6 +966,248 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       _showInfo(text.generationStatusShareFailedMessage);
     } finally {
       _completeMediaAction(mediaActionCancelToken);
+    }
+  }
+
+  Future<void> _showRemoveWatermarkSheet(
+    TemplateGenerationResult generation,
+  ) async {
+    final text = AppLocalizations.of(context);
+    unawaited(_recordWatermarkAnalytics(generation, 'remove_clicked'));
+    unawaited(_recordWatermarkAnalytics(generation, 'paywall_viewed'));
+    final action = await showModalBottomSheet<_RemoveWatermarkAction>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = sheetContext.petMagicColors;
+        final bottomInset = petMagicScrollableBottomInset(sheetContext);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      text.generationStatusRemoveWatermarkSheetTitle,
+                      style: Theme.of(sheetContext).textTheme.titleMedium
+                          ?.copyWith(
+                            color: colors.textStrong,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      text.generationStatusRemoveWatermarkSheetBody(
+                        generation.removeWatermarkCostCredits,
+                      ),
+                      style: Theme.of(sheetContext).textTheme.bodyMedium
+                          ?.copyWith(color: colors.textSoft, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(
+                        sheetContext,
+                      ).pop(_RemoveWatermarkAction.credit),
+                      icon: const Icon(Icons.bolt_rounded, size: 18),
+                      label: Text(
+                        text.generationStatusRemoveWatermarkUseCredit(
+                          generation.removeWatermarkCostCredits,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(
+                        sheetContext,
+                      ).pop(_RemoveWatermarkAction.premium),
+                      icon: const Icon(
+                        Icons.workspace_premium_rounded,
+                        size: 18,
+                      ),
+                      label: Text(text.generationStatusUpgradePremium),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    if (action == _RemoveWatermarkAction.premium) {
+      context.push(PremiumPage.routePath);
+      return;
+    }
+
+    await _removeWatermark(generation);
+  }
+
+  Future<void> _removeWatermark(TemplateGenerationResult generation) async {
+    if (_isRemovingWatermark) {
+      return;
+    }
+
+    final text = AppLocalizations.of(context);
+    setState(() => _isRemovingWatermark = true);
+    try {
+      final result = await ref
+          .read(templateGenerationRepositoryProvider)
+          .removeWatermark(generation.generationId);
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo(
+        result.watermarkRemoved
+            ? text.generationStatusWatermarkRemoved
+            : text.generationStatusRemoveWatermarkFailed,
+      );
+      await _load(silent: true);
+    } on DioException catch (error) {
+      if (!mounted || CancelToken.isCancel(error)) {
+        return;
+      }
+
+      if (error.response?.statusCode == 402) {
+        await _showWatermarkNoCreditsSheet();
+      } else {
+        _showInfo(text.generationStatusRemoveWatermarkFailed);
+      }
+    } on Object {
+      if (!mounted) {
+        return;
+      }
+
+      _showInfo(text.generationStatusRemoveWatermarkFailed);
+    } finally {
+      if (mounted) {
+        setState(() => _isRemovingWatermark = false);
+      }
+    }
+  }
+
+  Future<void> _showWatermarkNoCreditsSheet() async {
+    final text = AppLocalizations.of(context);
+    final action = await showModalBottomSheet<_RemoveWatermarkAction>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final colors = sheetContext.petMagicColors;
+        final bottomInset = petMagicScrollableBottomInset(sheetContext);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(12, 0, 12, bottomInset),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colors.border.withValues(alpha: 0.85),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      text.generationStatusRemoveWatermarkSheetTitle,
+                      style: Theme.of(sheetContext).textTheme.titleMedium
+                          ?.copyWith(
+                            color: colors.textStrong,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      text.generationStatusRemoveWatermarkNoCredits,
+                      style: Theme.of(sheetContext).textTheme.bodyMedium
+                          ?.copyWith(color: colors.textSoft, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: () => Navigator.of(
+                        sheetContext,
+                      ).pop(_RemoveWatermarkAction.credits),
+                      icon: const Icon(Icons.account_balance_wallet_rounded),
+                      label: Text(text.walletBuySparkTitle),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.of(
+                        sheetContext,
+                      ).pop(_RemoveWatermarkAction.premium),
+                      icon: const Icon(Icons.workspace_premium_rounded),
+                      label: Text(text.generationStatusUpgradePremium),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    if (action == _RemoveWatermarkAction.credits) {
+      context.push(WalletPage.routePath);
+      return;
+    }
+
+    context.push(PremiumPage.routePath);
+  }
+
+  Future<void> _recordWatermarkAnalytics(
+    TemplateGenerationResult generation,
+    String eventType, {
+    String? unlockMethod,
+    int? creditsSpent,
+  }) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: eventType,
+            generationId: generation.generationId,
+            metadata: {
+              'generationId': generation.generationId,
+              'templateId': generation.templateId,
+              'mediaType': isVideoGeneration(generation) ? 'video' : 'image',
+              'userPlan': generation.userPlan,
+              'unlockMethod': ?unlockMethod,
+              'creditsSpent': ?creditsSpent,
+            },
+          );
+    } catch (_) {
+      // Analytics is best-effort and must not block result actions.
     }
   }
 
@@ -724,6 +1294,51 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _showInfo(text.generationStatusLinkCopiedMessage);
   }
 
+  Future<void> _openCompareViewer(TemplateGenerationResult generation) async {
+    final text = AppLocalizations.of(context);
+    final beforeUrl = generation.inputPreviewUrl?.trim();
+    if (beforeUrl == null || beforeUrl.isEmpty) {
+      _showInfo(text.generationStatusCompareBeforeUnavailable);
+      return;
+    }
+
+    final afterUrl = generation.resultPreviewUrl?.trim();
+    if (afterUrl == null || afterUrl.isEmpty) {
+      _showInfo(text.generationStatusCompareResultUnavailable);
+      return;
+    }
+
+    final safeBeforeUri = parseSafeGenerationMediaUri(beforeUrl);
+    final safeAfterUri = parseSafeGenerationMediaUri(afterUrl);
+    if (safeBeforeUri == null || safeAfterUri == null) {
+      _showInfo(text.generationStatusCompareOpenFailed);
+      return;
+    }
+
+    await _recordCompareAnalytics(generation, 'compare_clicked');
+    if (!mounted) {
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _BeforeAfterCompareViewer(
+          generation: generation,
+          beforeUrl: safeBeforeUri.toString(),
+          afterUrl: safeAfterUri.toString(),
+          onViewed: () => _recordCompareAnalytics(generation, 'compare_viewed'),
+          onSliderMoved: () =>
+              _recordCompareAnalytics(generation, 'compare_slider_moved'),
+          onClosed: () => _recordCompareAnalytics(generation, 'compare_closed'),
+          onShare: () async {
+            await _recordCompareAnalytics(generation, 'compare_share_clicked');
+            await _shareResult(generation);
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _openFullscreenPreview(
     TemplateGenerationResult generation,
   ) async {
@@ -762,6 +1377,31 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         ),
       ),
     );
+  }
+
+  Future<void> _recordCompareAnalytics(
+    TemplateGenerationResult generation,
+    String eventType,
+  ) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: eventType,
+            generationId: generation.generationId,
+            metadata: {
+              'generationId': generation.generationId,
+              'templateId': generation.templateId,
+              'petId': generation.petId,
+              'inputSourceType': generation.inputSourceType,
+              'userPlan': generation.userPlan,
+              'hasWatermark': generation.hasWatermark,
+            },
+          );
+    } on Object {
+      // Best-effort analytics must not block compare interactions.
+    }
   }
 
   void _showInfo(String message) {
@@ -833,10 +1473,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
 
       if (generation.isCompleted) {
         unawaited(_materializeLocalMediaAndRefresh(generation));
+        unawaited(_recordFeedbackPromptViewed(generation));
       }
 
       if (generation.isTerminal) {
         _stopPolling();
+        unawaited(_recordTemplateOfTheDayTerminalAnalytics(generation));
 
         final reachedTerminalNow = previousGeneration != null
             ? !previousGeneration.isTerminal
@@ -886,6 +1528,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       if (localizedCachedGeneration.isCompleted) {
         unawaited(_materializeLocalMediaAndRefresh(localizedCachedGeneration));
       }
+      if (localizedCachedGeneration.isTerminal) {
+        unawaited(
+          _recordTemplateOfTheDayTerminalAnalytics(localizedCachedGeneration),
+        );
+      }
       return;
     }
 
@@ -901,6 +1548,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final current = _generation;
     if (current == null || current.generationId != generation.generationId) {
       return generation;
+    }
+
+    if (current.outputUrl != generation.outputUrl) {
+      return generation.copyWith(
+        clearLocalPreviewPath: true,
+        clearLocalOutputPath: true,
+        isLocalMediaReady: false,
+      );
     }
 
     return generation.copyWith(
@@ -939,6 +1594,8 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     if (generation == null) {
       return;
     }
+
+    unawaited(_recordFeedbackRatingSelected(generation, rating));
 
     if (rating > 1) {
       await _submitFeedback(generation, rating, const [], null);
@@ -994,12 +1651,302 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         ).generationStatusFeedbackThanksMessage,
         tone: PetMagicToastTone.success,
       );
+    } on Object {
+      unawaited(_recordFeedbackSubmitFailed(generation));
+      rethrow;
     } finally {
       if (mounted) {
         setState(() => _isSubmittingFeedback = false);
       }
     }
   }
+
+  Future<void> _submitStructuredFeedback({
+    required TemplateGenerationResult generation,
+    required String type,
+    required String category,
+    required String sourceScreen,
+    int? rating,
+    String? message,
+  }) async {
+    if (!mounted || _isSubmittingFeedback) {
+      return;
+    }
+
+    setState(() => _isSubmittingFeedback = true);
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .submitFeedback(
+            type: type,
+            category: category,
+            rating: rating,
+            message: message,
+            generationId: generation.generationId,
+            templateId: generation.templateId,
+            petId: generation.petId,
+            sourceScreen: sourceScreen,
+          );
+      if (!mounted) {
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).generationStatusFeedbackThanksMessage,
+        tone: PetMagicToastTone.success,
+      );
+    } on Object {
+      unawaited(_recordFeedbackSubmitFailed(generation));
+      rethrow;
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmittingFeedback = false);
+      }
+    }
+  }
+
+  Future<void> _showReportProblemSheet(
+    TemplateGenerationResult generation,
+  ) async {
+    unawaited(
+      ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: 'feedback_report_clicked',
+            generationId: generation.generationId,
+          ),
+    );
+
+    final feedbackText = _feedbackText(context);
+    final result = await showPetMagicModalBottomSheet<_FeedbackResult>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context, bottomInset) => Padding(
+        padding: EdgeInsets.only(bottom: bottomInset),
+        child: _ProblemFeedbackSheet(
+          title: feedbackText.reportTitle,
+          reasons: feedbackText.reportReasons,
+        ),
+      ),
+    );
+
+    if (!mounted || result == null || result.reasons.isEmpty) {
+      return;
+    }
+
+    final category = result.reasons.first;
+    await _submitStructuredFeedback(
+      generation: generation,
+      type: category == 'payment' ? 'PaymentIssue' : 'BugReport',
+      category: category,
+      rating: -1,
+      message: result.comment,
+      sourceScreen: 'generation_result_report',
+    );
+  }
+
+  Future<void> _recordFeedbackPromptViewed(
+    TemplateGenerationResult generation,
+  ) async {
+    final key = '${generation.generationId}:feedback_prompt_viewed';
+    if (!_recordedFeedbackPromptEvents.add(key)) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: 'feedback_prompt_viewed',
+            generationId: generation.generationId,
+            metadata: {
+              'feedbackType': 'GenerationResult',
+              'templateId': generation.templateId,
+              'generationId': generation.generationId,
+              'platform': Theme.of(context).platform.name,
+              'userPlan': generation.userPlan,
+            },
+          );
+    } on Object {
+      // Best-effort analytics must not block the result screen.
+    }
+  }
+
+  Future<void> _recordFeedbackRatingSelected(
+    TemplateGenerationResult generation,
+    int rating,
+  ) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: 'feedback_rating_selected',
+            generationId: generation.generationId,
+            metadata: {
+              'feedbackType': 'GenerationResult',
+              'category': rating == 3
+                  ? 'good'
+                  : rating == 2
+                  ? 'okay'
+                  : 'bad',
+              'rating': rating == 3
+                  ? 1
+                  : rating == 2
+                  ? 0
+                  : -1,
+              'templateId': generation.templateId,
+              'generationId': generation.generationId,
+              'platform': Theme.of(context).platform.name,
+              'userPlan': generation.userPlan,
+            },
+          );
+    } on Object {
+      // Best-effort analytics must not block feedback.
+    }
+  }
+
+  Future<void> _recordFeedbackSubmitFailed(
+    TemplateGenerationResult generation,
+  ) async {
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: generation.templateId,
+            eventType: 'feedback_submit_failed',
+            generationId: generation.generationId,
+            metadata: {
+              'feedbackType': 'GenerationResult',
+              'templateId': generation.templateId,
+              'generationId': generation.generationId,
+              'platform': Theme.of(context).platform.name,
+              'userPlan': generation.userPlan,
+            },
+          );
+    } on Object {
+      // Best-effort analytics must not block feedback error handling.
+    }
+  }
+
+  Future<void> _recordTemplateOfTheDayTerminalAnalytics(
+    TemplateGenerationResult generation,
+  ) async {
+    final featured = widget.templateOfTheDay;
+    if (featured == null || !generation.isTerminal) {
+      return;
+    }
+
+    final eventType = generation.isCompleted
+        ? 'generation_completed'
+        : generation.isFailed
+        ? 'generation_failed'
+        : null;
+    if (eventType == null) {
+      return;
+    }
+
+    final key = '${generation.generationId}:$eventType';
+    if (!_recordedTemplateOfTheDayTerminalEvents.add(key)) {
+      return;
+    }
+
+    try {
+      await ref
+          .read(templateGenerationRepositoryProvider)
+          .recordAnalyticsEvent(
+            templateId: featured.templateId,
+            eventType: eventType,
+            generationId: generation.generationId,
+            metadata: <String, Object?>{
+              'templateId': featured.templateId,
+              'type': featured.templateType.apiValue.toLowerCase(),
+              'source': featured.source,
+              'isPremium': featured.isPremium,
+              'userPlan': generation.userPlan,
+              'date': _templateOfTheDayDateValue(featured),
+              'screen': 'generation_status',
+              if (generation.failureCode != null &&
+                  generation.failureCode!.isNotEmpty)
+                'failureCode': generation.failureCode,
+            },
+          );
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateOfTheDay',
+        operation: 'generation_status_analytics',
+        message:
+            'Could not record Template of the Day terminal analytics event.',
+        error: error,
+        stackTrace: stackTrace,
+        context: <String, Object?>{
+          'eventType': eventType,
+          'templateId': featured.templateId,
+          'generationId': generation.generationId,
+        },
+      );
+    }
+  }
+}
+
+enum _RemoveWatermarkAction { credit, credits, premium }
+
+String _generateSimilarImageCostMessage(AppLocalizations text) =>
+    text.localeName.startsWith('ru') ? 'Стоимость: 1 credit' : 'Cost: 1 credit';
+
+String _generateSimilarVideoCostMessage(AppLocalizations text) =>
+    text.localeName.startsWith('ru')
+    ? 'Стоимость: 5 credits'
+    : 'Cost: 5 credits';
+
+String _generateSimilarConfirmLabel(AppLocalizations text) =>
+    text.localeName.startsWith('ru') ? 'Генерировать' : 'Generate';
+
+String _cancelLabel(AppLocalizations text) =>
+    text.localeName.startsWith('ru') ? 'Отмена' : 'Cancel';
+
+String _sourceUnavailableMessage(AppLocalizations text) =>
+    text.localeName.startsWith('ru')
+    ? 'Исходный файл недоступен.'
+    : 'Source file is unavailable.';
+
+String _templateOfTheDayDateValue(TemplateOfTheDayItem featured) {
+  final date = featured.date.toUtc();
+  final month = date.month.toString().padLeft(2, '0');
+  final day = date.day.toString().padLeft(2, '0');
+  return '${date.year}-$month-$day';
+}
+
+String _insufficientCreditsMessage(AppLocalizations text) =>
+    text.localeName.startsWith('ru')
+    ? 'Недостаточно credits.'
+    : 'Not enough credits.';
+
+String _generateSimilarGenericErrorMessage(AppLocalizations text) =>
+    text.localeName.startsWith('ru')
+    ? 'Не удалось сгенерировать. Попробуйте ещё раз.'
+    : 'Could not generate. Please try again.';
+
+String _generateSimilarErrorMessage(AppLocalizations text, AppException error) {
+  final message = error.message.toLowerCase();
+  if (error.statusCode == 402 || message.contains('insufficient')) {
+    return _insufficientCreditsMessage(text);
+  }
+
+  if (message.contains('source_media_unavailable') ||
+      message.contains('generation_result_input_unavailable') ||
+      message.contains('unavailable')) {
+    return _sourceUnavailableMessage(text);
+  }
+
+  return _generateSimilarGenericErrorMessage(text);
 }
 
 String _mapStatusLoadError(Object error) {

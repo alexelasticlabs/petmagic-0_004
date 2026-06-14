@@ -156,6 +156,84 @@ abstract class AppLocalizations {
   /// **'Search templates'**
   String get searchTemplates;
 
+  /// No description provided for @randomTemplateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Random template'**
+  String get randomTemplateAction;
+
+  /// No description provided for @randomTemplateAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any template'**
+  String get randomTemplateAny;
+
+  /// No description provided for @randomTemplateImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image template'**
+  String get randomTemplateImage;
+
+  /// No description provided for @randomTemplateVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video template'**
+  String get randomTemplateVideo;
+
+  /// No description provided for @randomTemplateNoTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates available.'**
+  String get randomTemplateNoTemplates;
+
+  /// No description provided for @randomTemplateNoAvailableForType.
+  ///
+  /// In en, this message translates to:
+  /// **'No available templates for this type.'**
+  String get randomTemplateNoAvailableForType;
+
+  /// No description provided for @randomTemplateNoImageTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No image templates available.'**
+  String get randomTemplateNoImageTemplates;
+
+  /// No description provided for @randomTemplateNoVideoTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No video templates available.'**
+  String get randomTemplateNoVideoTemplates;
+
+  /// No description provided for @randomTemplateLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load templates. Please try again.'**
+  String get randomTemplateLoadFailed;
+
+  /// No description provided for @templateOfTheDayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Template of the Day'**
+  String get templateOfTheDayTitle;
+
+  /// No description provided for @templateOfTheDaySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s magic idea'**
+  String get templateOfTheDaySubtitle;
+
+  /// No description provided for @templateOfTheDayTryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Try this template'**
+  String get templateOfTheDayTryAction;
+
+  /// No description provided for @templateOfTheDayFeedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s pick'**
+  String get templateOfTheDayFeedBadge;
+
   /// No description provided for @allFilter.
   ///
   /// In en, this message translates to:
@@ -6057,6 +6135,84 @@ abstract class AppLocalizations {
   /// **'Yearly'**
   String get subscriptionBillingPeriodYearly;
 
+  /// No description provided for @generationStatusWatermarkRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark removed'**
+  String get generationStatusWatermarkRemoved;
+
+  /// No description provided for @generationStatusWatermarkAddedFreePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark added on the free plan'**
+  String get generationStatusWatermarkAddedFreePlan;
+
+  /// No description provided for @generationStatusShareWithWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Share with watermark'**
+  String get generationStatusShareWithWatermark;
+
+  /// No description provided for @generationStatusDownloadWithoutWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Download without watermark'**
+  String get generationStatusDownloadWithoutWatermark;
+
+  /// No description provided for @generationStatusSaveWithWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Save with watermark'**
+  String get generationStatusSaveWithWatermark;
+
+  /// No description provided for @generationStatusRemoveWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove watermark'**
+  String get generationStatusRemoveWatermark;
+
+  /// No description provided for @generationStatusRemovingWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing...'**
+  String get generationStatusRemovingWatermark;
+
+  /// No description provided for @generationStatusUpgradePremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade to Premium'**
+  String get generationStatusUpgradePremium;
+
+  /// No description provided for @generationStatusRemoveWatermarkSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove watermark'**
+  String get generationStatusRemoveWatermarkSheetTitle;
+
+  /// No description provided for @generationStatusRemoveWatermarkSheetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Use {cost} credit for this result, or upgrade to Premium for clean downloads.'**
+  String generationStatusRemoveWatermarkSheetBody(int cost);
+
+  /// No description provided for @generationStatusRemoveWatermarkUseCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Use {cost} credit'**
+  String generationStatusRemoveWatermarkUseCredit(int cost);
+
+  /// No description provided for @generationStatusRemoveWatermarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not remove watermark. Please try again.'**
+  String get generationStatusRemoveWatermarkFailed;
+
+  /// No description provided for @generationStatusRemoveWatermarkNoCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough credits. Buy credits or upgrade to Premium.'**
+  String get generationStatusRemoveWatermarkNoCredits;
+
   /// No description provided for @globalOfflineBannerTitle.
   ///
   /// In en, this message translates to:
@@ -6080,6 +6236,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'re back online.'**
   String get globalOnlineRestoredBannerMessage;
+
+  /// No description provided for @generationStatusCompareAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get generationStatusCompareAction;
+
+  /// No description provided for @generationStatusCompareBeforeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Before'**
+  String get generationStatusCompareBeforeLabel;
+
+  /// No description provided for @generationStatusCompareAfterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'After'**
+  String get generationStatusCompareAfterLabel;
+
+  /// No description provided for @generationStatusCompareBeforeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Original photo is no longer available.'**
+  String get generationStatusCompareBeforeUnavailable;
+
+  /// No description provided for @generationStatusCompareResultUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Result is unavailable.'**
+  String get generationStatusCompareResultUnavailable;
+
+  /// No description provided for @generationStatusCompareOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open comparison.'**
+  String get generationStatusCompareOpenFailed;
 }
 
 class _AppLocalizationsDelegate

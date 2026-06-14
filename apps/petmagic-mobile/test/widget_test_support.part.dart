@@ -260,6 +260,21 @@ class _FakeTemplatesRepository implements TemplatesRepository {
       TemplatesFeedPage(items: items, nextCursor: null, hasMore: false);
 
   @override
+  Future<List<TemplateItem>> readSyncedCatalogItems() async => items;
+
+  @override
+  Future<TemplateOfTheDayItem?> fetchTemplateOfTheDay() async => null;
+
+  @override
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? source,
+    String? generationId,
+    Map<String, Object?>? metadata,
+  }) async {}
+
+  @override
   Future<int> fetchCatalogVersion() async => 1;
 
   @override
@@ -675,6 +690,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
     if (!_hasConversation) {
@@ -750,6 +766,7 @@ class _ThrowingSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
     throw Exception('unexpected support failure');
@@ -764,6 +781,7 @@ class _DelayedSupportChatRepository extends SupportChatRepository {
   Future<SupportChatConversation> getConversation({
     int take = 60,
     DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
     return Completer<SupportChatConversation>().future;

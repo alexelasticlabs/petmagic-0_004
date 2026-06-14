@@ -339,3 +339,92 @@ class TemplatesCatalogChangesDto {
     );
   }
 }
+
+class PublicTemplateOfTheDayDto {
+  const PublicTemplateOfTheDayDto({required this.template});
+
+  final TemplateOfTheDayItemDto? template;
+
+  factory PublicTemplateOfTheDayDto.fromJson(Map<String, Object?> json) {
+    final rawTemplate = json['template'];
+    return PublicTemplateOfTheDayDto(
+      template: rawTemplate is Map
+          ? TemplateOfTheDayItemDto.fromJson(
+              Map<String, Object?>.from(rawTemplate),
+            )
+          : null,
+    );
+  }
+
+  TemplateOfTheDayItem? toDomain() => template?.toDomain();
+}
+
+class TemplateOfTheDayItemDto {
+  const TemplateOfTheDayItemDto({
+    required this.templateId,
+    required this.title,
+    required this.subtitle,
+    required this.badgeText,
+    required this.type,
+    required this.isPremium,
+    required this.requiredPlan,
+    required this.date,
+    required this.source,
+    this.thumbnailUrl,
+    this.previewMediaUrl,
+  });
+
+  final String templateId;
+  final String title;
+  final String subtitle;
+  final String badgeText;
+  final String type;
+  final String? thumbnailUrl;
+  final String? previewMediaUrl;
+  final bool isPremium;
+  final String requiredPlan;
+  final DateTime date;
+  final String source;
+
+  factory TemplateOfTheDayItemDto.fromJson(Map<String, Object?> json) {
+    return TemplateOfTheDayItemDto(
+      templateId: (json['templateId'] as String? ?? '').trim(),
+      title: json['title'] as String? ?? '',
+      subtitle: json['subtitle'] as String? ?? '',
+      badgeText: json['badgeText'] as String? ?? '',
+      type: json['type'] as String? ?? 'Image',
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      previewMediaUrl: json['previewMediaUrl'] as String?,
+      isPremium: TemplateItemDto._toBool(json['isPremium']) ?? false,
+      requiredPlan: json['requiredPlan'] as String? ?? 'free',
+      date: _parseDate(json['date'] as String?),
+      source: json['source'] as String? ?? 'auto',
+    );
+  }
+
+  TemplateOfTheDayItem toDomain() => TemplateOfTheDayItem(
+    templateId: templateId,
+    title: title,
+    subtitle: subtitle,
+    badgeText: badgeText,
+    templateType: templateTypeFromApi(type),
+    thumbnailUrl: thumbnailUrl,
+    previewMediaUrl: previewMediaUrl,
+    isPremium: isPremium,
+    requiredPlan: requiredPlan,
+    date: date,
+    source: source,
+  );
+
+  static DateTime _parseDate(String? raw) {
+    final normalized = raw?.trim();
+    if (normalized != null &&
+        RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(normalized)) {
+      final parts = normalized.split('-').map(int.parse).toList();
+      return DateTime.utc(parts[0], parts[1], parts[2]);
+    }
+
+    final parsed = normalized == null ? null : DateTime.tryParse(normalized);
+    return (parsed ?? DateTime.now()).toUtc();
+  }
+}

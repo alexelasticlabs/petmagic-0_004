@@ -816,11 +816,15 @@ class SupportChatController extends Notifier<SupportChatState> {
     if (before == null) {
       return;
     }
+    final beforeMessageId = conversation.messages.isEmpty
+        ? null
+        : conversation.messages.first.messageId;
 
     state = state.copyWith(isLoadingOlder: true);
     try {
       final chunk = await _repository.getConversation(
         beforeMessageCreatedAtUtc: before,
+        beforeMessageId: beforeMessageId,
       );
       if (!ref.mounted) {
         return;

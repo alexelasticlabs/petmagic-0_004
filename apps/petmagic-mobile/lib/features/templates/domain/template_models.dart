@@ -1,5 +1,61 @@
 enum TemplateType { image, video }
 
+enum TemplateRandomMode { any, image, video }
+
+class TemplateOfTheDayItem {
+  const TemplateOfTheDayItem({
+    required this.templateId,
+    required this.title,
+    required this.subtitle,
+    required this.badgeText,
+    required this.templateType,
+    required this.isPremium,
+    required this.requiredPlan,
+    required this.date,
+    required this.source,
+    this.thumbnailUrl,
+    this.previewMediaUrl,
+  });
+
+  final String templateId;
+  final String title;
+  final String subtitle;
+  final String badgeText;
+  final TemplateType templateType;
+  final String? thumbnailUrl;
+  final String? previewMediaUrl;
+  final bool isPremium;
+  final String requiredPlan;
+  final DateTime date;
+  final String source;
+
+  bool get isVideo => templateType == TemplateType.video;
+
+  TemplateItem toFallbackTemplateItem() {
+    final previewUrl = previewMediaUrl?.trim();
+    return TemplateItem(
+      templateId: templateId,
+      templateType: templateType,
+      title: title,
+      shortDescription: subtitle,
+      petPhotoRequirements: const [],
+      category: '',
+      tags: const [],
+      isPremium: isPremium,
+      tokenCost: 0,
+      effectivePromoBadge: badgeText,
+      thumbnailUrl: thumbnailUrl,
+      previewAsset: previewUrl == null || previewUrl.isEmpty
+          ? null
+          : TemplateAsset(
+              url: previewUrl,
+              fileName: previewUrl.split('/').last,
+              contentType: isVideo ? 'video/mp4' : 'image/jpeg',
+            ),
+    );
+  }
+}
+
 extension TemplateTypeApi on TemplateType {
   String get apiValue => switch (this) {
     TemplateType.image => 'Image',

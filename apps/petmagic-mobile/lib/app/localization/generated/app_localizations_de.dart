@@ -34,6 +34,47 @@ class AppLocalizationsDe extends AppLocalizations {
   String get searchTemplates => 'Vorlagen suchen';
 
   @override
+  String get randomTemplateAction => 'Random template';
+
+  @override
+  String get randomTemplateAny => 'Any template';
+
+  @override
+  String get randomTemplateImage => 'Image template';
+
+  @override
+  String get randomTemplateVideo => 'Video template';
+
+  @override
+  String get randomTemplateNoTemplates => 'No templates available.';
+
+  @override
+  String get randomTemplateNoAvailableForType =>
+      'No available templates for this type.';
+
+  @override
+  String get randomTemplateNoImageTemplates => 'No image templates available.';
+
+  @override
+  String get randomTemplateNoVideoTemplates => 'No video templates available.';
+
+  @override
+  String get randomTemplateLoadFailed =>
+      'Could not load templates. Please try again.';
+
+  @override
+  String get templateOfTheDayTitle => 'Template of the Day';
+
+  @override
+  String get templateOfTheDaySubtitle => 'Today\'s magic idea';
+
+  @override
+  String get templateOfTheDayTryAction => 'Try this template';
+
+  @override
+  String get templateOfTheDayFeedBadge => 'Today\'s pick';
+
+  @override
   String get allFilter => 'Alle';
 
   @override
@@ -3421,6 +3462,54 @@ class AppLocalizationsDe extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Jährlich';
 
   @override
+  String get generationStatusWatermarkRemoved => 'Wasserzeichen entfernt';
+
+  @override
+  String get generationStatusWatermarkAddedFreePlan =>
+      'Wasserzeichen im kostenlosen Plan hinzugefügt';
+
+  @override
+  String get generationStatusShareWithWatermark => 'Mit Wasserzeichen teilen';
+
+  @override
+  String get generationStatusDownloadWithoutWatermark =>
+      'Ohne Wasserzeichen herunterladen';
+
+  @override
+  String get generationStatusSaveWithWatermark => 'Mit Wasserzeichen speichern';
+
+  @override
+  String get generationStatusRemoveWatermark => 'Wasserzeichen entfernen';
+
+  @override
+  String get generationStatusRemovingWatermark => 'Wird entfernt...';
+
+  @override
+  String get generationStatusUpgradePremium => 'Auf Premium upgraden';
+
+  @override
+  String get generationStatusRemoveWatermarkSheetTitle =>
+      'Wasserzeichen entfernen';
+
+  @override
+  String generationStatusRemoveWatermarkSheetBody(int cost) {
+    return 'Verwende $cost Credit für dieses Ergebnis oder upgrade auf Premium für saubere Downloads.';
+  }
+
+  @override
+  String generationStatusRemoveWatermarkUseCredit(int cost) {
+    return '$cost Credit verwenden';
+  }
+
+  @override
+  String get generationStatusRemoveWatermarkFailed =>
+      'Wasserzeichen konnte nicht entfernt werden. Bitte versuche es erneut.';
+
+  @override
+  String get generationStatusRemoveWatermarkNoCredits =>
+      'Nicht genug Credits. Kaufe Credits oder upgrade auf Premium.';
+
+  @override
   String get globalOfflineBannerTitle => 'Keine Internetverbindung';
 
   @override
@@ -3432,4 +3521,24 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get globalOnlineRestoredBannerMessage => 'Sie sind wieder online.';
+
+  @override
+  String get generationStatusCompareAction => 'Compare';
+
+  @override
+  String get generationStatusCompareBeforeLabel => 'Before';
+
+  @override
+  String get generationStatusCompareAfterLabel => 'After';
+
+  @override
+  String get generationStatusCompareBeforeUnavailable =>
+      'Original photo is no longer available.';
+
+  @override
+  String get generationStatusCompareResultUnavailable =>
+      'Result is unavailable.';
+
+  @override
+  String get generationStatusCompareOpenFailed => 'Could not open comparison.';
 }

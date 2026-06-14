@@ -82,6 +82,23 @@ void main() {
     );
   });
 
+  testWidgets('compact sign-in inline actions do not overflow', (tester) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      surfaceSize: const Size(375, 667),
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Welcome back!'), findsOneWidget);
+    expect(find.text('Forgot password?'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Sign Up'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('auth social providers are platform-specific and ordered', () {
     expect(authSocialProvidersForPlatform(isIOS: false), [
       ExternalAuthProvider.google,

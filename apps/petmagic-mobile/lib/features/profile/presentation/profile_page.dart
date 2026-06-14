@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
@@ -218,6 +219,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                           padding: EdgeInsets.zero,
                           child: Column(
                             children: [
+                              ProfileSettingsRow(
+                                icon: Icons.pets_rounded,
+                                title: text.profilePetsTitle,
+                                subtitle: text.profilePetsSubtitle,
+                                iconColor: colors.accent,
+                                onTap: () => context.push(MyPetsPage.routePath),
+                              ),
                               ProfileSettingsRow(
                                 icon: Icons.privacy_tip_outlined,
                                 title: text.profileLegalShortcutTitle,

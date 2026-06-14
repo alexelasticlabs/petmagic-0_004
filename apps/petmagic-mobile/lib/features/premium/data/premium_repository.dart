@@ -178,7 +178,11 @@ class PremiumRepository {
   }
 
   Future<
-    ({bool isAvailable, Set<String> productIds, Map<String, String> productPrices})
+    ({
+      bool isAvailable,
+      Set<String> productIds,
+      Map<String, String> productPrices,
+    })
   >
   fetchStoreAvailability(
     List<PremiumPlanModel> plans,
@@ -216,7 +220,8 @@ class PremiumRepository {
       isAvailable: true,
       productIds: response.productDetails.map((product) => product.id).toSet(),
       productPrices: {
-        for (final product in response.productDetails) product.id: product.price,
+        for (final product in response.productDetails)
+          product.id: product.price,
       },
     );
   }
