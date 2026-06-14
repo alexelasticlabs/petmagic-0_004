@@ -90,6 +90,7 @@ internal sealed class TemplateMediaLifecycleService(
         }
 
         record.LifecycleState = TemplateMediaLifecycleState.Deleted;
+        record.IsDeleted = true;
         record.TemplateId = null;
         record.GenerationJobId = null;
         record.ExpiresAtUtc = null;
@@ -134,12 +135,59 @@ internal sealed class TemplateMediaLifecycleService(
             .FirstOrDefaultAsync(x => x.Url == url, cancellationToken);
     }
 
-    private static void ApplyAssetMetadata(TemplateMediaRecord record, TemplateAssetCommand asset, TemplateMediaRole role)
+    private void ApplyAssetMetadata(TemplateMediaRecord record, TemplateAssetCommand asset, TemplateMediaRole role)
     {
         record.Url = asset.Url;
+        record.StoragePath = ResolveManagedStoragePath(asset.Url) ?? asset.Url;
         record.FileName = asset.FileName;
         record.ContentType = asset.ContentType;
         record.FileSizeBytes = asset.FileSizeBytes;
         record.Role = role;
+        record.MediaType = asset.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "video" : "image";
+        record.SourceType = role is TemplateMediaRole.GenerationOutputImage or TemplateMediaRole.GenerationOutputVideo
+            ? "generation_result"
+            : "user_upload";
+    }
+
+    private string? ResolveManagedStoragePath(string assetUrl)
+    {
+        var candidate = assetUrl.Trim().Replace('\\', '/');
+        if (candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
+        var localBaseUrl = options.PublicBaseUrl.TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(localBaseUrl)
+            && candidate.StartsWith(localBaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            var relativePath = candidate[localBaseUrl.Length..].TrimStart('/');
+            return relativePath.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase)
+                ? relativePath
+                : null;
+        }
+
+        if (!options.R2.IsConfigured)
+        {
+            return null;
+        }
+
+        var r2BaseUrl = options.R2.PublicBaseUrl.TrimEnd('/');
+        if (!candidate.StartsWith(r2BaseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var storageKey = candidate[r2BaseUrl.Length..].TrimStart('/');
+        var objectKeyPrefix = NormalizeObjectKeyPrefix(options.R2.ObjectKeyPrefix);
+        return storageKey.StartsWith($"{objectKeyPrefix}/", StringComparison.OrdinalIgnoreCase)
+            ? storageKey
+            : null;
+    }
+
+    private static string NormalizeObjectKeyPrefix(string prefix)
+    {
+        var normalized = prefix.Trim().Trim('/').Replace('\\', '/');
+        return string.IsNullOrWhiteSpace(normalized) ? "templates-media" : normalized;
     }
 }

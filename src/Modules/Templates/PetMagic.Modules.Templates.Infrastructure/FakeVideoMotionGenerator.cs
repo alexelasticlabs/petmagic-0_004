@@ -12,6 +12,7 @@ internal sealed class FakeVideoMotionGenerator : IVideoMotionGenerator
         bool keepOriginalSound,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken)
     {
         return Task.FromResult(Result.Success(new VideoMotionGenerationResult(referenceVideoUrl, null, null)));

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -23,6 +24,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var r2Section = section.GetSection("R2");
         var falSection = section.GetSection("Fal");
         var firebasePushSection = section.GetSection("FirebasePush");
+        var watermarkSection = section.GetSection("Watermark");
         var configuredStorageProvider = ReadValue(section, "StorageProvider", "TEMPLATES_STORAGE_PROVIDER");
         var configuredAiProvider = ReadValue(section, "AiProvider", "TEMPLATES_AI_PROVIDER");
         var options = new TemplatesOptions
@@ -94,6 +96,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             MediaCleanupWorkerEnabled = ParseBool(section["MediaCleanupWorkerEnabled"], true),
             MediaCleanupPollIntervalMilliseconds = ParsePositiveInt(section["MediaCleanupPollIntervalMilliseconds"], 1_000),
             MediaCleanupRetryDelayMilliseconds = ParseNonNegativeInt(section["MediaCleanupRetryDelayMilliseconds"], 30_000),
+            TemplateOfTheDayAutoPickWorkerEnabled = ParseBool(section["TemplateOfTheDayAutoPickWorkerEnabled"], true),
+            TemplateOfTheDayAutoPickIntervalMinutes = ParsePositiveInt(section["TemplateOfTheDayAutoPickIntervalMinutes"], 60),
+            TemplateOfTheDayBusinessTimeZone = section["TemplateOfTheDayBusinessTimeZone"] ?? "UTC",
+            TemplateOfTheDayAutoPickAllowedTypes = section["TemplateOfTheDayAutoPickAllowedTypes"] ?? "both",
+            TemplateOfTheDayAutoPickExcludeRecentDays = ParseNonNegativeInt(section["TemplateOfTheDayAutoPickExcludeRecentDays"], 7),
             MetadataTempRetentionHours = ParsePositiveInt(section["MetadataTempRetentionHours"], 24),
             CleanupExpiredGenerationMediaWhileRefundPending = ParseBool(section["CleanupExpiredGenerationMediaWhileRefundPending"], true),
             UserMediaReadUrlTtlSeconds = ParsePositiveInt(section["UserMediaReadUrlTtlSeconds"], 900),
@@ -122,18 +129,35 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 ProjectId = ReadValue(firebasePushSection, "ProjectId", "FIREBASE_PROJECT_ID") ?? string.Empty,
                 ServiceAccountJson = ReadValue(firebasePushSection, "ServiceAccountJson", "FIREBASE_SERVICE_ACCOUNT_JSON") ?? string.Empty,
                 ServiceAccountJsonPath = ReadValue(firebasePushSection, "ServiceAccountJsonPath", "FIREBASE_SERVICE_ACCOUNT_JSON_PATH") ?? string.Empty
+            },
+            Watermark = new TemplateWatermarkOptions
+            {
+                Enabled = ParseBool(watermarkSection["Enabled"], true),
+                Text = watermarkSection["Text"] ?? "Made with PetMagic",
+                LogoUrl = watermarkSection["LogoUrl"] ?? string.Empty,
+                Opacity = ParseDouble(watermarkSection["Opacity"], 0.55, 0.45, 0.65),
+                Position = watermarkSection["Position"] ?? "bottom-right",
+                Size = watermarkSection["Size"] ?? "small",
+                CostCredits = ParsePositiveInt(watermarkSection["CostCredits"], 1),
+                ApplyToImages = ParseBool(watermarkSection["ApplyToImages"], true),
+                ApplyToVideos = ParseBool(watermarkSection["ApplyToVideos"], true),
+                PreviewImageUrl = watermarkSection["PreviewImageUrl"] ?? string.Empty,
+                PreviewVideoFrameUrl = watermarkSection["PreviewVideoFrameUrl"] ?? string.Empty,
+                FfmpegPath = watermarkSection["FfmpegPath"] ?? "ffmpeg"
             }
         };
 
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
 
         services.AddSingleton(options);
+        services.AddSingleton<TemplateWatermarkSettingsStore>();
         services.AddDbContext<TemplatesDbContext>(dbOptions =>
         {
             dbOptions.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
         services.AddSingleton<ITemplateMediaUploadPolicy, ConfiguredTemplateMediaUploadPolicy>();
         services.AddSingleton<IMediaMetadataReader, FileMediaMetadataReader>();
+        services.AddSingleton<ITemplateWatermarkRenderer, TemplateWatermarkRenderer>();
         AddMediaStorage(services, options);
         AddGenerationBilling(services);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
@@ -150,8 +174,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         });
         services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
         services.AddScoped<ITemplatesService, TemplatesService>();
+        services.AddScoped<IPetsService, PetsService>();
+        services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IAdminUserTemplateAnalyticsReader, AdminUserTemplateAnalyticsReader>();
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+        services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
         if (options.GenerationWorkerEnabled)
         {
@@ -162,6 +189,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (options.MediaCleanupWorkerEnabled)
         {
             services.AddHostedService<TemplateMediaCleanupWorker>();
+        }
+
+        if (options.TemplateOfTheDayAutoPickWorkerEnabled)
+        {
+            services.AddHostedService<TemplateOfTheDayAutoPickWorker>();
         }
 
         return services;
@@ -202,6 +234,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             ALTER COLUMN "LocalizedTextsJson" TYPE text USING "LocalizedTextsJson"::text;
             """);
 
+        await SyncWatermarkSettingsStoreAsync(scope.ServiceProvider, dbContext, options, cancellationToken: default);
         await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
 
         if (!options.SeedSampleTemplates)
@@ -319,6 +352,55 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         await dbContext.SaveChangesAsync();
         await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
+    }
+
+    private static async Task SyncWatermarkSettingsStoreAsync(
+        IServiceProvider serviceProvider,
+        TemplatesDbContext dbContext,
+        TemplatesOptions options,
+        CancellationToken cancellationToken)
+    {
+        var store = serviceProvider.GetRequiredService<TemplateWatermarkSettingsStore>();
+        var persisted = await dbContext.TemplateWatermarkSettings
+            .AsNoTracking()
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (persisted is not null)
+        {
+            store.Replace(new AdminWatermarkSettingsResponse(
+                persisted.Enabled,
+                persisted.Text,
+                persisted.LogoUrl,
+                persisted.Opacity,
+                persisted.Position,
+                persisted.Size,
+                persisted.CostCredits,
+                persisted.ApplyToImages,
+                persisted.ApplyToVideos,
+                persisted.PreviewImageUrl,
+                persisted.PreviewVideoFrameUrl));
+            return;
+        }
+
+        var current = store.Current;
+        dbContext.TemplateWatermarkSettings.Add(new TemplateWatermarkSettings
+        {
+            Id = Guid.NewGuid(),
+            Enabled = current.Enabled,
+            Text = current.Text,
+            LogoUrl = current.LogoUrl,
+            Opacity = current.Opacity,
+            Position = current.Position,
+            Size = current.Size,
+            CostCredits = current.CostCredits,
+            ApplyToImages = current.ApplyToImages,
+            ApplyToVideos = current.ApplyToVideos,
+            PreviewImageUrl = current.PreviewImageUrl,
+            PreviewVideoFrameUrl = current.PreviewVideoFrameUrl,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task BackfillTemplateLocalizationsAsync(
@@ -568,6 +650,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static int ParsePositiveInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var parsed) && parsed > 0 ? parsed : fallback;
+    }
+
+    private static double ParseDouble(string? raw, double fallback, double min, double max)
+    {
+        if (!double.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value))
+        {
+            return fallback;
+        }
+
+        return Math.Clamp(value, min, max);
     }
 
     private static int ParseNonNegativeInt(string? raw, int fallback)

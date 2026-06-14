@@ -268,7 +268,75 @@ public sealed class TemplateGenerationJobProcessorTests
         Assert.Equal(0.219m, persisted.MotionProviderCostUsd);
         Assert.Equal(template.ImageModel, imageGenerator.Model);
         Assert.Equal("https://fal.example.test/generated-image.png", generatedMediaImporter.GeneratedImageUrl);
-        Assert.Equal("http://localhost:5000/templates-media/output.png", persisted.ResultUrl);
+        Assert.Equal("templates-media/output.png", persisted.ResultUrl);
+    }
+
+    [Fact]
+    public async Task ProcessNextAsync_ShouldUseCleanGenerationResultAsset_WhenInputMediaAssetIdIsSet()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        var inputMediaAssetId = Guid.NewGuid();
+        var parentGenerationId = Guid.NewGuid();
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/watermarked-parent.jpg",
+            SourceImageFileName = "parent.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            InputSourceType = "generation_result",
+            InputMediaAssetId = inputMediaAssetId,
+            ParentGenerationId = parentGenerationId,
+            ParentGenerationResultId = parentGenerationId,
+            CreatedAtUtc = now.AddMinutes(-1),
+            QueuedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-1),
+            UpdatedAtUtc = now.AddMinutes(-1)
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = inputMediaAssetId,
+            UserId = userId,
+            MediaType = "image",
+            StoragePath = "r2://templates/clean-parent.jpg",
+            WatermarkedStoragePath = "r2://templates/watermarked-parent.jpg",
+            SourceType = "generation_result",
+            GenerationId = parentGenerationId,
+            Url = "http://localhost:5000/templates-media/clean-parent.jpg",
+            FileName = "clean-parent.jpg",
+            ContentType = "image/jpeg",
+            FileSizeBytes = 1024,
+            Role = TemplateMediaRole.GenerationOutputImage,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            UploadedAtUtc = now.AddMinutes(-2),
+            AttachedAtUtc = now.AddMinutes(-2)
+        });
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var imageGenerator = new TrackingImageGenerator();
+        var mediaStorage = new TrackingMediaStorage();
+        var processor = CreateProcessor(
+            dbContext,
+            imageGenerator: imageGenerator,
+            mediaStorage: mediaStorage);
+
+        var processed = await processor.ProcessNextAsync(CancellationToken.None);
+
+        Assert.True(processed);
+        Assert.Equal("signed:r2://templates/clean-parent.jpg", imageGenerator.SourceImageUrl);
+        Assert.Contains("r2://templates/clean-parent.jpg", mediaStorage.ReadUrls);
+        Assert.DoesNotContain("r2://templates/watermarked-parent.jpg", mediaStorage.ReadUrls);
+        Assert.DoesNotContain("http://localhost:5000/templates-media/watermarked-parent.jpg", mediaStorage.ReadUrls);
     }
 
     [Fact]
@@ -429,11 +497,37 @@ public sealed class TemplateGenerationJobProcessorTests
             generatedMediaImporter ?? new NoopGeneratedMediaImporter(),
             mediaMetadataReader ?? new FixedDurationMetadataReader(),
             mediaStorage ?? new TrackingMediaStorage(),
+            new NoopImagePreviewGenerator(),
+            new PassthroughWatermarkRenderer(),
             billing ?? new TestTemplateGenerationBilling(),
             new RecordingTemplateFeedRealtimeService(),
             new NoopPushNotificationSender(),
             options ?? CreateOptions(),
             NullLogger<TemplateGenerationJobProcessor>.Instance);
+    }
+
+    private sealed class NoopImagePreviewGenerator : IImagePreviewGenerator
+    {
+        public Task<StoredMediaResponse?> CreatePreviewAsync(
+            StoredMediaResponse original,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StoredMediaResponse?>(null);
+        }
+    }
+
+    private sealed class PassthroughWatermarkRenderer : ITemplateWatermarkRenderer
+    {
+        public Task<Result<StoredMediaResponse>> CreateWatermarkedCopyAsync(
+            StoredMediaResponse original,
+            TemplateType mediaType,
+            Guid generationId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(original));
+        }
     }
 
     private sealed class NoopPushNotificationSender : ITemplateGenerationPushNotificationSender
@@ -614,7 +708,9 @@ public sealed class TemplateGenerationJobProcessorTests
 
     private sealed class NoopImageGenerator : IImageGenerator
     {
-        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model, CancellationToken cancellationToken)
+        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model,
+            int? seed,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new ImageGenerationResult(sourceImageUrl, null, null)));
         }
@@ -623,10 +719,14 @@ public sealed class TemplateGenerationJobProcessorTests
     private sealed class TrackingImageGenerator : IImageGenerator
     {
         public string? Model { get; private set; }
+        public string? SourceImageUrl { get; private set; }
 
-        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model, CancellationToken cancellationToken)
+        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model,
+            int? seed,
+            CancellationToken cancellationToken)
         {
             Model = model;
+            SourceImageUrl = sourceImageUrl;
             return Task.FromResult(Result.Success(new ImageGenerationResult(
                 "https://fal.example.test/generated-image.png",
                 "image-request-1",
@@ -643,6 +743,7 @@ public sealed class TemplateGenerationJobProcessorTests
             bool keepOriginalSound,
             string prompt,
             string model,
+            int? seed,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new VideoMotionGenerationResult("https://fal.example.test/generated.mp4", null, null)));
@@ -660,6 +761,7 @@ public sealed class TemplateGenerationJobProcessorTests
             bool keepOriginalSound,
             string prompt,
             string model,
+            int? seed,
             CancellationToken cancellationToken)
         {
             Model = model;
@@ -720,6 +822,7 @@ public sealed class TemplateGenerationJobProcessorTests
             bool keepOriginalSound,
             string prompt,
             string model,
+            int? seed,
             CancellationToken cancellationToken)
         {
             await recorder.CaptureAsync("generating", cancellationToken);
@@ -776,6 +879,7 @@ public sealed class TemplateGenerationJobProcessorTests
             string sourceImageUrl,
             string prompt,
             string model,
+            int? seed,
             CancellationToken cancellationToken)
         {
             CorrelationId = CorrelationContext.CurrentId;
@@ -845,6 +949,7 @@ public sealed class TemplateGenerationJobProcessorTests
     private sealed class TrackingMediaStorage : IMediaStorage
     {
         public ConcurrentBag<string> DeletedUrls { get; } = [];
+        public ConcurrentBag<string> ReadUrls { get; } = [];
 
         public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
@@ -862,6 +967,12 @@ public sealed class TemplateGenerationJobProcessorTests
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(Result.Success());
         }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            ReadUrls.Add(assetUrl);
+            return Task.FromResult(Result.Success($"signed:{assetUrl}"));
+        }
     }
 
     private sealed class TestTemplateGenerationBilling : ITemplateGenerationBilling
@@ -877,6 +988,11 @@ public sealed class TemplateGenerationJobProcessorTests
         {
             RefundedGenerationIds.Add(generationId);
             return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(0));
         }
     }
 }

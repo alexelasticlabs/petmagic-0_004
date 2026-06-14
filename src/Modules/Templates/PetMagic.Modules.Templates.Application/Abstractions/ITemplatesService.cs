@@ -46,6 +46,26 @@ public interface ITemplatesService
 
     Task<Result<AdminTemplateGenerationListPageResponse>> ListAdminGenerationsAsync(AdminTemplateGenerationsQuery query, CancellationToken cancellationToken);
 
+    Task<Result<AdminWatermarkSettingsResponse>> GetAdminWatermarkSettingsAsync(CancellationToken cancellationToken);
+
+    Task<Result<AdminWatermarkSettingsResponse>> UpdateAdminWatermarkSettingsAsync(UpdateAdminWatermarkSettingsCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDayScheduleResponse>> ListAdminTemplateOfTheDayScheduleAsync(int? skip, int? take, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDaySettingsResponse>> GetAdminTemplateOfTheDaySettingsAsync(CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDaySettingsResponse>> UpdateAdminTemplateOfTheDaySettingsAsync(UpdateTemplateOfTheDaySettingsCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDayResponse?>> GetAdminCurrentTemplateOfTheDayAsync(DateOnly? date, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDayResponse>> CreateTemplateOfTheDayAsync(CreateTemplateOfTheDayCommand command, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDayResponse>> UpdateTemplateOfTheDayAsync(UpdateTemplateOfTheDayCommand command, CancellationToken cancellationToken);
+
+    Task<Result> DeleteTemplateOfTheDayAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Result<AdminTemplateOfTheDayResponse>> AutoPickTemplateOfTheDayAsync(AutoPickTemplateOfTheDayCommand command, CancellationToken cancellationToken);
+
     Task<Result> RecordAnalyticsEventAsync(RecordTemplateAnalyticsEventCommand command, CancellationToken cancellationToken);
 
     Task<Result<AdminTemplateResponse>> CreateImageAsync(CreateImageTemplateCommand command, CancellationToken cancellationToken);
@@ -73,4 +93,6 @@ public interface ITemplatesService
     Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken);
 
     Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken);
+
+    Task<Result<PublicTemplateOfTheDayResponse>> GetPublicTemplateOfTheDayAsync(DateOnly? date, string? locale, CancellationToken cancellationToken);
 }

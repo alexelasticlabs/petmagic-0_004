@@ -1,9 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
@@ -19,17 +23,53 @@ internal sealed class TemplateGenerationJobProcessor(
     IGeneratedMediaImporter generatedMediaImporter,
     IMediaMetadataReader mediaMetadataReader,
     IMediaStorage mediaStorage,
+    IImagePreviewGenerator imagePreviewGenerator,
     ITemplateGenerationBilling billing,
     ITemplateFeedRealtimeService realtimeService,
     ITemplateGenerationPushNotificationSender pushNotificationSender,
     TemplatesOptions options,
-    ILogger<TemplateGenerationJobProcessor> logger)
+    ILogger<TemplateGenerationJobProcessor> logger,
+    ITemplateWatermarkRenderer? watermarkRenderer = null,
+    TemplateWatermarkSettingsStore? watermarkSettings = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
     private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
     private static readonly object LocalConcurrencyLock = new();
     private static readonly HashSet<int> LocalConcurrencySlots = [];
+
+    public TemplateGenerationJobProcessor(
+        TemplatesDbContext dbContext,
+        IImagePreprocessor imagePreprocessor,
+        IImageGenerator imageGenerator,
+        IVideoMotionGenerator videoMotionGenerator,
+        IGeneratedMediaImporter generatedMediaImporter,
+        IMediaMetadataReader mediaMetadataReader,
+        IMediaStorage mediaStorage,
+        IImagePreviewGenerator imagePreviewGenerator,
+        ITemplateWatermarkRenderer watermarkRenderer,
+        ITemplateGenerationBilling billing,
+        ITemplateFeedRealtimeService realtimeService,
+        ITemplateGenerationPushNotificationSender pushNotificationSender,
+        TemplatesOptions options,
+        ILogger<TemplateGenerationJobProcessor> logger)
+        : this(
+            dbContext,
+            imagePreprocessor,
+            imageGenerator,
+            videoMotionGenerator,
+            generatedMediaImporter,
+            mediaMetadataReader,
+            mediaStorage,
+            imagePreviewGenerator,
+            billing,
+            realtimeService,
+            pushNotificationSender,
+            options,
+            logger,
+            watermarkRenderer)
+    {
+    }
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
@@ -141,6 +181,10 @@ internal sealed class TemplateGenerationJobProcessor(
                 "UpdatedAtUtc" = {2},
                 "NormalizedImageUrl" = NULL,
                 "ResultUrl" = NULL,
+                "WatermarkedResultUrl" = NULL,
+                "IsWatermarkRequired" = FALSE,
+                "IsWatermarkRemoved" = FALSE,
+                "WatermarkFailureCode" = NULL,
                 "UsedPreprocessingModel" = NULL,
                 "UsedKlingModel" = NULL,
                 "PreprocessingProviderRequestId" = NULL,
@@ -231,6 +275,10 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         job.NormalizedImageUrl = null;
         job.ResultUrl = null;
+        job.WatermarkedResultUrl = null;
+        job.IsWatermarkRequired = false;
+        job.IsWatermarkRemoved = false;
+        job.WatermarkFailureCode = null;
         job.UsedPreprocessingModel = null;
         job.UsedKlingModel = null;
         job.PreprocessingProviderRequestId = null;
@@ -373,10 +421,39 @@ internal sealed class TemplateGenerationJobProcessor(
             : CorrelationContext.ResolveOrCreate();
     }
 
+    private static string PreparePrompt(TemplateGenerationJob job, string basePrompt)
+    {
+        if (job.GenerationMode != TemplateGenerationMode.Similar)
+        {
+            return basePrompt;
+        }
+
+        job.GenerationSeed ??= RandomNumberGenerator.GetInt32(1, int.MaxValue);
+        job.PromptBeforeVariation ??= basePrompt;
+
+        var variation = NormalizeVariationStrength(job.VariationStrength) switch
+        {
+            "low" => "Create a close sibling variation: keep the same composition and style, with a subtle change in lighting, background detail, or pose.",
+            "high" => "Create a clearly related variation: preserve the template style and pet identity, but vary the background, lighting, pose, and small scene details.",
+            _ => "Create a similar but not identical variation: preserve the template style and pet identity, while gently varying background, lighting, pose, and small details."
+        };
+
+        job.PromptAfterVariation = $"{basePrompt}\n\n{variation} Seed: {job.GenerationSeed.Value}.";
+        return job.PromptAfterVariation;
+    }
+
+    private static string NormalizeVariationStrength(string? value)
+    {
+        return string.Equals(value, "low", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "high", StringComparison.OrdinalIgnoreCase)
+            ? value!.ToLowerInvariant()
+            : "medium";
+    }
+
     private async Task ProcessImageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {
         var imageModel = job.Template.ImageModel!;
-        var imagePrompt = TemplateGenerationService.ResolvePrompt(job.Template.ImagePrompt, options.DefaultImagePrompt);
+        var imagePrompt = PreparePrompt(job, TemplateGenerationService.ResolvePrompt(job.Template.ImagePrompt, options.DefaultImagePrompt));
 
         if (!await PublishProcessingStageAsync(job, cancellationToken))
         {
@@ -385,7 +462,7 @@ internal sealed class TemplateGenerationJobProcessor(
 
         job.UsedPreprocessingModel = imageModel;
 
-        var sourceImageUrl = await CreateProviderReadUrlAsync(job.SourceImageUrl, cancellationToken);
+        var sourceImageUrl = await CreateProviderSourceImageReadUrlAsync(job, cancellationToken);
         if (sourceImageUrl is null)
         {
             await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
@@ -396,6 +473,7 @@ internal sealed class TemplateGenerationJobProcessor(
             sourceImageUrl,
             imagePrompt,
             imageModel,
+            job.GenerationSeed,
             cancellationToken);
 
         if (generated.IsFailure)
@@ -426,8 +504,27 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
-        job.ResultUrl = storedOutput.Value.Url;
+        var watermarkedOutput = await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Image, cancellationToken);
+        var resultPreview = await imagePreviewGenerator.CreatePreviewAsync(
+            storedOutput.Value,
+            $"generation-{job.Id:N}-result-preview.webp",
+            BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview"),
+            cancellationToken);
+        var watermarkedPreview = watermarkedOutput is null
+            ? null
+            : await imagePreviewGenerator.CreatePreviewAsync(
+                watermarkedOutput,
+                $"generation-{job.Id:N}-watermarked-result-preview.webp",
+                BuildGenerationPreviewStorageKey(job.UserId, job.Id, "result-preview-watermarked"),
+                cancellationToken);
+        job.ResultUrl = storedOutput.Value.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
+        RegisterGenerationOutputMediaRecord(
+            job,
+            storedOutput.Value,
+            TemplateType.Image,
+            resultPreview,
+            watermarkedPreview);
         job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
@@ -436,6 +533,12 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationCompleted);
+        if (job.GenerationMode == TemplateGenerationMode.Similar)
+        {
+            AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerateSimilarCompleted);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation(
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
@@ -450,9 +553,9 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         var referenceMotion = TemplateGenerationService.GetAsset(job.Template, TemplateAssetKind.ReferenceMotion)!;
         var preprocessingModel = job.Template.PreprocessingModel!;
-        var preprocessingPrompt = TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
+        var preprocessingPrompt = PreparePrompt(job, TemplateGenerationService.ResolvePrompt(job.Template.PreprocessingPrompt, options.DefaultPreprocessingPrompt));
         var motionModel = job.Template.KlingModel!;
-        var motionPrompt = TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt);
+        var motionPrompt = PreparePrompt(job, TemplateGenerationService.ResolvePrompt(job.Template.KlingPrompt, options.DefaultKlingPrompt));
 
         if (!await PublishProcessingStageAsync(job, cancellationToken))
         {
@@ -462,7 +565,7 @@ internal sealed class TemplateGenerationJobProcessor(
         job.UsedPreprocessingModel = preprocessingModel;
         job.UsedKlingModel = motionModel;
 
-        var sourceImageUrl = await CreateProviderReadUrlAsync(job.SourceImageUrl, cancellationToken);
+        var sourceImageUrl = await CreateProviderSourceImageReadUrlAsync(job, cancellationToken);
         if (sourceImageUrl is null)
         {
             await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
@@ -503,6 +606,7 @@ internal sealed class TemplateGenerationJobProcessor(
             job.Template.KeepOriginalSound ?? true,
             motionPrompt,
             motionModel,
+            job.GenerationSeed,
             cancellationToken);
 
         if (generated.IsFailure)
@@ -545,8 +649,10 @@ internal sealed class TemplateGenerationJobProcessor(
             job.MotionProviderCostUsd = FalModelPricing.TryCalculateMotionCostUsd(motionModel, durationResult.Value);
         }
 
-        job.ResultUrl = storedOutput.Value.Url;
+        await ApplyWatermarkAsync(job, storedOutput.Value, TemplateType.Video, cancellationToken);
+        job.ResultUrl = storedOutput.Value.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
+        RegisterGenerationOutputMediaRecord(job, storedOutput.Value, TemplateType.Video, null, null);
         job.Status = TemplateGenerationStatus.Succeeded;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
@@ -555,6 +661,12 @@ internal sealed class TemplateGenerationJobProcessor(
             return;
         }
 
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationCompleted);
+        if (job.GenerationMode == TemplateGenerationMode.Similar)
+        {
+            AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerateSimilarCompleted);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
         logger.LogInformation(
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
@@ -577,6 +689,101 @@ internal sealed class TemplateGenerationJobProcessor(
         TemplateGenerationMetrics.RecordJobStage(job, TemplateGenerationService.ResolveStage(job));
         await PublishStatusChangedAsync(job, cancellationToken);
         return true;
+    }
+
+    private async Task<StoredMediaResponse?> ApplyWatermarkAsync(
+        TemplateGenerationJob job,
+        StoredMediaResponse storedOutput,
+        TemplateType mediaType,
+        CancellationToken cancellationToken)
+    {
+        var settings = watermarkSettings?.Current ?? new TemplateWatermarkSettingsStore(options).Current;
+        var applies = settings.Enabled
+            && ((mediaType == TemplateType.Image && settings.ApplyToImages)
+                || (mediaType == TemplateType.Video && settings.ApplyToVideos))
+            && watermarkRenderer is not null;
+        job.IsWatermarkRequired = applies;
+        job.IsWatermarkRemoved = false;
+        job.WatermarkFailureCode = null;
+        job.WatermarkedResultUrl = null;
+
+        if (!applies)
+        {
+            return null;
+        }
+
+        var watermarked = await watermarkRenderer!.CreateWatermarkedCopyAsync(
+            storedOutput,
+            mediaType,
+            job.Id,
+            cancellationToken);
+        if (watermarked.IsSuccess)
+        {
+            job.WatermarkedResultUrl = watermarked.Value.StorageKey;
+            return watermarked.Value;
+        }
+
+        job.WatermarkFailureCode = watermarked.Error.Code;
+        logger.LogWarning(
+            "Template generation watermark copy could not be prepared. GenerationId={GenerationId} ErrorCode={ErrorCode}",
+            job.Id,
+            watermarked.Error.Code);
+        return null;
+    }
+
+    private void RegisterGenerationOutputMediaRecord(
+        TemplateGenerationJob job,
+        StoredMediaResponse storedOutput,
+        TemplateType mediaType,
+        StoredMediaResponse? preview,
+        StoredMediaResponse? watermarkedPreview)
+    {
+        var now = DateTime.UtcNow;
+        var mediaTypeText = mediaType.ToString().ToLowerInvariant();
+        var existing = job.MediaRecords.FirstOrDefault(x =>
+            x.GenerationId == job.Id
+            && x.SourceType == "generation_result"
+            && x.MediaType == mediaTypeText);
+
+        if (existing is null)
+        {
+            existing = new TemplateMediaRecord
+            {
+                Id = Guid.NewGuid(),
+                UploadedAtUtc = now
+            };
+            job.MediaRecords.Add(existing);
+        }
+
+        existing.UserId = job.UserId;
+        existing.MediaType = mediaTypeText;
+        existing.StoragePath = storedOutput.StorageKey;
+        existing.WatermarkedStoragePath = job.WatermarkedResultUrl;
+        existing.PreviewUrl = preview?.StorageKey;
+        existing.WatermarkedPreviewUrl = watermarkedPreview?.StorageKey;
+        existing.SourceType = "generation_result";
+        existing.GenerationId = job.Id;
+        existing.Url = storedOutput.Url;
+        existing.FileName = storedOutput.FileName;
+        existing.ContentType = storedOutput.ContentType;
+        existing.FileSizeBytes = storedOutput.FileSizeBytes;
+        existing.Role = mediaType == TemplateType.Video
+            ? TemplateMediaRole.GenerationOutputVideo
+            : TemplateMediaRole.GenerationOutputImage;
+        existing.LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration;
+        existing.GenerationJobId = job.Id;
+        existing.ExpiresAtUtc = null;
+        existing.AttachedAtUtc = now;
+        existing.DeletedAtUtc = null;
+        existing.IsDeleted = false;
+        existing.FailureCode = null;
+        existing.FailureMessage = null;
+        job.ResultMediaAssetId = existing.Id;
+    }
+
+    private static string BuildGenerationPreviewStorageKey(Guid userId, Guid generationId, string fileName)
+    {
+        return $"users/{userId:N}/generations/{generationId:N}/{fileName}.webp";
     }
 
     private async Task<bool> MarkFailedAsync(
@@ -619,8 +826,61 @@ internal sealed class TemplateGenerationJobProcessor(
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationFailed);
+        if (job.GenerationMode == TemplateGenerationMode.Similar)
+        {
+            AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerateSimilarFailed);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         return true;
+    }
+
+    private void AddAnalyticsEvent(TemplateGenerationJob job, string eventType)
+    {
+        dbContext.TemplateAnalyticsEvents.Add(new TemplateAnalyticsEvent
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = job.TemplateId,
+            UserId = job.UserId == TemplateGenerationService.AdminTestUserId ? null : job.UserId,
+            GenerationId = job.Id,
+            EventType = eventType,
+            Source = "worker",
+            DeviceClass = "unknown",
+            CountryCode = "unknown",
+            MetadataJson = JsonSerializer.Serialize(new
+            {
+                generationId = job.Id,
+                templateId = job.TemplateId,
+                parentGenerationId = job.ParentGenerationId,
+                newTemplateId = job.TemplateId,
+                newTemplateType = NormalizeAnalyticsMediaType(job.Template?.TemplateType.ToString()),
+                mediaType = NormalizeAnalyticsMediaType(job.Template?.TemplateType.ToString()),
+                inputMediaType = ResolveAnalyticsInputMediaType(job),
+                userPlan = (string?)null,
+                creditsCost = job.TokenCost
+            }),
+            ModerationStatus = "approved",
+            CreatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private static string ResolveAnalyticsInputMediaType(TemplateGenerationJob job)
+    {
+        if (string.Equals(job.InputSourceType, "generation_result", StringComparison.OrdinalIgnoreCase)
+            && job.Template?.RequiredInputMediaType is TemplateType requiredInputMediaType)
+        {
+            return requiredInputMediaType.ToString().ToLowerInvariant();
+        }
+
+        return job.SourceImageContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true
+            ? "image"
+            : "unknown";
+    }
+
+    private static string NormalizeAnalyticsMediaType(string? mediaType)
+    {
+        return string.IsNullOrWhiteSpace(mediaType) ? "unknown" : mediaType.Trim().ToLowerInvariant();
     }
 
     private async ValueTask PublishStatusChangedAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
@@ -638,6 +898,40 @@ internal sealed class TemplateGenerationJobProcessor(
         var ttl = TimeSpan.FromSeconds(Math.Max(1, options.UserMediaReadUrlTtlSeconds));
         var signed = await mediaStorage.CreateReadUrlAsync(assetUrl, ttl, cancellationToken);
         return signed.IsSuccess ? signed.Value : null;
+    }
+
+    private async Task<string?> CreateProviderSourceImageReadUrlAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken)
+    {
+        var assetUrl = job.SourceImageUrl;
+        if (string.Equals(job.InputSourceType, "generation_result", StringComparison.OrdinalIgnoreCase)
+            && job.InputMediaAssetId is Guid inputMediaAssetId)
+        {
+            var mediaRecord = await dbContext.TemplateMediaRecords
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.Id == inputMediaAssetId
+                        && x.UserId == job.UserId
+                        && !x.IsDeleted
+                        && x.DeletedAtUtc == null
+                        && x.MediaType == "image"
+                        && x.SourceType == "generation_result",
+                    cancellationToken);
+
+            if (mediaRecord is null)
+            {
+                return null;
+            }
+
+            assetUrl = string.IsNullOrWhiteSpace(mediaRecord.StoragePath)
+                ? mediaRecord.Url
+                : mediaRecord.StoragePath;
+        }
+
+        return string.IsNullOrWhiteSpace(assetUrl)
+            ? null
+            : await CreateProviderReadUrlAsync(assetUrl, cancellationToken);
     }
 
     private Task<bool> SaveClaimedChangesAsync(

@@ -13,4 +13,9 @@ internal sealed class NoopTemplateGenerationBilling : ITemplateGenerationBilling
     {
         return Task.FromResult(Result.Success());
     }
+
+    public Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(Result.Success(0));
+    }
 }

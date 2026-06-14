@@ -76,6 +76,16 @@ public sealed class TemplatesOptions
 
     public int MediaCleanupRetryDelayMilliseconds { get; init; } = 30_000;
 
+    public bool TemplateOfTheDayAutoPickWorkerEnabled { get; init; } = true;
+
+    public int TemplateOfTheDayAutoPickIntervalMinutes { get; init; } = 60;
+
+    public string TemplateOfTheDayBusinessTimeZone { get; init; } = "UTC";
+
+    public string TemplateOfTheDayAutoPickAllowedTypes { get; init; } = "both";
+
+    public int TemplateOfTheDayAutoPickExcludeRecentDays { get; init; } = 7;
+
     public int MetadataTempRetentionHours { get; init; } = 24;
 
     public bool CleanupExpiredGenerationMediaWhileRefundPending { get; init; } = true;
@@ -91,6 +101,8 @@ public sealed class TemplatesOptions
     public FalAiOptions Fal { get; init; } = new();
 
     public FirebasePushOptions FirebasePush { get; init; } = new();
+
+    public TemplateWatermarkOptions Watermark { get; init; } = new();
 }
 
 public static class TemplateStorageProviders
@@ -156,4 +168,31 @@ public sealed class FirebasePushOptions
         Enabled
         && !string.IsNullOrWhiteSpace(ProjectId)
         && (!string.IsNullOrWhiteSpace(ServiceAccountJson) || !string.IsNullOrWhiteSpace(ServiceAccountJsonPath));
+}
+
+public sealed class TemplateWatermarkOptions
+{
+    public bool Enabled { get; init; } = true;
+
+    public string Text { get; init; } = "Made with PetMagic";
+
+    public string LogoUrl { get; init; } = string.Empty;
+
+    public double Opacity { get; init; } = 0.55;
+
+    public string Position { get; init; } = "bottom-right";
+
+    public string Size { get; init; } = "small";
+
+    public int CostCredits { get; init; } = 1;
+
+    public bool ApplyToImages { get; init; } = true;
+
+    public bool ApplyToVideos { get; init; } = true;
+
+    public string PreviewImageUrl { get; init; } = string.Empty;
+
+    public string PreviewVideoFrameUrl { get; init; } = string.Empty;
+
+    public string FfmpegPath { get; init; } = "ffmpeg";
 }

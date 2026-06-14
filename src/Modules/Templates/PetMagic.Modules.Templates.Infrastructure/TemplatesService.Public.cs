@@ -14,18 +14,22 @@ internal sealed partial class TemplatesService
         var page = NormalizePublicCatalogPage(query.Page);
         var pageSize = NormalizePublicCatalogPageSize(query.PageSize);
         var normalizedCategory = query.Category?.Trim();
+        var normalizedTags = NormalizeTags(query.Tags ?? []);
 
         var baseQuery = dbContext.TemplateItems
             .AsNoTracking()
             .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
-            .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value);
+            .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
+            .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
         if (!string.IsNullOrWhiteSpace(normalizedCategory))
         {
             var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
             baseQuery = baseQuery.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
         }
+
+        baseQuery = ApplyTemplateTagFilter(baseQuery, normalizedTags);
 
         var totalCount = await baseQuery.LongCountAsync(cancellationToken);
         var offset = (page - 1) * pageSize;
@@ -83,19 +87,9 @@ internal sealed partial class TemplatesService
 
     public async Task<Result<PublicTemplatesCatalogVersionResponse>> GetPublicCatalogVersionAsync(CancellationToken cancellationToken)
     {
-        var version = await GetCurrentCatalogVersionAsync(cancellationToken);
-        DateTime? updatedAtUtc = null;
+        var snapshot = await GetCurrentCatalogVersionSnapshotAsync(cancellationToken);
 
-        if (version > 0)
-        {
-            updatedAtUtc = await dbContext.TemplateCatalogChanges
-                .AsNoTracking()
-                .Where(change => change.Version == version)
-                .Select(change => (DateTime?)change.UpdatedAtUtc)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
-        return Result.Success(new PublicTemplatesCatalogVersionResponse(version, updatedAtUtc));
+        return Result.Success(new PublicTemplatesCatalogVersionResponse(snapshot.Version, snapshot.UpdatedAtUtc));
     }
 
     public async Task<Result<PublicTemplatesCatalogChangesResponse>> GetPublicCatalogChangesAsync(long sinceVersion, string? locale, CancellationToken cancellationToken)
@@ -226,24 +220,85 @@ internal sealed partial class TemplatesService
     public async Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, string? locale, CancellationToken cancellationToken)
     {
         var normalizedTags = NormalizeTags(tags ?? []);
-        var items = await dbContext.TemplateItems
+        var query = dbContext.TemplateItems
             .AsNoTracking()
-            .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !type.HasValue || x.TemplateType == type.Value)
-            .Where(x => string.IsNullOrWhiteSpace(category) || string.Equals(x.Category, category.Trim(), StringComparison.OrdinalIgnoreCase))
-            .Where(x => !premiumOnly.HasValue || !premiumOnly.Value || x.IsPremium)
+            .Where(x => !premiumOnly.HasValue || !premiumOnly.Value || x.IsPremium);
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var normalizedCategoryUpper = category.Trim().ToUpperInvariant();
+            query = query.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
+        }
+
+        query = ApplyTemplateTagFilter(query, normalizedTags);
+
+        var items = await query
             .OrderBy(x => x.IsPremium)
             .ThenBy(x => x.Title)
+            .ThenBy(x => x.Id)
+            .Take(PublicLegacyListMaxTake)
+            .Select(template => new
+            {
+                template.Id,
+                template.TemplateType,
+                template.Title,
+                template.ShortDescription,
+                template.LocalizedTextsJson,
+                template.PetPhotoRequirements,
+                template.Category,
+                template.Tags,
+                template.IsPremium,
+                template.TokenCost,
+                template.PromoBadgeMode,
+                template.Status,
+                template.MusicDescription,
+                template.ReferenceVideoDurationSeconds,
+                template.CreatedAtUtc,
+                template.UpdatedAtUtc,
+                Preview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.FileName,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault()
+            })
             .ToArrayAsync(cancellationToken);
 
-        var filtered = items
-            .Where(x => normalizedTags.Length == 0 || normalizedTags.All(tag => DeserializeTags(x.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
-            .Select(template => MapPublicListItem(template, locale))
+        var publicItems = items
+            .Select(template => MapPublicListItem(
+                template.Id,
+                template.TemplateType,
+                template.Title,
+                template.ShortDescription,
+                template.LocalizedTextsJson,
+                template.PetPhotoRequirements,
+                template.Category,
+                template.Tags,
+                template.IsPremium,
+                template.TokenCost,
+                template.PromoBadgeMode,
+                template.Status,
+                template.MusicDescription,
+                template.ReferenceVideoDurationSeconds,
+                template.CreatedAtUtc,
+                template.UpdatedAtUtc,
+                template.Preview?.Url,
+                template.Preview?.FileName,
+                template.Preview?.ContentType,
+                template.Preview?.FileSizeBytes,
+                template.Preview?.DurationSeconds,
+                locale))
             .ToArray();
 
-        return Result.Success<IReadOnlyList<PublicTemplateListItemResponse>>(filtered);
+        return Result.Success<IReadOnlyList<PublicTemplateListItemResponse>>(publicItems);
     }
 
     public async Task<Result<IReadOnlyList<PublicTemplateCategoryResponse>>> ListPublicCategoriesAsync(CancellationToken cancellationToken)
@@ -268,7 +323,6 @@ internal sealed partial class TemplatesService
 
         var filteredQuery = dbContext.TemplateItems
             .AsNoTracking()
-            .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null)
             .Where(x => x.Status == TemplateStatus.Active)
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
@@ -302,32 +356,84 @@ internal sealed partial class TemplatesService
             .OrderByDescending(template => template.UpdatedAtUtc)
             .ThenByDescending(template => template.Id);
 
-        TemplateItem[] filtered;
-
-        if (normalizedTags.Length == 0)
-        {
-            filtered = await orderedQuery
-                .Take(take + 1)
-                .ToArrayAsync(cancellationToken);
-        }
-        else
-        {
-            filtered = [.. (await orderedQuery.ToArrayAsync(cancellationToken))
-                .Where(template => normalizedTags.All(tag => DeserializeTags(template.Tags).Contains(tag, StringComparer.OrdinalIgnoreCase)))
-                .Take(take + 1)];
-        }
+        var filtered = await ApplyTemplateTagFilter(orderedQuery, normalizedTags)
+            .Take(take + 1)
+            .Select(template => new
+            {
+                template.Id,
+                template.TemplateType,
+                template.Title,
+                template.ShortDescription,
+                template.LocalizedTextsJson,
+                template.PetPhotoRequirements,
+                template.Category,
+                template.Tags,
+                template.IsPremium,
+                template.TokenCost,
+                template.PromoBadgeMode,
+                template.Status,
+                template.MusicDescription,
+                template.ReferenceVideoDurationSeconds,
+                template.CreatedAtUtc,
+                template.UpdatedAtUtc,
+                Preview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.FileName,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault()
+            })
+            .ToArrayAsync(cancellationToken);
 
         var pageItems = filtered.Take(take).ToArray();
         var hasMore = filtered.Length > take;
         var nextCursor = hasMore && pageItems.Length > 0
-            ? FormatPublicFeedCursor(pageItems[^1])
+            ? FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Id)
             : null;
 
         return Result.Success(new PublicTemplatesFeedResponse(
-            [.. pageItems.Select(template => MapPublicListItem(template, query.Locale))],
+            [.. pageItems.Select(template => MapPublicListItem(
+                template.Id,
+                template.TemplateType,
+                template.Title,
+                template.ShortDescription,
+                template.LocalizedTextsJson,
+                template.PetPhotoRequirements,
+                template.Category,
+                template.Tags,
+                template.IsPremium,
+                template.TokenCost,
+                template.PromoBadgeMode,
+                template.Status,
+                template.MusicDescription,
+                template.ReferenceVideoDurationSeconds,
+                template.CreatedAtUtc,
+                template.UpdatedAtUtc,
+                template.Preview?.Url,
+                template.Preview?.FileName,
+                template.Preview?.ContentType,
+                template.Preview?.FileSizeBytes,
+                template.Preview?.DurationSeconds,
+                query.Locale))],
             nextCursor,
             hasMore,
             DateTime.UtcNow));
+    }
+
+    private static IQueryable<TemplateItem> ApplyTemplateTagFilter(IQueryable<TemplateItem> query, string[] normalizedTags)
+    {
+        foreach (var tag in normalizedTags)
+        {
+            var tagNeedle = "," + tag.ToLowerInvariant() + ",";
+            query = query.Where(template => ("," + (template.Tags ?? string.Empty).ToLower() + ",").Contains(tagNeedle));
+        }
+
+        return query;
     }
 
     public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken)

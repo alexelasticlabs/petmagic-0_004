@@ -397,6 +397,30 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPublicAsync_ShouldCapLegacyResponseForUnpagedClients()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        for (var index = 0; index < 105; index++)
+        {
+            await CreateActiveImageTemplateAsync(
+                service,
+                $"Legacy Template {index:D3}",
+                "Legacy",
+                ["legacy"]);
+        }
+
+        var publicList = await service.ListPublicAsync(null, null, null, null, null, CancellationToken.None);
+
+        Assert.True(publicList.IsSuccess);
+        Assert.Equal(100, publicList.Value.Count);
+        Assert.Equal("Legacy Template 000", publicList.Value[0].Title);
+        Assert.Equal("Legacy Template 099", publicList.Value[^1].Title);
+        Assert.DoesNotContain(publicList.Value, item => item.Title == "Legacy Template 100");
+    }
+
+    [Fact]
     public async Task TemplateResponses_ShouldIncludePetPhotoRequirements()
     {
         await using var dbContext = CreateDbContext();
@@ -772,6 +796,55 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListPublicCatalogAsync_ShouldApplyTagAndPremiumFiltersForPagedClients()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var freeTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Cozy Free",
+            "Portrait",
+            ["cozy", "free"]);
+
+        var premiumTemplate = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Cozy Premium",
+                "Premium portrait",
+                "Portrait",
+                ["cozy", "premium"],
+                true,
+                40,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/cozy-premium.jpg", "cozy-premium.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(premiumTemplate.IsSuccess);
+
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(
+                1,
+                20,
+                TemplateType.Image,
+                "Portrait",
+                null,
+                ["cozy", "premium"],
+                true),
+            CancellationToken.None);
+
+        Assert.True(catalog.IsSuccess);
+        var item = Assert.Single(catalog.Value.Items);
+        Assert.Equal(premiumTemplate.Value.TemplateId, item.Id);
+        Assert.DoesNotContain(catalog.Value.Items, item => item.Id == freeTemplateId);
+        Assert.True(item.IsPremium);
+        Assert.Equal(1, catalog.Value.TotalCount);
+        Assert.False(catalog.Value.HasMore);
+    }
+
+    [Fact]
     public async Task DeleteAsync_ShouldKeepTemplate_WhenMediaCleanupFails()
     {
         await using var dbContext = CreateDbContext();
@@ -827,6 +900,8 @@ public sealed partial class TemplatesServiceTests
         var initialVersion = await service.GetPublicCatalogVersionAsync(CancellationToken.None);
         Assert.True(initialVersion.IsSuccess);
         Assert.True(initialVersion.Value.Version > 0);
+        var initialChange = await dbContext.TemplateCatalogChanges.SingleAsync(x => x.Version == initialVersion.Value.Version);
+        Assert.Equal(initialChange.UpdatedAtUtc, initialVersion.Value.UpdatedAtUtc);
 
         var firstChanges = await service.GetPublicCatalogChangesAsync(0, null, CancellationToken.None);
         Assert.True(firstChanges.IsSuccess);

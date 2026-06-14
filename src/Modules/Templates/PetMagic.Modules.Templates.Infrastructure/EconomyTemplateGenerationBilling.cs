@@ -1,6 +1,7 @@
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -34,6 +35,29 @@ internal sealed class EconomyTemplateGenerationBilling(IEconomyService economySe
             cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
+    }
+
+    public async Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+    {
+        if (creditCost <= 0)
+        {
+            var wallet = await economyService.GetWalletAsync(userId, isPremium: false, cancellationToken);
+            return wallet.IsSuccess
+                ? Result.Success(wallet.Value.Balance)
+                : Result.Failure<int>(wallet.Error);
+        }
+
+        var result = await economyService.SpendAsync(
+            new SpendBalanceCommand(
+                userId,
+                creditCost,
+                $"template_watermark_unlock:{generationId:N}",
+                WalletLedgerSource.WatermarkUnlock),
+            cancellationToken);
+
+        return result.IsSuccess
+            ? Result.Success(result.Value.NewBalance)
+            : Result.Failure<int>(result.Error);
     }
 
     private static string CreateReason(Guid generationId)

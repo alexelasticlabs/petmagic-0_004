@@ -11,5 +11,6 @@ public interface IVideoMotionGenerator
         bool keepOriginalSound,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken);
 }

@@ -9,15 +9,16 @@ public sealed record MediaUploadCommand(
     string ContentType,
     byte[]? Content,
     Stream? ContentStream,
-    long? ContentLengthBytes)
+    long? ContentLengthBytes,
+    string? PreferredStorageKey = null)
 {
     public MediaUploadCommand(string fileName, string contentType, byte[] content)
-        : this(fileName, contentType, content, null, content.LongLength)
+        : this(fileName, contentType, content, null, content.LongLength, null)
     {
     }
 
     public MediaUploadCommand(string fileName, string contentType, Stream contentStream, long? contentLengthBytes = null)
-        : this(fileName, contentType, null, contentStream, contentLengthBytes)
+        : this(fileName, contentType, null, contentStream, contentLengthBytes, null)
     {
     }
 }
@@ -41,7 +42,12 @@ public sealed record CreateImageTemplateCommand(
     string ImageModel,
     string ImagePrompt,
     string? Status = null,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record UpdateImageTemplateCommand(
     Guid TemplateId,
@@ -56,7 +62,12 @@ public sealed record UpdateImageTemplateCommand(
     string ImageModel,
     string ImagePrompt,
     string? Status = null,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record CreateVideoTemplateCommand(
     string Title,
@@ -75,7 +86,12 @@ public sealed record CreateVideoTemplateCommand(
     string KlingPrompt,
     bool KeepOriginalSound,
     string? Status = null,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record UpdateVideoTemplateCommand(
     Guid TemplateId,
@@ -95,7 +111,12 @@ public sealed record UpdateVideoTemplateCommand(
     string KlingPrompt,
     bool KeepOriginalSound,
     string? Status = null,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record ChangeTemplateStatusCommand(Guid TemplateId, string Status);
 
@@ -110,12 +131,134 @@ public sealed record ChangeTemplateCategoryArchiveStateCommand(
     Guid CategoryId,
     bool IsArchived);
 
+public sealed record CreateTemplateOfTheDayCommand(
+    Guid TemplateId,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    bool IsActive,
+    bool IsManual,
+    int Priority,
+    string? TitleOverride,
+    string? SubtitleOverride,
+    string? BadgeTextOverride,
+    Guid? CreatedByAdminId);
+
+public sealed record UpdateTemplateOfTheDayCommand(
+    Guid Id,
+    Guid TemplateId,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    bool IsActive,
+    bool IsManual,
+    int Priority,
+    string? TitleOverride,
+    string? SubtitleOverride,
+    string? BadgeTextOverride);
+
+public sealed record AutoPickTemplateOfTheDayCommand(
+    DateOnly Date,
+    string? AllowedTypes,
+    int? ExcludeRecentDays,
+    Guid? CreatedByAdminId,
+    bool Force = false);
+
+public sealed record UpdateTemplateOfTheDaySettingsCommand(
+    bool AutoModeEnabled,
+    string? AllowedTypes,
+    int? ExcludeRecentDays,
+    Guid? UpdatedByAdminId);
+
 public sealed record StartTemplateGenerationCommand(
     Guid UserId,
     Guid TemplateId,
     TemplateAssetCommand SourceImageAsset,
     string? IdempotencyKey = null,
     string? RequestHash = null,
+    int? ActiveGenerationLimit = null,
+    TemplateAssetCommand? SourceImagePreviewAsset = null)
+{
+    public StartTemplateGenerationCommand(
+        Guid userId,
+        Guid templateId,
+        TemplateAssetCommand sourceImageAsset,
+        string? idempotencyKey,
+        string? requestHash,
+        int? activeGenerationLimit)
+        : this(
+            userId,
+            templateId,
+            sourceImageAsset,
+            idempotencyKey,
+            requestHash,
+            activeGenerationLimit,
+            null)
+    {
+    }
+
+    public StartTemplateGenerationCommand(
+        Guid userId,
+        Guid templateId,
+        TemplateAssetCommand sourceImageAsset,
+        string? _legacyPlaceholder,
+        string? idempotencyKey,
+        string? requestHash,
+        int? activeGenerationLimit)
+        : this(
+            userId,
+            templateId,
+            sourceImageAsset,
+            idempotencyKey,
+            requestHash,
+            activeGenerationLimit,
+            null)
+    {
+    }
+}
+
+public sealed record StartTemplateGenerationFromResultCommand(
+    Guid UserId,
+    Guid ParentGenerationResultId,
+    Guid TemplateId,
+    string? IdempotencyKey = null,
+    int? ActiveGenerationLimit = null);
+
+public sealed record StartSimilarTemplateGenerationCommand(
+    Guid UserId,
+    Guid SourceGenerationId,
+    string VariationStrength = "medium",
+    string? IdempotencyKey = null,
+    int? ActiveGenerationLimit = null);
+
+public sealed record CreatePetCommand(
+    Guid UserId,
+    string Name,
+    string Type,
+    string? Breed);
+
+public sealed record UpdatePetCommand(
+    Guid UserId,
+    Guid PetId,
+    string Name,
+    string Type,
+    string? Breed);
+
+public sealed record UploadPetPhotoCommand(
+    Guid UserId,
+    Guid PetId,
+    MediaUploadCommand Photo);
+
+public sealed record SetPetPhotoFavoriteCommand(
+    Guid UserId,
+    Guid PetId,
+    Guid PhotoId,
+    bool IsFavorite);
+
+public sealed record StartTemplateGenerationFromPetCommand(
+    Guid UserId,
+    Guid PetId,
+    Guid? PetPhotoId,
+    Guid TemplateId,
+    string? IdempotencyKey = null,
     int? ActiveGenerationLimit = null);
 
 public sealed record StoredMediaResponse(
@@ -125,6 +268,52 @@ public sealed record StoredMediaResponse(
     string ContentType,
     long? FileSizeBytes,
     string? LocalPath);
+
+public sealed record PetPhotoResponse(
+    Guid Id,
+    Guid PetId,
+    Guid MediaAssetId,
+    string Url,
+    string? ThumbnailUrl,
+    string FileName,
+    string ContentType,
+    long? FileSizeBytes,
+    bool IsFavorite,
+    bool IsAvatar,
+    int SortOrder,
+    string Status,
+    DateTime CreatedAtUtc,
+    bool IsDeleted);
+
+public sealed record PetResponse(
+    Guid Id,
+    Guid UserId,
+    string Name,
+    string Type,
+    string? Breed,
+    Guid? AvatarMediaAssetId,
+    string? AvatarUrl,
+    int PhotosCount,
+    int GenerationsCount,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    bool IsDeleted);
+
+public sealed record AdminPetResponse(
+    Guid Id,
+    Guid UserId,
+    string Name,
+    string Type,
+    string? Breed,
+    Guid? AvatarMediaAssetId,
+    string? AvatarUrl,
+    int PhotosCount,
+    int GenerationsCount,
+    string Status,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    bool IsDeleted);
 
 public sealed record TemplateAssetResponse(
     string Url,
@@ -152,7 +341,12 @@ public sealed record AdminTemplateListItemResponse(
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
     decimal? EstimatedCostUsd = null,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record AdminTemplateCatalogQuery(
     string? Type,
@@ -170,6 +364,42 @@ public sealed record AdminTemplateCatalogPageResponse(
     int Take,
     int TotalCount,
     bool HasMore);
+
+public sealed record AdminTemplateOfTheDayResponse(
+    Guid Id,
+    Guid TemplateId,
+    string TemplateTitle,
+    string TemplateType,
+    string Category,
+    string Status,
+    bool IsPremium,
+    TemplateAssetResponse? PreviewAsset,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    bool IsActive,
+    bool IsManual,
+    int Priority,
+    string? TitleOverride,
+    string? SubtitleOverride,
+    string? BadgeTextOverride,
+    DateTime CreatedAtUtc,
+    DateTime UpdatedAtUtc,
+    Guid? CreatedByAdminId);
+
+public sealed record AdminTemplateOfTheDayScheduleResponse(
+    IReadOnlyList<AdminTemplateOfTheDayResponse> Items,
+    int Skip,
+    int Take,
+    int TotalCount,
+    bool HasMore,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminTemplateOfTheDaySettingsResponse(
+    bool AutoModeEnabled,
+    string AllowedTypes,
+    int ExcludeRecentDays,
+    DateTime UpdatedAtUtc,
+    Guid? UpdatedByAdminId);
 
 public sealed record AdminTemplateCategoryListItemResponse(
     Guid CategoryId,
@@ -213,7 +443,12 @@ public sealed record AdminTemplateResponse(
     decimal? EstimatedProviderCostUsd,
     DateTime CreatedAtUtc,
     DateTime UpdatedAtUtc,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record AdminTemplateStatisticsResponse(
     Guid TemplateId,
@@ -272,7 +507,8 @@ public sealed record RecordTemplateAnalyticsEventCommand(
     string? CountryCode,
     Guid? UserId,
     Guid? GenerationId,
-    string? FeedbackMessage = null);
+    string? FeedbackMessage = null,
+    string? MetadataJson = null);
 
 public sealed record TemplateGenerationHistoryQuery(
     string? Status,
@@ -288,6 +524,140 @@ public sealed record RecordTemplateGenerationFeedbackCommand(
     string[] SelectedReasons,
     string? Comment,
     double? InputPhotoQualityScore = null);
+
+public sealed record SubmitFeedbackCommand(
+    Guid? UserId,
+    string Type,
+    string Category,
+    int? Rating,
+    string? Message,
+    Guid? GenerationId,
+    Guid? TemplateId,
+    Guid? PetId,
+    string? SourceScreen,
+    string? AppVersion,
+    string? Platform,
+    string? DeviceModel,
+    string? Locale);
+
+public sealed record SubmitFeedbackResponse(Guid FeedbackId, string Status);
+
+public sealed record AdminFeedbackQuery(
+    string? Status,
+    string? Priority,
+    string? Type,
+    string? Category,
+    Guid? GenerationId,
+    Guid? TemplateId,
+    string? Platform,
+    DateTime? FromUtc,
+    DateTime? ToUtc,
+    Guid? UserId,
+    int? Skip,
+    int? Take);
+
+public sealed record AdminFeedbackListItemResponse(
+    Guid Id,
+    Guid? UserId,
+    string Type,
+    string Category,
+    int? Rating,
+    Guid? GenerationId,
+    Guid? TemplateId,
+    string? TemplateTitle,
+    Guid? PetId,
+    string SourceScreen,
+    string? Platform,
+    string Status,
+    string Priority,
+    string? Message,
+    string? PreviewUrl,
+    DateTime CreatedAtUtc);
+
+public sealed record AdminFeedbackPageResponse(
+    IReadOnlyList<AdminFeedbackListItemResponse> Items,
+    int TotalCount,
+    int Skip,
+    int Take,
+    bool HasMore,
+    DateTime GeneratedAtUtc);
+
+public sealed record AdminFeedbackDetailsResponse(
+    Guid Id,
+    Guid? UserId,
+    string? UserEmail,
+    string? UserPlan,
+    int? UserCredits,
+    string Type,
+    string Category,
+    int? Rating,
+    string? Message,
+    string SourceScreen,
+    string? AppVersion,
+    string? Platform,
+    string? DeviceModel,
+    string? Locale,
+    string? ErrorCode,
+    string? ProviderName,
+    string Status,
+    string Priority,
+    DateTime CreatedAtUtc,
+    DateTime? ReviewedAtUtc,
+    Guid? ReviewedByAdminId,
+    string? AdminNote,
+    AdminFeedbackGenerationContextResponse? Generation,
+    bool CanRefund,
+    CreditRefundResponse? Refund);
+
+public sealed record AdminFeedbackGenerationContextResponse(
+    Guid GenerationId,
+    Guid UserId,
+    Guid TemplateId,
+    string TemplateTitle,
+    Guid? PetId,
+    string? InputPreviewUrl,
+    string? ResultPreviewUrl,
+    string? ProviderName,
+    string? ErrorCode,
+    int CreditsCharged,
+    DateTime? ChargedAtUtc,
+    DateTime? RefundedAtUtc);
+
+public sealed record UpdateFeedbackAdminCommand(
+    Guid FeedbackId,
+    Guid AdminUserId,
+    string? Status,
+    string? Priority,
+    string? AdminNote);
+
+public sealed record RefundFeedbackCreditsCommand(
+    Guid FeedbackId,
+    Guid AdminUserId,
+    int? Amount,
+    string? Reason);
+
+public sealed record CreditRefundResponse(
+    Guid Id,
+    Guid UserId,
+    Guid? FeedbackId,
+    Guid? GenerationId,
+    int Amount,
+    string Reason,
+    Guid AdminId,
+    DateTime CreatedAtUtc);
+
+public sealed record TemplateFeedbackSummaryResponse(
+    Guid TemplateId,
+    int PositiveCount,
+    int NeutralCount,
+    int NegativeCount,
+    double PositiveRate,
+    double NeutralRate,
+    double NegativeRate,
+    IReadOnlyList<TemplateFeedbackIssueResponse> TopIssues,
+    bool HasNegativeWarning);
+
+public sealed record TemplateFeedbackIssueResponse(string Category, int Count);
 
 public sealed record RegisterTemplatePushTokenCommand(
     Guid UserId,
@@ -558,7 +928,33 @@ public sealed record AdminTemplateGenerationListItemResponse(
     DateTime UpdatedAtUtc,
     DateTime? StartedAtUtc,
     DateTime? CompletedAtUtc,
-    DateTime? RefundedAtUtc);
+    DateTime? RefundedAtUtc,
+    bool IsWatermarkRequired,
+    bool IsWatermarkRemoved,
+    string? WatermarkedMediaPath,
+    string? WatermarkUnlockMethod,
+    Guid? WatermarkUnlockedByUserId,
+    int? WatermarkCreditsSpent,
+    DateTime? WatermarkUnlockedAtUtc,
+    Guid? ParentGenerationId = null,
+    Guid? ParentGenerationResultId = null,
+    string InputSourceType = "user_upload",
+    Guid? InputMediaAssetId = null,
+    Guid? ResultMediaAssetId = null,
+    string? InputPreviewUrl = null,
+    string? ResultPreviewUrl = null,
+    bool CanCompareBeforeAfter = false,
+    string? ParentTemplateTitle = null,
+    string? ParentTemplateType = null,
+    int ChildCount = 0,
+    Guid? SimilarToGenerationId = null,
+    string GenerationMode = "normal",
+    string? VariationStrength = null,
+    int? GenerationSeed = null,
+    string? PromptBeforeVariation = null,
+    string? PromptAfterVariation = null,
+    Guid? PetId = null,
+    Guid? PetPhotoId = null);
 
 public sealed record AdminTemplateGenerationListPageResponse(
     IReadOnlyList<AdminTemplateGenerationListItemResponse> Items,
@@ -581,7 +977,12 @@ public sealed record PublicTemplateListItemResponse(
     TemplateAssetResponse? PreviewAsset,
     string? MusicDescription,
     double? ReferenceVideoDurationSeconds,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
 
 public sealed record PublicTemplateCategoryResponse(
     string Name);
@@ -591,7 +992,9 @@ public sealed record PublicTemplatesCatalogQuery(
     int? PageSize,
     TemplateType? Type,
     string? Category,
-    string? Locale);
+    string? Locale,
+    string[]? Tags = null,
+    bool? PremiumOnly = null);
 
 public sealed record PublicTemplateCatalogMetadataResponse(
     Guid Id,
@@ -654,7 +1057,42 @@ public sealed record PublicTemplateResponse(
     TemplateAssetResponse? PreviewAsset,
     string? MusicDescription,
     double? ReferenceVideoDurationSeconds,
-    IReadOnlyList<string>? PetPhotoRequirements = null);
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium");
+
+public sealed record CompatibleGenerationTemplateResponse(
+    Guid Id,
+    string Title,
+    string Type,
+    string? ThumbnailUrl,
+    bool IsPremium,
+    bool IsRecommended,
+    int TokenCost);
+
+public sealed record CompatibleGenerationTemplatesResponse(
+    Guid ResultId,
+    string InputMediaType,
+    IReadOnlyList<CompatibleGenerationTemplateResponse> Templates);
+
+public sealed record PublicTemplateOfTheDayResponse(
+    PublicTemplateOfTheDayItemResponse? Template);
+
+public sealed record PublicTemplateOfTheDayItemResponse(
+    Guid TemplateId,
+    string Title,
+    string Subtitle,
+    string BadgeText,
+    string Type,
+    string? ThumbnailUrl,
+    string? PreviewMediaUrl,
+    bool IsPremium,
+    string RequiredPlan,
+    DateOnly Date,
+    string Source);
 
 public sealed record TemplateGenerationResponse(
     Guid GenerationId,
@@ -694,7 +1132,79 @@ public sealed record TemplateGenerationResponse(
     DateTime? RefundedAtUtc = null,
     bool IsUnread = false,
     int? QueuePosition = null,
-    int? EstimatedWaitSeconds = null)
+    int? EstimatedWaitSeconds = null,
+    bool HasWatermark = false,
+    bool CanRemoveWatermark = false,
+    bool IsWatermarkRemoved = false,
+    int RemoveWatermarkCostCredits = 1,
+    string UserPlan = "free",
+    string? WatermarkMessage = null,
+    bool SupportsGenerateSimilar = false,
+    Guid? ParentGenerationId = null,
+    Guid? ParentGenerationResultId = null,
+    Guid? SimilarToGenerationId = null,
+    string GenerationMode = "normal",
+    string? VariationStrength = null,
+    int? GenerationSeed = null,
+    string? PromptBeforeVariation = null,
+    string? PromptAfterVariation = null,
+    string InputSourceType = "user_upload",
+    Guid? InputMediaAssetId = null,
+    Guid? ResultMediaAssetId = null,
+    string? InputPreviewUrl = null,
+    string? ResultPreviewUrl = null,
+    bool CanCompareBeforeAfter = false,
+    Guid? PetId = null,
+    Guid? PetPhotoId = null)
 {
     public Guid JobId => GenerationId;
+    public string? MediaUrl => OutputUrl;
 }
+
+public sealed record RemoveGenerationWatermarkCommand(
+    Guid UserId,
+    Guid GenerationId,
+    string PaymentMethod,
+    bool IsPremium);
+
+public sealed record RemoveGenerationWatermarkResponse(
+    bool WatermarkRemoved,
+    int CreditsSpent,
+    int? RemainingCredits,
+    string? MediaUrl);
+
+public sealed record GenerationDownloadResponse(
+    string MediaUrl,
+    bool HasWatermark,
+    string FileName);
+
+public sealed record GenerateSimilarRequest(
+    string? VariationStrength = null);
+
+public sealed record GenerateSimilarResponse(
+    Guid GenerationId,
+    string Status);
+
+public sealed record AdminWatermarkSettingsResponse(
+    bool Enabled,
+    string Text,
+    string? LogoUrl,
+    double Opacity,
+    string Position,
+    string Size,
+    int CostCredits,
+    bool ApplyToImages,
+    bool ApplyToVideos,
+    string PreviewImageUrl,
+    string PreviewVideoFrameUrl);
+
+public sealed record UpdateAdminWatermarkSettingsCommand(
+    bool Enabled,
+    string Text,
+    string? LogoUrl,
+    double Opacity,
+    string Position,
+    string Size,
+    int CostCredits,
+    bool ApplyToImages,
+    bool ApplyToVideos);

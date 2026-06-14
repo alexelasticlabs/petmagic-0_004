@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -158,6 +159,56 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task GenerationCanonicalAliases_ShouldReturnResultDownloadShareAndRemoveWatermark()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Canonical Alias Portrait",
+            "Portrait",
+            ["canonical", "alias"]);
+        var queued = await UploadGenerationSourceAsync(
+            application.Client,
+            created.TemplateId,
+            "pet.jpg",
+            "image/jpeg",
+            JpegBytes());
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
+
+        var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
+            application.Client,
+            $"/api/generations/{generation.GenerationId}");
+        using var fetchedJsonResponse = await application.Client.GetAsync($"/api/generations/{generation.GenerationId}");
+        fetchedJsonResponse.EnsureSuccessStatusCode();
+        using var fetchedJson = JsonDocument.Parse(await fetchedJsonResponse.Content.ReadAsStringAsync());
+        var download = await GetFromJsonAsync<GenerationDownloadResponse>(
+            application.Client,
+            $"/api/generations/{generation.GenerationId}/download");
+        var share = await PostAsJsonAsync<GenerationDownloadResponse>(
+            application.Client,
+            $"/api/generations/{generation.GenerationId}/share",
+            new { });
+        var unlock = await PostAsJsonAsync<RemoveGenerationWatermarkResponse>(
+            application.Client,
+            $"/api/generations/{generation.GenerationId}/remove-watermark",
+            new { paymentMethod = "credit" });
+
+        Assert.Equal(generation.GenerationId, fetched.GenerationId);
+        Assert.Equal("Succeeded", fetched.Status);
+        Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+        Assert.Equal(fetched.OutputUrl, fetched.MediaUrl);
+        Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("outputUrl").GetString());
+        Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("mediaUrl").GetString());
+        Assert.Equal(generation.OutputUrl, download.MediaUrl);
+        Assert.Equal(generation.OutputUrl, share.MediaUrl);
+        Assert.False(download.HasWatermark);
+        Assert.False(share.HasWatermark);
+        Assert.True(unlock.WatermarkRemoved);
+        Assert.Equal(generation.OutputUrl, unlock.MediaUrl);
+    }
+
+    [Fact]
     public async Task VideoGenerationFlow_ShouldRejectDraftTemplateAndCleanupUploadedSource()
     {
         await using var application = await TestApplication.CreateAsync();
@@ -207,7 +258,9 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Contains("templates.invalid_status", body);
-        Assert.Single(application.MediaStorage.DeletedUrls);
+        Assert.Equal(2, application.MediaStorage.DeletedUrls.Count);
+        Assert.Contains(application.MediaStorage.DeletedUrls, url => url.EndsWith("/pet.jpg", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(application.MediaStorage.DeletedUrls, url => url.EndsWith("/pet-preview.webp", StringComparison.OrdinalIgnoreCase));
         Assert.Empty(application.Billing.ChargedGenerationIds);
     }
 

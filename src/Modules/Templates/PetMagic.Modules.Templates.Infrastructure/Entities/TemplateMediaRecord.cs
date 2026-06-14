@@ -6,6 +6,24 @@ public sealed class TemplateMediaRecord
 {
     public Guid Id { get; set; }
 
+    public Guid? UserId { get; set; }
+
+    public string MediaType { get; set; } = "image";
+
+    public string StoragePath { get; set; } = string.Empty;
+
+    public string? WatermarkedStoragePath { get; set; }
+
+    public string? PreviewUrl { get; set; }
+
+    public string? WatermarkedPreviewUrl { get; set; }
+
+    public string SourceType { get; set; } = "user_upload";
+
+    public Guid? GenerationId { get; set; }
+
+    public bool IsDeleted { get; set; }
+
     public string Url { get; set; } = string.Empty;
 
     public string FileName { get; set; } = string.Empty;

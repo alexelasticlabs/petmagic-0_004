@@ -35,7 +35,7 @@ public static class AdminTemplateCategoryEndpoints
 
     private static async Task<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>> ListAsync(
         [FromQuery] bool includeArchived,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminCategoriesAsync(includeArchived, cancellationToken);

@@ -21,6 +21,14 @@ internal static class TemplatesErrors
     public static readonly Error InvalidPreprocessingModel = new("templates.invalid_preprocessing_model", "Preprocessing model is not supported.");
     public static readonly Error InvalidKlingModel = new("templates.invalid_kling_model", "Kling model is not supported.");
     public static readonly Error InvalidMediaUpload = new("templates.invalid_media_upload", "Media upload is invalid.");
+    public static readonly Error PetNotFound = new("pets.not_found", "Pet was not found.");
+    public static readonly Error PetPhotoNotFound = new("pets.photo_not_found", "Pet photo was not found.");
+    public static readonly Error PetPhotoRequired = new("pets.photo_required", "Add a pet photo to start generation.");
+    public static readonly Error InvalidPetStatus = new("pets.invalid_status", "Pet status is invalid.");
+    public static readonly Error GenerationResultInputUnavailable = new("templates.generation_result_input_unavailable", "Could not use this result. Please try again.");
+    public static readonly Error GenerationResultInputUnsupported = new("templates.generation_result_input_unsupported", "Template does not support this result as input.");
+    public static readonly Error GenerateSimilarUnsupported = new("templates.generate_similar_unsupported", "Template does not support similar generations.");
+    public static readonly Error SourceMediaUnavailable = new("templates.source_media_unavailable", "Source media is unavailable.");
     public static readonly Error MediaStorageFailed = new("templates.media_storage_failed", "Media upload could not be stored.");
     public static readonly Error MediaMetadataFailed = new("templates.media_metadata_failed", "Media metadata could not be determined.");
     public static readonly Error AiProviderUnavailable = new("templates.ai_provider_unavailable", "AI provider is not configured.");
@@ -30,7 +38,20 @@ internal static class TemplatesErrors
     public static readonly Error ActiveGenerationLimitReached = new("ACTIVE_GENERATION_LIMIT_REACHED", "Active generation limit was reached.");
     public static readonly Error GenerationQueueOverloaded = new("GENERATION_QUEUE_OVERLOADED", "Generation queue is overloaded.");
     public static readonly Error InvalidFeedback = new("templates.invalid_feedback", "Generation feedback is invalid.");
+    public static readonly Error FeedbackNotFound = new("feedback.not_found", "Feedback was not found.");
+    public static readonly Error FeedbackRateLimited = new("feedback.rate_limited", "Feedback rate limit was reached.");
+    public static readonly Error FeedbackForbidden = new("feedback.forbidden", "Feedback target does not belong to the current user.");
+    public static readonly Error FeedbackRefundUnavailable = new("feedback.refund_unavailable", "Feedback cannot be refunded.");
+    public static readonly Error FeedbackRefundAlreadyIssued = new("feedback.refund_already_issued", "Credits were already refunded for this feedback or generation.");
     public static readonly Error InvalidPushToken = new("templates.push_token_invalid", "Push device token is invalid.");
     public static readonly Error GeneratedMediaImportFailed = new("templates.generated_media_import_failed", "Generated media could not be imported into storage.");
     public static readonly Error GeneratedMediaTooLarge = new("templates.generated_media_too_large", "Generated media exceeds the maximum allowed size.");
+    public static readonly Error WatermarkDisabled = new("templates.watermark_disabled", "Watermarking is disabled.");
+    public static readonly Error WatermarkRenderFailed = new("templates.watermark_render_failed", "Watermarked media could not be prepared.");
+    public static readonly Error WatermarkAlreadyRemoved = new("templates.watermark_already_removed", "Watermark has already been removed.");
+    public static readonly Error WatermarkNotReady = new("templates.watermark_not_ready", "Watermarked media is still being prepared.");
+    public static readonly Error InvalidTemplateOfTheDayDateRange = new("templates.template_of_the_day_invalid_date_range", "Template of the Day date range is invalid.");
+    public static readonly Error TemplateOfTheDayDateOccupied = new("templates.template_of_the_day_date_occupied", "Template of the Day already has an active manual assignment for this date range.");
+    public static readonly Error TemplateOfTheDayTemplateUnavailable = new("templates.template_of_the_day_template_unavailable", "Template of the Day must reference an active template with a valid preview asset.");
+    public static readonly Error TemplateOfTheDayAutoModeDisabled = new("templates.template_of_the_day_auto_mode_disabled", "Template of the Day auto mode is disabled.");
 }

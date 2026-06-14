@@ -178,16 +178,33 @@ internal sealed partial class TemplatesService
 
     private async Task<long> GetCurrentCatalogVersionAsync(CancellationToken cancellationToken)
     {
-        var templateVersion = await dbContext.TemplateItems
-            .Select(template => (long?)template.Version)
-            .MaxAsync(cancellationToken) ?? 0L;
-
-        var changeVersion = await dbContext.TemplateCatalogChanges
-            .Select(change => (long?)change.Version)
-            .MaxAsync(cancellationToken) ?? 0L;
-
-        return Math.Max(templateVersion, changeVersion);
+        var snapshot = await GetCurrentCatalogVersionSnapshotAsync(cancellationToken);
+        return snapshot.Version;
     }
+
+    private async Task<CatalogVersionSnapshot> GetCurrentCatalogVersionSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var latestChange = await dbContext.TemplateCatalogChanges
+            .AsNoTracking()
+            .OrderByDescending(change => change.Version)
+            .Select(change => new CatalogVersionSnapshot(change.Version, change.UpdatedAtUtc))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latestChange is not null)
+        {
+            return latestChange;
+        }
+
+        var latestTemplate = await dbContext.TemplateItems
+            .AsNoTracking()
+            .OrderByDescending(template => template.Version)
+            .Select(template => new CatalogVersionSnapshot(template.Version, null))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return latestTemplate ?? new CatalogVersionSnapshot(0L, null);
+    }
+
+    private sealed record CatalogVersionSnapshot(long Version, DateTime? UpdatedAtUtc);
 
     private async Task<long> GetNextCatalogVersionAsync(CancellationToken cancellationToken)
     {
@@ -234,7 +251,11 @@ internal sealed partial class TemplatesService
         }
 
         var parts = rawCursor.Trim().Split(':', 2, StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks) || !Guid.TryParseExact(parts[1], "N", out var templateId))
+        if (parts.Length != 2
+            || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks)
+            || ticks < DateTime.MinValue.Ticks
+            || ticks > DateTime.MaxValue.Ticks
+            || !Guid.TryParseExact(parts[1], "N", out var templateId))
         {
             return null;
         }
@@ -244,7 +265,12 @@ internal sealed partial class TemplatesService
 
     private static string FormatPublicFeedCursor(TemplateItem template)
     {
-        return string.Create(CultureInfo.InvariantCulture, $"{template.UpdatedAtUtc.Ticks}:{template.Id:N}");
+        return FormatPublicFeedCursor(template.UpdatedAtUtc, template.Id);
+    }
+
+    private static string FormatPublicFeedCursor(DateTime updatedAtUtc, Guid templateId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{updatedAtUtc.Ticks}:{templateId:N}");
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
@@ -308,6 +334,14 @@ internal sealed partial class TemplatesService
     private static string ResolvePrompt(string prompt, string fallback)
     {
         return string.IsNullOrWhiteSpace(prompt) ? fallback : prompt.Trim();
+    }
+
+    private static string NormalizeVariationStrength(string? raw)
+    {
+        return string.Equals(raw, "low", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(raw, "high", StringComparison.OrdinalIgnoreCase)
+            ? raw!.ToLowerInvariant()
+            : "medium";
     }
 
     private async Task CleanupObsoleteMediaAsync(string[] assetUrls, CancellationToken cancellationToken)

@@ -14,16 +14,21 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
         bool keepOriginalSound,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken)
     {
-        var input = new
+        var input = new Dictionary<string, object?>
         {
-            prompt,
-            image_url = normalizedImageUrl,
-            video_url = referenceVideoUrl,
-            character_orientation = characterOrientation.ToLowerInvariant(),
-            keep_original_sound = keepOriginalSound
+            ["prompt"] = prompt,
+            ["image_url"] = normalizedImageUrl,
+            ["video_url"] = referenceVideoUrl,
+            ["character_orientation"] = characterOrientation.ToLowerInvariant(),
+            ["keep_original_sound"] = keepOriginalSound
         };
+        if (seed is not null)
+        {
+            input["seed"] = seed.Value;
+        }
 
         var result = await queueClient.RunAsync(model, input, cancellationToken);
         if (result.IsFailure)

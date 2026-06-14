@@ -24,8 +24,13 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
         }
 
         string? tempPath = null;
-        var extension = Path.GetExtension(asset.FileName);
-        var storageKey = BuildObjectKey(extension);
+        var extension = Path.GetExtension(asset.PreferredStorageKey ?? asset.FileName);
+        if (!TryResolvePreferredStorageKey(asset.PreferredStorageKey, extension, out var preferredStorageKey))
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+        }
+
+        var storageKey = BuildObjectKey(extension, preferredStorageKey);
 
         try
         {
@@ -137,15 +142,65 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
         }
     }
 
-    private string BuildObjectKey(string extension)
+    private string BuildObjectKey(string extension, string? preferredStorageKey)
     {
         var now = DateTime.UtcNow;
         var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
+        if (!string.IsNullOrWhiteSpace(preferredStorageKey))
+        {
+            return $"{prefix}/{preferredStorageKey}";
+        }
+
         var safeExtension = string.IsNullOrWhiteSpace(extension) || extension.Length > 16
             ? string.Empty
             : extension;
 
         return $"{prefix}/{now:yyyy}/{now:MM}/{Guid.NewGuid():N}{safeExtension}";
+    }
+
+    private static bool TryResolvePreferredStorageKey(string? preferredStorageKey, string extension, out string? normalized)
+    {
+        normalized = null;
+        if (string.IsNullOrWhiteSpace(preferredStorageKey))
+        {
+            return true;
+        }
+
+        var candidate = preferredStorageKey.Trim().Replace('\\', '/').Trim('/');
+        if (candidate.Length == 0
+            || candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase)
+            || Path.IsPathRooted(candidate))
+        {
+            return false;
+        }
+
+        var segments = candidate.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var segment in segments)
+        {
+            if (segment is "." or ".." || segment.Any(IsUnsafePathCharacter))
+            {
+                return false;
+            }
+        }
+
+        var fileExtension = Path.GetExtension(segments[^1]);
+        if (!string.Equals(fileExtension, extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        normalized = string.Join('/', segments);
+        return true;
+    }
+
+    private static bool IsUnsafePathCharacter(char value)
+    {
+        return !(char.IsAsciiLetterOrDigit(value) || value is '-' or '_' or '.');
     }
 
     private string BuildPublicUrl(string storageKey)
@@ -155,14 +210,20 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
 
     private string? TryResolveManagedKey(string assetUrl)
     {
+        var candidate = assetUrl.Trim().Replace('\\', '/');
+        var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
+        if (candidate.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
         var baseUrl = options.R2.PublicBaseUrl.TrimEnd('/');
-        if (!assetUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var storageKey = assetUrl[baseUrl.Length..].TrimStart('/').Replace('\\', '/');
-        var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
+        var storageKey = candidate[baseUrl.Length..].TrimStart('/');
         return storageKey.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase)
             ? storageKey
             : null;

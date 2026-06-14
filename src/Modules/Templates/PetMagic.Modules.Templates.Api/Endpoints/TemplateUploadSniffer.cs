@@ -90,6 +90,30 @@ internal static class TemplateUploadSniffer
             && header[6] == 0x79
             && header[7] == 0x70)
         {
+            var brand = string.Create(4, header, static (chars, bytes) =>
+            {
+                for (var i = 0; i < chars.Length; i++)
+                {
+                    chars[i] = (char)bytes[8 + i];
+                }
+            });
+
+            if (string.Equals(brand, "heic", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "heix", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "hevc", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "hevx", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "heis", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "heim", StringComparison.OrdinalIgnoreCase))
+            {
+                return "image/heic";
+            }
+
+            if (string.Equals(brand, "mif1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(brand, "msf1", StringComparison.OrdinalIgnoreCase))
+            {
+                return "image/heif";
+            }
+
             return "video/mp4";
         }
 

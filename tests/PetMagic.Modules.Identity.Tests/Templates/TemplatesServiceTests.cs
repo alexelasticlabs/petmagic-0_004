@@ -19,9 +19,28 @@ public sealed partial class TemplatesServiceTests
         TemplatesDbContext dbContext,
         IMediaStorage? mediaStorage = null,
         ITemplateFeedRealtimeService? realtimeService = null,
-        IAdminAuditLog? adminAuditLog = null)
+        IAdminAuditLog? adminAuditLog = null,
+        TemplatesOptions? templatesOptions = null)
     {
-        var options = new TemplatesOptions
+        var options = templatesOptions ?? CreateTemplatesServiceOptions();
+
+        IMediaMetadataReader metadataReader = new TestMediaMetadataReader();
+        ITemplateMediaLifecycleService lifecycleService = new TemplateMediaLifecycleService(dbContext, options);
+        return new TemplatesService(
+            dbContext,
+            options,
+            metadataReader,
+            mediaStorage ?? new RecordingMediaStorage(),
+            lifecycleService,
+            realtimeService ?? new RecordingTemplateFeedRealtimeService(),
+            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())),
+            adminAuditLog);
+    }
+
+    private static TemplatesOptions CreateTemplatesServiceOptions(
+        string templateOfTheDayBusinessTimeZone = "UTC")
+    {
+        return new TemplatesOptions
         {
             PublicBaseUrl = "http://localhost:5000",
             LocalMediaRootPath = "wwwroot/templates-media",
@@ -41,20 +60,9 @@ public sealed partial class TemplatesServiceTests
                 "fal-ai/kling-video/v3/standard/motion-control"
             ],
             SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
-            SeedSampleTemplates = false
+            SeedSampleTemplates = false,
+            TemplateOfTheDayBusinessTimeZone = templateOfTheDayBusinessTimeZone
         };
-
-        IMediaMetadataReader metadataReader = new TestMediaMetadataReader();
-        ITemplateMediaLifecycleService lifecycleService = new TemplateMediaLifecycleService(dbContext, options);
-        return new TemplatesService(
-            dbContext,
-            options,
-            metadataReader,
-            mediaStorage ?? new RecordingMediaStorage(),
-            lifecycleService,
-            realtimeService ?? new RecordingTemplateFeedRealtimeService(),
-            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())),
-            adminAuditLog);
     }
 
     private static async Task<Guid> CreateActiveImageTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
@@ -200,9 +208,11 @@ public sealed partial class TemplatesServiceTests
             durationSeconds);
     }
 
-    private sealed class RecordingMediaStorage : IMediaStorage
+    private sealed class RecordingMediaStorage(bool signReadUrls = false) : IMediaStorage
     {
         public List<string> DeletedUrls { get; } = [];
+        public List<string> ReadUrls { get; } = [];
+        public List<TimeSpan> ReadTtls { get; } = [];
 
         public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
@@ -220,6 +230,13 @@ public sealed partial class TemplatesServiceTests
         {
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            ReadUrls.Add(assetUrl);
+            ReadTtls.Add(ttl);
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(signReadUrls ? $"{assetUrl}?signed=1" : assetUrl));
         }
     }
 
@@ -266,6 +283,11 @@ public sealed partial class TemplatesServiceTests
         public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(0));
         }
     }
 }

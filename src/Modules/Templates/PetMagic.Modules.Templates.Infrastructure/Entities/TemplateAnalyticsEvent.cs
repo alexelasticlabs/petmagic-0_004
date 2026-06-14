@@ -20,6 +20,8 @@ public sealed class TemplateAnalyticsEvent
 
     public string? FeedbackMessage { get; set; }
 
+    public string? MetadataJson { get; set; }
+
     public string ModerationStatus { get; set; } = "pending";
 
     public string? ModerationComment { get; set; }

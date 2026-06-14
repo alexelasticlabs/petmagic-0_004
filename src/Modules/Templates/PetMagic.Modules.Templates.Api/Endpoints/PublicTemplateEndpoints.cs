@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Security.Claims;
+using System.Text.Json;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -26,6 +28,7 @@ public static class PublicTemplateEndpoints
         group.MapGet("/changes", GetCatalogChangesAsync).AllowAnonymous();
         group.MapGet("/categories", ListCategoriesAsync).AllowAnonymous();
         group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
+        group.MapGet("/template-of-the-day", GetTemplateOfTheDayAsync).AllowAnonymous();
         group.MapGet("/events", StreamEventsAsync).AllowAnonymous();
         group.MapGet("/{templateId:guid}", GetAsync).AllowAnonymous();
         group.MapPost("/{templateId:guid}/analytics/events", RecordAnalyticsEventAsync).AllowAnonymous();
@@ -42,17 +45,25 @@ public static class PublicTemplateEndpoints
         [FromQuery] string[]? tags,
         [FromQuery] bool? premiumOnly,
         [FromQuery] string? locale,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        TemplateType? templateType = Enum.TryParse<TemplateType>(type, true, out var parsedType)
-            ? parsedType
-            : null;
+        if (!TryParseOptionalTemplateType(type, out var templateType))
+        {
+            return InvalidTemplateTypeProblem();
+        }
 
         if (page.HasValue || pageSize.HasValue)
         {
             var pagedResult = await service.ListPublicCatalogAsync(
-                new PublicTemplatesCatalogQuery(page, pageSize, templateType, category, ResolveLocalePreference(httpContext, locale)),
+                new PublicTemplatesCatalogQuery(
+                    page,
+                    pageSize,
+                    templateType,
+                    category,
+                    ResolveLocalePreference(httpContext, locale),
+                    tags,
+                    premiumOnly),
                 cancellationToken);
             return TypedResults.Ok(pagedResult.Value);
         }
@@ -63,7 +74,7 @@ public static class PublicTemplateEndpoints
 
     private static async Task<Ok<PublicTemplatesCatalogVersionResponse>> GetCatalogVersionAsync(
         HttpContext httpContext,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         httpContext.Response.Headers.CacheControl = "public, max-age=10";
@@ -76,7 +87,7 @@ public static class PublicTemplateEndpoints
         [FromQuery] long? sinceVersion,
         [FromQuery] string? locale,
         HttpContext httpContext,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         if (!sinceVersion.HasValue || sinceVersion.Value < 0)
@@ -136,14 +147,14 @@ public static class PublicTemplateEndpoints
     }
 
     private static async Task<Ok<IReadOnlyList<PublicTemplateCategoryResponse>>> ListCategoriesAsync(
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListPublicCategoriesAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<PublicTemplatesFeedResponse>> ListFeedAsync(
+    private static async Task<Results<Ok<PublicTemplatesFeedResponse>, ProblemHttpResult>> ListFeedAsync(
         HttpContext httpContext,
         [FromQuery] string? type,
         [FromQuery] string? category,
@@ -153,12 +164,24 @@ public static class PublicTemplateEndpoints
         [FromQuery] int? take,
         [FromQuery] string? cursor,
         [FromQuery] string? locale,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        TemplateType? templateType = Enum.TryParse<TemplateType>(type, true, out var parsedType)
-            ? parsedType
-            : null;
+        if (!TryParseOptionalTemplateType(type, out var templateType))
+        {
+            return TypedResults.Problem(
+                title: "templates.invalid_type",
+                detail: "Query parameter type must be Image or Video.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (IsInvalidPublicFeedCursor(cursor))
+        {
+            return TypedResults.Problem(
+                title: "templates.invalid_cursor",
+                detail: "Query parameter cursor must be the nextCursor value returned by a previous feed response.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
 
         var result = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(
@@ -175,12 +198,69 @@ public static class PublicTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Ok<PublicTemplateOfTheDayResponse>> GetTemplateOfTheDayAsync(
+        HttpContext httpContext,
+        [FromQuery] DateOnly? date,
+        [FromQuery] string? locale,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetPublicTemplateOfTheDayAsync(
+            date,
+            ResolveLocalePreference(httpContext, locale),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static bool IsInvalidPublicFeedCursor(string? rawCursor)
+    {
+        if (string.IsNullOrWhiteSpace(rawCursor))
+        {
+            return false;
+        }
+
+        var parts = rawCursor.Trim().Split(':', 2, StringSplitOptions.TrimEntries);
+        return parts.Length != 2
+            || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks)
+            || ticks < DateTime.MinValue.Ticks
+            || ticks > DateTime.MaxValue.Ticks
+            || !Guid.TryParseExact(parts[1], "N", out _);
+    }
+
+    private static bool TryParseOptionalTemplateType(string? rawType, out TemplateType? templateType)
+    {
+        templateType = null;
+        if (string.IsNullOrWhiteSpace(rawType))
+        {
+            return true;
+        }
+
+        var normalizedType = rawType.Trim();
+        if (!Enum.GetNames<TemplateType>().Any(name =>
+                string.Equals(name, normalizedType, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        templateType = Enum.Parse<TemplateType>(normalizedType, ignoreCase: true);
+        return true;
+    }
+
+    private static ProblemHttpResult InvalidTemplateTypeProblem()
+    {
+        return TypedResults.Problem(
+            title: "templates.invalid_type",
+            detail: "Query parameter type must be Image or Video.",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
     private static async Task<Results<Ok<PublicTemplateResponse>, ProblemHttpResult>> GetAsync(
         Guid templateId,
         [FromQuery] string? source,
         [FromQuery] string? locale,
         HttpContext httpContext,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetPublicAsync(templateId, ResolveLocalePreference(httpContext, locale), cancellationToken);
@@ -208,7 +288,7 @@ public static class PublicTemplateEndpoints
         Guid templateId,
         [FromBody] RecordTemplateAnalyticsEventRequest request,
         HttpContext httpContext,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.RecordAnalyticsEventAsync(
@@ -220,7 +300,8 @@ public static class PublicTemplateEndpoints
                 string.IsNullOrWhiteSpace(request.CountryCode) ? ResolveCountryCode(httpContext) : request.CountryCode,
                 ResolveUserId(httpContext),
                 request.GenerationId,
-                request.FeedbackMessage),
+                request.FeedbackMessage,
+                SerializeMetadata(request.Metadata)),
             cancellationToken);
 
         if (result.IsFailure)
@@ -238,8 +319,29 @@ public static class PublicTemplateEndpoints
             TemplateAnalyticsEventTypes.VideoView => TemplateAnalyticsEventTypes.VideoView,
             TemplateAnalyticsEventTypes.Complaint => TemplateAnalyticsEventTypes.Complaint,
             TemplateAnalyticsEventTypes.Feedback => TemplateAnalyticsEventTypes.Feedback,
+            TemplateAnalyticsEventTypes.UseAsInputClicked => TemplateAnalyticsEventTypes.UseAsInputClicked,
+            TemplateAnalyticsEventTypes.TemplateOfTheDayViewed => TemplateAnalyticsEventTypes.TemplateOfTheDayViewed,
+            TemplateAnalyticsEventTypes.TemplateOfTheDayClicked => TemplateAnalyticsEventTypes.TemplateOfTheDayClicked,
+            TemplateAnalyticsEventTypes.TemplateOfTheDayOpened => TemplateAnalyticsEventTypes.TemplateOfTheDayOpened,
+            TemplateAnalyticsEventTypes.TemplateSelected => TemplateAnalyticsEventTypes.TemplateSelected,
+            TemplateAnalyticsEventTypes.GenerationStarted => TemplateAnalyticsEventTypes.GenerationStarted,
+            TemplateAnalyticsEventTypes.GenerationCompleted => TemplateAnalyticsEventTypes.GenerationCompleted,
+            TemplateAnalyticsEventTypes.GenerationFailed => TemplateAnalyticsEventTypes.GenerationFailed,
+            TemplateAnalyticsEventTypes.RemoveClicked => TemplateAnalyticsEventTypes.RemoveClicked,
+            TemplateAnalyticsEventTypes.PaywallViewed => TemplateAnalyticsEventTypes.PaywallViewed,
+            TemplateAnalyticsEventTypes.CreateVideoClicked => TemplateAnalyticsEventTypes.CreateVideoClicked,
+            TemplateAnalyticsEventTypes.CompareClicked => TemplateAnalyticsEventTypes.CompareClicked,
+            TemplateAnalyticsEventTypes.CompareViewed => TemplateAnalyticsEventTypes.CompareViewed,
+            TemplateAnalyticsEventTypes.CompareSliderMoved => TemplateAnalyticsEventTypes.CompareSliderMoved,
+            TemplateAnalyticsEventTypes.CompareShareClicked => TemplateAnalyticsEventTypes.CompareShareClicked,
+            TemplateAnalyticsEventTypes.CompareClosed => TemplateAnalyticsEventTypes.CompareClosed,
             _ => TemplateAnalyticsEventTypes.View
         };
+    }
+
+    private static string? SerializeMetadata(IReadOnlyDictionary<string, JsonElement>? metadata)
+    {
+        return metadata is { Count: > 0 } ? JsonSerializer.Serialize(metadata) : null;
     }
 
     private static string DetectDeviceClass(HttpContext httpContext)
@@ -334,5 +436,12 @@ public static class PublicTemplateEndpoints
         await httpContext.Response.Body.FlushAsync(cancellationToken);
     }
 
-    private sealed record RecordTemplateAnalyticsEventRequest(string? EventType, string? Source, string? DeviceClass, string? CountryCode, Guid? GenerationId, string? FeedbackMessage);
+    private sealed record RecordTemplateAnalyticsEventRequest(
+        string? EventType,
+        string? Source,
+        string? DeviceClass,
+        string? CountryCode,
+        Guid? GenerationId,
+        string? FeedbackMessage,
+        IReadOnlyDictionary<string, JsonElement>? Metadata);
 }

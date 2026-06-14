@@ -33,6 +33,10 @@ public sealed class TemplatesApiStartupSmokeTests
     [InlineData("POST", "/api/templates/{templateId:guid}/generations", "generation-create")]
     [InlineData("GET", "/api/templates/generations", "generation-status")]
     [InlineData("GET", "/api/templates/generations/{generationId:guid}", "generation-status")]
+    [InlineData("GET", "/api/generations/{generationId:guid}", "generation-status")]
+    [InlineData("POST", "/api/generations/{generationId:guid}/remove-watermark", "templates")]
+    [InlineData("GET", "/api/generations/{generationId:guid}/download", "templates")]
+    [InlineData("POST", "/api/generations/{generationId:guid}/share", "templates")]
     [InlineData("POST", "/api/templates/generations/{generationId:guid}/feedback", "templates")]
     public async Task TemplateGenerationEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
@@ -77,11 +81,33 @@ public sealed class TemplatesApiStartupSmokeTests
     [InlineData("DELETE", "/api/admin/templates/{templateId:guid}")]
     [InlineData("POST", "/api/admin/templates/{templateId:guid}/test")]
     [InlineData("POST", "/api/admin/templates/media/upload")]
+    [InlineData("GET", "/api/admin/templates/monetization/watermark")]
+    [InlineData("PUT", "/api/admin/templates/monetization/watermark")]
+    [InlineData("POST", "/api/admin/templates/generations/{generationId:guid}/grant-clean-download")]
     [InlineData("POST", "/api/admin/templates/categories/")]
     [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}")]
     [InlineData("PUT", "/api/admin/templates/categories/{categoryId:guid}/archive")]
     [InlineData("DELETE", "/api/admin/templates/categories/{categoryId:guid}")]
     public async Task TemplatesAdminMutationEndpoints_ShouldRequireAdminOnlyPolicy(
+        string method,
+        string routePattern)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        Assert.Contains("AdminOnly", app.GetAuthorizationPolicies(method, routePattern));
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/admin/template-of-the-day")]
+    [InlineData("GET", "/api/admin/template-of-the-day/current")]
+    [InlineData("GET", "/api/admin/template-of-the-day/schedule")]
+    [InlineData("GET", "/api/admin/template-of-the-day/settings")]
+    [InlineData("PUT", "/api/admin/template-of-the-day/settings")]
+    [InlineData("POST", "/api/admin/template-of-the-day")]
+    [InlineData("PUT", "/api/admin/template-of-the-day/{id:guid}")]
+    [InlineData("DELETE", "/api/admin/template-of-the-day/{id:guid}")]
+    [InlineData("POST", "/api/admin/template-of-the-day/auto-pick")]
+    public async Task TemplateOfTheDayAdminEndpoints_ShouldRequireAdminOnlyPolicy(
         string method,
         string routePattern)
     {
@@ -238,12 +264,16 @@ public sealed class TemplatesApiStartupSmokeTests
 
         public string[] GetAuthorizationPolicies(string method, string routePattern)
         {
+            var normalizedRoutePattern = NormalizeRoutePattern(routePattern);
             var endpoint = app.Services
                 .GetRequiredService<EndpointDataSource>()
                 .Endpoints
                 .OfType<RouteEndpoint>()
                 .Single(endpoint =>
-                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    string.Equals(
+                        NormalizeRoutePattern(endpoint.RoutePattern.RawText),
+                        normalizedRoutePattern,
+                        StringComparison.Ordinal)
                     && endpoint.Metadata
                         .GetRequiredMetadata<IHttpMethodMetadata>()
                         .HttpMethods
@@ -255,6 +285,16 @@ public sealed class TemplatesApiStartupSmokeTests
                 .Where(policy => !string.IsNullOrWhiteSpace(policy))
                 .Cast<string>()
                 .ToArray();
+        }
+
+        private static string NormalizeRoutePattern(string? routePattern)
+        {
+            if (string.IsNullOrWhiteSpace(routePattern) || routePattern == "/")
+            {
+                return routePattern ?? string.Empty;
+            }
+
+            return routePattern.TrimEnd('/');
         }
 
         public async ValueTask DisposeAsync()

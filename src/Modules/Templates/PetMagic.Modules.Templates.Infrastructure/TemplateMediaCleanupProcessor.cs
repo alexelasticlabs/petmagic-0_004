@@ -54,6 +54,7 @@ internal sealed class TemplateMediaCleanupProcessor(
         }
 
         record.LifecycleState = TemplateMediaLifecycleState.Deleted;
+        record.IsDeleted = true;
         record.DeletedAtUtc = now;
         record.LastCleanupAttemptAtUtc = now;
         record.FailureCode = null;
@@ -92,7 +93,8 @@ internal sealed class TemplateMediaCleanupProcessor(
             {
                 job.SourceImageUrl,
                 job.NormalizedImageUrl,
-                job.ResultUrl
+                job.ResultUrl,
+                job.WatermarkedResultUrl
             }
             .Where(url => !string.IsNullOrWhiteSpace(url))
             .Cast<string>()
@@ -118,9 +120,19 @@ internal sealed class TemplateMediaCleanupProcessor(
         job.SourceImageUrl = string.Empty;
         job.NormalizedImageUrl = null;
         job.ResultUrl = null;
+        job.WatermarkedResultUrl = null;
         job.UserMediaDeletedAtUtc = now;
         job.LastUserMediaCleanupAttemptAtUtc = now;
         job.UserMediaCleanupFailureCode = null;
+        var mediaRecords = await dbContext.TemplateMediaRecords
+            .Where(record => record.GenerationJobId == job.Id || record.GenerationId == job.Id)
+            .ToArrayAsync(cancellationToken);
+        foreach (var record in mediaRecords)
+        {
+            record.IsDeleted = true;
+            record.DeletedAtUtc = now;
+            record.LifecycleState = TemplateMediaLifecycleState.Deleted;
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }

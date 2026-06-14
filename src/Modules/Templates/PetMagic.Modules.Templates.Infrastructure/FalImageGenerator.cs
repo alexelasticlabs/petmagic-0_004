@@ -11,15 +11,20 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
         string sourceImageUrl,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken)
     {
-        var input = new
+        var input = new Dictionary<string, object?>
         {
-            prompt,
-            image_urls = new[] { sourceImageUrl },
-            num_images = 1,
-            output_format = "png"
+            ["prompt"] = prompt,
+            ["image_urls"] = new[] { sourceImageUrl },
+            ["num_images"] = 1,
+            ["output_format"] = "png"
         };
+        if (seed is not null)
+        {
+            input["seed"] = seed.Value;
+        }
 
         var result = await queueClient.RunAsync(model, input, cancellationToken);
         if (result.IsFailure)

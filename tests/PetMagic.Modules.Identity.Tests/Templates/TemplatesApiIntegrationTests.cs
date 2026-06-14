@@ -283,9 +283,11 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<ITemplateMediaUploadPolicy>(new FixedTemplateMediaUploadPolicy());
             builder.Services.AddSingleton<IImagePreprocessor, TestImagePreprocessor>();
             builder.Services.AddSingleton<IImageGenerator, TestImageGenerator>();
+            builder.Services.AddSingleton<IImagePreviewGenerator>(new TestImagePreviewGenerator(mediaStorage));
             builder.Services.AddSingleton<IVideoMotionGenerator, TestVideoMotionGenerator>();
             builder.Services.AddSingleton<IGeneratedMediaImporter>(new TestGeneratedMediaImporter(mediaStorage, failGeneratedMediaImport));
             builder.Services.AddSingleton<ITemplateGenerationBilling>(billing);
+            builder.Services.AddSingleton<ITemplateWatermarkRenderer, PassthroughWatermarkRenderer>();
             builder.Services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
             builder.Services.AddSingleton<ITemplateGenerationPushNotificationSender, NoopPushNotificationSender>();
             builder.Services
@@ -294,6 +296,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<ITemplateMediaLifecycleService, TemplateMediaLifecycleService>();
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
+            builder.Services.AddScoped<IPetsService, PetsService>();
             builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();
             builder.Services.AddHostedService<TemplateGenerationWorker>();
@@ -318,6 +321,18 @@ public sealed partial class TemplatesApiIntegrationTests
             public Task NotifyGenerationTerminalAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken)
             {
                 return Task.CompletedTask;
+            }
+        }
+
+        private sealed class PassthroughWatermarkRenderer : ITemplateWatermarkRenderer
+        {
+            public Task<Result<StoredMediaResponse>> CreateWatermarkedCopyAsync(
+                StoredMediaResponse original,
+                TemplateType mediaType,
+                Guid generationId,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(Result.Success(original));
             }
         }
 
@@ -400,9 +415,27 @@ public sealed partial class TemplatesApiIntegrationTests
 
     private sealed class TestImageGenerator : IImageGenerator
     {
-        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model, CancellationToken cancellationToken)
+        public Task<Result<ImageGenerationResult>> CreateAsync(string sourceImageUrl, string prompt, string model,
+            int? seed,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new ImageGenerationResult($"https://fal.example.test/generated/{Guid.NewGuid():N}.png", null, null)));
+        }
+    }
+
+    private sealed class TestImagePreviewGenerator(IMediaStorage mediaStorage) : IImagePreviewGenerator
+    {
+        public async Task<StoredMediaResponse?> CreatePreviewAsync(
+            StoredMediaResponse original,
+            string outputFileName,
+            string? preferredStorageKey,
+            CancellationToken cancellationToken)
+        {
+            var result = await mediaStorage.StoreAsync(
+                new MediaUploadCommand(outputFileName, "image/webp", "preview-content"u8.ToArray()),
+                cancellationToken);
+
+            return result.IsSuccess ? result.Value : null;
         }
     }
 
@@ -415,6 +448,7 @@ public sealed partial class TemplatesApiIntegrationTests
             bool keepOriginalSound,
             string prompt,
             string model,
+            int? seed,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(new VideoMotionGenerationResult($"https://fal.example.test/generated/{Guid.NewGuid():N}.mp4", null, null)));
@@ -464,6 +498,11 @@ public sealed partial class TemplatesApiIntegrationTests
         {
             RefundedGenerationIds.Add(generationId);
             return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(0));
         }
     }
 

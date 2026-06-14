@@ -76,6 +76,28 @@ public sealed class LocalFileMediaStorageTests
         }
     }
 
+    [Theory]
+    [InlineData("templates-media/2026/06/result.png", "http://localhost:5000/templates-media/2026/06/result.png")]
+    [InlineData("http://localhost:5000/templates-media/2026/06/result.png", "http://localhost:5000/templates-media/2026/06/result.png")]
+    [InlineData("https://cdn.example.com/result.png", "https://cdn.example.com/result.png")]
+    public async Task CreateReadUrlAsync_ShouldResolveManagedKeysAndPreserveExternalUrls(string assetUrl, string expected)
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var readUrl = await storage.CreateReadUrlAsync(assetUrl, TimeSpan.FromMinutes(5), CancellationToken.None);
+
+            Assert.True(readUrl.IsSuccess);
+            Assert.Equal(expected, readUrl.Value);
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task StoreAsync_ShouldRejectUnsafeOctetStreamExtension()
     {

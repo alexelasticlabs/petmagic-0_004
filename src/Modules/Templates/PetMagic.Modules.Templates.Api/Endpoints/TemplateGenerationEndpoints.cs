@@ -50,6 +50,49 @@ public static class TemplateGenerationEndpoints
             .RequireRateLimiting("generation-create")
             .DisableAntiforgery();
 
+        group.MapGet("/generation-results/{resultId:guid}/compatible-templates", GetCompatibleTemplatesAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        group.MapPost("/generations/from-result", StartGenerationFromResultAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-create");
+
+        endpoints.MapGet("/api/generation-results/{resultId:guid}/compatible-templates", GetCompatibleTemplatesAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        endpoints.MapPost("/api/generations/from-result", StartGenerationFromResultAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-create");
+
+        endpoints.MapPost("/api/generations/{generationId:guid}/generate-similar", GenerateSimilarAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-create");
+
+        endpoints.MapGet("/api/generations/{generationId:guid}", GetGenerationAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("generation-status");
+
+        endpoints.MapPost("/api/generations/{generationId:guid}/remove-watermark", RemoveWatermarkAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        endpoints.MapGet("/api/generations/{generationId:guid}/download", DownloadGenerationAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        endpoints.MapPost("/api/generations/{generationId:guid}/share", ShareGenerationAsync)
+            .WithTags("Template Generations")
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-status");
@@ -61,6 +104,18 @@ public static class TemplateGenerationEndpoints
         group.MapGet("/generations/{generationId:guid}", GetGenerationAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-status");
+
+        group.MapPost("/generations/{generationId:guid}/remove-watermark", RemoveWatermarkAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        group.MapGet("/generations/{generationId:guid}/download", DownloadGenerationAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        group.MapPost("/generations/{generationId:guid}/share", ShareGenerationAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
 
         group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
             .RequireAuthorization()
@@ -85,11 +140,135 @@ public static class TemplateGenerationEndpoints
         return endpoints;
     }
 
+    private static async Task<Results<Ok<CompatibleGenerationTemplatesResponse>, ProblemHttpResult>> GetCompatibleTemplatesAsync(
+        HttpContext context,
+        Guid resultId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var result = await generationService.GetCompatibleTemplatesAsync(userId!.Value, resultId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<TemplateGenerationResponse>, ProblemHttpResult, ValidationProblem>> StartGenerationFromResultAsync(
+        HttpContext context,
+        [FromBody] StartGenerationFromResultRequest request,
+        [FromServices] ITemplateGenerationService generationService,
+        [FromServices] ITemplatesService templatesService,
+        [FromServices] IValidator<StartTemplateGenerationFromResultCommand> validator,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var templateLookup = await templatesService.GetAdminAsync(request.TemplateId, cancellationToken);
+        if (templateLookup.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: templateLookup.Error.Code,
+                detail: templateLookup.Error.Message,
+                statusCode: string.Equals(templateLookup.Error.Code, "templates.not_found", StringComparison.Ordinal)
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status400BadRequest);
+        }
+
+        if (templateLookup.Value.IsPremium
+            && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
+        {
+            return TypedResults.Problem(
+                title: PremiumRequiredCode,
+                detail: PremiumRequiredMessage,
+                statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var command = new StartTemplateGenerationFromResultCommand(
+            userId!.Value,
+            request.ParentGenerationResultId,
+            request.TemplateId,
+            NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
+            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken));
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await generationService.StartFromResultAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
+    }
+
+    private static async Task<Results<Accepted<GenerateSimilarResponse>, ProblemHttpResult, ValidationProblem>> GenerateSimilarAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromBody] GenerateSimilarRequest? request,
+        [FromServices] ITemplateGenerationService generationService,
+        [FromServices] IValidator<StartSimilarTemplateGenerationCommand> validator,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var command = new StartSimilarTemplateGenerationCommand(
+            userId!.Value,
+            generationId,
+            string.IsNullOrWhiteSpace(request?.VariationStrength) ? "medium" : request!.VariationStrength!,
+            NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
+            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken));
+
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await generationService.StartSimilarAsync(command, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        var response = new GenerateSimilarResponse(result.Value.GenerationId, result.Value.Status);
+        return TypedResults.Accepted($"/api/templates/generations/{response.GenerationId}", response);
+    }
+
     private static async Task<Results<Accepted<TemplateGenerationResponse>, ProblemHttpResult, ValidationProblem>> StartGenerationAsync(
         HttpContext context,
         Guid templateId,
         [FromForm] IFormFile? sourceImage,
         [FromServices] IMediaStorage mediaStorage,
+        [FromServices] IImagePreviewGenerator imagePreviewGenerator,
         [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
         [FromServices] ITemplatesService templatesService,
         [FromServices] IValidator<StartTemplateGenerationCommand> validator,
@@ -157,27 +336,35 @@ public static class TemplateGenerationEndpoints
         }
 
         var stored = storeResult.Value;
+        var preview = await imagePreviewGenerator.CreatePreviewAsync(
+            stored,
+            $"{Path.GetFileNameWithoutExtension(stored.FileName)}-preview.webp",
+            preferredStorageKey: null,
+            cancellationToken);
         try
         {
             var command = new StartTemplateGenerationCommand(
-                userId!.Value,
-                templateId,
-                new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
-                idempotencyKey,
-                requestHash,
-                activeGenerationLimit);
+                UserId: userId!.Value,
+                TemplateId: templateId,
+                SourceImageAsset: new TemplateAssetCommand(stored.Url, stored.FileName, stored.ContentType, stored.FileSizeBytes, null),
+                SourceImagePreviewAsset: preview is null
+                    ? null
+                    : new TemplateAssetCommand(preview.Url, preview.FileName, preview.ContentType, preview.FileSizeBytes, null),
+                IdempotencyKey: idempotencyKey,
+                RequestHash: requestHash,
+                ActiveGenerationLimit: activeGenerationLimit);
 
             var validation = await validator.ValidateAsync(command, cancellationToken);
             if (!validation.IsValid)
             {
-                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+                await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
                 return TypedResults.ValidationProblem(validation.ToDictionary());
             }
 
             var result = await generationService.StartAsync(command, cancellationToken);
             if (result.IsFailure)
             {
-                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+                await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
                 return TypedResults.Problem(
                     title: result.Error.Code,
                     detail: result.Error.Message,
@@ -187,22 +374,37 @@ public static class TemplateGenerationEndpoints
             if (!string.Equals(result.Value.SourceImageAsset?.FileName, stored.FileName, StringComparison.Ordinal)
                 || !string.Equals(result.Value.SourceImageAsset?.ContentType, stored.ContentType, StringComparison.OrdinalIgnoreCase))
             {
-                await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+                await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
             }
 
             return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
         }
         catch
         {
-            await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
+            await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
             throw;
+        }
+    }
+
+    private static async Task DeleteUploadedGenerationMediaAsync(
+        IMediaStorage mediaStorage,
+        StoredMediaResponse stored,
+        StoredMediaResponse? preview)
+    {
+        IEnumerable<string> urls = preview is null
+            ? [stored.Url]
+            : new[] { stored.Url, preview.Url }.Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var url in urls)
+        {
+            await mediaStorage.DeleteAsync(url, CancellationToken.None);
         }
     }
 
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> GetGenerationAsync(
         HttpContext context,
         Guid generationId,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -211,10 +413,93 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var result = await generationService.GetAsync(userId!.Value, generationId, cancellationToken);
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var result = await generationService.GetAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<RemoveGenerationWatermarkResponse>, ProblemHttpResult>> RemoveWatermarkAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromBody] RemoveWatermarkRequest? request,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var result = await generationService.RemoveWatermarkAsync(
+            new RemoveGenerationWatermarkCommand(
+                userId.Value,
+                generationId,
+                request?.PaymentMethod ?? "credit",
+                isPremium),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<GenerationDownloadResponse>, ProblemHttpResult>> DownloadGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var result = await generationService.GetDownloadAsync(userId.Value, generationId, isPremium, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<GenerationDownloadResponse>, ProblemHttpResult>> ShareGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var result = await generationService.GetShareAsync(userId.Value, generationId, isPremium, cancellationToken);
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveFailureStatusCode(result.Error));
         }
 
         return TypedResults.Ok(result.Value);
@@ -225,7 +510,7 @@ public static class TemplateGenerationEndpoints
         [FromQuery] string? status,
         [FromQuery] int? skip,
         [FromQuery] int? take,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -234,9 +519,11 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.ListAsync(
             userId!.Value,
             new TemplateGenerationHistoryQuery(status, skip, take),
+            isPremium,
             cancellationToken);
 
         if (result.IsFailure)
@@ -249,7 +536,7 @@ public static class TemplateGenerationEndpoints
 
     private static async Task<Results<Ok<TemplateGenerationUnreadCountResponse>, ProblemHttpResult>> GetUnreadCountAsync(
         HttpContext context,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -270,7 +557,7 @@ public static class TemplateGenerationEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> MarkReadAsync(
         HttpContext context,
         Guid generationId,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -279,7 +566,8 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
-        var result = await generationService.MarkReadAsync(userId!.Value, generationId, cancellationToken);
+        var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
+        var result = await generationService.MarkReadAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
@@ -291,7 +579,7 @@ public static class TemplateGenerationEndpoints
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteGenerationAsync(
         HttpContext context,
         Guid generationId,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -367,7 +655,7 @@ public static class TemplateGenerationEndpoints
         HttpContext context,
         Guid generationId,
         [FromBody] RecordTemplateGenerationFeedbackRequest request,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
@@ -442,12 +730,15 @@ public static class TemplateGenerationEndpoints
             "GENERATION_JOB_NOT_FOUND" => StatusCodes.Status404NotFound,
             "templates.invalid_status" => StatusCodes.Status409Conflict,
             "templates.type_mismatch" => StatusCodes.Status400BadRequest,
+            "templates.generation_result_input_unavailable" => StatusCodes.Status409Conflict,
+            "templates.generation_result_input_unsupported" => StatusCodes.Status400BadRequest,
             "templates.image_model_required" => StatusCodes.Status409Conflict,
             "templates.invalid_image_model" => StatusCodes.Status400BadRequest,
             "templates.reference_motion_required" => StatusCodes.Status409Conflict,
             "templates.character_orientation_required" => StatusCodes.Status409Conflict,
             "templates.premium_required" => StatusCodes.Status403Forbidden,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,
+            "templates.watermark_not_ready" => StatusCodes.Status202Accepted,
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
             "GENERATION_QUEUE_OVERLOADED" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
@@ -555,4 +846,8 @@ public static class TemplateGenerationEndpoints
     private sealed record RegisterPushTokenRequest(string Token, string Platform, string? DeviceId, string? AppVersion, string? Locale);
 
     private sealed record UnregisterPushTokenRequest(string Token);
+
+    private sealed record RemoveWatermarkRequest(string? PaymentMethod);
+
+    private sealed record StartGenerationFromResultRequest(Guid ParentGenerationResultId, Guid TemplateId);
 }

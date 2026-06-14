@@ -1,5 +1,7 @@
-using FluentValidation;
 using System.Globalization;
+using System.Security.Claims;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -17,6 +19,8 @@ public static class AdminTemplateEndpoints
 {
     private const double PreviewMinDurationSeconds = 0.5;
     private const double PreviewMaxDurationSeconds = 18.0;
+    private const int RecentGenerationsDefaultTake = 25;
+    private const int RecentGenerationsMaxTake = 250;
 
     public static IEndpointRouteBuilder MapAdminTemplateEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -31,6 +35,12 @@ public static class AdminTemplateEndpoints
         group.MapPost("/moderation/{eventId:guid}/decision", DecideModerationItemAsync);
         group.MapGet("/generations/metrics", GetGenerationDashboardMetricsAsync);
         group.MapGet("/generations", ListGenerationsAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapGet("/monetization/watermark", GetWatermarkSettingsAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPut("/monetization/watermark", UpdateWatermarkSettingsAsync)
+            .RequireAuthorization("AdminOnly");
+        group.MapPost("/generations/{generationId:guid}/grant-clean-download", GrantCleanDownloadAsync)
             .RequireAuthorization("AdminOnly");
         group.MapGet("/{templateId:guid}", GetAsync);
         group.MapGet("/{templateId:guid}/statistics", GetStatisticsAsync);
@@ -60,10 +70,149 @@ public static class AdminTemplateEndpoints
             .RequireAuthorization("AdminOnly")
             .DisableAntiforgery();
 
+        var templateOfTheDayGroup = endpoints.MapGroup("/api/admin/template-of-the-day")
+            .WithTags("Admin.TemplateOfTheDay")
+            .RequireAuthorization("AdminOnly")
+            .RequireRateLimiting("admin");
+
+        endpoints.MapGet("/api/admin/template-of-the-day", ListTemplateOfTheDayScheduleAsync)
+            .WithTags("Admin.TemplateOfTheDay")
+            .RequireAuthorization("AdminOnly")
+            .RequireRateLimiting("admin");
+        endpoints.MapPost("/api/admin/template-of-the-day", CreateTemplateOfTheDayAsync)
+            .WithTags("Admin.TemplateOfTheDay")
+            .RequireAuthorization("AdminOnly")
+            .RequireRateLimiting("admin");
+        templateOfTheDayGroup.MapGet("/current", GetCurrentTemplateOfTheDayAsync);
+        templateOfTheDayGroup.MapGet("/schedule", ListTemplateOfTheDayScheduleAsync);
+        templateOfTheDayGroup.MapGet("/settings", GetTemplateOfTheDaySettingsAsync);
+        templateOfTheDayGroup.MapPut("/settings", UpdateTemplateOfTheDaySettingsAsync);
+        templateOfTheDayGroup.MapPut("/{id:guid}", UpdateTemplateOfTheDayAsync);
+        templateOfTheDayGroup.MapDelete("/{id:guid}", DeleteTemplateOfTheDayAsync);
+        templateOfTheDayGroup.MapPost("/auto-pick", AutoPickTemplateOfTheDayAsync);
+
         return endpoints;
     }
 
-    private static async Task<Ok<AdminTemplateCatalogPageResponse>> ListAsync(
+    private static async Task<Ok<AdminTemplateOfTheDayScheduleResponse>> ListTemplateOfTheDayScheduleAsync(
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.ListAdminTemplateOfTheDayScheduleAsync(skip, take, cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminTemplateOfTheDayResponse?>> GetCurrentTemplateOfTheDayAsync(
+        [FromQuery] DateOnly? date,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminCurrentTemplateOfTheDayAsync(date, cancellationToken);
+        AdminTemplateOfTheDayResponse? value = result.Value;
+        return TypedResults.Ok<AdminTemplateOfTheDayResponse?>(value);
+    }
+
+    private static async Task<Ok<AdminTemplateOfTheDaySettingsResponse>> GetTemplateOfTheDaySettingsAsync(
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminTemplateOfTheDaySettingsAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminTemplateOfTheDaySettingsResponse>> UpdateTemplateOfTheDaySettingsAsync(
+        [FromBody] TemplateOfTheDaySettingsRequest request,
+        HttpContext httpContext,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.UpdateAdminTemplateOfTheDaySettingsAsync(
+            new UpdateTemplateOfTheDaySettingsCommand(
+                request.AutoModeEnabled,
+                request.AllowedTypes,
+                request.ExcludeRecentDays,
+                ResolveAdminUserId(httpContext)),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> CreateTemplateOfTheDayAsync(
+        [FromBody] TemplateOfTheDayRequest request,
+        HttpContext httpContext,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.CreateTemplateOfTheDayAsync(
+            new CreateTemplateOfTheDayCommand(
+                request.TemplateId,
+                request.StartDate,
+                request.EndDate,
+                request.IsActive,
+                request.IsManual,
+                request.Priority,
+                request.TitleOverride,
+                request.SubtitleOverride,
+                request.BadgeTextOverride,
+                ResolveAdminUserId(httpContext)),
+            cancellationToken);
+
+        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> UpdateTemplateOfTheDayAsync(
+        Guid id,
+        [FromBody] TemplateOfTheDayRequest request,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.UpdateTemplateOfTheDayAsync(
+            new UpdateTemplateOfTheDayCommand(
+                id,
+                request.TemplateId,
+                request.StartDate,
+                request.EndDate,
+                request.IsActive,
+                request.IsManual,
+                request.Priority,
+                request.TitleOverride,
+                request.SubtitleOverride,
+                request.BadgeTextOverride),
+            cancellationToken);
+
+        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> DeleteTemplateOfTheDayAsync(
+        Guid id,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.DeleteTemplateOfTheDayAsync(id, cancellationToken);
+        return result.IsFailure ? ToTemplateOfTheDayDeleteProblem(result.Error) : TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> AutoPickTemplateOfTheDayAsync(
+        [FromBody] AutoPickTemplateOfTheDayRequest request,
+        HttpContext httpContext,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.AutoPickTemplateOfTheDayAsync(
+            new AutoPickTemplateOfTheDayCommand(
+                request.Date,
+                request.AllowedTypes,
+                request.ExcludeRecentDays,
+                ResolveAdminUserId(httpContext),
+                Force: true),
+            cancellationToken);
+
+        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<AdminTemplateCatalogPageResponse>, ProblemHttpResult>> ListAsync(
         [FromQuery] string? type,
         [FromQuery] string? status,
         [FromQuery] string? search,
@@ -72,9 +221,15 @@ public static class AdminTemplateEndpoints
         [FromQuery] string? sort,
         [FromQuery] int? skip,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var filterProblem = ValidateCatalogFilters(type, status, access, sort);
+        if (filterProblem is not null)
+        {
+            return filterProblem;
+        }
+
         var result = await service.ListAdminAsync(
             new AdminTemplateCatalogQuery(type, status, search, category, access, sort, skip, take),
             cancellationToken);
@@ -90,7 +245,7 @@ public static class AdminTemplateEndpoints
         [FromQuery] string? access,
         [FromQuery] string? sort,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminTemplatesAnalyticsAsync(
@@ -100,8 +255,88 @@ public static class AdminTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static ProblemHttpResult? ValidateCatalogFilters(
+        string? type,
+        string? status,
+        string? access,
+        string? sort)
+    {
+        if (!IsNeutralFilter(type) && !IsDefinedEnumName<TemplateType>(type))
+        {
+            return InvalidCatalogFilterProblem(
+                "templates.invalid_type",
+                "Query parameter type must be Image or Video.");
+        }
+
+        var normalizedStatus = status?.Trim();
+        if (!IsNeutralFilter(normalizedStatus)
+            && !string.Equals(normalizedStatus, "not_archived", StringComparison.OrdinalIgnoreCase)
+            && !IsDefinedEnumName<TemplateStatus>(status))
+        {
+            return InvalidCatalogFilterProblem(
+                "templates.invalid_status",
+                "Query parameter status must be Draft, Active, Archived, or not_archived.");
+        }
+
+        if (!IsNeutralFilter(access)
+            && !IsOneOf(access, "premium", "free"))
+        {
+            return InvalidCatalogFilterProblem(
+                "templates.invalid_access",
+                "Query parameter access must be premium or free.");
+        }
+
+        if (!IsNeutralFilter(sort)
+            && !IsOneOf(sort, "newest", "updated", "title", "tokens"))
+        {
+            return InvalidCatalogFilterProblem(
+                "templates.invalid_sort",
+                "Query parameter sort must be newest, updated, title, or tokens.");
+        }
+
+        return null;
+    }
+
+    private static ProblemHttpResult InvalidCatalogFilterProblem(string title, string detail)
+    {
+        return TypedResults.Problem(
+            title: title,
+            detail: detail,
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static bool IsNeutralFilter(string? raw)
+    {
+        return string.IsNullOrWhiteSpace(raw)
+            || string.Equals(raw.Trim(), "all", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDefinedEnumName<TEnum>(string? raw)
+        where TEnum : struct, Enum
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var normalized = raw.Trim();
+        return Enum.GetNames<TEnum>().Any(name =>
+            string.Equals(name, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsOneOf(string? raw, params string[] values)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var normalized = raw.Trim();
+        return values.Any(value => string.Equals(value, normalized, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static async Task<Ok<AdminTemplateGenerationDashboardMetricsResponse>> GetGenerationDashboardMetricsAsync(
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminGenerationDashboardMetricsAsync(cancellationToken);
@@ -113,7 +348,7 @@ public static class AdminTemplateEndpoints
         [FromQuery] string? search,
         [FromQuery] int? skip,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminModerationQueueAsync(
@@ -126,7 +361,7 @@ public static class AdminTemplateEndpoints
     private static async Task<Results<Ok<AdminModerationQueueItemResponse>, ProblemHttpResult>> DecideModerationItemAsync(
         Guid eventId,
         [FromBody] AdminModerationDecisionRequest? request,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.DecideAdminModerationItemAsync(
@@ -151,7 +386,7 @@ public static class AdminTemplateEndpoints
         [FromQuery] string? search,
         [FromQuery] int? skip,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminGenerationsAsync(
@@ -161,9 +396,60 @@ public static class AdminTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
+    private static async Task<Ok<AdminWatermarkSettingsResponse>> GetWatermarkSettingsAsync(
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.GetAdminWatermarkSettingsAsync(cancellationToken);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Ok<AdminWatermarkSettingsResponse>> UpdateWatermarkSettingsAsync(
+        [FromBody] WatermarkSettingsRequest request,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.UpdateAdminWatermarkSettingsAsync(
+            new UpdateAdminWatermarkSettingsCommand(
+                request.Enabled,
+                request.Text,
+                request.LogoUrl,
+                request.Opacity,
+                request.Position,
+                request.Size,
+                request.CostCredits,
+                request.ApplyToImages,
+                request.ApplyToVideos),
+            cancellationToken);
+
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<RemoveGenerationWatermarkResponse>, ProblemHttpResult>> GrantCleanDownloadAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var result = await generationService.GrantAdminCleanDownloadAsync(
+            ResolveAdminUserId(context) ?? Guid.Empty,
+            generationId,
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: StatusCodes.Status404NotFound);
+        }
+
+        return TypedResults.Ok(result.Value);
+    }
+
     private static async Task<Results<Ok<AdminTemplateResponse>, ProblemHttpResult>> GetAsync(
         Guid templateId,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminAsync(templateId, cancellationToken);
@@ -177,7 +463,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<AdminTemplateStatisticsResponse>, ProblemHttpResult>> GetStatisticsAsync(
         Guid templateId,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminStatisticsAsync(templateId, cancellationToken);
@@ -191,7 +477,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<IReadOnlyList<AdminTemplateTrendPointResponse>>, ProblemHttpResult>> GetTrendAsync(
         Guid templateId,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminTrendAsync(templateId, cancellationToken);
@@ -206,10 +492,10 @@ public static class AdminTemplateEndpoints
     private static async Task<Results<Ok<IReadOnlyList<AdminTemplateRecentGenerationResponse>>, ProblemHttpResult>> GetRecentAsync(
         Guid templateId,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var size = take.HasValue ? Math.Clamp(take.Value, 1, 250) : int.MaxValue;
+        var size = take.HasValue ? Math.Clamp(take.Value, 1, RecentGenerationsMaxTake) : RecentGenerationsDefaultTake;
         var result = await service.GetAdminRecentGenerationsAsync(templateId, size, cancellationToken);
         if (result.IsFailure)
         {
@@ -222,7 +508,7 @@ public static class AdminTemplateEndpoints
     private static async Task<Results<Ok<IReadOnlyList<TemplateGenerationResponse>>, ProblemHttpResult>> GetTestHistoryAsync(
         Guid templateId,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var size = take.HasValue ? Math.Clamp(take.Value, 1, 50) : 12;
@@ -237,7 +523,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<IReadOnlyList<AdminTemplateFailureBreakdownItemResponse>>, ProblemHttpResult>> GetFailureBreakdownAsync(
         Guid templateId,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminFailureBreakdownAsync(templateId, cancellationToken);
@@ -251,7 +537,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<AdminTemplateEventAnalyticsResponse>, ProblemHttpResult>> GetEventAnalyticsAsync(
         Guid templateId,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminEventAnalyticsAsync(templateId, cancellationToken);
@@ -268,7 +554,7 @@ public static class AdminTemplateEndpoints
         [FromQuery] string? type,
         [FromQuery] string? search,
         [FromQuery] int? take,
-        ITemplatesService service,
+        [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminFeedbackAsync(
@@ -335,7 +621,7 @@ public static class AdminTemplateEndpoints
 
     private static async Task<Results<Ok<TemplateGenerationResponse>, ProblemHttpResult>> GetAdminTestAsync(
         Guid generationId,
-        ITemplateGenerationService generationService,
+        [FromServices] ITemplateGenerationService generationService,
         CancellationToken cancellationToken)
     {
         var result = await generationService.GetAdminAsync(generationId, cancellationToken);
@@ -375,7 +661,25 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        var command = new UpdateImageTemplateCommand(templateId, request.Title, request.ShortDescription, request.Category, request.Tags, request.IsPremium, request.TokenCost, request.PromoBadgeMode, request.PreviewAsset, request.ImageModel, request.ImagePrompt, request.Status, request.PetPhotoRequirements);
+        var command = new UpdateImageTemplateCommand(
+            templateId,
+            request.Title,
+            request.ShortDescription,
+            request.Category,
+            request.Tags,
+            request.IsPremium,
+            request.TokenCost,
+            request.PromoBadgeMode,
+            request.PreviewAsset,
+            request.ImageModel,
+            request.ImagePrompt,
+            request.Status,
+            request.PetPhotoRequirements,
+            request.SupportsGenerationResultInput,
+            request.RequiredInputMediaType,
+            request.RecommendedAfterImageGeneration,
+            request.SupportsGenerateSimilar,
+            request.DefaultVariationStrength);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -437,7 +741,12 @@ public static class AdminTemplateEndpoints
             request.KlingPrompt,
             request.KeepOriginalSound,
             request.Status,
-            request.PetPhotoRequirements);
+            request.PetPhotoRequirements,
+            request.SupportsGenerationResultInput,
+            request.RequiredInputMediaType,
+            request.RecommendedAfterImageGeneration,
+            request.SupportsGenerateSimilar,
+            request.DefaultVariationStrength);
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -767,6 +1076,68 @@ public static class AdminTemplateEndpoints
         return normalized.Trim();
     }
 
+    private static Guid? ResolveAdminUserId(HttpContext httpContext)
+    {
+        var raw = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub");
+
+        return Guid.TryParse(raw, out var userId) ? userId : null;
+    }
+
+    private static ProblemHttpResult ToTemplateOfTheDayProblem(PetMagic.BuildingBlocks.Results.Error error)
+    {
+        var statusCode = error.Code switch
+        {
+            "templates.not_found" => StatusCodes.Status404NotFound,
+            "templates.template_of_the_day_template_unavailable" => StatusCodes.Status404NotFound,
+            "templates.template_of_the_day_date_occupied" => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest
+        };
+
+        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+    }
+
+    private static ProblemHttpResult ToTemplateOfTheDayDeleteProblem(PetMagic.BuildingBlocks.Results.Error error)
+    {
+        var statusCode = string.Equals(error.Code, "templates.not_found", StringComparison.Ordinal)
+            ? StatusCodes.Status404NotFound
+            : StatusCodes.Status400BadRequest;
+
+        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+    }
+
+    public sealed record TemplateOfTheDayRequest(
+        Guid TemplateId,
+        DateOnly StartDate,
+        DateOnly? EndDate,
+        bool IsActive,
+        bool IsManual,
+        int Priority,
+        string? TitleOverride,
+        string? SubtitleOverride,
+        string? BadgeTextOverride);
+
+    public sealed record AutoPickTemplateOfTheDayRequest(
+        DateOnly Date,
+        string? AllowedTypes,
+        int? ExcludeRecentDays);
+
+    public sealed record TemplateOfTheDaySettingsRequest(
+        bool AutoModeEnabled,
+        string? AllowedTypes,
+        int? ExcludeRecentDays);
+
+    public sealed record WatermarkSettingsRequest(
+        bool Enabled,
+        string Text,
+        string? LogoUrl,
+        double Opacity,
+        string Position,
+        string Size,
+        int CostCredits,
+        bool ApplyToImages,
+        bool ApplyToVideos);
+
     public sealed record UpdateImageTemplateRequest(
         string Title,
         string ShortDescription,
@@ -779,7 +1150,12 @@ public static class AdminTemplateEndpoints
         string ImageModel,
         string ImagePrompt,
         string? Status = null,
-        IReadOnlyList<string>? PetPhotoRequirements = null);
+        IReadOnlyList<string>? PetPhotoRequirements = null,
+        bool SupportsGenerationResultInput = false,
+        string? RequiredInputMediaType = null,
+        bool RecommendedAfterImageGeneration = false,
+        bool SupportsGenerateSimilar = true,
+        string DefaultVariationStrength = "medium");
 
     public sealed record UpdateVideoTemplateRequest(
         string Title,
@@ -798,7 +1174,12 @@ public static class AdminTemplateEndpoints
         string KlingPrompt,
         bool KeepOriginalSound,
         string? Status = null,
-        IReadOnlyList<string>? PetPhotoRequirements = null);
+        IReadOnlyList<string>? PetPhotoRequirements = null,
+        bool SupportsGenerationResultInput = false,
+        string? RequiredInputMediaType = null,
+        bool RecommendedAfterImageGeneration = false,
+        bool SupportsGenerateSimilar = true,
+        string DefaultVariationStrength = "medium");
 
     public sealed record ChangeTemplateStatusRequest(string Status);
 

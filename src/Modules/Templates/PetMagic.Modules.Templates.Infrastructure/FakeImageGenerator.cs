@@ -9,6 +9,7 @@ internal sealed class FakeImageGenerator : IImageGenerator
         string sourceImageUrl,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken)
     {
         return Task.FromResult(Result.Success(new ImageGenerationResult(sourceImageUrl, null, null)));

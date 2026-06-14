@@ -6,5 +6,6 @@ public enum TemplateMediaRole
     ReferenceMotionAsset = 2,
     GenerationSourceImage = 3,
     GenerationNormalizedImage = 4,
-    GenerationOutputVideo = 5
+    GenerationOutputVideo = 5,
+    GenerationOutputImage = 6
 }

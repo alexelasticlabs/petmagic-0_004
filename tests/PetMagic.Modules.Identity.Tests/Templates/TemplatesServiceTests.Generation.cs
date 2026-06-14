@@ -3,9 +3,12 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Observability;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -107,6 +110,113 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetCompatibleTemplatesAsync_ShouldReturnOnlyTemplatesCompatibleWithCompletedImageResult()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var userId = Guid.NewGuid();
+        var parent = await CreateCompletedImageGenerationAsync(dbContext, service, userId);
+        var compatibleVideo = await CreateGenerationResultVideoTemplateAsync(
+            service,
+            "Compatible Video",
+            supportsGenerationResultInput: true,
+            requiredInputMediaType: TemplateType.Image.ToString(),
+            recommendedAfterImageGeneration: true);
+        await CreateGenerationResultVideoTemplateAsync(
+            service,
+            "Video Result Only",
+            supportsGenerationResultInput: true,
+            requiredInputMediaType: TemplateType.Video.ToString(),
+            recommendedAfterImageGeneration: true);
+        await CreateGenerationResultVideoTemplateAsync(
+            service,
+            "Not Supported",
+            supportsGenerationResultInput: false,
+            requiredInputMediaType: TemplateType.Image.ToString(),
+            recommendedAfterImageGeneration: true);
+
+        var compatible = await generationService.GetCompatibleTemplatesAsync(
+            userId,
+            parent.Id,
+            CancellationToken.None);
+
+        Assert.True(compatible.IsSuccess);
+        Assert.Equal(parent.Id, compatible.Value.ResultId);
+        Assert.Equal("image", compatible.Value.InputMediaType);
+        var template = Assert.Single(compatible.Value.Templates);
+        Assert.Equal(compatibleVideo, template.Id);
+        Assert.Equal("Video", template.Type);
+        Assert.True(template.IsRecommended);
+    }
+
+    [Fact]
+    public async Task StartFromResultAsync_ShouldCreateChildVideoGenerationWithCleanInternalInput()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var userId = Guid.NewGuid();
+        var parent = await CreateCompletedImageGenerationAsync(dbContext, service, userId);
+        var videoTemplateId = await CreateGenerationResultVideoTemplateAsync(
+            service,
+            "Result To Video",
+            supportsGenerationResultInput: true,
+            requiredInputMediaType: TemplateType.Image.ToString(),
+            recommendedAfterImageGeneration: true);
+
+        var started = await generationService.StartFromResultAsync(
+            new StartTemplateGenerationFromResultCommand(
+                userId,
+                parent.Id,
+                videoTemplateId,
+                "from-result-key",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(videoTemplateId, started.Value.TemplateId);
+        Assert.Equal("Queued", started.Value.Status);
+        Assert.Null(started.Value.SourceImageAsset);
+        Assert.Equal(parent.Id, started.Value.ParentGenerationId);
+        Assert.Equal(parent.Id, started.Value.ParentGenerationResultId);
+        Assert.Equal("generation_result", started.Value.InputSourceType);
+        Assert.NotNull(started.Value.InputMediaAssetId);
+
+        var child = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        var persistedParent = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == parent.Id);
+        Assert.Equal(parent.Id, child.ParentGenerationId);
+        Assert.Equal(parent.Id, child.ParentGenerationResultId);
+        Assert.Equal("generation_result", child.InputSourceType);
+        Assert.NotNull(child.InputMediaAssetId);
+        Assert.NotNull(child.ChargedAtUtc);
+        Assert.Null(persistedParent.ChargedAtUtc);
+
+        var inputAsset = await dbContext.TemplateMediaRecords.SingleAsync(x => x.Id == child.InputMediaAssetId);
+        Assert.Equal(userId, inputAsset.UserId);
+        Assert.Equal("image", inputAsset.MediaType);
+        Assert.Equal("generation_result", inputAsset.SourceType);
+        Assert.Equal(parent.Id, inputAsset.GenerationId);
+        Assert.Equal(parent.ResultUrl, inputAsset.StoragePath);
+        Assert.Equal(parent.WatermarkedResultUrl, inputAsset.WatermarkedStoragePath);
+        Assert.Equal(inputAsset.Id, started.Value.InputMediaAssetId);
+
+        var analyticsEvents = await dbContext.TemplateAnalyticsEvents
+            .Where(x => x.GenerationId == child.Id)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToArrayAsync();
+        Assert.Contains(analyticsEvents, x => x.EventType == TemplateAnalyticsEventTypes.TemplateSelected);
+        Assert.Contains(analyticsEvents, x => x.EventType == TemplateAnalyticsEventTypes.GenerationStarted);
+        var startedEvent = analyticsEvents.Single(x => x.EventType == TemplateAnalyticsEventTypes.GenerationStarted);
+        using var metadata = JsonDocument.Parse(startedEvent.MetadataJson!);
+        Assert.Equal(parent.Id, metadata.RootElement.GetProperty("parentGenerationId").GetGuid());
+        Assert.Equal(videoTemplateId, metadata.RootElement.GetProperty("newTemplateId").GetGuid());
+        Assert.Equal("video", metadata.RootElement.GetProperty("newTemplateType").GetString());
+        Assert.Equal("image", metadata.RootElement.GetProperty("inputMediaType").GetString());
+        Assert.Equal(30, metadata.RootElement.GetProperty("creditsCost").GetInt32());
+    }
+
+    [Fact]
     public async Task StartAsync_ShouldReturnExistingActiveJob_WhenRequestHashMatches()
     {
         await using var dbContext = CreateDbContext();
@@ -171,6 +281,76 @@ public sealed partial class TemplatesServiceTests
         Assert.True(second.IsSuccess);
         Assert.Equal(first.Value.GenerationId, second.Value.GenerationId);
         Assert.Equal(1, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    private static async Task<TemplateGenerationJob> CreateCompletedImageGenerationAsync(
+        TemplatesDbContext dbContext,
+        ITemplatesService service,
+        Guid userId)
+    {
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            $"Parent Portrait {Guid.NewGuid():N}",
+            "Portrait",
+            ["parent"]);
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = 20,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 2048,
+            ResultUrl = "https://cdn.example.com/results/clean-parent.png",
+            WatermarkedResultUrl = "https://cdn.example.com/results/watermarked-parent.png",
+            CreatedAtUtc = now.AddMinutes(-10),
+            QueuedAtUtc = now.AddMinutes(-10),
+            UpdatedAtUtc = now.AddMinutes(-5),
+            CompletedAtUtc = now.AddMinutes(-5),
+            MediaImportCompletedAtUtc = now.AddMinutes(-5)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+        return job;
+    }
+
+    private static async Task<Guid> CreateGenerationResultVideoTemplateAsync(
+        ITemplatesService service,
+        string title,
+        bool supportsGenerationResultInput,
+        string requiredInputMediaType,
+        bool recommendedAfterImageGeneration)
+    {
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                title,
+                $"{title} description",
+                "Video",
+                ["from-result"],
+                false,
+                30,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                string.Empty,
+                CreatePreviewAsset($"https://cdn.example.com/{title.ToLowerInvariant().Replace(' ', '-')}.mp4", "preview.mp4", "video/mp4"),
+                CreateReferenceAsset(8.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "cinematic motion",
+                true,
+                TemplateStatus.Active.ToString(),
+                null,
+                supportsGenerationResultInput,
+                requiredInputMediaType,
+                recommendedAfterImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        return created.Value.TemplateId;
     }
 
     [Fact]
@@ -520,6 +700,149 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListAdminGenerationsAsync_ShouldReturnBatchedRelationshipAndPreviewFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var parentTemplateId = await CreateActiveImageTemplateAsync(service, "Admin Parent Portrait", "Portrait", ["admin-jobs"]);
+        var childTemplateId = await CreateActiveImageTemplateAsync(service, "Admin Child Portrait", "Portrait", ["admin-jobs"]);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var parentGenerationId = Guid.NewGuid();
+        var childGenerationId = Guid.NewGuid();
+        var childOfChildGenerationId = Guid.NewGuid();
+        var inputMediaId = Guid.NewGuid();
+        var resultMediaId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = parentGenerationId,
+                UserId = userId,
+                TemplateId = parentTemplateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/parent-source.jpg",
+                SourceImageFileName = "parent-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-8),
+                QueuedAtUtc = now.AddMinutes(-8),
+                UpdatedAtUtc = now.AddMinutes(-7),
+                CompletedAtUtc = now.AddMinutes(-7)
+            },
+            new TemplateGenerationJob
+            {
+                Id = childGenerationId,
+                UserId = userId,
+                TemplateId = childTemplateId,
+                ParentGenerationId = parentGenerationId,
+                ParentGenerationResultId = parentGenerationId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/child-source.jpg",
+                SourceImageFileName = "child-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                InputSourceType = "generation_result",
+                InputMediaAssetId = inputMediaId,
+                ResultMediaAssetId = resultMediaId,
+                IsWatermarkRequired = true,
+                IsWatermarkRemoved = false,
+                WatermarkedResultUrl = "https://cdn.example.com/child-watermarked-output.jpg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-4),
+                CompletedAtUtc = now.AddMinutes(-4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = childOfChildGenerationId,
+                UserId = userId,
+                TemplateId = childTemplateId,
+                ParentGenerationId = childGenerationId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/grandchild-source.jpg",
+                SourceImageFileName = "grandchild-source.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3)
+            });
+        dbContext.TemplateMediaRecords.AddRange(
+            new TemplateMediaRecord
+            {
+                Id = inputMediaId,
+                UserId = userId,
+                MediaType = "image",
+                SourceType = "generation_result",
+                Url = "https://cdn.example.com/input-original.jpg",
+                PreviewUrl = "https://cdn.example.com/input-preview.jpg",
+                FileName = "input-original.jpg",
+                ContentType = "image/jpeg",
+                UploadedAtUtc = now.AddMinutes(-6)
+            },
+            new TemplateMediaRecord
+            {
+                Id = resultMediaId,
+                UserId = userId,
+                MediaType = "image",
+                SourceType = "generation_result",
+                GenerationId = childGenerationId,
+                Url = "https://cdn.example.com/result-clean.jpg",
+                PreviewUrl = "https://cdn.example.com/result-clean-preview.jpg",
+                WatermarkedStoragePath = "https://cdn.example.com/result-watermarked-storage.jpg",
+                WatermarkedPreviewUrl = "https://cdn.example.com/result-watermarked-preview.jpg",
+                FileName = "result-clean.jpg",
+                ContentType = "image/jpeg",
+                UploadedAtUtc = now.AddMinutes(-4)
+            });
+        dbContext.TemplateGenerationWatermarkUnlocks.AddRange(
+            new TemplateGenerationWatermarkUnlock
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                GenerationJobId = childGenerationId,
+                UnlockMethod = TemplateWatermarkUnlockMethod.Premium,
+                CreditsSpent = 0,
+                CreatedAtUtc = now.AddMinutes(-3)
+            },
+            new TemplateGenerationWatermarkUnlock
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                UnlockedByUserId = adminId,
+                GenerationJobId = childGenerationId,
+                UnlockMethod = TemplateWatermarkUnlockMethod.Admin,
+                CreditsSpent = 1,
+                CreatedAtUtc = now.AddMinutes(-1)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var page = await service.ListAdminGenerationsAsync(
+            new AdminTemplateGenerationsQuery(null, null, userId.ToString(), childGenerationId.ToString(), 0, 10),
+            CancellationToken.None);
+
+        Assert.True(page.IsSuccess);
+        var item = Assert.Single(page.Value.Items);
+        Assert.Equal(childGenerationId, item.GenerationId);
+        Assert.Equal(parentGenerationId, item.ParentGenerationId);
+        Assert.Equal(parentGenerationId, item.ParentGenerationResultId);
+        Assert.Equal("Admin Parent Portrait", item.ParentTemplateTitle);
+        Assert.Equal("Image", item.ParentTemplateType);
+        Assert.Equal(1, item.ChildCount);
+        Assert.Equal("generation_result", item.InputSourceType);
+        Assert.Equal(inputMediaId, item.InputMediaAssetId);
+        Assert.Equal("https://cdn.example.com/input-preview.jpg", item.InputPreviewUrl);
+        Assert.Equal(resultMediaId, item.ResultMediaAssetId);
+        Assert.Equal("https://cdn.example.com/result-watermarked-preview.jpg", item.ResultPreviewUrl);
+        Assert.Equal("admin", item.WatermarkUnlockMethod);
+        Assert.Equal(adminId, item.WatermarkUnlockedByUserId);
+        Assert.Equal(1, item.WatermarkCreditsSpent);
+        Assert.Equal(now.AddMinutes(-1), item.WatermarkUnlockedAtUtc);
+    }
+
+    [Fact]
     public async Task ListAdminGenerationsAsync_ShouldSupportCancelledAndRetryingStatusFilters()
     {
         await using var dbContext = CreateDbContext();
@@ -693,7 +1016,7 @@ public sealed partial class TemplatesServiceTests
             });
         await dbContext.SaveChangesAsync();
 
-        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("all", null, 10), CancellationToken.None);
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("all", null, 10), isPremium: false, CancellationToken.None);
 
         Assert.True(history.IsSuccess);
         Assert.DoesNotContain(history.Value, x => x.GenerationId == olderForeignQueuedJobId);
@@ -710,6 +1033,120 @@ public sealed partial class TemplatesServiceTests
         var processing = Assert.Single(history.Value, x => x.GenerationId == processingJobId);
         Assert.Null(processing.QueuePosition);
         Assert.Null(processing.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task ListAsync_ShouldReturnComparePreviewFieldsForCompletedImages()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Compare History Portrait", "Portrait", ["compare-history"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var firstGenerationId = Guid.NewGuid();
+        var secondGenerationId = Guid.NewGuid();
+        var firstInputMediaId = Guid.NewGuid();
+        var secondInputMediaId = Guid.NewGuid();
+        var firstResultMediaId = Guid.NewGuid();
+        var secondResultMediaId = Guid.NewGuid();
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = firstGenerationId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/input-1.jpg",
+                SourceImageFileName = "input-1.jpg",
+                SourceImageContentType = "image/jpeg",
+                InputMediaAssetId = firstInputMediaId,
+                ResultMediaAssetId = firstResultMediaId,
+                ResultUrl = "https://cdn.example.com/result-1.png",
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                StartedAtUtc = now.AddMinutes(-2),
+                CompletedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-2)
+            },
+            new TemplateGenerationJob
+            {
+                Id = secondGenerationId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/input-2.jpg",
+                SourceImageFileName = "input-2.jpg",
+                SourceImageContentType = "image/jpeg",
+                InputMediaAssetId = secondInputMediaId,
+                ResultMediaAssetId = secondResultMediaId,
+                ResultUrl = "https://cdn.example.com/result-2.png",
+                CreatedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = now.AddMinutes(-4),
+                StartedAtUtc = now.AddMinutes(-4),
+                CompletedAtUtc = now.AddMinutes(-3),
+                UpdatedAtUtc = now.AddMinutes(-3),
+                ChargedAtUtc = now.AddMinutes(-4)
+            });
+        dbContext.TemplateMediaRecords.AddRange(
+            CreateGenerationMediaRecord(firstInputMediaId, userId, firstGenerationId, "user_upload", "https://cdn.example.com/input-1.jpg", "https://cdn.example.com/input-preview-1.webp", now.AddMinutes(-2)),
+            CreateGenerationMediaRecord(secondInputMediaId, userId, secondGenerationId, "user_upload", "https://cdn.example.com/input-2.jpg", "https://cdn.example.com/input-preview-2.webp", now.AddMinutes(-4)),
+            CreateGenerationMediaRecord(firstResultMediaId, userId, firstGenerationId, "generation_result", "https://cdn.example.com/result-1.png", "https://cdn.example.com/result-preview-1.webp", now.AddMinutes(-1)),
+            CreateGenerationMediaRecord(secondResultMediaId, userId, secondGenerationId, "generation_result", "https://cdn.example.com/result-2.png", "https://cdn.example.com/result-preview-2.webp", now.AddMinutes(-3)));
+        await dbContext.SaveChangesAsync();
+
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), isPremium: false, CancellationToken.None);
+
+        Assert.True(history.IsSuccess);
+        Assert.Equal(2, history.Value.Count);
+
+        var first = Assert.Single(history.Value, x => x.GenerationId == firstGenerationId);
+        Assert.True(first.CanCompareBeforeAfter);
+        Assert.Equal(firstInputMediaId, first.InputMediaAssetId);
+        Assert.Equal(firstResultMediaId, first.ResultMediaAssetId);
+        Assert.Equal("https://cdn.example.com/input-preview-1.webp", first.InputPreviewUrl);
+        Assert.Equal("https://cdn.example.com/result-preview-1.webp", first.ResultPreviewUrl);
+
+        var second = Assert.Single(history.Value, x => x.GenerationId == secondGenerationId);
+        Assert.True(second.CanCompareBeforeAfter);
+        Assert.Equal(secondInputMediaId, second.InputMediaAssetId);
+        Assert.Equal(secondResultMediaId, second.ResultMediaAssetId);
+        Assert.Equal("https://cdn.example.com/input-preview-2.webp", second.InputPreviewUrl);
+        Assert.Equal("https://cdn.example.com/result-preview-2.webp", second.ResultPreviewUrl);
+    }
+
+    private static TemplateMediaRecord CreateGenerationMediaRecord(
+        Guid id,
+        Guid userId,
+        Guid generationId,
+        string sourceType,
+        string url,
+        string previewUrl,
+        DateTime uploadedAtUtc)
+    {
+        return new TemplateMediaRecord
+        {
+            Id = id,
+            UserId = userId,
+            MediaType = "image",
+            StoragePath = url,
+            PreviewUrl = previewUrl,
+            SourceType = sourceType,
+            GenerationId = generationId,
+            Url = url,
+            FileName = Path.GetFileName(new Uri(url).AbsolutePath),
+            ContentType = "image/png",
+            Role = sourceType == "generation_result"
+                ? TemplateMediaRole.GenerationOutputImage
+                : TemplateMediaRole.GenerationSourceImage,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            UploadedAtUtc = uploadedAtUtc,
+            AttachedAtUtc = uploadedAtUtc
+        };
     }
 
     private static TemplateGenerationJob CreateAdminMetricsJob(
@@ -768,7 +1205,7 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
 
         var fetched = await generationService.GetAsync(otherUserId, job.Id, CancellationToken.None);
-        var markedRead = await generationService.MarkReadAsync(otherUserId, job.Id, CancellationToken.None);
+        var markedRead = await generationService.MarkReadAsync(otherUserId, job.Id, isPremium: false, CancellationToken.None);
         var deleted = await generationService.DeleteAsync(otherUserId, job.Id, CancellationToken.None);
         var feedback = await generationService.RecordFeedbackAsync(
             new RecordTemplateGenerationFeedbackCommand(otherUserId, job.Id, 2, [], null, null),
@@ -835,7 +1272,7 @@ public sealed partial class TemplatesServiceTests
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync();
 
-        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), CancellationToken.None);
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), isPremium: false, CancellationToken.None);
 
         Assert.True(history.IsSuccess);
         var item = Assert.Single(history.Value);
@@ -850,7 +1287,7 @@ public sealed partial class TemplatesServiceTests
         Assert.True(unread.IsSuccess);
         Assert.Equal(1, unread.Value.Count);
 
-        var markedRead = await generationService.MarkReadAsync(userId, job.Id, CancellationToken.None);
+        var markedRead = await generationService.MarkReadAsync(userId, job.Id, isPremium: false, CancellationToken.None);
         Assert.True(markedRead.IsSuccess);
 
         var unreadAfterRead = await generationService.GetUnreadCountAsync(userId, CancellationToken.None);
@@ -871,7 +1308,11 @@ public sealed partial class TemplatesServiceTests
         var persistedFeedback = await dbContext.TemplateGenerationFeedback.SingleAsync();
         Assert.Equal(job.Id, persistedFeedback.GenerationId);
         Assert.Equal(created.Value.TemplateId, persistedFeedback.TemplateId);
-        Assert.Equal(1, persistedFeedback.Rating);
+        Assert.Equal(-1, persistedFeedback.Rating);
+        Assert.Equal("GenerationResult", persistedFeedback.Type);
+        Assert.Equal("face_distorted", persistedFeedback.Category);
+        Assert.Equal("New", persistedFeedback.Status);
+        Assert.Equal("Medium", persistedFeedback.Priority);
         Assert.Contains("face_distorted", persistedFeedback.SelectedReasons);
         Assert.Equal("The result differs from preview.", persistedFeedback.Comment);
         Assert.Equal("openai/gpt-image-2/edit", persistedFeedback.ModelUsed);

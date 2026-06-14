@@ -190,7 +190,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .Select(x => new AdminTemplateRecentGenerationResponse(
                 x.Id,
                 x.UserId,
-                x.Status.ToString(),
+                MapRecentGenerationStatus(x.Status),
                 x.TokenCost,
                 x.AttemptCount,
                 x.UsedPreprocessingModel,
@@ -205,6 +205,15 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             .ToArrayAsync(cancellationToken);
 
         return Result.Success<IReadOnlyList<AdminTemplateRecentGenerationResponse>>(recent);
+    }
+
+    private static string MapRecentGenerationStatus(TemplateGenerationStatus status)
+    {
+        return status switch
+        {
+            TemplateGenerationStatus.Completed => "Completed",
+            _ => status.ToString()
+        };
     }
 
     public async Task<Result<IReadOnlyList<TemplateGenerationResponse>>> GetAdminTestHistoryAsync(Guid templateId, int take, CancellationToken cancellationToken)
@@ -554,6 +563,7 @@ internal sealed class TemplateAdminAnalyticsService(TemplatesDbContext dbContext
             DeviceClass = NormalizeAnalyticsValue(command.DeviceClass, "unknown", 32),
             CountryCode = NormalizeAnalyticsValue(command.CountryCode, "unknown", 8).ToUpperInvariant(),
             FeedbackMessage = NormalizeOptionalText(command.FeedbackMessage, 2000),
+            MetadataJson = NormalizeOptionalText(command.MetadataJson, 2000),
             CreatedAtUtc = DateTime.UtcNow
         });
         await dbContext.SaveChangesAsync(cancellationToken);

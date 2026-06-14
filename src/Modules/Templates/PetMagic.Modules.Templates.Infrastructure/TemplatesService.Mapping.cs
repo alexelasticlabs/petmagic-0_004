@@ -114,7 +114,12 @@ internal sealed partial class TemplatesService
             template.CreatedAtUtc,
             template.UpdatedAtUtc,
             estimatedCostUsd,
-            DeserializeRequirements(template.PetPhotoRequirements));
+            DeserializeRequirements(template.PetPhotoRequirements),
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType?.ToString(),
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength);
     }
 
     private static AdminTemplateResponse MapAdminResponse(TemplateItem template)
@@ -153,7 +158,12 @@ internal sealed partial class TemplatesService
                     template.ReferenceVideoDurationSeconds),
             template.CreatedAtUtc,
             template.UpdatedAtUtc,
-            DeserializeRequirements(template.PetPhotoRequirements));
+            DeserializeRequirements(template.PetPhotoRequirements),
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType?.ToString(),
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength);
     }
 
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)
@@ -173,7 +183,76 @@ internal sealed partial class TemplatesService
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements));
+                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType?.ToString(),
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength);
+    }
+
+    private static PublicTemplateListItemResponse MapPublicListItem(
+        Guid templateId,
+        TemplateType templateType,
+        string title,
+        string shortDescription,
+        string? localizedTextsJson,
+        string? petPhotoRequirements,
+        string category,
+        string tags,
+        bool isPremium,
+        int tokenCost,
+        TemplatePromoBadgeMode promoBadgeMode,
+        TemplateStatus status,
+        string? musicDescription,
+        double? referenceVideoDurationSeconds,
+        DateTime createdAtUtc,
+        DateTime updatedAtUtc,
+        string? previewUrl,
+        string? previewFileName,
+        string? previewContentType,
+        long? previewFileSizeBytes,
+        double? previewDurationSeconds,
+        string? locale)
+    {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
+            ? null
+            : new TemplateAssetResponse(
+                previewUrl,
+                previewFileName ?? string.Empty,
+                previewContentType ?? string.Empty,
+                previewFileSizeBytes,
+                previewDurationSeconds);
+
+        return new PublicTemplateListItemResponse(
+            templateId,
+            templateType.ToString(),
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
+            category,
+            ResolveEffectivePromoBadge(
+                promoBadgeMode,
+                createdAtUtc,
+                updatedAtUtc,
+                status,
+                isPremium,
+                tokenCost,
+                [
+                    title,
+                    shortDescription,
+                    category,
+                    tags,
+                    musicDescription
+                ],
+                DateTime.UtcNow),
+            DeserializeTags(tags),
+            isPremium,
+            tokenCost,
+            previewAsset,
+            musicDescription,
+            referenceVideoDurationSeconds,
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements));
     }
 
     private static PublicTemplateResponse MapPublicResponse(TemplateItem template, string? locale)
@@ -193,7 +272,12 @@ internal sealed partial class TemplatesService
             GetAsset(template, TemplateAssetKind.Preview),
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements));
+                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType?.ToString(),
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength);
     }
 
     private static TemplatePromoBadgeMode ParsePromoBadgeMode(string raw)
@@ -205,12 +289,8 @@ internal sealed partial class TemplatesService
 
     private static string? ResolveEffectivePromoBadge(TemplateItem template, DateTime utcNow)
     {
-        if (template.PromoBadgeMode != TemplatePromoBadgeMode.Auto)
-        {
-            return template.PromoBadgeMode.ToString();
-        }
-
-        return TemplatePromoBadgeRules.ResolveAutoBadge(
+        return ResolveEffectivePromoBadge(
+            template.PromoBadgeMode,
             template.CreatedAtUtc,
             template.UpdatedAtUtc,
             template.Status,
@@ -225,6 +305,31 @@ internal sealed partial class TemplatesService
                 template.ImagePrompt,
                 template.KlingPrompt
             ],
+            utcNow);
+    }
+
+    private static string? ResolveEffectivePromoBadge(
+        TemplatePromoBadgeMode promoBadgeMode,
+        DateTime createdAtUtc,
+        DateTime updatedAtUtc,
+        TemplateStatus status,
+        bool isPremium,
+        int tokenCost,
+        IReadOnlyList<string?> signals,
+        DateTime utcNow)
+    {
+        if (promoBadgeMode != TemplatePromoBadgeMode.Auto)
+        {
+            return promoBadgeMode.ToString();
+        }
+
+        return TemplatePromoBadgeRules.ResolveAutoBadge(
+            createdAtUtc,
+            updatedAtUtc,
+            status,
+            isPremium,
+            tokenCost,
+            signals,
             utcNow);
     }
 }

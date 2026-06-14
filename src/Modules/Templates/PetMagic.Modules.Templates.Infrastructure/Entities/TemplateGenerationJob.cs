@@ -10,6 +10,32 @@ public sealed class TemplateGenerationJob
 
     public Guid TemplateId { get; set; }
 
+    public Guid? ParentGenerationId { get; set; }
+
+    public Guid? ParentGenerationResultId { get; set; }
+
+    public Guid? SimilarToGenerationId { get; set; }
+
+    public TemplateGenerationMode GenerationMode { get; set; } = TemplateGenerationMode.Normal;
+
+    public string? VariationStrength { get; set; }
+
+    public int? GenerationSeed { get; set; }
+
+    public string? PromptBeforeVariation { get; set; }
+
+    public string? PromptAfterVariation { get; set; }
+
+    public Guid? PetId { get; set; }
+
+    public Guid? PetPhotoId { get; set; }
+
+    public string InputSourceType { get; set; } = "user_upload";
+
+    public Guid? InputMediaAssetId { get; set; }
+
+    public Guid? ResultMediaAssetId { get; set; }
+
     public TemplateGenerationStatus Status { get; set; }
 
     public int TokenCost { get; set; }
@@ -27,6 +53,14 @@ public sealed class TemplateGenerationJob
     public string? ReferenceMotionUrl { get; set; }
 
     public string? ResultUrl { get; set; }
+
+    public string? WatermarkedResultUrl { get; set; }
+
+    public bool IsWatermarkRequired { get; set; }
+
+    public bool IsWatermarkRemoved { get; set; }
+
+    public string? WatermarkFailureCode { get; set; }
 
     public DateTime? LockedAtUtc { get; set; }
 
@@ -101,4 +135,6 @@ public sealed class TemplateGenerationJob
     public TemplateItem Template { get; set; } = null!;
 
     public List<TemplateMediaRecord> MediaRecords { get; set; } = [];
+
+    public List<TemplateGenerationWatermarkUnlock> WatermarkUnlocks { get; set; } = [];
 }

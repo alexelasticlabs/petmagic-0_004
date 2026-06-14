@@ -15,6 +15,8 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         ["jpg"] = ".jpg",
         ["png"] = ".png",
         ["webp"] = ".webp",
+        ["heic"] = ".heic",
+        ["heif"] = ".heif",
         ["gif"] = ".gif"
     };
 
@@ -36,6 +38,8 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         [".jpeg"] = "image/jpeg",
         [".png"] = "image/png",
         [".webp"] = "image/webp",
+        [".heic"] = "image/heic",
+        [".heif"] = "image/heif",
         [".gif"] = "image/gif",
         [".mp4"] = "video/mp4",
         [".mov"] = "video/quicktime",
@@ -61,9 +65,17 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
 
         Directory.CreateDirectory(root);
 
+        var now = DateTime.UtcNow;
         var safeName = $"{Guid.NewGuid():N}{extension}";
-        var relativePath = Path.Combine("templates-media", DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
-        var physicalPath = Path.Combine(root, DateTime.UtcNow.ToString("yyyy"), DateTime.UtcNow.ToString("MM"), safeName);
+        if (!TryResolvePreferredStorageKey(asset.PreferredStorageKey, extension, out var preferredStorageKey))
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
+        }
+
+        var storageRelativePath = preferredStorageKey
+            ?? Path.Combine(now.ToString("yyyy"), now.ToString("MM"), safeName);
+        var relativePath = Path.Combine("templates-media", storageRelativePath);
+        var physicalPath = Path.Combine(root, storageRelativePath);
 
         Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
         try
@@ -110,6 +122,51 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         var url = $"{baseUrl}/{normalizedRelativePath}";
 
         return Result.Success(new StoredMediaResponse(url, normalizedRelativePath, asset.FileName, normalizedContentType, contentLength, physicalPath));
+    }
+
+    private static bool TryResolvePreferredStorageKey(string? preferredStorageKey, string extension, out string? normalized)
+    {
+        normalized = null;
+        if (string.IsNullOrWhiteSpace(preferredStorageKey))
+        {
+            return true;
+        }
+
+        var candidate = preferredStorageKey.Trim().Replace('\\', '/').Trim('/');
+        if (candidate.Length == 0
+            || candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase)
+            || Path.IsPathRooted(candidate))
+        {
+            return false;
+        }
+
+        var segments = candidate.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var segment in segments)
+        {
+            if (segment is "." or ".." || segment.Any(IsUnsafePathCharacter))
+            {
+                return false;
+            }
+        }
+
+        var fileExtension = Path.GetExtension(segments[^1]);
+        if (!string.Equals(fileExtension, extension, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        normalized = string.Join('/', segments);
+        return true;
+    }
+
+    private static bool IsUnsafePathCharacter(char value)
+    {
+        return !(char.IsAsciiLetterOrDigit(value) || value is '-' or '_' or '.');
     }
 
     public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
@@ -170,21 +227,44 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
         return Path.GetFullPath(root);
     }
 
+    public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(assetUrl))
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+
+        var relativePath = TryResolveManagedRelativePath(assetUrl);
+        if (relativePath is null)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+
+        var baseUrl = options.PublicBaseUrl.TrimEnd('/');
+        return Task.FromResult(Result.Success($"{baseUrl}/{relativePath}"));
+    }
+
     private string? TryResolveManagedRelativePath(string assetUrl)
     {
+        var candidate = assetUrl.Trim().Replace('\\', '/');
+        if (candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!assetUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var relativePath = assetUrl[baseUrl.Length..].TrimStart('/');
+        var relativePath = candidate[baseUrl.Length..].TrimStart('/');
         if (!relativePath.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        return relativePath.Replace('\\', '/');
+        return relativePath;
     }
 
     private static bool TryResolveStoredFileFormat(

@@ -82,9 +82,9 @@ internal sealed partial class TemplatesService
 
         itemsQuery = normalizedSort switch
         {
-            "title" => itemsQuery.OrderBy(x => x.Title).ThenByDescending(x => x.UpdatedAtUtc),
-            "tokens" => itemsQuery.OrderByDescending(x => x.TokenCost).ThenByDescending(x => x.UpdatedAtUtc),
-            _ => itemsQuery.OrderByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.CreatedAtUtc)
+            "title" => itemsQuery.OrderBy(x => x.Title).ThenByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.Id),
+            "tokens" => itemsQuery.OrderByDescending(x => x.TokenCost).ThenByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.Id),
+            _ => itemsQuery.OrderByDescending(x => x.UpdatedAtUtc).ThenByDescending(x => x.CreatedAtUtc).ThenByDescending(x => x.Id)
         };
 
         var totalCount = await itemsQuery.CountAsync(cancellationToken);

@@ -42,6 +42,11 @@ internal sealed partial class TemplatesService
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             TokenCost = command.TokenCost,
+            SupportsGenerationResultInput = command.SupportsGenerationResultInput,
+            RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType),
+            RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration,
+            SupportsGenerateSimilar = command.SupportsGenerateSimilar,
+            DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength),
             Status = statusResult.Value,
             PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode),
             ImageModel = command.ImageModel.Trim(),
@@ -120,6 +125,11 @@ internal sealed partial class TemplatesService
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
         template.TokenCost = command.TokenCost;
+        template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
+        template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
+        template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
+        template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
+        template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
         template.Status = statusResult.Value;
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
         template.ImageModel = command.ImageModel.Trim();
@@ -157,6 +167,11 @@ internal sealed partial class TemplatesService
             template.Tags = SerializeTags(command.Tags);
             template.IsPremium = command.IsPremium;
             template.TokenCost = command.TokenCost;
+            template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
+            template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
+            template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
+            template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
+            template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
             template.Status = statusResult.Value;
             template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
             template.ImageModel = command.ImageModel.Trim();
@@ -226,6 +241,11 @@ internal sealed partial class TemplatesService
             Tags = SerializeTags(command.Tags),
             IsPremium = command.IsPremium,
             TokenCost = command.TokenCost,
+            SupportsGenerationResultInput = command.SupportsGenerationResultInput,
+            RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType),
+            RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration,
+            SupportsGenerateSimilar = command.SupportsGenerateSimilar,
+            DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength),
             Status = statusResult.Value,
             PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode),
             MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim(),
@@ -314,6 +334,11 @@ internal sealed partial class TemplatesService
         template.Tags = SerializeTags(command.Tags);
         template.IsPremium = command.IsPremium;
         template.TokenCost = command.TokenCost;
+        template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
+        template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
+        template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
+        template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
+        template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
         template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
         template.MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim();
         template.ReferenceVideoDurationSeconds = duration;
@@ -370,6 +395,11 @@ internal sealed partial class TemplatesService
             template.Tags = SerializeTags(command.Tags);
             template.IsPremium = command.IsPremium;
             template.TokenCost = command.TokenCost;
+            template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
+            template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
+            template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
+            template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
+            template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
             template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
             template.MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim();
             template.ReferenceVideoDurationSeconds = duration;
@@ -514,5 +544,10 @@ internal sealed partial class TemplatesService
             TemplateStatus.Archived => "admin.content.rejected",
             _ => "admin.content.status_changed"
         };
+    }
+
+    private static TemplateType? ParseInputMediaType(string? raw)
+    {
+        return Enum.TryParse<TemplateType>(raw, true, out var value) ? value : null;
     }
 }

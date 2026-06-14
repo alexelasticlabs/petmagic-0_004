@@ -8,7 +8,9 @@ internal sealed class FakeMediaStorage : IMediaStorage
 {
     public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
-        var key = $"stub/{Guid.NewGuid():N}/{asset.FileName}";
+        var key = string.IsNullOrWhiteSpace(asset.PreferredStorageKey)
+            ? $"templates-media/stub/{Guid.NewGuid():N}/{asset.FileName}"
+            : $"templates-media/{asset.PreferredStorageKey.Trim().TrimStart('/')}";
         var contentLength = asset.Content?.LongLength ?? asset.ContentLengthBytes ?? 0;
         return Task.FromResult(Result.Success(new StoredMediaResponse($"http://localhost:5000/{key}", key, asset.FileName, asset.ContentType, contentLength, null)));
     }

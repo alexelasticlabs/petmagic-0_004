@@ -28,6 +28,16 @@ public sealed class TemplateItem
 
     public int TokenCost { get; set; }
 
+    public bool SupportsGenerationResultInput { get; set; }
+
+    public TemplateType? RequiredInputMediaType { get; set; }
+
+    public bool RecommendedAfterImageGeneration { get; set; }
+
+    public bool SupportsGenerateSimilar { get; set; } = true;
+
+    public string DefaultVariationStrength { get; set; } = "medium";
+
     public TemplateStatus Status { get; set; }
 
     public TemplatePromoBadgeMode PromoBadgeMode { get; set; } = TemplatePromoBadgeMode.Auto;

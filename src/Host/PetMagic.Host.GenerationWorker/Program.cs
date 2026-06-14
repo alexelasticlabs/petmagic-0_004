@@ -89,8 +89,9 @@ finally
 
 static void LoadDotEnvFileIfPresent()
 {
-    var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-    if (!string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase))
+    var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+        ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+    if (!string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase))
     {
         return;
     }

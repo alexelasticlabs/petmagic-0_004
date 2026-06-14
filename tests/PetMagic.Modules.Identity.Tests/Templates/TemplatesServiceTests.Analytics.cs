@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+
 using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
@@ -219,7 +222,7 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
 
         var trend = await service.GetAdminTrendAsync(created.Value.TemplateId, CancellationToken.None);
-        var recent = await service.GetAdminRecentGenerationsAsync(created.Value.TemplateId, 2, CancellationToken.None);
+        var recent = await service.GetAdminRecentGenerationsAsync(created.Value.TemplateId, 3, CancellationToken.None);
         var failures = await service.GetAdminFailureBreakdownAsync(created.Value.TemplateId, CancellationToken.None);
 
         Assert.True(trend.IsSuccess);
@@ -235,10 +238,11 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(0, trend.Value[1].SuccessRatePercent);
 
         Assert.True(recent.IsSuccess);
-        Assert.Equal(2, recent.Value.Count);
+        Assert.Equal(3, recent.Value.Count);
         Assert.Equal(TemplateGenerationStatus.Queued.ToString(), recent.Value[0].Status);
         Assert.Equal(failedId, recent.Value[1].GenerationId);
         Assert.Equal(2, recent.Value[1].AttemptCount);
+        Assert.Equal("Completed", recent.Value[2].Status);
 
         Assert.True(failures.IsSuccess);
         var failure = Assert.Single(failures.Value);
@@ -294,6 +298,75 @@ public sealed partial class TemplatesServiceTests
         Assert.Contains(analytics.Value.Devices, x => x.Key == "ios" && x.Count == 1);
         Assert.Contains(analytics.Value.Devices, x => x.Key == "android" && x.Count == 1);
         Assert.Contains(analytics.Value.Geography, x => x.Key == "us" && x.Label == "US" && x.Count == 2);
+    }
+
+    [Fact]
+    public async Task RecordAnalyticsEventAsync_ShouldPersistTemplateOfTheDayLifecycleEventsWithMetadata()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Daily Analytics",
+                "Template of the Day analytics",
+                "Portrait",
+                ["daily"],
+                true,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/daily-analytics.jpg", "daily-analytics.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var generationId = Guid.NewGuid();
+        var eventTypes = new[]
+        {
+            TemplateAnalyticsEventTypes.TemplateOfTheDayViewed,
+            TemplateAnalyticsEventTypes.TemplateOfTheDayClicked,
+            TemplateAnalyticsEventTypes.TemplateOfTheDayOpened,
+            TemplateAnalyticsEventTypes.GenerationStarted,
+            TemplateAnalyticsEventTypes.GenerationCompleted,
+            TemplateAnalyticsEventTypes.GenerationFailed
+        };
+
+        foreach (var eventType in eventTypes)
+        {
+            var result = await service.RecordAnalyticsEventAsync(
+                new RecordTemplateAnalyticsEventCommand(
+                    created.Value.TemplateId,
+                    eventType,
+                    "manual",
+                    "ios",
+                    "us",
+                    Guid.NewGuid(),
+                    generationId,
+                    MetadataJson: """
+                    {"templateId":"daily-template","type":"image","source":"manual","isPremium":true,"userPlan":"premium","date":"2026-06-14","screen":"templates"}
+                    """),
+                CancellationToken.None);
+
+            Assert.True(result.IsSuccess);
+        }
+
+        var stored = await dbContext.TemplateAnalyticsEvents
+            .Where(item => item.TemplateId == created.Value.TemplateId)
+            .OrderBy(item => item.CreatedAtUtc)
+            .ToArrayAsync();
+
+        Assert.Equal(eventTypes, stored.Select(item => item.EventType));
+        Assert.All(stored, item =>
+        {
+            Assert.Equal("manual", item.Source);
+            Assert.Equal(generationId, item.GenerationId);
+            Assert.NotNull(item.MetadataJson);
+            Assert.Contains("\"screen\":\"templates\"", item.MetadataJson);
+            Assert.Contains("\"date\":\"2026-06-14\"", item.MetadataJson);
+        });
     }
 
     [Fact]

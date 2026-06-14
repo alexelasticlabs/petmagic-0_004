@@ -8,5 +8,6 @@ public interface IImageGenerator
         string sourceImageUrl,
         string prompt,
         string model,
+        int? seed,
         CancellationToken cancellationToken);
 }

@@ -22,6 +22,8 @@ public static class TemplatesApiModule
         services.AddScoped<IValidator<UpdateVideoTemplateCommand>, UpdateVideoTemplateCommandValidator>();
         services.AddScoped<IValidator<ChangeTemplateStatusCommand>, ChangeTemplateStatusCommandValidator>();
         services.AddScoped<IValidator<StartTemplateGenerationCommand>, StartTemplateGenerationCommandValidator>();
+        services.AddScoped<IValidator<StartTemplateGenerationFromResultCommand>, StartTemplateGenerationFromResultCommandValidator>();
+        services.AddScoped<IValidator<StartSimilarTemplateGenerationCommand>, StartSimilarTemplateGenerationCommandValidator>();
 
         return services;
     }
@@ -30,7 +32,9 @@ public static class TemplatesApiModule
     {
         app.MapAdminTemplateCategoryEndpoints();
         app.MapAdminTemplateEndpoints();
+        app.MapFeedbackEndpoints();
         app.MapPublicTemplateEndpoints();
+        app.MapPetEndpoints();
         app.MapTemplateGenerationEndpoints();
         return app;
     }
