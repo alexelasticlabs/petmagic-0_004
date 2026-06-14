@@ -5,19 +5,21 @@
   display: grid;
   place-items: center;
   padding: 0.9rem;
-  background: rgba(2, 4, 7, 0.62);
+  background: color-mix(in srgb, var(--surface-0) 72%, transparent);
   backdrop-filter: blur(2px);
 }
 
 .dialog {
   width: min(30rem, 100%);
+  max-height: min(42rem, calc(100dvh - 1.8rem));
+  overflow-y: auto;
   display: grid;
   gap: 0.72rem;
   padding: 0.86rem;
   border: 1px solid var(--border-soft);
   border-radius: 0.75rem;
   background: var(--surface-1);
-  box-shadow: 0 24px 52px rgba(0, 0, 0, 0.48);
+  box-shadow: var(--shadow-strong);
 }
 
 .title {
@@ -36,6 +38,17 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.48rem;
+}
+
+@media (max-width: 420px) {
+  .actions {
+    justify-content: stretch;
+  }
+
+  .actions :global(.ui-button) {
+    flex: 1 1 9rem;
+  }
 }

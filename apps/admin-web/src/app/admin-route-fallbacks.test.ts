@@ -3,7 +3,13 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const errorPagePath = fileURLToPath(new URL("./[locale]/error.tsx", import.meta.url));
+const errorStylesPath = fileURLToPath(
+  new URL("./[locale]/admin-route-fallback.module.css", import.meta.url)
+);
 const globalErrorPagePath = fileURLToPath(new URL("./global-error.tsx", import.meta.url));
+const globalErrorStylesPath = fileURLToPath(
+  new URL("./global-error.module.css", import.meta.url)
+);
 const loadingPagePath = fileURLToPath(new URL("./[locale]/loading.tsx", import.meta.url));
 const rootNotFoundPagePath = fileURLToPath(new URL("./not-found.tsx", import.meta.url));
 const notFoundPagePath = fileURLToPath(
@@ -13,7 +19,9 @@ const notFoundPagePath = fileURLToPath(
 describe("admin route fallbacks", () => {
   it("uses generic safe fallback copy instead of raw errors or placeholder nav labels", () => {
     const errorSource = readFileSync(errorPagePath, "utf8");
+    const errorStyles = readFileSync(errorStylesPath, "utf8");
     const globalErrorSource = readFileSync(globalErrorPagePath, "utf8");
+    const globalErrorStyles = readFileSync(globalErrorStylesPath, "utf8");
     const loadingSource = readFileSync(loadingPagePath, "utf8");
 
     expect(errorSource).toContain("title={text.adminErrorTitle}");
@@ -27,15 +35,30 @@ describe("admin route fallbacks", () => {
     expect(errorSource).toContain('fallbackHref.endsWith("/dashboard")');
     expect(errorSource).toContain("text.signIn");
     expect(errorSource).not.toContain('href={`/${locale}/dashboard`}');
+    expect(errorSource).toContain("className={styles.actionRow}");
+    expect(errorSource).not.toContain('style={{ display: "flex"');
+    expect(errorStyles).toContain("@media (max-width: 520px)");
 
     expect(globalErrorSource).toContain('clientLogger.error("admin.global_error_boundary_triggered"');
     expect(globalErrorSource).toContain("<html lang={isRu ? \"ru\" : \"en\"}>");
+    expect(globalErrorSource).toContain('import styles from "./global-error.module.css"');
+    expect(globalErrorSource).toContain("className={styles.body}");
+    expect(globalErrorSource).toContain("className={styles.panel}");
+    expect(globalErrorSource).toContain("className={styles.primaryAction}");
+    expect(globalErrorSource).toContain("className={styles.secondaryAction}");
     expect(globalErrorSource).toContain("onClick={reset}");
     expect(globalErrorSource).toContain('href={isRu ? "/ru" : "/en"}');
     expect(globalErrorSource).not.toContain("{error.message}");
     expect(globalErrorSource).not.toContain("message: error.message");
     expect(globalErrorSource).not.toContain("error.stack");
     expect(globalErrorSource).not.toContain("JSON.stringify(error");
+    expect(globalErrorSource).not.toContain("CSSProperties");
+    expect(globalErrorSource).not.toContain("style={");
+    expect(globalErrorSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(globalErrorStyles).toContain("@media (prefers-color-scheme: dark)");
+    expect(globalErrorStyles).toContain("@media (max-width: 520px)");
+    expect(globalErrorStyles).toContain(".primaryAction");
+    expect(globalErrorStyles).toContain(".secondaryAction");
 
     expect(loadingSource).toContain("description={text.adminLoadingDescription}");
     expect(loadingSource).not.toContain("description={text.navDashboard}");

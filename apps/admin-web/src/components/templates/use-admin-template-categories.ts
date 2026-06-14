@@ -32,7 +32,7 @@ export function useAdminTemplateCategories({
     categories: categoriesQuery.data ?? [],
     hasError: categoriesQuery.isError,
     isFetching: categoriesQuery.isFetching,
-    isLoading: categoriesQuery.isLoading || categoriesQuery.isFetching,
+    isLoading: categoriesQuery.isLoading,
     refresh,
   };
 }

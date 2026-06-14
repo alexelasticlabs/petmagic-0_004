@@ -554,8 +554,8 @@ function TrendChart({
       >
         <defs>
           <linearGradient id="template-analytics-area" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(74, 222, 128, 0.36)" />
-            <stop offset="100%" stopColor="rgba(74, 222, 128, 0.02)" />
+            <stop offset="0%" stopColor="var(--success)" stopOpacity="0.36" />
+            <stop offset="100%" stopColor="var(--success)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
 
@@ -646,10 +646,10 @@ function StatusRing({
 }) {
   const total = Math.max(statistics.totalRuns, 1);
   const segments = [
-    { label: text.completedRuns, value: statistics.completedRuns, color: "#22c55e" },
-    { label: text.failedRuns, value: statistics.failedRuns, color: "#f87171" },
-    { label: text.runsInQueue, value: statistics.queuedRuns, color: "#7dd3fc" },
-    { label: text.processingNow, value: statistics.processingRuns, color: "#fcd34d" },
+    { label: text.completedRuns, value: statistics.completedRuns, color: "var(--success)" },
+    { label: text.failedRuns, value: statistics.failedRuns, color: "var(--danger)" },
+    { label: text.runsInQueue, value: statistics.queuedRuns, color: "var(--info)" },
+    { label: text.processingNow, value: statistics.processingRuns, color: "var(--warning)" },
   ];
 
   let offset = 0;
@@ -661,7 +661,9 @@ function StatusRing({
       return `${segment.color} ${start}% ${offset}%`;
     })
     .join(", ");
-  const background = gradient ? `conic-gradient(${gradient})` : "conic-gradient(#1f3651 0 100%)";
+  const background = gradient
+    ? `conic-gradient(${gradient})`
+    : "conic-gradient(var(--surface-3) 0 100%)";
 
   return (
     <div className={styles.ringSection}>

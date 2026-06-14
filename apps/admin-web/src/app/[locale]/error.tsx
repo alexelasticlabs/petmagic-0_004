@@ -11,6 +11,8 @@ import { useAuthSession } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, isLocale } from "@/lib/i18n";
 
+import styles from "./admin-route-fallback.module.css";
+
 type ErrorPageProps = {
   error: Error & { digest?: string };
   reset: () => void;
@@ -45,7 +47,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
         title={text.adminErrorTitle}
         description={text.adminErrorDescription}
         action={
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <div className={styles.actionRow}>
             <Button variant="primary" onClick={reset}>
               {text.adminRetryAction}
             </Button>

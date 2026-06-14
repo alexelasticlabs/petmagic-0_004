@@ -37,7 +37,8 @@ export function useAdminTemplateOptions({ enabled = true, templateType }: UseAdm
 
   return {
     hasError: templatesQuery.isError,
-    isLoading: templatesQuery.isLoading || templatesQuery.isFetching,
+    isFetching: templatesQuery.isFetching,
+    isLoading: templatesQuery.isLoading,
     refresh,
     templates: templatesQuery.data?.items ?? [],
   };

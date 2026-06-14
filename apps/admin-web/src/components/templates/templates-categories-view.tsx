@@ -50,9 +50,9 @@ type ToastState = {
 };
 
 const typeColors = {
-  Video: "#22c55e",
-  Image: "#38bdf8",
-  Archived: "#94a3b8",
+  Video: "var(--success)",
+  Image: "var(--info)",
+  Archived: "var(--text-muted)",
 };
 
 const CATEGORY_NAME_MAX_LENGTH = 64;

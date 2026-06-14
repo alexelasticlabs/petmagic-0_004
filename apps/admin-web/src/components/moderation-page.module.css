@@ -113,3 +113,18 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 520px) {
+  .pager {
+    justify-content: stretch;
+  }
+
+  .pageInfo {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .pager .button {
+    flex: 1 1 8rem;
+  }
+}

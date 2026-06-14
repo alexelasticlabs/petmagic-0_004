@@ -116,12 +116,14 @@ export type Dictionary = {
   navModeration: string;
   navUsers: string;
   navGenerations: string;
+  navFeedback: string;
   navRoleManagement: string;
   navTemplates: string;
   navImageTemplates: string;
   navVideoTemplates: string;
   navTemplateAnalytics: string;
   navTemplateCategories: string;
+  navTemplateDailyFeatured: string;
   navPromoCodes: string;
   navSectionOverview: string;
   navSectionGrowth: string;
@@ -133,6 +135,7 @@ export type Dictionary = {
   promoCodesTokenOnlyBadge: string;
   promoCodesLoadingDescription: string;
   promoCodesErrorDescription: string;
+  promoCodesMetricsErrorDescription: string;
   promoCodesCreateAction: string;
   promoCodesExportAction: string;
   promoCodesRefreshAction: string;

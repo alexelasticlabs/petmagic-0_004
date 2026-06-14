@@ -36,7 +36,12 @@ describe("template analytics error states", () => {
     );
     expect(detailSource).toContain("{text.retryAction}");
 
-    expect(hubSource).toContain("title={error ?? text.loadError}");
+    expect(hubSource).toContain("const hasBlockingError = overviewQuery.isError && !overview;");
+    expect(hubSource).toContain("const hasPartialError = overviewQuery.isError && Boolean(overview);");
+    expect(hubSource).toContain("if (hasBlockingError || !overview)");
+    expect(hubSource).toContain("title={text.loadError}");
+    expect(hubSource).toContain("title={text.partialErrorTitle}");
+    expect(hubSource).toContain("description={text.partialErrorDescription}");
     expect(hubSource).toContain("disabled={!session || overviewQuery.isFetching}");
     expect(hubSource).toContain(
       "if (!session) {\n                  return;\n                }\n\n                void overviewQuery.refetch().catch(() => undefined);"
@@ -67,6 +72,7 @@ describe("template analytics error states", () => {
       "adminQueryKeys.templateAnalyticsFeedback(templateId, filter, normalizedSearch)"
     );
     expect(feedbackHookSource).toContain("search: normalizedSearch || undefined");
+    expect(feedbackHookSource).toContain("placeholderData: keepPreviousData,");
     expect(pageSource).not.toContain("setFeedbackSearch(feedbackSearchInput.trim());");
     expect(pageSource).not.toContain("onFeedbackSearchChange={setFeedbackSearchInput}");
     expect(detailSectionsSource).not.toContain("onFeedbackSearchChange(event.target.value)");
@@ -91,6 +97,28 @@ describe("template analytics error states", () => {
       "if (!enabled) {\n      return categoriesQuery;\n    }\n\n    return categoriesQuery.refetch();"
     );
     expect(categoriesHookSource).not.toContain("refresh: categoriesQuery.refetch");
+  });
+
+  it("keeps template option lists visible during background refetches", () => {
+    const optionsHookSource = readFileSync(optionsHookPath, "utf8");
+
+    expect(optionsHookSource).toContain("isFetching: templatesQuery.isFetching,");
+    expect(optionsHookSource).toContain("isLoading: templatesQuery.isLoading,");
+    expect(optionsHookSource).not.toContain(
+      "isLoading: templatesQuery.isLoading || templatesQuery.isFetching"
+    );
+  });
+
+  it("keeps template feedback results visible during background refetches", () => {
+    const feedbackHookSource = readFileSync(feedbackHookPath, "utf8");
+
+    expect(feedbackHookSource).toContain("import { keepPreviousData, useQuery }");
+    expect(feedbackHookSource).toContain("placeholderData: keepPreviousData,");
+    expect(feedbackHookSource).toContain("isFetching: feedbackQuery.isFetching,");
+    expect(feedbackHookSource).toContain("isLoading: feedbackQuery.isLoading,");
+    expect(feedbackHookSource).not.toContain(
+      "isLoading: feedbackQuery.isLoading || feedbackQuery.isFetching"
+    );
   });
 
   it("keeps manual recent-run expansion disabled until auth session is restored", () => {

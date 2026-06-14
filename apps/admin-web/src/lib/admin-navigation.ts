@@ -9,12 +9,14 @@ export type AdminSectionKey =
   | "moderation"
   | "users"
   | "generations"
+  | "feedback"
   | "role-management"
   | "templates"
   | "image-templates"
   | "video-templates"
   | "template-analytics"
-  | "template-categories";
+  | "template-categories"
+  | "template-daily-featured";
 
 export type AdminNavLink = {
   type: "link";
@@ -56,7 +58,10 @@ export function matchesAdminPath(currentPath: string, targetPath: string) {
   return currentPath === targetPath || currentPath.startsWith(`${targetPath}/`);
 }
 
-export function getAdminNavItems(locale: Locale, roles?: readonly string[] | null): AdminNavEntry[] {
+export function getAdminNavItems(
+  locale: Locale,
+  roles?: readonly string[] | null
+): AdminNavEntry[] {
   const text = getDictionary(locale);
 
   const allItems: AdminNavEntry[] = [
@@ -66,8 +71,24 @@ export function getAdminNavItems(locale: Locale, roles?: readonly string[] | nul
     { type: "link", key: "support", href: `/${locale}/support`, label: text.navSupport },
     { type: "link", key: "moderation", href: `/${locale}/moderation`, label: text.navModeration },
     { type: "link", key: "users", href: `/${locale}/users`, label: text.navUsers },
-    { type: "link", key: "generations", href: `/${locale}/generations`, label: text.navGenerations },
-    { type: "link", key: "role-management", href: `/${locale}/roles`, label: text.navRoleManagement },
+    {
+      type: "link",
+      key: "generations",
+      href: `/${locale}/generations`,
+      label: text.navGenerations,
+    },
+    {
+      type: "link",
+      key: "feedback",
+      href: `/${locale}/feedback`,
+      label: text.navFeedback,
+    },
+    {
+      type: "link",
+      key: "role-management",
+      href: `/${locale}/roles`,
+      label: text.navRoleManagement,
+    },
     {
       type: "group",
       key: "templates",
@@ -91,6 +112,12 @@ export function getAdminNavItems(locale: Locale, roles?: readonly string[] | nul
           key: "template-analytics",
           href: `/${locale}/templates/analytics`,
           label: text.navTemplateAnalytics,
+        },
+        {
+          type: "link",
+          key: "template-daily-featured",
+          href: `/${locale}/templates/daily-featured`,
+          label: text.navTemplateDailyFeatured,
         },
         {
           type: "link",
@@ -178,8 +205,18 @@ export function getAdminPageMeta(
       title: locale === "ru" ? "Генерации" : "Generations",
       description:
         locale === "ru"
-          ? "Очередь и история генераций с фильтрами по статусу, provider, пользователю и job id."
+          ? "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и job id."
           : "Generation queue and history with status, provider, user, and job id filters.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/feedback")) {
+    return {
+      title: "Feedback",
+      description:
+        locale === "ru"
+          ? "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом credits."
+          : "Generation, bug, payment, and general feedback with status handling and credit refunds.",
     };
   }
 
@@ -188,7 +225,7 @@ export function getAdminPageMeta(
       title: locale === "ru" ? "Управление ролями" : "Role Management",
       description:
         locale === "ru"
-          ? "Список Admin и Moderator, назначение и снятие Moderator с audit log."
+          ? "Списки Admin и Moderator, назначение и снятие Moderator с журналом аудита."
           : "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
     };
   }
@@ -208,7 +245,7 @@ export function getAdminPageMeta(
       title: locale === "ru" ? "Модерация" : "Moderation",
       description:
         locale === "ru"
-          ? "Очередь жалоб и обратной связи по шаблонам с approve/reject решением."
+          ? "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
           : "Complaint and feedback queue for templates with approve/reject decisions.",
     };
   }
@@ -240,6 +277,16 @@ export function getAdminPageMeta(
         locale === "ru"
           ? "Сводка по категориям, типам шаблонов и наполнению каталога."
           : "Overview of categories, template types, and catalog coverage.",
+    };
+  }
+
+  if (matchesAdminPath(currentPath, "/templates/daily-featured")) {
+    return {
+      title: locale === "ru" ? "Шаблон дня" : "Daily Featured",
+      description:
+        locale === "ru"
+          ? "Ручные назначения и auto-pick для Template of the Day."
+          : "Manual assignments and auto-pick for Template of the Day.",
     };
   }
 

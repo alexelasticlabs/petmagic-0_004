@@ -27,11 +27,11 @@
 @keyframes pulseSlaRing {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
   }
 
   50% {
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.22);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
   }
 }
 
@@ -154,12 +154,21 @@
 .rowMetaGroup,
 .chatMetaLine,
 .composerContextHint,
-.templateToolbarCompact {
+.templateToolbarCompact,
+.errorActions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   min-width: 0;
+}
+
+.errorActions {
+  gap: 0.72rem;
+}
+
+.errorActions > * {
+  flex: 0 1 auto;
 }
 
 .sidePanelTabs {
@@ -205,7 +214,11 @@
 .inboxPane,
 .chatShell,
 .sideCard {
-  background: linear-gradient(180deg, rgba(12, 18, 31, 0.94), rgba(10, 14, 24, 0.98));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 94%, var(--surface-2) 6%),
+    color-mix(in srgb, var(--surface-1) 98%, var(--surface-0) 2%)
+  );
 }
 
 .inboxPane,
@@ -317,9 +330,9 @@
   height: 2rem;
   padding: 0 0.75rem;
   border-radius: 999px;
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.26);
-  color: #effcf4;
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--success) 26%, var(--border-soft));
+  color: var(--toast-success-fg);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -366,8 +379,8 @@
 .searchInput:focus,
 .input:focus,
 .textarea:focus {
-  border-color: rgba(34, 197, 94, 0.55);
-  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.24);
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border-soft));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 24%, transparent);
 }
 
 .inboxQueueGrid {
@@ -407,19 +420,19 @@
 }
 
 .conversationRow:hover {
-  border-color: rgba(34, 197, 94, 0.46);
+  border-color: color-mix(in srgb, var(--success) 46%, var(--border-soft));
   transform: translateY(-1px);
   background: var(--surface-hover);
 }
 
 .conversationRowActive {
-  border-color: rgba(34, 197, 94, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+  border-color: color-mix(in srgb, var(--success) 72%, var(--border-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 24%, transparent);
 }
 
 .conversationRowClosed {
-  border-color: rgba(100, 116, 139, 0.24);
-  background: color-mix(in srgb, var(--surface-2) 84%, #64748b 16%);
+  border-color: color-mix(in srgb, var(--text-muted) 24%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 84%, var(--text-muted) 16%);
 }
 
 .conversationRowClosed .avatar,
@@ -429,8 +442,8 @@
 }
 
 .conversationRowUnread {
-  border-color: rgba(34, 197, 94, 0.36);
-  background: color-mix(in srgb, var(--surface-2) 88%, rgba(34, 197, 94, 0.18) 12%);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--success) 12%);
 }
 
 .rowTitleUnread {
@@ -540,27 +553,27 @@
 }
 
 .slaPill_good {
-  color: #d8fbe6;
-  background: rgba(34, 197, 94, 0.14);
-  border-color: rgba(34, 197, 94, 0.28);
+  color: var(--toast-success-fg);
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border-soft));
 }
 
 .slaPill_warning {
-  color: #fff2c7;
-  background: rgba(250, 204, 21, 0.16);
-  border-color: rgba(250, 204, 21, 0.28);
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border-soft));
 }
 
 .slaPill_risk {
-  color: #ffd9be;
-  background: rgba(249, 115, 22, 0.16);
-  border-color: rgba(249, 115, 22, 0.3);
+  color: color-mix(in srgb, var(--warning) 72%, var(--danger) 28%);
+  background: color-mix(in srgb, var(--warning) 12%, var(--danger-soft-bg));
+  border-color: color-mix(in srgb, var(--warning) 26%, var(--border-soft));
 }
 
 .slaPill_critical {
-  color: #ffd6db;
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.32);
+  color: var(--danger-soft-fg);
+  background: var(--danger-soft-bg);
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border-soft));
   animation: pulseSlaRing 2s ease-in-out infinite;
 }
 
@@ -585,10 +598,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.24), rgba(18, 102, 58, 0.85));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 24%, var(--surface-2)),
+    color-mix(in srgb, var(--success) 82%, var(--surface-1))
+  );
   color: var(--text-strong);
   font-weight: 600;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
 }
 
 .avatar {
@@ -632,7 +649,7 @@
   height: 24px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(34, 197, 94, 0.18);
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-2));
   color: var(--success);
   display: inline-flex;
   align-items: center;
@@ -656,8 +673,8 @@
 }
 
 .chatShellDragging {
-  border-color: rgba(34, 197, 94, 0.65) !important;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.18) !important;
+  border-color: color-mix(in srgb, var(--success) 65%, var(--border-soft)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--success) 18%, transparent) !important;
 }
 
 .dropOverlay {
@@ -667,8 +684,8 @@
   display: grid;
   place-items: center;
   border-radius: inherit;
-  background: rgba(34, 197, 94, 0.06);
-  border: 2px dashed rgba(34, 197, 94, 0.55);
+  background: color-mix(in srgb, var(--success) 6%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--success) 55%, var(--border-soft));
   pointer-events: none;
 }
 
@@ -677,10 +694,16 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  color: rgba(34, 197, 94, 0.85);
+  color: color-mix(in srgb, var(--success) 85%, var(--text-strong));
   font-size: 0.95rem;
   font-weight: 500;
   letter-spacing: 0.01em;
+}
+
+.dropOverlayIcon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
 }
 
 .chatTitleRow {
@@ -704,7 +727,7 @@
   border-radius: 999px;
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
-  color: #dce7f2;
+  color: var(--text-soft);
   font-size: 0.76rem;
   font-weight: 600;
 }
@@ -725,7 +748,7 @@
   height: 8px;
   border-radius: 999px;
   background: var(--success);
-  box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.12);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .detailRow span,
@@ -758,9 +781,9 @@
 }
 
 .chatResponderPill {
-  border-color: rgba(59, 130, 246, 0.36);
-  background: rgba(59, 130, 246, 0.14);
-  color: #dbeafe;
+  border-color: color-mix(in srgb, var(--info) 36%, var(--border-soft));
+  background: color-mix(in srgb, var(--info) 14%, var(--surface-2));
+  color: color-mix(in srgb, var(--info) 58%, var(--text-strong));
 }
 
 .chatStatusControls {
@@ -822,15 +845,15 @@
 }
 
 .systemEventCard_info .systemEventDot {
-  background: rgba(56, 189, 248, 0.85);
+  background: color-mix(in srgb, var(--info) 85%, transparent);
 }
 
 .systemEventCard_success .systemEventDot {
-  background: rgba(34, 197, 94, 0.85);
+  background: color-mix(in srgb, var(--success) 85%, transparent);
 }
 
 .systemEventCard_warning .systemEventDot {
-  background: rgba(250, 204, 21, 0.85);
+  background: color-mix(in srgb, var(--warning) 85%, transparent);
 }
 
 .systemEventTime {
@@ -845,16 +868,16 @@
   max-width: 16rem;
   border-radius: 0.72rem;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.36);
+  border: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--surface-0) 64%, transparent);
 }
 
 .messageVideoDurationBadge {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  background: rgba(17, 24, 39, 0.75);
-  color: #fff;
+  background: color-mix(in srgb, var(--surface-0) 75%, transparent);
+  color: var(--text-inverse);
   font-size: 0.66rem;
   font-weight: 700;
   border-radius: 999px;
@@ -899,7 +922,7 @@
 .messageMediaOnly {
   gap: 4px;
   padding: 4px;
-  border-color: rgba(125, 211, 252, 0.2);
+  border-color: color-mix(in srgb, var(--info) 20%, var(--border-soft));
 }
 
 .messageMediaOnly .messageHeader {
@@ -913,26 +936,26 @@
 }
 
 .messageHighlighted {
-  border-color: rgba(34, 197, 94, 0.64);
+  border-color: color-mix(in srgb, var(--success) 64%, var(--border-soft));
   box-shadow:
-    0 0 0 1px rgba(34, 197, 94, 0.3),
-    0 0 18px rgba(34, 197, 94, 0.22);
+    0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent),
+    0 0 18px color-mix(in srgb, var(--success) 22%, transparent);
 }
 
 .messageAdmin {
   justify-self: end;
-  background: rgba(16, 87, 57, 0.34);
-  border-color: rgba(34, 197, 94, 0.34);
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
 }
 
 .messageBot {
-  border-color: rgba(14, 165, 233, 0.34);
-  background: rgba(14, 165, 233, 0.18);
+  border-color: color-mix(in srgb, var(--info) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--info) 18%, var(--surface-1));
 }
 
 .messageUser {
   justify-self: start;
-  background: color-mix(in srgb, var(--surface-1) 84%, #0f172a 16%);
+  background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-0) 16%);
 }
 
 .inlineSystemLabel {
@@ -942,9 +965,9 @@
   gap: 10px;
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(125, 211, 252, 0.38);
-  background: rgba(14, 116, 144, 0.16);
-  color: #d9f6ff;
+  border: 1px solid color-mix(in srgb, var(--info) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--info) 16%, var(--surface-2));
+  color: color-mix(in srgb, var(--info) 62%, var(--text-strong));
   font-size: 0.76rem;
   letter-spacing: 0.01em;
 }
@@ -984,7 +1007,7 @@
   max-height: 9.5rem;
   object-fit: cover;
   border-radius: 0.64rem;
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  border: 1px solid var(--border-soft);
 }
 
 .messageAttachmentCard {
@@ -993,7 +1016,7 @@
   gap: 8px;
   padding: 8px 9px;
   border-radius: 0.78rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-soft));
   background: var(--accent-soft-bg);
   color: inherit;
   font: inherit;
@@ -1014,8 +1037,8 @@
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 0.68rem;
-  background: rgba(34, 197, 94, 0.14);
-  border: 1px solid rgba(34, 197, 94, 0.22);
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));
   color: var(--toast-success-fg);
   font-size: 0.68rem;
   font-weight: 600;
@@ -1050,8 +1073,8 @@
 
 .messageAttachmentCard:hover,
 .attachmentActionButton:hover {
-  color: #edf6ff;
-  border-color: rgba(34, 197, 94, 0.36);
+  color: var(--text-strong);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
 }
 
 .messageAttachmentStatusRow {
@@ -1066,9 +1089,9 @@
   justify-content: center;
   padding: 0.22rem 0.58rem;
   border-radius: 999px;
-  border: 1px solid rgba(127, 145, 168, 0.42);
-  background: rgba(127, 145, 168, 0.14);
-  color: #d2deec;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--text-muted) 14%, var(--surface-2));
+  color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1076,21 +1099,21 @@
 
 .messageAttachmentStatus_uploading,
 .messageAttachmentStatus_retry {
-  border-color: rgba(245, 158, 11, 0.42);
-  background: rgba(245, 158, 11, 0.16);
-  color: #ffedca;
+  border-color: color-mix(in srgb, var(--warning) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
+  color: var(--warning);
 }
 
 .messageAttachmentStatus_uploaded {
-  border-color: rgba(34, 197, 94, 0.48);
-  background: rgba(34, 197, 94, 0.17);
+  border-color: color-mix(in srgb, var(--success) 48%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 17%, var(--surface-2));
   color: var(--toast-success-fg);
 }
 
 .messageAttachmentStatus_failed {
-  border-color: rgba(248, 113, 113, 0.5);
-  background: rgba(248, 113, 113, 0.17);
-  color: #ffd9d9;
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border-soft));
+  background: color-mix(in srgb, var(--danger) 17%, var(--surface-2));
+  color: var(--danger-soft-fg);
 }
 
 .messageAttachmentStatusErrorCode {
@@ -1099,22 +1122,30 @@
 }
 
 .avatarTinyAdmin {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.28), rgba(30, 64, 175, 0.82));
-  border-color: rgba(59, 130, 246, 0.38);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--info) 28%, var(--surface-2)),
+    color-mix(in srgb, var(--info) 82%, var(--surface-1))
+  );
+  border-color: color-mix(in srgb, var(--info) 38%, var(--border-soft));
 }
 
 .avatarTinyBot {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.35), rgba(2, 132, 199, 0.78));
-  border-color: rgba(14, 165, 233, 0.5);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 35%, var(--surface-2)),
+    color-mix(in srgb, var(--accent) 78%, var(--surface-1))
+  );
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border-soft));
 }
 
 .messageAdmin .messageBody,
 .messageAdmin .messageHeader {
-  color: #f5fff8;
+  color: var(--text-strong);
 }
 
 .messageHeader {
-  color: #a4b4c8;
+  color: var(--text-muted);
   font-size: 0.72rem;
   display: flex;
   justify-content: space-between;
@@ -1136,18 +1167,18 @@
   font-size: 0.68rem;
   font-weight: 700;
   color: var(--text-muted);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   user-select: none;
 }
 
 .messageTickRead {
-  color: rgba(34, 197, 94, 0.82);
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
 }
 
 .messageReplyAction {
   border: 1px solid var(--border-soft);
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.16);
+  background: color-mix(in srgb, var(--text-muted) 16%, var(--surface-2));
   color: var(--text-muted);
   font: inherit;
   font-size: 0.7rem;
@@ -1158,7 +1189,7 @@
 }
 
 .messageReplyAction:hover {
-  border-color: rgba(34, 197, 94, 0.4);
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border-soft));
   color: var(--text-strong);
 }
 
@@ -1170,7 +1201,7 @@
   text-align: left;
   border: 0;
   border-radius: 0.62rem;
-  background: rgba(34, 197, 94, 0.09);
+  background: color-mix(in srgb, var(--success) 9%, var(--surface-2));
   color: inherit;
   padding: 0.3rem 0.45rem;
   cursor: pointer;
@@ -1188,7 +1219,7 @@
 }
 
 .messageReplyBlockLabel {
-  color: color-mix(in srgb, var(--text-muted) 88%, #34d399 12%);
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--success) 12%);
   font-size: 0.7rem;
   font-weight: 700;
   line-height: 1.25;
@@ -1212,7 +1243,7 @@
   width: 3px;
   min-height: 24px;
   border-radius: 999px;
-  background: rgba(52, 211, 153, 0.8);
+  background: color-mix(in srgb, var(--success) 80%, var(--surface-1));
 }
 
 .deletedAttachmentPlaceholder {
@@ -1220,8 +1251,8 @@
   place-items: center;
   min-height: 4.6rem;
   border-radius: 0.9rem;
-  border: 1px dashed rgba(148, 163, 184, 0.42);
-  background: rgba(100, 116, 139, 0.14);
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--text-muted) 14%, var(--surface-2));
   color: var(--text-muted);
   font-size: 0.72rem;
   text-align: center;
@@ -1247,8 +1278,8 @@
   align-items: center;
   padding: 6px 8px;
   border-radius: 0.72rem;
-  border: 1px solid rgba(34, 197, 94, 0.22);
-  background: rgba(34, 197, 94, 0.09);
+  border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 9%, var(--surface-2));
   min-width: 0;
 }
 
@@ -1256,7 +1287,7 @@
   width: 3px;
   min-height: 26px;
   border-radius: 999px;
-  background: rgba(52, 211, 153, 0.82);
+  background: color-mix(in srgb, var(--success) 82%, var(--surface-1));
 }
 
 .composerReplyPreviewContent {
@@ -1308,7 +1339,7 @@
 
 .composerReplyClose:hover {
   color: var(--text-strong);
-  border-color: rgba(34, 197, 94, 0.36);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
 }
 
 .attachmentPreviewCard {
@@ -1329,7 +1360,7 @@
   height: 72px;
   border-radius: 0.72rem;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, var(--border-soft));
 }
 
 .attachmentPreviewActions {
@@ -1367,7 +1398,7 @@
 }
 
 .quickTemplateButton:hover {
-  border-color: rgba(34, 197, 94, 0.34);
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
   background: var(--surface-hover);
 }
 
@@ -1391,8 +1422,8 @@
   gap: 14px;
   padding: 0.95rem;
   border-radius: 1rem;
-  border: 1px solid rgba(100, 116, 139, 0.28);
-  background: color-mix(in srgb, var(--surface-2) 86%, #64748b 14%);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--text-muted) 14%);
 }
 
 .closedComposerCopy {
@@ -1420,8 +1451,8 @@
   min-height: 1.65rem;
   padding: 0.25rem 0.62rem;
   border-radius: 999px;
-  border: 1px solid rgba(100, 116, 139, 0.3);
-  background: rgba(100, 116, 139, 0.13);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--text-muted) 13%, var(--surface-2));
   color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 700;
@@ -1458,13 +1489,13 @@
   gap: 8px;
   padding: 0.72rem;
   border-radius: 0.92rem;
-  border: 1px solid rgba(248, 81, 73, 0.2);
-  background: rgba(47, 15, 19, 0.16);
+  border: 1px solid color-mix(in srgb, var(--danger) 20%, var(--border-soft));
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-1));
 }
 
 .dangerActionBlock span,
 .dangerActionToggle {
-  color: #ffb8b1;
+  color: var(--danger-soft-fg);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1485,7 +1516,7 @@
   gap: 12px;
   padding: 0.82rem;
   border-radius: 1rem;
-  border: 1px solid rgba(34, 197, 94, 0.18);
+  border: 1px solid color-mix(in srgb, var(--success) 18%, var(--border-soft));
   background: var(--surface-2);
 }
 
@@ -1510,7 +1541,7 @@
 
 .statusOverviewText,
 .statusOverviewHint {
-  color: #9cb0c5;
+  color: var(--text-muted);
   font-size: 0.8rem;
   line-height: 1.5;
 }
@@ -1552,8 +1583,8 @@
   gap: 8px;
   padding: 0.68rem 0.72rem;
   border-radius: 0.92rem;
-  border: 1px solid rgba(248, 81, 73, 0.22);
-  background: rgba(47, 15, 19, 0.22);
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--danger) 22%, var(--surface-1));
 }
 
 .resolveConfirmBox {
@@ -1561,7 +1592,7 @@
   gap: 10px;
   padding: 0.82rem;
   border-radius: 0.9rem;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
   background: var(--surface-2);
 }
 
@@ -1577,7 +1608,7 @@
 }
 
 .workflowDangerLabel {
-  color: #ffb8b1;
+  color: var(--danger-soft-fg);
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -1585,21 +1616,21 @@
 }
 
 .workflowDangerButton {
-  border-color: rgba(248, 81, 73, 0.58) !important;
-  background: rgba(86, 20, 26, 0.82) !important;
-  color: #ffe0dc !important;
+  border-color: color-mix(in srgb, var(--danger) 58%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--danger) 82%, var(--surface-1)) !important;
+  color: var(--danger-soft-fg) !important;
 }
 
 .workflowDangerButton:hover:not(:disabled) {
-  border-color: rgba(248, 81, 73, 0.82) !important;
-  background: rgba(115, 27, 35, 0.96) !important;
+  border-color: color-mix(in srgb, var(--danger) 82%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--danger) 96%, var(--surface-1)) !important;
 }
 
 .sidePanelTab {
   flex: 0 0 auto;
   border: 1px solid var(--border-soft);
   border-radius: 0.85rem;
-  background: rgba(13, 20, 33, 0.84);
+  background: color-mix(in srgb, var(--surface-2) 84%, transparent);
   color: var(--text-muted);
   padding: 0.5rem 0.72rem;
   font: inherit;
@@ -1612,9 +1643,9 @@
 }
 
 .sidePanelTabActive {
-  color: #f4fbff;
-  border-color: rgba(34, 197, 94, 0.52);
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--text-strong);
+  border-color: color-mix(in srgb, var(--success) 52%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-2));
 }
 
 .sidePanelTabDisabled {
@@ -1736,7 +1767,7 @@
   padding: 14px;
   border-radius: 1rem;
   border: 1px solid var(--border-soft);
-  background: rgba(15, 22, 36, 0.94);
+  background: color-mix(in srgb, var(--surface-1) 94%, var(--surface-2));
   color: var(--text-strong);
   cursor: pointer;
   transition:
@@ -1746,13 +1777,13 @@
 }
 
 .templateListItem:hover {
-  border-color: rgba(34, 197, 94, 0.42);
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border-soft));
   transform: translateY(-1px);
 }
 
 .templateListItemActive {
-  border-color: rgba(34, 197, 94, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.24);
+  border-color: color-mix(in srgb, var(--success) 72%, var(--border-soft));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 24%, transparent);
 }
 
 .templateListItemHeader,
@@ -1854,7 +1885,7 @@
   height: 76px;
   object-fit: cover;
   border-radius: 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, var(--border-soft));
 }
 
 .attachmentListMeta {
@@ -2067,16 +2098,19 @@
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #e2f0ff;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.72) 0%, rgba(59, 130, 246, 0.56) 100%);
-  border: 1px solid rgba(59, 130, 246, 0.32);
+  color: var(--accent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 18%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--info) 14%, var(--surface-1)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--info) 32%, var(--border-soft));
   user-select: none;
 }
 
 :root[data-theme="light"] .spAvatarMd {
-  color: #1a3a7a;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(96, 165, 250, 0.22) 100%);
-  border-color: rgba(37, 99, 235, 0.28);
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-soft));
 }
 
 .spIdentityInfo {
@@ -2117,15 +2151,15 @@
 }
 
 .spPlanChipPremium {
-  color: #fbbf24;
-  border-color: rgba(251, 191, 36, 0.42);
-  background: rgba(251, 191, 36, 0.1);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface-2));
 }
 
 :root[data-theme="light"] .spPlanChipPremium {
-  color: #b45309;
-  border-color: rgba(180, 83, 9, 0.32);
-  background: rgba(251, 191, 36, 0.14);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 32%, var(--border-soft));
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-2));
 }
 
 .spUserEmail {
@@ -2160,12 +2194,12 @@
 }
 
 .spStatusMetaUrgent {
-  color: #f87171;
+  color: var(--danger);
   font-weight: 600;
 }
 
 :root[data-theme="light"] .spStatusMetaUrgent {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .spActionsBlock {
@@ -2191,7 +2225,7 @@
   gap: 10px;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
   background: var(--surface-2);
 }
 
@@ -2244,23 +2278,19 @@
 
 .spTabBtn:hover {
   color: var(--text-soft);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-:root[data-theme="light"] .spTabBtn:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-2));
 }
 
 .spTabBtnActive {
   color: var(--text-strong);
   background: var(--surface-1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 :root[data-theme="light"] .spTabBtnActive {
   box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.12),
-    0 0 0 1px rgba(37, 99, 235, 0.1);
+    0 1px 3px color-mix(in srgb, var(--surface-0) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .spContent {
@@ -2338,7 +2368,6 @@
   min-width: 0;
   text-align: center;
   justify-content: center;
-  font-size: 0.76rem;
   font: inherit;
   font-size: 0.76rem;
   font-weight: 500;
@@ -2392,11 +2421,11 @@
 }
 
 .spDangerTrigger:hover {
-  color: #fca5a5;
+  color: var(--danger-soft-fg);
 }
 
 :root[data-theme="light"] .spDangerTrigger:hover {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .spDangerActions {
@@ -2658,8 +2687,8 @@
 :global(:root[data-theme="dark"]) .queueSubFilters,
 :global(:root:not([data-theme="light"])) .spTabNav,
 :global(:root[data-theme="dark"]) .spTabNav {
-  background: color-mix(in srgb, var(--surface-2) 88%, #04070c 12%);
-  border-color: color-mix(in srgb, var(--border-soft) 84%, #0b121d 16%);
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0) 12%);
+  border-color: color-mix(in srgb, var(--border-soft) 84%, var(--surface-0) 16%);
 }
 
 :global(:root:not([data-theme="light"])) .queueSubFilterActive,
@@ -2668,8 +2697,8 @@
 :global(:root[data-theme="dark"]) .spTabBtnActive {
   background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-3) 28%);
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.44),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    0 1px 2px color-mix(in srgb, var(--surface-0) 44%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
 }
 
 :global(:root:not([data-theme="light"])) .conversationRow,
@@ -5472,6 +5501,16 @@
   min-height: 2.95rem;
   border-radius: 14px;
   font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .errorActions {
+    align-items: stretch;
+  }
+
+  .errorActions > * {
+    flex: 1 1 10rem;
+  }
 }
 
 @media (max-width: 1480px) {

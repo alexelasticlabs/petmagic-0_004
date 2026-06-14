@@ -166,7 +166,7 @@ export function EconomyPageSubscriptionsSection({
                           {humanizeStatus(item.status, locale)}
                         </AdminStatusBadge>
                         {item.cancelAtPeriodEnd ? (
-                          <AdminStatusBadge color="#f59e0b">
+                          <AdminStatusBadge color="var(--warning)">
                             {text.cancelAtPeriodEndLabel}
                           </AdminStatusBadge>
                         ) : null}
@@ -193,6 +193,7 @@ export function EconomyPageSubscriptionsSection({
               type="button"
               className={styles.pagerButton}
               disabled={subscriptionPage === 0 || subscriptionsIsFetching}
+              aria-label={text.previousSubscriptionsPageLabel}
               onClick={() => setSubscriptionPage((current) => Math.max(0, current - 1))}
             >
               {text.previousPage}
@@ -201,6 +202,7 @@ export function EconomyPageSubscriptionsSection({
               type="button"
               className={styles.pagerButton}
               disabled={!subscriptionsHasMore || subscriptionsIsFetching}
+              aria-label={text.nextSubscriptionsPageLabel}
               onClick={() => setSubscriptionPage((current) => current + 1)}
             >
               {text.nextPage}

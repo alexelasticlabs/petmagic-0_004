@@ -6,6 +6,7 @@ const dashboardViewPath = fileURLToPath(new URL("./dashboard-view.tsx", import.m
 const dashboardChartsPath = fileURLToPath(
   new URL("./dashboard/dashboard-charts.tsx", import.meta.url)
 );
+const dashboardStylesPath = fileURLToPath(new URL("./dashboard-view.module.css", import.meta.url));
 
 describe("dashboard production data handling", () => {
   it("fails the dashboard query instead of silently substituting zero metrics", () => {
@@ -129,6 +130,49 @@ describe("dashboard production data handling", () => {
     expect(chartSource).toContain("function formatChartCurrencyAmount(");
     expect(source).not.toContain("currency: currencyCode,");
     expect(chartSource).not.toContain("currency: currencyCode,");
+  });
+
+  it("keeps dashboard chart and status colors theme-token based", () => {
+    const source = readFileSync(dashboardViewPath, "utf8");
+    const chartSource = readFileSync(dashboardChartsPath, "utf8");
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+    const visualSource = [source, chartSource, stylesSource].join("\n");
+
+    expect(source).toContain('accentColor: "var(--success)"');
+    expect(source).toContain('color: "var(--brand)"');
+    expect(source).toContain('cancelled: "var(--danger)"');
+    expect(chartSource).toContain('stopColor="var(--success)"');
+    expect(chartSource).toContain('stroke="var(--border-soft)"');
+    expect(chartSource).toContain('fill="var(--text-muted)"');
+    expect(stylesSource).toContain("color: var(--accent-strong);");
+    expect(stylesSource).toContain("border-bottom: 1px solid var(--border-soft);");
+    expect(visualSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(visualSource).not.toContain("rgba(");
+  });
+
+  it("keeps dashboard icons and tone colors in shared components and CSS module classes", () => {
+    const source = readFileSync(dashboardViewPath, "utf8");
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(source).toContain("CaretDownIcon");
+    expect(source).toContain("styles.toolbarChevron");
+    expect(source).toContain("styles.activityIconSuccess");
+    expect(source).toContain("styles.activityIconInfo");
+    expect(source).toContain("styles.activityIconBrand");
+    expect(source).toContain("styles.activityIconDanger");
+    expect(source).toContain("styles[`legendDot${capitalizeTone(item.tone)}`]");
+    expect(stylesSource).toContain(".toolbarChevron");
+    expect(stylesSource).toContain(".legendDotSuccess");
+    expect(stylesSource).toContain(".legendDotBrand");
+    expect(stylesSource).toContain(".legendDotNeutral");
+    expect(stylesSource).toContain(".activityIconSuccess");
+    expect(stylesSource).toContain(".activityIconInfo");
+    expect(stylesSource).toContain(".activityIconBrand");
+    expect(stylesSource).toContain(".activityIconDanger");
+    expect([source, stylesSource].join("\n")).not.toContain("--activity-color");
+    expect([source, stylesSource].join("\n")).not.toContain("--legend-color");
+    expect(source).not.toContain("<svg");
+    expect(source).not.toContain("CSSProperties");
   });
 
   it("sanitizes dashboard user, support, and identifier labels before rendering", () => {

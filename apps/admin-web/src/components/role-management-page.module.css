@@ -60,6 +60,8 @@
   font: inherit;
   font-size: 0.8rem;
   cursor: pointer;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .button:hover:not(:disabled) {
@@ -156,11 +158,21 @@
   }
 
   .pager {
+    flex-direction: column;
     align-items: stretch;
+  }
+
+  .pageInfo {
+    width: 100%;
   }
 
   .pagerActions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .userRow > .button {
+    width: 100%;
   }
 }

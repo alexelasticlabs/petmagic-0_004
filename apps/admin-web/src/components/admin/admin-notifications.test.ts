@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/admin-notifications";
 
 const adminTopbarPath = fileURLToPath(new URL("./admin-topbar.tsx", import.meta.url));
+const adminShellStylesPath = fileURLToPath(new URL("./admin-shell.module.css", import.meta.url));
 
 describe("admin notification sanitization", () => {
   it("masks sensitive values before notifications are persisted", () => {
@@ -114,6 +115,7 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("sanitizeAdminNotificationText,");
     expect(source).toContain("const safeNotificationTitle = sanitizeAdminNotificationText(");
     expect(source).toContain("const safeNotificationMessage = sanitizeAdminNotificationText(");
+    expect(source).toContain('{locale === "ru" ? "Закреплено" : "Pinned"}');
     expect(source).toContain("{safeNotificationTitle}");
     expect(source).toContain("{safeNotificationMessage}");
     expect(source).not.toContain(
@@ -122,5 +124,48 @@ describe("admin notification sanitization", () => {
     expect(source).not.toContain(
       '<p className={styles.notificationCardMessage}>{item.message}</p>'
     );
+  });
+
+  it("keeps the topbar notification dialog keyboard reachable", () => {
+    const source = readFileSync(adminTopbarPath, "utf8");
+
+    expect(source).toContain("useCallback, useEffect, useId, useMemo, useRef, useState");
+    expect(source).toContain("const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);");
+    expect(source).toContain("const notificationPanelRef = useRef<HTMLDivElement | null>(null);");
+    expect(source).toContain("const notificationPanelId = useId();");
+    expect(source).toContain("const notificationPanelTitleId = useId();");
+    expect(source).toContain("const closeNotificationPanel = useCallback(");
+    expect(source).toContain("notificationPanelRef.current?.focus();");
+    expect(source).toContain("closeNotificationPanel({ restoreFocus: true });");
+    expect(source).toContain("ref={notificationTriggerRef}");
+    expect(source).toContain("aria-controls={isNotificationsOpen ? notificationPanelId : undefined}");
+    expect(source).toContain("id={notificationPanelId}");
+    expect(source).toContain("ref={notificationPanelRef}");
+    expect(source).toContain("aria-labelledby={notificationPanelTitleId}");
+    expect(source).toContain("tabIndex={-1}");
+    expect(source).toContain("id={notificationPanelTitleId}");
+  });
+
+  it("keeps the topbar notification dialog inside narrow viewports", () => {
+    const source = readFileSync(adminShellStylesPath, "utf8");
+
+    expect(source).toContain("max-height: min(36rem, calc(100dvh - 5.6rem));");
+    expect(source).toContain("overflow: hidden;");
+    expect(source).toContain(".notificationPanel:focus-visible");
+    expect(source).toContain("@media (max-width: 640px)");
+    expect(source).toContain("position: fixed;");
+    expect(source).toContain("right: 0.75rem;");
+    expect(source).toContain("left: 0.75rem;");
+    expect(source).toContain("max-height: calc(100dvh - 5.5rem);");
+  });
+
+  it("keeps sidebar notification badges theme-token based", () => {
+    const source = readFileSync(adminShellStylesPath, "utf8");
+
+    expect(source).toContain(".navBadge {");
+    expect(source).toContain("background: var(--danger);");
+    expect(source).toContain("color: var(--text-inverse);");
+    expect(source).not.toContain("background: rgba(239, 68, 68, 0.88);");
+    expect(source).not.toContain("color: #fff;");
   });
 });

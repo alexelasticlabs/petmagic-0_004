@@ -1,8 +1,10 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactElement, useEffect, useMemo } from "react";
+import { type ReactElement, useEffect, useMemo, useState } from "react";
 
 import {
   AdminBadge,
@@ -21,7 +23,18 @@ import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-detail-page.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
-import { useAuthSession } from "@/lib/api-client";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
+import {
+  changeAdminUserPetPhotoStatus,
+  changeAdminUserPetStatus,
+  fetchAdminUserPetGenerations,
+  fetchAdminUserPetPhotos,
+  fetchAdminUserPets,
+  type AdminUserPet,
+  type AdminUserPetGeneration,
+  type AdminUserPetPhoto,
+  useAuthSession,
+} from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getAdminUserDisplayName, maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -35,14 +48,99 @@ const ACTIVITY_LIMIT = 12;
 const RECENT_ITEMS_LIMIT = 8;
 const AUDIT_ITEMS_LIMIT = 12;
 
+function getUserPetsCopy(locale: Locale) {
+  const isRu = locale === "ru";
+
+  return {
+    title: isRu ? "Питомцы" : "Pets",
+    description: isRu
+      ? "Профили питомцев, фото, генерации и модерационный статус."
+      : "Pet profiles, photos, generation counts, and moderation status.",
+    noPets: isRu ? "Питомцы пока не добавлены." : "No pets yet.",
+    loadError: isRu ? "Не удалось загрузить питомцев." : "Failed to load pets.",
+    loadingPhotos: isRu ? "Загружаем фото..." : "Loading photos...",
+    photosLoadError: isRu ? "Не удалось загрузить фото питомца." : "Failed to load pet photos.",
+    noPhotos: isRu ? "Фото нет." : "No photos.",
+    loadingGenerations: isRu
+      ? "Загружаем историю генераций питомца..."
+      : "Loading pet generation history...",
+    generationsLoadError: isRu
+      ? "Не удалось загрузить генерации питомца."
+      : "Failed to load pet generations.",
+    noGenerations: isRu ? "Генераций питомца нет." : "No pet generations.",
+    photosCount: isRu ? "фото" : "photos",
+    generationsCount: isRu ? "генераций" : "generations",
+    hide: isRu ? "Скрыть" : "Hide",
+    restore: isRu ? "Восстановить" : "Restore",
+    hidePhoto: isRu ? "Скрыть фото" : "Hide photo",
+    restorePhoto: isRu ? "Восстановить фото" : "Restore photo",
+    showDetails: isRu ? "Показать фото и генерации" : "Show photos and generations",
+    hideDetails: isRu ? "Скрыть детали" : "Hide details",
+    avatar: isRu ? "Аватар" : "Avatar",
+    favorite: isRu ? "Избранное" : "Favorite",
+    photoAlt: isRu ? "фото питомца" : "pet photo",
+    thumbnailReady: isRu ? "thumbnail готов" : "thumbnail ready",
+    originalOnly: isRu ? "только original" : "original only",
+    fallbackTemplate: isRu ? "Шаблон" : "Template",
+  };
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value < 0) {
+    return "0 B";
+  }
+
+  if (value < 1024) {
+    return `${value} B`;
+  }
+
+  const kib = value / 1024;
+  if (kib < 1024) {
+    return `${kib.toFixed(1)} KB`;
+  }
+
+  return `${(kib / 1024).toFixed(1)} MB`;
+}
+
+function getPurchaseStatusColor(status: string): string {
+  return status === "succeeded" ? "var(--success)" : "var(--warning)";
+}
+
+function getGenerationStatusColor(status: string): string {
+  if (status === "Completed") {
+    return "var(--success)";
+  }
+
+  if (status === "Failed") {
+    return "var(--danger)";
+  }
+
+  return "var(--text-muted)";
+}
+
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
+  const petText = useMemo(() => getUserPetsCopy(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
+  const queryClient = useQueryClient();
+  const [expandedPetIds, setExpandedPetIds] = useState<ReadonlySet<string>>(() => new Set());
   const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;
   const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
     enabled: canViewUserProfile,
     userId,
+  });
+  const petsQuery = useQuery<AdminUserPet[]>({
+    enabled: canViewUserProfile && Boolean(userId),
+    queryKey: ["admin", "users", userId, "pets"],
+    queryFn: ({ signal }) => fetchAdminUserPets(userId, signal),
+  });
+  const petStatusMutation = useMutation({
+    mutationFn: ({ petId, status }: { petId: string; status: "active" | "hidden" }) =>
+      changeAdminUserPetStatus(userId, petId, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["admin", "users", userId, "pets"] });
+    },
   });
 
   useEffect(() => {
@@ -227,6 +325,92 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         }}
       />
 
+      <AdminCard title={petText.title} description={petText.description}>
+        {petsQuery.isError ? (
+          <AdminStateCard
+            tone="danger"
+            title={getAdminErrorMessage(petsQuery.error, petText.loadError)}
+            action={
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void petsQuery.refetch().catch(() => undefined)}
+                disabled={!canViewUserProfile || petsQuery.isFetching}
+              >
+                {text.supportRetryAction}
+              </Button>
+            }
+          />
+        ) : (
+          <DataList
+            emptyTitle={petsQuery.isLoading ? text.loading : petText.noPets}
+            items={(petsQuery.data ?? []).map((pet) => {
+              const isExpanded = expandedPetIds.has(pet.id);
+
+              return (
+                <article key={pet.id} className={styles.dataCard}>
+                  <div className={styles.dataHeader}>
+                    <strong>{sanitizeSensitiveText(pet.name, 80)}</strong>
+                    <AdminStatusBadge color={pet.status === "active" ? "var(--success)" : "var(--warning)"}>
+                      {sanitizeSensitiveText(pet.status, 32)}
+                    </AdminStatusBadge>
+                  </div>
+                  <p>
+                    {sanitizeSensitiveText(pet.type, 24)}
+                    {pet.breed ? ` • ${sanitizeSensitiveText(pet.breed, 60)}` : ""} •{" "}
+                    {pet.photosCount} {petText.photosCount} • {pet.generationsCount}{" "}
+                    {petText.generationsCount}
+                  </p>
+                  <span>{formatDateTime(pet.updatedAtUtc, locale)}</span>
+                  <div className={styles.errorActions}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={!canViewUserProfile || petStatusMutation.isPending}
+                      onClick={() =>
+                        petStatusMutation.mutate({
+                          petId: pet.id,
+                          status: pet.status === "active" ? "hidden" : "active",
+                        })
+                      }
+                    >
+                      {pet.status === "active" ? petText.hide : petText.restore}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setExpandedPetIds((current) => {
+                          const next = new Set(current);
+                          if (next.has(pet.id)) {
+                            next.delete(pet.id);
+                          } else {
+                            next.add(pet.id);
+                          }
+                          return next;
+                        })
+                      }
+                    >
+                      {isExpanded ? petText.hideDetails : petText.showDetails}
+                    </Button>
+                  </div>
+                  {isExpanded ? (
+                    <AdminPetDetails
+                      locale={locale}
+                      userId={userId}
+                      pet={pet}
+                      text={petText}
+                      canManagePets={canViewUserProfile}
+                      retryLabel={text.supportRetryAction}
+                    />
+                  ) : null}
+                </article>
+              );
+            })}
+          />
+        )}
+      </AdminCard>
+
       <AdminCard title={text.userActivityTitle}>
         {analytics.recentActivity.length ? (
           <div className={styles.timeline}>
@@ -256,7 +440,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
               <article key={purchase.orderId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
                   <strong>{purchase.sparkToGrant} spark</strong>
-                  <AdminStatusBadge color={purchase.status === "succeeded" ? "#2dd4bf" : "#f59e0b"}>
+                  <AdminStatusBadge color={getPurchaseStatusColor(purchase.status)}>
                     {sanitizeSensitiveText(purchase.status, 48)}
                   </AdminStatusBadge>
                 </div>
@@ -279,15 +463,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
               <article key={generation.generationId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
                   <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
-                  <AdminStatusBadge
-                    color={
-                      generation.status === "Completed"
-                        ? "#22c55e"
-                        : generation.status === "Failed"
-                          ? "#f87171"
-                          : "#8da1ba"
-                    }
-                  >
+                  <AdminStatusBadge color={getGenerationStatusColor(generation.status)}>
                     {sanitizeSensitiveText(generation.status, 48)}
                   </AdminStatusBadge>
                 </div>
@@ -372,6 +548,151 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div className={styles.metric}>
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AdminPetDetails({
+  canManagePets,
+  locale,
+  pet,
+  retryLabel,
+  text,
+  userId,
+}: {
+  canManagePets: boolean;
+  locale: Locale;
+  pet: AdminUserPet;
+  retryLabel: string;
+  text: ReturnType<typeof getUserPetsCopy>;
+  userId: string;
+}) {
+  const queryClient = useQueryClient();
+  const photosQuery = useQuery<AdminUserPetPhoto[]>({
+    queryKey: ["admin", "users", userId, "pets", pet.id, "photos"],
+    queryFn: ({ signal }) => fetchAdminUserPetPhotos(userId, pet.id, signal),
+  });
+  const generationsQuery = useQuery<AdminUserPetGeneration[]>({
+    queryKey: ["admin", "users", userId, "pets", pet.id, "generations"],
+    queryFn: ({ signal }) => fetchAdminUserPetGenerations(userId, pet.id, signal),
+  });
+  const photoStatusMutation = useMutation({
+    mutationFn: ({
+      photoId,
+      status,
+    }: {
+      photoId: string;
+      status: "active" | "hidden";
+    }) => changeAdminUserPetPhotoStatus(userId, pet.id, photoId, status),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["admin", "users", userId, "pets", pet.id, "photos"],
+      });
+    },
+  });
+
+  const photos = photosQuery.data ?? [];
+  const generations = generationsQuery.data ?? [];
+
+  return (
+    <div className={styles.petDetails}>
+      {photosQuery.isLoading ? (
+        <span className={styles.petDetailState}>{text.loadingPhotos}</span>
+      ) : photosQuery.isError ? (
+        <AdminStateCard
+          tone="danger"
+          title={getAdminErrorMessage(photosQuery.error, text.photosLoadError)}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void photosQuery.refetch().catch(() => undefined)}
+              disabled={photosQuery.isFetching}
+            >
+              {retryLabel}
+            </Button>
+          }
+        />
+      ) : photos.length ? (
+        <div className={styles.petMediaGrid}>
+          {photos.slice(0, 6).map((photo) => (
+            <div key={photo.id} className={styles.petPhoto}>
+              <Image
+                src={photo.thumbnailUrl ?? photo.url}
+                alt={`${sanitizeSensitiveText(pet.name, 40)} ${text.photoAlt}`}
+                width={160}
+                height={160}
+              />
+              <span>
+                {photo.isAvatar ? `${text.avatar} • ` : ""}
+                {photo.isFavorite ? `${text.favorite} • ` : ""}
+                {sanitizeSensitiveText(photo.status, 32)}
+              </span>
+              <span>
+                {sanitizeSensitiveText(photo.contentType, 64)}
+                {typeof photo.fileSizeBytes === "number" ? ` • ${formatBytes(photo.fileSizeBytes)}` : ""}
+                {" • "}
+                {photo.thumbnailUrl ? text.thumbnailReady : text.originalOnly}
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!canManagePets || photoStatusMutation.isPending}
+                onClick={() =>
+                  photoStatusMutation.mutate({
+                    photoId: photo.id,
+                    status: photo.status === "active" ? "hidden" : "active",
+                  })
+                }
+              >
+                {photo.status === "active" ? text.hidePhoto : text.restorePhoto}
+              </Button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <span className={styles.petDetailState}>{text.noPhotos}</span>
+      )}
+
+      {generationsQuery.isLoading ? (
+        <span className={styles.petDetailState}>{text.loadingGenerations}</span>
+      ) : generationsQuery.isError ? (
+        <AdminStateCard
+          tone="danger"
+          title={getAdminErrorMessage(generationsQuery.error, text.generationsLoadError)}
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => void generationsQuery.refetch().catch(() => undefined)}
+              disabled={generationsQuery.isFetching}
+            >
+              {retryLabel}
+            </Button>
+          }
+        />
+      ) : generations.length ? (
+        <DataList
+          emptyTitle={text.noGenerations}
+          items={generations.slice(0, 6).map((generation) => (
+            <article key={generation.generationId} className={styles.dataCard}>
+              <div className={styles.dataHeader}>
+                <strong>{sanitizeSensitiveText(generation.templateTitle ?? generation.templateId, 120)}</strong>
+                <AdminStatusBadge color={getGenerationStatusColor(generation.status)}>
+                  {sanitizeSensitiveText(generation.status, 48)}
+                </AdminStatusBadge>
+              </div>
+              <p>
+                {sanitizeSensitiveText(generation.templateType ?? text.fallbackTemplate, 48)} •{" "}
+                {generation.tokenCost} PawSpark
+              </p>
+              <span>{formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
+            </article>
+          ))}
+        />
+      ) : (
+        <span className={styles.petDetailState}>{text.noGenerations}</span>
+      )}
     </div>
   );
 }

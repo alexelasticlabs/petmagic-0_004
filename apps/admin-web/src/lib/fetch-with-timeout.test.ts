@@ -60,7 +60,7 @@ describe("fetchWithTimeout", () => {
   });
 
   it("adds a correlation id header to direct timed fetches", async () => {
-    const fetchMock = vi.fn(async () => new Response("ok"));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("ok"));
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchWithTimeout("/secure-media", { credentials: "include" }, 5_000);
@@ -71,7 +71,7 @@ describe("fetchWithTimeout", () => {
   });
 
   it("preserves caller-provided correlation ids", async () => {
-    const fetchMock = vi.fn(async () => new Response("ok"));
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response("ok"));
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchWithTimeout(

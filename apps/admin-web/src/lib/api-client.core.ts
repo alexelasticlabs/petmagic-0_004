@@ -43,6 +43,7 @@ type ApiError = Error & {
   validationErrors?: string[];
 };
 type AuthSessionSnapshot = AuthSession | null | undefined;
+type JsonRecord = Record<string, unknown>;
 
 let cachedAuthRaw: string | null | undefined;
 let cachedAuthSession: AuthSession | null = null;
@@ -153,6 +154,54 @@ export function encodePathSegment(value: string): string {
   return encodeURIComponent(value);
 }
 
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isValidUserProfile(value: unknown): value is UserProfile {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    typeof value.userId === "string" &&
+    value.userId.trim().length > 0 &&
+    typeof value.email === "string" &&
+    value.email.trim().length > 0 &&
+    typeof value.isPremium === "boolean" &&
+    typeof value.emailConfirmed === "boolean" &&
+    isStringArray(value.roles)
+  );
+}
+
+function validateAuthSession(value: unknown, source: string): AuthSession {
+  if (!isRecord(value)) {
+    throw new Error(`${source} auth session is not an object.`);
+  }
+
+  if (!isValidUserProfile(value.user)) {
+    throw new Error(`${source} auth session is missing required user fields.`);
+  }
+
+  if (typeof value.expiresAtUtc !== "string" || value.expiresAtUtc.trim().length === 0) {
+    throw new Error(`${source} auth session is missing expiresAtUtc.`);
+  }
+
+  if (typeof value.accessToken !== "undefined" && typeof value.accessToken !== "string") {
+    throw new Error(`${source} auth session has an invalid accessToken.`);
+  }
+
+  if (typeof value.refreshToken !== "undefined" && typeof value.refreshToken !== "string") {
+    throw new Error(`${source} auth session has an invalid refreshToken.`);
+  }
+
+  return value as AuthSession;
+}
+
 export async function cachedGet<TResponse>(
   cacheKey: string,
   cache: Map<string, { value: TResponse; expiresAt: number }>,
@@ -210,7 +259,7 @@ export function getSession(): AuthSession | null {
   }
 
   try {
-    const parsed = JSON.parse(raw) as AuthSession;
+    const parsed = validateAuthSession(JSON.parse(raw), "Stored");
     const parsedUserId = parsed.user?.userId ?? null;
     const hasStoredToken =
       (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) ||
@@ -402,14 +451,16 @@ function sanitizeSessionForStorage(session: AuthSession): AuthSession {
 }
 
 function saveSession(session: AuthSession): void {
+  const validSession = validateAuthSession(session, "Backend");
+
   clearAdminListCaches();
   authSessionMutationVersion += 1;
-  volatileAccessToken = session.accessToken?.trim() ? session.accessToken : null;
-  volatileRefreshToken = session.refreshToken?.trim() ? session.refreshToken : null;
-  volatileTokenUserId = session.user.userId;
+  volatileAccessToken = validSession.accessToken?.trim() ? validSession.accessToken : null;
+  volatileRefreshToken = validSession.refreshToken?.trim() ? validSession.refreshToken : null;
+  volatileTokenUserId = validSession.user.userId;
 
   if (typeof window !== "undefined") {
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(session)));
+    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(validSession)));
     notifyAuthSessionChanged();
   }
 }

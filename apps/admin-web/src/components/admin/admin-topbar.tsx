@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { BellIcon, CaretDownIcon, MenuIcon } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
@@ -64,6 +64,10 @@ export function AdminTopbar({
   const [notificationPanelPathname, setNotificationPanelPathname] = useState<string | null>(null);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>("all");
   const notificationRootRef = useRef<HTMLDivElement | null>(null);
+  const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+  const notificationPanelId = useId();
+  const notificationPanelTitleId = useId();
   const themeLabel =
     locale === "ru"
       ? theme === "dark"
@@ -129,6 +133,22 @@ export function AdminTopbar({
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
 
+  const closeNotificationPanel = useCallback((options?: { restoreFocus?: boolean }) => {
+    setNotificationPanelPathname(null);
+
+    if (options?.restoreFocus && typeof window !== "undefined") {
+      window.requestAnimationFrame(() => notificationTriggerRef.current?.focus());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isNotificationsOpen) {
+      return;
+    }
+
+    notificationPanelRef.current?.focus();
+  }, [isNotificationsOpen]);
+
   useEffect(() => {
     const isSupportRoute = /^\/(ru|en)\/support(\/|$)/.test(pathname);
     if (!isSupportRoute) {
@@ -151,13 +171,13 @@ export function AdminTopbar({
         event.target instanceof Node &&
         !notificationRootRef.current.contains(event.target)
       ) {
-        setNotificationPanelPathname(null);
+        closeNotificationPanel();
       }
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setNotificationPanelPathname(null);
+        closeNotificationPanel({ restoreFocus: true });
       }
     }
 
@@ -167,7 +187,7 @@ export function AdminTopbar({
       window.removeEventListener("mousedown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isNotificationsOpen]);
+  }, [closeNotificationPanel, isNotificationsOpen]);
 
   return (
     <header className={styles.topbar}>
@@ -190,13 +210,20 @@ export function AdminTopbar({
       <div className={styles.topbarActions}>
         <div className={styles.notificationRoot} ref={notificationRootRef}>
           <button
+            ref={notificationTriggerRef}
             type="button"
             className={`${styles.localeTrigger} ${styles.notificationTrigger} ${isNotificationsOpen ? styles.notificationTriggerActive : ""}`}
-            onClick={() =>
-              setNotificationPanelPathname((current) => (current === pathname ? null : pathname))
-            }
+            onClick={() => {
+              if (isNotificationsOpen) {
+                closeNotificationPanel({ restoreFocus: true });
+                return;
+              }
+
+              setNotificationPanelPathname(pathname);
+            }}
             aria-haspopup="dialog"
             aria-expanded={isNotificationsOpen}
+            aria-controls={isNotificationsOpen ? notificationPanelId : undefined}
             aria-label={locale === "ru" ? "Открыть уведомления" : "Open notifications"}
             title={locale === "ru" ? "Уведомления" : "Notifications"}
           >
@@ -208,16 +235,19 @@ export function AdminTopbar({
 
           {isNotificationsOpen ? (
             <div
+              id={notificationPanelId}
+              ref={notificationPanelRef}
               className={styles.notificationPanel}
               role="dialog"
-              aria-label={locale === "ru" ? "Центр уведомлений" : "Notification center"}
+              aria-labelledby={notificationPanelTitleId}
+              tabIndex={-1}
             >
               <div className={styles.notificationPanelHeader}>
                 <div className={styles.notificationPanelCopy}>
                   <span className={styles.notificationEyebrow}>
                     {locale === "ru" ? "Центр уведомлений" : "Notification center"}
                   </span>
-                  <strong className={styles.notificationTitle}>
+                  <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
                     {locale === "ru" ? "Важные события админки" : "Important admin events"}
                   </strong>
                   <p className={styles.notificationSummary}>
@@ -264,7 +294,7 @@ export function AdminTopbar({
                   <Link
                     href={`/${locale}/support`}
                     className={`${styles.notificationCard} ${styles.notificationCardUnread} ${styles.notificationCardPinned}`}
-                    onClick={() => setNotificationPanelPathname(null)}
+                    onClick={() => closeNotificationPanel()}
                   >
                     <div className={styles.notificationCardMeta}>
                       <div className={styles.notificationCardMetaLead}>
@@ -316,7 +346,7 @@ export function AdminTopbar({
                             <div className={styles.notificationCardMeta}>
                               <div className={styles.notificationCardMetaLead}>
                                 <span className={styles.notificationPinnedMark}>
-                                  {locale === "ru" ? "Pinned" : "Pinned"}
+                                  {locale === "ru" ? "Закреплено" : "Pinned"}
                                 </span>
                                 <span
                                   className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
@@ -367,7 +397,7 @@ export function AdminTopbar({
                               className={`${styles.notificationCard} ${styles.notificationCardPinned} ${!item.read ? styles.notificationCardUnread : ""}`}
                               onClick={() => {
                                 markAsRead(item.id);
-                                setNotificationPanelPathname(null);
+                                closeNotificationPanel();
                               }}
                             >
                               {content}
@@ -456,7 +486,7 @@ export function AdminTopbar({
                               className={`${styles.notificationCard} ${!item.read ? styles.notificationCardUnread : ""}`}
                               onClick={() => {
                                 markAsRead(item.id);
-                                setNotificationPanelPathname(null);
+                                closeNotificationPanel();
                               }}
                             >
                               {content}

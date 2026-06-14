@@ -16,6 +16,7 @@ describe("admin-rbac", () => {
   const concreteAdminRoutes = [
     "/dashboard",
     "/economy",
+    "/feedback",
     "/generations",
     "/image-templates",
     "/moderation",
@@ -26,6 +27,7 @@ describe("admin-rbac", () => {
     "/templates",
     "/templates/analytics",
     "/templates/categories",
+    "/templates/daily-featured",
     "/templates/image",
     "/templates/image/analytics/template-1",
     "/templates/image/editor",
@@ -54,8 +56,10 @@ describe("admin-rbac", () => {
 
   it("limits moderators to permitted operational sections", () => {
     expect(canAccessAdminPath(["Moderator"], "/support/abc")).toBe(true);
+    expect(canAccessAdminPath(["Moderator"], "/feedback")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/moderation")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/templates/video")).toBe(true);
+    expect(canAccessAdminPath(["Moderator"], "/templates/daily-featured")).toBe(false);
     expect(canAccessAdminPath(["Moderator"], "/templates/image/analytics/template-1")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/templates/video/analytics/template-1")).toBe(true);
     expect(canAccessAdminPath(["Moderator"], "/templates/image/editor")).toBe(false);
@@ -84,9 +88,7 @@ describe("admin-rbac", () => {
   });
 
   it("keeps protected route coverage aligned with locale admin pages", () => {
-    expect(collectLocaleAdminRoutes(localeAppRoot).sort()).toEqual(
-      [...concreteAdminRoutes].sort()
-    );
+    expect(collectLocaleAdminRoutes(localeAppRoot).sort()).toEqual([...concreteAdminRoutes].sort());
   });
 });
 

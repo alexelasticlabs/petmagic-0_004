@@ -42,12 +42,14 @@ const iconMap = {
   moderation: ChartIcon,
   users: UsersIcon,
   generations: ChartIcon,
+  feedback: SupportIcon,
   "role-management": UsersIcon,
   templates: TemplatesIcon,
   "image-templates": ImageIcon,
   "template-analytics": ChartIcon,
   "video-templates": VideoIcon,
   "template-categories": TemplatesIcon,
+  "template-daily-featured": TemplatesIcon,
 };
 
 function getTargetPath(href: string) {
@@ -72,7 +74,7 @@ function buildNavSections(navItems: AdminNavEntry[], locale: Locale): NavSection
     {
       key: "users",
       label: text.navSectionUsers,
-      itemKeys: ["users", "role-management", "generations", "support", "moderation"],
+      itemKeys: ["users", "role-management", "generations", "feedback", "support", "moderation"],
     },
   ];
 

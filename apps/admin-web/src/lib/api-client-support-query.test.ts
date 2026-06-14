@@ -25,7 +25,7 @@ describe("api-client.support query normalization", () => {
   });
 
   it("normalizes support inbox page parameters before building request URLs", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({ items: [], page: 2, pageSize: 100, totalCount: 0, hasMore: false })
     );
     const overlongSearch = "s".repeat(SUPPORT_INBOX_SEARCH_MAX_LENGTH + 20);
@@ -49,8 +49,26 @@ describe("api-client.support query normalization", () => {
     });
   });
 
+  it("serializes multi-status support inbox filters with backend priority and sort", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportInbox(["New", "WaitingForUser"], "all", {
+      priority: "High",
+      sort: "priority",
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets?status=New&status=WaitingForUser&priority=High&sort=priority&page=1&pageSize=50"
+    );
+  });
+
   it("requests support inbox metrics with abort support", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         totalConversations: 6,
         openConversations: 4,
@@ -72,7 +90,7 @@ describe("api-client.support query normalization", () => {
   });
 
   it("normalizes support conversation message take before building request URLs", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         conversationId: "conversation-1",
         subjectUserId: "user-1",
@@ -86,15 +104,16 @@ describe("api-client.support query normalization", () => {
     await fetchSupportConversation("conversation-1", {
       take: 25.8,
       beforeMessageCreatedAtUtc: "2026-06-06T12:00:00Z",
+      beforeMessageId: "message-1",
     });
 
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-      "https://api.example.com/api/admin/support/tickets/conversation-1?take=25&beforeMessageCreatedAtUtc=2026-06-06T12%3A00%3A00Z"
+      "https://api.example.com/api/admin/support/tickets/conversation-1?take=25&beforeMessageCreatedAtUtc=2026-06-06T12%3A00%3A00Z&beforeMessageId=message-1"
     );
   });
 
   it("encodes support ids before placing them in API path segments", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         conversationId: "ticket/one two?x",
         subjectUserId: "user-1",
@@ -115,7 +134,7 @@ describe("api-client.support query normalization", () => {
   });
 
   it("bounds support message bodies before sending reply payloads", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         messageId: "message-1",
         conversationId: "ticket-1",

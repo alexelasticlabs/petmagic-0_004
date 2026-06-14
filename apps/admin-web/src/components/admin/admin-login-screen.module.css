@@ -50,7 +50,7 @@
   font-size: clamp(1.2rem, 2vw, 1.5rem);
   font-weight: 600;
   color: var(--text-strong);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.25;
 }
 
@@ -89,15 +89,15 @@
 }
 
 .previewDotRed {
-  background: #ef4444;
+  background: var(--danger);
 }
 
 .previewDotYellow {
-  background: #f59e0b;
+  background: var(--warning);
 }
 
 .previewDotGreen {
-  background: #22c55e;
+  background: var(--success);
 }
 
 .previewWindowTitle {
@@ -143,6 +143,12 @@
 .previewChart {
   width: 100%;
   height: 52px;
+}
+
+.previewChartGraphic {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .previewStats {

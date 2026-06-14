@@ -36,8 +36,8 @@ export function RevenueChart({
     <svg viewBox="0 0 610 240" className={styles.chartSvg} aria-label={ariaLabel}>
       <defs>
         <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--success)" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
         </linearGradient>
       </defs>
       {yLabels.map(({ y }) => (
@@ -47,7 +47,7 @@ export function RevenueChart({
           y1={y}
           x2="570"
           y2={y}
-          stroke="#21332d"
+          stroke="var(--border-soft)"
           strokeWidth="1"
           strokeDasharray="4 4"
         />
@@ -58,7 +58,7 @@ export function RevenueChart({
           x="36"
           y={y + 4}
           textAnchor="end"
-          fill="#7f938b"
+          fill="var(--text-muted)"
           fontSize="10"
           fontFamily="system-ui"
         >
@@ -68,7 +68,7 @@ export function RevenueChart({
       <polygon points={areaPoints} fill="url(#dashboardRevenueGradient)" />
       <polyline
         points={points}
-        stroke="#34d399"
+        stroke="var(--success)"
         strokeWidth="2.4"
         fill="none"
         strokeLinejoin="round"
@@ -81,8 +81,8 @@ export function RevenueChart({
             cx={x}
             cy={y}
             r="3.6"
-            fill="#34d399"
-            stroke="#050706"
+            fill="var(--success)"
+            stroke="var(--surface-1)"
             strokeWidth="1.6"
           />
         );
@@ -93,7 +93,7 @@ export function RevenueChart({
           x={x}
           y={220}
           textAnchor="middle"
-          fill="#7f938b"
+          fill="var(--text-muted)"
           fontSize="10"
           fontFamily="system-ui"
         >
@@ -138,10 +138,10 @@ export function DonutChart({
 
   return (
     <svg viewBox="0 0 180 180" className={styles.donutSvg} aria-hidden="true">
-      <circle cx="90" cy="90" r="65" stroke="#18231f" strokeWidth="22" fill="none" />
-      {segments.map((segment) => (
+      <circle cx="90" cy="90" r="65" stroke="var(--border-soft)" strokeWidth="22" fill="none" />
+      {segments.map((segment, index) => (
           <circle
-            key={segment.color}
+            key={`${segment.color}-${index}`}
             cx="90"
             cy="90"
             r="65"
@@ -156,14 +156,21 @@ export function DonutChart({
         x="90"
         y="86"
         textAnchor="middle"
-        fill="#f4fff9"
+        fill="var(--text-strong)"
         fontSize="20"
         fontWeight="800"
         fontFamily="system-ui"
       >
         {total}
       </text>
-      <text x="90" y="104" textAnchor="middle" fill="#7f938b" fontSize="10" fontFamily="system-ui">
+      <text
+        x="90"
+        y="104"
+        textAnchor="middle"
+        fill="var(--text-muted)"
+        fontSize="10"
+        fontFamily="system-ui"
+      >
         {label}
       </text>
     </svg>

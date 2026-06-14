@@ -65,6 +65,9 @@ describe("template analytics export", () => {
       promoBadgeMode: "Auto",
       isPremium: true,
       tokenCost: 60,
+      supportsGenerationResultInput: true,
+      requiredInputMediaType: "Image",
+      recommendedAfterImageGeneration: true,
       tags: ["birthday token=raw-token"],
       previewAsset: {
         url: "https://cdn.example.com/preview.mp4?X-Amz-Signature=secret",

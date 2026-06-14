@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { SearchIcon, UploadIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -858,7 +859,7 @@ export function SupportConversationPage({
           tone="danger"
           title={text.supportLoadError}
           action={
-            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+            <div className={styles.errorActions}>
               <Button
                 variant="secondary"
                 onClick={() => {
@@ -890,15 +891,12 @@ export function SupportConversationPage({
               </div>
               <span className={styles.supportPageSubtitle}>{supportWorkspaceSubtitle}</span>
             </div>
-            <div className={styles.supportPageToolbar}>
-              <label className={`${styles.searchField} ${styles.supportPageHeroSearch}`}>
-                <span className={styles.supportSearchIcon} aria-hidden="true">
-                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <circle cx="8.5" cy="8.5" r="5.5" />
-                    <path d="M12.5 12.5 17 17" strokeLinecap="round" />
-                  </svg>
-                </span>
-                <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
+              <div className={styles.supportPageToolbar}>
+                <label className={`${styles.searchField} ${styles.supportPageHeroSearch}`}>
+                  <span className={styles.supportSearchIcon} aria-hidden="true">
+                    <SearchIcon />
+                  </span>
+                  <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
                 <input
                   ref={searchInputRef}
                   className={`${styles.searchInput} ${styles.supportPageSearchInput}`}
@@ -1227,19 +1225,7 @@ export function SupportConversationPage({
                 {isDragging ? (
                   <div className={styles.dropOverlay}>
                     <div className={styles.dropOverlayContent}>
-                      <svg
-                        width="40"
-                        height="40"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        aria-hidden="true"
-                      >
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
+                      <UploadIcon className={styles.dropOverlayIcon} />
                       <span>{locale === "ru" ? "Перетащите фото сюда" : "Drop image here"}</span>
                     </div>
                   </div>

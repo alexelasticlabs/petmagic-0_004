@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/login-card.module.css";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { getDefaultAdminPath, hasAdminPanelAccess } from "@/lib/admin-rbac";
@@ -20,82 +21,6 @@ import {
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale, getDictionary } from "@/lib/i18n";
 import { maskEmail } from "@/lib/sensitive-display";
-
-/* ── SVG icons ────────────────────────────────────────────────────── */
-function IconEmail() {
-  return (
-    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="2" y="4" width="20" height="16" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M22 6.5L12 13.5L2 6.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconLock() {
-  return (
-    <svg className={styles.inputIcon} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="3" y="11" width="18" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
-      <path
-        d="M7 11V7a5 5 0 0 1 10 0v4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconEyeOn() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-function IconEyeOff() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <path
-        d="M14.12 14.12A3 3 0 019.88 9.88"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <line
-        x1="1"
-        y1="1"
-        x2="23"
-        y2="23"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /* ── Component ────────────────────────────────────────────────────── */
 type LoginCardProps = { locale: Locale };
@@ -295,7 +220,7 @@ export function LoginCard({ locale }: LoginCardProps) {
             {text.emailLabel}
           </label>
           <div className={styles.inputWrap}>
-            <IconEmail />
+            <MailIcon className={styles.inputIcon} />
             <input
               ref={emailInputRef}
               id="login-email"
@@ -324,7 +249,7 @@ export function LoginCard({ locale }: LoginCardProps) {
             {text.passwordLabel}
           </label>
           <div className={styles.inputWrap}>
-            <IconLock />
+            <LockIcon className={styles.inputIcon} />
             <input
               id="login-password"
               className={`${styles.input} ${styles.inputPaddedRight}`}
@@ -357,7 +282,7 @@ export function LoginCard({ locale }: LoginCardProps) {
               }
               onClick={() => setShowPassword((c) => !c)}
             >
-              {showPassword ? <IconEyeOff /> : <IconEyeOn />}
+              {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </div>
         </div>

@@ -119,12 +119,14 @@ export const enDictionary: Dictionary = {
   navModeration: "Moderation",
   navUsers: "Users",
   navGenerations: "Generations",
+  navFeedback: "Feedback",
   navRoleManagement: "Role Management",
   navTemplates: "Templates",
   navImageTemplates: "Image Templates",
   navVideoTemplates: "Video Templates",
   navTemplateAnalytics: "Template Analytics",
   navTemplateCategories: "Categories",
+  navTemplateDailyFeatured: "Daily Featured",
   navPromoCodes: "Promo Codes",
   navSectionOverview: "Overview",
   navSectionGrowth: "Growth",
@@ -138,6 +140,8 @@ export const enDictionary: Dictionary = {
   promoCodesLoadingDescription: "Loading active and archived promo codes.",
   promoCodesErrorDescription:
     "Failed to load promo codes. Check service availability and try again.",
+  promoCodesMetricsErrorDescription:
+    "Promo code summary metrics did not refresh. The table below is still available.",
   promoCodesCreateAction: "Create promo code",
   promoCodesExportAction: "Export CSV",
   promoCodesRefreshAction: "Refresh",

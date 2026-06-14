@@ -32,6 +32,7 @@ type AdminStatCardProps = {
 type AdminStatusBadgeProps = {
   children: ReactNode;
   color: string;
+  className?: string;
 };
 
 type AdminPageHeroProps = {
@@ -317,10 +318,12 @@ export function AdminStatCard({
   );
 }
 
-export function AdminStatusBadge({ children, color }: AdminStatusBadgeProps) {
+export function AdminStatusBadge({ children, color, className }: AdminStatusBadgeProps) {
   const style = { "--status-color": color } as CSSProperties;
+  const badgeClassName = className ? `${styles.statusBadge} ${className}` : styles.statusBadge;
+
   return (
-    <span className={styles.statusBadge} style={style}>
+    <span className={badgeClassName} style={style}>
       {children}
     </span>
   );

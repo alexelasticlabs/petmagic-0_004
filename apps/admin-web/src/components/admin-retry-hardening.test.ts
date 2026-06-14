@@ -22,16 +22,41 @@ describe("admin retry hardening", () => {
     );
   });
 
+  it("keeps role assignment search failures distinct from empty search results", () => {
+    const source = readFileSync(roleManagementPath, "utf8");
+
+    expect(source).toContain(
+      'searchError: isRu ? "Не удалось выполнить поиск пользователей" : "Failed to search users"'
+    );
+    expect(source).toContain("const isSearchActive = debouncedSearch.trim().length >= 2;");
+    expect(source).toContain("isSearchActive && searchQuery.isError");
+    expect(source).toContain(
+      "description={getAdminErrorMessage(searchQuery.error, text.searchError)}"
+    );
+    expect(source).toContain("disabled={!canManageRoles || searchQuery.isFetching}");
+    expect(source).toContain("void searchQuery.refetch().catch(() => undefined);");
+    expect(source).toContain("isSearchActive &&\n            !searchQuery.isLoading");
+    expect(source).toContain("!searchQuery.isError &&\n            searchResults.length === 0");
+    expect(source).not.toContain(
+      "debouncedSearch.trim().length >= 2 &&\n          !searchQuery.isLoading &&\n          searchResults.length === 0"
+    );
+  });
+
   it("swallows safe manual retry failures on promo and generations pages", () => {
     const promoSource = readFileSync(promoCodesPath, "utf8");
     const generationsSource = readFileSync(generationsPath, "utf8");
 
     expect(promoSource).toContain("promoCodesQuery.refetch().catch(() => undefined)");
     expect(promoSource).toContain(
-      "!canManagePromoCodes || promoCodesQuery.isFetching || promoMetricsQuery.isFetching"
+      "const isPromoRefreshFetching = promoCodesQuery.isFetching || promoMetricsQuery.isFetching;"
     );
+    expect(promoSource).toContain("disabled={!canManagePromoCodes || isPromoRefreshFetching}");
+    expect(promoSource).toContain("promoCodesQueryIsFetching={isPromoRefreshFetching}");
     expect(promoSource).toContain(
       "if (!canManagePromoCodes) {\n                  return;\n                }\n\n                void promoCodesQuery.refetch().catch(() => undefined);"
+    );
+    expect(promoSource).toContain(
+      "void promoCodesQuery.refetch().catch(() => undefined);\n            void promoMetricsQuery.refetch().catch(() => undefined);"
     );
     expect(generationsSource).toContain("generationsQuery.refetch().catch(() => undefined)");
     expect(generationsSource).toContain(

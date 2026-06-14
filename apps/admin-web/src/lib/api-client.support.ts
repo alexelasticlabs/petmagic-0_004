@@ -27,6 +27,7 @@ function normalizePositiveInteger(value: number | undefined, maxValue: number): 
 
 export const SUPPORT_INBOX_SEARCH_MAX_LENGTH = 120;
 export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 2_000;
+export type SupportInboxSort = "default" | "priority" | "waiting" | "updated" | "created";
 
 function normalizeSupportInboxSearch(value: string | undefined): string | undefined {
   return value?.trim().slice(0, SUPPORT_INBOX_SEARCH_MAX_LENGTH) || undefined;
@@ -37,10 +38,12 @@ function normalizeSupportMessageBody(value: string | undefined): string {
 }
 
 export async function fetchSupportInbox(
-  status?: SupportConversationStatus,
+  status?: SupportConversationStatus | SupportConversationStatus[],
   assignment: SupportInboxAssignmentScope = "all",
   options?: {
     search?: string;
+    priority?: SupportConversationPriority;
+    sort?: SupportInboxSort;
     page?: number;
     pageSize?: number;
     signal?: AbortSignal;
@@ -49,11 +52,18 @@ export async function fetchSupportInbox(
   const normalizedPage = normalizePositiveInteger(options?.page, 10_000);
   const normalizedPageSize = normalizePositiveInteger(options?.pageSize, 100);
   const searchParams = new URLSearchParams();
-  if (status) {
-    searchParams.set("status", status);
+  const statuses = Array.isArray(status) ? status : status ? [status] : [];
+  for (const statusFilter of statuses) {
+    searchParams.append("status", statusFilter);
   }
   if (assignment !== "all") {
     searchParams.set("assignment", assignment);
+  }
+  if (options?.priority) {
+    searchParams.set("priority", options.priority);
+  }
+  if (options?.sort && options.sort !== "default") {
+    searchParams.set("sort", options.sort);
   }
   const search = normalizeSupportInboxSearch(options?.search);
   if (search) {
@@ -74,7 +84,9 @@ export async function fetchSupportInbox(
   });
 }
 
-export async function fetchSupportInboxMetrics(signal?: AbortSignal): Promise<AdminSupportInboxMetrics> {
+export async function fetchSupportInboxMetrics(
+  signal?: AbortSignal
+): Promise<AdminSupportInboxMetrics> {
   return apiRequest<AdminSupportInboxMetrics>("/api/admin/support/tickets/metrics", {
     method: "GET",
     signal,
@@ -86,6 +98,7 @@ export async function fetchSupportConversation(
   options?: {
     take?: number;
     beforeMessageCreatedAtUtc?: string | null;
+    beforeMessageId?: string | null;
     signal?: AbortSignal;
   }
 ): Promise<AdminSupportConversation> {
@@ -98,6 +111,10 @@ export async function fetchSupportConversation(
 
   if (options?.beforeMessageCreatedAtUtc) {
     searchParams.set("beforeMessageCreatedAtUtc", options.beforeMessageCreatedAtUtc);
+  }
+
+  if (options?.beforeMessageId) {
+    searchParams.set("beforeMessageId", options.beforeMessageId);
   }
 
   const query = searchParams.size > 0 ? `?${searchParams.toString()}` : "";

@@ -144,7 +144,8 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
 
   const overview = overviewQuery.data ?? null;
   const isLoading = overviewQuery.isPending && !overview;
-  const error = overviewQuery.isError ? text.loadError : null;
+  const hasBlockingError = overviewQuery.isError && !overview;
+  const hasPartialError = overviewQuery.isError && Boolean(overview);
 
   if (!session) {
     return (
@@ -190,12 +191,12 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     );
   }
 
-  if (error || !overview) {
+  if (hasBlockingError || !overview) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard
           tone="danger"
-          title={error ?? text.loadError}
+          title={text.loadError}
           action={
             <Button
               type="button"
@@ -301,6 +302,30 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           { label: text.premium, value: formatNumber(summary.premiumTemplates, locale) },
         ]}
       />
+
+      {hasPartialError ? (
+        <AdminStateCard
+          tone="warning"
+          title={text.partialErrorTitle}
+          description={text.partialErrorDescription}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!session || overviewQuery.isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void overviewQuery.refetch().catch(() => undefined);
+              }}
+            >
+              {text.retryAction}
+            </Button>
+          }
+        />
+      ) : null}
 
       <AdminToolbar className={styles.toolbar}>
         <div className={styles.segmented} aria-label={text.periodLabel}>
@@ -649,12 +674,12 @@ function TrendChart({
       >
         <defs>
           <linearGradient id="templatesHubLine" x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#22c55e" />
-            <stop offset="1" stopColor="#38bdf8" />
+            <stop offset="0" stopColor="var(--success)" />
+            <stop offset="1" stopColor="var(--info)" />
           </linearGradient>
           <linearGradient id="templatesHubArea" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#22c55e" stopOpacity="0.22" />
-            <stop offset="1" stopColor="#22c55e" stopOpacity="0" />
+            <stop offset="0" stopColor="var(--success)" stopOpacity="0.22" />
+            <stop offset="1" stopColor="var(--success)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[0, 0.25, 0.5, 0.75, 1].map((ratio, index) => {
@@ -1115,6 +1140,12 @@ function getCopy(locale: AppLocale) {
     loadError: isRu
       ? "Не удалось загрузить аналитику шаблонов."
       : "Failed to load template analytics.",
+    partialErrorTitle: isRu
+      ? "Отчет показан из последнего успешного ответа"
+      : "Showing the last successful report",
+    partialErrorDescription: isRu
+      ? "Обновление аналитики не завершилось. Данные ниже остаются доступными."
+      : "Template analytics did not refresh. The report below is still available.",
     retryAction: isRu ? "Повторить" : "Retry",
     periodLabel: isRu ? "Период" : "Period",
     typeFilter: isRu ? "Тип" : "Type",

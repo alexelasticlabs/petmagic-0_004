@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildLocaleSwitchPath,
   getAdminNavItems,
+  getAdminPageMeta,
   matchesAdminPath,
   stripLocalePrefix,
 } from "./admin-navigation";
+import { getDictionary } from "./i18n";
 
 describe("admin-navigation", () => {
   it("strips locale prefix from pathname", () => {
@@ -47,10 +49,16 @@ describe("admin-navigation", () => {
   it("hides admin-only sections for moderators", () => {
     const items = getAdminNavItems("en", ["Moderator"]);
     const keys = items.map((item) => item.key);
+    const templateGroup = items.find((item) => item.type === "group" && item.key === "templates");
+    const templateKeys =
+      templateGroup?.type === "group" ? templateGroup.items.map((item) => item.key) : [];
 
     expect(keys).toContain("support");
     expect(keys).toContain("moderation");
     expect(keys).toContain("templates");
+    expect(templateKeys).toContain("template-analytics");
+    expect(templateKeys).toContain("template-categories");
+    expect(templateKeys).not.toContain("template-daily-featured");
     expect(keys).not.toContain("dashboard");
     expect(keys).not.toContain("economy");
     expect(keys).not.toContain("promo-codes");
@@ -67,5 +75,28 @@ describe("admin-navigation", () => {
     expect(adminKeys).toContain("role-management");
     expect(userKeys).not.toContain("generations");
     expect(userKeys).not.toContain("role-management");
+  });
+
+  it("keeps Russian sidebar section labels localized", () => {
+    const text = getDictionary("ru");
+
+    expect([
+      text.navSectionOverview,
+      text.navSectionGrowth,
+      text.navSectionContent,
+      text.navSectionUsers,
+    ]).toEqual(["Обзор", "Рост", "Контент", "Пользователи"]);
+  });
+
+  it("keeps Russian page meta free of editorial English labels", () => {
+    expect(getAdminPageMeta("ru", "/generations", "Admin").description).toBe(
+      "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и job id."
+    );
+    expect(getAdminPageMeta("ru", "/roles", "Admin").description).toBe(
+      "Списки Admin и Moderator, назначение и снятие Moderator с журналом аудита."
+    );
+    expect(getAdminPageMeta("ru", "/moderation", "Admin").description).toBe(
+      "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
+    );
   });
 });

@@ -1,6 +1,7 @@
 "use client";
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -11,6 +12,7 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import styles from "@/components/moderation-page.module.css";
 import { Toast } from "@/components/ui/toast";
@@ -46,7 +48,7 @@ const PAGE_SIZE = 25;
 function getCopy(locale: Locale) {
   const isRu = locale === "ru";
   return {
-    eyebrow: isRu ? "Content safety" : "Content safety",
+    eyebrow: isRu ? "Безопасность контента" : "Content safety",
     title: isRu ? "Модерация" : "Moderation",
     description: isRu
       ? "Очередь жалоб и обратной связи по шаблонам. Решения пишутся в audit log."
@@ -85,6 +87,9 @@ function getCopy(locale: Locale) {
       : "Enter a decision reason: at least 3 characters.",
     previous: isRu ? "Назад" : "Previous",
     next: isRu ? "Вперед" : "Next",
+    pageLabel: isRu ? "Страница" : "Page",
+    previousPageLabel: isRu ? "Предыдущая страница очереди" : "Previous queue page",
+    nextPageLabel: isRu ? "Следующая страница очереди" : "Next queue page",
     retry: isRu ? "Повторить" : "Retry",
     statusPending: isRu ? "Ожидает" : "Pending",
     statusApproved: isRu ? "Одобрено" : "Approved",
@@ -110,9 +115,9 @@ function useDebouncedValue(value: string, delayMs: number) {
 }
 
 function statusColor(status: string) {
-  if (status === "approved") return "#22c55e";
-  if (status === "rejected") return "#ef4444";
-  return "#f59e0b";
+  if (status === "approved") return "var(--success)";
+  if (status === "rejected") return "var(--danger)";
+  return "var(--warning)";
 }
 
 function shortId(value?: string | null) {
@@ -143,6 +148,7 @@ function formatTemplateType(templateType: string, text: ReturnType<typeof getCop
 
 export function ModerationPage({ locale }: ModerationPageProps) {
   const text = getCopy(locale);
+  const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
   const sessionRoles = session?.user.roles ?? [];
@@ -166,6 +172,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  useEffect(() => {
+    ensureAdminSession(locale, router);
+  }, [locale, router, session]);
+
   const query = useMemo(
     () =>
       normalizeAdminModerationQueueQuery({
@@ -180,7 +190,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   const queueQuery = useQuery({
     queryKey: adminQueryKeys.moderationQueue(query),
     queryFn: ({ signal }) => fetchAdminModerationQueue(query, signal),
-    enabled: Boolean(session),
+    enabled: canModerate,
     placeholderData: keepPreviousData,
   });
 
@@ -302,7 +312,9 @@ export function ModerationPage({ locale }: ModerationPageProps) {
         </div>
       </AdminCard>
 
-      {queueQuery.isLoading ? (
+      {!canModerate ? (
+        <AdminStateCard title={text.loading} />
+      ) : queueQuery.isLoading ? (
         <AdminStateCard title={text.loading} />
       ) : queueQuery.isError ? (
         <AdminStateCard
@@ -313,9 +325,9 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             <button
               type="button"
               className={styles.button}
-              disabled={!session || queueQuery.isFetching}
+              disabled={!canModerate || queueQuery.isFetching}
               onClick={() => {
-                if (!session) {
+                if (!canModerate) {
                   return;
                 }
 
@@ -387,7 +399,9 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={styles.button}
-                          disabled={!canModerate || item.status !== "pending" || isDecisionSubmitting}
+                          disabled={
+                            !canModerate || item.status !== "pending" || isDecisionSubmitting
+                          }
                           onClick={() => openDecision(item, "approve")}
                         >
                           {text.approve}
@@ -395,7 +409,9 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={`${styles.button} ${styles.danger}`}
-                          disabled={!canModerate || item.status !== "pending" || isDecisionSubmitting}
+                          disabled={
+                            !canModerate || item.status !== "pending" || isDecisionSubmitting
+                          }
                           onClick={() => openDecision(item, "reject")}
                         >
                           {text.reject}
@@ -408,11 +424,14 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             </table>
           </div>
           <div className={styles.pager}>
-            <span className={styles.pageInfo}>{page + 1}</span>
+            <span className={styles.pageInfo}>
+              {text.pageLabel} {page + 1}
+            </span>
             <button
               type="button"
               className={styles.button}
               disabled={page === 0 || queueQuery.isFetching}
+              aria-label={text.previousPageLabel}
               onClick={() => setPage((current) => Math.max(0, current - 1))}
             >
               {text.previous}
@@ -421,6 +440,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
               type="button"
               className={styles.button}
               disabled={!queueQuery.data?.hasMore || queueQuery.isFetching}
+              aria-label={text.nextPageLabel}
               onClick={() => setPage((current) => current + 1)}
             >
               {text.next}

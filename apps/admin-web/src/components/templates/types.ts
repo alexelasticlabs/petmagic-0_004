@@ -9,6 +9,9 @@ export type TemplateFormState = {
   tags: string;
   isPremium: boolean;
   tokenCost: string;
+  supportsGenerationResultInput: boolean;
+  requiredInputMediaType: "Image" | "Video";
+  recommendedAfterImageGeneration: boolean;
   previewUrl: string;
   previewUrlSource: "none" | "persisted" | "uploaded";
   previewFileName: string;

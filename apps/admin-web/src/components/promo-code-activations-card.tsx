@@ -128,7 +128,7 @@ export function PromoCodeActivationsCard({
                         {formatRewardValue(redemption.rewardValue, redemption.rewardKind, text)}
                       </td>
                       <td>
-                        <AdminStatusBadge color="#22c55e">
+                        <AdminStatusBadge color="var(--success)">
                           {text.promoCodesActivationStatusSuccess}
                         </AdminStatusBadge>
                       </td>

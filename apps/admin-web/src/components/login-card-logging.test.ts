@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const loginCardPath = fileURLToPath(new URL("./login-card.tsx", import.meta.url));
+const loginCardStylesPath = fileURLToPath(new URL("./login-card.module.css", import.meta.url));
 
 describe("login card logging", () => {
   it("does not send raw login email to client telemetry", () => {
@@ -33,5 +34,12 @@ describe("login card logging", () => {
     );
     expect(source).not.toContain("router.prefetch(`/${locale}/dashboard`)");
     expect(source).not.toContain(": `/${locale}/dashboard`");
+  });
+
+  it("keeps compact auth headings from using negative letter spacing", () => {
+    const source = readFileSync(loginCardStylesPath, "utf8");
+
+    expect(source).toContain("letter-spacing: 0;");
+    expect(source).not.toContain("letter-spacing: -");
   });
 });

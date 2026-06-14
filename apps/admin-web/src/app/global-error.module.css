@@ -1,0 +1,183 @@
+.body {
+  --global-error-surface-0: #f5f7fb;
+  --global-error-surface-1: #ffffff;
+  --global-error-surface-2: #eef2f7;
+  --global-error-text-strong: #121a26;
+  --global-error-text-soft: #334155;
+  --global-error-text-muted: #5b6b7d;
+  --global-error-border: #d7dee8;
+  --global-error-accent: #2563eb;
+  --global-error-accent-hover: #1d4ed8;
+  --global-error-accent-contrast: #f8fbff;
+  --global-error-focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.24);
+  --global-error-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+
+  min-height: 100vh;
+  margin: 0;
+  color: var(--global-error-text-soft);
+  font-family:
+    IBM Plex Sans,
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 24rem),
+    linear-gradient(
+      180deg,
+      var(--global-error-surface-0) 0%,
+      var(--global-error-surface-2) 100%
+    );
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto,
+    auto;
+}
+
+.main {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.panel {
+  width: min(100%, 34rem);
+  border: 1px solid var(--global-error-border);
+  border-radius: 8px;
+  background: var(--global-error-surface-1);
+  box-shadow: var(--global-error-shadow);
+  padding: 2rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--global-error-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: var(--global-error-text-strong);
+  font-size: clamp(1.6rem, 4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.description {
+  margin: 1rem 0 0;
+  color: var(--global-error-text-soft);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.primaryAction,
+.secondaryAction {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+
+.primaryAction {
+  border: 1px solid var(--global-error-accent);
+  background: var(--global-error-accent);
+  color: var(--global-error-accent-contrast);
+}
+
+.primaryAction:hover {
+  border-color: var(--global-error-accent-hover);
+  background: var(--global-error-accent-hover);
+}
+
+.secondaryAction {
+  border: 1px solid var(--global-error-border);
+  background: var(--global-error-surface-1);
+  color: var(--global-error-text-strong);
+}
+
+.secondaryAction:hover {
+  background: var(--global-error-surface-2);
+}
+
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible {
+  outline: none;
+  box-shadow: var(--global-error-focus-ring);
+}
+
+@media (prefers-color-scheme: dark) {
+  .body {
+    --global-error-surface-0: #000000;
+    --global-error-surface-1: #090b0e;
+    --global-error-surface-2: #141920;
+    --global-error-text-strong: #f5f7fa;
+    --global-error-text-soft: #c8d0d9;
+    --global-error-text-muted: #8c99a6;
+    --global-error-border: #20262d;
+    --global-error-accent: #1a73e8;
+    --global-error-accent-hover: #226fdb;
+    --global-error-accent-contrast: #f6f8fa;
+    --global-error-focus-ring: 0 0 0 2px rgba(138, 180, 248, 0.24);
+    --global-error-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+      radial-gradient(circle at top left, rgba(138, 180, 248, 0.035), transparent 24rem),
+      linear-gradient(
+        180deg,
+        var(--global-error-surface-0) 0%,
+        var(--global-error-surface-1) 100%
+      );
+    background-size:
+      32px 32px,
+      32px 32px,
+      auto,
+      auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .main {
+    padding: 1rem;
+  }
+
+  .panel {
+    padding: 1.25rem;
+  }
+
+  .actions {
+    align-items: stretch;
+  }
+
+  .primaryAction,
+  .secondaryAction {
+    flex: 1 1 10rem;
+  }
+}

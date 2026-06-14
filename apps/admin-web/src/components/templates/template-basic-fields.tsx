@@ -89,6 +89,20 @@ export function TemplateBasicFields({
       tone: "recommended",
     },
   ];
+  const inputMediaTypeOptions: SelectOption[] = [
+    {
+      value: "Image",
+      label: "Image",
+      description: "Completed image result",
+      tone: "recommended",
+    },
+    {
+      value: "Video",
+      label: "Video",
+      description: "Reserved for future video-result input",
+      tone: "neutral",
+    },
+  ];
 
   return (
     <div className={styles.formGrid}>
@@ -284,6 +298,70 @@ export function TemplateBasicFields({
           </label>
         ) : null}
       </div>
+
+      <div className={styles.accessGroup}>
+        <span className={styles.accessLabel}>Generation result input</span>
+        <div className={styles.accessOptions}>
+          <button
+            type="button"
+            className={joinClassNames(
+              styles.accessOption,
+              form.supportsGenerationResultInput ? styles.accessOptionActive : null
+            )}
+            onClick={() =>
+              setForm((current) => ({
+                ...current,
+                supportsGenerationResultInput: !current.supportsGenerationResultInput,
+              }))
+            }
+          >
+            <span className={styles.accessOptionTitle}>
+              {form.supportsGenerationResultInput ? "Supported" : "Not supported"}
+            </span>
+            <span className={styles.accessOptionHint}>
+              Allows completed generation results to start this template.
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={joinClassNames(
+              styles.accessOption,
+              form.recommendedAfterImageGeneration ? styles.accessOptionActive : null
+            )}
+            onClick={() =>
+              setForm((current) => ({
+                ...current,
+                recommendedAfterImageGeneration: !current.recommendedAfterImageGeneration,
+              }))
+            }
+          >
+            <span className={styles.accessOptionTitle}>
+              {form.recommendedAfterImageGeneration ? "Recommended" : "Not recommended"}
+            </span>
+            <span className={styles.accessOptionHint}>
+              Prioritizes this template after image generation.
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <label className={styles.fieldBlock}>
+        <span className={styles.fieldHeader}>
+          <span>Required input media type</span>
+        </span>
+        <Select
+          value={form.requiredInputMediaType}
+          options={inputMediaTypeOptions}
+          ariaLabel="Required input media type"
+          onChange={(value) =>
+            setForm((current) => ({
+              ...current,
+              requiredInputMediaType: value === "Video" ? "Video" : "Image",
+            }))
+          }
+        />
+      </label>
     </div>
   );
 }

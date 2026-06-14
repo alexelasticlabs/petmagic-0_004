@@ -526,6 +526,7 @@ export function useSupportConversationController({
     if (!beforeMessageCreatedAtUtc) {
       return;
     }
+    const beforeMessageId = currentConversation.messages[0]?.messageId;
 
     loadOlderAbortControllerRef.current?.abort();
     const abortController = new AbortController();
@@ -536,6 +537,7 @@ export function useSupportConversationController({
       olderConversation = await fetchSupportConversation(conversationId, {
         take: supportConversationMessagesTake,
         beforeMessageCreatedAtUtc,
+        beforeMessageId,
         signal: abortController.signal,
       });
     } catch (error) {

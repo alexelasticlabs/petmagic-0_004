@@ -14,6 +14,7 @@ const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", i
 const supportUiPrimitivesPath = fileURLToPath(
   new URL("./support-conversation-ui-primitives.tsx", import.meta.url)
 );
+const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
 const selectPath = fileURLToPath(new URL("../ui/select.tsx", import.meta.url));
 const adminFollowupsPath = fileURLToPath(
   new URL("../../../../../docs/admin-web-production-followups.md", import.meta.url)
@@ -152,6 +153,7 @@ describe("support conversation controller errors", () => {
 
   it("keeps route-level conversation load failures retryable", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
+    const stylesSource = readFileSync(supportStylesPath, "utf8");
 
     expect(pageSource).toContain("conversationQuery.isError || !conversation");
     expect(pageSource).toContain(
@@ -161,6 +163,10 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("disabled={!canManageSupportWorkspace || conversationQuery.isFetching}");
     expect(pageSource).toContain("{text.supportRetryAction}");
     expect(pageSource).toContain("{text.supportBackToInbox}");
+    expect(pageSource).toContain("className={styles.errorActions}");
+    expect(pageSource).not.toContain('style={{ display: "flex"');
+    expect(stylesSource).toContain(".errorActions");
+    expect(stylesSource).toContain("@media (max-width: 520px)");
   });
 
   it("sends exact support status filters through backend query params", () => {
@@ -259,7 +265,7 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("does not expose backend-unsupported support priority and sort controls as local queue filters", () => {
+  it("does not expose support priority and sort controls as local current-page filters", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
     const followups = readFileSync(adminFollowupsPath, "utf8");
 
@@ -274,7 +280,9 @@ describe("support conversation controller errors", () => {
     expect(pageSource).not.toContain("left.priority");
     expect(pageSource).not.toContain("right.priority");
     expect(followups).toContain("## Support queue priority, sort, and waiting filters");
-    expect(followups).toContain("Add `priority`, `sort`, and multi-status support");
+    expect(followups).toContain(
+      "The backend support inbox endpoint accepts `priority`, `sort`, and repeated"
+    );
     expect(followups).toContain(
       "Re-enable priority and sort controls by passing backend query params"
     );

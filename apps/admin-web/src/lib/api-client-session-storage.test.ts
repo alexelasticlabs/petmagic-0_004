@@ -169,6 +169,60 @@ describe("api-client session storage", () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("raw-secret");
   });
 
+  it("clears legacy admin-shaped sessions before they can crash the shell", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    window.sessionStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({
+        accessToken: "legacy-access-secret",
+        refreshToken: "legacy-refresh-secret",
+        expiresAt: Date.now() + 60_000,
+        admin: {
+          id: "admin-user-id",
+          email: "admin@example.com",
+          roles: ["Admin"],
+        },
+      })
+    );
+
+    expect(getSession()).toBeNull();
+
+    expect(window.sessionStorage.getItem(AUTH_KEY)).toBeNull();
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).toContain("auth.session_parse_failed");
+    expect(serializedLogs).not.toContain("legacy-access-secret");
+    expect(serializedLogs).not.toContain("legacy-refresh-secret");
+  });
+
+  it("rejects malformed login sessions without storing partial auth state", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        accessToken: "backend-access-secret",
+        refreshToken: "backend-refresh-secret",
+        expiresAtUtc: new Date(Date.now() + 60_000).toISOString(),
+        user: {
+          userId: "admin-user-id",
+          email: "admin@example.com",
+          isPremium: false,
+          emailConfirmed: true,
+          roles: "Admin",
+        },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(login("admin@example.com", "password")).rejects.toThrow(
+      "Backend auth session is missing required user fields."
+    );
+
+    expect(window.sessionStorage.getItem(AUTH_KEY)).toBeNull();
+    expect(getSession()).toBeNull();
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).not.toContain("backend-access-secret");
+    expect(serializedLogs).not.toContain("backend-refresh-secret");
+  });
+
   it("adds canonical correlation header and logs failed API requests without response bodies", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchMock = vi.fn(async () =>

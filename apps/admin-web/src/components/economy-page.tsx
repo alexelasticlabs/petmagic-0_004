@@ -1,7 +1,7 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
@@ -65,12 +65,15 @@ import {
   refundAdminEconomyPurchase,
   testAdminPaymentProviderConfigMatch,
   updateAdminCurrencyPack,
+  fetchAdminWatermarkSettings,
   updateAdminPaymentProviderConfig,
+  updateAdminWatermarkSettings,
   updateAdminSubscriptionPlan,
   useAuthSession,
   type AdminEconomyPurchase,
   type AdminPaymentProviderConfigurationMatch,
   type AdminEconomySubscription,
+  type AdminWatermarkSettings,
 } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
@@ -79,6 +82,9 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 type EconomyPageProps = {
   locale: Locale;
 };
+
+const watermarkPositionOptions = ["bottom-right", "bottom-left", "top-right", "top-left"] as const;
+const watermarkSizeOptions = ["small", "medium", "large"] as const;
 
 type TableOrEmptyProps = {
   hasItems: boolean;
@@ -94,6 +100,93 @@ function TableOrEmpty({ hasItems, emptyTitle, children }: TableOrEmptyProps) {
   return <>{children}</>;
 }
 
+function WatermarkPreviewPanel({
+  locale,
+  settings,
+}: {
+  locale: Locale;
+  settings: AdminWatermarkSettings;
+}) {
+  const isRu = locale === "ru";
+  const previewStyle = {
+    "--watermark-preview-opacity": String(settings.opacity),
+  } as CSSProperties;
+  const badgeText = settings.text.trim() || "PetMagic";
+  const position = normalizeWatermarkPosition(settings.position);
+  const size = normalizeWatermarkSize(settings.size);
+
+  function renderFrame(kind: "image" | "video", sourceUrl: string) {
+    const title =
+      kind === "image"
+        ? isRu
+          ? "Preview image"
+          : "Preview image"
+        : isRu
+        ? "Preview video frame"
+        : "Preview video frame";
+    const applies = kind === "image" ? settings.applyToImages : settings.applyToVideos;
+
+    return (
+      <div className={styles.watermarkPreviewCard}>
+        <div className={styles.watermarkPreviewHeader}>
+          <strong>{title}</strong>
+          <span>{applies ? (isRu ? "Включён" : "Enabled") : isRu ? "Отключён" : "Disabled"}</span>
+        </div>
+        <div
+          className={styles.watermarkPreviewFrame}
+          data-kind={kind}
+          style={previewStyle}
+        >
+          {sourceUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={sourceUrl} alt={title} className={styles.watermarkPreviewMedia} />
+          ) : (
+            <div className={styles.watermarkPreviewPlaceholder}>
+              {kind === "image"
+                ? isRu
+                  ? "Тестовое изображение"
+                  : "Test image"
+                : isRu
+                ? "Тестовый кадр видео"
+                : "Test video frame"}
+            </div>
+          )}
+          {settings.enabled && applies ? (
+            <div
+              className={styles.watermarkPreviewBadge}
+              data-position={position}
+              data-size={size}
+            >
+              {settings.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.logoUrl} alt="" className={styles.watermarkPreviewLogo} />
+              ) : null}
+              <span>{badgeText}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.watermarkPreviewGrid}>
+      {renderFrame("image", settings.previewImageUrl)}
+      {renderFrame("video", settings.previewVideoFrameUrl)}
+    </div>
+  );
+}
+
+function normalizeWatermarkPosition(value: string) {
+  return watermarkPositionOptions.includes(value as (typeof watermarkPositionOptions)[number])
+    ? value
+    : "bottom-right";
+}
+
+function normalizeWatermarkSize(value: string) {
+  return watermarkSizeOptions.includes(value as (typeof watermarkSizeOptions)[number]) ? value : "small";
+}
+
 export function EconomyPage({ locale }: EconomyPageProps) {
   const text = getEconomyText(locale);
   const queryClient = useQueryClient();
@@ -103,7 +196,9 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     eventProvider,
     eventStatus,
     refetchAll,
-    hasError,
+    economyError,
+    hasBlockingError,
+    hasPartialError,
     isFetching,
     isLoading,
     ledgerItems,
@@ -165,8 +260,15 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   const [refundTarget, setRefundTarget] = useState<AdminEconomyPurchase | null>(null);
   const [isCancelSubscriptionInFlight, setIsCancelSubscriptionInFlight] = useState(false);
   const [isRefundPurchaseInFlight, setIsRefundPurchaseInFlight] = useState(false);
+  const [watermarkDraft, setWatermarkDraft] = useState<AdminWatermarkSettings | null>(null);
   const cancelSubscriptionInFlightRef = useRef(false);
   const refundPurchaseInFlightRef = useRef(false);
+
+  const watermarkQuery = useQuery({
+    queryKey: adminQueryKeys.templateWatermarkSettings,
+    queryFn: ({ signal }) => fetchAdminWatermarkSettings(signal),
+    enabled: canManageEconomy,
+  });
 
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "economy",
@@ -197,6 +299,13 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     });
   }
 
+  function updateWatermarkDraft(patch: Partial<AdminWatermarkSettings>) {
+    setWatermarkDraft((current) => {
+      const base = current ?? watermarkQuery.data;
+      return base ? { ...base, ...patch } : current;
+    });
+  }
+
   const savePackMutation = useMutation({
     mutationFn: async (packId: string) => {
       assertCanManageEconomy();
@@ -215,6 +324,35 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     },
     onError: (error) => {
       setFeedback({ tone: "danger", message: getAdminErrorMessage(error, text.packSaveError) });
+    },
+  });
+
+  const saveWatermarkMutation = useMutation({
+    mutationFn: async () => {
+      assertCanManageEconomy();
+      const draft = watermarkDraft ?? watermarkQuery.data;
+      if (!draft) {
+        throw new Error(locale === "ru" ? "Настройки watermark не загружены" : "Watermark settings are not loaded");
+      }
+
+      return updateAdminWatermarkSettings(draft);
+    },
+    onSuccess: async (settings) => {
+      setFeedback({
+        tone: "success",
+        message: locale === "ru" ? "Настройки watermark сохранены" : "Watermark settings saved",
+      });
+      setWatermarkDraft(settings);
+      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateWatermarkSettings });
+    },
+    onError: (error) => {
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(
+          error,
+          locale === "ru" ? "Не удалось сохранить watermark" : "Could not save watermark settings"
+        ),
+      });
     },
   });
 
@@ -530,7 +668,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     );
   }
 
-  if (hasError) {
+  if (hasBlockingError) {
     return (
       <AdminPage className={styles.page}>
         <AdminPageHero eyebrow={text.eyebrow} title={text.title} description={text.description} />
@@ -558,6 +696,8 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       </AdminPage>
     );
   }
+
+  const effectiveWatermarkDraft = watermarkDraft ?? watermarkQuery.data ?? null;
 
   return (
     <AdminPage className={styles.page}>
@@ -610,6 +750,29 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       </AdminPageGrid>
 
       {feedback ? <AdminStateCard tone={feedback.tone} title={feedback.message} /> : null}
+      {hasPartialError ? (
+        <AdminStateCard
+          tone="warning"
+          title={text.partialErrorTitle}
+          description={getAdminErrorMessage(economyError, text.errorDescription)}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!canManageEconomy || isFetching}
+              onClick={() => {
+                if (!canManageEconomy) {
+                  return;
+                }
+
+                void refetchAll().catch(() => undefined);
+              }}
+            >
+              {locale === "ru" ? "Повторить" : "Retry"}
+            </Button>
+          }
+        />
+      ) : null}
 
       <AdminCard title={text.packsTitle} description={text.packsDescription}>
         <AdminMetricStrip
@@ -899,6 +1062,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 type="button"
                 className={styles.pagerButton}
                 disabled={purchasePage === 0 || purchasesIsFetching}
+                aria-label={text.previousPurchasesPageLabel}
                 onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
               >
                 {text.previousPage}
@@ -907,6 +1071,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 type="button"
                 className={styles.pagerButton}
                 disabled={!purchasesHasMore || purchasesIsFetching}
+                aria-label={text.nextPurchasesPageLabel}
                 onClick={() => setPurchasePage((current) => current + 1)}
               >
                 {text.nextPage}
@@ -915,6 +1080,149 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           </TableOrEmpty>
         </AdminCard>
       </AdminPageGrid>
+
+      <AdminCard
+        title={locale === "ru" ? "Watermark" : "Watermark"}
+        description={
+          locale === "ru"
+            ? "Настройки мягкого продвижения для бесплатных результатов и разового clean unlock."
+            : "Free-result promotion and one-time clean unlock settings."
+        }
+        action={
+          <Button
+            type="button"
+            disabled={!canManageEconomy || !effectiveWatermarkDraft || saveWatermarkMutation.isPending}
+            onClick={() => saveWatermarkMutation.mutate()}
+          >
+            {saveWatermarkMutation.isPending
+              ? text.savingAction
+              : locale === "ru"
+              ? "Сохранить watermark"
+              : "Save watermark"}
+          </Button>
+        }
+      >
+        {watermarkQuery.isLoading || !effectiveWatermarkDraft ? (
+          <AdminStateCard
+            tone="info"
+            title={locale === "ru" ? "Загружаем watermark" : "Loading watermark settings"}
+          />
+        ) : (
+          <div className={styles.rewardFields}>
+            <div className={styles.formRow}>
+              <label className={styles.checkboxField}>
+                <input
+                  type="checkbox"
+                  checked={effectiveWatermarkDraft.enabled}
+                  onChange={(event) => updateWatermarkDraft({ enabled: event.target.checked })}
+                />
+                <span>{locale === "ru" ? "Включён" : "Enabled"}</span>
+              </label>
+              <label className={styles.checkboxField}>
+                <input
+                  type="checkbox"
+                  checked={effectiveWatermarkDraft.applyToImages}
+                  onChange={(event) =>
+                    updateWatermarkDraft({ applyToImages: event.target.checked })
+                  }
+                />
+                <span>{locale === "ru" ? "Images" : "Images"}</span>
+              </label>
+              <label className={styles.checkboxField}>
+                <input
+                  type="checkbox"
+                  checked={effectiveWatermarkDraft.applyToVideos}
+                  onChange={(event) =>
+                    updateWatermarkDraft({ applyToVideos: event.target.checked })
+                  }
+                />
+                <span>{locale === "ru" ? "Videos" : "Videos"}</span>
+              </label>
+            </div>
+            <div className={styles.formRow}>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Текст" : "Text"}</span>
+                <input
+                  className={styles.input}
+                  value={effectiveWatermarkDraft.text}
+                  maxLength={80}
+                  onChange={(event) => updateWatermarkDraft({ text: event.target.value })}
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Cost in credits" : "Cost in credits"}</span>
+                <input
+                  className={styles.input}
+                  inputMode="numeric"
+                  value={String(effectiveWatermarkDraft.costCredits)}
+                  onChange={(event) =>
+                    updateWatermarkDraft({
+                      costCredits: Math.max(1, Number.parseInt(event.target.value, 10) || 1),
+                    })
+                  }
+                />
+              </label>
+            </div>
+            <div className={styles.formRow}>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Opacity" : "Opacity"}</span>
+                <input
+                  className={styles.input}
+                  inputMode="decimal"
+                  value={String(effectiveWatermarkDraft.opacity)}
+                  onChange={(event) =>
+                    updateWatermarkDraft({
+                      opacity: Math.min(
+                        0.65,
+                        Math.max(0.45, Number.parseFloat(event.target.value) || 0.55)
+                      ),
+                    })
+                  }
+                />
+              </label>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Logo URL" : "Logo URL"}</span>
+                <input
+                  className={styles.input}
+                  value={effectiveWatermarkDraft.logoUrl ?? ""}
+                  onChange={(event) => updateWatermarkDraft({ logoUrl: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className={styles.formRow}>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Position" : "Position"}</span>
+                <select
+                  className={styles.input}
+                  value={normalizeWatermarkPosition(effectiveWatermarkDraft.position)}
+                  onChange={(event) => updateWatermarkDraft({ position: event.target.value })}
+                >
+                  {watermarkPositionOptions.map((position) => (
+                    <option key={position} value={position}>
+                      {position}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>{locale === "ru" ? "Size" : "Size"}</span>
+                <select
+                  className={styles.input}
+                  value={normalizeWatermarkSize(effectiveWatermarkDraft.size)}
+                  onChange={(event) => updateWatermarkDraft({ size: event.target.value })}
+                >
+                  {watermarkSizeOptions.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <WatermarkPreviewPanel locale={locale} settings={effectiveWatermarkDraft} />
+          </div>
+        )}
+      </AdminCard>
 
       <AdminPageGrid columns="two">
         <EconomyPageSubscriptionPlansSection
@@ -1154,17 +1462,17 @@ function statusColor(value: string) {
     case "active":
     case "succeeded":
     case "processed":
-      return "#22c55e";
+      return "var(--success)";
     case "trialing":
-      return "#38bdf8";
+      return "var(--info)";
     case "past_due":
     case "failed":
-      return "#f87171";
+      return "var(--danger)";
     case "canceled":
     case "expired":
     case "refunded":
-      return "#64748b";
+      return "var(--neutral)";
     default:
-      return "#f59e0b";
+      return "var(--warning)";
   }
 }

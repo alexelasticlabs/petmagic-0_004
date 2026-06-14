@@ -152,6 +152,11 @@
   height: 0.92rem;
 }
 
+.phoneInlineIcon {
+  display: block;
+  flex: 0 0 auto;
+}
+
 .phoneHeroBadge::before {
   content: "";
   position: absolute;

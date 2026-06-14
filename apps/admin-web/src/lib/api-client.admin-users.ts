@@ -11,6 +11,9 @@ import type {
     AdminUserAnalytics,
     AdminUserDashboardMetrics,
     AdminUserDetail,
+    AdminUserPet,
+    AdminUserPetGeneration,
+    AdminUserPetPhoto,
     AdminUserWalletOperation,
     UserListPage,
 } from "./api-client.types";
@@ -160,6 +163,83 @@ export async function fetchAdminUserAnalytics(
         signal,
       }),
     signal
+  );
+}
+
+export async function fetchAdminUserPets(
+  userId: string,
+  signal?: AbortSignal
+): Promise<AdminUserPet[]> {
+  const encodedUserId = encodePathSegment(userId);
+  return apiRequest<AdminUserPet[]>(`/api/admin/users/${encodedUserId}/pets`, {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function changeAdminUserPetStatus(
+  userId: string,
+  petId: string,
+  status: "active" | "hidden" | "flagged" | "deleted"
+): Promise<AdminUserPet> {
+  const encodedUserId = encodePathSegment(userId);
+  const encodedPetId = encodePathSegment(petId);
+  return apiRequest<AdminUserPet>(
+    `/api/admin/users/${encodedUserId}/pets/${encodedPetId}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }
+  );
+}
+
+export async function fetchAdminUserPetPhotos(
+  userId: string,
+  petId: string,
+  signal?: AbortSignal
+): Promise<AdminUserPetPhoto[]> {
+  const encodedUserId = encodePathSegment(userId);
+  const encodedPetId = encodePathSegment(petId);
+  return apiRequest<AdminUserPetPhoto[]>(
+    `/api/admin/users/${encodedUserId}/pets/${encodedPetId}/photos`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
+}
+
+export async function fetchAdminUserPetGenerations(
+  userId: string,
+  petId: string,
+  signal?: AbortSignal
+): Promise<AdminUserPetGeneration[]> {
+  const encodedUserId = encodePathSegment(userId);
+  const encodedPetId = encodePathSegment(petId);
+  return apiRequest<AdminUserPetGeneration[]>(
+    `/api/admin/users/${encodedUserId}/pets/${encodedPetId}/generations`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
+}
+
+export async function changeAdminUserPetPhotoStatus(
+  userId: string,
+  petId: string,
+  photoId: string,
+  status: "active" | "hidden" | "flagged" | "deleted"
+): Promise<AdminUserPetPhoto> {
+  const encodedUserId = encodePathSegment(userId);
+  const encodedPetId = encodePathSegment(petId);
+  const encodedPhotoId = encodePathSegment(photoId);
+  return apiRequest<AdminUserPetPhoto>(
+    `/api/admin/users/${encodedUserId}/pets/${encodedPetId}/photos/${encodedPhotoId}/status`,
+    {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }
   );
 }
 

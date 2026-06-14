@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md";
@@ -20,16 +20,13 @@ const sizeClassMap: Record<ButtonSize, string> = {
   md: "ui-button--md",
 };
 
-export function Button({
-  variant = "secondary",
-  size = "md",
-  className,
-  type = "button",
-  ...rest
-}: ButtonProps) {
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "secondary", size = "md", className, type = "button", ...rest },
+  ref
+) {
   const classes = [variantClassMap[variant], sizeClassMap[size], className]
     .filter(Boolean)
     .join(" ");
 
-  return <button type={type} className={classes} {...rest} />;
-}
+  return <button ref={ref} type={type} className={classes} {...rest} />;
+});

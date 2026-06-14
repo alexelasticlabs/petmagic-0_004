@@ -85,7 +85,7 @@ describe("admin users api client query and role guards", () => {
   });
 
   it("encodes user ids before placing them in API path segments", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         userId: "user/one two?x",
         email: "admin@example.com",
@@ -105,7 +105,7 @@ describe("admin users api client query and role guards", () => {
   });
 
   it("requests backend user dashboard metrics with abort support", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         totalUsers: 10,
         premiumUsers: 3,
@@ -133,7 +133,7 @@ describe("admin users api client query and role guards", () => {
   });
 
   it("bounds wallet adjustment reasons before sending audit payloads", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         operationId: "wallet-operation-1",
         userId: "user-1",

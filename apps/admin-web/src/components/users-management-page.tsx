@@ -1,12 +1,13 @@
 "use client";
 
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
   CancelCircleIcon,
+  CaretDownIcon,
   DollarIcon,
   MoreHorizontalIcon,
   UsersIcon,
@@ -31,6 +32,7 @@ import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users-management-page.module.css";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   adjustAdminUserWallet,
@@ -46,6 +48,8 @@ import {
   setPremium,
   USER_SEARCH_MAX_LENGTH,
   USER_WALLET_REASON_MAX_LENGTH,
+  type AdminEconomyUserSubscriptionSummary,
+  type AdminUserAnalytics,
   type AdminUserDashboardMetrics,
   type UserListItem,
 } from "@/lib/api-client";
@@ -67,6 +71,19 @@ type ActionsMenuPosition = {
   left: number;
   minWidth: number;
   openUpward: boolean;
+};
+
+type AccountStatus = "active" | "blocked" | "unconfirmed";
+
+const accountStatusColors: Record<AccountStatus, string> = {
+  active: "var(--success)",
+  blocked: "var(--danger)",
+  unconfirmed: "var(--warning)",
+};
+
+const premiumStatusColors = {
+  premium: "var(--success)",
+  free: "var(--text-muted)",
 };
 
 type WalletDialogState = {
@@ -99,6 +116,47 @@ type StatusFilter = "all" | "active" | "blocked" | "unconfirmed";
 type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "userRoleUser">;
 
 const PAGE_SIZE = 12;
+const ROW_ENRICHMENT_CONCURRENCY = 4;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException("Aborted", "AbortError");
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+async function fetchUserRowEnrichment<TValue>(
+  userIds: readonly string[],
+  signal: AbortSignal | undefined,
+  load: (userId: string, signal?: AbortSignal) => Promise<TValue>
+): Promise<Map<string, TValue>> {
+  const results = new Map<string, TValue>();
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < userIds.length) {
+      throwIfAborted(signal);
+      const userId = userIds[nextIndex];
+      nextIndex += 1;
+
+      try {
+        const value = await load(userId, signal);
+        results.set(userId, value);
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  const workerCount = Math.min(ROW_ENRICHMENT_CONCURRENCY, userIds.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}
 
 function getUserRoleLabel(role: string, text: UserRoleText) {
   return role === "Admin"
@@ -126,7 +184,7 @@ function getUserAvatarLabel(user: Pick<UserListItem, "displayName" | "email" | "
   return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
 }
 
-function getAccountStatus(user: UserListItem): "active" | "blocked" | "unconfirmed" {
+function getAccountStatus(user: UserListItem): AccountStatus {
   if (!user.isActive) {
     return "blocked";
   }
@@ -216,6 +274,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             pageInfo: "Страница",
             prevPage: "Назад",
             nextPage: "Вперед",
+            previousPageLabel: "Предыдущая страница пользователей",
+            nextPageLabel: "Следующая страница пользователей",
             sideTitle: "Карточка пользователя",
             sideDescription: "Ключевые данные, история действий и контроль аккаунта",
             closePanel: "Закрыть",
@@ -292,6 +352,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             pageInfo: "Page",
             prevPage: "Prev",
             nextPage: "Next",
+            previousPageLabel: "Previous users page",
+            nextPageLabel: "Next users page",
             sideTitle: "User side panel",
             sideDescription: "Key profile context, history, and controls",
             closePanel: "Close",
@@ -695,53 +757,45 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   ]);
 
   const pageUsers = users;
+  const pageUserIds = useMemo(() => pageUsers.map((user) => user.userId), [pageUsers]);
 
-  const analyticsQueries = useQueries({
-    queries: pageUsers.map((user) => ({
-      queryKey: adminQueryKeys.userAnalytics(user.userId),
-      queryFn: ({ signal }) => fetchAdminUserAnalytics(user.userId, signal),
-      enabled: hasSession,
-      staleTime: 30_000,
-    })),
+  const rowAnalyticsQuery = useQuery({
+    queryKey: adminQueryKeys.userRowAnalytics(pageUserIds),
+    queryFn: ({ signal }) =>
+      fetchUserRowEnrichment<AdminUserAnalytics>(pageUserIds, signal, fetchAdminUserAnalytics),
+    enabled: hasSession && pageUserIds.length > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   });
 
   const analyticsByUserId = useMemo(() => {
-    const map = new Map<string, Awaited<ReturnType<typeof fetchAdminUserAnalytics>>>();
-    for (const [index, user] of pageUsers.entries()) {
-      const analytics = analyticsQueries[index]?.data;
-      if (analytics) {
-        map.set(user.userId, analytics);
-      }
-    }
-    return map;
-  }, [analyticsQueries, pageUsers]);
+    return rowAnalyticsQuery.data ?? new Map<string, AdminUserAnalytics>();
+  }, [rowAnalyticsQuery.data]);
 
   const currentPage = Math.max(1, Math.floor(usersPage.skip / PAGE_SIZE) + 1);
   const totalPages = Math.max(1, Math.ceil(usersPage.totalCount / PAGE_SIZE));
   const pagedUsers = pageUsers;
+  const premiumPageUserIds = useMemo(
+    () => pagedUsers.filter((user) => user.isPremium).map((user) => user.userId),
+    [pagedUsers]
+  );
 
-  const pageSubscriptionQueries = useQueries({
-    queries: pagedUsers.map((user) => ({
-      queryKey: adminQueryKeys.economyUserSubscriptionSummary(user.userId),
-      queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(user.userId, signal),
-      enabled: hasSession && user.isPremium,
-      staleTime: 45_000,
-    })),
+  const rowSubscriptionsQuery = useQuery({
+    queryKey: adminQueryKeys.economyUserSubscriptionSummaries(premiumPageUserIds),
+    queryFn: ({ signal }) =>
+      fetchUserRowEnrichment<AdminEconomyUserSubscriptionSummary>(
+        premiumPageUserIds,
+        signal,
+        fetchAdminEconomyUserSubscriptionSummary
+      ),
+    enabled: hasSession && premiumPageUserIds.length > 0,
+    placeholderData: keepPreviousData,
+    staleTime: 45_000,
   });
 
   const pageSubscriptionsByUserId = useMemo(() => {
-    const map = new Map<
-      string,
-      Awaited<ReturnType<typeof fetchAdminEconomyUserSubscriptionSummary>>
-    >();
-    for (const [index, user] of pagedUsers.entries()) {
-      const data = pageSubscriptionQueries[index]?.data;
-      if (data) {
-        map.set(user.userId, data);
-      }
-    }
-    return map;
-  }, [pageSubscriptionQueries, pagedUsers]);
+    return rowSubscriptionsQuery.data ?? new Map<string, AdminEconomyUserSubscriptionSummary>();
+  }, [rowSubscriptionsQuery.data]);
 
   const supportTickets = useMemo(
     () => supportInboxQuery.data?.items ?? [],
@@ -1150,19 +1204,23 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                           </div>
                         </td>
                         <td data-label={ui.accountStatus}>
-                          {status === "blocked" ? (
-                            <AdminStatusBadge color="#f87171">{ui.blockedBadge}</AdminStatusBadge>
-                          ) : status === "unconfirmed" ? (
-                            <AdminStatusBadge color="#f59e0b">
-                              {ui.unconfirmedBadge}
-                            </AdminStatusBadge>
-                          ) : (
-                            <AdminStatusBadge color="#2dd4bf">{ui.activeBadge}</AdminStatusBadge>
-                          )}
+                          <AdminStatusBadge color={accountStatusColors[status]}>
+                            {status === "blocked"
+                              ? ui.blockedBadge
+                              : status === "unconfirmed"
+                                ? ui.unconfirmedBadge
+                                : ui.activeBadge}
+                          </AdminStatusBadge>
                         </td>
                         <td data-label={ui.premiumAndExpiry}>
                           <div className={styles.stackCell}>
-                            <AdminStatusBadge color={user.isPremium ? "#22c55e" : "#8da1ba"}>
+                            <AdminStatusBadge
+                              color={
+                                user.isPremium
+                                  ? premiumStatusColors.premium
+                                  : premiumStatusColors.free
+                              }
+                            >
                               {user.isPremium ? text.yesLabel : text.noLabel}
                             </AdminStatusBadge>
                             <span className={styles.userMeta}>
@@ -1266,10 +1324,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   size="sm"
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
                   disabled={currentPage <= 1 || isUsersFetching}
+                  aria-label={ui.previousPageLabel}
+                  title={ui.previousPageLabel}
                 >
-                  {ui.prevPage}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
                 </Button>
-                <span>
+                <span className={styles.pageInfo}>
                   {ui.pageInfo} {currentPage} / {totalPages}
                 </span>
                 <Button
@@ -1277,8 +1337,10 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   size="sm"
                   onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                   disabled={currentPage >= totalPages || isUsersFetching}
+                  aria-label={ui.nextPageLabel}
+                  title={ui.nextPageLabel}
                 >
-                  {ui.nextPage}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
                 </Button>
               </div>
             </div>
@@ -1533,10 +1595,47 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   </button>
                 </header>
 
-                {!selectedUser ? (
+                {selectedUserProfile.hasError && !selectedUser ? (
+                  <AdminStateCard
+                    tone="danger"
+                    title={getAdminErrorMessage(selectedUserProfile.error, text.errorLoadingUsers)}
+                    action={
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={selectedUserProfile.isFetching}
+                        onClick={() => void selectedUserProfile.refresh().catch(() => undefined)}
+                      >
+                        {text.supportRetryAction}
+                      </Button>
+                    }
+                  />
+                ) : !selectedUser ? (
                   <AdminStateCard tone="info" title={text.loading} />
                 ) : (
                   <div className={styles.sidePanelContent}>
+                    {selectedUserProfile.hasError ? (
+                      <AdminStateCard
+                        tone="warning"
+                        title={getAdminErrorMessage(
+                          selectedUserProfile.error,
+                          text.errorLoadingUsers
+                        )}
+                        action={
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={selectedUserProfile.isFetching}
+                            onClick={() =>
+                              void selectedUserProfile.refresh().catch(() => undefined)
+                            }
+                          >
+                            {text.supportRetryAction}
+                          </Button>
+                        }
+                      />
+                    ) : null}
+
                     <section className={styles.panelSection}>
                       <h4>{ui.sectionProfile}</h4>
                       <div className={styles.profileRow}>

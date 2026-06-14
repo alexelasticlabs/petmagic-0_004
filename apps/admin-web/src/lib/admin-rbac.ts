@@ -5,6 +5,7 @@ export type AdminPanelRole = "Admin" | "Moderator";
 const moderatorSections = new Set<AdminSectionKey>([
   "support",
   "moderation",
+  "feedback",
   "templates",
   "image-templates",
   "video-templates",
@@ -85,6 +86,10 @@ export function canAccessAdminPath(
     return canAccessAdminSection(roles, "generations");
   }
 
+  if (matchesAdminPath(currentPath, "/feedback")) {
+    return canAccessAdminSection(roles, "feedback");
+  }
+
   if (matchesAdminPath(currentPath, "/roles")) {
     return canAccessAdminSection(roles, "role-management");
   }
@@ -99,6 +104,10 @@ export function canAccessAdminPath(
 
   if (matchesAdminPath(currentPath, "/templates/categories")) {
     return canAccessAdminSection(roles, "template-categories");
+  }
+
+  if (matchesAdminPath(currentPath, "/templates/daily-featured")) {
+    return canAccessAdminSection(roles, "template-daily-featured");
   }
 
   if (matchesAdminPath(currentPath, "/templates/analytics")) {

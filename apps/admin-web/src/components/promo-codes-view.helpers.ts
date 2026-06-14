@@ -209,18 +209,18 @@ export function getPromoStatus(
   now: number
 ): PromoStatusModel {
   if (!code.isActive && hasArchiveWindowMarker(code)) {
-    return { key: "archived", label: text.promoCodesStatusArchived, color: "#64748b" };
+    return { key: "archived", label: text.promoCodesStatusArchived, color: "var(--text-muted)" };
   }
 
   const startsAt = code.startsAtUtc ? new Date(code.startsAtUtc).getTime() : null;
   const expiresAt = code.expiresAtUtc ? new Date(code.expiresAtUtc).getTime() : null;
 
   if (code.redeemedCount >= code.maxRedemptions) {
-    return { key: "exhausted", label: text.promoCodesStatusLimitReached, color: "#f59e0b" };
+    return { key: "exhausted", label: text.promoCodesStatusLimitReached, color: "var(--warning)" };
   }
 
   if (expiresAt !== null && expiresAt <= now) {
-    return { key: "expired", label: text.promoCodesStatusExpired, color: "#f87171" };
+    return { key: "expired", label: text.promoCodesStatusExpired, color: "var(--danger)" };
   }
 
   if (!code.isActive) {
@@ -231,17 +231,17 @@ export function getPromoStatus(
       !code.description.trim();
 
     if (isDraft) {
-      return { key: "draft", label: text.promoCodesStatusDraft, color: "#94a3b8" };
+      return { key: "draft", label: text.promoCodesStatusDraft, color: "var(--text-muted)" };
     }
 
-    return { key: "paused", label: text.promoCodesStatusPaused, color: "#f59e0b" };
+    return { key: "paused", label: text.promoCodesStatusPaused, color: "var(--warning)" };
   }
 
   if (startsAt !== null && startsAt > now) {
-    return { key: "scheduled", label: text.promoCodesStatusScheduled, color: "#38bdf8" };
+    return { key: "scheduled", label: text.promoCodesStatusScheduled, color: "var(--info)" };
   }
 
-  return { key: "active", label: text.promoCodesStatusActiveOption, color: "#22c55e" };
+  return { key: "active", label: text.promoCodesStatusActiveOption, color: "var(--success)" };
 }
 
 function hasArchiveWindowMarker(code: AdminRedeemCode) {

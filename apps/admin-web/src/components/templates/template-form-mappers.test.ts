@@ -173,6 +173,9 @@ function createTemplate(): AdminTemplate {
     promoBadgeMode: "Auto",
     isPremium: false,
     tokenCost: 60,
+    supportsGenerationResultInput: true,
+    requiredInputMediaType: "Image",
+    recommendedAfterImageGeneration: false,
     tags: [],
     previewAsset: {
       url: "https://cdn.example.com/preview.jpg?X-Amz-Signature=preview-secret",

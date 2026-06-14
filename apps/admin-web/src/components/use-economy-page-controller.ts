@@ -262,6 +262,27 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     packsQuery.isError ||
     economyDashboardMetricsQuery.isError;
 
+  const hasResolvedData =
+    ledgerQuery.isSuccess ||
+    purchasesQuery.isSuccess ||
+    subscriptionsQuery.isSuccess ||
+    subscriptionPlansQuery.isSuccess ||
+    providerConfigsQuery.isSuccess ||
+    subscriptionEventsQuery.isSuccess ||
+    packsQuery.isSuccess ||
+    economyDashboardMetricsQuery.isSuccess;
+
+  const economyError =
+    ledgerQuery.error ??
+    purchasesQuery.error ??
+    subscriptionsQuery.error ??
+    subscriptionPlansQuery.error ??
+    providerConfigsQuery.error ??
+    subscriptionEventsQuery.error ??
+    packsQuery.error ??
+    economyDashboardMetricsQuery.error ??
+    null;
+
   const isFetching =
     ledgerQuery.isFetching ||
     purchasesQuery.isFetching ||
@@ -275,7 +296,9 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   return {
     eventProvider,
     eventStatus,
-    hasError,
+    hasBlockingError: hasError && !hasResolvedData,
+    hasPartialError: hasError && hasResolvedData,
+    economyError,
     isFetching,
     isLoading,
     ledgerItems,

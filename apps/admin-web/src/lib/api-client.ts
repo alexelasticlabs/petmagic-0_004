@@ -6,3 +6,4 @@ export * from "./api-client.admin-users";
 export * from "./api-client.economy";
 export * from "./api-client.support";
 export * from "./api-client.templates";
+export * from "./api-client.feedback";

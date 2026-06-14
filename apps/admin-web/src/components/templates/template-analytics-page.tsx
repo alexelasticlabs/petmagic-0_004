@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 
 import {
@@ -57,11 +58,13 @@ import { useAdminTemplateFeedback } from "@/components/templates/use-admin-templ
 import { Button } from "@/components/ui/button";
 import {
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
+  fetchAdminTemplateFeedbackSummary,
   fetchAdminTemplateRecentGenerations,
   useAuthSession,
   type AdminTemplateEventAnalytics,
   type AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -133,6 +136,11 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     filter: feedbackFilter,
     search: feedbackSearch,
     templateId,
+  });
+  const feedbackSummaryQuery = useQuery({
+    queryKey: adminQueryKeys.templateFeedbackSummary(templateId),
+    queryFn: ({ signal }) => fetchAdminTemplateFeedbackSummary(templateId, signal),
+    enabled: Boolean(session && templateId),
   });
   const error = hasError ? text.loadError : null;
   const feedbackError = hasFeedbackError ? text.feedbackLoadError : null;
@@ -591,6 +599,46 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         }
         text={text}
       />
+
+      {feedbackSummaryQuery.data ? (
+        <AdminStateCard
+          title={isRu ? "Feedback summary" : "Feedback summary"}
+          description={
+            feedbackSummaryQuery.data.hasNegativeWarning
+              ? isRu
+                ? "У шаблона высокий негативный feedback."
+                : "This template has elevated negative feedback."
+              : isRu
+                ? "Сводка позитивных, нейтральных и негативных оценок по новому feedback."
+                : "Positive, neutral, and negative rate summary from the new feedback stream."
+          }
+          tone={feedbackSummaryQuery.data.hasNegativeWarning ? "warning" : "info"}
+        >
+          <AdminMetricStrip
+            items={[
+              {
+                label: isRu ? "Positive" : "Positive",
+                value: `${feedbackSummaryQuery.data.positiveRate.toFixed(1)}% (${feedbackSummaryQuery.data.positiveCount})`,
+              },
+              {
+                label: isRu ? "Neutral" : "Neutral",
+                value: `${feedbackSummaryQuery.data.neutralRate.toFixed(1)}% (${feedbackSummaryQuery.data.neutralCount})`,
+              },
+              {
+                label: isRu ? "Negative" : "Negative",
+                value: `${feedbackSummaryQuery.data.negativeRate.toFixed(1)}% (${feedbackSummaryQuery.data.negativeCount})`,
+              },
+              {
+                label: isRu ? "Top issues" : "Top issues",
+                value:
+                  feedbackSummaryQuery.data.topIssues
+                    .map((issue) => `${issue.category}: ${issue.count}`)
+                    .join(", ") || "-",
+              },
+            ]}
+          />
+        </AdminStateCard>
+      ) : null}
 
       <TemplateAnalyticsSnapshotSection
         activeRuns={activeRuns}

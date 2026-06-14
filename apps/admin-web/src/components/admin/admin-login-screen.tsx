@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 
-import { BrandMark } from "@/components/admin/admin-icons";
+import { AdminLoginPreviewChart, BrandMark } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import styles from "@/components/admin/admin-login-screen.module.css";
 import { type Locale } from "@/lib/i18n";
@@ -79,31 +79,7 @@ function LoginDashboardPreview() {
 
         <div className={styles.previewMain}>
           <div className={styles.previewChart}>
-            <svg
-              viewBox="0 0 180 52"
-              fill="none"
-              preserveAspectRatio="none"
-              width="100%"
-              height="100%"
-            >
-              <defs>
-                <linearGradient id="loginDashboardGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#22c55e" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <polygon
-                points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14 180,52 0,52"
-                fill="url(#loginDashboardGradient)"
-              />
-              <polyline
-                points="0,44 22,34 44,38 70,21 90,27 110,15 130,19 155,11 180,14"
-                stroke="#22c55e"
-                strokeWidth="1.8"
-                fill="none"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <AdminLoginPreviewChart className={styles.previewChartGraphic} />
           </div>
 
           <div className={styles.previewStats}>

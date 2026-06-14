@@ -8,6 +8,8 @@ export const adminQueryKeys = {
   userDetail: (userId: string) => ["admin", "users", userId, "detail"] as const,
   userDetailDisabled: ["admin", "users", "detail", "disabled"] as const,
   userAnalytics: (userId: string) => ["admin", "users", userId, "analytics"] as const,
+  userRowAnalytics: (userIds: readonly string[]) =>
+    ["admin", "users", "row-analytics", userIds] as const,
   userAnalyticsDisabled: ["admin", "users", "analytics", "disabled"] as const,
   economyLedger: (source: string, statusUserKey: string) =>
     ["admin", "economy", "ledger", source, statusUserKey] as const,
@@ -17,6 +19,8 @@ export const adminQueryKeys = {
     ["admin", "economy", "subscriptions", query] as const,
   economyUserSubscriptionSummary: (userId: string) =>
     ["admin", "economy", "users", userId, "subscription-summary"] as const,
+  economyUserSubscriptionSummaries: (userIds: readonly string[]) =>
+    ["admin", "economy", "users", "subscription-summaries", userIds] as const,
   economyUserSubscriptionSummaryDisabled: [
     "admin",
     "economy",
@@ -68,5 +72,10 @@ export const adminQueryKeys = {
     ["admin", "templates", templateId, "analytics-feedback", feedbackType, search] as const,
   templateGenerationMetrics: ["admin", "templates", "generations", "metrics"] as const,
   templateGenerations: (query: unknown) => ["admin", "templates", "generations", query] as const,
+  templateWatermarkSettings: ["admin", "templates", "monetization", "watermark"] as const,
   moderationQueue: (query: unknown) => ["admin", "moderation", query] as const,
+  feedback: (query: unknown) => ["admin", "feedback", query] as const,
+  feedbackDetails: (feedbackId: string) => ["admin", "feedback", feedbackId] as const,
+  templateFeedbackSummary: (templateId: string) =>
+    ["admin", "templates", templateId, "feedback-summary"] as const,
 };

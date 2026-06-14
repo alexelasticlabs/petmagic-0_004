@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import styles from "@/components/admin/confirmation-dialog.module.css";
@@ -33,6 +33,30 @@ export function ConfirmationDialog({
   onCancel,
   onConfirm,
 }: ConfirmationDialogProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open || typeof document === "undefined") {
+      return;
+    }
+
+    previouslyFocusedElementRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    cancelButtonRef.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previouslyFocusedElementRef.current?.focus();
+      previouslyFocusedElementRef.current = null;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open || isSubmitting) {
       return;
@@ -58,19 +82,25 @@ export function ConfirmationDialog({
         className={styles.dialog}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="admin-confirmation-title"
-        aria-describedby="admin-confirmation-description"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="admin-confirmation-title" className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           {title}
         </h2>
-        <p id="admin-confirmation-description" className={styles.description}>
+        <p id={descriptionId} className={styles.description}>
           {description}
         </p>
         {children}
         <div className={styles.actions}>
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
+          <Button
+            ref={cancelButtonRef}
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
             {cancelLabel}
           </Button>
           <Button

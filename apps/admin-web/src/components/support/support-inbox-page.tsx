@@ -11,11 +11,7 @@ import { SupportConversationPage } from "@/components/support/support-conversati
 import styles from "@/components/support/support-page.module.css";
 import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import {
-  fetchSupportInbox,
-  useAuthSession,
-  type AdminSupportInboxPage,
-} from "@/lib/api-client";
+import { fetchSupportInbox, useAuthSession, type AdminSupportInboxPage } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type SupportInboxPageProps = {
@@ -25,19 +21,20 @@ type SupportInboxPageProps = {
 export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   const router = useRouter();
   const session = useAuthSession();
+  const sessionRoles = session?.user.roles ?? [];
+  const canManageSupportWorkspace =
+    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const text = getDictionary(locale);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!session) {
-      ensureAdminSession(locale, router);
-    }
+    ensureAdminSession(locale, router);
   }, [locale, router, session]);
 
   const inboxQuery = useQuery<AdminSupportInboxPage>({
     queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
     queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
-    enabled: Boolean(session),
+    enabled: canManageSupportWorkspace,
   });
 
   const sortedConversations = useMemo(
@@ -57,7 +54,11 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     return sortedConversations[0]?.conversationId ?? null;
   }, [selectedConversationId, sortedConversations]);
 
-  if (inboxQuery.isLoading || (sortedConversations.length > 0 && !activeConversationId)) {
+  if (
+    !canManageSupportWorkspace ||
+    inboxQuery.isLoading ||
+    (sortedConversations.length > 0 && !activeConversationId)
+  ) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard
@@ -80,13 +81,13 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
             <Button
               variant="secondary"
               onClick={() => {
-                if (!session) {
+                if (!canManageSupportWorkspace) {
                   return;
                 }
 
                 void inboxQuery.refetch().catch(() => undefined);
               }}
-              disabled={!session || inboxQuery.isFetching}
+              disabled={!canManageSupportWorkspace || inboxQuery.isFetching}
             >
               {text.adminRetryAction}
             </Button>

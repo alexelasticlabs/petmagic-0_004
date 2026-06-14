@@ -38,6 +38,13 @@
   flex: 0 0 auto;
 }
 
+.toolbarChevron {
+  width: 0.62rem;
+  height: 0.62rem;
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
 .cardActionLink {
   color: var(--info);
   font-weight: 600;
@@ -47,7 +54,7 @@
 }
 
 .cardActionLink:hover {
-  color: #9ec1ff;
+  color: var(--accent-strong);
 }
 
 .chartToolbar {
@@ -99,7 +106,18 @@
   width: 0.65rem;
   height: 0.65rem;
   border-radius: var(--radius-xs);
-  background: var(--legend-color);
+}
+
+.legendDotSuccess {
+  background: var(--success);
+}
+
+.legendDotBrand {
+  background: var(--brand);
+}
+
+.legendDotNeutral {
+  background: var(--neutral);
 }
 
 .legendLabel {
@@ -136,7 +154,7 @@
   gap: 0.55rem;
   min-width: 0;
   padding: 0.5rem 0;
-  border-bottom: 1px solid rgba(46, 56, 74, 0.5);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .activityItem:last-child {
@@ -151,12 +169,27 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--activity-color);
 }
 
 .activityIcon svg {
   width: 0.95rem;
   height: 0.95rem;
+}
+
+.activityIconSuccess {
+  color: var(--success);
+}
+
+.activityIconInfo {
+  color: var(--info);
+}
+
+.activityIconBrand {
+  color: var(--brand);
+}
+
+.activityIconDanger {
+  color: var(--danger);
 }
 
 .activityBody {

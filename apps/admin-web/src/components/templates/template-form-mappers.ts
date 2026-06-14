@@ -69,6 +69,9 @@ export function createInitialTemplateForm(templateType: TemplateType): TemplateF
     tags: "",
     isPremium: false,
     tokenCost: templateType === "Video" ? "60" : "20",
+    supportsGenerationResultInput: false,
+    requiredInputMediaType: "Image",
+    recommendedAfterImageGeneration: false,
     previewUrl: "",
     previewUrlSource: "none",
     previewFileName: "",
@@ -102,6 +105,9 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     tags: template.tags.join(", "),
     isPremium: template.isPremium,
     tokenCost: template.tokenCost.toString(),
+    supportsGenerationResultInput: template.supportsGenerationResultInput ?? false,
+    requiredInputMediaType: template.requiredInputMediaType ?? "Image",
+    recommendedAfterImageGeneration: template.recommendedAfterImageGeneration ?? false,
     previewUrl: template.previewAsset?.url ?? "",
     previewUrlSource: template.previewAsset?.url ? "persisted" : "none",
     previewFileName: template.previewAsset?.fileName ?? "",
@@ -155,6 +161,9 @@ export async function saveImageTemplateFromForm(
     ),
     imageModel: normalizeTemplateText(form.imageModel, TEMPLATE_MODEL_MAX_LENGTH),
     imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH),
+    supportsGenerationResultInput: form.supportsGenerationResultInput,
+    requiredInputMediaType: form.requiredInputMediaType,
+    recommendedAfterImageGeneration: form.recommendedAfterImageGeneration,
   };
 
   return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);
@@ -203,6 +212,9 @@ export async function saveVideoTemplateFromForm(
     klingModel: normalizeTemplateText(form.klingModel, TEMPLATE_MODEL_MAX_LENGTH),
     klingPrompt: normalizeTemplateText(form.klingPrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     keepOriginalSound: form.keepOriginalSound,
+    supportsGenerationResultInput: form.supportsGenerationResultInput,
+    requiredInputMediaType: form.requiredInputMediaType,
+    recommendedAfterImageGeneration: form.recommendedAfterImageGeneration,
   };
 
   return templateId ? updateVideoTemplate(templateId, payload) : createVideoTemplate(payload);

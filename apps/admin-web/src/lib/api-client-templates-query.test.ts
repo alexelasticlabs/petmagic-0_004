@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearAdminListCaches } from "@/lib/api-client.core";
 import {
+  createTemplateOfTheDay,
   decideAdminModerationItem,
   fetchAdminModerationQueue,
   fetchAdminTemplateGenerationMetrics,
@@ -15,6 +16,7 @@ import {
   GENERATION_PROVIDER_FILTER_MAX_LENGTH,
   GENERATION_SEARCH_FILTER_MAX_LENGTH,
   GENERATION_USER_FILTER_MAX_LENGTH,
+  fetchTemplateOfTheDaySettings,
   MODERATION_DECISION_REASON_MAX_LENGTH,
   MODERATION_SEARCH_MAX_LENGTH,
   normalizeAdminTemplateCatalogQuery,
@@ -22,6 +24,7 @@ import {
   normalizeAdminTemplateGenerationsQuery,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
+  updateTemplateOfTheDaySettings,
 } from "@/lib/api-client.templates";
 
 function readSource(relativePath: string): string {
@@ -142,7 +145,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("normalizes template take-only request URLs", async () => {
-    const fetchMock = vi.fn(async () => Response.json([]));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchAdminTemplateRecentGenerations("template-recent", 25.8);
@@ -156,8 +159,44 @@ describe("api-client.templates query normalization", () => {
     ]);
   });
 
+  it("normalizes shared generation success aliases for admin template tests", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.includes("/tests?")) {
+        return Response.json([
+          {
+            generationId: "generation-history",
+            status: "Succeeded",
+            tokenCost: 10,
+            attemptCount: 1,
+            createdAtUtc: "2026-06-14T12:00:00Z",
+            updatedAtUtc: "2026-06-14T12:01:00Z",
+            userMediaExpired: false,
+          },
+        ]);
+      }
+
+      return Response.json({
+        generationId: "generation-single",
+        status: "Succeeded",
+        tokenCost: 10,
+        attemptCount: 1,
+        createdAtUtc: "2026-06-14T12:00:00Z",
+        updatedAtUtc: "2026-06-14T12:01:00Z",
+        userMediaExpired: false,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const single = await fetchAdminTemplateTest("generation-single");
+    const history = await fetchAdminTemplateTestHistory("template-tests", 5);
+
+    expect(single.status).toBe("Completed");
+    expect(history[0]?.status).toBe("Completed");
+  });
+
   it("sends template catalog search and filters to the backend", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         items: [],
         skip: 12,
@@ -184,7 +223,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("preserves moderation queue totalCount for dashboard KPI counts", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         items: [],
         skip: 0,
@@ -205,7 +244,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("requests backend generation dashboard metrics with abort support", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         totalJobs: 12,
         generationsToday: 3,
@@ -237,7 +276,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("uses a stable cache key for equivalent template catalog queries", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         items: [],
         skip: 0,
@@ -267,7 +306,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("bounds template feedback search before request URLs", async () => {
-    const fetchMock = vi.fn(async () => Response.json([]));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
     const overlongSearch = "f".repeat(TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH + 20);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -282,8 +321,86 @@ describe("api-client.templates query normalization", () => {
     ]);
   });
 
+  it("reads and updates Template of the Day auto-mode settings", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      if (String(input).endsWith("/settings")) {
+        return Response.json({
+          autoModeEnabled: true,
+          allowedTypes: "video",
+          excludeRecentDays: 14,
+          updatedAtUtc: "2026-06-14T12:00:00Z",
+        });
+      }
+
+      return Response.json({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const settings = await fetchTemplateOfTheDaySettings();
+    await updateTemplateOfTheDaySettings({
+      autoModeEnabled: false,
+      allowedTypes: "image",
+      excludeRecentDays: 0,
+    });
+
+    expect(settings.allowedTypes).toBe("video");
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/template-of-the-day/settings",
+      "https://api.example.com/api/admin/template-of-the-day/settings",
+    ]);
+    expect(fetchMock.mock.calls[1]?.[1]?.method).toBe("PUT");
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+      autoModeEnabled: false,
+      allowedTypes: "image",
+      excludeRecentDays: 0,
+    });
+  });
+
+  it("creates Template of the Day assignments on the no-trailing-slash collection route", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        id: "assignment-1",
+        templateId: "template-1",
+        templateTitle: "Daily Portrait",
+        templateType: "Image",
+        category: "Portrait",
+        templateStatus: "Active",
+        isPremium: false,
+        previewAsset: null,
+        startDate: "2026-06-14",
+        endDate: null,
+        isActive: true,
+        isManual: true,
+        priority: 10,
+        titleOverride: "Featured",
+        subtitleOverride: null,
+        badgeTextOverride: null,
+        createdAtUtc: "2026-06-14T00:00:00Z",
+        updatedAtUtc: "2026-06-14T00:00:00Z",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await createTemplateOfTheDay({
+      templateId: "template-1",
+      startDate: "2026-06-14",
+      endDate: null,
+      isActive: true,
+      isManual: true,
+      priority: 10,
+      titleOverride: "Featured",
+      subtitleOverride: null,
+      badgeTextOverride: null,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/template-of-the-day",
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe("POST");
+  });
+
   it("encodes template ids before placing them in API path segments", async () => {
-    const fetchMock = vi.fn(async () => Response.json([]));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
     vi.stubGlobal("fetch", fetchMock);
 
     await fetchAdminTemplateRecentGenerations("template/one two?x", 25);
@@ -301,7 +418,7 @@ describe("api-client.templates query normalization", () => {
   });
 
   it("bounds moderation decision reasons before sending audit payloads", async () => {
-    const fetchMock = vi.fn(async () => Response.json({}));
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
     const overlongReason = "r".repeat(MODERATION_DECISION_REASON_MAX_LENGTH + 20);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -323,14 +440,28 @@ describe("api-client.templates query normalization", () => {
   it("propagates AbortSignal through template GET helpers", () => {
     const source = readSource("lib/api-client.templates.ts");
 
-    expect(source).toContain("export async function fetchAdminTemplates(\n  query: AdminTemplateCatalogQuery = {},\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplateCategories(\n  includeArchived = true,\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplate(\n  templateId: string,\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplateStatistics(\n  templateId: string,\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplatesAnalyticsOverview(\n  query: AdminTemplatesAnalyticsQuery = {},\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplateTest(\n  generationId: string,\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminTemplateTestHistory(\n  templateId: string,\n  take?: number,\n  signal?: AbortSignal");
-    expect(source).toContain("{ method: \"GET\", signal }");
+    expect(source).toContain(
+      "export async function fetchAdminTemplates(\n  query: AdminTemplateCatalogQuery = {},\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplateCategories(\n  includeArchived = true,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplate(\n  templateId: string,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplateStatistics(\n  templateId: string,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplatesAnalyticsOverview(\n  query: AdminTemplatesAnalyticsQuery = {},\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplateTest(\n  generationId: string,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminTemplateTestHistory(\n  templateId: string,\n  take?: number,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain('{ method: "GET", signal }');
   });
 
   it("uses React Query AbortSignal in template catalog and analytics hooks", () => {
@@ -343,12 +474,16 @@ describe("api-client.templates query normalization", () => {
     const categoriesSource = readSource("components/templates/use-admin-template-categories.ts");
     const hubSource = readSource("components/templates/templates-analytics-hub-page.tsx");
 
-    expect(catalogSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(normalizedQuery, signal)");
+    expect(catalogSource).toContain(
+      "queryFn: ({ signal }) => fetchAdminTemplates(normalizedQuery, signal)"
+    );
     expect(catalogSource).toContain("fetchAdminTemplatesAnalyticsOverview(");
     expect(catalogSource).toContain("signal");
     expect(overviewSource).toContain("queryFn: async ({ signal }) =>");
     expect(overviewSource).toContain("fetchAdminTemplate(templateId, signal)");
-    expect(overviewSource).toContain("fetchAdminTemplateRecentGenerations(templateId, previewTake, signal)");
+    expect(overviewSource).toContain(
+      "fetchAdminTemplateRecentGenerations(templateId, previewTake, signal)"
+    );
     expect(feedbackSource).toContain("queryFn: ({ signal }) =>");
     expect(feedbackSource).toContain("}, signal)");
     expect(optionsSource).toContain("queryFn: ({ signal }) => fetchAdminTemplates(query, signal)");

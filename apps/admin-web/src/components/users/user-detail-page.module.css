@@ -140,6 +140,45 @@
   padding-right: 0.2rem;
 }
 
+.petMediaGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.petPhoto {
+  display: grid;
+  gap: 0.42rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+}
+
+.petPhoto img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+}
+
+.petDetails {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.petDetailState {
+  display: block;
+  padding: 0.62rem 0.68rem;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 @media (max-width: 900px) {
   .profileHeader {
     grid-template-columns: 1fr;

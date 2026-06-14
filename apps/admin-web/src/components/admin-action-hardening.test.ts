@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 const roleManagementPagePath = fileURLToPath(
   new URL("./role-management-page.tsx", import.meta.url)
 );
+const roleManagementStylesPath = fileURLToPath(
+  new URL("./role-management-page.module.css", import.meta.url)
+);
 const usersManagementPagePath = fileURLToPath(
   new URL("./users-management-page.tsx", import.meta.url)
 );
@@ -22,19 +25,25 @@ const localeErrorPagePath = fileURLToPath(new URL("../app/[locale]/error.tsx", i
 describe("admin action hardening", () => {
   it("guards role management actions and surfaces sanitized backend errors", () => {
     const source = readFileSync(roleManagementPagePath, "utf8");
+    const stylesSource = readFileSync(roleManagementStylesPath, "utf8");
 
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("useAuthSession,");
     expect(source).toContain("const session = useAuthSession();");
-    expect(source).toContain(
-      'const canManageRoles = session?.user.roles.includes("Admin") ?? false;'
-    );
-    expect(source).toContain(
-      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
-    );
+    expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
+    expect(source).toContain('const canManageRoles = sessionRoles.includes("Admin");');
+    expect(source).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
+    expect(source).toContain("{!canManageRoles || isLoading ? (");
+    expect(source).toContain("{canManageRoles ? (\n        <AdminCard title={text.searchTitle}");
     expect(source).toContain("enabled: canManageRoles");
     expect(source).toContain("enabled: canManageRoles && debouncedSearch.trim().length >= 2");
     expect(source).toContain("roleActionsAdminOnly: isRu");
+    expect(source).toContain("assignModeratorLabel: isRu");
+    expect(source).toContain("revokeModeratorLabel: isRu");
+    expect(source).toContain('eyebrow: isRu ? "Контроль доступа" : "Access control"');
+    expect(source).toContain('adminOnly: isRu ? "Только Admin" : "Admin only"');
+    expect(source).toContain('adminsTitle: isRu ? "Администраторы" : "Admins"');
+    expect(source).toContain('moderatorsTitle: isRu ? "Модераторы" : "Moderators"');
     expect(source).toContain("function assertCanManageRoles(): boolean");
     expect(source).toContain('setToast({ type: "error", message: text.roleActionsAdminOnly });');
     expect(source).toContain("useRef,");
@@ -57,22 +66,46 @@ describe("admin action hardening", () => {
     expect(source).toContain("getAdminErrorMessage(error, text.failed)");
     expect(source).toContain("USER_SEARCH_MAX_LENGTH,");
     expect(source).toContain("setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))");
+    expect(source).toContain('type="search"');
+    expect(source).toContain('autoComplete="off"');
     expect(source).toContain("maxLength={USER_SEARCH_MAX_LENGTH}");
     expect(source).toContain("const [adminsPage, setAdminsPage] = useState(0);");
     expect(source).toContain("skip: adminsPage * PAGE_SIZE");
     expect(source).toContain("skip: moderatorsPage * PAGE_SIZE");
     expect(source).toContain("queryKey: adminQueryKeys.usersRoot");
     expect(source).toContain("function RolePager(");
+    expect(source).toContain(
+      'previousPageLabel: isRu ? "Предыдущая страница списка ролей" : "Previous role list page"'
+    );
+    expect(source).toContain(
+      'nextPageLabel: isRu ? "Следующая страница списка ролей" : "Next role list page"'
+    );
+    expect(source).toContain("aria-label={text.previousPageLabel}");
+    expect(source).toContain("aria-label={text.nextPageLabel}");
+    expect(stylesSource).toContain(
+      ".pager {\n    flex-direction: column;\n    align-items: stretch;"
+    );
+    expect(stylesSource).toContain(".pageInfo {\n    width: 100%;");
+    expect(stylesSource).toContain(".pagerActions {\n    display: grid;");
+    expect(stylesSource).toContain("grid-template-columns: 1fr 1fr;\n    width: 100%;");
     expect(source).toContain("sanitizeSensitiveText(getAdminUserDisplayName(user), 96)");
     expect(source).toContain("shortIdentifier(user.userId)");
     expect(source).toContain("sanitizeSensitiveText(role, 32)");
     expect(source).toContain("disabled={!canManageRoles || isSubmitting}");
+    expect(source).toContain(
+      "aria-label={`${text.revokeModeratorLabel} ${userDisplayName(user)}`}"
+    );
     expect(source).toContain('const isAdmin = user.roles.includes("Admin");');
     expect(source).toContain(
       "disabled={!canManageRoles || isAdmin || isModerator || isSubmitting}"
     );
-    expect(source).toContain("isAdmin\n                      ? text.adminAlreadyPrivileged");
-    expect(source).toContain(': isModerator\n                        ? "Moderator"');
+    expect(source).toContain(
+      "aria-label={`${text.assignModeratorLabel} ${userDisplayName(user)}`}"
+    );
+    expect(source).toContain("text.adminAlreadyPrivileged");
+    expect(source).toContain('? "Moderator"');
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
+    expect(stylesSource).toContain(".userRow > .button {\n    width: 100%;");
     expect(source).not.toContain("{user.userId} / {text.created}");
     expect(source).not.toContain("{role}\n        </AdminBadge>");
     expect(source).not.toContain("setSearch(event.target.value)");
@@ -106,10 +139,10 @@ describe("admin action hardening", () => {
     expect(source).toContain("if (isUserActionLocked) {\n        return;");
     expect(source).toContain("const isBusy = busyUserId === user.userId || isUserActionLocked;");
     expect(source).toContain("disabled={isUserActionLocked}");
-    expect(source).toContain("disabled={isUserActionLocked || busyUserId === openActionsUser.userId}");
     expect(source).toContain(
-      "disabled={isUserActionLocked || busyUserId === selectedUser.userId}"
+      "disabled={isUserActionLocked || busyUserId === openActionsUser.userId}"
     );
+    expect(source).toContain("disabled={isUserActionLocked || busyUserId === selectedUser.userId}");
   });
 
   it("keeps users financial and destructive controls admin-only in the UI layer", () => {
@@ -136,9 +169,7 @@ describe("admin action hardening", () => {
     );
     expect(source).toContain('amount: event.target.value.replace(/\\D+/g, "").slice(0, 8)');
     expect(source).toContain("maxLength={8}");
-    expect(source).toContain(
-      "reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH)"
-    );
+    expect(source).toContain("reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH)");
     expect(source).toContain("maxLength={USER_WALLET_REASON_MAX_LENGTH}");
     expect(source).toContain(
       'variant="ghost"\n                    size="sm"\n                    onClick={closeWalletDialog}\n                    disabled={walletDialogSubmitting}'
@@ -189,6 +220,15 @@ describe("admin action hardening", () => {
   it("does not expose browser-only sorting on the paged users table", () => {
     const source = readFileSync(usersManagementPagePath, "utf8");
 
+    expect(source).toContain("const ROW_ENRICHMENT_CONCURRENCY = 4;");
+    expect(source).toContain("function fetchUserRowEnrichment<TValue>(");
+    expect(source).toContain("queryKey: adminQueryKeys.userRowAnalytics(pageUserIds)");
+    expect(source).toContain(
+      "queryKey: adminQueryKeys.economyUserSubscriptionSummaries(premiumPageUserIds)"
+    );
+    expect(source).toContain("fetchUserRowEnrichment<AdminUserAnalytics>");
+    expect(source).toContain("fetchUserRowEnrichment<AdminEconomyUserSubscriptionSummary>");
+    expect(source).not.toContain("useQueries");
     expect(source).not.toContain("type SortMode");
     expect(source).not.toContain("sortMode");
     expect(source).not.toContain("sortLastActivity");
@@ -279,13 +319,13 @@ describe("admin action hardening", () => {
 
     expect(hookSource).toContain("hasSession: canManageRoles");
     expect(source).toContain("hasSession,");
-    expect(source).toContain("enabled: hasSession,");
+    expect(source).toContain("enabled: hasSession && pageUserIds.length > 0");
     expect(source).toContain("enabled: hasSession && users.length > 0");
     expect(source).toContain(
       "const selectedUserProfile = useAdminUserProfile({ enabled: hasSession, userId: selectedUserId });"
     );
     expect(source).toContain("enabled: hasSession && Boolean(selectedUserId)");
-    expect(source).toContain("enabled: hasSession && user.isPremium");
+    expect(source).toContain("enabled: hasSession && premiumPageUserIds.length > 0");
     expect(source).not.toContain("enabled: users.length > 0");
     expect(source).not.toContain("enabled: Boolean(selectedUserId)");
     expect(source).not.toContain("enabled: true,\n      staleTime: 30_000");
@@ -293,6 +333,16 @@ describe("admin action hardening", () => {
     expect(profileHookSource).toContain("enabled?: boolean;");
     expect(profileHookSource).toContain("const canLoadUser = enabled && Boolean(userId);");
     expect(profileHookSource).toContain("enabled: canLoadUser");
+    expect(profileHookSource).toContain("const error = userQuery.error ?? analyticsQuery.error ?? null;");
+    expect(profileHookSource).toContain("error,");
+    expect(source).toContain("selectedUserProfile.hasError && !selectedUser");
+    expect(source).toContain(
+      "title={getAdminErrorMessage(selectedUserProfile.error, text.errorLoadingUsers)}"
+    );
+    expect(source).toContain("disabled={selectedUserProfile.isFetching}");
+    expect(source).toContain(
+      "void selectedUserProfile.refresh().catch(() => undefined)"
+    );
     expect(profileHookSource).not.toContain("enabled: Boolean(userId)");
     expect(detailSource).toContain(
       'const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;'

@@ -116,7 +116,7 @@ describe("api-client.economy query normalization", () => {
   });
 
   it("normalizes direct economy paged request URLs", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({ items: [], skip: 0, take: 0, hasMore: false, totalCount: 0 })
     );
     const overlongSource = "l".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH + 20);
@@ -168,7 +168,7 @@ describe("api-client.economy query normalization", () => {
   });
 
   it("requests backend redeem code metrics with abort support", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         totalCodes: 12,
         activeCodes: 9,
@@ -210,7 +210,7 @@ describe("api-client.economy query normalization", () => {
   });
 
   it("encodes economy ids before placing them in API path segments", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({ items: [], skip: 0, take: 0, hasMore: false, totalCount: 0 })
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -225,7 +225,7 @@ describe("api-client.economy query normalization", () => {
   });
 
   it("requests backend economy dashboard metrics with abort support", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         purchasesThisWeek: 4,
         purchasesPreviousWeek: 2,
@@ -258,7 +258,7 @@ describe("api-client.economy query normalization", () => {
   });
 
   it("bounds refund reasons before sending audit payloads", async () => {
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({
         orderId: "order-1",
         userId: "user-1",

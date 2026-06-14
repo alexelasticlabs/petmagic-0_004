@@ -17,11 +17,17 @@ import type { AdminRedeemCode } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
 
 const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
+const promoCodesHelpersPath = fileURLToPath(
+  new URL("./promo-codes-view.helpers.ts", import.meta.url)
+);
 const promoCodesListCardPath = fileURLToPath(
   new URL("./promo-codes-list-card.tsx", import.meta.url)
 );
 const promoCodeActivationsCardPath = fileURLToPath(
   new URL("./promo-code-activations-card.tsx", import.meta.url)
+);
+const promoCodesStylesPath = fileURLToPath(
+  new URL("./promo-codes-view.module.css", import.meta.url)
 );
 
 function createRedeemCode(patch: Partial<AdminRedeemCode> = {}): AdminRedeemCode {
@@ -196,25 +202,43 @@ describe("promo code dangerous action hardening", () => {
   it("keeps archive confirmation open until the backend action succeeds", () => {
     const source = readFileSync(promoCodesViewPath, "utf8");
 
-    expect(source).toContain('const canManagePromoCodes = session?.user.roles.includes("Admin") ?? false;');
+    expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
+    expect(source).toContain('const canManagePromoCodes = sessionRoles.includes("Admin");');
+    expect(source).toContain("if (!canManagePromoCodes || promoCodesQuery.isLoading)");
+    expect(source).not.toContain(
+      "if (!canManagePromoCodes || promoCodesQuery.isLoading || promoMetricsQuery.isLoading)"
+    );
     expect(source).toContain("function assertCanManagePromoCodes(): boolean");
-    expect(source).toContain("setFeedback({ tone: \"danger\", message: promoCodesAdminOnlyMessage });");
+    expect(source).toContain(
+      'setFeedback({ tone: "danger", message: promoCodesAdminOnlyMessage });'
+    );
     expect(source).toContain("if (!assertCanManagePromoCodes()) {\n      return;");
     expect(source).toContain("if (!assertCanManagePromoCodes()) {\n      return false;");
-    expect(source).toContain("async function handleArchive(code: AdminRedeemCode): Promise<boolean>");
+    expect(source).toContain(
+      "async function handleArchive(code: AdminRedeemCode): Promise<boolean>"
+    );
     expect(source).toContain("await archiveMutation.mutateAsync");
     expect(source).toContain("handleArchive(codePendingArchive).then((succeeded)");
     expect(source).toContain("function requestArchiveCode(code: AdminRedeemCode)");
     expect(source).toContain("onArchive={requestArchiveCode}");
     expect(source).not.toContain("setCodePendingArchive(code);\n        }}");
     expect(source).toContain(
-      "!canManagePromoCodes || promoCodesQuery.isFetching || promoMetricsQuery.isFetching"
+      "const isPromoRefreshFetching = promoCodesQuery.isFetching || promoMetricsQuery.isFetching;"
     );
+    expect(source).toContain("if (promoCodesQuery.isError)");
+    expect(source).not.toContain("if (promoCodesQuery.isError || promoMetricsQuery.isError)");
+    expect(source).toContain("promoMetricsQuery.isError ? (");
+    expect(source).toContain("title={text.promoCodesMetricsErrorDescription}");
+    expect(source).toContain(
+      "description={getAdminErrorMessage(\n            promoMetricsQuery.error,\n            text.promoCodesMetricsErrorDescription\n          )}"
+    );
+    expect(source).toContain("disabled={!canManagePromoCodes || isPromoRefreshFetching}");
+    expect(source).toContain("promoCodesQueryIsFetching={isPromoRefreshFetching}");
     expect(source).toContain(
       "if (!canManagePromoCodes) {\n                  return;\n                }\n\n                void promoCodesQuery.refetch().catch(() => undefined);"
     );
     expect(source).toContain(
-      "if (!canManagePromoCodes) {\n              return;\n            }\n\n            void promoCodesQuery.refetch().catch(() => undefined);"
+      "void promoCodesQuery.refetch().catch(() => undefined);\n            void promoMetricsQuery.refetch().catch(() => undefined);"
     );
     expect(source).toContain("promoCodesQuery.refetch().catch(() => undefined)");
     expect(source).toContain("promoMetricsQuery.refetch().catch(() => undefined)");
@@ -230,7 +254,9 @@ describe("promo code dangerous action hardening", () => {
     expect(viewSource).toContain(
       "async function handleCopyCode(code: string) {\n    if (!assertCanManagePromoCodes())"
     );
-    expect(viewSource).toContain("function handleExport() {\n    if (!assertCanManagePromoCodes())");
+    expect(viewSource).toContain(
+      "function handleExport() {\n    if (!assertCanManagePromoCodes())"
+    );
     expect(viewSource).toContain("canManagePromoCodes={canManagePromoCodes}");
     expect(listCardSource).toContain("canManagePromoCodes: boolean;");
     expect(listCardSource).toContain("disabled={!hasFilteredCodes || !canManagePromoCodes}");
@@ -241,6 +267,20 @@ describe("promo code dangerous action hardening", () => {
 });
 
 describe("promo code activation data sourcing", () => {
+  it("keeps the selected promo code context stable across filtered page refetches", () => {
+    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+
+    expect(viewSource).toContain(
+      "const [selectedCodeSnapshot, setSelectedCodeSnapshot] = useState<AdminRedeemCode | null>(null);"
+    );
+    expect(viewSource).toContain(
+      "promoCodes.find((code) => code.redeemCodeId === selectedCodeId) ??\n      (selectedCodeSnapshot?.redeemCodeId === selectedCodeId ? selectedCodeSnapshot : null)"
+    );
+    expect(viewSource).toContain("setSelectedCodeSnapshot(code);");
+    expect(viewSource).toContain("setSelectedCodeSnapshot(null);");
+    expect(viewSource).toContain("placeholderData: keepPreviousData");
+  });
+
   it("does not substitute embedded redemption history when backend activations fail", () => {
     const viewSource = readFileSync(promoCodesViewPath, "utf8");
     const cardSource = readFileSync(
@@ -270,12 +310,13 @@ describe("promo code activation data sourcing", () => {
     );
 
     expect(viewSource).toContain("const debouncedSearch = useDebouncedValue(search, 350);");
-    expect(viewSource).toContain(
-      'const canManagePromoCodes = session?.user.roles.includes("Admin") ?? false;'
+    expect(viewSource).toContain('const canManagePromoCodes = sessionRoles.includes("Admin");');
+    expect(viewSource).toContain("const sessionRoles = session?.user.roles ?? [];");
+    expect(viewSource).toContain("if (!canManagePromoCodes || promoCodesQuery.isLoading)");
+    expect(viewSource).not.toContain(
+      "if (!canManagePromoCodes || promoCodesQuery.isLoading || promoMetricsQuery.isLoading)"
     );
-    expect(viewSource).toContain(
-      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
-    );
+    expect(viewSource).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(viewSource).toContain("normalizeAdminRedeemCodesQuery({");
     expect(viewSource).toContain("skip: (page - 1) * pageSize");
     expect(viewSource).toContain("const promoCodesTotalCount =");
@@ -285,16 +326,18 @@ describe("promo code activation data sourcing", () => {
     expect(readFileSync(promoCodesListCardPath, "utf8")).toContain(
       "of ${formatNumber(totalCount, locale)}"
     );
-    expect(viewSource).toContain("queryKey: adminQueryKeys.economyRedeemCodes(promoCodesQueryParams)");
+    expect(viewSource).toContain(
+      "queryKey: adminQueryKeys.economyRedeemCodes(promoCodesQueryParams)"
+    );
     expect(viewSource).toContain("fetchAdminRedeemCodes(promoCodesQueryParams, signal)");
     expect(viewSource).toContain("enabled: canManagePromoCodes");
-    expect(viewSource).toContain(
-      "!canManagePromoCodes || hasActivePromoFilters || isEditorOpen"
-    );
+    expect(viewSource).toContain("!canManagePromoCodes || hasActivePromoFilters || isEditorOpen");
     expect(viewSource).toContain(
       "queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot })"
     );
-    expect(viewSource).not.toContain("const totalPages = hasMorePromoCodes ? currentPage + 1 : currentPage;");
+    expect(viewSource).not.toContain(
+      "const totalPages = hasMorePromoCodes ? currentPage + 1 : currentPage;"
+    );
     expect(viewSource).not.toContain("hasMorePromoCodes");
     expect(viewSource).not.toContain("promoCodesTotalCount === null");
     expect(readFileSync(promoCodesListCardPath, "utf8")).not.toContain("totalCount === null");
@@ -314,7 +357,9 @@ describe("promo code activation data sourcing", () => {
     expect(viewSource).toContain(
       "queryKey: adminQueryKeys.economyRedeemCodeMetrics(promoCodeMetricsQueryParams)"
     );
-    expect(viewSource).toContain("fetchAdminRedeemCodeMetrics(promoCodeMetricsQueryParams, signal)");
+    expect(viewSource).toContain(
+      "fetchAdminRedeemCodeMetrics(promoCodeMetricsQueryParams, signal)"
+    );
     expect(viewSource).toContain("enabled: canManagePromoCodes");
     expect(viewSource).toContain("value={formatNumber(metrics.totalCodes, locale)}");
     expect(viewSource).toContain("value={formatNumber(metrics.activeCodes, locale)}");
@@ -370,23 +415,83 @@ describe("promo code sensitive display", () => {
     expect(source).toContain("formatPromoDisplayText(code.description, 160)");
     expect(source).toContain("formatPromoDisplayText(code.createdBy, 80)");
     expect(source).not.toContain("const codeValue = code.code || `${code.codePrefix}...`");
-    expect(source).not.toContain("code.description.trim() || \"-\"");
-    expect(source).not.toContain("code.createdBy?.trim() || \"-\"");
+    expect(source).not.toContain('code.description.trim() || "-"');
+    expect(source).not.toContain('code.createdBy?.trim() || "-"');
+  });
+
+  it("keeps promo code filters and pagination usable on tablet and mobile widths", () => {
+    const listSource = readFileSync(promoCodesListCardPath, "utf8");
+    const stylesSource = readFileSync(promoCodesStylesPath, "utf8");
+
+    expect(listSource).toContain("CaretDownIcon");
+    expect(listSource).toContain("title={text.promoCodesPreviousAction}");
+    expect(listSource).toContain("title={text.promoCodesNextAction}");
+    expect(listSource).toContain("className={`${styles.pageIcon} ${styles.pageIconPrevious}`}");
+    expect(listSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
+    expect(listSource).not.toContain('{"<"}');
+    expect(listSource).not.toContain('{">"}');
+    expect(listSource).toContain('aria-current={pageNumber === currentPage ? "page" : undefined}');
+    expect(listSource).toContain("`Page ${formatNumber(pageNumber, locale)}`");
+    expect(listSource).toContain("`Страница ${formatNumber(pageNumber, locale)}`");
+    expect(stylesSource).toContain(".tableTopBar {\n  display: flex;\n  flex-wrap: wrap;");
+    expect(stylesSource).toContain(".statusTabs {\n  min-width: 0;\n  max-width: 100%;");
+    expect(stylesSource).toContain("overflow-x: auto;");
+    expect(stylesSource).toContain(".paginationActions {\n  min-width: 0;\n  max-width: 100%;");
+    expect(stylesSource).toContain("@media (max-width: 1080px)");
+    expect(stylesSource).toContain(
+      ".filterBar {\n    grid-template-columns: repeat(2, minmax(0, 1fr));"
+    );
+    expect(stylesSource).toContain(".searchField {\n    grid-column: 1 / -1;");
+    expect(stylesSource).toContain("@media (max-width: 860px)");
+    expect(stylesSource).toContain(".statusTabs {\n    width: 100%;\n    flex-wrap: nowrap;");
+    expect(stylesSource).toContain(".paginationActions {\n    justify-content: flex-start;");
+  });
+
+  it("keeps promo code status colors and overlays on semantic theme tokens", () => {
+    const helperSource = readFileSync(promoCodesHelpersPath, "utf8");
+    const listSource = readFileSync(promoCodesListCardPath, "utf8");
+    const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
+    const stylesSource = readFileSync(promoCodesStylesPath, "utf8");
+
+    expect(helperSource).toContain('color: "var(--success)"');
+    expect(helperSource).toContain('color: "var(--warning)"');
+    expect(helperSource).toContain('color: "var(--danger)"');
+    expect(helperSource).toContain('color: "var(--info)"');
+    expect(helperSource).toContain('color: "var(--text-muted)"');
+    expect(listSource).toContain("const rewardKindColors: Record<AdminRedeemRewardKind, string>");
+    expect(listSource).toContain('spark: "var(--success)"');
+    expect(listSource).toContain('premium_days: "var(--info)"');
+    expect(listSource).toContain("color={rewardKindColors[code.rewardKind]}");
+    expect(activationsSource).toContain('AdminStatusBadge color="var(--success)"');
+    expect(stylesSource).toContain(
+      "background: color-mix(in srgb, var(--surface-0) 74%, transparent);"
+    );
+    expect(stylesSource).toContain("box-shadow: var(--shadow-strong);");
+    expect(stylesSource).not.toContain("rgba(");
+    expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(listSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(activationsSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
   });
 
   it("sanitizes selected promo code labels and disables repeated activation retries", () => {
     const viewSource = readFileSync(promoCodesViewPath, "utf8");
     const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
 
-    expect(viewSource).toContain("formatPromoDisplayText(\n                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,\n                80");
+    expect(viewSource).toContain(
+      "formatPromoDisplayText(\n                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,\n                80"
+    );
     expect(viewSource).toContain("enabled: canManagePromoCodes && Boolean(selectedCodeId)");
     expect(viewSource).toContain("selectedUsersQueries = useQueries({");
     expect(viewSource).toContain("enabled: canManagePromoCodes");
-    expect(viewSource).not.toContain("`${codePendingArchive.code}: ${text.promoCodesArchiveConfirm}`");
-    expect(activationsSource).toContain("formatPromoDisplayText(selectedCode.code || `${selectedCode.codePrefix}...`, 80)");
+    expect(viewSource).not.toContain(
+      "`${codePendingArchive.code}: ${text.promoCodesArchiveConfirm}`"
+    );
+    expect(activationsSource).toContain(
+      "formatPromoDisplayText(selectedCode.code || `${selectedCode.codePrefix}...`, 80)"
+    );
     expect(activationsSource).toContain("disabled={activationsIsFetching}");
     expect(activationsSource).not.toContain(
-      "`${selectedCode.code || `${selectedCode.codePrefix}...`} · ${selectedStatusLabel ?? \"\"}`"
+      '`${selectedCode.code || `${selectedCode.codePrefix}...`} · ${selectedStatusLabel ?? ""}`'
     );
   });
 });

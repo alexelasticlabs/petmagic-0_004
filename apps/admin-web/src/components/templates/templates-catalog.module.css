@@ -372,7 +372,7 @@
   text-overflow: ellipsis;
 }
 
-.cardFooter :global(.admin-primitives-module__gNhzuG__statusBadge) {
+.cardStatusBadge {
   min-height: 1.4rem;
   padding-inline: 0.5rem;
   font-size: 0.64rem;
@@ -489,7 +489,7 @@
   font-size: 0.78rem;
   font-weight: 600;
   line-height: 1.1;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -596,25 +596,25 @@
   border-radius: var(--radius);
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table) {
+.listTable {
   min-width: 76rem;
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table th) {
+.listTable th {
   padding: 0 0.68rem 0.58rem;
   color: var(--text-muted);
   font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   white-space: nowrap;
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table td) {
+.listTable td {
   padding: 0.54rem 0.68rem;
   border-bottom-color: var(--border-soft);
   vertical-align: middle;
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr) {
+.listTable tbody tr {
   background: var(--surface-2);
   transition:
     background 100ms ease,
@@ -622,20 +622,20 @@
   cursor: default;
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover) {
+.listTable tbody tr:hover {
   background: var(--surface-hover);
   box-shadow:
     inset 3px 0 0 var(--accent),
     inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:last-child td) {
+.listTable tbody tr:last-child td {
   border-bottom: none;
 }
 
 /* sticky actions column */
-.listCard :global(.admin-primitives-module__gNhzuG__table thead tr th:last-child),
-.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr td:last-child) {
+.listTable thead tr th:last-child,
+.listTable tbody tr td:last-child {
   position: sticky;
   right: 0;
   z-index: 2;
@@ -644,11 +644,11 @@
   box-shadow: -4px 0 10px color-mix(in srgb, var(--surface-0) 35%, transparent);
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__table tbody tr:hover td:last-child) {
+.listTable tbody tr:hover td:last-child {
   background: var(--surface-hover);
 }
 
-.listCard :global(.admin-primitives-module__gNhzuG__statusBadge) {
+.listStatusBadge {
   min-height: 1.4rem;
   padding-inline: 0.55rem;
   font-size: 0.68rem;
@@ -726,7 +726,7 @@
   color: var(--text-muted);
   font-size: 0.67rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -942,6 +942,20 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.pageIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.pageIconPrevious {
+  transform: rotate(90deg);
+}
+
+.pageIconNext {
+  transform: rotate(-90deg);
 }
 
 @keyframes shimmer {

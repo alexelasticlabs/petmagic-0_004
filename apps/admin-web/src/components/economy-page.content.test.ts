@@ -12,6 +12,8 @@ import {
 } from "@/components/economy-page.content";
 
 const economyPagePath = fileURLToPath(new URL("./economy-page.tsx", import.meta.url));
+const economyStylesPath = fileURLToPath(new URL("./economy-page.module.css", import.meta.url));
+const economyContentPath = fileURLToPath(new URL("./economy-page.content.ts", import.meta.url));
 const providerConfigsSectionPath = fileURLToPath(
   new URL("./economy-page-provider-configs-section.tsx", import.meta.url)
 );
@@ -35,6 +37,28 @@ describe("economy-page content", () => {
     expect(enText.title).toBe("Economy");
     expect(ruText.providerConfigDeleteConfirm).toBe("Удалить этот маршрут оплаты?");
     expect(enText.providerConfigDeleteConfirm).toBe("Delete this payment route?");
+    expect(ruText.partialErrorTitle).toBe("Часть данных не обновилась");
+    expect(enText.partialErrorTitle).toBe("Some data did not refresh");
+  });
+
+  it("keeps Russian economy copy localized and text keys unique", () => {
+    const ruText = getEconomyText("ru");
+    const source = readFileSync(economyContentPath, "utf8");
+
+    expect(ruText.subscriptionPlansDescription).toContain("экран оплаты");
+    expect(ruText.subscriptionEventsDescription).toContain("магазинов приложений");
+    expect(ruText.cancelSubscriptionDescription).toContain("журнал аудита");
+    expect(ruText.refundPurchaseDescription).toContain("статус заказа сменится на возврат");
+    expect(ruText.externalCheckoutFlag).toBe("Внешняя оплата");
+    expect(ruText.storeDisclosureFlag).toBe("Раскрытие условий магазина");
+    expect(ruText.warningTitleLabel).toBe("Заголовок предупреждения");
+    expect(ruText.warningMessageLabel).toBe("Текст предупреждения");
+
+    const ruValues = Object.values(ruText).join("\n");
+    expect(ruValues).not.toMatch(
+      /\b(checkout|store\/Stripe|Store disclosure|warning|audit log|refunded)\b/
+    );
+    expect(source.match(/cancelSubscriptionError:/g) ?? []).toHaveLength(2);
   });
 
   it("provides expected select options for filters", () => {
@@ -103,7 +127,7 @@ describe("economy-page content", () => {
     expect(source).toContain('const canManageEconomy = session?.user.roles.includes("Admin") ?? false;');
     expect(source).toContain("function assertCanManageEconomy()");
     expect(source).toContain("throw new Error(text.financialActionsAdminOnly);");
-    expect(source.match(/assertCanManageEconomy\(\);/g) ?? []).toHaveLength(11);
+    expect(source.match(/assertCanManageEconomy\(\);/g) ?? []).toHaveLength(12);
     expect(source).toContain("function requestCancelSubscription(subscription: AdminEconomySubscription)");
     expect(source).toContain("function requestRefundPurchase(purchase: AdminEconomyPurchase)");
     expect(source).toContain("reportEconomyAccessDenied(error);");
@@ -149,8 +173,16 @@ describe("economy-page content", () => {
     expect(controllerSource).toContain("ledgerQuery.refetch()");
     expect(controllerSource).toContain("purchasesQuery.refetch()");
     expect(controllerSource).toContain("subscriptionsQuery.refetch()");
+    expect(controllerSource).toContain("const hasResolvedData =");
+    expect(controllerSource).toContain("hasBlockingError: hasError && !hasResolvedData");
+    expect(controllerSource).toContain("hasPartialError: hasError && hasResolvedData");
+    expect(controllerSource).toContain("economyError,");
     expect(controllerSource).toContain("isFetching,");
     expect(controllerSource).toContain("refetchAll,");
+    expect(economySource).toContain("if (hasBlockingError) {");
+    expect(economySource).toContain("hasPartialError ? (");
+    expect(economySource).toContain("title={text.partialErrorTitle}");
+    expect(economySource).toContain("description={getAdminErrorMessage(economyError, text.errorDescription)}");
     expect(economySource).toContain("disabled={!canManageEconomy || isFetching}");
     expect(economySource).toContain(
       "if (!canManageEconomy) {\n                  return;\n                }\n\n                void refetchAll().catch(() => undefined);"
@@ -334,6 +366,7 @@ describe("economy-page content", () => {
 
   it("disables payment and subscription pagination while stale backend requests are fetching", () => {
     const economySource = readFileSync(economyPagePath, "utf8");
+    const stylesSource = readFileSync(economyStylesPath, "utf8");
     const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
     const controllerSource = readFileSync(economyControllerPath, "utf8");
 
@@ -354,13 +387,61 @@ describe("economy-page content", () => {
     expect(controllerSource).toContain("purchasesIsFetching: purchasesQuery.isFetching");
     expect(controllerSource).toContain("subscriptionsIsFetching: subscriptionsQuery.isFetching");
     expect(economySource).toContain("disabled={purchasePage === 0 || purchasesIsFetching}");
+    expect(economySource).toContain("aria-label={text.previousPurchasesPageLabel}");
     expect(economySource).toContain("disabled={!purchasesHasMore || purchasesIsFetching}");
+    expect(economySource).toContain("aria-label={text.nextPurchasesPageLabel}");
     expect(subscriptionsSource).toContain(
       "disabled={subscriptionPage === 0 || subscriptionsIsFetching}"
     );
+    expect(subscriptionsSource).toContain("aria-label={text.previousSubscriptionsPageLabel}");
     expect(subscriptionsSource).toContain(
       "disabled={!subscriptionsHasMore || subscriptionsIsFetching}"
     );
+    expect(subscriptionsSource).toContain("aria-label={text.nextSubscriptionsPageLabel}");
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".pager {\n    justify-content: stretch;");
+    expect(stylesSource).toContain(".pagerButton {\n    flex: 1 1 8rem;");
+    expect(economySource).not.toContain("aria-label={text.previousPage}");
+    expect(subscriptionsSource).not.toContain("aria-label={text.previousPage}");
+  });
+
+  it("keeps economy form, flag, and pager controls theme-token based", () => {
+    const stylesSource = readFileSync(economyStylesPath, "utf8");
+
+    expect(stylesSource).toContain(".input {\n  width: 100%;\n  min-width: 7.5rem;\n  border: 1px solid var(--border-soft);");
+    expect(stylesSource).toContain("background: var(--surface-2);");
+    expect(stylesSource).toContain("accent-color: var(--success);");
+    expect(stylesSource).toContain(".usageItem {\n  display: grid;");
+    expect(stylesSource).toContain(".pagerButton,\n.dangerButton {\n  min-height: 2rem;\n  border: 1px solid var(--border-soft);");
+    expect(stylesSource).toContain("border-color: color-mix(in srgb, var(--danger) 28%, var(--border-soft));");
+    expect(stylesSource).toContain(".flagList span {\n  padding: 0.28rem 0.5rem;");
+    expect(stylesSource).toContain(".positive {\n  color: var(--success);");
+    expect(stylesSource).toContain(".negative {\n  color: var(--danger);");
+    expect(stylesSource).not.toContain("background: rgba(10, 16, 28, 0.88);");
+    expect(stylesSource).not.toContain("background: rgba(26, 39, 56, 0.55);");
+    expect(stylesSource).not.toContain("accent-color: #10c878;");
+    expect(stylesSource).not.toContain("color: #4ade80;");
+    expect(stylesSource).not.toContain("color: #f87171;");
+  });
+
+  it("keeps economy status badge colors on semantic theme tokens", () => {
+    const economySource = readFileSync(economyPagePath, "utf8");
+    const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
+
+    expect(economySource).toContain('return "var(--success)"');
+    expect(economySource).toContain('return "var(--info)"');
+    expect(economySource).toContain('return "var(--danger)"');
+    expect(economySource).toContain('return "var(--neutral)"');
+    expect(economySource).toContain('return "var(--warning)"');
+    expect(economySource).toContain("color={statusColor(item.status)}");
+    expect(subscriptionsSource).toContain('color="var(--warning)"');
+    expect(subscriptionsSource).toContain("color={statusColor(item.status)}");
+    expect(economySource).not.toContain('return "#22c55e";');
+    expect(economySource).not.toContain('return "#38bdf8";');
+    expect(economySource).not.toContain('return "#f87171";');
+    expect(economySource).not.toContain('return "#64748b";');
+    expect(economySource).not.toContain('return "#f59e0b";');
+    expect(subscriptionsSource).not.toContain('color="#f59e0b"');
   });
 
   it("bounds economy pack and premium plan free-text state updates", () => {
@@ -440,5 +521,32 @@ describe("economy-page content", () => {
     expect(providerConfigsSource).not.toContain(
       "disabled={isSavingConfig || isProviderConfigInvalid}"
     );
+  });
+
+  it("renders a visual watermark preview for image and video settings", () => {
+    const source = readFileSync(economyPagePath, "utf8");
+    const styles = readFileSync(economyStylesPath, "utf8");
+
+    expect(source).toContain("function WatermarkPreviewPanel");
+    expect(source).toContain("const watermarkPositionOptions");
+    expect(source).toContain("const watermarkSizeOptions");
+    expect(source).toContain("renderFrame(\"image\", settings.previewImageUrl)");
+    expect(source).toContain("renderFrame(\"video\", settings.previewVideoFrameUrl)");
+    expect(source).toContain(
+      "<WatermarkPreviewPanel locale={locale} settings={effectiveWatermarkDraft} />"
+    );
+    expect(source).toContain("className={styles.watermarkPreviewBadge}");
+    expect(source).toContain("data-position={position}");
+    expect(source).toContain("data-size={size}");
+    expect(source).toContain("updateWatermarkDraft({ position: event.target.value })");
+    expect(source).toContain("updateWatermarkDraft({ size: event.target.value })");
+    expect(source).toContain("settings.logoUrl");
+    expect(styles).toContain(".watermarkPreviewGrid");
+    expect(styles).toContain(".watermarkPreviewFrame[data-kind=\"video\"]");
+    expect(styles).toContain("right: 4%;");
+    expect(styles).toContain("bottom: 4%;");
+    expect(styles).toContain(".watermarkPreviewBadge[data-position=\"top-left\"]");
+    expect(styles).toContain(".watermarkPreviewBadge[data-size=\"large\"]");
+    expect(styles).toContain("opacity: var(--watermark-preview-opacity, 0.55);");
   });
 });

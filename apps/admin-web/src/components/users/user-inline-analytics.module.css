@@ -40,9 +40,9 @@
   min-height: 2rem;
   padding: 0 0.76rem;
   border-radius: 999px;
-  border: 1px solid rgba(96, 165, 250, 0.32);
-  background: rgba(37, 99, 235, 0.12);
-  color: var(--text-strong);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border-soft));
+  background: var(--accent-soft-bg);
+  color: var(--accent-strong);
   text-decoration: none;
   font-weight: 600;
   font-size: 0.78rem;
@@ -79,8 +79,12 @@
   gap: 0.35rem;
   padding: 0.74rem 0.82rem;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: linear-gradient(180deg, rgba(12, 18, 30, 0.86), rgba(7, 11, 20, 0.94));
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 72%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 88%, var(--surface-0))
+  );
 }
 
 .timelineHeader {

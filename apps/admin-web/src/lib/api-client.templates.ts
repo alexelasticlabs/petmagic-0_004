@@ -25,12 +25,17 @@ import type {
   AdminTemplateFailureBreakdownItem,
   AdminTemplateFeedbackItem,
   AdminTemplateFeedbackQuery,
+  AdminTemplateOfTheDay,
+  AdminTemplateOfTheDaySchedule,
+  AdminTemplateOfTheDaySettings,
   AdminModerationQueueItem,
   AdminModerationQueuePage,
   AdminModerationQueueQuery,
   AdminTemplateGenerationDashboardMetrics,
   AdminTemplateGenerationsPage,
   AdminTemplateGenerationsQuery,
+  AdminWatermarkSettings,
+  RemoveGenerationWatermarkResponse,
   AdminTemplateRecentGeneration,
   AdminTemplateStatistics,
   AdminTemplateTestRun,
@@ -41,6 +46,9 @@ import type {
   TemplateAsset,
   TemplateAssetKind,
   TemplateCategoryPayload,
+  TemplateOfTheDayAutoPickPayload,
+  TemplateOfTheDayPayload,
+  TemplateOfTheDaySettingsPayload,
   TemplateStatus,
   TemplateType,
   VideoTemplatePayload,
@@ -142,6 +150,93 @@ export async function fetchAdminTemplateCategories(
       }),
     signal
   );
+}
+
+export async function fetchTemplateOfTheDaySchedule(
+  signal?: AbortSignal
+): Promise<AdminTemplateOfTheDaySchedule> {
+  return apiRequest<AdminTemplateOfTheDaySchedule>("/api/admin/template-of-the-day/schedule", {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function fetchCurrentTemplateOfTheDay(
+  date?: string,
+  signal?: AbortSignal
+): Promise<AdminTemplateOfTheDay | null> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  return apiRequest<AdminTemplateOfTheDay | null>(
+    `/api/admin/template-of-the-day/current${query}`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
+}
+
+export async function fetchTemplateOfTheDaySettings(
+  signal?: AbortSignal
+): Promise<AdminTemplateOfTheDaySettings> {
+  return apiRequest<AdminTemplateOfTheDaySettings>("/api/admin/template-of-the-day/settings", {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function updateTemplateOfTheDaySettings(
+  payload: TemplateOfTheDaySettingsPayload
+): Promise<AdminTemplateOfTheDaySettings> {
+  return apiRequest<AdminTemplateOfTheDaySettings>("/api/admin/template-of-the-day/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function createTemplateOfTheDay(
+  payload: TemplateOfTheDayPayload
+): Promise<AdminTemplateOfTheDay> {
+  const item = await apiRequest<AdminTemplateOfTheDay>("/api/admin/template-of-the-day", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  clearAdminListCaches();
+  return item;
+}
+
+export async function updateTemplateOfTheDay(
+  id: string,
+  payload: TemplateOfTheDayPayload
+): Promise<AdminTemplateOfTheDay> {
+  const encodedId = encodePathSegment(id);
+  const item = await apiRequest<AdminTemplateOfTheDay>(
+    `/api/admin/template-of-the-day/${encodedId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }
+  );
+  clearAdminListCaches();
+  return item;
+}
+
+export async function deleteTemplateOfTheDay(id: string): Promise<void> {
+  const encodedId = encodePathSegment(id);
+  await apiRequest<void>(`/api/admin/template-of-the-day/${encodedId}`, {
+    method: "DELETE",
+  });
+  clearAdminListCaches();
+}
+
+export async function autoPickTemplateOfTheDay(
+  payload: TemplateOfTheDayAutoPickPayload
+): Promise<AdminTemplateOfTheDay> {
+  const item = await apiRequest<AdminTemplateOfTheDay>("/api/admin/template-of-the-day/auto-pick", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  clearAdminListCaches();
+  return item;
 }
 
 export async function createTemplateCategory(
@@ -365,9 +460,7 @@ export async function decideAdminModerationItem(
   payload: { action: "approve" | "reject"; reason: string }
 ): Promise<AdminModerationQueueItem> {
   const encodedEventId = encodePathSegment(eventId);
-  const normalizedReason = payload.reason
-    .trim()
-    .slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);
+  const normalizedReason = payload.reason.trim().slice(0, MODERATION_DECISION_REASON_MAX_LENGTH);
   return apiRequest<AdminModerationQueueItem>(
     `/api/admin/templates/moderation/${encodedEventId}/decision`,
     {
@@ -461,10 +554,14 @@ export async function startAdminTemplateTest(
   const formData = new FormData();
   formData.append("sourceImage", file);
 
-  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/${encodedTemplateId}/test`, {
-    method: "POST",
-    body: formData,
-  });
+  const run = await apiRequest<AdminTemplateTestRun>(
+    `/api/admin/templates/${encodedTemplateId}/test`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+  return normalizeAdminTemplateTestRun(run);
 }
 
 export async function fetchAdminTemplateTest(
@@ -472,10 +569,14 @@ export async function fetchAdminTemplateTest(
   signal?: AbortSignal
 ): Promise<AdminTemplateTestRun> {
   const encodedGenerationId = encodePathSegment(generationId);
-  return apiRequest<AdminTemplateTestRun>(`/api/admin/templates/tests/${encodedGenerationId}`, {
-    method: "GET",
-    signal,
-  });
+  const run = await apiRequest<AdminTemplateTestRun>(
+    `/api/admin/templates/tests/${encodedGenerationId}`,
+    {
+      method: "GET",
+      signal,
+    }
+  );
+  return normalizeAdminTemplateTestRun(run);
 }
 
 export async function fetchAdminTemplateTestHistory(
@@ -490,13 +591,18 @@ export async function fetchAdminTemplateTestHistory(
       : undefined;
   const query =
     typeof normalizedTake === "number" ? `?take=${encodeURIComponent(String(normalizedTake))}` : "";
-  return apiRequest<AdminTemplateTestRun[]>(
+  const runs = await apiRequest<AdminTemplateTestRun[]>(
     `/api/admin/templates/${encodedTemplateId}/tests${query}`,
     {
       method: "GET",
       signal,
     }
   );
+  return runs.map(normalizeAdminTemplateTestRun);
+}
+
+function normalizeAdminTemplateTestRun(run: AdminTemplateTestRun): AdminTemplateTestRun {
+  return run.status === "Succeeded" ? { ...run, status: "Completed" } : run;
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {
@@ -595,4 +701,32 @@ export async function uploadTemplateMedia(
     method: "POST",
     body: formData,
   });
+}
+
+export async function fetchAdminWatermarkSettings(
+  signal?: AbortSignal
+): Promise<AdminWatermarkSettings> {
+  return apiRequest<AdminWatermarkSettings>("/api/admin/templates/monetization/watermark", {
+    method: "GET",
+    signal,
+  });
+}
+
+export async function updateAdminWatermarkSettings(
+  payload: AdminWatermarkSettings
+): Promise<AdminWatermarkSettings> {
+  return apiRequest<AdminWatermarkSettings>("/api/admin/templates/monetization/watermark", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function grantAdminGenerationCleanDownload(
+  generationId: string
+): Promise<RemoveGenerationWatermarkResponse> {
+  const encodedGenerationId = encodePathSegment(generationId);
+  return apiRequest<RemoveGenerationWatermarkResponse>(
+    `/api/admin/templates/generations/${encodedGenerationId}/grant-clean-download`,
+    { method: "POST" }
+  );
 }

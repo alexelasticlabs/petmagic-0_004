@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -36,11 +36,13 @@ export function useAdminTemplateFeedback({
         type: filter === "all" ? undefined : filter,
       }, signal),
     enabled,
+    placeholderData: keepPreviousData,
   });
 
   return {
     hasError: feedbackQuery.isError,
-    isLoading: feedbackQuery.isLoading || feedbackQuery.isFetching,
+    isFetching: feedbackQuery.isFetching,
+    isLoading: feedbackQuery.isLoading,
     items: feedbackQuery.data ?? [],
   };
 }

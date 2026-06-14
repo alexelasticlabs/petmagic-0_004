@@ -35,9 +35,6 @@ describe("resolveAdminApiBaseUrl", () => {
     ).toThrow("Admin production API base URL must use HTTPS.");
   });
 });
-import { describe, expect, it } from "vitest";
-
-import { resolveAdminApiBaseUrl } from "@/lib/admin-api-base-url";
 
 describe("admin-api-base-url", () => {
   it("uses localhost only outside production when no URL is configured", () => {

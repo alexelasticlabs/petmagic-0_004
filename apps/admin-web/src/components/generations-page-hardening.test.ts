@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const generationsPagePath = fileURLToPath(new URL("./generations-page.tsx", import.meta.url));
+const generationsStylesPath = fileURLToPath(
+  new URL("./generations-page.module.css", import.meta.url)
+);
 
 describe("generations page hardening", () => {
   it("sanitizes generation display strings instead of rendering provider or failure values raw", () => {
@@ -26,6 +29,17 @@ describe("generations page hardening", () => {
   it("localizes generation statuses and keeps unsupported retry/cancel actions out of the UI", () => {
     const source = readFileSync(generationsPagePath, "utf8");
 
+    expect(source).toContain('eyebrow: isRu ? "Операции" : "Operations"');
+    expect(source).toContain(
+      'description: isRu\n      ? "Операционный список заданий генерации'
+    );
+    expect(source).toContain('adminOnly: isRu ? "Только Admin" : "Admin only"');
+    expect(source).toContain('total: isRu ? "Всего заданий" : "Total jobs"');
+    expect(source).toContain('allJobsScope: isRu ? "Все задания" : "All jobs"');
+    expect(source).toContain(
+      'emptyDescription: isRu\n      ? "Измените фильтры или дождитесь новых заданий генерации."'
+    );
+    expect(source).toContain('job: isRu ? "Задание" : "Job"');
     expect(source).toContain('pending: isRu ? "Ожидает" : "Pending"');
     expect(source).toContain('running: isRu ? "В работе" : "Running"');
     expect(source).toContain('failed: isRu ? "Ошибка" : "Failed"');
@@ -78,6 +92,24 @@ describe("generations page hardening", () => {
     expect(source).not.toContain("setUser(event.target.value);");
   });
 
+  it("keeps generation pagination accessible and usable on narrow screens", () => {
+    const source = readFileSync(generationsPagePath, "utf8");
+    const stylesSource = readFileSync(generationsStylesPath, "utf8");
+
+    expect(source).toContain(
+      'previousPageLabel: isRu ? "Предыдущая страница генераций" : "Previous generations page"'
+    );
+    expect(source).toContain(
+      'nextPageLabel: isRu ? "Следующая страница генераций" : "Next generations page"'
+    );
+    expect(source).toContain("aria-label={text.previousPageLabel}");
+    expect(source).toContain("aria-label={text.nextPageLabel}");
+    expect(source).toContain("disabled={pageIndex === 0 || generationsQuery.isFetching}");
+    expect(source).toContain("disabled={!page?.hasMore || generationsQuery.isFetching}");
+    expect(stylesSource).toContain(".pageInfo {\n    width: 100%;");
+    expect(stylesSource).toContain(".pager .button {\n    width: 100%;");
+  });
+
   it("sources status KPI cards from backend aggregate metrics", () => {
     const source = readFileSync(generationsPagePath, "utf8");
 
@@ -93,5 +125,33 @@ describe("generations page hardening", () => {
     expect(source).toContain('aria-busy={generationsQuery.isFetching ? "true" : undefined}');
     expect(source).not.toContain('currentPageScope: isRu ? "Текущая страница" : "Current page"');
     expect(source).not.toContain("items.filter((item) => item.status");
+  });
+
+  it("uses theme tokens for generation status badge colors", () => {
+    const source = readFileSync(generationsPagePath, "utf8");
+
+    expect(source).toContain('return "var(--success)";');
+    expect(source).toContain('return "var(--danger)";');
+    expect(source).toContain('return "var(--neutral)";');
+    expect(source).toContain('return "var(--magenta)";');
+    expect(source).toContain('return "var(--info)";');
+    expect(source).toContain('return "var(--warning)";');
+    expect(source).not.toContain('return "#22c55e";');
+    expect(source).not.toContain('return "#ef4444";');
+    expect(source).not.toContain('return "#64748b";');
+    expect(source).not.toContain('return "#a855f7";');
+    expect(source).not.toContain('return "#3b82f6";');
+    expect(source).not.toContain('return "#f59e0b";');
+  });
+
+  it("shows watermark unlock actor together with method, credits, and timestamp", () => {
+    const source = readFileSync(generationsPagePath, "utf8");
+
+    expect(source).toContain("watermarkUnlockedBy: isRu ? \"кем\" : \"by\"");
+    expect(source).toContain("const watermarkUnlockedByText = item.watermarkUnlockedByUserId");
+    expect(source).toContain("formatShortId(item.watermarkUnlockedByUserId)");
+    expect(source).toContain("{text.watermarkUnlockedBy} {watermarkUnlockedByText}");
+    expect(source).toContain("item.watermarkCreditsSpent");
+    expect(source).toContain("item.watermarkUnlockedAtUtc");
   });
 });

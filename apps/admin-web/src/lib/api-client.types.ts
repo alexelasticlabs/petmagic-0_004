@@ -169,6 +169,143 @@ export type AdminUserGeneration = {
   completedAtUtc?: string | null;
 };
 
+export type FeedbackType =
+  | "GenerationResult"
+  | "GenerationFailure"
+  | "BugReport"
+  | "FeatureRequest"
+  | "PaymentIssue"
+  | "General";
+
+export type FeedbackStatus = "New" | "InReview" | "Resolved" | "Dismissed";
+
+export type FeedbackPriority = "Low" | "Medium" | "High" | "Critical";
+
+export type AdminFeedbackListItem = {
+  id: string;
+  userId?: string | null;
+  type: FeedbackType | string;
+  category: string;
+  rating?: number | null;
+  generationId?: string | null;
+  templateId?: string | null;
+  templateTitle?: string | null;
+  petId?: string | null;
+  sourceScreen: string;
+  platform?: string | null;
+  status: FeedbackStatus | string;
+  priority: FeedbackPriority | string;
+  message?: string | null;
+  previewUrl?: string | null;
+  createdAtUtc: string;
+};
+
+export type AdminFeedbackPage = {
+  items: AdminFeedbackListItem[];
+  totalCount: number;
+  skip: number;
+  take: number;
+  hasMore: boolean;
+  generatedAtUtc: string;
+};
+
+export type AdminFeedbackGenerationContext = {
+  generationId: string;
+  userId: string;
+  templateId: string;
+  templateTitle: string;
+  petId?: string | null;
+  inputPreviewUrl?: string | null;
+  resultPreviewUrl?: string | null;
+  providerName?: string | null;
+  errorCode?: string | null;
+  creditsCharged: number;
+  chargedAtUtc?: string | null;
+  refundedAtUtc?: string | null;
+};
+
+export type CreditRefund = {
+  id: string;
+  userId: string;
+  feedbackId?: string | null;
+  generationId?: string | null;
+  amount: number;
+  reason: string;
+  adminId: string;
+  createdAtUtc: string;
+};
+
+export type AdminFeedbackDetails = {
+  id: string;
+  userId?: string | null;
+  userEmail?: string | null;
+  userPlan?: string | null;
+  userCredits?: number | null;
+  type: FeedbackType | string;
+  category: string;
+  rating?: number | null;
+  message?: string | null;
+  sourceScreen: string;
+  appVersion?: string | null;
+  platform?: string | null;
+  deviceModel?: string | null;
+  locale?: string | null;
+  errorCode?: string | null;
+  providerName?: string | null;
+  status: FeedbackStatus | string;
+  priority: FeedbackPriority | string;
+  createdAtUtc: string;
+  reviewedAtUtc?: string | null;
+  reviewedByAdminId?: string | null;
+  adminNote?: string | null;
+  generation?: AdminFeedbackGenerationContext | null;
+  canRefund: boolean;
+  refund?: CreditRefund | null;
+};
+
+export type AdminFeedbackQuery = {
+  status?: FeedbackStatus | "All";
+  priority?: FeedbackPriority | "All";
+  type?: FeedbackType | "All";
+  category?: string;
+  generationId?: string;
+  templateId?: string;
+  platform?: string;
+  fromUtc?: string;
+  toUtc?: string;
+  userId?: string;
+  skip?: number;
+  take?: number;
+};
+
+export type UpdateFeedbackAdminPayload = {
+  status?: FeedbackStatus;
+  priority?: FeedbackPriority;
+  adminNote?: string;
+};
+
+export type RefundFeedbackCreditsPayload = {
+  amount?: number;
+  reason?: string;
+};
+
+export type TemplateFeedbackIssue = {
+  category: string;
+  count: number;
+};
+
+export type TemplateFeedbackSummary = {
+  templateId: string;
+  positiveCount: number;
+  neutralCount: number;
+  negativeCount: number;
+  positiveRate: number;
+  neutralRate: number;
+  negativeRate: number;
+  topIssues: TemplateFeedbackIssue[];
+  hasNegativeWarning: boolean;
+};
+
 export type AdminUserTemplateEvent = {
   eventId: string;
   templateId: string;
@@ -205,6 +342,55 @@ export type AdminUserWalletOperation = {
   source: string;
   reason: string;
   occurredAtUtc: string;
+};
+
+export type AdminUserPet = {
+  id: string;
+  userId: string;
+  name: string;
+  type: string;
+  breed?: string | null;
+  avatarMediaAssetId?: string | null;
+  avatarUrl?: string | null;
+  photosCount: number;
+  generationsCount: number;
+  status: string;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  isDeleted: boolean;
+};
+
+export type AdminUserPetPhoto = {
+  id: string;
+  petId: string;
+  mediaAssetId: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  fileName: string;
+  contentType: string;
+  fileSizeBytes?: number | null;
+  isFavorite: boolean;
+  isAvatar: boolean;
+  sortOrder: number;
+  status: string;
+  createdAtUtc: string;
+  isDeleted: boolean;
+};
+
+export type AdminUserPetGeneration = {
+  generationId: string;
+  templateId: string;
+  status: string;
+  tokenCost: number;
+  templateTitle?: string | null;
+  templateType?: TemplateType | null;
+  outputUrl?: string | null;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+  createdAtUtc: string;
+  completedAtUtc?: string | null;
+  petId?: string | null;
+  petPhotoId?: string | null;
 };
 
 export type AdminUserAnalytics = {
@@ -606,6 +792,7 @@ export type TemplateStatus = "Draft" | "Active" | "Archived";
 export type TemplateGenerationJobStatus =
   | "Queued"
   | "Processing"
+  | "Succeeded"
   | "Completed"
   | "Failed"
   | "Cancelled"
@@ -658,6 +845,11 @@ export type AdminTemplateListItem = {
   createdAtUtc: string;
   updatedAtUtc: string;
   estimatedCostUsd?: number;
+  supportsGenerationResultInput?: boolean;
+  requiredInputMediaType?: TemplateType | null;
+  recommendedAfterImageGeneration?: boolean;
+  supportsGenerateSimilar?: boolean;
+  defaultVariationStrength?: "low" | "medium" | "high" | string;
 };
 
 export type AdminTemplateCatalogPage = {
@@ -666,6 +858,67 @@ export type AdminTemplateCatalogPage = {
   take: number;
   totalCount: number;
   hasMore: boolean;
+};
+
+export type AdminTemplateOfTheDay = {
+  id: string;
+  templateId: string;
+  templateTitle: string;
+  templateType: TemplateType;
+  category: string;
+  status: TemplateStatus;
+  isPremium: boolean;
+  previewAsset?: TemplateAsset | null;
+  startDate: string;
+  endDate?: string | null;
+  isActive: boolean;
+  isManual: boolean;
+  priority: number;
+  titleOverride?: string | null;
+  subtitleOverride?: string | null;
+  badgeTextOverride?: string | null;
+  createdAtUtc: string;
+  updatedAtUtc: string;
+  createdByAdminId?: string | null;
+};
+
+export type AdminTemplateOfTheDaySchedule = {
+  items: AdminTemplateOfTheDay[];
+  skip: number;
+  take: number;
+  totalCount: number;
+};
+
+export type AdminTemplateOfTheDaySettings = {
+  autoModeEnabled: boolean;
+  allowedTypes: "both" | "image" | "video";
+  excludeRecentDays: number;
+  updatedAtUtc: string;
+  updatedByAdminId?: string | null;
+};
+
+export type TemplateOfTheDayPayload = {
+  templateId: string;
+  startDate: string;
+  endDate?: string | null;
+  isActive: boolean;
+  isManual: boolean;
+  priority: number;
+  titleOverride?: string | null;
+  subtitleOverride?: string | null;
+  badgeTextOverride?: string | null;
+};
+
+export type TemplateOfTheDayAutoPickPayload = {
+  date: string;
+  allowedTypes?: "both" | "image" | "video";
+  excludeRecentDays?: number;
+};
+
+export type TemplateOfTheDaySettingsPayload = {
+  autoModeEnabled: boolean;
+  allowedTypes?: "both" | "image" | "video";
+  excludeRecentDays?: number;
 };
 
 export type AdminTemplateCategory = {
@@ -712,6 +965,11 @@ export type AdminTemplate = {
   estimatedProviderCostUsd?: number;
   createdAtUtc: string;
   updatedAtUtc: string;
+  supportsGenerationResultInput?: boolean;
+  requiredInputMediaType?: TemplateType | null;
+  recommendedAfterImageGeneration?: boolean;
+  supportsGenerateSimilar?: boolean;
+  defaultVariationStrength?: "low" | "medium" | "high" | string;
 };
 
 export type AdminTemplateStatistics = {
@@ -980,6 +1238,32 @@ export type AdminTemplateGenerationListItem = {
   startedAtUtc?: string | null;
   completedAtUtc?: string | null;
   refundedAtUtc?: string | null;
+  isWatermarkRequired: boolean;
+  isWatermarkRemoved: boolean;
+  watermarkedMediaPath?: string | null;
+  watermarkUnlockMethod?: string | null;
+  watermarkUnlockedByUserId?: string | null;
+  watermarkCreditsSpent?: number | null;
+  watermarkUnlockedAtUtc?: string | null;
+  parentGenerationId?: string | null;
+  parentGenerationResultId?: string | null;
+  inputSourceType: "user_upload" | "generation_result" | "pet_photo" | string;
+  inputMediaAssetId?: string | null;
+  resultMediaAssetId?: string | null;
+  inputPreviewUrl?: string | null;
+  resultPreviewUrl?: string | null;
+  canCompareBeforeAfter: boolean;
+  parentTemplateTitle?: string | null;
+  parentTemplateType?: TemplateType | null;
+  childCount: number;
+  similarToGenerationId?: string | null;
+  generationMode?: "normal" | "similar" | string;
+  variationStrength?: "low" | "medium" | "high" | string | null;
+  generationSeed?: number | null;
+  promptBeforeVariation?: string | null;
+  promptAfterVariation?: string | null;
+  petId?: string | null;
+  petPhotoId?: string | null;
 };
 
 export type AdminTemplateGenerationsQuery = {
@@ -998,6 +1282,27 @@ export type AdminTemplateGenerationsPage = {
   take: number;
   hasMore: boolean;
   generatedAtUtc: string;
+};
+
+export type AdminWatermarkSettings = {
+  enabled: boolean;
+  text: string;
+  logoUrl?: string | null;
+  opacity: number;
+  position: string;
+  size: string;
+  costCredits: number;
+  applyToImages: boolean;
+  applyToVideos: boolean;
+  previewImageUrl: string;
+  previewVideoFrameUrl: string;
+};
+
+export type RemoveGenerationWatermarkResponse = {
+  watermarkRemoved: boolean;
+  creditsSpent: number;
+  remainingCredits?: number | null;
+  mediaUrl?: string | null;
 };
 
 export type AdminTemplateTestRun = {
@@ -1044,6 +1349,11 @@ export type ImageTemplatePayload = {
   previewAsset?: TemplateAssetInput;
   imageModel: string;
   imagePrompt: string;
+  supportsGenerationResultInput?: boolean;
+  requiredInputMediaType?: TemplateType | null;
+  recommendedAfterImageGeneration?: boolean;
+  supportsGenerateSimilar?: boolean;
+  defaultVariationStrength?: "low" | "medium" | "high" | string;
 };
 
 export type VideoTemplatePayload = {
@@ -1064,6 +1374,11 @@ export type VideoTemplatePayload = {
   klingModel: string;
   klingPrompt: string;
   keepOriginalSound: boolean;
+  supportsGenerationResultInput?: boolean;
+  requiredInputMediaType?: TemplateType | null;
+  recommendedAfterImageGeneration?: boolean;
+  supportsGenerateSimilar?: boolean;
+  defaultVariationStrength?: "low" | "medium" | "high" | string;
 };
 
 export type TemplateCategoryPayload = {

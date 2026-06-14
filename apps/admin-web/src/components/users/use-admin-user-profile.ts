@@ -35,6 +35,7 @@ export function useAdminUserProfile({ enabled = true, userId }: UseAdminUserProf
     canLoadUser && (!user || !analytics) && (userQuery.isLoading || analyticsQuery.isLoading);
   const hasError =
     canLoadUser && ((!user && userQuery.isError) || (!analytics && analyticsQuery.isError));
+  const error = userQuery.error ?? analyticsQuery.error ?? null;
 
   async function refresh() {
     if (!canLoadUser) {
@@ -57,6 +58,7 @@ export function useAdminUserProfile({ enabled = true, userId }: UseAdminUserProf
 
   return {
     analytics,
+    error,
     hasError,
     isFetching: userQuery.isFetching || analyticsQuery.isFetching,
     isLoading,

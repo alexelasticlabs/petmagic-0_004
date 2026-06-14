@@ -51,28 +51,27 @@ const PAGE_SIZE = 50;
 function getCopy(locale: Locale) {
   const isRu = locale === "ru";
   return {
-    eyebrow: isRu ? "Access control" : "Access control",
+    eyebrow: isRu ? "Контроль доступа" : "Access control",
     title: isRu ? "Управление ролями" : "Role Management",
     description: isRu
       ? "Admin и Moderator управляются из этой панели. Premium не считается ролью."
       : "Admin and Moderator are managed from this panel. Premium is not a role.",
-    adminOnly: "Admin only",
-    adminsTitle: "Admins",
+    adminOnly: isRu ? "Только Admin" : "Admin only",
+    adminsTitle: isRu ? "Администраторы" : "Admins",
     adminsDescription: isRu
       ? "Список пользователей с полным доступом. Последнего Admin нельзя понизить."
       : "Users with full access. The last Admin cannot be downgraded.",
-    moderatorsTitle: "Moderators",
+    moderatorsTitle: isRu ? "Модераторы" : "Moderators",
     moderatorsDescription: isRu
       ? "Пользователи с ограниченным доступом к разрешенным разделам."
       : "Users with limited access to permitted sections.",
     searchTitle: isRu ? "Назначить Moderator" : "Assign Moderator",
-    searchDescription: isRu
-      ? "Поиск по email, id или имени."
-      : "Search by email, id, or name.",
+    searchDescription: isRu ? "Поиск по email, id или имени." : "Search by email, id, or name.",
     searchLabel: isRu ? "Пользователь" : "User",
     searchPlaceholder: isRu ? "email, user id или имя" : "email, user id, or name",
     loading: isRu ? "Загрузка ролей" : "Loading roles",
     error: isRu ? "Не удалось загрузить роли" : "Failed to load roles",
+    searchError: isRu ? "Не удалось выполнить поиск пользователей" : "Failed to search users",
     emptyAdmins: isRu ? "Admin не найдены" : "No admins found",
     emptyModerators: isRu ? "Moderator не найдены" : "No moderators found",
     emptySearch: isRu ? "Введите запрос для поиска пользователя" : "Enter a query to search users",
@@ -94,10 +93,14 @@ function getCopy(locale: Locale) {
     roleActionsAdminOnly: isRu
       ? "Изменять роли может только Admin."
       : "Only Admin can change roles.",
+    assignModeratorLabel: isRu ? "Назначить Moderator пользователю" : "Assign Moderator to",
+    revokeModeratorLabel: isRu ? "Снять Moderator у пользователя" : "Remove Moderator from",
     created: isRu ? "Создан" : "Created",
     retry: isRu ? "Повторить" : "Retry",
     previous: isRu ? "Назад" : "Previous",
     next: isRu ? "Вперёд" : "Next",
+    previousPageLabel: isRu ? "Предыдущая страница списка ролей" : "Previous role list page",
+    nextPageLabel: isRu ? "Следующая страница списка ролей" : "Next role list page",
     page: isRu ? "Страница" : "Page",
     of: isRu ? "из" : "of",
     showing: isRu ? "Показано" : "Showing",
@@ -199,6 +202,7 @@ function RolePager({
           type="button"
           className={styles.button}
           disabled={pageIndex === 0 || isFetching}
+          aria-label={text.previousPageLabel}
           onClick={onPrevious}
         >
           {text.previous}
@@ -207,6 +211,7 @@ function RolePager({
           type="button"
           className={styles.button}
           disabled={!hasMore || isFetching}
+          aria-label={text.nextPageLabel}
           onClick={onNext}
         >
           {text.next}
@@ -221,7 +226,8 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const queryClient = useQueryClient();
   const router = useRouter();
   const session = useAuthSession();
-  const canManageRoles = session?.user.roles.includes("Admin") ?? false;
+  const sessionRoles = session?.user.roles ?? [];
+  const canManageRoles = sessionRoles.includes("Admin");
   const [search, setSearch] = useState("");
   const [adminsPage, setAdminsPage] = useState(0);
   const [moderatorsPage, setModeratorsPage] = useState(0);
@@ -355,6 +361,10 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
       tone: "danger",
       action: async () => {
         await revokeRole(user.userId, "Moderator");
+        if (moderators.length <= 1) {
+          setModeratorsPage((currentPage) => Math.max(0, currentPage - 1));
+        }
+
         await refreshRoleQueries(user.userId);
       },
     });
@@ -364,6 +374,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const moderators = moderatorsQuery.data?.items ?? [];
   const searchResults = searchQuery.data?.items ?? [];
   const isRoleRetryFetching = adminsQuery.isFetching || moderatorsQuery.isFetching;
+  const isSearchActive = debouncedSearch.trim().length >= 2;
 
   return (
     <section className={styles.page}>
@@ -374,7 +385,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
         badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
       />
 
-      {isLoading ? (
+      {!canManageRoles || isLoading ? (
         <AdminStateCard title={text.loading} />
       ) : isError ? (
         <AdminStateCard
@@ -434,6 +445,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                     <button
                       type="button"
                       className={`${styles.button} ${styles.buttonDanger}`}
+                      aria-label={`${text.revokeModeratorLabel} ${userDisplayName(user)}`}
                       disabled={!canManageRoles || isSubmitting}
                       onClick={() => confirmRevokeModerator(user)}
                     >
@@ -459,56 +471,85 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
         </div>
       )}
 
-      <AdminCard title={text.searchTitle} description={text.searchDescription}>
-        <div className={styles.search}>
-          <label className={styles.field}>
-            <span className={styles.label}>{text.searchLabel}</span>
-            <input
-              className={styles.input}
-              value={search}
-              onChange={(event) => setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))}
-              maxLength={USER_SEARCH_MAX_LENGTH}
-              placeholder={text.searchPlaceholder}
-            />
-          </label>
-        </div>
-        <div className={styles.userList}>
-          {debouncedSearch.trim().length < 2 ? <AdminStateCard title={text.emptySearch} /> : null}
-          {debouncedSearch.trim().length >= 2 && searchQuery.isLoading ? (
-            <AdminStateCard title={text.loading} />
-          ) : null}
-          {debouncedSearch.trim().length >= 2 &&
-          !searchQuery.isLoading &&
-          searchResults.length === 0 ? (
-            <AdminStateCard title={text.noSearchResults} />
-          ) : null}
-          {searchResults.map((user) => {
-            const isAdmin = user.roles.includes("Admin");
-            const isModerator = user.roles.includes("Moderator");
-            return (
-              <UserRow
-                key={user.userId}
-                user={user}
-                locale={locale}
+      {canManageRoles ? (
+        <AdminCard title={text.searchTitle} description={text.searchDescription}>
+          <div className={styles.search}>
+            <label className={styles.field}>
+              <span className={styles.label}>{text.searchLabel}</span>
+              <input
+                type="search"
+                autoComplete="off"
+                className={styles.input}
+                value={search}
+                onChange={(event) => setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))}
+                maxLength={USER_SEARCH_MAX_LENGTH}
+                placeholder={text.searchPlaceholder}
+              />
+            </label>
+          </div>
+          <div className={styles.userList}>
+            {!isSearchActive ? <AdminStateCard title={text.emptySearch} /> : null}
+            {isSearchActive && searchQuery.isLoading ? (
+              <AdminStateCard title={text.loading} />
+            ) : null}
+            {isSearchActive && searchQuery.isError ? (
+              <AdminStateCard
+                title={text.searchError}
+                description={getAdminErrorMessage(searchQuery.error, text.searchError)}
+                tone="danger"
                 action={
                   <button
                     type="button"
                     className={styles.button}
-                    disabled={!canManageRoles || isAdmin || isModerator || isSubmitting}
-                    onClick={() => confirmAssignModerator(user)}
+                    disabled={!canManageRoles || searchQuery.isFetching}
+                    onClick={() => {
+                      if (!canManageRoles) {
+                        return;
+                      }
+
+                      void searchQuery.refetch().catch(() => undefined);
+                    }}
                   >
-                    {isAdmin
-                      ? text.adminAlreadyPrivileged
-                      : isModerator
-                        ? "Moderator"
-                        : text.assign}
+                    {text.retry}
                   </button>
                 }
               />
-            );
-          })}
-        </div>
-      </AdminCard>
+            ) : null}
+            {isSearchActive &&
+            !searchQuery.isLoading &&
+            !searchQuery.isError &&
+            searchResults.length === 0 ? (
+              <AdminStateCard title={text.noSearchResults} />
+            ) : null}
+            {searchResults.map((user) => {
+              const isAdmin = user.roles.includes("Admin");
+              const isModerator = user.roles.includes("Moderator");
+              return (
+                <UserRow
+                  key={user.userId}
+                  user={user}
+                  locale={locale}
+                  action={
+                    <button
+                      type="button"
+                      className={styles.button}
+                      aria-label={`${text.assignModeratorLabel} ${userDisplayName(user)}`}
+                      disabled={!canManageRoles || isAdmin || isModerator || isSubmitting}
+                      onClick={() => confirmAssignModerator(user)}
+                    >
+                      {isAdmin
+                        ? text.adminAlreadyPrivileged
+                        : isModerator
+                          ? "Moderator"
+                          : text.assign}
+                    </button>
+                  }
+                />
+              );
+            })}
+          </div>
+        </AdminCard>
+      ) : null}
 
       <ConfirmationDialog
         open={Boolean(pendingAction)}

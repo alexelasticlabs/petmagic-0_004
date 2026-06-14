@@ -163,8 +163,8 @@
   height: 1.3rem;
   padding: 0 0.28rem;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.88);
-  color: #fff;
+  background: var(--danger);
+  color: var(--text-inverse);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1.3rem;
@@ -530,8 +530,8 @@
   padding: 0 0.26rem;
   border: 2px solid var(--admin-surface);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--danger) 82%, #fff 18%);
-  color: #fff;
+  background: var(--danger);
+  color: var(--text-inverse);
   font-size: 0.68rem;
   font-weight: 700;
   line-height: 1;
@@ -543,14 +543,24 @@
   right: 0;
   z-index: 40;
   width: min(28rem, calc(100vw - 1.5rem));
+  max-height: min(36rem, calc(100dvh - 5.6rem));
   display: grid;
   gap: 0.82rem;
+  overflow: hidden;
   padding: 0.9rem;
   border: 1px solid var(--admin-border);
   border-radius: calc(var(--radius) + 2px);
   background: color-mix(in srgb, var(--surface-1) 94%, transparent);
   box-shadow: var(--shadow-strong);
   backdrop-filter: blur(14px);
+}
+
+.notificationPanel:focus {
+  outline: none;
+}
+
+.notificationPanel:focus-visible {
+  box-shadow: var(--focus-ring), var(--shadow-strong);
 }
 
 .notificationPanelHeader {
@@ -963,9 +973,12 @@
   }
 
   .notificationPanel {
-    right: auto;
-    left: 0;
-    width: min(100vw - 1.64rem, 28rem);
+    position: fixed;
+    top: 4.75rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    width: auto;
+    max-height: calc(100dvh - 5.5rem);
   }
 
   .userRole {

@@ -3,12 +3,13 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import {
   ArrowUpSmallIcon,
   CalendarIcon,
   CancelCircleIcon,
+  CaretDownIcon,
   CartIcon,
   ChartIcon,
   DashboardIcon,
@@ -87,6 +88,7 @@ type DashboardActivityItem = {
 
 type DashboardUserDistributionItem = {
   color: string;
+  tone: "success" | "brand" | "neutral";
   label: string;
   pct: string;
   count: string;
@@ -147,20 +149,17 @@ const STAT_ICONS: Record<DashboardStatIcon, ReactNode> = {
 };
 
 function ActivityIcon({ type }: { type: DashboardActivityType }) {
-  const configs: Record<DashboardActivityType, { color: string; path: ReactNode }> = {
-    new: { color: "#22c55e", path: <CartIcon /> },
-    update: { color: "#60a5fa", path: <RefreshIcon /> },
-    register: { color: "#2dd4bf", path: <UserRegisterIcon /> },
-    cancel: { color: "#f87171", path: <CancelCircleIcon /> },
+  const configs: Record<DashboardActivityType, { className: string; icon: ReactNode }> = {
+    new: { className: styles.activityIconSuccess, icon: <CartIcon /> },
+    update: { className: styles.activityIconInfo, icon: <RefreshIcon /> },
+    register: { className: styles.activityIconBrand, icon: <UserRegisterIcon /> },
+    cancel: { className: styles.activityIconDanger, icon: <CancelCircleIcon /> },
   };
   const config = configs[type];
-  const style = { "--activity-color": config.color } as CSSProperties;
 
   return (
-    <div className={styles.activityIcon} style={style}>
-      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        {config.path}
-      </svg>
+    <div className={`${styles.activityIcon} ${config.className}`}>
+      {config.icon}
     </div>
   );
 }
@@ -182,10 +181,10 @@ export function DashboardView({ locale }: DashboardViewProps) {
 
   const viewModel = dashboardQuery.data;
   const statusColors = {
-    new: "#22c55e",
-    processing: "#60a5fa",
-    delivered: "#2dd4bf",
-    cancelled: "#f87171",
+    new: "var(--success)",
+    processing: "var(--info)",
+    delivered: "var(--brand)",
+    cancelled: "var(--danger)",
   };
 
   const copy = getDashboardCopy(locale);
@@ -280,14 +279,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
             <AdminBadge tone="info" className={styles.chartToolbar}>
               <CalendarIcon className={styles.toolbarIcon} />
               {viewModel.revenueChart.rangeLabel}
-              <svg viewBox="0 0 12 8" fill="none" aria-hidden="true">
-                <path
-                  d="M1 1L6 7L11 1"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <CaretDownIcon className={styles.toolbarChevron} />
             </AdminBadge>
           }
         >
@@ -372,10 +364,9 @@ export function DashboardView({ locale }: DashboardViewProps) {
             />
             <div className={styles.legend}>
               {viewModel.userDistribution.map((item) => {
-                const style = { "--legend-color": item.color } as CSSProperties;
                 return (
                   <div key={item.label} className={styles.legendItem}>
-                    <span className={styles.legendDot} style={style} />
+                    <span className={`${styles.legendDot} ${styles[`legendDot${capitalizeTone(item.tone)}`]}`} />
                     <span className={styles.legendLabel}>{item.label}</span>
                     <span className={styles.legendPercent}>{item.pct}</span>
                     <span className={styles.legendCount}>({item.count})</span>
@@ -557,7 +548,7 @@ function buildDashboardFromData(
       delta: formatSignedPercentDelta(currentUsers, previousUsers, locale),
       subtext: copy.stats.usersSubtext,
       icon: "people",
-      accentColor: "#2dd4bf",
+      accentColor: "var(--brand)",
       isPositiveTrend: currentUsers >= previousUsers,
     },
     {
@@ -566,7 +557,7 @@ function buildDashboardFromData(
       delta: formatSignedPercentDelta(currentPurchasesCount, previousPurchasesCount, locale),
       subtext: copy.stats.ordersSubtext,
       icon: "cart",
-      accentColor: "#22c55e",
+      accentColor: "var(--success)",
       isPositiveTrend: currentPurchasesCount >= previousPurchasesCount,
     },
     {
@@ -575,7 +566,7 @@ function buildDashboardFromData(
       delta: formatSignedPercentDelta(currentRevenue, previousRevenue, locale),
       subtext: copy.stats.revenueSubtext,
       icon: "dollar",
-      accentColor: "#facc15",
+      accentColor: "var(--warning)",
       isPositiveTrend: currentRevenue >= previousRevenue,
     },
     {
@@ -584,7 +575,7 @@ function buildDashboardFromData(
       delta: formatSignedNumber(currentConversion - previousConversion, locale, 1, copy.stats.pp),
       subtext: copy.stats.conversionSubtext,
       icon: "trendUp",
-      accentColor: "#f472b6",
+      accentColor: "var(--magenta)",
       isPositiveTrend: currentConversion >= previousConversion,
     },
     {
@@ -593,7 +584,7 @@ function buildDashboardFromData(
       delta: copy.stats.live,
       subtext: copy.stats.premiumUsersSubtext,
       icon: "people",
-      accentColor: "#a78bfa",
+      accentColor: "var(--accent)",
     },
     {
       label: copy.stats.activeSubscriptions,
@@ -601,7 +592,7 @@ function buildDashboardFromData(
       delta: copy.stats.live,
       subtext: copy.stats.activeSubscriptionsSubtext,
       icon: "dollar",
-      accentColor: "#34d399",
+      accentColor: "var(--success)",
     },
     {
       label: copy.stats.generationsToday,
@@ -609,7 +600,7 @@ function buildDashboardFromData(
       delta: `${formatNumber(generationMetrics.generationsThisWeek, locale)} ${copy.stats.weekShort}`,
       subtext: `${formatNumber(generationMetrics.generationsThisMonth, locale)} ${copy.stats.monthShort}`,
       icon: "trendUp",
-      accentColor: "#38bdf8",
+      accentColor: "var(--info)",
     },
     {
       label: copy.stats.failedGenerations,
@@ -617,7 +608,7 @@ function buildDashboardFromData(
       delta: `${formatNumber(generationMetrics.failedGenerationsToday, locale)} ${copy.stats.todayShort}`,
       subtext: `${formatNumber(generationMetrics.failedGenerationsThisMonth, locale)} ${copy.stats.monthShort}`,
       icon: "trendUp",
-      accentColor: "#f87171",
+      accentColor: "var(--danger)",
     },
     {
       label: copy.stats.pendingJobs,
@@ -625,7 +616,7 @@ function buildDashboardFromData(
       delta: `${formatNumber(generationMetrics.runningJobs, locale)} ${copy.stats.runningShort}`,
       subtext: copy.stats.pendingJobsSubtext,
       icon: "cart",
-      accentColor: "#facc15",
+      accentColor: "var(--warning)",
     },
     {
       label: copy.stats.paymentSuccessFailure,
@@ -633,7 +624,7 @@ function buildDashboardFromData(
       delta: copy.stats.currentWeek,
       subtext: copy.stats.paymentSuccessFailureSubtext,
       icon: "dollar",
-      accentColor: "#fb7185",
+      accentColor: "var(--danger)",
     },
     {
       label: copy.stats.moderationQueue,
@@ -641,7 +632,7 @@ function buildDashboardFromData(
       delta: copy.stats.live,
       subtext: copy.stats.moderationQueueSubtext,
       icon: "people",
-      accentColor: "#f472b6",
+      accentColor: "var(--magenta)",
     },
   ];
 
@@ -768,24 +759,33 @@ function buildUserDistribution(
 
   return [
     {
-      color: "#22c55e",
+      color: "var(--success)",
+      tone: "success",
       label: locale === "ru" ? "Администраторы" : "Administrators",
       pct: toPercent(admins),
       count: formatNumber(admins, locale),
     },
     {
-      color: "#059669",
+      color: "var(--brand)",
+      tone: "brand",
       label: locale === "ru" ? "Модераторы" : "Moderators",
       pct: toPercent(moderators),
       count: formatNumber(moderators, locale),
     },
     {
-      color: "#1f5d3c",
+      color: "var(--neutral)",
+      tone: "neutral",
       label: locale === "ru" ? "Пользователи" : "Users",
       pct: toPercent(regular),
       count: formatNumber(regular, locale),
     },
   ];
+}
+
+function capitalizeTone(value: DashboardUserDistributionItem["tone"]): Capitalize<DashboardUserDistributionItem["tone"]> {
+  return (value.charAt(0).toUpperCase() + value.slice(1)) as Capitalize<
+    DashboardUserDistributionItem["tone"]
+  >;
 }
 
 function buildDashboardRevenueSeries(

@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { DownloadIcon, MoreHorizontalIcon, RefreshIcon } from "@/components/admin/admin-icons";
+import {
+  CaretDownIcon,
+  DownloadIcon,
+  MoreHorizontalIcon,
+  RefreshIcon,
+} from "@/components/admin/admin-icons";
 import {
   AdminCard,
   AdminFilterBar,
@@ -30,6 +35,11 @@ import { type AdminRedeemCode, type AdminRedeemRewardKind } from "@/lib/api-clie
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 const PROMO_CODES_SEARCH_MAX_LENGTH = 120;
+
+const rewardKindColors: Record<AdminRedeemRewardKind, string> = {
+  spark: "var(--success)",
+  premium_days: "var(--info)",
+};
 
 type PromoCodesListCardProps = {
   text: ReturnType<typeof getDictionary>;
@@ -331,9 +341,7 @@ export function PromoCodesListCard({
                       </td>
                       <td>
                         <div className={styles.rewardCell}>
-                          <AdminStatusBadge
-                            color={code.rewardKind === "spark" ? "#22c55e" : "#60a5fa"}
-                          >
+                          <AdminStatusBadge color={rewardKindColors[code.rewardKind]}>
                             {formatRewardValue(code.rewardValue, code.rewardKind, text)}
                           </AdminStatusBadge>
                           <span className={styles.descriptionMeta}>
@@ -416,8 +424,9 @@ export function PromoCodesListCard({
                 onClick={onPreviousPage}
                 disabled={currentPage <= 1}
                 aria-label={text.promoCodesPreviousAction}
+                title={text.promoCodesPreviousAction}
               >
-                {"<"}
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
               </Button>
 
               <div className={styles.paginationActions}>
@@ -427,6 +436,12 @@ export function PromoCodesListCard({
                     variant={pageNumber === currentPage ? "primary" : "secondary"}
                     size="sm"
                     className={styles.paginationNumber}
+                    aria-current={pageNumber === currentPage ? "page" : undefined}
+                    aria-label={
+                      locale === "ru"
+                        ? `Страница ${formatNumber(pageNumber, locale)}`
+                        : `Page ${formatNumber(pageNumber, locale)}`
+                    }
                     onClick={() => onSelectPage(pageNumber)}
                   >
                     {formatNumber(pageNumber, locale)}
@@ -440,8 +455,9 @@ export function PromoCodesListCard({
                 onClick={onNextPage}
                 disabled={currentPage >= totalPages}
                 aria-label={text.promoCodesNextAction}
+                title={text.promoCodesNextAction}
               >
-                {">"}
+                <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
               </Button>
             </div>
 

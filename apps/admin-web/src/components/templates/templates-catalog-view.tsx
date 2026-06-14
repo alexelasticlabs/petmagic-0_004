@@ -7,7 +7,9 @@ import { useEffect, useMemo, useState, type ReactElement } from "react";
 import {
   CalendarIcon,
   CancelCircleIcon,
+  CaretDownIcon,
   ChartIcon,
+  DollarIcon,
   ImageIcon,
   PencilIcon,
   PlayCircleIcon,
@@ -79,79 +81,16 @@ function useDebouncedValue(value: string, delayMs: number) {
 }
 
 const statusColors: Record<TemplateStatus, string> = {
-  Draft: "#facc15",
-  Active: "#22c55e",
-  Archived: "#94a3b8",
+  Draft: "var(--warning)",
+  Active: "var(--success)",
+  Archived: "var(--text-muted)",
 };
 
 const METRIC_ICONS: Record<string, ReactElement> = {
-  cardMetric_primary: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}
-    >
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M12 7v1m0 8v1M9.5 9.5A2.5 2.5 0 0 1 12 8a2.5 2.5 0 0 1 0 5 2.5 2.5 0 0 0 0 5 2.5 2.5 0 0 0 2.5-1.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  cardMetric_info: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}
-    >
-      <ellipse cx="12" cy="12" rx="10" ry="6" stroke="currentColor" strokeWidth="1.7" />
-      <circle cx="12" cy="12" r="2.2" fill="currentColor" />
-    </svg>
-  ),
-  cardMetric_success: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}
-    >
-      <path
-        d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  cardMetric_danger: (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-      style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}
-    >
-      <path
-        d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <line
-        x1="12"
-        y1="9"
-        x2="12"
-        y2="13"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-      <circle cx="12" cy="17" r="0.8" fill="currentColor" />
-    </svg>
-  ),
+  cardMetric_primary: <DollarIcon className={styles.cardMetricIcon} />,
+  cardMetric_info: <ImageIcon className={styles.cardMetricIcon} />,
+  cardMetric_success: <PlayCircleIcon className={styles.cardMetricIcon} />,
+  cardMetric_danger: <CancelCircleIcon className={styles.cardMetricIcon} />,
 };
 
 export function TemplatesCatalogView({
@@ -618,7 +557,7 @@ export function TemplatesCatalogView({
           ) : (
             <AdminCard padding="md" className={styles.listCard}>
               <div className={adminTableStyles.tableWrap}>
-                <table className={adminTableStyles.table}>
+                <table className={`${adminTableStyles.table} ${styles.listTable}`}>
                   <thead>
                     <tr>
                       <th>{isRu ? "Шаблон" : "Template"}</th>
@@ -732,7 +671,10 @@ export function TemplatesCatalogView({
                             </span>
                           </td>
                           <td data-label={text.statusLabel}>
-                            <AdminStatusBadge color={statusColors[template.status]}>
+                            <AdminStatusBadge
+                              className={styles.listStatusBadge}
+                              color={statusColors[template.status]}
+                            >
                               {getTemplateStatusLabel(template.status, locale)}
                             </AdminStatusBadge>
                           </td>
@@ -869,9 +811,11 @@ export function TemplatesCatalogView({
                   variant="secondary"
                   size="sm"
                   disabled={currentPage <= 1 || isFetching}
+                  aria-label={copy.previousPageLabel}
+                  title={copy.previousPageLabel}
                   onClick={() => setPage((value) => Math.max(1, value - 1))}
                 >
-                  {"<"}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
                 </Button>
                 {visiblePageNumbers.map((pageNumber) => (
                   <Button
@@ -890,9 +834,11 @@ export function TemplatesCatalogView({
                   variant="secondary"
                   size="sm"
                   disabled={currentPage >= totalPages || !hasMore || isFetching}
+                  aria-label={copy.nextPageLabel}
+                  title={copy.nextPageLabel}
                   onClick={() => setPage((value) => value + 1)}
                 >
-                  {">"}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
                 </Button>
               </div>
             </div>
@@ -1030,7 +976,7 @@ function TemplateCatalogCard({
           <span className={styles.cardTimestamp}>
             {copy.updatedShort} {formatDate(template.updatedAtUtc, locale)}
           </span>
-          <AdminStatusBadge color={statusColors[template.status]}>
+          <AdminStatusBadge className={styles.cardStatusBadge} color={statusColors[template.status]}>
             {getTemplateStatusLabel(template.status, locale)}
           </AdminStatusBadge>
         </div>
@@ -1262,6 +1208,8 @@ function getCatalogCopy(locale: Locale, templateType: TemplateType) {
     tokensShort: "PawSpark",
     updatedLabel: isRu ? "Обновлен" : "Updated",
     updatedShort: isRu ? "Обновлен" : "Updated",
+    previousPageLabel: isRu ? "Предыдущая страница шаблонов" : "Previous templates page",
+    nextPageLabel: isRu ? "Следующая страница шаблонов" : "Next templates page",
     showing: (visible: number, total: number) =>
       isRu
         ? `Показано ${visible} из ${total} шаблонов`

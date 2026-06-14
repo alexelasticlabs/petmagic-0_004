@@ -31,9 +31,11 @@ describe("admin user query cancellation", () => {
     expect(usersPageSource).toContain(
       "fetchAdminEconomyUserSubscriptionSummary(selectedUserId!, signal)"
     );
-    expect(usersPageSource).toContain("fetchAdminUserAnalytics(user.userId, signal)");
     expect(usersPageSource).toContain(
-      "fetchAdminEconomyUserSubscriptionSummary(user.userId, signal)"
+      "fetchUserRowEnrichment<AdminUserAnalytics>(pageUserIds, signal, fetchAdminUserAnalytics)"
+    );
+    expect(usersPageSource).toContain(
+      "fetchUserRowEnrichment<AdminEconomyUserSubscriptionSummary>(\n        premiumPageUserIds,\n        signal,\n        fetchAdminEconomyUserSubscriptionSummary"
     );
     expect(promoCodesSource).toContain("fetchAdminUser(userId, signal)");
     expect(supportSource).toContain("fetchAdminUser(subjectUserId!, signal)");

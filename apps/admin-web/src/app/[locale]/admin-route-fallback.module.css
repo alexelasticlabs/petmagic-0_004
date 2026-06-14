@@ -1,0 +1,21 @@
+.actionRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.72rem;
+}
+
+.actionRow > * {
+  flex: 0 1 auto;
+}
+
+@media (max-width: 520px) {
+  .actionRow {
+    align-items: stretch;
+  }
+
+  .actionRow > * {
+    flex: 1 1 10rem;
+  }
+}
