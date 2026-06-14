@@ -45,6 +45,14 @@ public static class HostApiProductionConfigurationValidator
             throw new InvalidOperationException("Cors:AllowedOrigins must use HTTPS origins outside development.");
         }
 
+        if (!string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment)
+            || uri.AbsolutePath != "/")
+        {
+            throw new InvalidOperationException("Cors:AllowedOrigins must contain origins only, without paths, query strings, fragments, or credentials outside development.");
+        }
+
         var host = uri.Host;
         if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
             || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)

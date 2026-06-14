@@ -144,17 +144,56 @@ public sealed partial class EconomyService(
         }
 
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
+        var now = DateTime.UtcNow;
+        var source = string.IsNullOrWhiteSpace(command.Source)
+            ? WalletLedgerSource.GenerationSpend
+            : command.Source;
+        if (source == WalletLedgerSource.WatermarkUnlock)
+        {
+            var existingSpend = await dbContext.WalletLedgerEntries
+                .AsNoTracking()
+                .FirstOrDefaultAsync(
+                    x => x.UserId == command.UserId
+                        && x.Source == WalletLedgerSource.WatermarkUnlock
+                        && x.Reason == command.Reason
+                        && x.Delta < 0,
+                    cancellationToken);
+            if (existingSpend is not null)
+            {
+                return Result.Success(new WalletOperationResponse(
+                    wallet.UserId,
+                    0,
+                    wallet.Balance,
+                    source,
+                    existingSpend.CreatedAtUtc,
+                    wallet.LastWeeklyGrantAtUtc?.AddDays(7),
+                    Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow)));
+            }
+        }
+
         if (wallet.Balance < command.Amount)
         {
             return Result.Failure<WalletOperationResponse>(EconomyErrors.InsufficientBalance);
         }
 
-        var now = DateTime.UtcNow;
-        var source = string.IsNullOrWhiteSpace(command.Source)
-            ? WalletLedgerSource.GenerationSpend
-            : command.Source;
         var response = ApplyWalletDelta(wallet, -command.Amount, source, command.Reason, now);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (source == WalletLedgerSource.WatermarkUnlock)
+        {
+            var existing = await TryResolveExistingWatermarkUnlockSpendAsync(
+                command.UserId,
+                command.Reason,
+                cancellationToken);
+            if (existing is not null)
+            {
+                return Result.Success(existing);
+            }
+
+            throw;
+        }
 
         return Result.Success(response);
     }
@@ -382,5 +421,40 @@ public sealed partial class EconomyService(
             ReferralAttributionStatus.Pending,
             options.Value.ReferralBonusSpark,
             now));
+    }
+
+    private async Task<WalletOperationResponse?> TryResolveExistingWatermarkUnlockSpendAsync(
+        Guid userId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear();
+
+        var existingSpend = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == userId
+                    && x.Source == WalletLedgerSource.WatermarkUnlock
+                    && x.Reason == reason
+                    && x.Delta < 0,
+                cancellationToken);
+        if (existingSpend is null)
+        {
+            return null;
+        }
+
+        var wallet = await dbContext.Wallets
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        var balance = wallet?.Balance ?? 0;
+
+        return new WalletOperationResponse(
+            userId,
+            0,
+            balance,
+            WalletLedgerSource.WatermarkUnlock,
+            existingSpend.CreatedAtUtc,
+            wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
+            Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
     }
 }

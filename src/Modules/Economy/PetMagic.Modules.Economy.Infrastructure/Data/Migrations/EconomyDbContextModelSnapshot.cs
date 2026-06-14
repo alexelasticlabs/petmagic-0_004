@@ -915,6 +915,11 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId")
                         .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL");
 
+                    b.HasIndex("UserId", "Source", "Reason")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ewl_UserId_Source_Reason_WatermarkUnlock")
+                        .HasFilter("\"Source\" = 'watermark_unlock'");
+
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("economy_wallet_ledger", (string)null);

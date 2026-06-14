@@ -13,6 +13,10 @@ public sealed class HostApiProductionConfigurationValidatorTests
     [InlineData("http://admin.petmagic.app")]
     [InlineData("*")]
     [InlineData("")]
+    [InlineData("https://admin.petmagic.app/path")]
+    [InlineData("https://admin.petmagic.app?token=secret")]
+    [InlineData("https://user:pass@admin.petmagic.app")]
+    [InlineData("https://admin.petmagic.app#fragment")]
     public void ValidateCorsAllowedOrigins_ShouldRejectUnsafeOriginsOutsideDevelopment(string origin)
     {
         var environment = CreateEnvironment(Environments.Production);

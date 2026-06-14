@@ -120,6 +120,45 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task SpendAsync_ShouldBeIdempotentForWatermarkUnlockReason()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 3,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+        var service = CreateService(dbContext);
+
+        var command = new SpendBalanceCommand(
+            userId,
+            1,
+            "template_watermark_unlock:abc123",
+            WalletLedgerSource.WatermarkUnlock);
+        var first = await service.SpendAsync(command, CancellationToken.None);
+        var second = await service.SpendAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(2, first.Value.NewBalance);
+        Assert.Equal(2, second.Value.NewBalance);
+        Assert.Equal(0, second.Value.Delta);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.WatermarkUnlock)
+            .ToArrayAsync();
+        Assert.Equal(2, wallet.Balance);
+        var ledgerEntry = Assert.Single(ledgerEntries);
+        Assert.Equal(-1, ledgerEntry.Delta);
+        Assert.Equal(command.Reason, ledgerEntry.Reason);
+    }
+
+    [Fact]
     public async Task ConfirmPackPurchase_ShouldCreditWalletOnce()
     {
         await using var dbContext = CreateDbContext();
@@ -1079,6 +1118,60 @@ public sealed partial class EconomyServiceTests
         Assert.Empty(secondPage.Value.Items);
         Assert.Equal(1, secondPage.Value.TotalCount);
         Assert.False(secondPage.Value.HasMore);
+    }
+
+    [Fact]
+    public async Task ListAdminRedeemCodesAsync_ShouldApplyComputedStatusFiltersInDatabase()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var service = CreateService(dbContext);
+        var now = DateTime.UtcNow;
+
+        var archivedResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                "STATUS-ARCHIVED",
+                "Archived campaign",
+                RedeemCodeRewardKind.Spark,
+                25,
+                100,
+                1,
+                false,
+                now.AddDays(-1),
+                now.AddDays(-1).AddSeconds(30)),
+            CancellationToken.None);
+        var expiredResult = await service.CreateRedeemCodeAsync(
+            new CreateRedeemCodeCommand(
+                "STATUS-EXPIRED",
+                "Expired campaign",
+                RedeemCodeRewardKind.Spark,
+                25,
+                100,
+                1,
+                true,
+                now.AddDays(-8),
+                now.AddDays(-1)),
+            CancellationToken.None);
+
+        Assert.True(archivedResult.IsSuccess);
+        Assert.True(expiredResult.IsSuccess);
+
+        var archived = await service.ListAdminRedeemCodesAsync(
+            new AdminRedeemCodeListQuery(Status: "archived", Sort: "code"),
+            CancellationToken.None);
+        var expired = await service.ListAdminRedeemCodesAsync(
+            new AdminRedeemCodeListQuery(Status: "expired", Sort: "code"),
+            CancellationToken.None);
+
+        Assert.True(archived.IsSuccess);
+        var archivedItem = Assert.Single(archived.Value.Items);
+        Assert.Equal(archivedResult.Value.RedeemCodeId, archivedItem.RedeemCodeId);
+        Assert.Equal(1, archived.Value.TotalCount);
+
+        Assert.True(expired.IsSuccess);
+        var expiredItem = Assert.Single(expired.Value.Items);
+        Assert.Equal(expiredResult.Value.RedeemCodeId, expiredItem.RedeemCodeId);
+        Assert.Equal(1, expired.Value.TotalCount);
     }
 
     [Fact]

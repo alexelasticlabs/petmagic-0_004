@@ -40,6 +40,7 @@ public sealed class DatabaseIndexModelTests
 
         AssertHasIndex<WalletLedgerEntry>(dbContext, ["CreatedAtUtc"]);
         AssertHasIndex<WalletLedgerEntry>(dbContext, ["Source", "CreatedAtUtc"]);
+        AssertHasUniqueIndex<WalletLedgerEntry>(dbContext, ["UserId", "Source", "Reason"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["CreatedAtUtc"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["Status", "CreatedAtUtc"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["UserId", "PaymentProvider", "CreatedAtUtc"]);
@@ -71,7 +72,19 @@ public sealed class DatabaseIndexModelTests
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "IdempotencyKey"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "RequestHash"]);
+        AssertHasUniqueIndex<TemplateGenerationWatermarkUnlock>(dbContext, ["UserId", "GenerationJobId"]);
         AssertHasUniqueIndex<TemplateAiProviderRequestPermit>(dbContext, ["Provider", "BucketUtc", "PermitNumber"]);
+        AssertHasUniqueIndex<TemplateCatalogChange>(dbContext, ["Version"]);
+        AssertHasIndex<TemplateItem>(dbContext, ["Status", "UpdatedAtUtc", "Id"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["TemplateId", "CreatedAtUtc"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["GenerationId", "UserId"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["TemplateId", "Rating", "CreatedAtUtc"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["Status", "Priority", "CreatedAtUtc"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["Type", "Category", "CreatedAtUtc"]);
+        AssertHasIndex<TemplateGenerationFeedback>(dbContext, ["UserId", "CreatedAtUtc"]);
+        AssertHasUniqueIndex<CreditRefund>(dbContext, ["FeedbackId"]);
+        AssertHasUniqueIndex<CreditRefund>(dbContext, ["GenerationId"]);
+        AssertHasIndex<CreditRefund>(dbContext, ["UserId", "CreatedAtUtc"]);
     }
 
     [Fact]

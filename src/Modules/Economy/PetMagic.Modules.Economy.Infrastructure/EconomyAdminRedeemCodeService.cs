@@ -46,17 +46,13 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             codesQuery = codesQuery.Where(x => x.RewardKind == normalizedRewardKind);
         }
 
-        var filteredCodes = (await codesQuery.ToListAsync(cancellationToken))
-            .Where(code => MatchesRedeemCodeStatus(code, normalizedStatus, now))
-            .ToList();
-        var totalCount = filteredCodes.Count;
+        codesQuery = ApplyRedeemCodeStatusFilter(codesQuery, normalizedStatus, now);
 
-        SortRedeemCodes(filteredCodes, normalizedSort);
-
-        var pageCodes = filteredCodes
+        var totalCount = await codesQuery.CountAsync(cancellationToken);
+        var pageCodes = await ApplyRedeemCodeSort(codesQuery, normalizedSort)
             .Skip(normalizedSkip)
             .Take(normalizedTake + 1)
-            .ToList();
+            .ToListAsync(cancellationToken);
 
         var pagedCodes = ToPaged(pageCodes, normalizedSkip, normalizedTake);
         var codes = pagedCodes.Items;
@@ -184,16 +180,15 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             codesQuery = codesQuery.Where(x => x.RewardKind == normalizedRewardKind);
         }
 
-        var filteredCodes = (await codesQuery.ToListAsync(cancellationToken))
-            .Where(code => MatchesRedeemCodeStatus(code, normalizedStatus, now))
-            .ToList();
+        codesQuery = ApplyRedeemCodeStatusFilter(codesQuery, normalizedStatus, now);
 
-        if (filteredCodes.Count == 0)
+        var totalCodes = await codesQuery.CountAsync(cancellationToken);
+        if (totalCodes == 0)
         {
             return Result.Success(new AdminRedeemCodeMetricsResponse(0, 0, 0, 0, 0, 0, 0, 0));
         }
 
-        var codeIds = filteredCodes.Select(x => x.Id).ToArray();
+        var codeIds = codesQuery.Select(x => x.Id);
         var redemptionStats = await dbContext.RedeemCodeRedemptions
             .AsNoTracking()
             .Where(x => codeIds.Contains(x.RedeemCodeId))
@@ -211,12 +206,13 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(new AdminRedeemCodeMetricsResponse(
-            filteredCodes.Count,
-            filteredCodes.Count(code => GetRedeemCodeStatus(code, now) == "active"),
+            totalCodes,
+            await ApplyRedeemCodeStatusFilter(codesQuery, "active", now).CountAsync(cancellationToken),
             redemptionStats?.TotalUses ?? 0,
             redemptionStats?.TotalGranted ?? 0,
-            filteredCodes.Count(code => code.CreatedAtUtc >= sevenDaysAgo),
-            filteredCodes.Count(code => GetRedeemCodeStatus(code, now) == "active" && code.UpdatedAtUtc >= sevenDaysAgo),
+            await codesQuery.CountAsync(code => code.CreatedAtUtc >= sevenDaysAgo, cancellationToken),
+            await ApplyRedeemCodeStatusFilter(codesQuery, "active", now)
+                .CountAsync(code => code.UpdatedAtUtc >= sevenDaysAgo, cancellationToken),
             redemptionStats?.UsesLast7d ?? 0,
             redemptionStats?.GrantedLast7d ?? 0));
     }
@@ -384,14 +380,69 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         return Result.Success(ToAdminRedeemCodeResponse(code, [.. redemptions.Select(ToAdminRedeemCodeRedemptionResponse)]));
     }
 
-    private static bool MatchesRedeemCodeStatus(RedeemCode code, string? status, DateTime now)
+    private static IQueryable<RedeemCode> ApplyRedeemCodeStatusFilter(
+        IQueryable<RedeemCode> query,
+        string? status,
+        DateTime now)
     {
-        if (string.IsNullOrWhiteSpace(status) || status == "all")
+        return status switch
         {
-            return true;
-        }
-
-        return GetRedeemCodeStatus(code, now) == status;
+            "active" => query.Where(code =>
+                code.IsActive &&
+                code.RedeemedCount < code.MaxRedemptions &&
+                (!code.ExpiresAtUtc.HasValue || code.ExpiresAtUtc.Value > now) &&
+                (!code.StartsAtUtc.HasValue || code.StartsAtUtc.Value <= now)),
+            "scheduled" => query.Where(code =>
+                code.IsActive &&
+                code.RedeemedCount < code.MaxRedemptions &&
+                (!code.ExpiresAtUtc.HasValue || code.ExpiresAtUtc.Value > now) &&
+                code.StartsAtUtc.HasValue &&
+                code.StartsAtUtc.Value > now),
+            "expired" => query.Where(code =>
+                !(!code.IsActive &&
+                    code.StartsAtUtc.HasValue &&
+                    code.ExpiresAtUtc.HasValue &&
+                    code.StartsAtUtc.Value <= code.ExpiresAtUtc.Value.AddSeconds(60) &&
+                    code.StartsAtUtc.Value >= code.ExpiresAtUtc.Value.AddSeconds(-60)) &&
+                code.RedeemedCount < code.MaxRedemptions &&
+                code.ExpiresAtUtc.HasValue &&
+                code.ExpiresAtUtc.Value <= now),
+            "exhausted" => query.Where(code =>
+                !(!code.IsActive &&
+                    code.StartsAtUtc.HasValue &&
+                    code.ExpiresAtUtc.HasValue &&
+                    code.StartsAtUtc.Value <= code.ExpiresAtUtc.Value.AddSeconds(60) &&
+                    code.StartsAtUtc.Value >= code.ExpiresAtUtc.Value.AddSeconds(-60)) &&
+                code.RedeemedCount >= code.MaxRedemptions),
+            "draft" => query.Where(code =>
+                !(!code.IsActive &&
+                    code.StartsAtUtc.HasValue &&
+                    code.ExpiresAtUtc.HasValue &&
+                    code.StartsAtUtc.Value <= code.ExpiresAtUtc.Value.AddSeconds(60) &&
+                    code.StartsAtUtc.Value >= code.ExpiresAtUtc.Value.AddSeconds(-60)) &&
+                !code.IsActive &&
+                code.RedeemedCount < code.MaxRedemptions &&
+                !code.StartsAtUtc.HasValue &&
+                !code.ExpiresAtUtc.HasValue &&
+                code.Description == string.Empty),
+            "paused" => query.Where(code =>
+                !(!code.IsActive &&
+                    code.StartsAtUtc.HasValue &&
+                    code.ExpiresAtUtc.HasValue &&
+                    code.StartsAtUtc.Value <= code.ExpiresAtUtc.Value.AddSeconds(60) &&
+                    code.StartsAtUtc.Value >= code.ExpiresAtUtc.Value.AddSeconds(-60)) &&
+                !code.IsActive &&
+                code.RedeemedCount < code.MaxRedemptions &&
+                (!code.ExpiresAtUtc.HasValue || code.ExpiresAtUtc.Value > now) &&
+                (code.StartsAtUtc.HasValue || code.ExpiresAtUtc.HasValue || code.Description != string.Empty)),
+            "archived" => query.Where(code =>
+                !code.IsActive &&
+                code.StartsAtUtc.HasValue &&
+                code.ExpiresAtUtc.HasValue &&
+                code.StartsAtUtc.Value <= code.ExpiresAtUtc.Value.AddSeconds(60) &&
+                code.StartsAtUtc.Value >= code.ExpiresAtUtc.Value.AddSeconds(-60)),
+            _ => query
+        };
     }
 
     private static string GetRedeemCodeStatus(RedeemCode code, DateTime now)
@@ -440,62 +491,32 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         return Math.Abs((code.StartsAtUtc.Value - code.ExpiresAtUtc.Value).TotalSeconds) <= 60;
     }
 
-    private static void SortRedeemCodes(List<RedeemCode> codes, string? sort)
+    private static IOrderedQueryable<RedeemCode> ApplyRedeemCodeSort(IQueryable<RedeemCode> query, string? sort)
     {
-        codes.Sort((first, second) =>
+        return sort switch
         {
-            var comparison = sort switch
-            {
-                "usage" => FirstNonZero(
-                    CompareDescending(first.RedeemedCount, second.RedeemedCount),
-                    CompareDescending(first.RewardValue, second.RewardValue)),
-                "reward" => FirstNonZero(
-                    CompareDescending(first.RewardValue, second.RewardValue),
-                    CompareDescending(first.MaxRedemptions, second.MaxRedemptions)),
-                "code" => FirstNonZero(
-                    string.Compare(first.Code, second.Code, StringComparison.OrdinalIgnoreCase),
-                    string.Compare(first.CodePrefix, second.CodePrefix, StringComparison.OrdinalIgnoreCase)),
-                "expiry" => FirstNonZero(
-                    CompareNullableDateAscending(first.ExpiresAtUtc, second.ExpiresAtUtc),
-                    CompareDescending(first.UpdatedAtUtc, second.UpdatedAtUtc)),
-                _ => FirstNonZero(
-                    CompareDescending(first.UpdatedAtUtc, second.UpdatedAtUtc),
-                    CompareDescending(first.CreatedAtUtc, second.CreatedAtUtc))
-            };
-
-            return comparison;
-        });
-    }
-
-    private static int FirstNonZero(params int[] values)
-    {
-        return values.FirstOrDefault(value => value != 0);
-    }
-
-    private static int CompareDescending<T>(T first, T second)
-        where T : IComparable<T>
-    {
-        return second.CompareTo(first);
-    }
-
-    private static int CompareNullableDateAscending(DateTime? first, DateTime? second)
-    {
-        if (first.HasValue && second.HasValue)
-        {
-            return first.Value.CompareTo(second.Value);
-        }
-
-        if (first.HasValue)
-        {
-            return -1;
-        }
-
-        if (second.HasValue)
-        {
-            return 1;
-        }
-
-        return 0;
+            "usage" => query
+                .OrderByDescending(code => code.RedeemedCount)
+                .ThenByDescending(code => code.RewardValue)
+                .ThenByDescending(code => code.Id),
+            "reward" => query
+                .OrderByDescending(code => code.RewardValue)
+                .ThenByDescending(code => code.MaxRedemptions)
+                .ThenByDescending(code => code.Id),
+            "code" => query
+                .OrderBy(code => code.Code)
+                .ThenBy(code => code.CodePrefix)
+                .ThenByDescending(code => code.Id),
+            "expiry" => query
+                .OrderBy(code => code.ExpiresAtUtc == null)
+                .ThenBy(code => code.ExpiresAtUtc)
+                .ThenByDescending(code => code.UpdatedAtUtc)
+                .ThenByDescending(code => code.Id),
+            _ => query
+                .OrderByDescending(code => code.UpdatedAtUtc)
+                .ThenByDescending(code => code.CreatedAtUtc)
+                .ThenByDescending(code => code.Id)
+        };
     }
 
     private static string? NormalizeListFilter(string? value)

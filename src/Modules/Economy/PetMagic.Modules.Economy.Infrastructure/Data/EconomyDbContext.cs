@@ -61,6 +61,10 @@ public sealed class EconomyDbContext(DbContextOptions<EconomyDbContext> options)
             entity.HasIndex(x => new { x.UserId, x.CreatedAtUtc });
             entity.HasIndex(x => x.CreatedAtUtc);
             entity.HasIndex(x => new { x.Source, x.CreatedAtUtc });
+            entity.HasIndex(x => new { x.UserId, x.Source, x.Reason })
+                .IsUnique()
+                .HasFilter("\"Source\" = 'watermark_unlock'")
+                .HasDatabaseName("UX_ewl_UserId_Source_Reason_WatermarkUnlock");
             entity.HasIndex(x => new { x.SourceProvider, x.SourceTransactionId })
                 .IsUnique()
                 .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL")
