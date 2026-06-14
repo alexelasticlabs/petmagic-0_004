@@ -71,7 +71,7 @@ public static partial class SupportChatEndpoints
         [FromForm] IFormFile? file,
         [FromForm] string? body,
         [FromForm] string? locale,
-        [FromForm] Guid? replyToMessageId,
+        [FromForm] string? replyToMessageId,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
         [FromServices] ISupportChatService service,
@@ -90,6 +90,12 @@ public static partial class SupportChatEndpoints
             });
         }
 
+        var formValidationErrors = ValidateSingleAttachmentFormFields(body, replyToMessageId, out var parsedReplyToMessageId);
+        if (formValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(formValidationErrors);
+        }
+
         var requestedContentType = file.ContentType ?? "application/octet-stream";
         var normalizedBody = string.IsNullOrWhiteSpace(body)
             ? Path.GetFileName(file.FileName)
@@ -103,7 +109,7 @@ public static partial class SupportChatEndpoints
                 IsAdmin: false,
                 AttachmentFileName: Path.GetFileName(file.FileName),
                 AttachmentContentType: requestedContentType,
-                ReplyToMessageId: replyToMessageId,
+                ReplyToMessageId: parsedReplyToMessageId,
                 Locale: ResolvePreferredLocale(locale, httpContext)),
             cancellationToken);
 

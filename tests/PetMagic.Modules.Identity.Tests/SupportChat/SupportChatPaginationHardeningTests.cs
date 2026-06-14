@@ -1,0 +1,130 @@
+namespace PetMagic.Modules.Identity.Tests.SupportChat;
+
+public sealed class SupportChatPaginationHardeningTests
+{
+    [Fact]
+    public void AdminInbox_ShouldUseStablePaginationOrder()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatService.cs"));
+
+        Assert.Contains("var orderedConversationsQuery = normalizedSort switch", source, StringComparison.Ordinal);
+        Assert.Contains("\"priority\" => conversationsQuery", source, StringComparison.Ordinal);
+        Assert.Contains("\"waiting\" => conversationsQuery", source, StringComparison.Ordinal);
+        Assert.Contains(".ThenByDescending(x => x.Id)", source, StringComparison.Ordinal);
+        Assert.Contains("orderedConversationsQuery\n            .Skip((page - 1) * pageSize)", source, StringComparison.Ordinal);
+        Assert.Contains(
+            ".OrderByDescending(message => message.CreatedAtUtc)\n                    .ThenByDescending(message => message.Id)",
+            source,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminInbox_ShouldKeepMultiStatusAndFieldSpecificFilterErrors()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatService.cs"));
+
+        Assert.Contains("query.Statuses is { Count: > 0 }", source, StringComparison.Ordinal);
+        Assert.Contains("requestedStatuses.Add(ToCanonicalStatus(status));", source, StringComparison.Ordinal);
+        Assert.Contains("support.source_invalid", source, StringComparison.Ordinal);
+        Assert.Contains("support.priority_invalid", source, StringComparison.Ordinal);
+        Assert.Contains("support.sort_invalid", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminInbox_ShouldRejectInvalidSortBeforeCountingRows()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatService.cs"));
+
+        var sortValidationIndex = source.IndexOf(
+            "if (normalizedSort is not (null or \"\" or \"default\" or \"priority\" or \"waiting\" or \"updated\" or \"created\"))",
+            StringComparison.Ordinal);
+        var countIndex = source.IndexOf(
+            "var totalCount = await conversationsQuery.CountAsync(cancellationToken);",
+            StringComparison.Ordinal);
+
+        Assert.True(sortValidationIndex >= 0, "Support inbox sort validation was not found.");
+        Assert.True(countIndex >= 0, "Support inbox count query was not found.");
+        Assert.True(
+            sortValidationIndex < countIndex,
+            "Support inbox must reject invalid sort values before running the count query.");
+    }
+
+    [Fact]
+    public void ConversationMessages_ShouldUseStablePaginationOrder()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatService.NotificationsAndMessages.cs"));
+
+        Assert.Contains(
+            ".OrderByDescending(x => x.CreatedAtUtc)\n            .ThenByDescending(x => x.Id)\n            .Take(normalizedTake + 1)",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains("Guid? BeforeMessageId = null", File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Application",
+            "Contracts",
+            "SupportChatContracts.cs")), StringComparison.Ordinal);
+        Assert.Contains(".Take(normalizedTake + 1)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ConversationMessages.AnyAsync", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MessageOperations_ShouldAvoidLoadingWholeConversationHistoryForHotActions()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            "SupportChatService.MessageOperations.cs"));
+
+        Assert.DoesNotContain(".Include(x => x.Messages)", source, StringComparison.Ordinal);
+        Assert.Contains("supportChatDbContext.ConversationMessages\n            .AsNoTracking()\n            .AnyAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("var unreadMessages = await supportChatDbContext.ConversationMessages", source, StringComparison.Ordinal);
+        Assert.Contains("message.ReadAtUtc == null", source, StringComparison.Ordinal);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
+    }
+}

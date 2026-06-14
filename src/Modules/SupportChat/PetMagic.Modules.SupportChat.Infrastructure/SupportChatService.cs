@@ -30,6 +30,9 @@ public sealed partial class SupportChatService(
     private static readonly Error MessageNotFound = new("support.message_not_found", "Support message was not found.");
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
     private static readonly Error InvalidStatus = new("support.status_invalid", "Support conversation status is not supported.");
+    private static readonly Error InvalidSource = new("support.source_invalid", "Support conversation source is not supported.");
+    private static readonly Error InvalidPriority = new("support.priority_invalid", "Support conversation priority is not supported.");
+    private static readonly Error InvalidSort = new("support.sort_invalid", "Support inbox sort is not supported.");
     private static readonly Error InvalidStatusTransition = new("support.status_transition_invalid", "Support conversation status transition is not allowed.");
     private static readonly Error InvalidTags = new("support.tags_invalid", "Support conversation tags are invalid.");
 
@@ -158,34 +161,44 @@ public sealed partial class SupportChatService(
             .AsNoTracking()
             .AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(query.Status))
+        var requestedStatusFilters = (query.Statuses is { Count: > 0 }
+                ? query.Statuses
+                : string.IsNullOrWhiteSpace(query.Status) ? [] : [query.Status])
+            .Where(status => !string.IsNullOrWhiteSpace(status))
+            .Select(status => status.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (requestedStatusFilters.Length > 0)
         {
-            if (!Enum.TryParse<SupportConversationStatus>(query.Status, true, out var status))
+            var requestedStatuses = new HashSet<SupportConversationStatus>();
+            foreach (var statusFilter in requestedStatusFilters)
             {
-                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
+                if (!Enum.TryParse<SupportConversationStatus>(statusFilter, true, out var status))
+                {
+                    return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
+                }
+
+                requestedStatuses.Add(ToCanonicalStatus(status));
             }
-            var requestedStatus = ToCanonicalStatus(status);
-            conversationsQuery = requestedStatus switch
-            {
-                SupportConversationStatus.New => conversationsQuery.Where(
-                    x => x.Status == SupportConversationStatus.New
-                         || (int)x.Status == LegacyWaitingForSupportStatusValue),
-                SupportConversationStatus.InProgress => conversationsQuery.Where(
-                    x => x.Status == SupportConversationStatus.InProgress),
-                SupportConversationStatus.WaitingForUser => conversationsQuery.Where(
-                    x => x.Status == SupportConversationStatus.WaitingForUser),
-                SupportConversationStatus.Closed => conversationsQuery.Where(
-                    x => x.Status == SupportConversationStatus.Closed
-                         || (int)x.Status == LegacyResolvedStatusValue),
-                _ => conversationsQuery
-            };
+
+            var includeNew = requestedStatuses.Contains(SupportConversationStatus.New);
+            var includeInProgress = requestedStatuses.Contains(SupportConversationStatus.InProgress);
+            var includeWaitingForUser = requestedStatuses.Contains(SupportConversationStatus.WaitingForUser);
+            var includeClosed = requestedStatuses.Contains(SupportConversationStatus.Closed);
+
+            conversationsQuery = conversationsQuery.Where(x =>
+                (includeNew && (x.Status == SupportConversationStatus.New || (int)x.Status == LegacyWaitingForSupportStatusValue))
+                || (includeInProgress && x.Status == SupportConversationStatus.InProgress)
+                || (includeWaitingForUser && x.Status == SupportConversationStatus.WaitingForUser)
+                || (includeClosed && (x.Status == SupportConversationStatus.Closed || (int)x.Status == LegacyResolvedStatusValue)));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Source))
         {
             if (!Enum.TryParse<SupportConversationSource>(query.Source, true, out var source))
             {
-                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
+                return Result.Failure<SupportConversationInboxPageResponse>(InvalidSource);
             }
 
             var requestedSource = ToCanonicalSource(source);
@@ -198,7 +211,7 @@ public sealed partial class SupportChatService(
         {
             if (!Enum.TryParse<SupportConversationPriority>(query.Priority, true, out var priority))
             {
-                return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
+                return Result.Failure<SupportConversationInboxPageResponse>(InvalidPriority);
             }
 
             conversationsQuery = conversationsQuery.Where(x => x.Priority == priority);
@@ -224,16 +237,49 @@ public sealed partial class SupportChatService(
 
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+
+        var normalizedSort = query.Sort?.Trim().ToLowerInvariant();
+        if (normalizedSort is not (null or "" or "default" or "priority" or "waiting" or "updated" or "created"))
+        {
+            return Result.Failure<SupportConversationInboxPageResponse>(InvalidSort);
+        }
+
         var totalCount = await conversationsQuery.CountAsync(cancellationToken);
 
-        var conversationRows = await conversationsQuery
-            .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
-            .ThenBy(x => x.Status == SupportConversationStatus.New ? 0
-                : x.Status == SupportConversationStatus.InProgress ? 1
-                : x.Status == SupportConversationStatus.WaitingForUser ? 2
-                : 3)
-            .ThenBy(x => x.WaitingSinceUtc ?? x.LastMessageAtUtc ?? x.CreatedAtUtc)
-            .ThenByDescending(x => x.UpdatedAtUtc)
+        var orderedConversationsQuery = normalizedSort switch
+        {
+            "priority" => conversationsQuery
+                .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
+                .ThenByDescending(x => x.Priority)
+                .ThenBy(x => x.WaitingSinceUtc ?? x.LastMessageAtUtc ?? x.CreatedAtUtc)
+                .ThenByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id),
+            "waiting" => conversationsQuery
+                .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
+                .ThenBy(x => x.WaitingSinceUtc ?? x.LastMessageAtUtc ?? x.CreatedAtUtc)
+                .ThenByDescending(x => x.Priority)
+                .ThenByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id),
+            "updated" => conversationsQuery
+                .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
+                .ThenByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id),
+            "created" => conversationsQuery
+                .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
+                .ThenByDescending(x => x.CreatedAtUtc)
+                .ThenByDescending(x => x.Id),
+            _ => conversationsQuery
+                .OrderBy(x => x.Status == SupportConversationStatus.Closed ? 1 : 0)
+                .ThenBy(x => x.Status == SupportConversationStatus.New ? 0
+                    : x.Status == SupportConversationStatus.InProgress ? 1
+                    : x.Status == SupportConversationStatus.WaitingForUser ? 2
+                    : 3)
+                .ThenBy(x => x.WaitingSinceUtc ?? x.LastMessageAtUtc ?? x.CreatedAtUtc)
+                .ThenByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id)
+        };
+
+        var conversationRows = await orderedConversationsQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(conversation => new
@@ -262,6 +308,7 @@ public sealed partial class SupportChatService(
                 LastMessage = conversation.Messages
                     .Where(message => message.SenderType != SupportMessageSenderType.System && !message.IsInternalNote)
                     .OrderByDescending(message => message.CreatedAtUtc)
+                    .ThenByDescending(message => message.Id)
                     .Select(message => new
                     {
                         message.Body,

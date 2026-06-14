@@ -105,6 +105,37 @@ public sealed partial class SupportChatService
 
         var conversation = await supportChatDbContext.SupportConversations
             .AsNoTracking()
+            .Select(x => new
+            {
+                x.Id,
+                x.InitiatorUserId,
+                x.AssignedAdminId,
+                x.Status,
+                x.Priority,
+                x.Source,
+                x.TagsJson,
+                x.AssistantScenario,
+                x.RelatedGenerationId,
+                x.RelatedPaymentId,
+                x.RelatedSubscriptionId,
+                x.CreatedAtUtc,
+                x.UpdatedAtUtc,
+                x.LastMessageAtUtc,
+                x.LastMessagePreview,
+                x.LastMessageSenderType,
+                x.WaitingSinceUtc,
+                x.ResolvedAtUtc,
+                x.ReopenUntilUtc,
+                x.ClosedAtUtc,
+                x.ClosedByUserId,
+                x.ReopenedAtUtc,
+                x.ReopenedByUserId,
+                x.FeedbackRating,
+                x.FeedbackComment,
+                x.FeedbackSubmittedAtUtc,
+                UserUnreadCount = x.Messages.Count(message => message.IsFromAdmin && message.ReadAtUtc == null),
+                AdminUnreadCount = x.Messages.Count(message => !message.IsFromAdmin && message.ReadAtUtc == null)
+            })
             .FirstAsync(x => x.Id == conversationId, cancellationToken);
 
         var messagesQuery = supportChatDbContext.ConversationMessages
@@ -115,13 +146,22 @@ public sealed partial class SupportChatService
 
         if (query?.BeforeMessageCreatedAtUtc is { } beforeMessageCreatedAtUtc)
         {
-            messagesQuery = messagesQuery.Where(x => x.CreatedAtUtc < beforeMessageCreatedAtUtc);
+            messagesQuery = query.BeforeMessageId is { } beforeMessageId
+                ? messagesQuery.Where(x =>
+                    x.CreatedAtUtc < beforeMessageCreatedAtUtc ||
+                    (x.CreatedAtUtc == beforeMessageCreatedAtUtc && x.Id.CompareTo(beforeMessageId) < 0))
+                : messagesQuery.Where(x => x.CreatedAtUtc < beforeMessageCreatedAtUtc);
         }
 
-        var visibleMessages = await messagesQuery
+        var pagedMessages = await messagesQuery
             .OrderByDescending(x => x.CreatedAtUtc)
-            .Take(normalizedTake)
+            .ThenByDescending(x => x.Id)
+            .Take(normalizedTake + 1)
             .ToListAsync(cancellationToken);
+        var hasOlderMessages = pagedMessages.Count > normalizedTake;
+        var visibleMessages = pagedMessages
+            .Take(normalizedTake)
+            .ToList();
         visibleMessages.Reverse();
 
         var userIds = visibleMessages
@@ -170,17 +210,7 @@ public sealed partial class SupportChatService
                 message.CreatedAtUtc));
         }
 
-        var userUnreadCount = await supportChatDbContext.ConversationMessages.CountAsync(
-            x => x.ConversationId == conversationId && x.IsFromAdmin && x.ReadAtUtc == null,
-            cancellationToken);
-        var adminUnreadCount = await supportChatDbContext.ConversationMessages.CountAsync(
-            x => x.ConversationId == conversationId && !x.IsFromAdmin && x.ReadAtUtc == null,
-            cancellationToken);
-
         var oldestLoadedMessageCreatedAtUtc = visibleMessages.FirstOrDefault()?.CreatedAtUtc;
-        var hasOlderMessages = oldestLoadedMessageCreatedAtUtc.HasValue && await supportChatDbContext.ConversationMessages.AnyAsync(
-            x => x.ConversationId == conversationId && x.CreatedAtUtc < oldestLoadedMessageCreatedAtUtc.Value,
-            cancellationToken);
 
         var now = DateTime.UtcNow;
         var normalizedStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
@@ -208,8 +238,8 @@ public sealed partial class SupportChatService
             conversation.RelatedGenerationId,
             conversation.RelatedPaymentId,
             conversation.RelatedSubscriptionId,
-            userUnreadCount,
-            adminUnreadCount,
+            conversation.UserUnreadCount,
+            conversation.AdminUnreadCount,
             conversation.CreatedAtUtc,
             conversation.UpdatedAtUtc,
             conversation.LastMessageAtUtc ?? lastVisibleMessage?.CreatedAtUtc,

@@ -179,6 +179,54 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AdminInbox_ShouldAcceptRepeatedStatusFiltersWithPrioritySort()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var otherUserClient = application.CreateClient(OtherUserId, "User");
+        var adminClient = application.CreateClient(AdminId, "Admin");
+
+        var newTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("New high priority case", SupportConversationPriority.High));
+
+        var waitingTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            otherUserClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Waiting case", SupportConversationPriority.Normal));
+
+        await PostAsJsonAsync<SupportMessageResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{waitingTicket.ConversationId}/messages",
+            new SendSupportMessageRequest("Need more details"));
+
+        var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
+            adminClient,
+            "/api/admin/support/tickets?status=New&status=WaitingForUser&sort=priority&page=1&pageSize=10");
+
+        Assert.Equal(2, tickets.TotalCount);
+        Assert.Equal(newTicket.ConversationId, tickets.Items[0].ConversationId);
+        Assert.Equal("High", tickets.Items[0].Priority);
+        Assert.Contains(tickets.Items, item => item.Status == "New");
+        Assert.Contains(tickets.Items, item => item.Status == "WaitingForUser");
+    }
+
+    [Fact]
+    public async Task AdminInbox_ShouldReturnFieldSpecificProblemForInvalidAssignmentFilter()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        using var response = await application.CreateClient(AdminId, "Admin")
+            .GetAsync("/api/admin/support/tickets?assignment=everyone");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("support.assignment_invalid", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AdminTicketEndpoints_ShouldExposeQueueActionsAndContext()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -569,6 +617,64 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task AttachmentBatchEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help with batch upload", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "files", "issue.png");
+        form.Add(new StringContent(new string('x', 4001)), "body");
+        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
+
+        using var response = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/messages/attachments",
+            form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
+    }
+
+    [Fact]
+    public async Task UserSingleAttachmentEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var userClient = application.CreateClient(UserId, "User");
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            userClient,
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need help with single upload", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "issue.png");
+        form.Add(new StringContent(new string('x', 4001)), "body");
+        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
+
+        using var response = await userClient.PostAsync(
+            $"/api/support/conversation/{created.ConversationId}/attachments",
+            form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
+    }
+
+    [Fact]
     public async Task UserMessageEndpoint_ShouldAppendLocalizedAutomaticReply_ForFirstMessage()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -598,6 +704,34 @@ public sealed class SupportChatEndpointsIntegrationTests
             botMessage.Body);
         Assert.True(botMessage.IsFromAdmin);
         Assert.True(botMessage.IsRead);
+    }
+
+    [Fact]
+    public async Task AdminSingleAttachmentEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Need admin upload review", SupportConversationPriority.Normal));
+
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+        form.Add(fileContent, "file", "admin-screenshot.png");
+        form.Add(new StringContent(new string('x', 4001)), "body");
+        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
+
+        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/attachments",
+            form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
     }
 
     [Fact]
@@ -837,6 +971,9 @@ public sealed class SupportChatEndpointsIntegrationTests
         public HttpClient AnonymousClient { get; }
 
         public TestServer Server => app.GetTestServer();
+
+        public FakeSupportAttachmentStorage AttachmentStorage =>
+            (FakeSupportAttachmentStorage)app.Services.GetRequiredService<ISupportAttachmentStorage>();
 
         public static async Task<SupportChatTestApplication> CreateAsync()
         {
@@ -1122,6 +1259,8 @@ public sealed class SupportChatEndpointsIntegrationTests
             "video/quicktime"
         };
 
+        public int StoreCallCount { get; private set; }
+
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
@@ -1131,6 +1270,8 @@ public sealed class SupportChatEndpointsIntegrationTests
             SupportAttachmentUploadCommand attachment,
             CancellationToken cancellationToken)
         {
+            StoreCallCount++;
+
             var normalizedContentType = NormalizeContentType(attachment.ContentType);
             if (!AllowedContentTypes.Contains(normalizedContentType))
             {

@@ -67,6 +67,7 @@ public static partial class SupportChatEndpoints
         HttpContext httpContext,
         [FromQuery] int? take,
         [FromQuery] DateTime? beforeMessageCreatedAtUtc,
+        [FromQuery] Guid? beforeMessageId,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -79,7 +80,8 @@ public static partial class SupportChatEndpoints
             userId,
             new SupportConversationMessagesQuery(
                 Take: take ?? 60,
-                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc),
+                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc,
+                BeforeMessageId: beforeMessageId),
             cancellationToken);
         if (result.IsFailure)
         {
@@ -95,7 +97,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromForm] IFormFile? file,
         [FromForm] string? body,
-        [FromForm] Guid? replyToMessageId,
+        [FromForm] string? replyToMessageId,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
         [FromServices] ISupportChatService service,
@@ -114,6 +116,12 @@ public static partial class SupportChatEndpoints
             });
         }
 
+        var formValidationErrors = ValidateSingleAttachmentFormFields(body, replyToMessageId, out var parsedReplyToMessageId);
+        if (formValidationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(formValidationErrors);
+        }
+
         var requestedContentType = file.ContentType ?? "application/octet-stream";
         var normalizedBody = string.IsNullOrWhiteSpace(body)
             ? Path.GetFileName(file.FileName)
@@ -127,7 +135,7 @@ public static partial class SupportChatEndpoints
                 IsAdmin: true,
                 AttachmentFileName: Path.GetFileName(file.FileName),
                 AttachmentContentType: requestedContentType,
-                ReplyToMessageId: replyToMessageId),
+                ReplyToMessageId: parsedReplyToMessageId),
             cancellationToken);
 
         if (createMessageResult.IsFailure)
@@ -269,6 +277,37 @@ public static partial class SupportChatEndpoints
                 $"Cannot upload more than {AttachmentBatchMaxCount} attachments in a single message."));
         }
 
+        var rawBody = form.TryGetValue("body", out var bodyValue)
+            ? bodyValue.ToString()
+            : string.Empty;
+        var locale = form.TryGetValue("locale", out var localeValue)
+            ? localeValue.ToString()
+            : null;
+        var validationErrors = new Dictionary<string, string[]>();
+        if (rawBody.Length > 4000)
+        {
+            validationErrors["body"] = ["Support message body must be at most 4000 characters."];
+        }
+
+        Guid? replyToMessageId = null;
+        if (form.TryGetValue("replyToMessageId", out var replyToMessageValue)
+            && !string.IsNullOrWhiteSpace(replyToMessageValue.ToString()))
+        {
+            if (Guid.TryParse(replyToMessageValue.ToString(), out var parsedReplyToMessageId))
+            {
+                replyToMessageId = parsedReplyToMessageId;
+            }
+            else
+            {
+                validationErrors["replyToMessageId"] = ["Reply target message id must be a valid GUID."];
+            }
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(validationErrors);
+        }
+
         var storedAttachments = new List<StoredSupportAttachmentResponse>(files.Count);
         foreach (var file in files)
         {
@@ -289,17 +328,6 @@ public static partial class SupportChatEndpoints
 
             storedAttachments.Add(storeResult.Value);
         }
-
-        var rawBody = form.TryGetValue("body", out var bodyValue)
-            ? bodyValue.ToString()
-            : string.Empty;
-        var locale = form.TryGetValue("locale", out var localeValue)
-            ? localeValue.ToString()
-            : null;
-        var replyToMessageId = form.TryGetValue("replyToMessageId", out var replyToMessageValue)
-            && Guid.TryParse(replyToMessageValue.ToString(), out var parsedReplyToMessageId)
-                ? parsedReplyToMessageId
-                : (Guid?)null;
 
         var command = new SendSupportAttachmentsCommand(
             conversationId,
@@ -332,6 +360,36 @@ public static partial class SupportChatEndpoints
         }
 
         return TypedResults.Ok(sendResult.Value);
+    }
+
+    private static Dictionary<string, string[]> ValidateSingleAttachmentFormFields(
+        string? body,
+        string? rawReplyToMessageId,
+        out Guid? replyToMessageId)
+    {
+        replyToMessageId = null;
+        var validationErrors = new Dictionary<string, string[]>();
+
+        if ((body ?? string.Empty).Length > 4000)
+        {
+            validationErrors["body"] = ["Support message body must be at most 4000 characters."];
+        }
+
+        if (string.IsNullOrWhiteSpace(rawReplyToMessageId))
+        {
+            return validationErrors;
+        }
+
+        if (Guid.TryParse(rawReplyToMessageId, out var parsedReplyToMessageId))
+        {
+            replyToMessageId = parsedReplyToMessageId;
+        }
+        else
+        {
+            validationErrors["replyToMessageId"] = ["Reply target message id must be a valid GUID."];
+        }
+
+        return validationErrors;
     }
 
     private static async Task CleanupStoredAttachmentsAsync(
@@ -460,7 +518,7 @@ public static partial class SupportChatEndpoints
 
     private static async Task<Results<Ok<SupportConversationInboxPageResponse>, ProblemHttpResult>> ListAdminInboxAsync(
         HttpContext httpContext,
-        [FromQuery] string? status,
+        [FromQuery] string[]? status,
         [FromQuery] string? assignment,
         [FromQuery] Guid? assignedTo,
         [FromQuery] string? source,
@@ -482,7 +540,7 @@ public static partial class SupportChatEndpoints
         {
             return TypedResults.Problem(
                 statusCode: StatusCodes.Status400BadRequest,
-                title: "Validation error",
+                title: "support.assignment_invalid",
                 detail: "Support inbox assignment filter is not supported.");
         }
 
@@ -490,9 +548,36 @@ public static partial class SupportChatEndpoints
         var requestedPageSize = pageSize is null or <= 0 ? 50 : pageSize.Value;
         var query = normalizedAssignment switch
         {
-            "mine" => new ListAdminSupportInboxQuery(status, AssignedAdminId: userId, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort),
-            "unassigned" => new ListAdminSupportInboxQuery(status, UnassignedOnly: true, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort),
-            _ => new ListAdminSupportInboxQuery(status, AssignedAdminId: assignedTo, Source: source, Priority: priority, Search: search, Page: requestedPage, PageSize: requestedPageSize, Sort: sort)
+            "mine" => new ListAdminSupportInboxQuery(
+                status?.FirstOrDefault(),
+                AssignedAdminId: userId,
+                Source: source,
+                Priority: priority,
+                Search: search,
+                Page: requestedPage,
+                PageSize: requestedPageSize,
+                Sort: sort,
+                Statuses: status),
+            "unassigned" => new ListAdminSupportInboxQuery(
+                status?.FirstOrDefault(),
+                UnassignedOnly: true,
+                Source: source,
+                Priority: priority,
+                Search: search,
+                Page: requestedPage,
+                PageSize: requestedPageSize,
+                Sort: sort,
+                Statuses: status),
+            _ => new ListAdminSupportInboxQuery(
+                status?.FirstOrDefault(),
+                AssignedAdminId: assignedTo,
+                Source: source,
+                Priority: priority,
+                Search: search,
+                Page: requestedPage,
+                PageSize: requestedPageSize,
+                Sort: sort,
+                Statuses: status)
         };
 
         var result = await service.ListAdminInboxAsync(query, cancellationToken);
@@ -516,6 +601,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromQuery] int? take,
         [FromQuery] DateTime? beforeMessageCreatedAtUtc,
+        [FromQuery] Guid? beforeMessageId,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -523,7 +609,8 @@ public static partial class SupportChatEndpoints
             conversationId,
             new SupportConversationMessagesQuery(
                 Take: take ?? 60,
-                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc),
+                BeforeMessageCreatedAtUtc: beforeMessageCreatedAtUtc,
+                BeforeMessageId: beforeMessageId),
             cancellationToken);
         if (result.IsFailure)
         {

@@ -328,6 +328,103 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task ListAdminInboxAsync_ShouldApplyMultiStatusPriorityAndSortOnBackend()
+    {
+        var store = CreateStore();
+
+        var normalUserId = Guid.NewGuid();
+        var highUserId = Guid.NewGuid();
+        var waitingUserId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, normalUserId, "normal@petmagic.test", "Normal User");
+        await SeedUserAsync(store, highUserId, "high@petmagic.test", "High User");
+        await SeedUserAsync(store, waitingUserId, "waiting@petmagic.test", "Waiting User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid normalConversationId;
+        Guid highConversationId;
+        Guid waitingConversationId;
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            normalConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(normalUserId, "Normal case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+            highConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(highUserId, "High case", SupportConversationPriority.High),
+                CancellationToken.None)).Value.ConversationId;
+            waitingConversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(waitingUserId, "Waiting case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var replyScope = await store.CreateScopeAsync())
+        {
+            var replyResult = await replyScope.CreateService().SendMessageAsync(
+                new SendSupportMessageCommand(waitingConversationId, adminId, "Waiting on user", true),
+                CancellationToken.None);
+
+            Assert.True(replyResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var result = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Priority: null,
+                PageSize: 10,
+                Sort: "priority",
+                Statuses: ["New", "WaitingForUser"]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value.TotalCount);
+        Assert.Equal(highConversationId, result.Value.Items[0].ConversationId);
+        Assert.Equal("High", result.Value.Items[0].Priority);
+        Assert.Contains(result.Value.Items, item => item.ConversationId == normalConversationId && item.Status == "New");
+        Assert.Contains(result.Value.Items, item => item.ConversationId == waitingConversationId && item.Status == "WaitingForUser");
+
+        var highOnly = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Priority: "High",
+                PageSize: 10,
+                Sort: "priority",
+                Statuses: ["New", "WaitingForUser"]),
+            CancellationToken.None);
+
+        Assert.True(highOnly.IsSuccess);
+        var highItem = Assert.Single(highOnly.Value.Items);
+        Assert.Equal(highConversationId, highItem.ConversationId);
+    }
+
+    [Theory]
+    [InlineData(null, "not-a-source", null, "support.source_invalid")]
+    [InlineData(null, null, "not-a-priority", "support.priority_invalid")]
+    [InlineData("not-a-sort", null, null, "support.sort_invalid")]
+    public async Task ListAdminInboxAsync_ShouldReturnFieldSpecificFilterErrors(
+        string? sort,
+        string? source,
+        string? priority,
+        string expectedErrorCode)
+    {
+        var store = CreateStore();
+
+        await using var scope = await store.CreateScopeAsync();
+        var result = await scope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Source: source,
+                Priority: priority,
+                Sort: sort),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(expectedErrorCode, result.Error.Code);
+    }
+
+    [Fact]
     public async Task GetAdminInboxMetricsAsync_ShouldReturnBackendAggregatedQueueCounts()
     {
         var store = CreateStore();

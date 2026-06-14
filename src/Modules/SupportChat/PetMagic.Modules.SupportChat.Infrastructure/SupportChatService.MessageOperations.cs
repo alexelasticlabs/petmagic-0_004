@@ -49,7 +49,6 @@ public sealed partial class SupportChatService
         CancellationToken cancellationToken)
     {
         var conversation = await supportChatDbContext.SupportConversations
-            .Include(x => x.Messages)
             .FirstOrDefaultAsync(x => x.Id == conversationId, cancellationToken);
         if (conversation is null)
         {
@@ -82,9 +81,14 @@ public sealed partial class SupportChatService
 
         var firstAttachment = normalizedAttachments.FirstOrDefault();
         var currentStatus = ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId);
-        var shouldAppendAutomaticReply = !isAdmin
-            && !conversation.Messages.Any(message =>
-                message.SenderType is SupportMessageSenderType.User or SupportMessageSenderType.Bot);
+        var hasExistingUserOrBotMessage = isAdmin || await supportChatDbContext.ConversationMessages
+            .AsNoTracking()
+            .AnyAsync(
+                message => message.ConversationId == conversationId
+                    && (message.SenderType == SupportMessageSenderType.User
+                        || message.SenderType == SupportMessageSenderType.Bot),
+                cancellationToken);
+        var shouldAppendAutomaticReply = !isAdmin && !hasExistingUserOrBotMessage;
         var shouldAppendReopenedEvent = !isAdmin && currentStatus == SupportConversationStatus.Closed;
 
         var message = await AppendMessageAsync(
@@ -160,7 +164,6 @@ public sealed partial class SupportChatService
     public async Task<Result<SupportMessageResponse>> CreateAttachmentMessageAsync(CreateSupportAttachmentMessageCommand command, CancellationToken cancellationToken)
     {
         var conversation = await supportChatDbContext.SupportConversations
-            .Include(x => x.Messages)
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
         {
@@ -423,7 +426,6 @@ public sealed partial class SupportChatService
     public async Task<Result> MarkConversationReadAsync(MarkSupportConversationReadCommand command, CancellationToken cancellationToken)
     {
         var conversation = await supportChatDbContext.SupportConversations
-            .Include(x => x.Messages)
             .FirstOrDefaultAsync(x => x.Id == command.ConversationId, cancellationToken);
         if (conversation is null)
         {
@@ -439,7 +441,13 @@ public sealed partial class SupportChatService
         var now = DateTime.UtcNow;
         var changed = false;
 
-        foreach (var message in conversation.Messages.Where(x => x.IsFromAdmin == markAdminMessages && x.ReadAtUtc is null))
+        var unreadMessages = await supportChatDbContext.ConversationMessages
+            .Where(message => message.ConversationId == conversation.Id
+                && message.IsFromAdmin == markAdminMessages
+                && message.ReadAtUtc == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var message in unreadMessages)
         {
             message.ReadAtUtc = now;
             changed = true;

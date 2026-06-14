@@ -21,7 +21,8 @@ public sealed record ListAdminSupportInboxQuery(
     string? Search = null,
     int Page = 1,
     int PageSize = 50,
-    string? Sort = null);
+    string? Sort = null,
+    IReadOnlyList<string>? Statuses = null);
 
 public sealed record SupportConversationInboxPageResponse(
     IReadOnlyList<SupportConversationSummaryResponse> Items,
@@ -39,7 +40,8 @@ public sealed record AdminSupportInboxMetricsResponse(
 
 public sealed record SupportConversationMessagesQuery(
     int Take = 60,
-    DateTime? BeforeMessageCreatedAtUtc = null);
+    DateTime? BeforeMessageCreatedAtUtc = null,
+    Guid? BeforeMessageId = null);
 
 public sealed record SendSupportMessageCommand(
     Guid ConversationId,

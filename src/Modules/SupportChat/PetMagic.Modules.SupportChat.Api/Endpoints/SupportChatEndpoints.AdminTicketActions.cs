@@ -245,7 +245,9 @@ public static partial class SupportChatEndpoints
             "support.template_not_found" => StatusCodes.Status404NotFound,
             "support.forbidden" => StatusCodes.Status403Forbidden,
             "support.status_transition_invalid" => StatusCodes.Status400BadRequest,
+            "support.source_invalid" => StatusCodes.Status400BadRequest,
             "support.priority_invalid" => StatusCodes.Status400BadRequest,
+            "support.sort_invalid" => StatusCodes.Status400BadRequest,
             "support.tags_invalid" => StatusCodes.Status400BadRequest,
             "support.invalid_subject" => StatusCodes.Status401Unauthorized,
             "support.attachment_invalid_upload" => StatusCodes.Status400BadRequest,
@@ -323,4 +325,3 @@ public static partial class SupportChatEndpoints
 
     public sealed record UpsertSupportReplyTemplateRequest(string Title, string Body, bool IsEnabled = true, int SortOrder = 0);
 }
-
