@@ -122,12 +122,11 @@ Current frontend state:
   `page`, and `pageSize` query params.
 - Exact status, archive, and unassigned filters are wired through those backend
   params.
-- The UI no longer exposes priority or alternate sort controls as global queue
-  filters because the current support inbox endpoint does not accept `priority`
-  or `sort`.
-- The UI no longer exposes the composite "waiting" quick filter because it would
-  require `New OR WaitingForUser`, while the current backend contract accepts
-  only one `status` value.
+- The backend support inbox endpoint accepts `priority`, `sort`, and repeated
+  `status` filters.
+- The UI still keeps priority, alternate sort controls, and the composite
+  "waiting" quick filter hidden until the visible controls are wired to the
+  backend query params and React Query keys.
 
 Production risk:
 
@@ -139,10 +138,9 @@ Production risk:
 
 Required backend contract:
 
-- Add `priority`, `sort`, and multi-status support to
-  `GET /api/admin/support/tickets`, for example:
-  `?status=New&status=WaitingForUser&priority=High&sort=priority&page=&pageSize=`.
-- Preserve existing `assignment`, `search`, `page`, and `pageSize` semantics.
+- Preserve `priority`, `sort`, repeated `status`, `assignment`, `search`,
+  `page`, and `pageSize` semantics in
+  `GET /api/admin/support/tickets`.
 - Continue returning the current paged response object (`items`, `page`,
   `pageSize`, `totalCount`, `hasMore`) so filter totals and page controls remain
   authoritative.
