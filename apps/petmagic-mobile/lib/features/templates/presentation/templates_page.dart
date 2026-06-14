@@ -27,7 +27,9 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/loading/magic_loading_screen.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class TemplatesPage extends ConsumerStatefulWidget {
@@ -769,54 +771,46 @@ class _TokenBalance extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: colors.border),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            InkWell(
-              onTap: onPressed,
-              borderRadius: BorderRadius.circular(22),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const PawSparkIcon(size: 18),
-                    const SizedBox(width: 6),
-                    Text(
-                      '$balance',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colors.textStrong,
-                        fontSize: 12.8,
-                        fontWeight: FontWeight.w700,
-                      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _HeaderActionSurface(
+            onPressed: onPressed,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const PawSparkIcon(size: 18),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$balance',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colors.textStrong,
+                      fontSize: 12.8,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Container(width: 1, height: 32, color: colors.border),
+          Tooltip(
+            message: addTooltip,
+            child: _HeaderActionSurface(
+              onPressed: onAddPressed,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Icon(
+                  Icons.add_rounded,
+                  color: colors.textStrong,
+                  size: 19,
                 ),
               ),
             ),
-            Container(width: 1, height: 32, color: colors.border),
-            Tooltip(
-              message: addTooltip,
-              child: InkWell(
-                onTap: onAddPressed,
-                borderRadius: BorderRadius.circular(22),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 8,
-                  ),
-                  child: Icon(
-                    Icons.add_rounded,
-                    color: colors.textStrong,
-                    size: 19,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -837,24 +831,20 @@ class _HeaderButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(22),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 18),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Icon(icon, color: color, size: 20),
-          ),
+    return _HeaderActionSurface(
+      onPressed: onPressed,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceGlass,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: colors.border),
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: 0.12), blurRadius: 18),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(icon, color: color, size: 20),
         ),
       ),
     );
@@ -917,42 +907,35 @@ class _StateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
     final bottomInset = petMagicBottomNavInset(
       context,
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
     );
 
-    return Padding(
+    return PetMagicAsyncStateView(
+      icon: icon,
+      title: title,
+      message: message,
+      actionLabel: actionLabel,
+      onAction: onAction,
       padding: EdgeInsets.fromLTRB(28, 36, 28, bottomInset),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: colors.accent, size: 46),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: colors.textStrong,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.textMuted,
-              fontSize: 13,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: onAction, child: Text(actionLabel)),
-        ],
-      ),
+    );
+  }
+}
+
+class _HeaderActionSurface extends StatelessWidget {
+  const _HeaderActionSurface({required this.onPressed, required this.child});
+
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return PetMagicInteractiveSurface(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(22),
+      scaleDown: 0.97,
+      child: child,
     );
   }
 }

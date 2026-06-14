@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/shared/widgets/motion.dart';
 
 class AuthBackdrop extends StatelessWidget {
   const AuthBackdrop({super.key});
@@ -77,126 +78,137 @@ class AuthHero extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 360;
+        final stackedCompact = compact && constraints.maxWidth < 340;
         final imageHeight = compact
-            ? (narrow ? 126.0 : 140.0)
+            ? (stackedCompact ? 116.0 : (narrow ? 126.0 : 140.0))
             : (narrow ? 172.0 : 196.0);
-        return ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: compact ? 152 : (narrow ? 190 : 214),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        final textBlock = Padding(
+          padding: EdgeInsets.only(bottom: compact ? 6 : (narrow ? 12 : 20)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: compact ? 13 : (narrow ? 12 : 11),
-                child: Padding(
-                  padding: EdgeInsets.only(
-                    bottom: compact ? 6 : (narrow ? 12 : 20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AuthWordmark(isDark: isDark, compact: compact),
-                      SizedBox(height: compact ? 6 : 10),
-                      Text(
-                        title,
-                        maxLines: 2,
-                        softWrap: true,
-                        overflow: TextOverflow.visible,
-                        style: titleStyle?.copyWith(
-                          fontSize: compact ? 18.5 : (narrow ? 20 : 22),
-                          height: compact ? 1.04 : 1.08,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0,
-                          color: colors.textStrong,
-                        ),
-                      ),
-                      SizedBox(height: compact ? 5 : 8),
-                      Text(
-                        subtitle,
-                        maxLines: compact ? 2 : 3,
-                        overflow: TextOverflow.visible,
-                        style: subtitleStyle?.copyWith(
-                          fontSize: compact ? 11.1 : (narrow ? 11.8 : 12.6),
-                          height: compact ? 1.28 : 1.36,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textSoft,
-                        ),
-                      ),
-                    ],
+              AuthWordmark(isDark: isDark, compact: compact),
+              SizedBox(height: compact ? 6 : 10),
+              Text(
+                title,
+                maxLines: stackedCompact ? 3 : 2,
+                softWrap: true,
+                overflow: TextOverflow.visible,
+                style: titleStyle?.copyWith(
+                  fontSize: compact ? 18.5 : (narrow ? 20 : 22),
+                  height: compact ? 1.04 : 1.08,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0,
+                  color: colors.textStrong,
+                ),
+              ),
+              SizedBox(height: compact ? 5 : 8),
+              Text(
+                subtitle,
+                maxLines: stackedCompact ? 3 : (compact ? 2 : 3),
+                overflow: TextOverflow.visible,
+                style: subtitleStyle?.copyWith(
+                  fontSize: compact ? 11.1 : (narrow ? 11.8 : 12.6),
+                  height: compact ? 1.28 : 1.36,
+                  fontWeight: FontWeight.w600,
+                  color: colors.textSoft,
+                ),
+              ),
+            ],
+          ),
+        );
+        final artwork = SizedBox(
+          height: imageHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        colors.gold.withValues(alpha: isDark ? 0.1 : 0.13),
+                        colors.accent.withValues(alpha: isDark ? 0.18 : 0.22),
+                        colors.accent.withValues(alpha: 0.06),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.08, 0.42, 0.76, 1],
+                    ),
                   ),
                 ),
               ),
-              SizedBox(width: compact ? 2 : (narrow ? 0 : 6)),
-              Expanded(
-                flex: compact ? 7 : (narrow ? 8 : 9),
-                child: SizedBox(
-                  height: imageHeight,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: RadialGradient(
-                              colors: [
-                                colors.gold.withValues(
-                                  alpha: isDark ? 0.1 : 0.13,
-                                ),
-                                colors.accent.withValues(
-                                  alpha: isDark ? 0.18 : 0.22,
-                                ),
-                                colors.accent.withValues(alpha: 0.06),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.08, 0.42, 0.76, 1],
-                            ),
-                          ),
+              Positioned(
+                left: compact ? 8 : (narrow ? 12 : 18),
+                right: compact ? 8 : (narrow ? 12 : 18),
+                top: compact ? 34 : (narrow ? 48 : 52),
+                bottom: compact ? 4 : 8,
+                child: Transform.rotate(
+                  angle: -0.1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(30),
+                      color: colors.surfaceGlass.withValues(
+                        alpha: isDark ? 0.24 : 0.68,
+                      ),
+                      border: Border.all(
+                        color: colors.border.withValues(
+                          alpha: isDark ? 0.45 : 0.55,
                         ),
                       ),
-                      Positioned(
-                        left: compact ? 8 : (narrow ? 12 : 18),
-                        right: compact ? 8 : (narrow ? 12 : 18),
-                        top: compact ? 34 : (narrow ? 48 : 52),
-                        bottom: compact ? 4 : 8,
-                        child: Transform.rotate(
-                          angle: -0.1,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30),
-                              color: colors.surfaceGlass.withValues(
-                                alpha: isDark ? 0.24 : 0.68,
-                              ),
-                              border: Border.all(
-                                color: colors.border.withValues(
-                                  alpha: isDark ? 0.45 : 0.55,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: compact ? -8 : (narrow ? -12 : -16),
-                        right: compact ? -8 : (narrow ? -12 : -16),
-                        top: compact ? 26 : (narrow ? 38 : 42),
-                        bottom: compact ? -36 : (narrow ? -46 : -68),
-                        child: Transform.scale(
-                          scale: compact ? 1.0 : (narrow ? 1.06 : 1.12),
-                          alignment: Alignment.bottomCenter,
-                          child: Image.asset(
-                            'assets/auth/petmagic-auth-hero.png',
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: compact ? -8 : (narrow ? -12 : -16),
+                right: compact ? -8 : (narrow ? -12 : -16),
+                top: compact ? 26 : (narrow ? 38 : 42),
+                bottom: compact ? -36 : (narrow ? -46 : -68),
+                child: Transform.scale(
+                  scale: compact ? 1.0 : (narrow ? 1.06 : 1.12),
+                  alignment: Alignment.bottomCenter,
+                  child: Image.asset(
+                    'assets/auth/petmagic-auth-hero.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
             ],
           ),
+        );
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: stackedCompact
+                ? 206
+                : (compact ? 152 : (narrow ? 190 : 214)),
+          ),
+          child: stackedCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    textBlock,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: SizedBox(width: 148, child: artwork),
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      flex: compact ? 13 : (narrow ? 12 : 11),
+                      child: textBlock,
+                    ),
+                    SizedBox(width: compact ? 2 : (narrow ? 0 : 6)),
+                    Expanded(
+                      flex: compact ? 7 : (narrow ? 8 : 9),
+                      child: artwork,
+                    ),
+                  ],
+                ),
         );
       },
     );
@@ -308,7 +320,7 @@ class AuthFormCard extends StatelessWidget {
   }
 }
 
-class AuthField extends StatelessWidget {
+class AuthField extends StatefulWidget {
   const AuthField({
     super.key,
     required this.controller,
@@ -337,93 +349,175 @@ class AuthField extends StatelessWidget {
   final bool compact;
 
   @override
+  State<AuthField> createState() => _AuthFieldState();
+}
+
+class _AuthFieldState extends State<AuthField> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
+  }
+
+  @override
+  void dispose() {
+    _focusNode
+      ..removeListener(_handleFocusChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final labelStyle = Theme.of(context).textTheme.bodyMedium;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inputFill = enabled
+    final hasError = widget.errorText != null && widget.errorText!.isNotEmpty;
+    final isFocused = _focusNode.hasFocus;
+    final duration = PetMotion.effectiveDuration(context, PetMotion.fast);
+    final inputFill = widget.enabled
         ? (isDark ? const Color(0xFF141C24) : const Color(0xFFFCFEFF))
         : colors.surfaceStrong.withValues(alpha: isDark ? 0.62 : 0.5);
-    final iconColor = enabled ? colors.textSoft : colors.textMuted;
+    final iconColor = widget.enabled
+        ? (isFocused ? colors.accent : colors.textSoft)
+        : colors.textMuted;
 
-    return TextField(
-      controller: controller,
-      onChanged: onChanged,
-      enabled: enabled,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      obscureText: obscureText,
-      style: labelStyle?.copyWith(
-        color: enabled ? colors.textStrong : colors.textMuted,
-        fontSize: compact ? 13.2 : 13.6,
-        fontWeight: FontWeight.w700,
-      ),
-      decoration: InputDecoration(
-        constraints: BoxConstraints(minHeight: compact ? 50 : 54),
-        errorText: errorText,
-        hintText: hintText,
-        hintStyle: labelStyle?.copyWith(
-          color: colors.textMuted.withValues(alpha: isDark ? 0.82 : 0.72),
-          fontSize: compact ? 12.6 : 13,
-          fontWeight: FontWeight.w600,
-        ),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 6),
-          child: Icon(prefixIcon, color: iconColor, size: 20),
-        ),
-        prefixIconConstraints: BoxConstraints(
-          minWidth: 44,
-          minHeight: compact ? 50 : 54,
-        ),
-        suffixIcon: trailing,
-        suffixIconColor: iconColor,
-        filled: true,
-        fillColor: inputFill,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: isDark ? const Color(0x665F7D70) : const Color(0xB6BAC8D2),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedContainer(
+          duration: duration,
+          curve: PetMotion.emphasized,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              if (isFocused || hasError)
+                BoxShadow(
+                  color: (hasError ? colors.danger : colors.accent).withValues(
+                    alpha: isDark ? 0.2 : 0.16,
+                  ),
+                  blurRadius: hasError ? 14 : 18,
+                  offset: const Offset(0, 8),
+                ),
+            ],
+          ),
+          child: TextField(
+            focusNode: _focusNode,
+            controller: widget.controller,
+            onChanged: widget.onChanged,
+            enabled: widget.enabled,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            obscureText: widget.obscureText,
+            style: labelStyle?.copyWith(
+              color: widget.enabled ? colors.textStrong : colors.textMuted,
+              fontSize: widget.compact ? 13.2 : 13.6,
+              fontWeight: FontWeight.w700,
+            ),
+            decoration: InputDecoration(
+              constraints: BoxConstraints(minHeight: widget.compact ? 50 : 54),
+              hintText: widget.hintText,
+              hintStyle: labelStyle?.copyWith(
+                color: colors.textMuted.withValues(alpha: isDark ? 0.82 : 0.72),
+                fontSize: widget.compact ? 12.6 : 13,
+                fontWeight: FontWeight.w600,
+              ),
+              prefixIcon: AnimatedSwitcher(
+                duration: duration,
+                child: Padding(
+                  key: ValueKey(iconColor),
+                  padding: const EdgeInsets.only(left: 14, right: 6),
+                  child: Icon(widget.prefixIcon, color: iconColor, size: 20),
+                ),
+              ),
+              prefixIconConstraints: BoxConstraints(
+                minWidth: 44,
+                minHeight: widget.compact ? 50 : 54,
+              ),
+              suffixIcon: widget.trailing,
+              suffixIconColor: iconColor,
+              filled: true,
+              fillColor: inputFill,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: isDark
+                      ? const Color(0x665F7D70)
+                      : const Color(0xB6BAC8D2),
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: hasError ? colors.danger : colors.accent,
+                  width: 1.55,
+                ),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: colors.border.withValues(alpha: isDark ? 0.38 : 0.45),
+                ),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: colors.danger.withValues(alpha: 0.64),
+                  width: 1.2,
+                ),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: colors.danger.withValues(alpha: 0.9),
+                  width: 1.4,
+                ),
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: widget.compact ? 13 : 15,
+              ),
+            ),
           ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(color: colors.accent, width: 1.55),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: colors.border.withValues(alpha: isDark ? 0.38 : 0.45),
+        AnimatedSize(
+          duration: duration,
+          curve: PetMotion.emphasized,
+          alignment: Alignment.topLeft,
+          child: AnimatedSwitcher(
+            duration: duration,
+            child: hasError
+                ? Padding(
+                    key: ValueKey(widget.errorText),
+                    padding: const EdgeInsets.only(left: 6, top: 6),
+                    child: Text(
+                      widget.errorText!,
+                      style: TextStyle(
+                        color: colors.danger.withValues(
+                          alpha: isDark ? 0.92 : 0.86,
+                        ),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                  )
+                : const SizedBox.shrink(key: ValueKey('no-error')),
           ),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: colors.danger.withValues(alpha: 0.64),
-            width: 1.2,
-          ),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(18),
-          borderSide: BorderSide(
-            color: colors.danger.withValues(alpha: 0.9),
-            width: 1.4,
-          ),
-        ),
-        errorStyle: TextStyle(
-          color: colors.danger.withValues(alpha: isDark ? 0.92 : 0.86),
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          height: 1.25,
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: compact ? 13 : 15,
-        ),
-      ),
+      ],
     );
   }
 }
@@ -623,10 +717,12 @@ class LightPrivacyPanel extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
+    this.compact = false,
   });
 
   final String title;
   final String subtitle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -634,13 +730,16 @@ class LightPrivacyPanel extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      margin: EdgeInsets.only(bottom: compact ? 2 : 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 14,
+        vertical: compact ? 11 : 13,
+      ),
       decoration: BoxDecoration(
         color: isDark
             ? colors.accent.withValues(alpha: 0.08)
             : colors.accentSoft.withValues(alpha: 0.34),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(compact ? 18 : 20),
         border: Border.all(
           color: isDark
               ? colors.accent.withValues(alpha: 0.16)
@@ -658,15 +757,19 @@ class LightPrivacyPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: compact ? 30 : 34,
+            height: compact ? 30 : 34,
             decoration: BoxDecoration(
               color: colors.accent.withValues(alpha: isDark ? 0.12 : 0.16),
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(compact ? 10 : 11),
             ),
-            child: Icon(Icons.shield_outlined, color: colors.accent, size: 18),
+            child: Icon(
+              Icons.shield_outlined,
+              color: colors.accent,
+              size: compact ? 16 : 18,
+            ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: compact ? 8 : 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -675,16 +778,16 @@ class LightPrivacyPanel extends StatelessWidget {
                   title,
                   style: TextStyle(
                     color: colors.textStrong,
-                    fontSize: 13.4,
+                    fontSize: compact ? 12.6 : 13.4,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: compact ? 3 : 4),
                 Text(
                   subtitle,
                   style: TextStyle(
                     color: colors.textSoft,
-                    fontSize: 11.8,
+                    fontSize: compact ? 10.9 : 11.8,
                     height: 1.35,
                     fontWeight: FontWeight.w600,
                   ),

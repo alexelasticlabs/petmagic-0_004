@@ -646,6 +646,8 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       return null;
     }
 
+    _stopPolling();
+    _cancelActiveLoad();
     final cancelToken = CancelToken();
     _activeMediaActionCancelToken = cancelToken;
     if (mounted) {
@@ -664,6 +666,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _activeMediaActionCancelToken = null;
     if (mounted) {
       setState(() => _isMediaActionInFlight = false);
+      _startPolling();
     } else {
       _isMediaActionInFlight = false;
     }
@@ -805,7 +808,11 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         widget.generationId,
         cancelToken: loadCancelToken,
       );
-      final generation = await _decorateWithLocalMedia(fetchedGeneration);
+      if (!mounted || loadCancelToken.isCancelled || _isMediaActionInFlight) {
+        return;
+      }
+
+      final generation = _reuseCurrentLocalMedia(fetchedGeneration);
       if (!mounted) {
         return;
       }
@@ -858,9 +865,13 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final cachedGeneration = await repository.readCachedGeneration(
       widget.generationId,
     );
+    if (!mounted) {
+      return;
+    }
+
     final localizedCachedGeneration = cachedGeneration == null
         ? null
-        : await _decorateWithLocalMedia(cachedGeneration);
+        : _reuseCurrentLocalMedia(cachedGeneration);
 
     if (!mounted) {
       return;
@@ -884,32 +895,18 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     });
   }
 
-  Future<TemplateGenerationResult> _decorateWithLocalMedia(
+  TemplateGenerationResult _reuseCurrentLocalMedia(
     TemplateGenerationResult generation,
-  ) async {
-    if (!generation.isCompleted) {
-      return generation.copyWith(
-        clearLocalPreviewPath: true,
-        clearLocalOutputPath: true,
-        isLocalMediaReady: false,
-      );
-    }
-
-    final localRecord = await ref
-        .read(generationGalleryStoreProvider)
-        .readLocalRecord(generation.generationId);
-    if (localRecord == null || localRecord.isDeletedLocally) {
-      return generation.copyWith(
-        clearLocalPreviewPath: true,
-        clearLocalOutputPath: true,
-        isLocalMediaReady: false,
-      );
+  ) {
+    final current = _generation;
+    if (current == null || current.generationId != generation.generationId) {
+      return generation;
     }
 
     return generation.copyWith(
-      localPreviewPath: localRecord.previewLocalPath,
-      localOutputPath: localRecord.outputLocalPath,
-      isLocalMediaReady: localRecord.isDownloadComplete,
+      localPreviewPath: current.localPreviewPath,
+      localOutputPath: current.localOutputPath,
+      isLocalMediaReady: current.isLocalMediaReady,
     );
   }
 

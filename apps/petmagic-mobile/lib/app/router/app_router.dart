@@ -28,6 +28,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_preview
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_page_transitions.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -392,25 +393,5 @@ CustomTransitionPage<T> _buildFadeSlidePage<T>({
   required GoRouterState state,
   required Widget child,
 }) {
-  return CustomTransitionPage<T>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: const Duration(milliseconds: 260),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final fade = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
-      );
-      final offset = Tween<Offset>(
-        begin: const Offset(0, 0.025),
-        end: Offset.zero,
-      ).animate(fade);
-      return FadeTransition(
-        opacity: fade,
-        child: SlideTransition(position: offset, child: child),
-      );
-    },
-  );
+  return buildPetMagicFadeSlidePage(state: state, child: child);
 }

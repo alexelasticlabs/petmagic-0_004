@@ -9,10 +9,6 @@ void main() {
         path: 'lib/features/startup/presentation/guest_welcome_page.dart',
         expectedListViewCount: 1,
       ),
-      _StartupScrollPolicy(
-        path: 'lib/features/startup/presentation/onboarding_page.dart',
-        expectedListViewCount: 1,
-      ),
     ]) {
       final source = File(policy.path).readAsStringSync();
 

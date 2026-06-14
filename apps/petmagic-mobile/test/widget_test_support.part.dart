@@ -13,9 +13,10 @@ Future<void> _pumpApp(
   ProfileRepository? profileRepository,
   ExternalAuthRepository? externalAuthRepository,
   AppLaunchController Function()? appLaunchController,
+  Size surfaceSize = const Size(1080, 1920),
 }) async {
   final view = tester.view;
-  view.physicalSize = const Size(1080, 1920);
+  view.physicalSize = surfaceSize;
   view.devicePixelRatio = 1.0;
 
   final sharedPrefsWithoutSession = Map<String, Object>.from(sharedPrefs)
@@ -472,6 +473,16 @@ class _FakeProfileRepository extends ProfileRepository {
     required String newPassword,
   }) async {
     passwordResetConfirmedFor = email;
+  }
+}
+
+class _UnavailableLegalDocumentsProfileRepository
+    extends _FakeProfileRepository {
+  @override
+  Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
+    required String locale,
+  }) async {
+    throw const AppException('Legal documents unavailable', statusCode: 503);
   }
 }
 

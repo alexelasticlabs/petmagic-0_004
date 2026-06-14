@@ -11,6 +11,8 @@ void main() {
     expect(source, contains('int _registrationEpoch = 0;'));
     expect(source, contains('Future<bool> _registerTokenWithRetry('));
     expect(source, contains('required int epoch,'));
+    expect(source, contains('PushTokenRegistrar'));
+    expect(source, contains('_pushTokenRegistrar.registerToken'));
     expect(source, contains('bool _canContinueRegistration(int epoch)'));
     expect(
       source,
@@ -29,6 +31,7 @@ void main() {
         'dispose() async {\n    _isDisposed = true;\n    _registrationEpoch++;',
       ),
     );
+    expect(source, contains('PushTokenRegistrar.invalidateToken(token)'));
   });
 
   test('notification failure logs do not include push token context', () {

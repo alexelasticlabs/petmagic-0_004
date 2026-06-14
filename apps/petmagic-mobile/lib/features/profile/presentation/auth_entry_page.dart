@@ -17,6 +17,8 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_m
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/widgets/motion.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 class AuthEntryPage extends StatelessWidget {
@@ -124,12 +126,15 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final viewport = MediaQuery.sizeOf(context);
+    final isShortViewport = viewport.height <= 700;
+    final isCompactViewport = viewport.height <= 760;
     final locale = Localizations.localeOf(context).toLanguageTag();
     final legalDocumentsAsync = ref.watch(
       currentLegalDocumentsProvider(locale),
     );
     final legalDocumentsAvailable = legalDocumentsAsync.value != null;
-    final compactLayout = _isSignUp;
+    final compactLayout = _isSignUp || isCompactViewport;
 
     final title = _isSignUp ? text.authRegisterTitle : text.authEntryTitle;
     final subtitle = _isSignUp
@@ -151,10 +156,18 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         _confirmPasswordController.text != _passwordController.text;
     final submitDisabled =
         state.isSaving || (_isSignUp && confirmPasswordMismatch);
+    final showTopConsentError =
+        _consentErrorMessage != null &&
+        !_isInlineConsentMessage(_consentErrorMessage!);
+    final showInlineTermsError =
+        _consentErrorMessage == 'auth.accept_terms_required';
+    final showInlineLegalError =
+        legalDocumentsAsync.hasError ||
+        _consentErrorMessage == 'auth.legal_documents_unavailable';
     final socialProviders = authSocialProvidersForPlatform(
       isIOS: !kIsWeb && Platform.isIOS,
     );
-    const heroBottomSpacing = 12.0;
+    final heroBottomSpacing = isShortViewport ? 8.0 : 12.0;
 
     ref.listen(profileControllerProvider, (previous, next) {
       if (!mounted) {
@@ -204,23 +217,45 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                   compactLayout ? 18 : 20,
                   compactLayout ? 2 : 4,
                   compactLayout ? 18 : 20,
-                  compactLayout ? 18 : 24,
+                  isShortViewport ? 14 : (compactLayout ? 18 : 24),
                 ),
                 children: [
                   AuthHero(
                     title: title,
                     subtitle: subtitle,
                     isDark: isDark,
-                    compact: false,
+                    compact: compactLayout,
                   ),
-                  const SizedBox(height: heroBottomSpacing),
-                  if (_consentErrorMessage != null)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: compactLayout ? 8 : 12),
-                      child: ErrorCard(
-                        message: _mapErrorMessage(_consentErrorMessage!, text),
-                      ),
+                  SizedBox(height: heroBottomSpacing),
+                  AnimatedSize(
+                    duration: PetMotion.effectiveDuration(
+                      context,
+                      PetMotion.fast,
                     ),
+                    curve: PetMotion.emphasized,
+                    child: AnimatedSwitcher(
+                      duration: PetMotion.effectiveDuration(
+                        context,
+                        PetMotion.fast,
+                      ),
+                      child: showTopConsentError
+                          ? Padding(
+                              key: ValueKey(_consentErrorMessage),
+                              padding: EdgeInsets.only(
+                                bottom: compactLayout ? 8 : 12,
+                              ),
+                              child: ErrorCard(
+                                message: _mapErrorMessage(
+                                  _consentErrorMessage!,
+                                  text,
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey('no-consent-error'),
+                            ),
+                    ),
+                  ),
                   AuthFormCard(
                     isDark: isDark,
                     compact: compactLayout,
@@ -268,10 +303,17 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                                       _obscurePassword = !_obscurePassword;
                                     });
                                   },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                            icon: AnimatedSwitcher(
+                              duration: PetMotion.effectiveDuration(
+                                context,
+                                PetMotion.fast,
+                              ),
+                              child: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                key: ValueKey(_obscurePassword),
+                              ),
                             ),
                           ),
                         ),
@@ -313,10 +355,17 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                                             !_obscureConfirmPassword;
                                       });
                                     },
-                              icon: Icon(
-                                _obscureConfirmPassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
+                              icon: AnimatedSwitcher(
+                                duration: PetMotion.effectiveDuration(
+                                  context,
+                                  PetMotion.fast,
+                                ),
+                                child: Icon(
+                                  _obscureConfirmPassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  key: ValueKey(_obscureConfirmPassword),
+                                ),
                               ),
                             ),
                           ),
@@ -348,17 +397,26 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                         });
                       },
                     ),
-                    if (legalDocumentsAsync.hasError) ...[
-                      const SizedBox(height: 5),
+                    if (showInlineTermsError) ...[
+                      SizedBox(height: isShortViewport ? 4 : 5),
+                      _LegalStateLine(
+                        message: _mapErrorMessage(
+                          'auth.accept_terms_required',
+                          text,
+                        ),
+                        isError: true,
+                      ),
+                    ] else if (showInlineLegalError) ...[
+                      SizedBox(height: isShortViewport ? 4 : 5),
                       _LegalStateLine(
                         message: text.authLegalUnavailable,
                         isError: true,
                       ),
                     ] else if (legalDocumentsAsync.isLoading) ...[
-                      const SizedBox(height: 5),
+                      SizedBox(height: isShortViewport ? 4 : 5),
                       _LegalStateLine(message: text.authLegalLoading),
                     ],
-                    const SizedBox(height: 5),
+                    SizedBox(height: isShortViewport ? 4 : 5),
                     _MarketingConsentOption(
                       value: _receiveUpdates,
                       title: text.authReceiveUpdatesLabel,
@@ -427,30 +485,21 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                               letterSpacing: 0,
                             ),
                       ),
-                      child: state.isSaving
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colors.textMuted,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(text.profileLoadingAction),
-                              ],
-                            )
-                          : Text(primaryAction),
+                      child: PetMagicAnimatedButtonChild(
+                        label: primaryAction,
+                        loadingLabel: text.profileLoadingAction,
+                        isLoading: state.isSaving,
+                        loadingIndicatorColor: colors.textMuted,
+                      ),
                     ),
                   ),
-                  SizedBox(height: compactLayout ? 12 : 18),
+                  SizedBox(
+                    height: isShortViewport ? 10 : (compactLayout ? 12 : 18),
+                  ),
                   AuthDivider(label: text.authOrContinueWith),
-                  SizedBox(height: compactLayout ? 10 : 14),
+                  SizedBox(
+                    height: isShortViewport ? 8 : (compactLayout ? 10 : 14),
+                  ),
                   Column(
                     children: [
                       for (
@@ -468,14 +517,21 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                           ),
                         ),
                         if (index < socialProviders.length - 1)
-                          SizedBox(height: compactLayout ? 8 : 10),
+                          SizedBox(
+                            height: isShortViewport
+                                ? 6
+                                : (compactLayout ? 8 : 10),
+                          ),
                       ],
                     ],
                   ),
-                  SizedBox(height: compactLayout ? 12 : 18),
+                  SizedBox(
+                    height: isShortViewport ? 10 : (compactLayout ? 12 : 18),
+                  ),
                   LightPrivacyPanel(
                     title: text.authPrivacyTitle,
                     subtitle: text.authPrivacySubtitle,
+                    compact: compactLayout,
                   ),
                 ],
               ),
@@ -636,6 +692,11 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       useRootNavigator: false,
       builder: (context) => _LegalDocumentSheet(document: document),
     );
+  }
+
+  bool _isInlineConsentMessage(String raw) {
+    return raw == 'auth.accept_terms_required' ||
+        raw == 'auth.legal_documents_unavailable';
   }
 }
 
@@ -1117,21 +1178,61 @@ class _AuthInlineActions extends StatelessWidget {
       );
     }
 
-    return Row(
-      children: [
-        TextButton(
-          onPressed: onForgotPassword,
-          style: compactButtonStyle,
-          child: Text(forgotPasswordAction),
-        ),
-        const Spacer(),
-        Text(switchPrompt, style: promptStyle),
-        TextButton(
-          onPressed: onSwitchMode,
-          style: compactButtonStyle,
-          child: Text(switchAction),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 340) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: onForgotPassword,
+                  style: compactButtonStyle,
+                  child: Text(forgotPasswordAction),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Center(
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    Text(
+                      switchPrompt,
+                      style: promptStyle,
+                      textAlign: TextAlign.center,
+                    ),
+                    TextButton(
+                      onPressed: onSwitchMode,
+                      style: compactButtonStyle,
+                      child: Text(switchAction),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            TextButton(
+              onPressed: onForgotPassword,
+              style: compactButtonStyle,
+              child: Text(forgotPasswordAction),
+            ),
+            const Spacer(),
+            Text(switchPrompt, style: promptStyle),
+            TextButton(
+              onPressed: onSwitchMode,
+              style: compactButtonStyle,
+              child: Text(switchAction),
+            ),
+          ],
+        );
+      },
     );
   }
 }

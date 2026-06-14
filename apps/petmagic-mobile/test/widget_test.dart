@@ -60,6 +60,28 @@ void main() {
     expect(find.text(text.startupWelcomeContinueGuest), findsOneWidget);
   });
 
+  testWidgets('compact welcome keeps primary actions in first viewport', (
+    tester,
+  ) async {
+    await _pumpApp(tester, surfaceSize: const Size(320, 568));
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).first),
+    );
+
+    await _pumpFrames(tester, count: 6);
+
+    expect(tester.takeException(), isNull);
+    _expectFullyVisible(
+      tester,
+      find.widgetWithText(FilledButton, text.profileSignInAction),
+    );
+    _expectFullyVisible(
+      tester,
+      find.widgetWithText(OutlinedButton, text.startupWelcomeContinueGuest),
+    );
+  });
+
   test('auth social providers are platform-specific and ordered', () {
     expect(authSocialProvidersForPlatform(isIOS: false), [
       ExternalAuthProvider.google,
@@ -153,6 +175,30 @@ void main() {
     );
   });
 
+  testWidgets('compact sign in keeps submit button visible without overflow', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      surfaceSize: const Size(320, 568),
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(AuthEntryPage)),
+    );
+
+    expect(tester.takeException(), isNull);
+    _expectFullyVisible(
+      tester,
+      find.widgetWithText(FilledButton, text.profileSignInAction),
+    );
+  });
+
   testWidgets('registration requires accepting terms', (tester) async {
     await _pumpApp(
       tester,
@@ -188,6 +234,52 @@ void main() {
         'You need to accept the Terms of Use and Privacy Policy to create an account.',
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('sign up legal error stays inline and keeps submit visible', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      profileRepository: _UnavailableLegalDocumentsProfileRepository(),
+      surfaceSize: const Size(393, 852),
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextButton, 'Sign Up'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password123');
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'Sign Up'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign Up'));
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final text = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).last),
+    );
+
+    expect(find.text(text.authLegalUnavailable), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    _expectFullyVisible(
+      tester,
+      find.widgetWithText(FilledButton, text.authRegisterAction),
     );
   });
 
@@ -1263,4 +1355,24 @@ void main() {
     final state = container.read(appPreferencesControllerProvider);
     expect(state.locale, const Locale('en'));
   });
+}
+
+void _expectFullyVisible(WidgetTester tester, Finder finder) {
+  expect(finder, findsOneWidget);
+
+  final rect = tester.getRect(finder);
+  final logicalSize = tester.view.physicalSize / tester.view.devicePixelRatio;
+
+  expect(rect.top >= 0, isTrue, reason: 'Widget starts above the viewport');
+  expect(rect.left >= 0, isTrue, reason: 'Widget starts left of the viewport');
+  expect(
+    rect.bottom <= logicalSize.height,
+    isTrue,
+    reason: 'Widget extends below the viewport',
+  );
+  expect(
+    rect.right <= logicalSize.width,
+    isTrue,
+    reason: 'Widget extends beyond the viewport width',
+  );
 }

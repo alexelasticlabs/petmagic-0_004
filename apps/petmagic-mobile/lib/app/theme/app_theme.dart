@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_page_transitions.dart';
 
 @immutable
 class PetMagicColors extends ThemeExtension<PetMagicColors> {
@@ -332,6 +333,67 @@ class AppTheme {
         color: colors.border,
         space: 1,
         thickness: 1.05,
+      ),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: PetMagicPageTransitionsBuilder(),
+          TargetPlatform.iOS: PetMagicPageTransitionsBuilder(),
+          TargetPlatform.macOS: PetMagicPageTransitionsBuilder(),
+        },
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: colors.surface,
+        modalBarrierColor: Colors.black.withValues(
+          alpha: brightness == Brightness.dark ? 0.62 : 0.38,
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        dragHandleColor: colors.border,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: colors.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: brightness == Brightness.light ? 8 : 2,
+        shadowColor: colors.shadow,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return colors.surfaceStrong;
+          }
+          if (states.contains(WidgetState.selected)) {
+            return colors.accent;
+          }
+          return colors.surface;
+        }),
+        checkColor: WidgetStatePropertyAll(_onColor(colors.accent)),
+        side: BorderSide(color: colors.border, width: 1.25),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return colors.textMuted;
+          }
+          if (states.contains(WidgetState.selected)) {
+            return _onColor(colors.accent);
+          }
+          return colors.textSoft;
+        }),
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return colors.surfaceStrong.withValues(alpha: 0.62);
+          }
+          if (states.contains(WidgetState.selected)) {
+            return colors.accent.withValues(alpha: 0.72);
+          }
+          return colors.surfaceStrong;
+        }),
+        trackOutlineColor: WidgetStatePropertyAll(colors.border),
       ),
       listTileTheme: ListTileThemeData(
         iconColor: colors.textSoft,

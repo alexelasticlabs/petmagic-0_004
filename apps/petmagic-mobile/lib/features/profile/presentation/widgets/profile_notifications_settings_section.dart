@@ -1,13 +1,12 @@
-import 'dart:io';
-
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
@@ -45,6 +44,11 @@ class _ProfileNotificationsSettingsSectionState
       NotificationPreferencesStorage();
   final AppPermissionCoordinator _permissionCoordinator =
       AppPermissionCoordinator();
+  late final PushTokenRegistrar _pushTokenRegistrar = PushTokenRegistrar(
+    templateRepository: ref.read(templateGenerationRepositoryProvider),
+    supportRepository: ref.read(supportChatRepositoryProvider),
+    walletRepository: ref.read(walletRepositoryProvider),
+  );
 
   NotificationPreferences? _preferences;
   AuthorizationStatus? _pushAuthorizationStatus;
@@ -247,35 +251,12 @@ class _ProfileNotificationsSettingsSectionState
         return;
       }
 
-      await ref
-          .read(templateGenerationRepositoryProvider)
-          .registerPushToken(
-            token: token,
-            platform: Platform.operatingSystem,
-            appVersion: AppConfig.appVersion,
-            locale: Platform.localeName,
-          );
-      if (!mounted) {
-        return;
-      }
-      await ref
-          .read(supportChatRepositoryProvider)
-          .registerPushToken(
-            token: token,
-            platform: Platform.operatingSystem,
-            appVersion: AppConfig.appVersion,
-            locale: Platform.localeName,
-          );
-      if (!mounted) {
-        return;
-      }
-      await ref
-          .read(walletRepositoryProvider)
-          .registerPushToken(
-            token: token,
-            platform: Platform.operatingSystem,
-            locale: Platform.localeName,
-          );
+      await _pushTokenRegistrar.registerToken(
+        token: token,
+        platform: defaultTargetPlatform.name,
+        locale: Localizations.localeOf(context).toLanguageTag(),
+        canContinue: () => mounted,
+      );
     } catch (error, stackTrace) {
       _logNotificationsFailure(
         'register_push_token_after_permission',

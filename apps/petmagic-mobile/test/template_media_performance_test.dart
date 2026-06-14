@@ -3,28 +3,40 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('template presentation avoids uncached Image.network widgets', () async {
-    final dartFiles = await Directory('lib/features/templates/presentation')
-        .list(recursive: true)
-        .where((entity) {
-          return entity is File && entity.path.endsWith('.dart');
-        })
-        .cast<File>()
-        .toList();
+  test(
+    'template presentation keeps network images bounded or cached',
+    () async {
+      final dartFiles = await Directory('lib/features/templates/presentation')
+          .list(recursive: true)
+          .where((entity) {
+            return entity is File && entity.path.endsWith('.dart');
+          })
+          .cast<File>()
+          .toList();
 
-    expect(dartFiles, isNotEmpty);
+      expect(dartFiles, isNotEmpty);
 
-    for (final file in dartFiles) {
-      final source = await file.readAsString();
-      expect(
-        source,
-        isNot(contains('Image.network(')),
-        reason:
-            '${file.path} should use CachedNetworkImage or a bounded '
-            'provider path for remote media.',
-      );
-    }
-  });
+      for (final file in dartFiles) {
+        final source = await file.readAsString();
+        if (!source.contains('Image.network(')) {
+          continue;
+        }
+
+        expect(source, contains('cacheWidth:'));
+        expect(source, contains('errorBuilder:'));
+        expect(
+          source,
+          anyOf(
+            contains('CachedNetworkImageProvider('),
+            contains('CachedNetworkImage('),
+          ),
+          reason:
+              '${file.path} may use Image.network only as a bounded fallback '
+              'after trying a cached provider path.',
+        );
+      }
+    },
+  );
 
   test(
     'template card fallback image path remains cached and bounded',
@@ -43,9 +55,10 @@ void main() {
           ),
         ),
       );
-      expect(source, contains('CachedNetworkImage('));
-      expect(source, contains('memCacheWidth: cacheWidth'));
-      expect(source, contains('maxWidthDiskCache: cacheWidth'));
+      expect(source, contains('ResizeImage.resizeIfNeeded('));
+      expect(source, contains('CachedNetworkImageProvider('));
+      expect(source, contains('maxWidth: cacheWidth'));
+      expect(source, contains('cacheWidth: cacheWidth'));
       expect(source, contains('filterQuality: FilterQuality.medium'));
     },
   );

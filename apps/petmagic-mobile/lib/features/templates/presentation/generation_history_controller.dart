@@ -438,6 +438,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
     try {
       await _repository.deleteGeneration(generationId);
+      if (!ref.mounted) {
+        return;
+      }
+
       await _galleryStore.clearPendingServerDelete(generationId);
     } on Object {
       rethrow;

@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -19,11 +20,17 @@ class NotificationCoordinator {
   }) : _templateRepository = templateRepository,
        _supportRepository = supportRepository,
        _walletRepository = walletRepository,
+       _pushTokenRegistrar = PushTokenRegistrar(
+         templateRepository: templateRepository,
+         supportRepository: supportRepository,
+         walletRepository: walletRepository,
+       ),
        _onRouteRequested = onRouteRequested;
 
   final TemplateGenerationRepository _templateRepository;
   final SupportChatRepository _supportRepository;
   final WalletRepository _walletRepository;
+  final PushTokenRegistrar _pushTokenRegistrar;
   final void Function(String route) _onRouteRequested;
   static const _allowedNotificationRoutes = <String>{
     '/templates',
@@ -126,19 +133,40 @@ class NotificationCoordinator {
     }
 
     try {
-      await _templateRepository.unregisterPushToken(token);
-    } catch (error, stackTrace) {
-      _logNotificationFailure('unregister_template_token', error, stackTrace);
-    }
-    try {
-      await _supportRepository.unregisterPushToken(token);
-    } catch (error, stackTrace) {
-      _logNotificationFailure('unregister_support_token', error, stackTrace);
-    }
-    try {
-      await _walletRepository.unregisterPushToken(token);
-    } catch (error, stackTrace) {
-      _logNotificationFailure('unregister_economy_token', error, stackTrace);
+      await Future.wait<void>([
+        _templateRepository.unregisterPushToken(token).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          _logNotificationFailure(
+            'unregister_template_token',
+            error,
+            stackTrace,
+          );
+        }),
+        _supportRepository.unregisterPushToken(token).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          _logNotificationFailure(
+            'unregister_support_token',
+            error,
+            stackTrace,
+          );
+        }),
+        _walletRepository.unregisterPushToken(token).catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          _logNotificationFailure(
+            'unregister_economy_token',
+            error,
+            stackTrace,
+          );
+        }),
+      ]);
+    } finally {
+      PushTokenRegistrar.invalidateToken(token);
     }
     _lastRegisteredToken = null;
   }
@@ -276,28 +304,13 @@ class NotificationCoordinator {
       }
 
       try {
-        await _templateRepository.registerPushToken(
+        final registered = await _pushTokenRegistrar.registerToken(
           token: token,
           platform: Platform.operatingSystem,
           locale: Platform.localeName,
+          canContinue: () => _canContinueRegistration(epoch),
         );
-        if (!_canContinueRegistration(epoch)) {
-          return false;
-        }
-        await _supportRepository.registerPushToken(
-          token: token,
-          platform: Platform.operatingSystem,
-          locale: Platform.localeName,
-        );
-        if (!_canContinueRegistration(epoch)) {
-          return false;
-        }
-        await _walletRepository.registerPushToken(
-          token: token,
-          platform: Platform.operatingSystem,
-          locale: Platform.localeName,
-        );
-        return _canContinueRegistration(epoch);
+        return registered && _canContinueRegistration(epoch);
       } catch (error, stackTrace) {
         if (!_canContinueRegistration(epoch)) {
           return false;

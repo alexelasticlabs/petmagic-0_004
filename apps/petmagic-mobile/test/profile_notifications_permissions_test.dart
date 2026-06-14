@@ -76,12 +76,17 @@ void main() {
     expect(requestPushBody, contains('_registerPushTokenIfAllowed'));
     expect(refreshPushBody, contains('_registerPushTokenIfAllowed'));
     expect(registerBody, contains('FirebaseMessaging.instance.getToken()'));
-    expect(registerBody, contains('templateGenerationRepositoryProvider'));
-    expect(registerBody, contains('supportChatRepositoryProvider'));
-    expect(registerBody, contains('walletRepositoryProvider'));
-    expect(registerBody, contains('AppConfig.appVersion'));
-    expect(registerBody, contains('Platform.operatingSystem'));
-    expect(registerBody, contains('Platform.localeName'));
+    expect(source, contains('PushTokenRegistrar'));
+    expect(source, contains('templateGenerationRepositoryProvider'));
+    expect(source, contains('supportChatRepositoryProvider'));
+    expect(source, contains('walletRepositoryProvider'));
+    expect(registerBody, contains('_pushTokenRegistrar.registerToken'));
+    expect(registerBody, contains('defaultTargetPlatform.name'));
+    expect(
+      registerBody,
+      contains('Localizations.localeOf(context).toLanguageTag()'),
+    );
+    expect(registerBody, contains('canContinue: () => mounted'));
     expect(registerBody, contains('register_push_token_after_permission'));
   });
 }

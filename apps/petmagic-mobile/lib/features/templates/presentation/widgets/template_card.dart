@@ -12,6 +12,8 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_image_state.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
@@ -879,62 +881,62 @@ class _TemplateActionButton extends StatelessWidget {
     const premiumTextColor = Color(0xFF251102);
     final usePremiumStyle = isPremiumLockCta || isPremiumTemplateCta;
     final useSoftPremiumStyle = isPremiumTemplateCta && !isPremiumLockCta;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onPressed,
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-          decoration: BoxDecoration(
-            gradient: isPremiumLockCta
-                ? const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xFFF0A41C),
-                      Color(0xFFF3C65A),
-                      Color(0xFFF9E18C),
-                    ],
-                    stops: [0, 0.54, 1],
-                  )
-                : useSoftPremiumStyle
-                ? const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Color(0xFFE8AA38),
-                      Color(0xFFEFCB72),
-                      Color(0xFFF5DE97),
-                    ],
-                    stops: [0, 0.58, 1],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Color(0xD910C878), Color(0xCCF2C96A)],
-                  ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: usePremiumStyle
-                  ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
-                  : Colors.white.withValues(alpha: 0.14),
-              width: usePremiumStyle ? 1.3 : 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color:
-                    (isPremiumLockCta
-                            ? const Color(0xFFE4901F)
-                            : useSoftPremiumStyle
-                            ? const Color(0xFFD8A64B)
-                            : const Color(0xFF10C878))
-                        .withValues(alpha: 0.24),
-                blurRadius: useSoftPremiumStyle ? 10 : 14,
-                offset: Offset(0, useSoftPremiumStyle ? 6 : 8),
-              ),
-            ],
+    return PetMagicInteractiveSurface(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(16),
+      scaleDown: 0.975,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isPremiumLockCta
+              ? const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFFF0A41C),
+                    Color(0xFFF3C65A),
+                    Color(0xFFF9E18C),
+                  ],
+                  stops: [0, 0.54, 1],
+                )
+              : useSoftPremiumStyle
+              ? const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFFE8AA38),
+                    Color(0xFFEFCB72),
+                    Color(0xFFF5DE97),
+                  ],
+                  stops: [0, 0.58, 1],
+                )
+              : const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [Color(0xD910C878), Color(0xCCF2C96A)],
+                ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: usePremiumStyle
+                ? const Color(0xFFF9E8B6).withValues(alpha: 0.88)
+                : Colors.white.withValues(alpha: 0.14),
+            width: usePremiumStyle ? 1.3 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color:
+                  (isPremiumLockCta
+                          ? const Color(0xFFE4901F)
+                          : useSoftPremiumStyle
+                          ? const Color(0xFFD8A64B)
+                          : const Color(0xFF10C878))
+                      .withValues(alpha: 0.24),
+              blurRadius: useSoftPremiumStyle ? 10 : 14,
+              offset: Offset(0, useSoftPremiumStyle ? 6 : 8),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -1016,67 +1018,11 @@ class _TemplateStatusChip extends StatelessWidget {
   }
 }
 
-class _MediaSkeletonPlaceholder extends StatefulWidget {
+class _MediaSkeletonPlaceholder extends StatelessWidget {
   const _MediaSkeletonPlaceholder();
 
   @override
-  State<_MediaSkeletonPlaceholder> createState() =>
-      _MediaSkeletonPlaceholderState();
-}
-
-class _MediaSkeletonPlaceholderState extends State<_MediaSkeletonPlaceholder>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late final Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.linear);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        final shimmerPosition = (_animation.value * 2) - 1;
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment(-1.2 + shimmerPosition, -0.2),
-              end: Alignment(0.4 + shimmerPosition, 0.2),
-              colors: [
-                colors.surfaceStrong.withValues(alpha: 0.9),
-                colors.accentSoft.withValues(alpha: 0.42),
-                colors.surface.withValues(alpha: 0.85),
-              ],
-              stops: const [0.2, 0.5, 0.85],
-            ),
-          ),
-          child: Center(
-            child: Icon(
-              Icons.auto_awesome_rounded,
-              color: colors.textMuted.withValues(alpha: 0.55),
-              size: 22,
-            ),
-          ),
-        );
-      },
-    );
-  }
+  Widget build(BuildContext context) => const PetMagicImageSkeleton();
 }
 
 class _MediaErrorPlaceholder extends StatelessWidget {
@@ -1087,81 +1033,17 @@ class _MediaErrorPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colors.surfaceStrong.withValues(alpha: 0.92),
-            colors.surface.withValues(alpha: 0.92),
-          ],
-        ),
-      ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isVideo
-                    ? Icons.videocam_off_rounded
-                    : Icons.broken_image_outlined,
-                color: colors.textMuted,
-                size: 24,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _isRu(context)
-                    ? 'Не удалось загрузить превью'
-                    : 'Failed to load preview',
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colors.textSoft,
-                  fontSize: 12.4,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (onRetry != null) ...[
-                const SizedBox(height: 6),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colors.surfaceGlass.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: colors.accent.withValues(alpha: 0.2),
-                    ),
-                  ),
-                  child: TextButton.icon(
-                    onPressed: onRetry,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 0),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: Text(
-                      _isRu(context) ? 'Повторить' : text.retryAction,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: colors.textSoft,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+    return PetMagicImageError(
+      title: _isRu(context)
+          ? 'Не удалось загрузить превью'
+          : 'Failed to load preview',
+      retryLabel: onRetry == null
+          ? null
+          : (_isRu(context) ? 'Повторить' : text.retryAction),
+      onRetry: onRetry,
+      icon: isVideo ? Icons.videocam_off_rounded : Icons.broken_image_outlined,
     );
   }
 
