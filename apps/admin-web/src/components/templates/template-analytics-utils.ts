@@ -293,7 +293,7 @@ export function formatUsd(value: number | null | undefined, locale: Locale) {
     return "-";
   }
 
-  return new Intl.NumberFormat(locale === "ru" ? "en-US" : "en-US", {
+  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,

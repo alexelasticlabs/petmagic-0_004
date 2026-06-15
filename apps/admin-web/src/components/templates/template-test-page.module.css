@@ -42,7 +42,7 @@
   color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .breadcrumbs a {
@@ -92,7 +92,7 @@
   font-family: var(--font-heading), sans-serif;
   font-size: 0.76rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -497,7 +497,7 @@
   color: var(--text-soft);
   font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .sourceUploadFooter {
@@ -600,7 +600,7 @@
   color: var(--text-muted);
   font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -659,7 +659,7 @@
   color: var(--info);
   font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -884,6 +884,14 @@
 
 .errorText {
   color: var(--danger-soft-fg);
+}
+
+.infoText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1280px) {

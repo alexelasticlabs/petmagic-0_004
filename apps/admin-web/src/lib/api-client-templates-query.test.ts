@@ -9,6 +9,7 @@ import {
   fetchAdminModerationQueue,
   fetchAdminTemplateGenerationMetrics,
   fetchAdminTemplates,
+  fetchAdminTemplatesAnalyticsOverview,
   fetchAdminTemplateFeedback,
   fetchAdminTemplateRecentGenerations,
   fetchAdminTemplateTest,
@@ -22,6 +23,7 @@ import {
   normalizeAdminTemplateCatalogQuery,
   normalizeAdminModerationQueueQuery,
   normalizeAdminTemplateGenerationsQuery,
+  normalizeAdminTemplatesAnalyticsQuery,
   TEMPLATE_CATALOG_SEARCH_MAX_LENGTH,
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   updateTemplateOfTheDaySettings,
@@ -113,6 +115,54 @@ describe("api-client.templates query normalization", () => {
       sort: "title",
       skip: 0,
       take: 100,
+    });
+  });
+
+  it("drops unsupported template catalog enum filters before backend requests", () => {
+    expect(
+      normalizeAdminTemplateCatalogQuery({
+        type: "Document" as never,
+        status: "Deleted" as never,
+        search: " portrait ",
+        category: " Featured ",
+        access: "vip" as never,
+        sort: "random" as never,
+        skip: 2.9,
+        take: 24.8,
+      })
+    ).toEqual({
+      type: undefined,
+      status: undefined,
+      search: "portrait",
+      category: "Featured",
+      access: undefined,
+      sort: undefined,
+      skip: 2,
+      take: 24,
+    });
+  });
+
+  it("normalizes template analytics filters before cache keys and URLs", () => {
+    const overlongCategory = "a".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH + 20);
+
+    expect(
+      normalizeAdminTemplatesAnalyticsQuery({
+        periodDays: 5000.9,
+        templateType: "Document" as never,
+        category: ` ${overlongCategory} `,
+        status: "Deleted" as never,
+        access: "vip" as never,
+        sort: "random" as never,
+        take: 500.2,
+      })
+    ).toEqual({
+      periodDays: 3650,
+      templateType: undefined,
+      category: "a".repeat(TEMPLATE_CATALOG_SEARCH_MAX_LENGTH),
+      status: undefined,
+      access: undefined,
+      sort: undefined,
+      take: 200,
     });
   });
 
@@ -318,6 +368,77 @@ describe("api-client.templates query normalization", () => {
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       `https://api.example.com/api/admin/templates/template-feedback/statistics/feedback?take=50&type=feedback&search=${"f".repeat(TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH)}`,
+    ]);
+  });
+
+  it("drops unsupported template feedback filters before request URLs", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => Response.json([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplateFeedback("template-feedback", {
+      search: " useful ",
+      take: 500.8,
+      type: "other" as never,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/template-feedback/statistics/feedback?take=100&search=useful",
+    ]);
+  });
+
+  it("sends normalized template analytics filters to the backend", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        summary: {
+          totalTemplates: 0,
+          videoTemplates: 0,
+          imageTemplates: 0,
+          activeTemplates: 0,
+          premiumTemplates: 0,
+          totalViews: 0,
+          totalGenerationStarts: 0,
+          completedGenerations: 0,
+          failedGenerations: 0,
+          conversionPercent: 0,
+          totalTokenCost: 0,
+          averageTokenCost: 0,
+          totalProviderCostUsd: 0,
+          complaintCount: 0,
+        },
+        trend: [],
+        topTemplates: [],
+        categories: [],
+        templateTypes: [],
+        sources: [],
+        devices: [],
+        geography: [],
+        feedback: [],
+        funnel: {
+          views: 0,
+          starts: 0,
+          completed: 0,
+          failed: 0,
+          complaints: 0,
+        },
+        templates: [],
+        availableCategories: [],
+        generatedAtUtc: "2026-06-15T00:00:00.000Z",
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminTemplatesAnalyticsOverview({
+      periodDays: 30.8,
+      templateType: "Document" as never,
+      category: " Premium ",
+      status: "Deleted" as never,
+      access: "vip" as never,
+      sort: "random" as never,
+      take: 250.4,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/templates/analytics?periodDays=30&category=Premium&take=200",
     ]);
   });
 

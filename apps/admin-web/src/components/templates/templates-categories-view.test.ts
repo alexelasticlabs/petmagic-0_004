@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const categoriesViewPath = fileURLToPath(
   new URL("./templates-categories-view.tsx", import.meta.url)
 );
+const catalogStylesPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
 
 describe("template categories view actions", () => {
   it("confirms archive changes and guards category mutations against double submit", () => {
@@ -72,18 +73,22 @@ describe("template categories view actions", () => {
     );
   });
 
-  it("trims and bounds category names before state updates and mutations", () => {
+  it("bounds category names while typing and trims only before mutations", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
 
     expect(source).toContain("const CATEGORY_NAME_MAX_LENGTH = 64;");
     expect(source).toContain("const name = normalizeCategoryName(newCategoryName);");
     expect(source).toContain("const name = normalizeCategoryName(editingName);");
-    expect(source).toContain("setNewCategoryName(normalizeCategoryName(event.target.value))");
-    expect(source).toContain("setEditingName(normalizeCategoryName(event.target.value))");
+    expect(source).toContain("setNewCategoryName(limitCategoryNameInput(event.target.value))");
+    expect(source).toContain("setEditingName(limitCategoryNameInput(event.target.value))");
     expect(source).toContain("setEditingName(normalizeCategoryName(category.name))");
     expect(source).toContain("maxLength={CATEGORY_NAME_MAX_LENGTH}");
     expect(source).toContain("function normalizeCategoryName(value: string): string");
     expect(source).toContain("return value.trim().slice(0, CATEGORY_NAME_MAX_LENGTH);");
+    expect(source).toContain("function limitCategoryNameInput(value: string): string");
+    expect(source).toContain("return value.slice(0, CATEGORY_NAME_MAX_LENGTH);");
+    expect(source).not.toContain("setNewCategoryName(normalizeCategoryName(event.target.value))");
+    expect(source).not.toContain("setEditingName(normalizeCategoryName(event.target.value))");
     expect(source).not.toContain("setNewCategoryName(event.target.value)");
     expect(source).not.toContain("setEditingName(event.target.value)");
     expect(source).not.toContain("const name = newCategoryName.trim();");
@@ -138,5 +143,20 @@ describe("template categories view actions", () => {
     expect(source).toContain(".map((tag) => `#${sanitizeSensitiveText(tag, 40)}`)");
     expect(source).not.toContain("<strong>{category.name}</strong>");
     expect(source).not.toContain(".map((tag) => `#${tag}`)");
+  });
+
+  it("disables category drilldown links while category actions are locked", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+    const stylesSource = readFileSync(catalogStylesPath, "utf8");
+
+    expect(source).toContain("isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : \"\"");
+    expect(source).toContain("aria-disabled={isCategoryActionLocked}");
+    expect(source).toContain("tabIndex={isCategoryActionLocked ? -1 : undefined}");
+    expect(source).toContain(
+      "if (isCategoryActionLocked) {\n                                  event.preventDefault();"
+    );
+    expect(stylesSource).toContain(".compactLinkDisabled,");
+    expect(stylesSource).toContain('.compactLink[aria-disabled="true"]');
+    expect(stylesSource).toContain("pointer-events: none;");
   });
 });

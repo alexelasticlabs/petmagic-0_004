@@ -71,7 +71,7 @@ export function useAdminTemplateCatalog({
     }
 
     if ((templatesResult.data?.items.length ?? 0) > 0) {
-      await analyticsRowsQuery.refetch();
+      void analyticsRowsQuery.refetch().catch(() => undefined);
     }
 
     return templatesResult;

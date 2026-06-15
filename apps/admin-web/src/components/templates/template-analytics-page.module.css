@@ -25,7 +25,7 @@
   color: var(--text-muted);
   font-size: 0.8rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .breadcrumbs a {
@@ -64,7 +64,7 @@
   font-family: var(--font-heading), sans-serif;
   font-size: 0.76rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   transition:
     transform 160ms ease,
     border-color 160ms ease,
@@ -815,7 +815,7 @@
   display: grid;
   gap: 0.58rem;
   border: 1px solid color-mix(in srgb, var(--info) 18%, transparent);
-  border-radius: 0.7rem;
+  border-radius: var(--radius-sm);
   padding: 0.8rem 0.88rem;
   background: var(--surface-2);
 }
@@ -963,8 +963,20 @@
 
   .toolbarActions,
   .segmentedControl,
+  .chartTabs,
   .heroActions > * {
     flex: 1 1 100%;
+  }
+
+  .chartTabs {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .chartTab,
+  .chartTabActive {
+    flex: 1 1 min(10rem, 100%);
+    min-width: 0;
   }
 
   .templateCard,

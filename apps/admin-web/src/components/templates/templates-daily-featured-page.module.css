@@ -158,9 +158,11 @@
 .previewEmpty {
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--info) 16%, transparent), transparent 34%),
-    linear-gradient(135deg, var(--surface-2), var(--surface-1));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-1) 96%, var(--surface-2))
+  );
 }
 
 .previewOverlay {
@@ -169,8 +171,13 @@
   display: grid;
   gap: 0.32rem;
   padding: 1rem;
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.76));
-  color: white;
+  border-top: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--surface-0) 86%, transparent)
+  );
+  color: var(--text-strong);
 }
 
 .previewBadge {
@@ -185,7 +192,7 @@
 .previewOverlay h3 {
   max-width: 36rem;
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(1rem, 0.92rem + 0.34vw, 1.2rem);
+  font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.18;
   overflow-wrap: anywhere;
@@ -193,7 +200,7 @@
 
 .previewOverlay p {
   max-width: 42rem;
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--text-soft);
   font-size: 0.78rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -212,6 +219,7 @@
   color: var(--text-strong);
   font-weight: 600;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .templateMeta {
@@ -219,6 +227,7 @@
   color: var(--text-muted);
   font-size: 0.74rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 960px) {
@@ -245,6 +254,14 @@
 
   .previewCard {
     min-height: 16rem;
+  }
+
+  .scheduleTable {
+    min-width: 40rem;
+  }
+
+  .previewOverlay h3 {
+    font-size: 1.05rem;
   }
 }
 

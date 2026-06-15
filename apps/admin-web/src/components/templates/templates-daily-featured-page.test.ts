@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
 const pageSource = readFileSync(
@@ -37,6 +36,31 @@ describe("templates daily featured page", () => {
     expect(stylesSource).toContain("@media (max-width: 640px)");
   });
 
+  it("keeps the storefront preview overlay theme-aware", () => {
+    expect(stylesSource).toContain(".previewOverlay {");
+    expect(stylesSource).toContain(".previewEmpty {");
+    expect(stylesSource).toContain(
+      "color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))"
+    );
+    expect(stylesSource).not.toContain("radial-gradient");
+    expect(stylesSource).toContain("border-top: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);");
+    expect(stylesSource).toContain("color-mix(in srgb, var(--surface-0) 86%, transparent)");
+    expect(stylesSource).toContain("color: var(--text-strong);");
+    expect(stylesSource).toContain(".previewOverlay p");
+    expect(stylesSource).toContain("color: var(--text-soft);");
+    expect(stylesSource).not.toContain("rgba(0, 0, 0, 0.76)");
+    expect(stylesSource).not.toContain("rgba(255, 255, 255, 0.78)");
+    expect(stylesSource).not.toContain("color: white;");
+  });
+
+  it("keeps the storefront preview title responsive without viewport-scaled type", () => {
+    expect(stylesSource).toContain(".previewOverlay h3 {");
+    expect(stylesSource).toContain("font-size: 1.15rem;");
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain("font-size: 1.05rem;");
+    expect(stylesSource).not.toMatch(/font-size:\s*[^;]*vw/);
+  });
+
   it("keeps schedule refresh separate from debounced template search", () => {
     expect(pageSource).toContain("function useDebouncedValue");
     expect(pageSource).toContain("const debouncedSearch = useDebouncedValue");
@@ -62,6 +86,44 @@ describe("templates daily featured page", () => {
     expect(pageSource).not.toContain("<th>Actions</th>");
   });
 
+  it("keeps daily featured schedule data partially recoverable when one request fails", () => {
+    expect(pageSource).toContain("await Promise.allSettled([");
+    expect(pageSource).toContain('if (scheduleResponse.status === "fulfilled")');
+    expect(pageSource).toContain('if (currentResponse.status === "fulfilled")');
+    expect(pageSource).toContain('if (settingsResponse.status === "fulfilled")');
+    expect(pageSource).toContain("let loadFailure: unknown = null;");
+    expect(pageSource).toContain("loadFailure ??= scheduleResponse.reason;");
+    expect(pageSource).toContain("loadFailure ??= currentResponse.reason;");
+    expect(pageSource).toContain("loadFailure ??= settingsResponse.reason;");
+    expect(pageSource).toContain("setError(getAdminErrorMessage(loadFailure, text.loadError));");
+    expect(pageSource).not.toContain(
+      "const [scheduleResponse, currentResponse, settingsResponse] = await Promise.all(["
+    );
+  });
+
+  it("keeps template option load failures local and retryable", () => {
+    expect(pageSource).toContain(
+      "const [templateOptionsError, setTemplateOptionsError] = useState<string | null>(null);"
+    );
+    expect(pageSource).toContain("setTemplateOptionsError(null);");
+    expect(pageSource).toContain(
+      "setTemplateOptionsError(getAdminErrorMessage(loadError, text.loadError));"
+    );
+    expect(pageSource).toContain(
+      "await Promise.allSettled([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);"
+    );
+    expect(pageSource).toContain("{templateOptionsError ? (");
+    expect(pageSource).toContain("description={templateOptionsError}");
+    expect(pageSource).toContain("disabled={!canManageTemplates || isTemplateOptionsLoading}");
+    expect(pageSource).toContain("onClick={() => void loadTemplateOptions(debouncedSearch)}");
+    expect(pageSource).not.toContain(
+      "await Promise.all([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);"
+    );
+    expect(pageSource).not.toContain(
+      'clientLogger.warn("templates.daily_featured_template_options_failed", { error: loadError });\n        setError(getAdminErrorMessage(loadError, text.loadError));'
+    );
+  });
+
   it("warns on occupied manual dates and sends manual assignment payloads", () => {
     expect(pageSource).toContain("function dateRangesOverlap");
     expect(pageSource).toContain("dateOccupiedWarning");
@@ -77,6 +139,19 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("Дата окончания не может быть раньше даты начала.");
     expect(pageSource).toContain("isSubmitting || invalidDateRangeWarning");
     expect(pageSource).toContain("!form.templateId || invalidDateRangeWarning");
+  });
+
+  it("blocks auto-pick runs until a date is selected", () => {
+    expect(pageSource).toContain("autoPickDateRequired: isRu");
+    expect(pageSource).toContain("Select a date before running auto-pick.");
+    expect(pageSource).toContain("Выберите дату для ручного автовыбора.");
+    expect(pageSource).toContain("const isAutoPickDateMissing = autoPick.date.trim().length === 0;");
+    expect(pageSource).toContain("if (!canManageTemplates || isSubmitting || isAutoPickDateMissing) return;");
+    expect(pageSource).toContain(
+      "disabled={!canManageTemplates || isSubmitting || isAutoPickDateMissing}"
+    );
+    expect(pageSource).toContain("description={text.autoPickDateRequired}");
+    expect(pageSource).toContain("date: autoPick.date");
   });
 
   it("filters assignment candidates by active status, type, access, and search", () => {
@@ -96,14 +171,13 @@ describe("templates daily featured page", () => {
 
   it("keeps the selected template visible when filters or search hide it", () => {
     expect(pageSource).toContain("type TemplateOption = Pick<");
-    expect(pageSource).toContain(
-      "const [selectedTemplateSnapshot, setSelectedTemplateSnapshot] = useState<TemplateOption | null>(null)"
-    );
+    expect(pageSource).toContain("const selectedTemplateSnapshot = useMemo(() => {");
+    expect(pageSource).toContain("if (!form.templateId) {\n      return null;");
     expect(pageSource).toContain("function optionFromTemplate");
     expect(pageSource).toContain("function optionFromAssignment");
     expect(pageSource).toContain("const templateOptions = useMemo(() => {");
     expect(pageSource).toContain("return [selectedTemplateSnapshot, ...options];");
-    expect(pageSource).toContain("if (selectedTemplate) {\n      setSelectedTemplateSnapshot");
+    expect(pageSource).toContain("if (selectedTemplate) {\n      return optionFromTemplate(selectedTemplate);");
     expect(pageSource).toContain("if (selectedAssignment?.templateId === form.templateId)");
     expect(pageSource).toContain("templateOptions.map((template) =>");
   });

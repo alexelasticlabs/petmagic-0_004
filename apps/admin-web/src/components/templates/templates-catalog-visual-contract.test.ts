@@ -45,6 +45,11 @@ describe("templates catalog visual contract", () => {
     const letterSpacingRules = cssSource.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
     expect(letterSpacingRules.every((rule) => rule === "letter-spacing: 0;")).toBe(true);
+    expect(cssSource).toContain(".bigMetric {");
+    expect(cssSource).toContain("font-size: 1.78rem;");
+    expect(cssSource).toContain(".heroCopy h1 {\n    font-size: 1.65rem;");
+    expect(cssSource).toContain(".bigMetric {\n    font-size: 1.56rem;");
+    expect(cssSource).not.toMatch(/font-size:\s*[^;]*vw/);
     expect(catalogSource).toContain("CaretDownIcon");
     expect(catalogSource).toContain("aria-label={copy.previousPageLabel}");
     expect(catalogSource).toContain("aria-label={copy.nextPageLabel}");
@@ -74,5 +79,22 @@ describe("templates catalog visual contract", () => {
     expect(cssSource).toContain("height: 0.85rem;");
     expect(cssSource).toContain("opacity: 0.7;");
     expect(cssSource).toContain("flex-shrink: 0;");
+  });
+
+  it("keeps list action controls stable in the sticky catalog table column", () => {
+    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const cssSource = readFileSync(catalogCssPath, "utf8");
+
+    expect(catalogSource).toContain("className={styles.tableActionsCell}");
+    expect(catalogSource).toContain("className={styles.tableActions}");
+    expect(cssSource).toContain(".tableActionsCell {\n  min-width: 13.25rem;");
+    expect(cssSource).toContain(".tableActions {\n  justify-content: flex-end;\n  flex-wrap: nowrap;");
+    expect(cssSource).toContain(".tableActions .cardActionIconButton {\n  flex: 0 0 1.9rem;");
+    expect(cssSource).toContain(
+      "@media (max-width: 760px) {\n  .catalogHero {\n    grid-template-columns: 1fr;"
+    );
+    expect(cssSource).toContain(".tableActions {\n    justify-content: flex-start;\n    flex-wrap: wrap;");
+    expect(cssSource).toContain(".tableActions .cardActionIconButton {\n    flex: 1 1 2.1rem;");
+    expect(cssSource).toContain(".tableActionsCell {\n    min-width: 14rem;");
   });
 });

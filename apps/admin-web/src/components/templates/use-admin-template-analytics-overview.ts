@@ -21,6 +21,7 @@ import {
 type AdminTemplateAnalyticsOverview = {
   eventAnalytics: AdminTemplateEventAnalytics;
   failureBreakdown: AdminTemplateFailureBreakdownItem[];
+  hasPartialSecondaryFailure: boolean;
   recentRunsPreview: AdminTemplateRecentGeneration[];
   statistics: AdminTemplateStatistics;
   template: AdminTemplate;
@@ -32,6 +33,23 @@ type UseAdminTemplateAnalyticsOverviewOptions = {
   previewTake?: number;
   templateId: string;
 };
+
+const EMPTY_EVENT_ANALYTICS: AdminTemplateEventAnalytics = {
+  totalViews: 0,
+  totalVideoViews: 0,
+  totalComplaints: 0,
+  sources: [],
+  devices: [],
+  geography: [],
+};
+
+function readSettledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
+}
+
+function hasRejectedResult(results: ReadonlyArray<PromiseSettledResult<unknown>>): boolean {
+  return results.some((result) => result.status === "rejected");
+}
 
 export function useAdminTemplateAnalyticsOverview({
   enabled = true,
@@ -57,23 +75,33 @@ export function useAdminTemplateAnalyticsOverview({
   const secondaryQuery = useQuery<
     Pick<
       AdminTemplateAnalyticsOverview,
-      "eventAnalytics" | "failureBreakdown" | "recentRunsPreview" | "trendPoints"
+      | "eventAnalytics"
+      | "failureBreakdown"
+      | "hasPartialSecondaryFailure"
+      | "recentRunsPreview"
+      | "trendPoints"
     >
   >({
     queryKey: adminQueryKeys.templateAnalyticsSecondary(templateId, previewTake),
     queryFn: async ({ signal }) => {
-      const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all([
+      const results = await Promise.allSettled([
         fetchAdminTemplateTrends(templateId, signal),
         fetchAdminTemplateRecentGenerations(templateId, previewTake, signal),
         fetchAdminTemplateFailureBreakdown(templateId, signal),
         fetchAdminTemplateEventAnalytics(templateId, signal),
       ]);
+      if (signal.aborted) {
+        throw new DOMException("Template analytics request was aborted.", "AbortError");
+      }
+
+      const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = results;
 
       return {
-        eventAnalytics,
-        failureBreakdown,
-        recentRunsPreview,
-        trendPoints,
+        eventAnalytics: readSettledValue(eventAnalytics, EMPTY_EVENT_ANALYTICS),
+        failureBreakdown: readSettledValue(failureBreakdown, []),
+        hasPartialSecondaryFailure: hasRejectedResult(results),
+        recentRunsPreview: readSettledValue(recentRunsPreview, []),
+        trendPoints: readSettledValue(trendPoints, []),
       };
     },
     enabled: enabled && primaryQuery.isSuccess,
@@ -84,6 +112,7 @@ export function useAdminTemplateAnalyticsOverview({
     failureBreakdown: secondaryQuery.data?.failureBreakdown ?? [],
     hasError: primaryQuery.isError,
     hasSecondaryError: secondaryQuery.isError,
+    hasSecondaryPartialError: secondaryQuery.data?.hasPartialSecondaryFailure ?? false,
     isFetching: primaryQuery.isFetching || secondaryQuery.isFetching,
     isLoading: primaryQuery.isLoading,
     isSecondaryLoading: primaryQuery.isSuccess && secondaryQuery.isLoading,
@@ -93,7 +122,12 @@ export function useAdminTemplateAnalyticsOverview({
         return;
       }
 
-      await Promise.all([primaryQuery.refetch(), secondaryQuery.refetch()]);
+      const primaryResult = await primaryQuery.refetch();
+      if (primaryResult.isError) {
+        return;
+      }
+
+      await secondaryQuery.refetch();
     },
     statistics: primaryQuery.data?.statistics ?? null,
     template: primaryQuery.data?.template ?? null,

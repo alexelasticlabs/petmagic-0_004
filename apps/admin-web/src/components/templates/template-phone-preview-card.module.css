@@ -22,9 +22,9 @@
   /* Phone preview always renders on dark video/image background.
      Override theme-sensitive variables to fixed "phone-screen" values
      so text/badges are readable regardless of the admin colour scheme. */
-  --text-inverse: #f2f5fa;
-  --surface-0: #000000;
-  --surface-2: #0c1118;
+  --text-inverse: var(--accent-contrast);
+  --surface-0: black;
+  --surface-2: color-mix(in srgb, black 88%, var(--accent) 12%);
 
   position: relative;
   aspect-ratio: var(--phone-preview-aspect-ratio, var(--template-image-aspect-ratio));
@@ -34,12 +34,12 @@
   border: 1px solid var(--border-soft);
   border-radius: 1.28rem;
   background:
-    radial-gradient(
-      circle at top,
-      color-mix(in srgb, var(--accent) 20%, transparent),
-      transparent 34%
-    ),
-    linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 92%, var(--accent) 8%) 0%,
+      var(--surface-2) 42%,
+      var(--surface-1) 100%
+    );
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
     0 16px 32px color-mix(in srgb, var(--surface-0) 42%, transparent);
@@ -57,10 +57,11 @@
       color-mix(in srgb, var(--surface-0) 22%, transparent) 84%,
       color-mix(in srgb, var(--surface-0) 42%, transparent) 100%
     ),
-    radial-gradient(
-      circle at 50% 115%,
-      color-mix(in srgb, var(--surface-2) 34%, transparent) 0%,
-      transparent 58%
+    linear-gradient(
+      135deg,
+      transparent 0%,
+      color-mix(in srgb, var(--surface-2) 18%, transparent) 68%,
+      color-mix(in srgb, var(--surface-2) 30%, transparent) 100%
     );
   pointer-events: none;
 }
@@ -106,7 +107,7 @@
   );
   color: var(--text-inverse);
   font-size: 0.56rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
   text-transform: uppercase;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -126,7 +127,7 @@
   color: var(--text-inverse);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.015em;
+  letter-spacing: 0;
   text-transform: none;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -162,16 +163,10 @@
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(
-      circle at 50% 0%,
-      color-mix(in srgb, var(--text-inverse) 20%, transparent) 0%,
-      color-mix(in srgb, var(--text-inverse) 8%, transparent) 35%,
-      transparent 70%
-    ),
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--text-inverse) 12%, transparent) 0%,
-      color-mix(in srgb, var(--text-inverse) 4%, transparent) 46%,
+      color-mix(in srgb, var(--text-inverse) 18%, transparent) 0%,
+      color-mix(in srgb, var(--text-inverse) 7%, transparent) 42%,
       transparent 100%
     );
   opacity: 0.72;
@@ -248,17 +243,12 @@
   width: 100%;
   height: 100%;
   display: block;
-  background:
-    radial-gradient(
-      circle at 50% 38%,
-      color-mix(in srgb, var(--accent) 8%, transparent),
-      transparent 22%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--surface-0) 22%, transparent) 0%,
-      color-mix(in srgb, var(--surface-0) 4%, transparent) 100%
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 7%, var(--surface-0)) 0%,
+    color-mix(in srgb, var(--surface-0) 22%, transparent) 44%,
+    color-mix(in srgb, var(--surface-0) 4%, transparent) 100%
+  );
 }
 
 .phoneBottomContent {
@@ -350,7 +340,7 @@
   font-size: 1.1rem;
   font-weight: 600;
   line-height: 1.03;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   text-shadow: 0 8px 20px color-mix(in srgb, var(--surface-0) 62%, transparent);
 }
 
@@ -399,7 +389,7 @@
   color: color-mix(in srgb, var(--text-inverse) 94%, transparent);
   font-size: 0.62rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   line-height: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -469,7 +459,7 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .phoneAccessIcon {

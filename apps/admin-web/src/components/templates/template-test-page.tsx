@@ -86,7 +86,7 @@ function isTemplateTestRunInFlight(run: AdminTemplateTestRun | null | undefined)
 
 export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) {
   const isRu = locale === "ru";
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
@@ -432,13 +432,15 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     providerCostText,
   });
   const hasSourceImage = Boolean(sourceImageUrl);
+  const stageOneLabel = isRu ? "Этап 01" : "Stage 01";
+  const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";
   const middleArtifact: ArtifactItem | null = isVideoTemplate
     ? {
         key: "normalized",
         title: isRu ? "Препроцессинг" : "Preprocessing",
         accent: "preprocess",
         imageUrl: run?.normalizedImageUrl ?? undefined,
-        placeholderEyebrow: isRu ? "Stage 01" : "Stage 01",
+        placeholderEyebrow: stageOneLabel,
         placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
         placeholderText:
           selectedFile || run?.sourceImageAsset
@@ -463,9 +465,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     imageUrl: isVideoTemplate ? undefined : (run?.outputUrl ?? undefined),
     videoUrl: isVideoTemplate ? (run?.outputUrl ?? undefined) : undefined,
     placeholderEyebrow: isVideoTemplate
-      ? isRu
-        ? "Stage 02"
-        : "Stage 02"
+      ? stageTwoLabel
       : isRu
         ? "Result"
         : "Result",

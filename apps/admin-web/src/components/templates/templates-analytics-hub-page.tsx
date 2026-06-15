@@ -41,6 +41,7 @@ import styles from "@/components/templates/templates-analytics-hub-page.module.c
 import { Button } from "@/components/ui/button";
 import {
   fetchAdminTemplatesAnalyticsOverview,
+  normalizeAdminTemplatesAnalyticsQuery,
   useAuthSession,
   type AdminTemplateAnalyticsDimension,
   type AdminTemplatesAnalyticsBreakdown,
@@ -80,6 +81,14 @@ function formatAnalyticsDisplayText(value: string, maxLength = 120) {
   return sanitizeSensitiveText(value, maxLength);
 }
 
+function getBoundedBarWidthPercent(value: number, minimumVisiblePercent: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(minimumVisiblePercent, value));
+}
+
 export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageProps) {
   const isRu = locale === "ru";
   const text = useMemo(() => getCopy(locale), [locale]);
@@ -95,15 +104,16 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const [chartMetric, setChartMetric] = useState<TrendMetricKey>("totalViews");
 
   const query = useMemo<AdminTemplatesAnalyticsQuery>(
-    () => ({
-      periodDays: period === "all" ? undefined : Number(period),
-      templateType,
-      category: category || undefined,
-      status,
-      access,
-      sort,
-      take: 50,
-    }),
+    () =>
+      normalizeAdminTemplatesAnalyticsQuery({
+        periodDays: period === "all" ? undefined : Number(period),
+        templateType,
+        category: category || undefined,
+        status,
+        access,
+        sort,
+        take: 50,
+      }),
     [access, category, period, sort, status, templateType]
   );
 
@@ -765,7 +775,9 @@ function FunnelList({
           <div className={styles.funnelTrack}>
             <span
               className={styles[`funnel_${row.tone}`]}
-              style={{ width: `${Math.max(5, (row.value / max) * 100)}%` }}
+              style={{
+                width: `${getBoundedBarWidthPercent((row.value / max) * 100, 5)}%`,
+              }}
             />
           </div>
         </div>
@@ -806,7 +818,11 @@ function BreakdownPanel({
               <span>{formatTemplateCount(row.templateCount, locale, templateCountLabel)}</span>
             </div>
             <div className={styles.breakdownBar}>
-              <span style={{ width: `${Math.max(6, (row.views / maxViews) * 100)}%` }} />
+              <span
+                style={{
+                  width: `${getBoundedBarWidthPercent((row.views / maxViews) * 100, 6)}%`,
+                }}
+              />
             </div>
             <span>{formatNumber(row.views, locale)}</span>
           </div>
@@ -889,7 +905,11 @@ function EventDimensionPanel({
               <span>{formatNumber(row.count, locale)}</span>
             </div>
             <div className={styles.dimensionTrack}>
-              <span style={{ width: `${Math.max(5, row.sharePercent)}%` }} />
+              <span
+                style={{
+                  width: `${getBoundedBarWidthPercent(row.sharePercent, 5)}%`,
+                }}
+              />
             </div>
             <em>{formatPercent(row.sharePercent, locale === "ru")}</em>
           </div>

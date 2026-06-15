@@ -4,6 +4,7 @@ import {
   formatAnalyticsValue,
   formatModelSummary,
   formatModelValue,
+  formatUsd,
 } from "@/components/templates/template-analytics-utils";
 
 describe("template analytics display utilities", () => {
@@ -23,5 +24,10 @@ describe("template analytics display utilities", () => {
         "video/provider/kling receipt=raw-receipt"
       )
     ).toBe("provider/model access_token=[redacted] + provider/kling receipt=[redacted]");
+  });
+
+  it("formats USD analytics values with the selected admin locale", () => {
+    expect(formatUsd(1234.56, "en")).toBe("$1,234.56");
+    expect(formatUsd(1234.56, "ru")).toBe("1\u00a0234,56\u00a0$");
   });
 });

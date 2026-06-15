@@ -85,11 +85,20 @@ describe("template analytics error states", () => {
     const optionsHookSource = readFileSync(optionsHookPath, "utf8");
 
     expect(overviewHookSource).toContain(
-      "if (!enabled) {\n        return;\n      }\n\n      await Promise.all([primaryQuery.refetch(), secondaryQuery.refetch()]);"
+      "if (!enabled) {\n        return;\n      }\n\n      const primaryResult = await primaryQuery.refetch();"
+    );
+    expect(overviewHookSource).toContain("if (primaryResult.isError) {\n        return;\n      }");
+    expect(overviewHookSource).toContain("await secondaryQuery.refetch();");
+    expect(overviewHookSource).not.toContain(
+      "await Promise.all([primaryQuery.refetch(), secondaryQuery.refetch()]);"
     );
     expect(catalogHookSource).toContain(
       "if (!enabled) {\n      return templatesQuery;\n    }\n\n    const templatesResult = await templatesQuery.refetch();"
     );
+    expect(catalogHookSource).toContain(
+      "void analyticsRowsQuery.refetch().catch(() => undefined);"
+    );
+    expect(catalogHookSource).not.toContain("await analyticsRowsQuery.refetch();");
     expect(optionsHookSource).toContain(
       "if (!enabled) {\n      return templatesQuery;\n    }\n\n    const result = await templatesQuery.refetch();"
     );
@@ -97,6 +106,34 @@ describe("template analytics error states", () => {
       "if (!enabled) {\n      return categoriesQuery;\n    }\n\n    return categoriesQuery.refetch();"
     );
     expect(categoriesHookSource).not.toContain("refresh: categoriesQuery.refetch");
+  });
+
+  it("keeps template analytics secondary widgets partially recoverable", () => {
+    const overviewHookSource = readFileSync(overviewHookPath, "utf8");
+    const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
+
+    expect(overviewHookSource).toContain("const results = await Promise.allSettled([");
+    expect(overviewHookSource).toContain(
+      "hasPartialSecondaryFailure: hasRejectedResult(results),"
+    );
+    expect(overviewHookSource).toContain(
+      "eventAnalytics: readSettledValue(eventAnalytics, EMPTY_EVENT_ANALYTICS),"
+    );
+    expect(overviewHookSource).toContain("failureBreakdown: readSettledValue(failureBreakdown, []),");
+    expect(overviewHookSource).toContain("recentRunsPreview: readSettledValue(recentRunsPreview, []),");
+    expect(overviewHookSource).toContain("trendPoints: readSettledValue(trendPoints, []),");
+    expect(overviewHookSource).toContain(
+      "hasSecondaryPartialError: secondaryQuery.data?.hasPartialSecondaryFailure ?? false,"
+    );
+    expect(overviewHookSource).not.toContain(
+      "const [trendPoints, recentRunsPreview, failureBreakdown, eventAnalytics] = await Promise.all(["
+    );
+
+    expect(pageSource).toContain("hasSecondaryPartialError,");
+    expect(pageSource).toContain("{hasSecondaryPartialError ? (");
+    expect(pageSource).toContain("title={text.secondaryPartialErrorTitle}");
+    expect(pageSource).toContain("description={text.secondaryPartialErrorDescription}");
+    expect(pageSource).toContain("disabled={!session || isFetching}");
   });
 
   it("keeps template option lists visible during background refetches", () => {

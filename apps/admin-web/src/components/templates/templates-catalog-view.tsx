@@ -99,7 +99,7 @@ export function TemplatesCatalogView({
   initialCategory,
 }: TemplatesCatalogViewProps) {
   const isRu = locale === "ru";
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
   const session = useAuthSession();
@@ -338,6 +338,11 @@ export function TemplatesCatalogView({
   const totalPages = Math.max(1, Math.ceil(totalCount / Math.max(1, pageTake)));
   const shownStart = templates.length > 0 ? pageSkip + 1 : 0;
   const shownEnd = templates.length > 0 ? Math.min(totalCount, pageSkip + templates.length) : 0;
+  useEffect(() => {
+    if (!isFetching && currentPage > totalPages) {
+      queueMicrotask(() => setPage(totalPages));
+    }
+  }, [currentPage, isFetching, totalPages]);
   const visiblePageNumbers = useMemo(() => {
     const end = totalCount > 0 ? Math.min(totalPages, Math.max(currentPage, 1)) : currentPage;
     const start = Math.max(1, end - 4);
@@ -563,7 +568,7 @@ export function TemplatesCatalogView({
           {!templates.length ? (
             <AdminStateCard tone="info" className={styles.empty} title={text.noTemplates} />
           ) : viewMode === "cards" ? (
-            <div className={styles.cardGrid}>
+            <div className={styles.cardGrid} aria-busy={isFetching ? "true" : undefined}>
               {templates.map((template) => (
                 <TemplateCatalogCard
                   key={template.templateId}
@@ -582,7 +587,7 @@ export function TemplatesCatalogView({
             </div>
           ) : (
             <AdminCard padding="md" className={styles.listCard}>
-              <div className={adminTableStyles.tableWrap}>
+              <div className={adminTableStyles.tableWrap} aria-busy={isFetching ? "true" : undefined}>
                 <table className={`${adminTableStyles.table} ${styles.listTable}`}>
                   <thead>
                     <tr>
@@ -708,33 +713,34 @@ export function TemplatesCatalogView({
                             data-label={isRu ? "Просмотры" : "Views"}
                             className={styles.metricValueCell}
                           >
-                            {formatAnalyticsInteger(analytics?.views)}
+                            {formatAnalyticsInteger(analytics?.views, locale)}
                           </td>
                           <td
                             data-label={isRu ? "Запуски" : "Starts"}
                             className={styles.metricValueCell}
                           >
-                            {formatAnalyticsInteger(analytics?.generationStarts)}
+                            {formatAnalyticsInteger(analytics?.generationStarts, locale)}
                           </td>
                           <td
                             data-label={isRu ? "Конверсия" : "Conversion"}
                             className={styles.metricValueCell}
                           >
                             {formatPercentMetric(
-                              analytics?.generationStarts ? analytics.conversionPercent : null
+                              analytics?.generationStarts ? analytics.conversionPercent : null,
+                              locale
                             )}
                           </td>
                           <td
                             data-label={isRu ? "Успех" : "Success"}
                             className={styles.metricValueCell}
                           >
-                            {formatPercentMetric(getSuccessRatePercent(analytics))}
+                            {formatPercentMetric(getSuccessRatePercent(analytics), locale)}
                           </td>
                           <td
                             data-label={isRu ? "Средняя стоимость" : "Average cost"}
                             className={styles.numericCell}
                           >
-                            {template.tokenCost}{" "}
+                            {formatAnalyticsInteger(template.tokenCost, locale)}{" "}
                             <span className={styles.numericSuffix}>{copy.tokensShort}</span>
                           </td>
                           <td data-label={copy.updatedLabel}>
@@ -747,9 +753,18 @@ export function TemplatesCatalogView({
                             <div className={styles.tableActions}>
                               <Link
                                 href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}
-                                className={styles.cardActionIconButton}
+                                className={`${styles.cardActionIconButton}${
+                                  isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+                                }`}
                                 aria-label={copy.analyticsAction}
+                                aria-disabled={isBusy}
+                                tabIndex={isBusy ? -1 : undefined}
                                 title={copy.analyticsAction}
+                                onClick={(event) => {
+                                  if (isBusy) {
+                                    event.preventDefault();
+                                  }
+                                }}
                               >
                                 <ChartIcon className={styles.actionIcon} />
                               </Link>
@@ -757,17 +772,35 @@ export function TemplatesCatalogView({
                                 <>
                                   <Link
                                     href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}
-                                    className={styles.cardActionIconButton}
+                                    className={`${styles.cardActionIconButton}${
+                                      isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+                                    }`}
                                     aria-label={text.editTemplate}
+                                    aria-disabled={isBusy}
+                                    tabIndex={isBusy ? -1 : undefined}
                                     title={text.editTemplate}
+                                    onClick={(event) => {
+                                      if (isBusy) {
+                                        event.preventDefault();
+                                      }
+                                    }}
                                   >
                                     <PencilIcon className={styles.actionIcon} />
                                   </Link>
                                   <Link
                                     href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}
-                                    className={styles.cardActionIconButton}
+                                    className={`${styles.cardActionIconButton}${
+                                      isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+                                    }`}
                                     aria-label={copy.testAction}
+                                    aria-disabled={isBusy}
+                                    tabIndex={isBusy ? -1 : undefined}
                                     title={copy.testAction}
+                                    onClick={(event) => {
+                                      if (isBusy) {
+                                        event.preventDefault();
+                                      }
+                                    }}
                                   >
                                     <PlayCircleIcon className={styles.actionIcon} />
                                   </Link>
@@ -1021,9 +1054,18 @@ function TemplateCatalogCard({
         <div className={styles.cardActions}>
           <Link
             href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}
-            className={styles.cardActionIconButton}
+            className={`${styles.cardActionIconButton}${
+              isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+            }`}
             aria-label={copy.analyticsAction}
+            aria-disabled={isBusy}
+            tabIndex={isBusy ? -1 : undefined}
             title={copy.analyticsAction}
+            onClick={(event) => {
+              if (isBusy) {
+                event.preventDefault();
+              }
+            }}
           >
             <ChartIcon className={styles.actionIcon} />
           </Link>
@@ -1031,17 +1073,35 @@ function TemplateCatalogCard({
             <>
               <Link
                 href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}
-                className={styles.cardActionIconButton}
+                className={`${styles.cardActionIconButton}${
+                  isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+                }`}
                 aria-label={text.editTemplate}
+                aria-disabled={isBusy}
+                tabIndex={isBusy ? -1 : undefined}
                 title={text.editTemplate}
+                onClick={(event) => {
+                  if (isBusy) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 <PencilIcon className={styles.actionIcon} />
               </Link>
               <Link
                 href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}
-                className={styles.cardActionIconButton}
+                className={`${styles.cardActionIconButton}${
+                  isBusy ? ` ${styles.cardActionIconButtonDisabled}` : ""
+                }`}
                 aria-label={copy.testAction}
+                aria-disabled={isBusy}
+                tabIndex={isBusy ? -1 : undefined}
                 title={copy.testAction}
+                onClick={(event) => {
+                  if (isBusy) {
+                    event.preventDefault();
+                  }
+                }}
               >
                 <PlayCircleIcon className={styles.actionIcon} />
               </Link>
@@ -1115,20 +1175,23 @@ function formatDuration(seconds?: number) {
   return `${minutes}:${remainder}`;
 }
 
-function formatAnalyticsInteger(value?: number) {
+function formatAnalyticsInteger(value: number | null | undefined, locale: Locale) {
   if (value === undefined || value === null) {
     return "-";
   }
 
-  return new Intl.NumberFormat("ru-RU").format(value);
+  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US").format(value);
 }
 
-function formatPercentMetric(value?: number | null) {
+function formatPercentMetric(value: number | null | undefined, locale: Locale) {
   if (value === undefined || value === null || Number.isNaN(value)) {
     return "-";
   }
 
-  return `${value.toFixed(1)}%`;
+  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value)}%`;
 }
 
 function getSuccessRatePercent(analytics?: AdminTemplatesAnalyticsTemplateRow) {
@@ -1153,7 +1216,7 @@ function getTemplateCardMetrics(
   const costValue =
     template.estimatedCostUsd !== undefined && template.estimatedCostUsd !== null
       ? `$${template.estimatedCostUsd.toFixed(3)}`
-      : `${formatAnalyticsInteger(template.tokenCost)} ${isRu ? "ток." : "tok."}`;
+      : `${formatAnalyticsInteger(template.tokenCost, locale)} ${isRu ? "ток." : "tok."}`;
 
   const metrics = [
     {
@@ -1163,17 +1226,17 @@ function getTemplateCardMetrics(
     },
     {
       label: isRu ? "Просмотры" : "Views",
-      value: formatAnalyticsInteger(analytics?.views),
+      value: formatAnalyticsInteger(analytics?.views, locale),
       tone: "cardMetric_info",
     },
     {
       label: isRu ? "Генерации" : "Generations",
-      value: formatAnalyticsInteger(analytics?.generationStarts),
+      value: formatAnalyticsInteger(analytics?.generationStarts, locale),
       tone: "cardMetric_success",
     },
     {
       label: isRu ? "Ошибки" : "Errors",
-      value: formatAnalyticsInteger(analytics?.failedGenerations),
+      value: formatAnalyticsInteger(analytics?.failedGenerations, locale),
       tone: "cardMetric_danger",
     },
   ];

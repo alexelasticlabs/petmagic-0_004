@@ -11,6 +11,12 @@ export function getTemplateAnalyticsCopy(locale: Locale) {
     loadError: isRu
       ? "Не удалось загрузить аналитику шаблона."
       : "Failed to load template analytics.",
+    secondaryPartialErrorTitle: isRu
+      ? "Часть аналитики временно недоступна"
+      : "Some analytics are temporarily unavailable",
+    secondaryPartialErrorDescription: isRu
+      ? "Показываем доступные данные. Повторите загрузку, чтобы обновить недостающие блоки."
+      : "Available data is still shown. Retry to refresh the missing sections.",
     retryAction: isRu ? "Повторить" : "Retry",
     rangeLabel: isRu ? "Период аналитики" : "Analytics period",
     range7: isRu ? "7 дней" : "7 days",

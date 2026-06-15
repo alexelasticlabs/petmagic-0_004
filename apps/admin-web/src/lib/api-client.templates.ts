@@ -73,8 +73,36 @@ export type AdminTemplateCatalogQuery = {
   take?: number;
 };
 
+const TEMPLATE_TYPES = ["Image", "Video"] as const;
+const TEMPLATE_STATUSES = ["Draft", "Active", "Archived"] as const;
+const TEMPLATE_CATALOG_STATUSES = ["Draft", "Active", "Archived", "not_archived"] as const;
+const TEMPLATE_CATALOG_ACCESS = ["premium", "free"] as const;
+const TEMPLATE_CATALOG_SORTS = ["newest", "title", "tokens"] as const;
+const TEMPLATE_FEEDBACK_TYPES = ["complaint", "feedback"] as const;
+const TEMPLATE_ANALYTICS_ACCESS = ["free", "premium"] as const;
+const TEMPLATE_ANALYTICS_SORTS = [
+  "views",
+  "starts",
+  "conversion",
+  "cost",
+  "tokens",
+  "updated",
+] as const;
+
 function normalizeTemplateCatalogFilter(value: string | undefined): string | undefined {
   return value?.trim().slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH) || undefined;
+}
+
+function normalizeTemplateFeedbackFilter(value: string | undefined): string | undefined {
+  return value?.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH) || undefined;
+}
+
+function normalizeAllowed<const T extends string>(
+  value: string | undefined,
+  allowed: readonly T[]
+): T | undefined {
+  const normalized = value?.trim();
+  return normalized && allowed.includes(normalized as T) ? (normalized as T) : undefined;
 }
 
 function normalizeTemplateCatalogPagedValue(value: number | undefined): number | undefined {
@@ -93,14 +121,35 @@ export function normalizeAdminTemplateCatalogQuery(
   query: AdminTemplateCatalogQuery = {}
 ): AdminTemplateCatalogQuery {
   return {
-    type: query.type,
-    status: query.status,
+    type: normalizeAllowed(query.type, TEMPLATE_TYPES),
+    status: normalizeAllowed(query.status, TEMPLATE_CATALOG_STATUSES),
     search: normalizeTemplateCatalogFilter(query.search),
     category: normalizeTemplateCatalogFilter(query.category),
-    access: query.access,
-    sort: query.sort,
+    access: normalizeAllowed(query.access, TEMPLATE_CATALOG_ACCESS),
+    sort: normalizeAllowed(query.sort, TEMPLATE_CATALOG_SORTS),
     skip: normalizeTemplateCatalogPagedValue(query.skip),
     take: normalizeTemplateCatalogTakeValue(query.take),
+  };
+}
+
+export function normalizeAdminTemplatesAnalyticsQuery(
+  query: AdminTemplatesAnalyticsQuery = {}
+): AdminTemplatesAnalyticsQuery {
+  return {
+    periodDays:
+      typeof query.periodDays === "number" && Number.isFinite(query.periodDays) && query.periodDays > 0
+        ? Math.min(3650, Math.floor(query.periodDays))
+        : undefined,
+    templateType:
+      query.templateType === "All" ? undefined : normalizeAllowed(query.templateType, TEMPLATE_TYPES),
+    category: normalizeTemplateCatalogFilter(query.category),
+    status: query.status === "All" ? undefined : normalizeAllowed(query.status, TEMPLATE_STATUSES),
+    access: query.access === "all" ? undefined : normalizeAllowed(query.access, TEMPLATE_ANALYTICS_ACCESS),
+    sort: normalizeAllowed(query.sort, TEMPLATE_ANALYTICS_SORTS),
+    take:
+      typeof query.take === "number" && Number.isFinite(query.take) && query.take > 0
+        ? Math.min(200, Math.floor(query.take))
+        : undefined,
   };
 }
 
@@ -409,9 +458,11 @@ export async function fetchAdminTemplateFeedback(
 ): Promise<AdminTemplateFeedbackItem[]> {
   const encodedTemplateId = encodePathSegment(templateId);
   const params = new URLSearchParams();
-  if (query.take) params.set("take", String(query.take));
-  if (query.type) params.set("type", query.type);
-  const search = query.search?.trim().slice(0, TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH);
+  const take = normalizeTemplateCatalogTakeValue(query.take);
+  const type = normalizeAllowed(query.type, TEMPLATE_FEEDBACK_TYPES);
+  const search = normalizeTemplateFeedbackFilter(query.search);
+  if (take !== undefined) params.set("take", String(take));
+  if (type) params.set("type", type);
   if (search) params.set("search", search);
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
   return apiRequest<AdminTemplateFeedbackItem[]>(
@@ -474,20 +525,20 @@ export async function fetchAdminTemplatesAnalyticsOverview(
   query: AdminTemplatesAnalyticsQuery = {},
   signal?: AbortSignal
 ): Promise<AdminTemplatesAnalyticsOverview> {
+  const normalizedQuery = normalizeAdminTemplatesAnalyticsQuery(query);
   const params = new URLSearchParams();
-  if (query.periodDays) params.set("periodDays", String(query.periodDays));
-  if (query.templateType && query.templateType !== "All")
-    params.set("templateType", query.templateType);
-  if (query.category) params.set("category", query.category);
-  if (query.status && query.status !== "All") params.set("status", query.status);
-  if (query.access && query.access !== "all") params.set("access", query.access);
-  if (query.sort) params.set("sort", query.sort);
-  if (query.take) params.set("take", String(query.take));
+  if (normalizedQuery.periodDays) params.set("periodDays", String(normalizedQuery.periodDays));
+  if (normalizedQuery.templateType) params.set("templateType", normalizedQuery.templateType);
+  if (normalizedQuery.category) params.set("category", normalizedQuery.category);
+  if (normalizedQuery.status) params.set("status", normalizedQuery.status);
+  if (normalizedQuery.access) params.set("access", normalizedQuery.access);
+  if (normalizedQuery.sort) params.set("sort", normalizedQuery.sort);
+  if (normalizedQuery.take) params.set("take", String(normalizedQuery.take));
 
   const suffix = params.size > 0 ? `?${params.toString()}` : "";
 
   return cachedGet(
-    `templates-analytics:${getAnalyticsOverviewCacheKey(query)}`,
+    `templates-analytics:${getAnalyticsOverviewCacheKey(normalizedQuery)}`,
     cachedTemplatesAnalyticsOverview,
     () =>
       apiRequest<AdminTemplatesAnalyticsOverview>(`/api/admin/templates/analytics${suffix}`, {

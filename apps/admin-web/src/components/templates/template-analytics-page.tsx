@@ -1,8 +1,8 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 
 import {
@@ -56,6 +56,7 @@ import {
 import { useAdminTemplateAnalyticsOverview } from "@/components/templates/use-admin-template-analytics-overview";
 import { useAdminTemplateFeedback } from "@/components/templates/use-admin-template-feedback";
 import { Button } from "@/components/ui/button";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   TEMPLATE_FEEDBACK_SEARCH_MAX_LENGTH,
   fetchAdminTemplateFeedbackSummary,
@@ -64,7 +65,6 @@ import {
   type AdminTemplateEventAnalytics,
   type AdminTemplateRecentGeneration,
 } from "@/lib/api-client";
-import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -103,6 +103,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     failureBreakdown,
     hasError,
     hasSecondaryError,
+    hasSecondaryPartialError,
     isFetching,
     isLoading,
     isSecondaryLoading,
@@ -496,6 +497,30 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         template={template}
         text={text}
       />
+
+      {hasSecondaryPartialError ? (
+        <AdminStateCard
+          tone="warning"
+          title={text.secondaryPartialErrorTitle}
+          description={text.secondaryPartialErrorDescription}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!session || isFetching}
+              onClick={() => {
+                if (!session) {
+                  return;
+                }
+
+                void refresh().catch(() => undefined);
+              }}
+            >
+              {text.retryAction}
+            </Button>
+          }
+        />
+      ) : null}
 
       <TemplateAnalyticsVisualSection
         chartMetric={chartMetric}

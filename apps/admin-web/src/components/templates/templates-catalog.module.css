@@ -52,6 +52,13 @@
   color: var(--text-soft);
 }
 
+.compactLinkDisabled,
+.compactLink[aria-disabled="true"] {
+  opacity: 0.62;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .primaryLink:hover,
 .secondaryLink:hover,
 .compactLink:hover {
@@ -826,7 +833,7 @@
 }
 
 .tableActionsCell {
-  min-width: 11rem;
+  min-width: 13.25rem;
   padding-inline: 0.5rem !important;
 }
 
@@ -834,6 +841,17 @@
   justify-content: flex-end;
   flex-wrap: nowrap;
   gap: 0.28rem;
+}
+
+.tableActions .cardActionIconButton {
+  flex: 0 0 1.9rem;
+}
+
+.cardActionIconButtonDisabled,
+.cardActionIconButton[aria-disabled="true"] {
+  opacity: 0.62;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .categoryToolbar {
@@ -912,7 +930,7 @@
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(1.56rem, 1.34rem + 0.52vw, 2rem);
+  font-size: 1.78rem;
   font-weight: 600;
   line-height: 1;
 }
@@ -1003,6 +1021,10 @@
     flex-wrap: wrap;
   }
 
+  .tableActions .cardActionIconButton {
+    flex: 1 1 2.1rem;
+  }
+
   .categoryToolbar {
     grid-template-columns: 1fr;
   }
@@ -1010,7 +1032,7 @@
 
 @media (max-width: 560px) {
   .heroCopy h1 {
-    font-size: clamp(1.55rem, 1.3rem + 1vw, 1.8rem);
+    font-size: 1.65rem;
   }
 
   .loadingGrid,
@@ -1018,8 +1040,12 @@
     grid-template-columns: 1fr;
   }
 
+  .bigMetric {
+    font-size: 1.56rem;
+  }
+
   .tableActionsCell {
-    min-width: 13rem;
+    min-width: 14rem;
   }
 
   .listTemplateThumb {

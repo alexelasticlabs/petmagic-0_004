@@ -3,10 +3,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const catalogViewPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
+const catalogCssPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
 
 describe("templates catalog actions", () => {
   it("confirms archive changes and sanitizes backend action errors", () => {
     const source = readFileSync(catalogViewPath, "utf8");
+    const styles = readFileSync(catalogCssPath, "utf8");
 
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("const isTemplateActionLocked = busyTemplateId !== null;");
@@ -51,6 +53,9 @@ describe("templates catalog actions", () => {
     expect(source).toContain("analyticsUnavailableDescription:");
     expect(source).toContain("Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}");
     expect(source).toContain("currentPage >= totalPages");
+    expect(source).toContain("if (!isFetching && currentPage > totalPages)");
+    expect(source).toContain("queueMicrotask(() => setPage(totalPages));");
+    expect(source).toContain("}, [currentPage, isFetching, totalPages]);");
     expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
     expect(source).toContain(
       "setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH))"
@@ -61,9 +66,22 @@ describe("templates catalog actions", () => {
       "href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}"
     );
     expect(source).toContain("href={`${testBasePath}/${encodeURIComponent(template.templateId)}`}");
-    expect(source).toContain("value: formatAnalyticsInteger(analytics?.views),");
-    expect(source).toContain("value: formatAnalyticsInteger(analytics?.generationStarts),");
-    expect(source).toContain("value: formatAnalyticsInteger(analytics?.failedGenerations),");
+    expect(source).toContain("isBusy ? ` ${styles.cardActionIconButtonDisabled}` : \"\"");
+    expect(source).toContain("aria-disabled={isBusy}");
+    expect(source).toContain("tabIndex={isBusy ? -1 : undefined}");
+    expect(source).toContain("event.preventDefault();");
+    expect(styles).toContain(".cardActionIconButtonDisabled,");
+    expect(styles).toContain('.cardActionIconButton[aria-disabled="true"]');
+    expect(styles).toContain("pointer-events: none;");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.views, locale),");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.generationStarts, locale),");
+    expect(source).toContain("value: formatAnalyticsInteger(analytics?.failedGenerations, locale),");
+    expect(source).toContain('new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US")');
+    expect(source).toContain("formatPercentMetric(\n                              analytics?.generationStarts ? analytics.conversionPercent : null,\n                              locale");
+    expect(source).toContain("formatPercentMetric(getSuccessRatePercent(analytics), locale)");
+    expect(source).toContain("{formatAnalyticsInteger(analytics?.views, locale)}");
+    expect(source).toContain("{formatAnalyticsInteger(analytics?.generationStarts, locale)}");
+    expect(source).toContain("{formatAnalyticsInteger(template.tokenCost, locale)}");
     expect(source).toContain("void handleStatusChange(templatePendingArchiveId, \"Archived\").then((succeeded) => {");
     expect(source).toContain("if (succeeded) {\n              setTemplatePendingArchiveId(null);");
     expect(source).toContain("void handleDelete(templatePendingDeleteId).then((succeeded) => {");
@@ -84,6 +102,8 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.views ?? 0)");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.generationStarts ?? 0)");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.failedGenerations ?? 0)");
+    expect(source).not.toContain('new Intl.NumberFormat("ru-RU").format(value)');
+    expect(source).not.toContain("return `${value.toFixed(1)}%`;");
     expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
   });

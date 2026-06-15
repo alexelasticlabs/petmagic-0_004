@@ -25,4 +25,21 @@ describe("template phone preview visual contract", () => {
     expect(source).not.toContain("focusable=\"false\"");
     expect(cssSource).toContain(".phoneInlineIcon {");
   });
+
+  it("keeps the phone mock readable without raw palette values or negative tracking", () => {
+    const cssSource = readFileSync(phonePreviewCssPath, "utf8");
+    const nonZeroLetterSpacingRules = [...cssSource.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
+
+    expect(cssSource).toContain("--text-inverse: var(--accent-contrast);");
+    expect(cssSource).toContain("--surface-0: black;");
+    expect(cssSource).toContain("--surface-2: color-mix(in srgb, black 88%, var(--accent) 12%);");
+    expect(cssSource).toContain("letter-spacing: 0;");
+    expect(cssSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(cssSource).not.toContain("rgba(");
+    expect(cssSource).not.toContain("radial-gradient");
+    expect(cssSource).not.toMatch(/letter-spacing:\s*-/);
+    expect(nonZeroLetterSpacingRules).toEqual([]);
+  });
 });

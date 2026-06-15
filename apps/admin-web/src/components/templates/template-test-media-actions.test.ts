@@ -12,6 +12,9 @@ const templateEditorPath = fileURLToPath(new URL("../template-editor.tsx", impor
 const templatePreviewAssetSectionPath = fileURLToPath(
   new URL("./template-preview-asset-section.tsx", import.meta.url)
 );
+const templateTestPageStylesPath = fileURLToPath(
+  new URL("./template-test-page.module.css", import.meta.url)
+);
 const templateEditorSectionsPath = fileURLToPath(
   new URL("./template-editor-sections.tsx", import.meta.url)
 );
@@ -174,6 +177,30 @@ describe("template test media actions", () => {
     expect(source).not.toContain("return `${safeTitle || \"template-test\"}-${generationId}${extension}`");
     expect(source).not.toContain("run.failureCode ?? (isRu ? \"Ошибка генерации\"");
     expect(source).not.toContain("? fileMeta\n");
+  });
+
+  it("localizes template test stage placeholder labels", () => {
+    const source = readFileSync(templateTestPagePath, "utf8");
+
+    expect(source).toContain('const stageOneLabel = isRu ? "Этап 01" : "Stage 01";');
+    expect(source).toContain('const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";');
+    expect(source).toContain("placeholderEyebrow: stageOneLabel");
+    expect(source).toContain("? stageTwoLabel");
+    expect(source).not.toContain('placeholderEyebrow: isRu ? "Stage 01" : "Stage 01"');
+    expect(source).not.toContain('? "Stage 02"\n        : "Stage 02"');
+  });
+
+  it("keeps template test page visuals on semantic tokens without decorative tracking", () => {
+    const stylesSource = readFileSync(templateTestPageStylesPath, "utf8");
+    const nonZeroLetterSpacingRules = [...stylesSource.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
+
+    expect(stylesSource).toContain("letter-spacing: 0;");
+    expect(stylesSource).not.toContain("rgba(");
+    expect(stylesSource).not.toContain("radial-gradient");
+    expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(nonZeroLetterSpacingRules).toEqual([]);
   });
 
   it("does not log raw template upload filenames", () => {

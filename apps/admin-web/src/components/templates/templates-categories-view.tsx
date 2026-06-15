@@ -58,7 +58,7 @@ const typeColors = {
 const CATEGORY_NAME_MAX_LENGTH = 64;
 
 export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps) {
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const canManageCategories = session?.user.roles.includes("Admin") ?? false;
@@ -128,13 +128,29 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   );
 
   const stats = useMemo(
-    () => ({
-      totalCategories: categories.length,
-      activeCategories: categories.filter((category) => !category.isArchived).length,
-      archivedCategories: categories.filter((category) => category.isArchived).length,
-      totalTemplates: categories.reduce((sum, category) => sum + category.totalTemplates, 0),
-      totalPremium: categories.reduce((sum, category) => sum + category.premiumTemplates, 0),
-    }),
+    () =>
+      categories.reduce(
+        (summary, category) => {
+          summary.totalCategories += 1;
+          summary.totalTemplates += category.totalTemplates;
+          summary.totalPremium += category.premiumTemplates;
+
+          if (category.isArchived) {
+            summary.archivedCategories += 1;
+          } else {
+            summary.activeCategories += 1;
+          }
+
+          return summary;
+        },
+        {
+          totalCategories: 0,
+          activeCategories: 0,
+          archivedCategories: 0,
+          totalTemplates: 0,
+          totalPremium: 0,
+        }
+      ),
     [categories]
   );
 
@@ -448,7 +464,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
               <input
                 className={styles.categoryInput}
                 value={newCategoryName}
-                onChange={(event) => setNewCategoryName(normalizeCategoryName(event.target.value))}
+                onChange={(event) => setNewCategoryName(limitCategoryNameInput(event.target.value))}
                 placeholder={isRu ? "Например, Portrait Pets" : "For example, Portrait Pets"}
                 maxLength={CATEGORY_NAME_MAX_LENGTH}
               />
@@ -483,7 +499,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
             title={isRu ? "Категории не найдены." : "No categories found."}
           />
         ) : (
-          <div className={adminTableStyles.tableWrap}>
+          <div className={adminTableStyles.tableWrap} aria-busy={isFetching ? "true" : undefined}>
             <table className={adminTableStyles.table}>
               <thead>
                 <tr>
@@ -505,7 +521,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                         <input
                           className={styles.categoryInput}
                           value={editingName}
-                          onChange={(event) => setEditingName(normalizeCategoryName(event.target.value))}
+                          onChange={(event) => setEditingName(limitCategoryNameInput(event.target.value))}
                           maxLength={CATEGORY_NAME_MAX_LENGTH}
                           disabled={isCategoryActionLocked}
                         />
@@ -581,15 +597,33 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                         ) : (
                           <>
                             <Link
-                              className={styles.compactLink}
+                              className={`${styles.compactLink}${
+                                isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : ""
+                              }`}
                               href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}
+                              aria-disabled={isCategoryActionLocked}
+                              tabIndex={isCategoryActionLocked ? -1 : undefined}
+                              onClick={(event) => {
+                                if (isCategoryActionLocked) {
+                                  event.preventDefault();
+                                }
+                              }}
                             >
                               <VideoIcon className={styles.linkIcon} />
                               <span>{text.templateKindVideoBadge}</span>
                             </Link>
                             <Link
-                              className={styles.compactLink}
+                              className={`${styles.compactLink}${
+                                isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : ""
+                              }`}
                               href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}
+                              aria-disabled={isCategoryActionLocked}
+                              tabIndex={isCategoryActionLocked ? -1 : undefined}
+                              onClick={(event) => {
+                                if (isCategoryActionLocked) {
+                                  event.preventDefault();
+                                }
+                              }}
                             >
                               <ImageIcon className={styles.linkIcon} />
                               <span>{text.templateKindImageBadge}</span>
@@ -735,4 +769,8 @@ function getActionErrorMessage(error: unknown, fallback: string): string {
 
 function normalizeCategoryName(value: string): string {
   return value.trim().slice(0, CATEGORY_NAME_MAX_LENGTH);
+}
+
+function limitCategoryNameInput(value: string): string {
+  return value.slice(0, CATEGORY_NAME_MAX_LENGTH);
 }

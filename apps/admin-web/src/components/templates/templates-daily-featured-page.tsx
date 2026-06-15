@@ -22,6 +22,7 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import { Button } from "@/components/ui/button";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {
@@ -44,7 +45,6 @@ import {
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 
-import styles from "@/components/templates/templates-daily-featured-page.module.css";
 
 type TemplatesDailyFeaturedPageProps = {
   locale: Locale;
@@ -265,6 +265,9 @@ function copy(locale: Locale) {
     invalidDateRangeWarning: isRu
       ? "Дата окончания не может быть раньше даты начала."
       : "End date cannot be earlier than start date.",
+    autoPickDateRequired: isRu
+      ? "Выберите дату для ручного автовыбора."
+      : "Select a date before running auto-pick.",
     noTemplates: isRu
       ? "Активные шаблоны по этому запросу не найдены."
       : "No active templates match this search.",
@@ -310,7 +313,6 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   const [current, setCurrent] = useState<AdminTemplateOfTheDay | null>(null);
   const [settings, setSettings] = useState<AdminTemplateOfTheDaySettings | null>(null);
   const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
-  const [selectedTemplateSnapshot, setSelectedTemplateSnapshot] = useState<TemplateOption | null>(null);
   const [search, setSearch] = useState("");
   const [templateTypeFilter, setTemplateTypeFilter] = useState<"" | TemplateType>("");
   const [templateAccessFilter, setTemplateAccessFilter] = useState<TemplateAccessFilter>("");
@@ -326,11 +328,27 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   const [isTemplateOptionsLoading, setIsTemplateOptionsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateOptionsError, setTemplateOptionsError] = useState<string | null>(null);
   const [assignmentPendingDelete, setAssignmentPendingDelete] =
     useState<AdminTemplateOfTheDay | null>(null);
 
   const selectedTemplate = templates.find((template) => template.templateId === form.templateId);
   const selectedAssignment = schedule.find((assignment) => assignment.id === form.id);
+  const selectedTemplateSnapshot = useMemo(() => {
+    if (!form.templateId) {
+      return null;
+    }
+
+    if (selectedTemplate) {
+      return optionFromTemplate(selectedTemplate);
+    }
+
+    if (selectedAssignment?.templateId === form.templateId) {
+      return optionFromAssignment(selectedAssignment);
+    }
+
+    return null;
+  }, [form.templateId, selectedAssignment, selectedTemplate]);
   const templateOptions = useMemo(() => {
     const options = templates.map(optionFromTemplate);
     if (
@@ -363,11 +381,13 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       dateRangesOverlap(form.startDate, form.endDate, assignment)
   );
   const invalidDateRangeWarning = hasInvalidDateRange(form.startDate, form.endDate);
+  const isAutoPickDateMissing = autoPick.date.trim().length === 0;
 
   const loadTemplateOptions = useCallback(
     async (query: string, signal?: AbortSignal) => {
       if (!canManageTemplates) {
         setTemplates([]);
+        setTemplateOptionsError(null);
         setIsTemplateOptionsLoading(false);
         return;
       }
@@ -385,10 +405,11 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           signal
         );
         setTemplates(templateResponse.items);
+        setTemplateOptionsError(null);
       } catch (loadError) {
         if (signal?.aborted) return;
         clientLogger.warn("templates.daily_featured_template_options_failed", { error: loadError });
-        setError(getAdminErrorMessage(loadError, text.loadError));
+        setTemplateOptionsError(getAdminErrorMessage(loadError, text.loadError));
       } finally {
         if (!signal?.aborted) {
           setIsTemplateOptionsLoading(false);
@@ -408,20 +429,44 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       setIsScheduleLoading(true);
       setError(null);
       try {
-        const [scheduleResponse, currentResponse, settingsResponse] = await Promise.all([
+        const [scheduleResponse, currentResponse, settingsResponse] = await Promise.allSettled([
           fetchTemplateOfTheDaySchedule(signal),
           fetchCurrentTemplateOfTheDay(undefined, signal),
           fetchTemplateOfTheDaySettings(signal),
         ]);
-        setSchedule(scheduleResponse.items);
-        setCurrent(currentResponse);
-        setSettings(settingsResponse);
-        setAutoPick((state) => ({
-          ...state,
-          autoModeEnabled: settingsResponse.autoModeEnabled,
-          allowedTypes: settingsResponse.allowedTypes,
-          excludeRecentDays: String(settingsResponse.excludeRecentDays),
-        }));
+
+        if (signal?.aborted) return;
+
+        let loadFailure: unknown = null;
+
+        if (scheduleResponse.status === "fulfilled") {
+          setSchedule(scheduleResponse.value.items);
+        } else {
+          loadFailure ??= scheduleResponse.reason;
+        }
+
+        if (currentResponse.status === "fulfilled") {
+          setCurrent(currentResponse.value);
+        } else {
+          loadFailure ??= currentResponse.reason;
+        }
+
+        if (settingsResponse.status === "fulfilled") {
+          setSettings(settingsResponse.value);
+          setAutoPick((state) => ({
+            ...state,
+            autoModeEnabled: settingsResponse.value.autoModeEnabled,
+            allowedTypes: settingsResponse.value.allowedTypes,
+            excludeRecentDays: String(settingsResponse.value.excludeRecentDays),
+          }));
+        } else {
+          loadFailure ??= settingsResponse.reason;
+        }
+
+        if (loadFailure) {
+          clientLogger.warn("templates.daily_featured_load_failed", { error: loadFailure });
+          setError(getAdminErrorMessage(loadFailure, text.loadError));
+        }
       } catch (loadError) {
         if (signal?.aborted) return;
         clientLogger.warn("templates.daily_featured_load_failed", { error: loadError });
@@ -440,7 +485,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       return;
     }
 
-    await Promise.all([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);
+    await Promise.allSettled([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);
   }, [canManageTemplates, debouncedSearch, loadScheduleData, loadTemplateOptions]);
 
   useEffect(() => {
@@ -453,7 +498,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     }
 
     const controller = new AbortController();
-    void loadScheduleData(controller.signal);
+    queueMicrotask(() => void loadScheduleData(controller.signal));
     return () => controller.abort();
   }, [canManageTemplates, loadScheduleData]);
 
@@ -463,25 +508,9 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     }
 
     const controller = new AbortController();
-    void loadTemplateOptions(debouncedSearch, controller.signal);
+    queueMicrotask(() => void loadTemplateOptions(debouncedSearch, controller.signal));
     return () => controller.abort();
   }, [canManageTemplates, debouncedSearch, loadTemplateOptions]);
-
-  useEffect(() => {
-    if (!form.templateId) {
-      setSelectedTemplateSnapshot(null);
-      return;
-    }
-
-    if (selectedTemplate) {
-      setSelectedTemplateSnapshot(optionFromTemplate(selectedTemplate));
-      return;
-    }
-
-    if (selectedAssignment?.templateId === form.templateId) {
-      setSelectedTemplateSnapshot(optionFromAssignment(selectedAssignment));
-    }
-  }, [form.templateId, selectedAssignment, selectedTemplate]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -528,7 +557,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   }
 
   async function handleAutoPick() {
-    if (!canManageTemplates || isSubmitting) return;
+    if (!canManageTemplates || isSubmitting || isAutoPickDateMissing) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -687,6 +716,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               <input
                 className={styles.control}
                 type="date"
+                required
                 value={autoPick.date}
                 disabled={!canManageTemplates || isSubmitting}
                 onChange={(event) =>
@@ -695,11 +725,14 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               />
             </label>
           </div>
+          {isAutoPickDateMissing ? (
+            <AdminStateCard tone="warning" description={text.autoPickDateRequired} />
+          ) : null}
           <div className={styles.actionRow}>
             <Button
               variant="primary"
               onClick={() => void handleAutoPick()}
-              disabled={!canManageTemplates || isSubmitting}
+              disabled={!canManageTemplates || isSubmitting || isAutoPickDateMissing}
             >
               <CalendarIcon className={styles.buttonIcon} />
               {text.autoPickRun}
@@ -770,6 +803,22 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 ))}
               </select>
             </label>
+            {templateOptionsError ? (
+              <AdminStateCard
+                tone="warning"
+                description={templateOptionsError}
+                action={
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!canManageTemplates || isTemplateOptionsLoading}
+                    onClick={() => void loadTemplateOptions(debouncedSearch)}
+                  >
+                    {text.retry}
+                  </Button>
+                }
+              />
+            ) : null}
             {!isTemplateOptionsLoading && templates.length === 0 ? (
               <AdminStateCard tone="info" description={text.noTemplates} />
             ) : null}
