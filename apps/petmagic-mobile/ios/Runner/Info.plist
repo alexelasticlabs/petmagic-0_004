@@ -17,7 +17,7 @@
 			<string>com.petmagic.app.google</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.288623941469-m7honkkhfc81ssplojfaig1oil1u5p6b</string>
+				<string>com.googleusercontent.apps.replace-with-ios-oauth-client-id</string>
 			</array>
 		</dict>
 		<dict>

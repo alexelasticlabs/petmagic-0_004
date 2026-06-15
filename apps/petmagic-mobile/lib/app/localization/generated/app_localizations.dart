@@ -5949,66 +5949,6 @@ abstract class AppLocalizations {
   /// **'Total'**
   String get premiumCheckoutTotalLabel;
 
-  /// No description provided for @debugStripeSmokeTestTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Stripe PaymentSheet Test'**
-  String get debugStripeSmokeTestTitle;
-
-  /// No description provided for @debugStripeSmokeTestSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Minimal screen to diagnose tap and focus behavior in PaymentSheet.'**
-  String get debugStripeSmokeTestSubtitle;
-
-  /// No description provided for @debugStripeSmokeTestOpenAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Open Stripe PaymentSheet'**
-  String get debugStripeSmokeTestOpenAction;
-
-  /// No description provided for @debugStripeSmokeTestOpeningAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Opening...'**
-  String get debugStripeSmokeTestOpeningAction;
-
-  /// No description provided for @debugStripeSmokeTestMethodUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Stripe payment method is unavailable.'**
-  String get debugStripeSmokeTestMethodUnavailable;
-
-  /// No description provided for @debugStripeSmokeTestNoPlans.
-  ///
-  /// In en, this message translates to:
-  /// **'No Premium plans with Stripe enabled were found.'**
-  String get debugStripeSmokeTestNoPlans;
-
-  /// No description provided for @debugStripeSmokeTestPrepareFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Failed to prepare PaymentSheet checkout.'**
-  String get debugStripeSmokeTestPrepareFailed;
-
-  /// No description provided for @debugStripeSmokeTestOpenedSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'PaymentSheet opened successfully.'**
-  String get debugStripeSmokeTestOpenedSuccess;
-
-  /// No description provided for @debugStripeSmokeTestDismissedOrFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'PaymentSheet was dismissed or failed.'**
-  String get debugStripeSmokeTestDismissedOrFailed;
-
-  /// No description provided for @debugStripeSmokeTestVerifyFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Payment verification failed.'**
-  String get debugStripeSmokeTestVerifyFailed;
-
   /// No description provided for @premiumBenefitAiGenerationsTitle.
   ///
   /// In en, this message translates to:

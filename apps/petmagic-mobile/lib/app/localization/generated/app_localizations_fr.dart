@@ -3367,43 +3367,6 @@ class AppLocalizationsFr extends AppLocalizations {
   String get premiumCheckoutTotalLabel => 'Total';
 
   @override
-  String get debugStripeSmokeTestTitle => 'Test Stripe PaymentSheet';
-
-  @override
-  String get debugStripeSmokeTestSubtitle =>
-      'Écran minimal pour diagnostiquer les tapotements et le focus de PaymentSheet.';
-
-  @override
-  String get debugStripeSmokeTestOpenAction => 'Ouvrir Stripe PaymentSheet';
-
-  @override
-  String get debugStripeSmokeTestOpeningAction => 'Ouverture...';
-
-  @override
-  String get debugStripeSmokeTestMethodUnavailable =>
-      'Le moyen de paiement Stripe n\'est pas disponible.';
-
-  @override
-  String get debugStripeSmokeTestNoPlans =>
-      'Aucun plan Premium compatible Stripe n\'a été trouvé.';
-
-  @override
-  String get debugStripeSmokeTestPrepareFailed =>
-      'Impossible de préparer le paiement PaymentSheet.';
-
-  @override
-  String get debugStripeSmokeTestOpenedSuccess =>
-      'PaymentSheet a été ouvert avec succès.';
-
-  @override
-  String get debugStripeSmokeTestDismissedOrFailed =>
-      'PaymentSheet a été fermé ou a échoué.';
-
-  @override
-  String get debugStripeSmokeTestVerifyFailed =>
-      'La vérification du paiement a échoué.';
-
-  @override
   String get premiumBenefitAiGenerationsTitle => '30 générations d\'IA';
 
   @override

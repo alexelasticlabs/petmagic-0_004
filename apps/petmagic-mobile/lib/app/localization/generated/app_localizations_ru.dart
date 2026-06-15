@@ -3318,42 +3318,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumCheckoutTotalLabel => 'Итого';
 
   @override
-  String get debugStripeSmokeTestTitle => 'Тест Stripe PaymentSheet';
-
-  @override
-  String get debugStripeSmokeTestSubtitle =>
-      'Минимальный экран для диагностики касаний и фокуса в PaymentSheet.';
-
-  @override
-  String get debugStripeSmokeTestOpenAction => 'Открыть Stripe PaymentSheet';
-
-  @override
-  String get debugStripeSmokeTestOpeningAction => 'Открываем...';
-
-  @override
-  String get debugStripeSmokeTestMethodUnavailable =>
-      'Метод оплаты Stripe недоступен.';
-
-  @override
-  String get debugStripeSmokeTestNoPlans =>
-      'Планы Premium с включенным Stripe не найдены.';
-
-  @override
-  String get debugStripeSmokeTestPrepareFailed =>
-      'Не удалось подготовить оплату через PaymentSheet.';
-
-  @override
-  String get debugStripeSmokeTestOpenedSuccess =>
-      'PaymentSheet успешно открыт.';
-
-  @override
-  String get debugStripeSmokeTestDismissedOrFailed =>
-      'PaymentSheet был закрыт или завершился ошибкой.';
-
-  @override
-  String get debugStripeSmokeTestVerifyFailed => 'Не удалось проверить оплату.';
-
-  @override
   String get premiumBenefitAiGenerationsTitle => '30 AI-генераций';
 
   @override
