@@ -38,11 +38,13 @@ export function useAdminTemplateFeedback({
     enabled,
     placeholderData: keepPreviousData,
   });
+  const isRefreshingWithPlaceholder = feedbackQuery.isFetching && feedbackQuery.isPlaceholderData;
+  const visibleItems = feedbackQuery.isPlaceholderData ? [] : (feedbackQuery.data ?? []);
 
   return {
     hasError: feedbackQuery.isError,
     isFetching: feedbackQuery.isFetching,
-    isLoading: feedbackQuery.isLoading,
-    items: feedbackQuery.data ?? [],
+    isLoading: feedbackQuery.isLoading || isRefreshingWithPlaceholder,
+    items: visibleItems,
   };
 }

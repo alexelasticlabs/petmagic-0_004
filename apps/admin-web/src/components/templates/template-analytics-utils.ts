@@ -391,7 +391,12 @@ export function formatModelValue(value: string | null | undefined) {
 }
 
 export function shortenId(value: string) {
-  return value.length > 13 ? `${value.slice(0, 8)}...${value.slice(-4)}` : value;
+  const safeValue = sanitizeSensitiveText(value, 48).replace(/\s/g, "");
+  if (!safeValue) {
+    return "-";
+  }
+
+  return safeValue.length > 13 ? `${safeValue.slice(0, 8)}...${safeValue.slice(-4)}` : safeValue;
 }
 
 function getUtcDay(value: string) {

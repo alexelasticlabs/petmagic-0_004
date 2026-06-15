@@ -121,10 +121,19 @@
     transform 140ms ease;
 }
 
-.tab:hover {
+.tab:not(:disabled):hover {
   background: var(--surface-hover);
   color: var(--text-strong);
   transform: translateY(-1px);
+}
+
+.tab:disabled,
+.tabActive:disabled,
+.viewButton:disabled,
+.viewButtonActive:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
 }
 
 .tabActive {
@@ -264,8 +273,8 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
-.viewButton:hover,
-.viewButtonActive:hover {
+.viewButton:not(:disabled):hover,
+.viewButtonActive:not(:disabled):hover {
   transform: translateY(-1px);
 }
 
@@ -843,6 +852,10 @@
   gap: 0.28rem;
 }
 
+.categoryTableActions {
+  justify-content: flex-start;
+}
+
 .tableActions .cardActionIconButton {
   flex: 0 0 1.9rem;
 }
@@ -888,10 +901,15 @@
   color: var(--text-muted);
 }
 
-.categoryInput:focus {
+.categoryInput:focus-visible {
   outline: none;
   border-color: var(--border-accent);
   box-shadow: var(--focus-ring);
+}
+
+.categoryInput:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .error {
@@ -1019,6 +1037,18 @@
   .tableActions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .categoryTableActions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    width: 100%;
+  }
+
+  .categoryTableActions > * {
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
   }
 
   .tableActions .cardActionIconButton {

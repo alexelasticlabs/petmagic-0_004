@@ -12,24 +12,39 @@ describe("templates catalog actions", () => {
 
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("const isTemplateActionLocked = busyTemplateId !== null;");
-    expect(source).toContain("if (isTemplateActionLocked) {\n      return false;");
+    expect(source).toContain("isCatalogFetching,");
+    expect(source).toContain("const isCatalogRefreshing = isCatalogFetching && !isLoading;");
+    expect(source).toContain(
+      "const isCatalogInteractionLocked = isTemplateActionLocked || isCatalogRefreshing;"
+    );
+    expect(source).toContain("if (isCatalogInteractionLocked) {\n      return false;");
     expect(source).toContain("async function handleStatusChange(templateId: string, status: TemplateStatus): Promise<boolean>");
     expect(source).toContain("async function handleDelete(templateId: string): Promise<boolean>");
     expect(source).toContain("setActionError(getAdminErrorMessage(error, text.errorSavingTemplate))");
     expect(source).toContain("setActionError(getAdminErrorMessage(error, text.errorDeletingTemplate))");
+    expect(source).toContain("function getCatalogActionErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("templateId: sanitizeSensitiveText(templateId, 80)");
+    expect(source).toContain("...getCatalogActionErrorDetails(error)");
     expect(source).toContain("function assertCanManageTemplates(): boolean");
     expect(source).toContain("setActionError(copy.templateActionsAdminOnly)");
+    expect(source).toContain("{canManageTemplates ? (\n          <Link href={categoriesPath}");
     expect(source).toContain("if (!assertCanManageTemplates()) {\n      return false;");
     expect(source).toContain("if (!assertCanManageTemplates()) {\n      return;");
     expect(source).toContain("const [templatePendingArchiveId, setTemplatePendingArchiveId]");
     expect(source).toContain("function requestStatusChange(templateId: string, status: TemplateStatus)");
     expect(source).toContain("function requestDeleteTemplate(templateId: string)");
     expect(source).toContain("setTemplatePendingArchiveId(templateId)");
-    expect(source).toContain("if (isTemplateActionLocked) {\n      return;\n    }");
+    expect(source).toContain("if (isCatalogInteractionLocked) {\n      return;\n    }");
     expect(source).toContain("setTemplatePendingDeleteId(templateId)");
     expect(source).toContain("open={templatePendingArchiveId !== null}");
-    expect(source).toContain("const isBusy = isTemplateActionLocked;");
+    expect(source).toContain("const isBusy = isCatalogInteractionLocked;");
     expect(source).toContain("const isBusy = busyTemplateId !== null;");
+    expect(source).toContain("isCatalogRefreshing ? (");
+    expect(source).toContain('<AdminStateCard tone="info" className={styles.empty} title={text.loading} />');
+    expect(source).toContain(
+      "isCatalogInteractionLocked ? (busyTemplateId ?? \"__refresh__\") : null"
+    );
     expect(source).toContain("isSubmitting={Boolean(templatePendingArchiveId && isTemplateActionLocked)}");
     expect(source).toContain("isSubmitting={Boolean(templatePendingDeleteId && isTemplateActionLocked)}");
     expect(source).toContain("if (!isTemplateActionLocked) {\n            setTemplatePendingArchiveId(null);");
@@ -38,11 +53,19 @@ describe("templates catalog actions", () => {
     expect(source).toContain("return sanitizeSensitiveText(template?.title ?? templateId, 96);");
     expect(source).toContain("function formatTemplateId(templateId: string, maxLength: number)");
     expect(source).toContain("ID: {formatTemplateId(template.templateId, 12)}");
-    expect(source).toContain("if (!session || isLoading)");
-    expect(source).toContain("disabled={!session || isFetching}");
     expect(source).toContain(
-      "if (!session) {\n                  return;\n                }\n\n                void refresh().catch(() => undefined);"
+      'const canViewTemplates =\n    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");'
     );
+    expect(source).toContain("enabled: canViewTemplates");
+    expect(source).toContain("ensureAdminSession(locale, router);");
+    expect(source).toContain("if (!canViewTemplates || isLoading)");
+    expect(source).toContain("disabled={!canViewTemplates || isFetching}");
+    expect(source).toContain("function requestCatalogRetry()");
+    expect(source).toContain(
+      "if (!canViewTemplates || isFetching) {\n      return;\n    }"
+    );
+    expect(source).toContain("void refresh().catch(() => undefined);");
+    expect(source).toContain("onClick={requestCatalogRetry}");
     expect(source).toContain("totalCount");
     expect(source).toContain("shownStart");
     expect(source).toContain("shownEnd");
@@ -54,13 +77,45 @@ describe("templates catalog actions", () => {
     expect(source).toContain("Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}");
     expect(source).toContain("currentPage >= totalPages");
     expect(source).toContain("if (!isFetching && currentPage > totalPages)");
-    expect(source).toContain("queueMicrotask(() => setPage(totalPages));");
-    expect(source).toContain("}, [currentPage, isFetching, totalPages]);");
+    expect(source).toContain("queueMicrotask(() => resetCatalogContext(totalPages));");
+    expect(source).toContain("}, [currentPage, isFetching, resetCatalogContext, totalPages]);");
+    expect(source).toContain("const resetPendingTemplateAction = useCallback(() => {");
+    expect(source).toContain(
+      "if (isTemplateActionLocked) {\n      return;\n    }\n\n    setTemplatePendingArchiveId(null);\n    setTemplatePendingDeleteId(null);"
+    );
+    expect(source).toContain("const resetCatalogContext = useCallback(");
+    expect(source).toContain("resetPendingTemplateAction();\n      setPage(nextPage);");
+    expect(source).toContain("resetCatalogContext();");
+    expect(source).toContain(
+      "const visibleTemplateIds = useMemo(\n    () => new Set(templates.map((template) => template.templateId)),"
+    );
+    expect(source).toContain(
+      "templatePendingArchiveId !== null && !visibleTemplateIds.has(templatePendingArchiveId)"
+    );
+    expect(source).toContain(
+      "templatePendingDeleteId !== null && !visibleTemplateIds.has(templatePendingDeleteId)"
+    );
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("setTemplatePendingArchiveId(null);");
+    expect(source).toContain("setTemplatePendingDeleteId(null);");
+    expect(source).toContain("onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}");
+    expect(source).toContain("onClick={() => resetCatalogContext(pageNumber)}");
+    expect(source).toContain("onClick={() => resetCatalogContext(currentPage + 1)}");
+    expect(source).toContain(
+      'disabled={archiveFilter === "active" || isCatalogInteractionLocked}'
+    );
+    expect(source).toContain(
+      'disabled={archiveFilter === "archived" || isCatalogInteractionLocked}'
+    );
+    expect(source).toContain('disabled={viewMode === "cards" || isCatalogInteractionLocked}');
+    expect(source).toContain('disabled={viewMode === "list" || isCatalogInteractionLocked}');
     expect(source).toContain("const TEMPLATE_CATALOG_SEARCH_MAX_LENGTH = 120;");
     expect(source).toContain(
       "setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH))"
     );
     expect(source).toContain("maxLength={TEMPLATE_CATALOG_SEARCH_MAX_LENGTH}");
+    expect(source).toContain("disabled={isCatalogInteractionLocked}");
+    expect(source).toContain("disabled={isCatalogInteractionLocked}\n                onChange={(value) => {");
     expect(source).toContain("href={`${analyticsBasePath}/${encodeURIComponent(template.templateId)}`}");
     expect(source).toContain(
       "href={`${editorBasePath}?templateId=${encodeURIComponent(template.templateId)}`}"
@@ -106,5 +161,7 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("return `${value.toFixed(1)}%`;");
     expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");
+    expect(source).not.toContain("error,\n      });");
+    expect(source).not.toContain("templateId,\n        status,\n        error");
   });
 });

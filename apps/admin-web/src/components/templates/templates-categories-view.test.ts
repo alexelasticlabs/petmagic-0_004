@@ -17,7 +17,7 @@ describe("template categories view actions", () => {
     expect(source).toContain("if (!assertCanManageCategories()) {\n      return;");
     expect(source).toContain("if (!assertCanManageCategories()) {\n      return false;");
     expect(source).toContain(
-      "const isCategoryActionLocked = isSubmitting || busyCategoryId !== null;"
+      "const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;"
     );
     expect(source).toContain("if (isCategoryActionLocked) {\n      return;");
     expect(source).toContain("if (isCategoryActionLocked) {\n      return false;");
@@ -46,6 +46,8 @@ describe("template categories view actions", () => {
     );
     expect(source).toContain("if (succeeded) {\n              setCategoryPendingDelete(null);");
     expect(source).toContain("disabled={isCategoryActionLocked || !newCategoryName.trim()}");
+    expect(source).toContain("aria-busy={isCategoryActionLocked}");
+    expect(source).toContain("disabled={isCategoryActionLocked}");
     expect(source).toContain("disabled={isCategoryActionLocked}");
     expect(source).toContain("isCategoryActionLocked || !editingName.trim()");
     expect(source).toContain(
@@ -100,15 +102,66 @@ describe("template categories view actions", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
 
     expect(source).toContain("const { categories, hasError, isFetching, isLoading, refresh }");
-    expect(source).toContain("if (!session || isLoading)");
-    expect(source).toContain("title={error}");
-    expect(source).toContain("disabled={!session || isFetching}");
     expect(source).toContain(
-      "if (!session) {\n                  return;\n                }\n\n                void refresh().catch(() => undefined);"
+      'const canViewCategories =\n    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");'
+    );
+    expect(source).toContain("enabled: canViewCategories");
+    expect(source).toContain("ensureAdminSession(locale, router);");
+    expect(source).toContain("if (!canViewCategories || isLoading)");
+    expect(source).toContain("title={error}");
+    expect(source).toContain("disabled={!canViewCategories || isFetching}");
+    expect(source).toContain("function requestCategoriesRetry()");
+    expect(source).toContain(
+      "if (!canViewCategories || isFetching) {\n      return;\n    }"
+    );
+    expect(source).toContain("onClick={requestCategoriesRetry}");
+    expect(source).toContain("retry: isRu ? \"Повторить\" : \"Retry\"");
+    expect(source).toContain("{categoryText.retry}");
+    expect(source).not.toContain(
+      "onClick={() => {\n                if (!canViewCategories)"
     );
   });
 
-  it("keeps the existing category table visible during background refetches", () => {
+  it("keeps category page copy centralized while preserving sanitized confirmation names", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain("const categoryText = useMemo(");
+    expect(source).toContain("const categoryActionsAdminOnly = categoryText.actionsAdminOnly;");
+    expect(source).toContain("title: categoryText.notificationTitle,");
+    expect(source).toContain("message: categoryText.createSuccess");
+    expect(source).toContain("getActionErrorMessage(actionError, categoryText.createError)");
+    expect(source).toContain("message: category.isArchived ? categoryText.restoreSuccess : categoryText.archiveSuccess");
+    expect(source).toContain("getActionErrorMessage(actionError, categoryText.archiveError)");
+    expect(source).toContain("message: categoryText.deleteSuccess");
+    expect(source).toContain("getActionErrorMessage(actionError, categoryText.deleteError)");
+    expect(source).toContain("eyebrow={categoryText.heroEyebrow}");
+    expect(source).toContain("title={categoryText.heroTitle}");
+    expect(source).toContain("description={categoryText.heroDescription}");
+    expect(source).toContain("badge={canManageCategories ? categoryText.crudEnabled : categoryText.readOnly}");
+    expect(source).toContain("title={categoryText.empty}");
+    expect(source).toContain("title={categoryText.deleteDialogTitle}");
+    expect(source).toContain("cancelLabel={categoryText.cancel}");
+    expect(source).toContain("restoreDialogDescription: (name: string) =>");
+    expect(source).toContain("archiveDialogDescription: (name: string) =>");
+    expect(source).toContain("deleteDialogDescription: (name: string) =>");
+    expect(source).toContain("videoCategoryLabel: (name: string) =>");
+    expect(source).toContain("imageCategoryLabel: (name: string) =>");
+    expect(source).toContain("editCategoryLabel: (name: string) =>");
+    expect(source).toContain("archiveCategoryLabel: (name: string) =>");
+    expect(source).toContain("restoreCategoryLabel: (name: string) =>");
+    expect(source).toContain("deleteCategoryLabel: (name: string) =>");
+    expect(source).toContain("categoryText.restoreDialogDescription(\n                  formatCategoryActionName(categoryPendingArchive)");
+    expect(source).toContain("categoryText.archiveDialogDescription(\n                  formatCategoryActionName(categoryPendingArchive)");
+    expect(source).toContain(
+      "categoryText.deleteDialogDescription(formatCategoryActionName(categoryPendingDelete))"
+    );
+    expect(source).not.toContain('title={isRu ? "Удалить категорию?" : "Delete category?"}');
+    expect(source).not.toContain('{isRu ? "Повторить" : "Retry"}');
+    expect(source).not.toContain('{isRu ? "Сохранить" : "Save"}');
+    expect(source).not.toContain('{isRu ? "Отмена" : "Cancel"}');
+  });
+
+  it("keeps the existing category table visible but locks actions during background refetches", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
     const hookSource = readFileSync(
       fileURLToPath(new URL("./use-admin-template-categories.ts", import.meta.url)),
@@ -120,8 +173,11 @@ describe("template categories view actions", () => {
     expect(hookSource).not.toContain(
       "isLoading: categoriesQuery.isLoading || categoriesQuery.isFetching"
     );
-    expect(source).toContain("disabled={!session || isFetching}");
-    expect(source).not.toContain("if (!session || isLoading || isFetching)");
+    expect(source).toContain("disabled={!canViewCategories || isFetching}");
+    expect(source).toContain(
+      "const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;"
+    );
+    expect(source).not.toContain("if (!canViewCategories || isLoading || isFetching)");
   });
 
   it("sanitizes category names before dangerous confirmation copy", () => {
@@ -149,8 +205,17 @@ describe("template categories view actions", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
     const stylesSource = readFileSync(catalogStylesPath, "utf8");
 
+    expect(source).toContain(
+      'className={`${styles.tableActions} ${styles.categoryTableActions}`}'
+    );
     expect(source).toContain("isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : \"\"");
     expect(source).toContain("aria-disabled={isCategoryActionLocked}");
+    expect(source).toContain("aria-label={categoryText.videoCategoryLabel");
+    expect(source).toContain("aria-label={categoryText.imageCategoryLabel");
+    expect(source).toContain("aria-label={categoryText.editCategoryLabel");
+    expect(source).toContain("aria-label={categoryText.deleteCategoryLabel");
+    expect(source).toContain("title={categoryText.videoCategoryLabel");
+    expect(source).toContain("title={categoryText.imageCategoryLabel");
     expect(source).toContain("tabIndex={isCategoryActionLocked ? -1 : undefined}");
     expect(source).toContain(
       "if (isCategoryActionLocked) {\n                                  event.preventDefault();"
@@ -158,5 +223,56 @@ describe("template categories view actions", () => {
     expect(stylesSource).toContain(".compactLinkDisabled,");
     expect(stylesSource).toContain('.compactLink[aria-disabled="true"]');
     expect(stylesSource).toContain("pointer-events: none;");
+    expect(stylesSource).toContain(".categoryInput:focus-visible");
+    expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
+    expect(stylesSource).toContain(".categoryInput:disabled");
+    expect(stylesSource).toContain("cursor: not-allowed;");
+    expect(stylesSource).toContain(".categoryTableActions {");
+    expect(stylesSource).toContain("grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));");
+    expect(stylesSource).toContain(".categoryTableActions > * {");
+    expect(stylesSource).toContain("justify-content: center;");
+    expect(stylesSource).toContain("min-width: 0;");
+    expect(stylesSource).not.toMatch(/\.categoryInput:focus(?!-visible)/);
+  });
+
+  it("clears stale category dialogs and editors after list refreshes", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain(
+      "const categoryIds = useMemo(\n    () => new Set(categories.map((category) => category.categoryId)),"
+    );
+    expect(source).toContain("if (isCategoryActionLocked) {\n      return;\n    }");
+    expect(source).toContain(
+      "categoryPendingArchive !== null && !categoryIds.has(categoryPendingArchive.categoryId)"
+    );
+    expect(source).toContain(
+      "categoryPendingDelete !== null && !categoryIds.has(categoryPendingDelete.categoryId)"
+    );
+    expect(source).toContain(
+      "editingCategoryId !== null && !categoryIds.has(editingCategoryId)"
+    );
+    expect(source).toContain("queueMicrotask(() => {");
+    expect(source).toContain("setCategoryPendingArchive(null);");
+    expect(source).toContain("setCategoryPendingDelete(null);");
+    expect(source).toContain("setEditingCategoryId(null);");
+    expect(source).toContain("setEditingName(\"\");");
+    expect(source).not.toContain("useEffect(() => {\n    setCategoryPendingArchive(null);");
+  });
+
+  it("clears category edit and confirmation state when switching archive tabs", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain("function switchArchiveFilter(nextFilter: ArchiveFilter)");
+    expect(source).toContain("if (isCategoryActionLocked) {\n      return;\n    }");
+    expect(source).toContain("setArchiveFilter(nextFilter);");
+    expect(source).toContain("setEditingCategoryId(null);");
+    expect(source).toContain("setEditingName(\"\");");
+    expect(source).toContain("setCategoryPendingArchive(null);");
+    expect(source).toContain("setCategoryPendingDelete(null);");
+    expect(source).toContain("disabled={isCategoryActionLocked}");
+    expect(source).toContain('onClick={() => switchArchiveFilter("active")}');
+    expect(source).toContain('onClick={() => switchArchiveFilter("archived")}');
+    expect(source).not.toContain('onClick={() => setArchiveFilter("active")}');
+    expect(source).not.toContain('onClick={() => setArchiveFilter("archived")}');
   });
 });

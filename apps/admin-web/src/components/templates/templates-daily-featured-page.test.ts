@@ -23,7 +23,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain(
       "if (!canManageTemplates) {\n        setIsScheduleLoading(false);"
     );
-    expect(pageSource).toContain("disabled={!canManageTemplates || isLoading}");
+    expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
   });
 
   it("uses the admin design system instead of inline layout styles", () => {
@@ -73,7 +73,7 @@ describe("templates daily featured page", () => {
 
   it("keeps loading and error states recoverable with localized copy", () => {
     expect(pageSource).toContain("action={");
-    expect(pageSource).toContain("disabled={!canManageTemplates || isLoading}");
+    expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
     expect(pageSource).toContain("title={error}");
     expect(pageSource).toContain("text.retry");
     expect(pageSource).toContain('date: isRu ? "Период" : "Date"');
@@ -105,6 +105,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain(
       "const [templateOptionsError, setTemplateOptionsError] = useState<string | null>(null);"
     );
+    expect(pageSource).toContain("setTemplates([]);");
     expect(pageSource).toContain("setTemplateOptionsError(null);");
     expect(pageSource).toContain(
       "setTemplateOptionsError(getAdminErrorMessage(loadError, text.loadError));"
@@ -114,7 +115,7 @@ describe("templates daily featured page", () => {
     );
     expect(pageSource).toContain("{templateOptionsError ? (");
     expect(pageSource).toContain("description={templateOptionsError}");
-    expect(pageSource).toContain("disabled={!canManageTemplates || isTemplateOptionsLoading}");
+    expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
     expect(pageSource).toContain("onClick={() => void loadTemplateOptions(debouncedSearch)}");
     expect(pageSource).not.toContain(
       "await Promise.all([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);"
@@ -122,6 +123,25 @@ describe("templates daily featured page", () => {
     expect(pageSource).not.toContain(
       'clientLogger.warn("templates.daily_featured_template_options_failed", { error: loadError });\n        setError(getAdminErrorMessage(loadError, text.loadError));'
     );
+  });
+
+  it("keeps daily featured logs and backend labels sanitized", () => {
+    expect(pageSource).toContain('import { sanitizeSensitiveText }');
+    expect(pageSource).toContain("function safeDisplayText");
+    expect(pageSource).toContain("function safeErrorDetails");
+    expect(pageSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(pageSource).toContain(
+      'clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadFailure));'
+    );
+    expect(pageSource).toContain(
+      'clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadError));'
+    );
+    expect(pageSource).toContain("safeDisplayText(template.title, 120)");
+    expect(pageSource).toContain("safeDisplayText(template.category, 72)");
+    expect(pageSource).toContain("safeDisplayText(assignment.templateTitle, 120)");
+    expect(pageSource).toContain("safeDisplayText(assignment.subtitleOverride, 220)");
+    expect(pageSource).not.toContain("{ error: loadError }");
+    expect(pageSource).not.toContain("{ error: loadFailure }");
   });
 
   it("warns on occupied manual dates and sends manual assignment payloads", () => {
@@ -137,8 +157,26 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("invalidDateRangeWarning");
     expect(pageSource).toContain("End date cannot be earlier than start date.");
     expect(pageSource).toContain("Дата окончания не может быть раньше даты начала.");
-    expect(pageSource).toContain("isSubmitting || invalidDateRangeWarning");
+    expect(pageSource).toContain("isActionLocked || invalidDateRangeWarning");
     expect(pageSource).toContain("!form.templateId || invalidDateRangeWarning");
+  });
+
+  it("locks daily featured mutations and form edits while data is loading or submitting", () => {
+    expect(pageSource).toContain("const isActionLocked = isSubmitting || isLoading;");
+    expect(pageSource).toContain(
+      "if (!canManageTemplates || !form.templateId || isActionLocked || invalidDateRangeWarning) return;"
+    );
+    expect(pageSource).toContain("if (!canManageTemplates || isActionLocked) {");
+    expect(pageSource).toContain(
+      "if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;"
+    );
+    expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
+    expect(pageSource).toContain("aria-busy={isActionLocked}");
+    expect(pageSource).not.toContain("disabled={isActionLocked}");
+    expect(pageSource).toContain(
+      "isSubmitting={Boolean(assignmentPendingDelete && isActionLocked)}"
+    );
+    expect(pageSource).not.toContain("disabled={!canManageTemplates || isSubmitting}");
   });
 
   it("blocks auto-pick runs until a date is selected", () => {
@@ -146,12 +184,28 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("Select a date before running auto-pick.");
     expect(pageSource).toContain("Выберите дату для ручного автовыбора.");
     expect(pageSource).toContain("const isAutoPickDateMissing = autoPick.date.trim().length === 0;");
-    expect(pageSource).toContain("if (!canManageTemplates || isSubmitting || isAutoPickDateMissing) return;");
+    expect(pageSource).toContain("if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;");
     expect(pageSource).toContain(
-      "disabled={!canManageTemplates || isSubmitting || isAutoPickDateMissing}"
+      "disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}"
     );
     expect(pageSource).toContain("description={text.autoPickDateRequired}");
     expect(pageSource).toContain("date: autoPick.date");
+  });
+
+  it("does not save auto-pick settings when nothing changed", () => {
+    expect(pageSource).toContain("const isAutoPickSettingsDirty =");
+    expect(pageSource).toContain("settings === null ||");
+    expect(pageSource).toContain("autoPick.autoModeEnabled !== settings.autoModeEnabled");
+    expect(pageSource).toContain("autoPick.allowedTypes !== settings.allowedTypes");
+    expect(pageSource).toContain(
+      "parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays"
+    );
+    expect(pageSource).toContain(
+      "if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;"
+    );
+    expect(pageSource).toContain(
+      "disabled={!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty}"
+    );
   });
 
   it("filters assignment candidates by active status, type, access, and search", () => {
@@ -171,32 +225,71 @@ describe("templates daily featured page", () => {
 
   it("keeps the selected template visible when filters or search hide it", () => {
     expect(pageSource).toContain("type TemplateOption = Pick<");
+    expect(pageSource).toContain(
+      "const [selectedTemplateOptionSnapshot, setSelectedTemplateOptionSnapshot] =\n    useState<TemplateOption | null>(null);"
+    );
     expect(pageSource).toContain("const selectedTemplateSnapshot = useMemo(() => {");
     expect(pageSource).toContain("if (!form.templateId) {\n      return null;");
     expect(pageSource).toContain("function optionFromTemplate");
     expect(pageSource).toContain("function optionFromAssignment");
+    expect(pageSource).toContain("if (selectedTemplateOptionSnapshot?.templateId === form.templateId)");
     expect(pageSource).toContain("const templateOptions = useMemo(() => {");
     expect(pageSource).toContain("return [selectedTemplateSnapshot, ...options];");
     expect(pageSource).toContain("if (selectedTemplate) {\n      return optionFromTemplate(selectedTemplate);");
     expect(pageSource).toContain("if (selectedAssignment?.templateId === form.templateId)");
+    expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(\n                    templateOptions.find");
+    expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));");
+    expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(null);");
     expect(pageSource).toContain("templateOptions.map((template) =>");
   });
 
   it("renders storefront preview media from the selected candidate or assignment", () => {
     expect(pageSource).toContain(
-      "const previewMediaUrl = getPreviewUrl(selectedTemplate ?? selectedAssignment)"
+      'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
     );
-    expect(pageSource).toContain("isVideoTemplate(previewType) ? (");
-    expect(pageSource).toContain("<video");
-    expect(pageSource).toContain("<img src={previewMediaUrl}");
+    expect(pageSource).toContain(
+      "const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot)"
+    );
+    expect(pageSource).toContain(
+      'const previewType = selectedTemplateSnapshot?.templateType ?? ("Image" as TemplateType);'
+    );
+    expect(pageSource).toContain(
+      'form.titleOverride.trim() || selectedTemplateSnapshot?.title || "",'
+    );
+    expect(pageSource).toContain(
+      'form.subtitleOverride.trim() || selectedTemplateSnapshot?.shortDescription || "",'
+    );
+    expect(pageSource).toContain("<TemplateSecureMedia");
+    expect(pageSource).toContain('kind={isVideoTemplate(previewType) ? "video" : "image"}');
+    expect(pageSource).toContain('surface: "daily-featured-preview"');
+    expect(pageSource).not.toContain("<video\n                  src={previewMediaUrl}");
+    expect(pageSource).not.toContain("<img src={previewMediaUrl}");
     expect(pageSource).toContain("text.previewEmptyTitle");
   });
 
   it("uses the shared confirmation dialog for destructive schedule actions", () => {
     expect(pageSource).toContain("import { ConfirmationDialog }");
     expect(pageSource).toContain("const [assignmentPendingDelete, setAssignmentPendingDelete]");
+    expect(pageSource).toContain("const scheduleAssignmentIds = useMemo(");
+    expect(pageSource).toContain("new Set(schedule.map((assignment) => assignment.id))");
+    expect(pageSource).toContain("if (isScheduleLoading || isActionLocked) {\n      return;\n    }");
+    expect(pageSource).toContain(
+      "const shouldResetPendingDelete =\n      assignmentPendingDelete && !scheduleAssignmentIds.has(assignmentPendingDelete.id);"
+    );
+    expect(pageSource).toContain("const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);");
+    expect(pageSource).toContain("queueMicrotask(() => {");
+    expect(pageSource).toContain(
+      "if (shouldResetPendingDelete) {\n        setAssignmentPendingDelete(null);\n      }"
+    );
+    expect(pageSource).toContain(
+      "if (shouldResetForm) {\n        setSelectedTemplateOptionSnapshot(null);\n        setForm(emptyForm(form.startDate));\n      }"
+    );
     expect(pageSource).toContain("deleteConfirmTitle");
     expect(pageSource).toContain("deleteConfirmDescription");
+    expect(pageSource).toContain("editAssignmentLabel");
+    expect(pageSource).toContain("deleteAssignmentLabel");
+    expect(pageSource).toContain("aria-label={text.editAssignmentLabel");
+    expect(pageSource).toContain("aria-label={text.deleteAssignmentLabel");
     expect(pageSource).toContain("setAssignmentPendingDelete(assignment)");
     expect(pageSource).toContain("<ConfirmationDialog");
     expect(pageSource).toContain("void handleDelete(assignmentPendingDelete).then((succeeded) =>");

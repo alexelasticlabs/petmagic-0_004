@@ -88,6 +88,7 @@ export function useAdminTemplateCatalog({
     getAnalyticsRow,
     hasError: templatesQuery.isError,
     hasSecondaryError: analyticsRowsQuery.isError,
+    isCatalogFetching: templatesQuery.isFetching,
     isFetching: templatesQuery.isFetching || analyticsRowsQuery.isFetching,
     isLoading: templatesQuery.isLoading,
     isSecondaryLoading: analyticsRowsQuery.isLoading,

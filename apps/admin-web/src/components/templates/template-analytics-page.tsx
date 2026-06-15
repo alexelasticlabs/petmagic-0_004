@@ -98,6 +98,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const text = useMemo(() => getTemplateAnalyticsCopy(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
+  const sessionRoles = session?.user.roles ?? [];
+  const canViewTemplateAnalytics =
+    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const {
     eventAnalytics,
     failureBreakdown,
@@ -113,7 +116,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     template,
     trendPoints,
   } = useAdminTemplateAnalyticsOverview({
-    enabled: Boolean(session),
+    enabled: canViewTemplateAnalytics,
     previewTake: RECENT_RUNS_PREVIEW_LIMIT,
     templateId,
   });
@@ -133,7 +136,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     isLoading: isFeedbackLoading,
     items: feedbackItems,
   } = useAdminTemplateFeedback({
-    enabled: Boolean(session),
+    enabled: canViewTemplateAnalytics,
     filter: feedbackFilter,
     search: feedbackSearch,
     templateId,
@@ -141,7 +144,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const feedbackSummaryQuery = useQuery({
     queryKey: adminQueryKeys.templateFeedbackSummary(templateId),
     queryFn: ({ signal }) => fetchAdminTemplateFeedbackSummary(templateId, signal),
-    enabled: Boolean(session && templateId),
+    enabled: canViewTemplateAnalytics && Boolean(templateId),
   });
   const error = hasError ? text.loadError : null;
   const feedbackError = hasFeedbackError ? text.feedbackLoadError : null;
@@ -156,6 +159,10 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     { key: "complaint", label: text.feedbackFilterComplaint },
     { key: "feedback", label: text.feedbackFilterFeedback },
   ];
+  const recentRunsPreviewSignature = useMemo(
+    () => recentRunsPreview.map((run) => run.generationId).join("|"),
+    [recentRunsPreview]
+  );
   const visibleRecentRuns = useMemo(() => {
     const allRuns = allRecentRuns ?? recentRunsPreview;
     if (recentRunsMode === "all") {
@@ -182,10 +189,10 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   }, [feedbackSearchInput]);
 
   useEffect(() => {
-    if (!session) {
+    if (!canViewTemplateAnalytics) {
       ensureAdminSession(locale, router);
     }
-  }, [locale, router, session]);
+  }, [canViewTemplateAnalytics, locale, router, session]);
 
   useEffect(
     () => () => {
@@ -194,7 +201,27 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     []
   );
 
-  if (isLoading) {
+  useEffect(() => {
+    recentRunsAbortControllerRef.current?.abort();
+    recentRunsAbortControllerRef.current = null;
+
+    queueMicrotask(() => {
+      setIsRecentRunsLoading(false);
+      setAllRecentRuns(null);
+      setRecentRunsError(null);
+      setRecentRunsMode((current) => (current === "latest" ? current : "latest"));
+    });
+  }, [recentRunsPreviewSignature]);
+
+  function requestAnalyticsRetry() {
+    if (!canViewTemplateAnalytics || isFetching) {
+      return;
+    }
+
+    void refresh().catch(() => undefined);
+  }
+
+  if (!canViewTemplateAnalytics || isLoading) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard tone="info" title={text.loading} />
@@ -212,14 +239,8 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void refresh().catch(() => undefined);
-              }}
+              disabled={!canViewTemplateAnalytics || isFetching}
+              onClick={requestAnalyticsRetry}
             >
               {text.retryAction}
             </Button>
@@ -261,6 +282,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       ? trendPoints
       : periodAnalytics.currentPoints
     : [];
+  const isAnalyticsToolbarLocked = isFetching || isSecondaryLoading;
 
   async function handleRecentRunsModeChange(mode: RecentRunsMode) {
     setRecentRunsError(null);
@@ -274,7 +296,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     }
 
     setRecentRunsMode(mode);
-    if (!session) {
+    if (!canViewTemplateAnalytics) {
       recentRunsAbortControllerRef.current?.abort();
       setIsRecentRunsLoading(false);
       setRecentRunsMode("latest");
@@ -307,9 +329,9 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       }
 
       clientLogger.warn("templates.analytics_recent_runs_load_failed", {
-        templateId,
+        templateId: sanitizeSensitiveText(templateId, 80),
         mode,
-        error,
+        errorName: error instanceof Error ? error.name : "UnknownError",
       });
       setRecentRunsMode("latest");
       setRecentRunsError(text.recentRunsExpandError);
@@ -408,8 +430,10 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     const link = document.createElement("a");
     link.href = url;
     link.download = formatSafeTemplateAnalyticsExportName(template.templateId);
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   return (
@@ -453,19 +477,22 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
       <AdminToolbar className={styles.analyticsToolbar}>
         <div className={styles.segmentedControl} aria-label={text.rangeLabel}>
-          {periodOptions.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className={
-                option.key === period ? styles.segmentedButtonActive : styles.segmentedButton
-              }
-              onClick={() => setPeriod(option.key)}
-            >
-              <CalendarIcon className={styles.controlIcon} />
-              <span>{option.label}</span>
-            </button>
-          ))}
+          {periodOptions.map((option) => {
+            const isActivePeriod = option.key === period;
+
+            return (
+              <button
+                key={option.key}
+                type="button"
+                className={isActivePeriod ? styles.segmentedButtonActive : styles.segmentedButton}
+                disabled={isActivePeriod || isAnalyticsToolbarLocked}
+                onClick={() => setPeriod(option.key)}
+              >
+                <CalendarIcon className={styles.controlIcon} />
+                <span>{option.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         <div className={styles.toolbarActions}>
@@ -473,6 +500,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             type="button"
             className={isComparisonEnabled ? styles.toolbarButtonActive : styles.toolbarButton}
             aria-pressed={isComparisonEnabled}
+            disabled={isAnalyticsToolbarLocked}
             onClick={() => setIsComparisonEnabled((value) => !value)}
           >
             <RefreshIcon className={styles.controlIcon} />
@@ -482,7 +510,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             type="button"
             className={styles.exportButton}
             onClick={handleExportAnalytics}
-            disabled={isSecondaryLoading}
+            disabled={isAnalyticsToolbarLocked}
           >
             <DownloadIcon className={styles.controlIcon} />
             <span>{text.exportAnalytics}</span>
@@ -507,14 +535,8 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void refresh().catch(() => undefined);
-              }}
+              disabled={!canViewTemplateAnalytics || isFetching}
+              onClick={requestAnalyticsRetry}
             >
               {text.retryAction}
             </Button>
@@ -526,6 +548,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         chartMetric={chartMetric}
         chartPoints={chartPoints}
         chartTabs={chartTabs}
+        isChartMetricLocked={isAnalyticsToolbarLocked}
         isRu={isRu}
         locale={locale}
         onChartMetricChange={setChartMetric}
@@ -573,7 +596,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       <div className={styles.detailsGrid}>
         {isSecondaryReady ? (
           <TemplateAnalyticsRecentRunsSection
-            canLoadRecentRuns={Boolean(session)}
+            canLoadRecentRuns={canViewTemplateAnalytics}
             canShowFailedRecentRuns={canShowFailedRecentRuns}
             canShowRecentRunModes={shouldShowRecentRunModes}
             error={recentRunsError}
@@ -627,7 +650,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
       {feedbackSummaryQuery.data ? (
         <AdminStateCard
-          title={isRu ? "Feedback summary" : "Feedback summary"}
+          title={isRu ? "Сводка feedback" : "Feedback summary"}
           description={
             feedbackSummaryQuery.data.hasNegativeWarning
               ? isRu
@@ -642,22 +665,22 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
           <AdminMetricStrip
             items={[
               {
-                label: isRu ? "Positive" : "Positive",
+                label: isRu ? "Позитив" : "Positive",
                 value: `${feedbackSummaryQuery.data.positiveRate.toFixed(1)}% (${feedbackSummaryQuery.data.positiveCount})`,
               },
               {
-                label: isRu ? "Neutral" : "Neutral",
+                label: isRu ? "Нейтрально" : "Neutral",
                 value: `${feedbackSummaryQuery.data.neutralRate.toFixed(1)}% (${feedbackSummaryQuery.data.neutralCount})`,
               },
               {
-                label: isRu ? "Negative" : "Negative",
+                label: isRu ? "Негатив" : "Negative",
                 value: `${feedbackSummaryQuery.data.negativeRate.toFixed(1)}% (${feedbackSummaryQuery.data.negativeCount})`,
               },
               {
-                label: isRu ? "Top issues" : "Top issues",
+                label: isRu ? "Главные проблемы" : "Top issues",
                 value:
                   feedbackSummaryQuery.data.topIssues
-                    .map((issue) => `${issue.category}: ${issue.count}`)
+                    .map((issue) => `${sanitizeSensitiveText(issue.category, 80)}: ${issue.count}`)
                     .join(", ") || "-",
               },
             ]}

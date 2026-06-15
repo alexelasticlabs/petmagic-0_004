@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 
 import {
   CalendarIcon,
@@ -93,6 +93,16 @@ const METRIC_ICONS: Record<string, ReactElement> = {
   cardMetric_danger: <CancelCircleIcon className={styles.cardMetricIcon} />,
 };
 
+function getCatalogActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function TemplatesCatalogView({
   locale,
   templateType,
@@ -103,6 +113,9 @@ export function TemplatesCatalogView({
   const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
   const router = useRouter();
   const session = useAuthSession();
+  const sessionRoles = session?.user.roles ?? [];
+  const canViewTemplates =
+    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyTemplateId, setBusyTemplateId] = useState<string | null>(null);
@@ -149,6 +162,7 @@ export function TemplatesCatalogView({
     hasError,
     hasMore,
     hasSecondaryError,
+    isCatalogFetching,
     isFetching,
     isLoading,
     pageSkip,
@@ -157,24 +171,26 @@ export function TemplatesCatalogView({
     templates,
     totalCount,
   } = useAdminTemplateCatalog({
-    enabled: Boolean(session),
+    enabled: canViewTemplates,
     query: catalogQuery,
     templateType,
   });
   const categoriesQuery = useAdminTemplateCategories({
-    enabled: Boolean(session),
+    enabled: canViewTemplates,
     includeArchived: true,
   });
   const [templatePendingArchiveId, setTemplatePendingArchiveId] = useState<string | null>(null);
   const [templatePendingDeleteId, setTemplatePendingDeleteId] = useState<string | null>(null);
   const isTemplateActionLocked = busyTemplateId !== null;
+  const isCatalogRefreshing = isCatalogFetching && !isLoading;
+  const isCatalogInteractionLocked = isTemplateActionLocked || isCatalogRefreshing;
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
 
   useEffect(() => {
-    if (!session) {
+    if (!canViewTemplates) {
       ensureAdminSession(locale, router);
     }
-  }, [locale, router, session]);
+  }, [canViewTemplates, locale, router, session]);
 
   function assertCanManageTemplates(): boolean {
     if (canManageTemplates) {
@@ -192,7 +208,7 @@ export function TemplatesCatalogView({
       return false;
     }
 
-    if (isTemplateActionLocked) {
+    if (isCatalogInteractionLocked) {
       return false;
     }
 
@@ -205,9 +221,9 @@ export function TemplatesCatalogView({
       return true;
     } catch (error) {
       clientLogger.error("templates.catalog_status_change_failed", {
-        templateId,
+        templateId: sanitizeSensitiveText(templateId, 80),
         status,
-        error,
+        ...getCatalogActionErrorDetails(error),
       });
       setActionError(getAdminErrorMessage(error, text.errorSavingTemplate));
       return false;
@@ -221,7 +237,7 @@ export function TemplatesCatalogView({
       return;
     }
 
-    if (isTemplateActionLocked) {
+    if (isCatalogInteractionLocked) {
       return;
     }
 
@@ -238,7 +254,7 @@ export function TemplatesCatalogView({
       return;
     }
 
-    if (isTemplateActionLocked) {
+    if (isCatalogInteractionLocked) {
       return;
     }
 
@@ -250,7 +266,7 @@ export function TemplatesCatalogView({
       return false;
     }
 
-    if (isTemplateActionLocked) {
+    if (isCatalogInteractionLocked) {
       return false;
     }
 
@@ -263,8 +279,8 @@ export function TemplatesCatalogView({
       return true;
     } catch (error) {
       clientLogger.error("templates.catalog_delete_failed", {
-        templateId,
-        error,
+        templateId: sanitizeSensitiveText(templateId, 80),
+        ...getCatalogActionErrorDetails(error),
       });
       setActionError(getAdminErrorMessage(error, text.errorDeletingTemplate));
       return false;
@@ -338,22 +354,74 @@ export function TemplatesCatalogView({
   const totalPages = Math.max(1, Math.ceil(totalCount / Math.max(1, pageTake)));
   const shownStart = templates.length > 0 ? pageSkip + 1 : 0;
   const shownEnd = templates.length > 0 ? Math.min(totalCount, pageSkip + templates.length) : 0;
+  const visibleTemplateIds = useMemo(
+    () => new Set(templates.map((template) => template.templateId)),
+    [templates]
+  );
+  const resetPendingTemplateAction = useCallback(() => {
+    if (isTemplateActionLocked) {
+      return;
+    }
+
+    setTemplatePendingArchiveId(null);
+    setTemplatePendingDeleteId(null);
+  }, [isTemplateActionLocked]);
+  const resetCatalogContext = useCallback(
+    (nextPage = 1) => {
+      resetPendingTemplateAction();
+      setPage(nextPage);
+    },
+    [resetPendingTemplateAction]
+  );
   useEffect(() => {
     if (!isFetching && currentPage > totalPages) {
-      queueMicrotask(() => setPage(totalPages));
+      queueMicrotask(() => resetCatalogContext(totalPages));
     }
-  }, [currentPage, isFetching, totalPages]);
+  }, [currentPage, isFetching, resetCatalogContext, totalPages]);
+  useEffect(() => {
+    if (isCatalogInteractionLocked) {
+      return;
+    }
+
+    const shouldResetArchive =
+      templatePendingArchiveId !== null && !visibleTemplateIds.has(templatePendingArchiveId);
+    const shouldResetDelete =
+      templatePendingDeleteId !== null && !visibleTemplateIds.has(templatePendingDeleteId);
+
+    if (!shouldResetArchive && !shouldResetDelete) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (shouldResetArchive) {
+        setTemplatePendingArchiveId(null);
+      }
+
+      if (shouldResetDelete) {
+        setTemplatePendingDeleteId(null);
+      }
+    });
+  }, [
+    isCatalogInteractionLocked,
+    templatePendingArchiveId,
+    templatePendingDeleteId,
+    visibleTemplateIds,
+  ]);
+  function requestCatalogRetry() {
+    if (!canViewTemplates || isFetching) {
+      return;
+    }
+
+    void refresh().catch(() => undefined);
+  }
+
   const visiblePageNumbers = useMemo(() => {
     const end = totalCount > 0 ? Math.min(totalPages, Math.max(currentPage, 1)) : currentPage;
     const start = Math.max(1, end - 4);
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   }, [currentPage, totalCount, totalPages]);
 
-  function resetPage() {
-    setPage(1);
-  }
-
-  if (!session || isLoading) {
+  if (!canViewTemplates || isLoading) {
     return (
       <AdminPage className={styles.catalogPage}>
         <AdminPageGrid
@@ -373,9 +441,11 @@ export function TemplatesCatalogView({
   return (
     <AdminPage className={styles.catalogPage}>
       <AdminToolbar className={styles.catalogActions}>
-        <Link href={categoriesPath} className={styles.secondaryLink}>
-          {copy.manageCategories}
-        </Link>
+        {canManageTemplates ? (
+          <Link href={categoriesPath} className={styles.secondaryLink}>
+            {copy.manageCategories}
+          </Link>
+        ) : null}
         {canManageTemplates ? (
           <Link href={editorBasePath} className={styles.primaryLink}>
             {copy.createTemplate}
@@ -387,10 +457,11 @@ export function TemplatesCatalogView({
         <button
           type="button"
           className={archiveFilter === "active" ? styles.tabActive : styles.tab}
+          disabled={archiveFilter === "active" || isCatalogInteractionLocked}
           onClick={() => {
             setArchiveFilter("active");
             setStatusFilter("all");
-            resetPage();
+            resetCatalogContext();
           }}
         >
           {copy.allTemplates}
@@ -398,10 +469,11 @@ export function TemplatesCatalogView({
         <button
           type="button"
           className={archiveFilter === "archived" ? styles.tabActive : styles.tab}
+          disabled={archiveFilter === "archived" || isCatalogInteractionLocked}
           onClick={() => {
             setArchiveFilter("archived");
             setStatusFilter("all");
-            resetPage();
+            resetCatalogContext();
           }}
         >
           {copy.archivedTemplates}
@@ -417,14 +489,8 @@ export function TemplatesCatalogView({
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void refresh().catch(() => undefined);
-              }}
+              disabled={!canViewTemplates || isFetching}
+              onClick={requestCatalogRetry}
             >
               {isRu ? "Повторить" : "Retry"}
             </Button>
@@ -442,14 +508,8 @@ export function TemplatesCatalogView({
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void refresh().catch(() => undefined);
-              }}
+              disabled={!canViewTemplates || isFetching}
+              onClick={requestCatalogRetry}
             >
               {isRu ? "Повторить" : "Retry"}
             </Button>
@@ -466,10 +526,11 @@ export function TemplatesCatalogView({
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value.slice(0, TEMPLATE_CATALOG_SEARCH_MAX_LENGTH));
-                  resetPage();
+                  resetCatalogContext();
                 }}
                 maxLength={TEMPLATE_CATALOG_SEARCH_MAX_LENGTH}
                 placeholder={copy.searchPlaceholder}
+                disabled={isCatalogInteractionLocked}
               />
             </label>
 
@@ -479,9 +540,10 @@ export function TemplatesCatalogView({
                 value={categoryFilter}
                 options={categoryOptions}
                 ariaLabel={text.categoryLabel}
+                disabled={isCatalogInteractionLocked}
                 onChange={(value) => {
                   setCategoryFilter(value);
-                  resetPage();
+                  resetCatalogContext();
                 }}
               />
             </label>
@@ -492,9 +554,10 @@ export function TemplatesCatalogView({
                 value={accessFilter}
                 options={accessOptions}
                 ariaLabel={copy.accessLabel}
+                disabled={isCatalogInteractionLocked}
                 onChange={(value) => {
                   setAccessFilter(value as AccessFilter);
-                  resetPage();
+                  resetCatalogContext();
                 }}
               />
             </label>
@@ -505,9 +568,10 @@ export function TemplatesCatalogView({
                 value={statusFilter}
                 options={statusOptions}
                 ariaLabel={text.statusLabel}
+                disabled={isCatalogInteractionLocked}
                 onChange={(value) => {
                   setStatusFilter(value as TemplateStatus | "all");
-                  resetPage();
+                  resetCatalogContext();
                 }}
               />
             </label>
@@ -519,9 +583,10 @@ export function TemplatesCatalogView({
                 options={sortOptions}
                 ariaLabel={copy.sortLabel}
                 showSelectedDescription={false}
+                disabled={isCatalogInteractionLocked}
                 onChange={(value) => {
                   setSortMode(value as SortMode);
-                  resetPage();
+                  resetCatalogContext();
                 }}
               />
             </label>
@@ -533,6 +598,7 @@ export function TemplatesCatalogView({
                   type="button"
                   className={viewMode === "cards" ? styles.viewButtonActive : styles.viewButton}
                   aria-pressed={viewMode === "cards"}
+                  disabled={viewMode === "cards" || isCatalogInteractionLocked}
                   onClick={() => setViewMode("cards")}
                 >
                   <span
@@ -550,6 +616,7 @@ export function TemplatesCatalogView({
                   type="button"
                   className={viewMode === "list" ? styles.viewButtonActive : styles.viewButton}
                   aria-pressed={viewMode === "list"}
+                  disabled={viewMode === "list" || isCatalogInteractionLocked}
                   onClick={() => setViewMode("list")}
                 >
                   <span
@@ -565,7 +632,9 @@ export function TemplatesCatalogView({
               </div>
             </div>
           </AdminFilterBar>
-          {!templates.length ? (
+          {isCatalogRefreshing ? (
+            <AdminStateCard tone="info" className={styles.empty} title={text.loading} />
+          ) : !templates.length ? (
             <AdminStateCard tone="info" className={styles.empty} title={text.noTemplates} />
           ) : viewMode === "cards" ? (
             <div className={styles.cardGrid} aria-busy={isFetching ? "true" : undefined}>
@@ -578,7 +647,9 @@ export function TemplatesCatalogView({
                   editorBasePath={editorBasePath}
                   analyticsBasePath={analyticsBasePath}
                   testBasePath={testBasePath}
-                  busyTemplateId={busyTemplateId}
+                  busyTemplateId={
+                    isCatalogInteractionLocked ? (busyTemplateId ?? "__refresh__") : null
+                  }
                   canManageTemplates={canManageTemplates}
                   onStatusChange={requestStatusChange}
                   onDeleteTemplate={requestDeleteTemplate}
@@ -607,7 +678,7 @@ export function TemplatesCatalogView({
                   </thead>
                   <tbody>
                     {templates.map((template) => {
-                      const isBusy = isTemplateActionLocked;
+                      const isBusy = isCatalogInteractionLocked;
                       const analytics = getAnalyticsRow(template.templateId);
                       const safeTemplateTitle = sanitizeSensitiveText(template.title, 96);
                       const safeTemplateDescription = sanitizeSensitiveText(
@@ -872,7 +943,7 @@ export function TemplatesCatalogView({
                   disabled={currentPage <= 1 || isFetching}
                   aria-label={copy.previousPageLabel}
                   title={copy.previousPageLabel}
-                  onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  onClick={() => resetCatalogContext(Math.max(1, currentPage - 1))}
                 >
                   <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
                 </Button>
@@ -883,7 +954,7 @@ export function TemplatesCatalogView({
                     variant={pageNumber === currentPage ? "primary" : "secondary"}
                     size="sm"
                     disabled={isFetching}
-                    onClick={() => setPage(pageNumber)}
+                    onClick={() => resetCatalogContext(pageNumber)}
                   >
                     {pageNumber}
                   </Button>
@@ -895,7 +966,7 @@ export function TemplatesCatalogView({
                   disabled={currentPage >= totalPages || !hasMore || isFetching}
                   aria-label={copy.nextPageLabel}
                   title={copy.nextPageLabel}
-                  onClick={() => setPage((value) => value + 1)}
+                  onClick={() => resetCatalogContext(currentPage + 1)}
                 >
                   <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
                 </Button>

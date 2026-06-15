@@ -61,9 +61,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const text = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
+  const sessionRoles = session?.user.roles ?? [];
+  const canViewCategories =
+    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const canManageCategories = session?.user.roles.includes("Admin") ?? false;
   const { categories, hasError, isFetching, isLoading, refresh } = useAdminTemplateCategories({
-    enabled: Boolean(session),
+    enabled: canViewCategories,
     includeArchived: true,
   });
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,17 +81,109 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     useState<AdminTemplateCategory | null>(null);
   const [categoryPendingDelete, setCategoryPendingDelete] =
     useState<AdminTemplateCategory | null>(null);
-  const isCategoryActionLocked = isSubmitting || busyCategoryId !== null;
+  const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;
   const isRu = locale === "ru";
-  const categoryActionsAdminOnly = isRu
-    ? "Управление категориями доступно только Admin."
-    : "Template category management is available to Admin only.";
+  const categoryText = useMemo(
+    () => ({
+      actionsAdminOnly: isRu
+        ? "Управление категориями доступно только Admin."
+        : "Template category management is available to Admin only.",
+      notificationTitle: isRu ? "Категории шаблонов" : "Template categories",
+      createSuccess: isRu ? "Категория создана." : "Category created.",
+      createError: isRu ? "Не удалось создать категорию." : "Could not create category.",
+      updateSuccess: isRu ? "Категория обновлена." : "Category updated.",
+      updateError: isRu ? "Не удалось обновить категорию." : "Could not update category.",
+      archiveSuccess: isRu ? "Категория отправлена в архив." : "Category archived.",
+      restoreSuccess: isRu ? "Категория возвращена из архива." : "Category restored from archive.",
+      archiveError: isRu
+        ? "Не удалось изменить состояние категории."
+        : "Could not change category state.",
+      deleteSuccess: isRu ? "Категория удалена." : "Category deleted.",
+      deleteError: isRu ? "Не удалось удалить категорию." : "Could not delete category.",
+      heroEyebrow: isRu ? "Структура каталога" : "Template taxonomy",
+      heroTitle: isRu ? "Категории шаблонов" : "Template Categories",
+      heroDescription: isRu
+        ? "Управляйте списком категорий, архивом и переименованием. Переименование категории автоматически обновляет связанные шаблоны."
+        : "Manage the category registry, archive state, and rename flows. Renaming a category updates linked templates automatically.",
+      crudEnabled: isRu ? "CRUD подключен" : "CRUD enabled",
+      readOnly: isRu ? "Только просмотр" : "Read-only",
+      activeTab: isRu ? "Активные" : "Active",
+      archiveTab: isRu ? "Архив" : "Archive",
+      categoriesMeta: isRu ? "Категорий" : "Categories",
+      templatesMeta: isRu ? "Шаблонов" : "Templates",
+      retry: isRu ? "Повторить" : "Retry",
+      totalCategories: isRu ? "Всего категорий" : "Total categories",
+      totalCategoriesHint: isRu ? "Категории в реестре" : "Categories in the registry",
+      activeCategories: isRu ? "Активные категории" : "Active categories",
+      activeCategoriesHint: isRu ? "Доступны для новых шаблонов" : "Available for new templates",
+      archiveLabel: isRu ? "Архив" : "Archive",
+      archivedCategoriesHint: isRu
+        ? "Скрыты для новых шаблонов"
+        : "Hidden from new template assignment",
+      totalTemplates: isRu ? "Всего шаблонов" : "Total templates",
+      totalTemplatesHint: isRu ? "Видео и изображения вместе" : "Video and image combined",
+      newCategoryTitle: isRu ? "Новая категория" : "New category",
+      newCategoryDescription: isRu
+        ? "Сначала создайте категорию здесь, затем она появится в редакторах шаблонов."
+        : "Create categories here first so they become available in template editors.",
+      categoryPlaceholder: isRu ? "Например, Portrait Pets" : "For example, Portrait Pets",
+      addCategory: isRu ? "Добавить категорию" : "Add category",
+      categoriesTitle: isRu ? "Категории" : "Categories",
+      archivedDescription: isRu
+        ? "Архивные категории остаются в статистике и в связанных шаблонах, но не предлагаются для новых шаблонов."
+        : "Archived categories stay in stats and linked templates, but are not suggested for new templates.",
+      activeDescription: isRu
+        ? "Переименование категории синхронно обновляет поле category у связанных шаблонов."
+        : "Renaming a category synchronously updates the category field on linked templates.",
+      empty: isRu ? "Категории не найдены." : "No categories found.",
+      state: isRu ? "Состояние" : "State",
+      total: isRu ? "Всего" : "Total",
+      archivedStatus: isRu ? "Архив" : "Archived",
+      activeStatus: isRu ? "Активна" : "Active",
+      save: isRu ? "Сохранить" : "Save",
+      cancel: isRu ? "Отмена" : "Cancel",
+      restore: isRu ? "Вернуть" : "Restore",
+      restoreDialogTitle: isRu ? "Вернуть категорию?" : "Restore category?",
+      archiveDialogTitle: isRu ? "Архивировать категорию?" : "Archive category?",
+      deleteDialogTitle: isRu ? "Удалить категорию?" : "Delete category?",
+      restoreDialogDescription: (name: string) =>
+        isRu
+          ? `Вернуть категорию "${name}" в активный список?`
+          : `Restore category "${name}" to the active list?`,
+      archiveDialogDescription: (name: string) =>
+        isRu
+          ? `Архивировать категорию "${name}"? Она останется в связанных шаблонах, но не будет доступна для новых шаблонов.`
+          : `Archive category "${name}"? It will stay on linked templates but won't be available for new templates.`,
+      deleteDialogDescription: (name: string) =>
+        isRu
+          ? `Удалить категорию "${name}"? Категория удаляется только если в ней нет шаблонов.`
+          : `Delete category "${name}"? It can only be removed when no templates reference it.`,
+      videoCategoryLabel: (name: string) =>
+        isRu ? `Открыть видео-шаблоны категории ${name}` : `Open video templates in ${name}`,
+      imageCategoryLabel: (name: string) =>
+        isRu ? `Открыть image-шаблоны категории ${name}` : `Open image templates in ${name}`,
+      editCategoryLabel: (name: string) =>
+        isRu ? `Переименовать категорию ${name}` : `Rename category ${name}`,
+      archiveCategoryLabel: (name: string) =>
+        isRu ? `Архивировать категорию ${name}` : `Archive category ${name}`,
+      restoreCategoryLabel: (name: string) =>
+        isRu ? `Вернуть категорию ${name}` : `Restore category ${name}`,
+      deleteCategoryLabel: (name: string) =>
+        isRu ? `Удалить категорию ${name}` : `Delete category ${name}`,
+    }),
+    [isRu]
+  );
+  const categoryActionsAdminOnly = categoryText.actionsAdminOnly;
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
+  const categoryIds = useMemo(
+    () => new Set(categories.map((category) => category.categoryId)),
+    [categories]
+  );
 
   useSyncToastToAdminNotifications(toast, {
     category: "templates",
     source: "template-categories",
-    title: isRu ? "Категории шаблонов" : "Template categories",
+    title: categoryText.notificationTitle,
     href: `/${locale}/templates/categories`,
   });
 
@@ -102,10 +197,48 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   }, [toast]);
 
   useEffect(() => {
-    if (!session) {
+    if (!canViewCategories) {
       ensureAdminSession(locale, router);
     }
-  }, [locale, router, session]);
+  }, [canViewCategories, locale, router, session]);
+
+  useEffect(() => {
+    if (isCategoryActionLocked) {
+      return;
+    }
+
+    const shouldResetArchive =
+      categoryPendingArchive !== null && !categoryIds.has(categoryPendingArchive.categoryId);
+    const shouldResetDelete =
+      categoryPendingDelete !== null && !categoryIds.has(categoryPendingDelete.categoryId);
+    const shouldResetEditing =
+      editingCategoryId !== null && !categoryIds.has(editingCategoryId);
+
+    if (!shouldResetArchive && !shouldResetDelete && !shouldResetEditing) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (shouldResetArchive) {
+        setCategoryPendingArchive(null);
+      }
+
+      if (shouldResetDelete) {
+        setCategoryPendingDelete(null);
+      }
+
+      if (shouldResetEditing) {
+        setEditingCategoryId(null);
+        setEditingName("");
+      }
+    });
+  }, [
+    categoryIds,
+    categoryPendingArchive,
+    categoryPendingDelete,
+    editingCategoryId,
+    isCategoryActionLocked,
+  ]);
 
   function assertCanManageCategories(): boolean {
     if (canManageCategories) {
@@ -179,12 +312,9 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       if (result.isError) {
         throw result.error;
       }
-      setToast({ type: "success", message: isRu ? "Категория создана." : "Category created." });
+      setToast({ type: "success", message: categoryText.createSuccess });
     } catch (actionError) {
-      const message = getActionErrorMessage(
-        actionError,
-        isRu ? "Не удалось создать категорию." : "Could not create category."
-      );
+      const message = getActionErrorMessage(actionError, categoryText.createError);
       setActionError(message);
       setToast({ type: "error", message });
     } finally {
@@ -217,12 +347,9 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       if (result.isError) {
         throw result.error;
       }
-      setToast({ type: "success", message: isRu ? "Категория обновлена." : "Category updated." });
+      setToast({ type: "success", message: categoryText.updateSuccess });
     } catch (actionError) {
-      const message = getActionErrorMessage(
-        actionError,
-        isRu ? "Не удалось обновить категорию." : "Could not update category."
-      );
+      const message = getActionErrorMessage(actionError, categoryText.updateError);
       setActionError(message);
       setToast({ type: "error", message });
     } finally {
@@ -254,20 +381,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       }
       setToast({
         type: "success",
-        message: category.isArchived
-          ? isRu
-            ? "Категория возвращена из архива."
-            : "Category restored from archive."
-          : isRu
-            ? "Категория отправлена в архив."
-            : "Category archived.",
+        message: category.isArchived ? categoryText.restoreSuccess : categoryText.archiveSuccess,
       });
       return true;
     } catch (actionError) {
-      const message = getActionErrorMessage(
-        actionError,
-        isRu ? "Не удалось изменить состояние категории." : "Could not change category state."
-      );
+      const message = getActionErrorMessage(actionError, categoryText.archiveError);
       setActionError(message);
       setToast({ type: "error", message });
       return false;
@@ -298,13 +416,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       if (result.isError) {
         throw result.error;
       }
-      setToast({ type: "success", message: isRu ? "Категория удалена." : "Category deleted." });
+      setToast({ type: "success", message: categoryText.deleteSuccess });
       return true;
     } catch (actionError) {
-      const message = getActionErrorMessage(
-        actionError,
-        isRu ? "Не удалось удалить категорию." : "Could not delete category."
-      );
+      const message = getActionErrorMessage(actionError, categoryText.deleteError);
       setActionError(message);
       setToast({ type: "error", message });
       return false;
@@ -337,7 +452,27 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
     setCategoryPendingDelete(category);
   }
 
-  if (!session || isLoading) {
+  function switchArchiveFilter(nextFilter: ArchiveFilter) {
+    if (isCategoryActionLocked) {
+      return;
+    }
+
+    setArchiveFilter(nextFilter);
+    setEditingCategoryId(null);
+    setEditingName("");
+    setCategoryPendingArchive(null);
+    setCategoryPendingDelete(null);
+  }
+
+  function requestCategoriesRetry() {
+    if (!canViewCategories || isFetching) {
+      return;
+    }
+
+    void refresh().catch(() => undefined);
+  }
+
+  if (!canViewCategories || isLoading) {
     return (
       <AdminPage className={styles.catalogPage}>
         <AdminPageGrid
@@ -357,43 +492,33 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   return (
     <AdminPage className={styles.catalogPage}>
       <AdminPageHero
-        eyebrow={isRu ? "Структура каталога" : "Template taxonomy"}
-        title={isRu ? "Категории шаблонов" : "Template Categories"}
-        description={
-          isRu
-            ? "Управляйте списком категорий, архивом и переименованием. Переименование категории автоматически обновляет связанные шаблоны."
-            : "Manage the category registry, archive state, and rename flows. Renaming a category updates linked templates automatically."
-        }
-        badge={
-          canManageCategories
-            ? isRu
-              ? "CRUD подключен"
-              : "CRUD enabled"
-            : isRu
-              ? "Только просмотр"
-              : "Read-only"
-        }
+        eyebrow={categoryText.heroEyebrow}
+        title={categoryText.heroTitle}
+        description={categoryText.heroDescription}
+        badge={canManageCategories ? categoryText.crudEnabled : categoryText.readOnly}
         actions={
           <div className={styles.catalogActions}>
             <button
               type="button"
               className={archiveFilter === "active" ? styles.tabActive : styles.tab}
-              onClick={() => setArchiveFilter("active")}
+              disabled={isCategoryActionLocked}
+              onClick={() => switchArchiveFilter("active")}
             >
-              {isRu ? "Активные" : "Active"}
+              {categoryText.activeTab}
             </button>
             <button
               type="button"
               className={archiveFilter === "archived" ? styles.tabActive : styles.tab}
-              onClick={() => setArchiveFilter("archived")}
+              disabled={isCategoryActionLocked}
+              onClick={() => switchArchiveFilter("archived")}
             >
-              {isRu ? "Архив" : "Archive"}
+              {categoryText.archiveTab}
             </button>
           </div>
         }
         metaItems={[
-          `${isRu ? "Категорий" : "Categories"}: ${stats.totalCategories}`,
-          `${isRu ? "Шаблонов" : "Templates"}: ${stats.totalTemplates}`,
+          `${categoryText.categoriesMeta}: ${stats.totalCategories}`,
+          `${categoryText.templatesMeta}: ${stats.totalTemplates}`,
           `${text.premiumLabel}: ${stats.totalPremium}`,
         ]}
       />
@@ -407,16 +532,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void refresh().catch(() => undefined);
-              }}
+              disabled={!canViewCategories || isFetching}
+              onClick={requestCategoriesRetry}
             >
-              {isRu ? "Повторить" : "Retry"}
+              {categoryText.retry}
             </Button>
           }
         />
@@ -425,48 +544,49 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       <AdminPageGrid columns="four" className={styles.categoryStatsGrid}>
         <AdminKpiCard
           tone="primary"
-          label={isRu ? "Всего категорий" : "Total categories"}
+          label={categoryText.totalCategories}
           value={stats.totalCategories}
-          hint={isRu ? "Категории в реестре" : "Categories in the registry"}
+          hint={categoryText.totalCategoriesHint}
         />
         <AdminKpiCard
           tone="success"
-          label={isRu ? "Активные категории" : "Active categories"}
+          label={categoryText.activeCategories}
           value={stats.activeCategories}
-          hint={isRu ? "Доступны для новых шаблонов" : "Available for new templates"}
+          hint={categoryText.activeCategoriesHint}
         />
         <AdminKpiCard
           tone="warning"
-          label={isRu ? "Архив" : "Archive"}
+          label={categoryText.archiveLabel}
           value={stats.archivedCategories}
-          hint={isRu ? "Скрыты для новых шаблонов" : "Hidden from new template assignment"}
+          hint={categoryText.archivedCategoriesHint}
         />
         <AdminKpiCard
           tone="info"
-          label={isRu ? "Всего шаблонов" : "Total templates"}
+          label={categoryText.totalTemplates}
           value={stats.totalTemplates}
-          hint={isRu ? "Видео и изображения вместе" : "Video and image combined"}
+          hint={categoryText.totalTemplatesHint}
         />
       </AdminPageGrid>
 
       {canManageCategories ? (
         <AdminCard
-          title={isRu ? "Новая категория" : "New category"}
-          description={
-            isRu
-              ? "Сначала создайте категорию здесь, затем она появится в редакторах шаблонов."
-              : "Create categories here first so they become available in template editors."
-          }
+          title={categoryText.newCategoryTitle}
+          description={categoryText.newCategoryDescription}
         >
-          <form className={styles.categoryToolbar} onSubmit={handleCreateCategory}>
+          <form
+            className={styles.categoryToolbar}
+            onSubmit={handleCreateCategory}
+            aria-busy={isCategoryActionLocked}
+          >
             <label className={styles.categoryField}>
               <span>{text.categoryLabel}</span>
               <input
                 className={styles.categoryInput}
                 value={newCategoryName}
                 onChange={(event) => setNewCategoryName(limitCategoryNameInput(event.target.value))}
-                placeholder={isRu ? "Например, Portrait Pets" : "For example, Portrait Pets"}
+                placeholder={categoryText.categoryPlaceholder}
                 maxLength={CATEGORY_NAME_MAX_LENGTH}
+                disabled={isCategoryActionLocked}
               />
             </label>
             <Button
@@ -474,29 +594,25 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
               variant="primary"
               disabled={isCategoryActionLocked || !newCategoryName.trim()}
             >
-              {isRu ? "Добавить категорию" : "Add category"}
+              {categoryText.addCategory}
             </Button>
           </form>
         </AdminCard>
       ) : null}
 
       <AdminCard
-        title={isRu ? "Категории" : "Categories"}
+        title={categoryText.categoriesTitle}
         description={
           archiveFilter === "archived"
-            ? isRu
-              ? "Архивные категории остаются в статистике и в связанных шаблонах, но не предлагаются для новых шаблонов."
-              : "Archived categories stay in stats and linked templates, but are not suggested for new templates."
-            : isRu
-              ? "Переименование категории синхронно обновляет поле category у связанных шаблонов."
-              : "Renaming a category synchronously updates the category field on linked templates."
+            ? categoryText.archivedDescription
+            : categoryText.activeDescription
         }
       >
         {!visibleCategories.length ? (
           <AdminStateCard
             tone="info"
             className={styles.empty}
-            title={isRu ? "Категории не найдены." : "No categories found."}
+            title={categoryText.empty}
           />
         ) : (
           <div className={adminTableStyles.tableWrap} aria-busy={isFetching ? "true" : undefined}>
@@ -504,8 +620,8 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
               <thead>
                 <tr>
                   <th>{text.categoryLabel}</th>
-                  <th>{isRu ? "Состояние" : "State"}</th>
-                  <th>{isRu ? "Всего" : "Total"}</th>
+                  <th>{categoryText.state}</th>
+                  <th>{categoryText.total}</th>
                   <th>{text.templateKindVideoBadge}</th>
                   <th>{text.templateKindImageBadge}</th>
                   <th>{text.statusLabel}</th>
@@ -537,20 +653,16 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                         </div>
                       )}
                     </td>
-                    <td data-label={isRu ? "Состояние" : "State"}>
+                    <td data-label={categoryText.state}>
                       <AdminStatusBadge
                         color={category.isArchived ? typeColors.Archived : typeColors.Video}
                       >
                         {category.isArchived
-                          ? isRu
-                            ? "Архив"
-                            : "Archived"
-                          : isRu
-                            ? "Активна"
-                            : "Active"}
+                          ? categoryText.archivedStatus
+                          : categoryText.activeStatus}
                       </AdminStatusBadge>
                     </td>
-                    <td data-label={isRu ? "Всего" : "Total"}>{category.totalTemplates}</td>
+                    <td data-label={categoryText.total}>{category.totalTemplates}</td>
                     <td data-label={text.templateKindVideoBadge}>
                       <AdminStatusBadge color={typeColors.Video}>
                         {category.videoTemplates}
@@ -567,7 +679,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                     </td>
                     <td data-label={text.premiumLabel}>{category.premiumTemplates}</td>
                     <td data-label={text.actionsLabel}>
-                      <div className={styles.tableActions}>
+                      <div className={`${styles.tableActions} ${styles.categoryTableActions}`}>
                         {canManageCategories && editingCategoryId === category.categoryId ? (
                           <>
                             <Button
@@ -579,7 +691,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                               }
                               onClick={() => void handleUpdateCategory(category.categoryId)}
                             >
-                              {isRu ? "Сохранить" : "Save"}
+                              {categoryText.save}
                             </Button>
                             <Button
                               type="button"
@@ -591,7 +703,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                 setEditingName("");
                               }}
                             >
-                              {isRu ? "Отмена" : "Cancel"}
+                              {categoryText.cancel}
                             </Button>
                           </>
                         ) : (
@@ -602,6 +714,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                               }`}
                               href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}
                               aria-disabled={isCategoryActionLocked}
+                              aria-label={categoryText.videoCategoryLabel(
+                                formatCategoryActionName(category)
+                              )}
+                              title={categoryText.videoCategoryLabel(
+                                formatCategoryActionName(category)
+                              )}
                               tabIndex={isCategoryActionLocked ? -1 : undefined}
                               onClick={(event) => {
                                 if (isCategoryActionLocked) {
@@ -618,6 +736,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                               }`}
                               href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}
                               aria-disabled={isCategoryActionLocked}
+                              aria-label={categoryText.imageCategoryLabel(
+                                formatCategoryActionName(category)
+                              )}
+                              title={categoryText.imageCategoryLabel(
+                                formatCategoryActionName(category)
+                              )}
                               tabIndex={isCategoryActionLocked ? -1 : undefined}
                               onClick={(event) => {
                                 if (isCategoryActionLocked) {
@@ -635,6 +759,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                   size="sm"
                                   variant="ghost"
                                   disabled={isCategoryActionLocked}
+                                  aria-label={categoryText.editCategoryLabel(
+                                    formatCategoryActionName(category)
+                                  )}
+                                  title={categoryText.editCategoryLabel(
+                                    formatCategoryActionName(category)
+                                  )}
                                   onClick={() => {
                                     setEditingCategoryId(category.categoryId);
                                     setEditingName(normalizeCategoryName(category.name));
@@ -647,12 +777,28 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                   size="sm"
                                   variant="secondary"
                                   disabled={isCategoryActionLocked}
+                                  aria-label={
+                                    category.isArchived
+                                      ? categoryText.restoreCategoryLabel(
+                                          formatCategoryActionName(category)
+                                        )
+                                      : categoryText.archiveCategoryLabel(
+                                          formatCategoryActionName(category)
+                                        )
+                                  }
+                                  title={
+                                    category.isArchived
+                                      ? categoryText.restoreCategoryLabel(
+                                          formatCategoryActionName(category)
+                                        )
+                                      : categoryText.archiveCategoryLabel(
+                                          formatCategoryActionName(category)
+                                        )
+                                  }
                                   onClick={() => requestArchiveToggle(category)}
                                 >
                                   {category.isArchived
-                                    ? isRu
-                                      ? "Вернуть"
-                                      : "Restore"
+                                    ? categoryText.restore
                                     : text.archive}
                                 </Button>
                                 <Button
@@ -663,6 +809,12 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                                     isCategoryActionLocked ||
                                     category.totalTemplates > 0
                                   }
+                                  aria-label={categoryText.deleteCategoryLabel(
+                                    formatCategoryActionName(category)
+                                  )}
+                                  title={categoryText.deleteCategoryLabel(
+                                    formatCategoryActionName(category)
+                                  )}
                                   onClick={() => requestDeleteCategory(category)}
                                 >
                                   {text.deleteTemplate}
@@ -685,28 +837,24 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         open={categoryPendingArchive !== null}
         title={
           categoryPendingArchive?.isArchived
-            ? isRu
-              ? "Вернуть категорию?"
-              : "Restore category?"
-            : isRu
-              ? "Архивировать категорию?"
-              : "Archive category?"
+            ? categoryText.restoreDialogTitle
+            : categoryText.archiveDialogTitle
         }
         description={
           categoryPendingArchive
             ? categoryPendingArchive.isArchived
-              ? isRu
-                ? `Вернуть категорию "${formatCategoryActionName(categoryPendingArchive)}" в активный список?`
-                : `Restore category "${formatCategoryActionName(categoryPendingArchive)}" to the active list?`
-              : isRu
-                ? `Архивировать категорию "${formatCategoryActionName(categoryPendingArchive)}"? Она останется в связанных шаблонах, но не будет доступна для новых шаблонов.`
-                : `Archive category "${formatCategoryActionName(categoryPendingArchive)}"? It will stay on linked templates but won't be available for new templates.`
+              ? categoryText.restoreDialogDescription(
+                  formatCategoryActionName(categoryPendingArchive)
+                )
+              : categoryText.archiveDialogDescription(
+                  formatCategoryActionName(categoryPendingArchive)
+                )
             : ""
         }
         confirmLabel={
-          categoryPendingArchive?.isArchived ? (isRu ? "Вернуть" : "Restore") : text.archive
+          categoryPendingArchive?.isArchived ? categoryText.restore : text.archive
         }
-        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        cancelLabel={categoryText.cancel}
         isSubmitting={Boolean(categoryPendingArchive && isCategoryActionLocked)}
         tone="primary"
         onCancel={() => {
@@ -729,16 +877,14 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
 
       <ConfirmationDialog
         open={categoryPendingDelete !== null}
-        title={isRu ? "Удалить категорию?" : "Delete category?"}
+        title={categoryText.deleteDialogTitle}
         description={
           categoryPendingDelete
-            ? isRu
-              ? `Удалить категорию "${formatCategoryActionName(categoryPendingDelete)}"? Категория удаляется только если в ней нет шаблонов.`
-              : `Delete category "${formatCategoryActionName(categoryPendingDelete)}"? It can only be removed when no templates reference it.`
+            ? categoryText.deleteDialogDescription(formatCategoryActionName(categoryPendingDelete))
             : ""
         }
         confirmLabel={text.deleteTemplate}
-        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        cancelLabel={categoryText.cancel}
         isSubmitting={Boolean(categoryPendingDelete && isCategoryActionLocked)}
         onCancel={() => {
           if (!isCategoryActionLocked) {

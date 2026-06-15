@@ -59,6 +59,28 @@ describe("templates catalog visual contract", () => {
     expect(catalogSource).not.toContain('{">"}');
   });
 
+  it("keeps active catalog tabs and view toggles non-interactive", () => {
+    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const cssSource = readFileSync(catalogCssPath, "utf8");
+
+    expect(catalogSource).toContain(
+      'disabled={archiveFilter === "active" || isCatalogInteractionLocked}'
+    );
+    expect(catalogSource).toContain(
+      'disabled={archiveFilter === "archived" || isCatalogInteractionLocked}'
+    );
+    expect(catalogSource).toContain('disabled={viewMode === "cards" || isCatalogInteractionLocked}');
+    expect(catalogSource).toContain('disabled={viewMode === "list" || isCatalogInteractionLocked}');
+    expect(cssSource).toContain(".tab:not(:disabled):hover");
+    expect(cssSource).toContain(".viewButton:not(:disabled):hover,");
+    expect(cssSource).toContain(".viewButtonActive:not(:disabled):hover");
+    expect(cssSource).toContain(".tab:disabled,");
+    expect(cssSource).toContain(".viewButtonActive:disabled");
+    expect(cssSource).toContain("cursor: not-allowed;");
+    expect(cssSource).toContain("opacity: 0.68;");
+    expect(cssSource).toContain("transform: none;");
+  });
+
   it("keeps card metric icon layout in the catalog stylesheet", () => {
     const catalogSource = readFileSync(catalogViewPath, "utf8");
     const cssSource = readFileSync(catalogCssPath, "utf8");

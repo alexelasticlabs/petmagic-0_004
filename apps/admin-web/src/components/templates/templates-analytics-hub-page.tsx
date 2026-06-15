@@ -95,6 +95,9 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   const dictionary = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
+  const sessionRoles = session?.user.roles ?? [];
+  const canViewTemplateAnalytics =
+    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const [period, setPeriod] = useState<PeriodKey>("30");
   const [templateType, setTemplateType] = useState<TemplateType | "All">("All");
   const [category, setCategory] = useState("");
@@ -118,10 +121,10 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
   );
 
   useEffect(() => {
-    if (!session) {
+    if (!canViewTemplateAnalytics) {
       ensureAdminSession(locale, router);
     }
-  }, [locale, router, session]);
+  }, [canViewTemplateAnalytics, locale, router, session]);
 
   const overviewQuery = useQuery<AdminTemplatesAnalyticsOverview>({
     queryKey: [
@@ -137,7 +140,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
       query.take ?? null,
     ],
     queryFn: ({ signal }) => fetchAdminTemplatesAnalyticsOverview(query, signal),
-    enabled: Boolean(session),
+    enabled: canViewTemplateAnalytics,
     placeholderData: keepPreviousData,
   });
 
@@ -147,17 +150,25 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     }
 
     clientLogger.error("templates.analytics_hub_load_failed", {
-      query,
-      error: overviewQuery.error,
+      query: sanitizeTemplatesAnalyticsQueryForExport(query),
+      errorName: overviewQuery.error instanceof Error ? overviewQuery.error.name : "UnknownError",
+      errorDigest:
+        overviewQuery.error &&
+        typeof overviewQuery.error === "object" &&
+        "digest" in overviewQuery.error
+          ? String((overviewQuery.error as { digest?: unknown }).digest ?? "")
+          : undefined,
     });
   }, [overviewQuery.error, query]);
 
-  const overview = overviewQuery.data ?? null;
-  const isLoading = overviewQuery.isPending && !overview;
+  const isOverviewRefreshing = overviewQuery.isFetching && overviewQuery.isPlaceholderData;
+  const overview = overviewQuery.isPlaceholderData ? null : (overviewQuery.data ?? null);
+  const isLoading = (overviewQuery.isPending && !overview) || isOverviewRefreshing;
   const hasBlockingError = overviewQuery.isError && !overview;
   const hasPartialError = overviewQuery.isError && Boolean(overview);
+  const isHubControlsLocked = overviewQuery.isFetching;
 
-  if (!session) {
+  if (!canViewTemplateAnalytics) {
     return (
       <AdminPage className={styles.page}>
         <AdminStateCard tone="info" title={text.loading} />
@@ -189,8 +200,18 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     const link = document.createElement("a");
     link.href = url;
     link.download = `templates-analytics-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function requestOverviewRetry() {
+    if (!canViewTemplateAnalytics || overviewQuery.isFetching) {
+      return;
+    }
+
+    void overviewQuery.refetch().catch(() => undefined);
   }
 
   if (isLoading) {
@@ -211,14 +232,8 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || overviewQuery.isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void overviewQuery.refetch().catch(() => undefined);
-              }}
+              disabled={!canViewTemplateAnalytics || overviewQuery.isFetching}
+              onClick={requestOverviewRetry}
             >
               {text.retryAction}
             </Button>
@@ -292,7 +307,12 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
               <TableIcon className={styles.controlIcon} />
               <span>{text.catalog}</span>
             </Link>
-            <button type="button" className={styles.primaryButton} onClick={handleExport}>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={handleExport}
+              disabled={isHubControlsLocked}
+            >
               <DownloadIcon className={styles.controlIcon} />
               <span>{text.export}</span>
             </button>
@@ -322,14 +342,8 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
             <Button
               type="button"
               variant="secondary"
-              disabled={!session || overviewQuery.isFetching}
-              onClick={() => {
-                if (!session) {
-                  return;
-                }
-
-                void overviewQuery.refetch().catch(() => undefined);
-              }}
+              disabled={!canViewTemplateAnalytics || overviewQuery.isFetching}
+              onClick={requestOverviewRetry}
             >
               {text.retryAction}
             </Button>
@@ -339,23 +353,29 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
 
       <AdminToolbar className={styles.toolbar}>
         <div className={styles.segmented} aria-label={text.periodLabel}>
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              className={period === option.key ? styles.segmentedActive : styles.segmentedButton}
-              onClick={() => setPeriod(option.key)}
-            >
-              <CalendarIcon className={styles.controlIcon} />
-              <span>{isRu ? option.ru : option.en}</span>
-            </button>
-          ))}
+          {PERIOD_OPTIONS.map((option) => {
+            const isActivePeriod = period === option.key;
+
+            return (
+              <button
+                key={option.key}
+                type="button"
+                className={isActivePeriod ? styles.segmentedActive : styles.segmentedButton}
+                disabled={isActivePeriod || isHubControlsLocked}
+                onClick={() => setPeriod(option.key)}
+              >
+                <CalendarIcon className={styles.controlIcon} />
+                <span>{isRu ? option.ru : option.en}</span>
+              </button>
+            );
+          })}
         </div>
 
         <AdminFilterBar className={styles.filters}>
           <SelectBox
             label={text.typeFilter}
             value={templateType}
+            disabled={isHubControlsLocked}
             onChange={(value) => setTemplateType(value as TemplateType | "All")}
             options={[
               { value: "All", label: text.allTemplates },
@@ -366,6 +386,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           <SelectBox
             label={text.categoryFilter}
             value={category}
+            disabled={isHubControlsLocked}
             onChange={setCategory}
             options={[
               { value: "", label: text.allCategories },
@@ -378,6 +399,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           <SelectBox
             label={text.statusFilter}
             value={status}
+            disabled={isHubControlsLocked}
             onChange={(value) => setStatus(value as TemplateStatus | "All")}
             options={[
               { value: "All", label: text.allStatuses },
@@ -389,6 +411,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           <SelectBox
             label={text.accessFilter}
             value={access}
+            disabled={isHubControlsLocked}
             onChange={(value) => setAccess(value as "all" | "free" | "premium")}
             options={[
               { value: "all", label: text.allAccess },
@@ -399,6 +422,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
           <SelectBox
             label={text.sortFilter}
             value={sort}
+            disabled={isHubControlsLocked}
             onChange={(value) =>
               setSort(value as NonNullable<AdminTemplatesAnalyticsQuery["sort"]>)
             }
@@ -435,17 +459,22 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
               </h2>
               <p>{text.trendHint}</p>
             </div>
-            <div className={styles.chartTabs}>
-              {chartTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  className={chartMetric === tab.key ? styles.chartTabActive : styles.chartTab}
-                  onClick={() => setChartMetric(tab.key)}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className={styles.chartTabs} aria-label={text.trendTitle}>
+              {chartTabs.map((tab) => {
+                const isActiveChartMetric = chartMetric === tab.key;
+
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    className={isActiveChartMetric ? styles.chartTabActive : styles.chartTab}
+                    disabled={isActiveChartMetric || isHubControlsLocked}
+                    onClick={() => setChartMetric(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
           <TrendChart
@@ -534,13 +563,23 @@ function SelectBox({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string;
   value: string;
   options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
-  return <AdminSelectField label={label} value={value} options={options} onChange={onChange} />;
+  return (
+    <AdminSelectField
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      disabled={disabled}
+    />
+  );
 }
 
 function getKpiTone(tone: string): AdminTone {
@@ -603,7 +642,7 @@ function FeedbackFeedPanel({
                     : text.feedbackTypeFeedback}
                 </span>
                 <Link href={templatePath} className={styles.feedbackTemplateLink}>
-                  {item.templateTitle}
+                  {formatAnalyticsDisplayText(item.templateTitle, 120)}
                 </Link>
               </div>
               <strong>{formatDateTime(item.createdAtUtc, locale)}</strong>
@@ -812,9 +851,9 @@ function BreakdownPanel({
       </div>
       <div className={styles.breakdownList}>
         {rows.slice(0, 6).map((row) => (
-          <div key={row.key} className={styles.breakdownRow}>
+            <div key={row.key} className={styles.breakdownRow}>
             <div className={styles.breakdownMeta}>
-              <strong>{row.label}</strong>
+              <strong>{formatAnalyticsDisplayText(row.label, 120)}</strong>
               <span>{formatTemplateCount(row.templateCount, locale, templateCountLabel)}</span>
             </div>
             <div className={styles.breakdownBar}>
@@ -901,7 +940,7 @@ function EventDimensionPanel({
         {rows.slice(0, 6).map((row) => (
           <div key={row.key} className={styles.dimensionRow}>
             <div>
-              <strong>{row.label}</strong>
+              <strong>{formatAnalyticsDisplayText(row.label, 120)}</strong>
               <span>{formatNumber(row.count, locale)}</span>
             </div>
             <div className={styles.dimensionTrack}>
@@ -1130,12 +1169,17 @@ function formatShortDate(value: string, locale: AppLocale) {
 }
 
 function shortId(value: string) {
-  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+  const safeValue = formatAnalyticsDisplayText(value, 32).replace(/\s/g, "");
+  if (!safeValue) {
+    return "-";
+  }
+
+  return safeValue.length > 12 ? `${safeValue.slice(0, 8)}...${safeValue.slice(-4)}` : safeValue;
 }
 
 function formatAnalyticsValue(value: string | null | undefined) {
   const normalized = value?.trim();
-  return normalized ? normalized : "-";
+  return normalized ? formatAnalyticsDisplayText(normalized, 96) : "-";
 }
 
 function getCopy(locale: AppLocale) {

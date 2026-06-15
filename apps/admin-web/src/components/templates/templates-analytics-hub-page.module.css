@@ -107,6 +107,18 @@
   transform: translateY(-1px);
 }
 
+.primaryButton:disabled,
+.segmentedButton:disabled,
+.segmentedActive:disabled,
+.chartTab:disabled,
+.chartTabActive:disabled,
+.inlineAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: none;
+}
+
 .toolbar {
   justify-content: space-between;
   gap: 0.62rem;
@@ -526,6 +538,8 @@
 
 .tableWrap {
   position: relative;
+  width: 100%;
+  min-width: 0;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;

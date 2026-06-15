@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const overviewPath = fileURLToPath(
   new URL("./template-analytics-overview-sections.tsx", import.meta.url)
 );
+const pagePath = fileURLToPath(new URL("./template-analytics-page.tsx", import.meta.url));
 const stylesPath = fileURLToPath(new URL("./template-analytics-page.module.css", import.meta.url));
 
 describe("template analytics overview visual contract", () => {
@@ -39,6 +40,27 @@ describe("template analytics overview visual contract", () => {
     expect(styles).toContain(".chartSummaryRow {\n    grid-template-columns: repeat(2, minmax(0, 1fr));");
   });
 
+  it("shows disabled detail analytics controls consistently during refreshes", () => {
+    const overviewSource = readFileSync(overviewPath, "utf8");
+    const pageSource = readFileSync(pagePath, "utf8");
+    const styles = readFileSync(stylesPath, "utf8");
+
+    expect(pageSource).toContain("const isActivePeriod = option.key === period;");
+    expect(pageSource).toContain("disabled={isActivePeriod || isAnalyticsToolbarLocked}");
+    expect(pageSource).toContain("isChartMetricLocked={isAnalyticsToolbarLocked}");
+    expect(overviewSource).toContain("isChartMetricLocked = false");
+    expect(overviewSource).toContain("const isActiveChartMetric = tab.key === chartMetric;");
+    expect(overviewSource).toContain("disabled={isActiveChartMetric || isChartMetricLocked}");
+    expect(styles).toContain(".segmentedButton:disabled,");
+    expect(styles).toContain(".toolbarButtonActive:disabled,");
+    expect(styles).toContain(".exportButton:disabled,");
+    expect(styles).toContain(".chartTabActive:disabled");
+    expect(styles).toContain("cursor: not-allowed;");
+    expect(styles).toContain("opacity: 0.58;");
+    expect(styles).toContain("transform: none;");
+    expect(styles).toContain("box-shadow: none;");
+  });
+
   it("keeps template analytics typography readable without decorative tracking", () => {
     const styles = readFileSync(stylesPath, "utf8");
     const nonZeroLetterSpacingRules = [...styles.matchAll(/letter-spacing:\s*([^;]+);/g)]
@@ -52,6 +74,9 @@ describe("template analytics overview visual contract", () => {
   it("keeps template analytics feedback cards on compact admin radii", () => {
     const styles = readFileSync(stylesPath, "utf8");
 
+    expect(styles).toContain(".feedbackSearchInput:focus-visible");
+    expect(styles).toContain("box-shadow: var(--focus-ring);");
+    expect(styles).not.toMatch(/\.feedbackSearchInput:focus(?!-visible)/);
     expect(styles).toContain(".feedbackItem {");
     expect(styles).toContain("border-radius: var(--radius-sm);");
     expect(styles).not.toMatch(/border-radius:\s*(?:0\.7rem|0\.8rem|0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/);

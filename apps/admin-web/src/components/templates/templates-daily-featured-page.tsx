@@ -22,6 +22,7 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import { Button } from "@/components/ui/button";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -44,6 +45,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 
 type TemplatesDailyFeaturedPageProps = {
@@ -152,7 +154,7 @@ function isVideoTemplate(type: TemplateType | string) {
   return type === "Video";
 }
 
-function getPreviewUrl(template?: AdminTemplateListItem | AdminTemplateOfTheDay | null) {
+function getPreviewUrl(template?: TemplateOption | AdminTemplateListItem | AdminTemplateOfTheDay | null) {
   return template?.previewAsset?.url?.trim() || null;
 }
 
@@ -190,6 +192,20 @@ function formatDateRange(assignment: AdminTemplateOfTheDay) {
   return assignment.endDate
     ? `${assignment.startDate} - ${assignment.endDate}`
     : assignment.startDate;
+}
+
+function safeDisplayText(value: string | null | undefined, maxLength = 120) {
+  return sanitizeSensitiveText(value, maxLength);
+}
+
+function safeErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
 }
 
 function dateRangesOverlap(startDate: string, endDate: string, assignment: AdminTemplateOfTheDay) {
@@ -252,6 +268,10 @@ function copy(locale: Locale) {
       isRu
         ? `Удалить назначение "${templateTitle}" из расписания? Текущий мобильный показ обновится после сохранения.`
         : `Delete "${templateTitle}" from the schedule? The current mobile storefront pick will update after the change is saved.`,
+    editAssignmentLabel: (templateTitle: string) =>
+      isRu ? `Изменить назначение ${templateTitle}` : `Edit ${templateTitle} assignment`,
+    deleteAssignmentLabel: (templateTitle: string) =>
+      isRu ? `Удалить назначение ${templateTitle}` : `Delete ${templateTitle} assignment`,
     preview: isRu ? "Предпросмотр" : "Preview",
     previewEmptyTitle: isRu ? "Выберите шаблон" : "Select a template",
     previewEmptySubtitle: isRu
@@ -318,6 +338,8 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   const [templateAccessFilter, setTemplateAccessFilter] = useState<TemplateAccessFilter>("");
   const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
   const [form, setForm] = useState<AssignmentFormState>(() => emptyForm());
+  const [selectedTemplateOptionSnapshot, setSelectedTemplateOptionSnapshot] =
+    useState<TemplateOption | null>(null);
   const [autoPick, setAutoPick] = useState<AutoPickState>({
     date: todayIso(),
     autoModeEnabled: true,
@@ -347,8 +369,12 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       return optionFromAssignment(selectedAssignment);
     }
 
+    if (selectedTemplateOptionSnapshot?.templateId === form.templateId) {
+      return selectedTemplateOptionSnapshot;
+    }
+
     return null;
-  }, [form.templateId, selectedAssignment, selectedTemplate]);
+  }, [form.templateId, selectedAssignment, selectedTemplate, selectedTemplateOptionSnapshot]);
   const templateOptions = useMemo(() => {
     const options = templates.map(optionFromTemplate);
     if (
@@ -361,18 +387,28 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
 
     return options;
   }, [form.templateId, selectedTemplateSnapshot, templates]);
-  const previewTitle =
-    form.titleOverride.trim() || selectedTemplate?.title || selectedAssignment?.templateTitle || "";
-  const previewSubtitle =
-    form.subtitleOverride.trim() ||
-    selectedTemplate?.shortDescription ||
-    selectedAssignment?.subtitleOverride ||
-    "";
-  const previewBadge = form.badgeTextOverride.trim() || text.heroBadge;
-  const previewType =
-    selectedTemplate?.templateType ?? selectedAssignment?.templateType ?? ("Image" as TemplateType);
-  const previewMediaUrl = getPreviewUrl(selectedTemplate ?? selectedAssignment);
+  const previewTitle = safeDisplayText(
+    form.titleOverride.trim() || selectedTemplateSnapshot?.title || "",
+    120
+  );
+  const previewSubtitle = safeDisplayText(
+    form.subtitleOverride.trim() || selectedTemplateSnapshot?.shortDescription || "",
+    220
+  );
+  const previewBadge = safeDisplayText(form.badgeTextOverride.trim() || text.heroBadge, 64);
+  const previewType = selectedTemplateSnapshot?.templateType ?? ("Image" as TemplateType);
+  const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot);
   const isLoading = isScheduleLoading || isTemplateOptionsLoading;
+  const isActionLocked = isSubmitting || isLoading;
+  const isAutoPickSettingsDirty =
+    settings === null ||
+    autoPick.autoModeEnabled !== settings.autoModeEnabled ||
+    autoPick.allowedTypes !== settings.allowedTypes ||
+    parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays;
+  const scheduleAssignmentIds = useMemo(
+    () => new Set(schedule.map((assignment) => assignment.id)),
+    [schedule]
+  );
   const dateOccupiedWarning = schedule.some(
     (assignment) =>
       assignment.isActive &&
@@ -393,6 +429,8 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       }
 
       setIsTemplateOptionsLoading(true);
+      setTemplates([]);
+      setTemplateOptionsError(null);
       try {
         const templateResponse = await fetchAdminTemplates(
           {
@@ -408,7 +446,11 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         setTemplateOptionsError(null);
       } catch (loadError) {
         if (signal?.aborted) return;
-        clientLogger.warn("templates.daily_featured_template_options_failed", { error: loadError });
+        clientLogger.warn(
+          "templates.daily_featured_template_options_failed",
+          safeErrorDetails(loadError)
+        );
+        setTemplates([]);
         setTemplateOptionsError(getAdminErrorMessage(loadError, text.loadError));
       } finally {
         if (!signal?.aborted) {
@@ -464,12 +506,12 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         }
 
         if (loadFailure) {
-          clientLogger.warn("templates.daily_featured_load_failed", { error: loadFailure });
+          clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadFailure));
           setError(getAdminErrorMessage(loadFailure, text.loadError));
         }
       } catch (loadError) {
         if (signal?.aborted) return;
-        clientLogger.warn("templates.daily_featured_load_failed", { error: loadError });
+        clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadError));
         setError(getAdminErrorMessage(loadError, text.loadError));
       } finally {
         if (!signal?.aborted) {
@@ -512,9 +554,41 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     return () => controller.abort();
   }, [canManageTemplates, debouncedSearch, loadTemplateOptions]);
 
+  useEffect(() => {
+    if (isScheduleLoading || isActionLocked) {
+      return;
+    }
+
+    const shouldResetPendingDelete =
+      assignmentPendingDelete && !scheduleAssignmentIds.has(assignmentPendingDelete.id);
+    const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);
+
+    if (!shouldResetPendingDelete && !shouldResetForm) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (shouldResetPendingDelete) {
+        setAssignmentPendingDelete(null);
+      }
+
+      if (shouldResetForm) {
+        setSelectedTemplateOptionSnapshot(null);
+        setForm(emptyForm(form.startDate));
+      }
+    });
+  }, [
+    assignmentPendingDelete,
+    form.id,
+    form.startDate,
+    isActionLocked,
+    isScheduleLoading,
+    scheduleAssignmentIds,
+  ]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canManageTemplates || !form.templateId || isSubmitting || invalidDateRangeWarning) return;
+    if (!canManageTemplates || !form.templateId || isActionLocked || invalidDateRangeWarning) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -525,6 +599,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       } else {
         await createTemplateOfTheDay(payload);
       }
+      setSelectedTemplateOptionSnapshot(null);
       setForm(emptyForm(form.startDate));
       await loadScheduleData();
     } catch (saveError) {
@@ -535,7 +610,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   }
 
   async function handleDelete(assignment: AdminTemplateOfTheDay) {
-    if (!canManageTemplates || isSubmitting) {
+    if (!canManageTemplates || isActionLocked) {
       return false;
     }
 
@@ -544,6 +619,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
     try {
       await deleteTemplateOfTheDay(assignment.id);
       if (form.id === assignment.id) {
+        setSelectedTemplateOptionSnapshot(null);
         setForm(emptyForm(form.startDate));
       }
       await loadScheduleData();
@@ -557,7 +633,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   }
 
   async function handleAutoPick() {
-    if (!canManageTemplates || isSubmitting || isAutoPickDateMissing) return;
+    if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -576,7 +652,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
   }
 
   async function handleSaveSettings() {
-    if (!canManageTemplates || isSubmitting) return;
+    if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -611,7 +687,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           <Button
             variant="secondary"
             onClick={() => void refreshPageData()}
-            disabled={!canManageTemplates || isLoading}
+            disabled={!canManageTemplates || isActionLocked}
           >
             <RefreshIcon className={styles.buttonIcon} />
             {text.refresh}
@@ -619,7 +695,9 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         }
         metaItems={[
           `${text.schedule}: ${schedule.length} ${text.assignments}`,
-          current ? `${text.current}: ${current.templateTitle}` : text.noCurrent,
+          current
+            ? `${text.current}: ${safeDisplayText(current.templateTitle, 120)}`
+            : text.noCurrent,
           settings?.autoModeEnabled ? text.autoModeEnabled : text.autoModeDisabled,
         ]}
       />
@@ -632,7 +710,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
             <Button
               variant="secondary"
               onClick={() => void refreshPageData()}
-              disabled={!canManageTemplates || isLoading}
+              disabled={!canManageTemplates || isActionLocked}
             >
               {text.retry}
             </Button>
@@ -659,7 +737,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
             <input
               type="checkbox"
               checked={autoPick.autoModeEnabled}
-              disabled={!canManageTemplates || isSubmitting}
+              disabled={!canManageTemplates || isActionLocked}
               onChange={(event) =>
                 setAutoPick((value) => ({
                   ...value,
@@ -673,7 +751,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
             <AdminSelectField
               label={text.allowedTypes}
               value={autoPick.allowedTypes}
-              disabled={!canManageTemplates || isSubmitting}
+              disabled={!canManageTemplates || isActionLocked}
               onChange={(value) =>
                 setAutoPick((state) => ({
                   ...state,
@@ -694,7 +772,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 min={0}
                 max={365}
                 value={autoPick.excludeRecentDays}
-                disabled={!canManageTemplates || isSubmitting}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) =>
                   setAutoPick((value) => ({ ...value, excludeRecentDays: event.target.value }))
                 }
@@ -705,7 +783,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
             <Button
               variant="secondary"
               onClick={() => void handleSaveSettings()}
-              disabled={!canManageTemplates || isSubmitting}
+              disabled={!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty}
             >
               {text.autoModeSave}
             </Button>
@@ -718,7 +796,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 type="date"
                 required
                 value={autoPick.date}
-                disabled={!canManageTemplates || isSubmitting}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) =>
                   setAutoPick((value) => ({ ...value, date: event.target.value }))
                 }
@@ -732,7 +810,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
             <Button
               variant="primary"
               onClick={() => void handleAutoPick()}
-              disabled={!canManageTemplates || isSubmitting || isAutoPickDateMissing}
+              disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}
             >
               <CalendarIcon className={styles.buttonIcon} />
               {text.autoPickRun}
@@ -746,7 +824,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
           title={text.form}
           description={canManageTemplates ? text.formDescription : text.formAdminOnly}
         >
-          <form onSubmit={handleSubmit} className={styles.form}>
+          <form onSubmit={handleSubmit} className={styles.form} aria-busy={isActionLocked}>
             <label className={styles.field}>
               <span>{text.templateSearch}</span>
               <input
@@ -754,6 +832,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 value={search}
                 maxLength={SEARCH_LIMIT}
                 placeholder={text.templateSearchPlaceholder}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) => setSearch(event.target.value.slice(0, SEARCH_LIMIT))}
               />
             </label>
@@ -761,7 +840,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               <AdminSelectField
                 label={text.templateTypeFilter}
                 value={templateTypeFilter}
-                disabled={isTemplateOptionsLoading}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(value) => setTemplateTypeFilter(value as "" | TemplateType)}
                 options={[
                   { value: "", label: text.allTemplateTypes },
@@ -772,7 +851,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               <AdminSelectField
                 label={text.templateAccessFilter}
                 value={templateAccessFilter}
-                disabled={isTemplateOptionsLoading}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(value) => setTemplateAccessFilter(value as TemplateAccessFilter)}
                 options={[
                   { value: "", label: text.allAccessLevels },
@@ -787,17 +866,23 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               <select
                 className={styles.control}
                 value={form.templateId}
-                disabled={!canManageTemplates || isSubmitting || isTemplateOptionsLoading}
-                onChange={(event) =>
-                  setForm((state) => ({ ...state, templateId: event.target.value }))
-                }
+                disabled={!canManageTemplates || isActionLocked}
+                onChange={(event) => {
+                  const nextTemplateId = event.target.value;
+                  setSelectedTemplateOptionSnapshot(
+                    templateOptions.find((template) => template.templateId === nextTemplateId) ??
+                      null
+                  );
+                  setForm((state) => ({ ...state, templateId: nextTemplateId }));
+                }}
               >
                 <option value="">
                   {isTemplateOptionsLoading ? text.loadingTemplates : text.selectTemplate}
                 </option>
                 {templateOptions.map((template) => (
                   <option key={template.templateId} value={template.templateId}>
-                    {template.title} · {template.templateType} · {template.category} ·{" "}
+                    {safeDisplayText(template.title, 120)} · {template.templateType} ·{" "}
+                    {safeDisplayText(template.category, 72)} ·{" "}
                     {template.isPremium ? text.premium : text.free}
                   </option>
                 ))}
@@ -811,7 +896,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                   <Button
                     type="button"
                     variant="secondary"
-                    disabled={!canManageTemplates || isTemplateOptionsLoading}
+                    disabled={!canManageTemplates || isActionLocked}
                     onClick={() => void loadTemplateOptions(debouncedSearch)}
                   >
                     {text.retry}
@@ -836,7 +921,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                   type="date"
                   required
                   value={form.startDate}
-                  disabled={!canManageTemplates || isSubmitting}
+                  disabled={!canManageTemplates || isActionLocked}
                   onChange={(event) =>
                     setForm((state) => ({ ...state, startDate: event.target.value }))
                   }
@@ -848,7 +933,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                   className={styles.control}
                   type="date"
                   value={form.endDate}
-                  disabled={!canManageTemplates || isSubmitting}
+                  disabled={!canManageTemplates || isActionLocked}
                   onChange={(event) =>
                     setForm((state) => ({ ...state, endDate: event.target.value }))
                   }
@@ -860,7 +945,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                   className={styles.control}
                   type="number"
                   value={form.priority}
-                  disabled={!canManageTemplates || isSubmitting}
+                  disabled={!canManageTemplates || isActionLocked}
                   onChange={(event) =>
                     setForm((state) => ({ ...state, priority: event.target.value }))
                   }
@@ -870,7 +955,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 <input
                   type="checkbox"
                   checked={form.isActive}
-                  disabled={!canManageTemplates || isSubmitting}
+                  disabled={!canManageTemplates || isActionLocked}
                   onChange={(event) =>
                     setForm((state) => ({ ...state, isActive: event.target.checked }))
                   }
@@ -884,7 +969,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 className={styles.control}
                 value={form.titleOverride}
                 maxLength={120}
-                disabled={!canManageTemplates || isSubmitting}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) =>
                   setForm((state) => ({
                     ...state,
@@ -899,7 +984,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 className={`${styles.control} ${styles.textarea}`}
                 value={form.subtitleOverride}
                 maxLength={240}
-                disabled={!canManageTemplates || isSubmitting}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) =>
                   setForm((state) => ({
                     ...state,
@@ -914,7 +999,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 className={styles.control}
                 value={form.badgeTextOverride}
                 maxLength={64}
-                disabled={!canManageTemplates || isSubmitting}
+                disabled={!canManageTemplates || isActionLocked}
                 onChange={(event) =>
                   setForm((state) => ({
                     ...state,
@@ -928,7 +1013,7 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 type="submit"
                 variant="primary"
                 disabled={
-                  !canManageTemplates || isSubmitting || !form.templateId || invalidDateRangeWarning
+                  !canManageTemplates || isActionLocked || !form.templateId || invalidDateRangeWarning
                 }
               >
                 <PencilIcon className={styles.buttonIcon} />
@@ -936,8 +1021,11 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => setForm(emptyForm(form.startDate))}
-                disabled={isSubmitting}
+                onClick={() => {
+                  setSelectedTemplateOptionSnapshot(null);
+                  setForm(emptyForm(form.startDate));
+                }}
+                disabled={!canManageTemplates || isActionLocked}
               >
                 {text.reset}
               </Button>
@@ -948,18 +1036,20 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         <AdminCard title={text.preview}>
           <div className={styles.previewCard}>
             {previewMediaUrl ? (
-              isVideoTemplate(previewType) ? (
-                <video
-                  src={previewMediaUrl}
-                  muted
-                  playsInline
-                  controls
-                  className={styles.previewMedia}
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewMediaUrl} alt={previewTitle} className={styles.previewMedia} />
-              )
+              <TemplateSecureMedia
+                url={previewMediaUrl}
+                kind={isVideoTemplate(previewType) ? "video" : "image"}
+                alt={previewTitle}
+                muted
+                playsInline
+                controls={isVideoTemplate(previewType)}
+                className={styles.previewMedia}
+                logContext={{
+                  templateId: selectedTemplateSnapshot?.templateId,
+                  contentType: selectedTemplateSnapshot?.previewAsset?.contentType,
+                  surface: "daily-featured-preview",
+                }}
+              />
             ) : (
               <div className={styles.previewEmpty}>
                 <AdminIconTile icon={<TemplatesIcon />} tone="info" />
@@ -996,9 +1086,11 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                 {schedule.map((assignment) => (
                   <tr key={assignment.id}>
                     <td>
-                      <strong className={styles.templateTitle}>{assignment.templateTitle}</strong>
+                      <strong className={styles.templateTitle}>
+                        {safeDisplayText(assignment.templateTitle, 120)}
+                      </strong>
                       <span className={styles.templateMeta}>
-                        {assignment.templateType} · {assignment.category} ·{" "}
+                        {assignment.templateType} · {safeDisplayText(assignment.category, 72)} ·{" "}
                         {assignment.isPremium ? text.premium : text.free}
                       </span>
                     </td>
@@ -1015,14 +1107,30 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
                         <Button
                           size="sm"
                           variant="secondary"
-                          onClick={() => setForm(formFromAssignment(assignment))}
+                          disabled={!canManageTemplates || isActionLocked}
+                          aria-label={text.editAssignmentLabel(
+                            safeDisplayText(assignment.templateTitle, 80)
+                          )}
+                          title={text.editAssignmentLabel(
+                            safeDisplayText(assignment.templateTitle, 80)
+                          )}
+                          onClick={() => {
+                            setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));
+                            setForm(formFromAssignment(assignment));
+                          }}
                         >
                           {text.edit}
                         </Button>
                         <Button
                           size="sm"
                           variant="danger"
-                          disabled={!canManageTemplates || isSubmitting}
+                          disabled={!canManageTemplates || isActionLocked}
+                          aria-label={text.deleteAssignmentLabel(
+                            safeDisplayText(assignment.templateTitle, 80)
+                          )}
+                          title={text.deleteAssignmentLabel(
+                            safeDisplayText(assignment.templateTitle, 80)
+                          )}
                           onClick={() => setAssignmentPendingDelete(assignment)}
                         >
                           {text.delete}
@@ -1042,14 +1150,16 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         title={text.deleteConfirmTitle}
         description={
           assignmentPendingDelete
-            ? text.deleteConfirmDescription(assignmentPendingDelete.templateTitle)
+            ? text.deleteConfirmDescription(
+                safeDisplayText(assignmentPendingDelete.templateTitle, 120)
+              )
             : ""
         }
         confirmLabel={text.delete}
         cancelLabel={text.cancel}
-        isSubmitting={Boolean(assignmentPendingDelete && isSubmitting)}
+        isSubmitting={Boolean(assignmentPendingDelete && isActionLocked)}
         onCancel={() => {
-          if (!isSubmitting) {
+          if (!isActionLocked) {
             setAssignmentPendingDelete(null);
           }
         }}
@@ -1078,9 +1188,10 @@ function AssignmentSummary({
 }) {
   return (
     <div className={styles.assignmentSummary}>
-      <strong>{assignment.templateTitle}</strong>
+      <strong>{safeDisplayText(assignment.templateTitle, 120)}</strong>
       <span>
-        {formatDateRange(assignment)} · {assignment.templateType} · {assignment.category}
+        {formatDateRange(assignment)} · {assignment.templateType} ·{" "}
+        {safeDisplayText(assignment.category, 72)}
       </span>
       <span>
         <AdminBadge tone={statusTone(assignment)}>
@@ -1090,17 +1201,17 @@ function AssignmentSummary({
       </span>
       {assignment.titleOverride ? (
         <span>
-          {text.titleLabel}: {assignment.titleOverride}
+          {text.titleLabel}: {safeDisplayText(assignment.titleOverride, 120)}
         </span>
       ) : null}
       {assignment.subtitleOverride ? (
         <span>
-          {text.subtitleLabel}: {assignment.subtitleOverride}
+          {text.subtitleLabel}: {safeDisplayText(assignment.subtitleOverride, 220)}
         </span>
       ) : null}
       {assignment.badgeTextOverride ? (
         <span>
-          {text.badgeLabel}: {assignment.badgeTextOverride}
+          {text.badgeLabel}: {safeDisplayText(assignment.badgeTextOverride, 64)}
         </span>
       ) : null}
     </div>

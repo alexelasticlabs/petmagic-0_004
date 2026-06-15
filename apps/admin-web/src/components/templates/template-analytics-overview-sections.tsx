@@ -84,6 +84,7 @@ export function TemplateAnalyticsVisualSection({
   chartMetric,
   chartPoints,
   chartTabs,
+  isChartMetricLocked = false,
   isRu,
   locale,
   onChartMetricChange,
@@ -93,6 +94,7 @@ export function TemplateAnalyticsVisualSection({
   chartMetric: TrendMetricKey;
   chartPoints: readonly AdminTemplateTrendPoint[];
   chartTabs: readonly { key: TrendMetricKey; label: string }[];
+  isChartMetricLocked?: boolean;
   isRu: boolean;
   locale: Locale;
   onChartMetricChange: (value: TrendMetricKey) => void;
@@ -112,17 +114,22 @@ export function TemplateAnalyticsVisualSection({
           </div>
 
           <div className={styles.chartTabs} aria-label={text.trendTitle}>
-            {chartTabs.map((tab) => (
-              <button
-                key={tab.key}
-                type="button"
-                className={tab.key === chartMetric ? styles.chartTabActive : styles.chartTab}
-                onClick={() => onChartMetricChange(tab.key)}
-              >
-                <ChartIcon className={styles.controlIcon} />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+            {chartTabs.map((tab) => {
+              const isActiveChartMetric = tab.key === chartMetric;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  className={isActiveChartMetric ? styles.chartTabActive : styles.chartTab}
+                  disabled={isActiveChartMetric || isChartMetricLocked}
+                  onClick={() => onChartMetricChange(tab.key)}
+                >
+                  <ChartIcon className={styles.controlIcon} />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
         <TrendChart
