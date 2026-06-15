@@ -1,5 +1,7 @@
 part of 'generations_gallery_page.dart';
 
+const int _generationGalleryThumbnailCacheWidth = 320;
+
 File? _localMediaFile(String? path) {
   final normalized = path?.trim();
   if (normalized == null || normalized.isEmpty) {
@@ -35,9 +37,7 @@ class _ActiveCard extends ConsumerWidget {
             .read(generationHistoryControllerProvider.notifier)
             .markRead(generation.generationId);
       }
-      context.push(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-      );
+      context.push(GenerationStatusPage.routeFor(generation.generationId));
     }
 
     return _CardEntrance(
@@ -79,13 +79,20 @@ class _ActiveCard extends ConsumerWidget {
                                 ? Image.file(
                                     localPreviewFile,
                                     fit: BoxFit.cover,
+                                    cacheWidth:
+                                        _generationGalleryThumbnailCacheWidth,
+                                    filterQuality: FilterQuality.medium,
                                   )
                                 : !canRenderPreview
                                 ? _ThumbnailPlaceholder(generation: generation)
                                 : CachedNetworkImage(
                                     imageUrl: safePreviewImageUrl!,
                                     fit: BoxFit.cover,
-                                    memCacheWidth: 320,
+                                    memCacheWidth:
+                                        _generationGalleryThumbnailCacheWidth,
+                                    maxWidthDiskCache:
+                                        _generationGalleryThumbnailCacheWidth,
+                                    filterQuality: FilterQuality.medium,
                                     errorWidget: (context, url, error) =>
                                         _ThumbnailPlaceholder(
                                           generation: generation,
@@ -207,9 +214,10 @@ class _ActiveCard extends ConsumerWidget {
 }
 
 class _ReadyGridCard extends ConsumerWidget {
-  const _ReadyGridCard({required this.generation});
+  const _ReadyGridCard({required this.generation, required this.galleryState});
 
   final TemplateGenerationResult generation;
+  final _GenerationsGalleryPageState galleryState;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -222,18 +230,15 @@ class _ReadyGridCard extends ConsumerWidget {
     final canRenderPreview = canRenderImagePreview(safePreviewImageUrl);
     final localPreviewFile = _localMediaFile(generation.localPreviewPath);
 
-    Future<void> openGeneration() async {
+    void openGeneration() {
       if (generation.isUnread) {
-        await ref
-            .read(generationHistoryControllerProvider.notifier)
-            .markRead(generation.generationId);
+        unawaited(
+          ref
+              .read(generationHistoryControllerProvider.notifier)
+              .markRead(generation.generationId),
+        );
       }
-      if (!context.mounted) {
-        return;
-      }
-      context.push(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-      );
+      context.push(GenerationStatusPage.routeFor(generation.generationId));
     }
 
     return _CardEntrance(
@@ -266,13 +271,23 @@ class _ReadyGridCard extends ConsumerWidget {
                             top: Radius.circular(16),
                           ),
                           child: localPreviewFile != null
-                              ? Image.file(localPreviewFile, fit: BoxFit.cover)
+                              ? Image.file(
+                                  localPreviewFile,
+                                  fit: BoxFit.cover,
+                                  cacheWidth:
+                                      _generationGalleryThumbnailCacheWidth,
+                                  filterQuality: FilterQuality.medium,
+                                )
                               : !canRenderPreview
                               ? _ThumbnailPlaceholder(generation: generation)
                               : CachedNetworkImage(
                                   imageUrl: safePreviewImageUrl!,
                                   fit: BoxFit.cover,
-                                  memCacheWidth: 320,
+                                  memCacheWidth:
+                                      _generationGalleryThumbnailCacheWidth,
+                                  maxWidthDiskCache:
+                                      _generationGalleryThumbnailCacheWidth,
+                                  filterQuality: FilterQuality.medium,
                                   errorWidget: (context, url, error) =>
                                       _ThumbnailPlaceholder(
                                         generation: generation,
@@ -350,6 +365,7 @@ class _ReadyGridCard extends ConsumerWidget {
                           text,
                           ref,
                           generation,
+                          galleryState,
                         ),
                         icon: Icon(
                           Icons.more_vert_rounded,
@@ -391,9 +407,7 @@ class _FailedCard extends ConsumerWidget {
             .read(generationHistoryControllerProvider.notifier)
             .markRead(generation.generationId);
       }
-      context.push(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-      );
+      context.push(GenerationStatusPage.routeFor(generation.generationId));
     }
 
     void pickAnotherPhoto() {
@@ -401,7 +415,15 @@ class _FailedCard extends ConsumerWidget {
     }
 
     void openSupport() {
-      context.push(SupportChatPage.routePath);
+      context.push(
+        SupportChatPage.routeFor(
+          initialMessage: _buildGenerationProblemReportMessage(
+            text,
+            generation,
+          ),
+          relatedGenerationId: generation.generationId,
+        ),
+      );
     }
 
     return _CardEntrance(
@@ -439,6 +461,9 @@ class _FailedCard extends ConsumerWidget {
                                   ? Image.file(
                                       localPreviewFile,
                                       fit: BoxFit.cover,
+                                      cacheWidth:
+                                          _generationGalleryThumbnailCacheWidth,
+                                      filterQuality: FilterQuality.medium,
                                     )
                                   : !canRenderPreview
                                   ? _ThumbnailPlaceholder(
@@ -447,7 +472,11 @@ class _FailedCard extends ConsumerWidget {
                                   : CachedNetworkImage(
                                       imageUrl: safePreviewImageUrl!,
                                       fit: BoxFit.cover,
-                                      memCacheWidth: 320,
+                                      memCacheWidth:
+                                          _generationGalleryThumbnailCacheWidth,
+                                      maxWidthDiskCache:
+                                          _generationGalleryThumbnailCacheWidth,
+                                      filterQuality: FilterQuality.medium,
                                       errorWidget: (context, url, error) =>
                                           _ThumbnailPlaceholder(
                                             generation: generation,

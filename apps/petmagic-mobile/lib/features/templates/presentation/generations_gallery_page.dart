@@ -107,7 +107,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   @override
   void dispose() {
     _cancelActiveMediaAction();
-    _historyController.setScreenVisible(false);
+    _historyController.setScreenVisible(false, clearLoadingState: false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -379,8 +379,10 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
               crossAxisSpacing: 10,
               childAspectRatio: 0.82,
             ),
-            itemBuilder: (context, index) =>
-                _ReadyGridCard(generation: filteredItems[index]),
+            itemBuilder: (context, index) => _ReadyGridCard(
+              generation: filteredItems[index],
+              galleryState: this,
+            ),
           ),
         ),
       ];
@@ -461,17 +463,13 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   }
 
   CancelToken? _startMediaAction() {
-    if (_activeMediaActionCancelToken != null) {
+    if (!mounted || _activeMediaActionCancelToken != null) {
       return null;
     }
 
     final cancelToken = CancelToken();
     _activeMediaActionCancelToken = cancelToken;
-    if (mounted) {
-      setState(() => _isMediaActionInFlight = true);
-    } else {
-      _isMediaActionInFlight = true;
-    }
+    setState(() => _isMediaActionInFlight = true);
     return cancelToken;
   }
 
@@ -592,8 +590,10 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
               crossAxisSpacing: 10,
               childAspectRatio: 0.82,
             ),
-            itemBuilder: (context, index) =>
-                _ReadyGridCard(generation: visibleItems[index]),
+            itemBuilder: (context, index) => _ReadyGridCard(
+              generation: visibleItems[index],
+              galleryState: this,
+            ),
           ),
           if (hiddenCount > 0 || _readyExpanded)
             SliverToBoxAdapter(

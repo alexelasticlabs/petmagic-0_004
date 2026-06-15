@@ -54,6 +54,7 @@ class GenerationGalleryStore {
 
   static const _entriesKeyPrefix = 'generation_gallery_entries_v1:';
   static const _generationScopeRoot = 'generation_gallery';
+  static const _maxEntriesPerScope = 120;
 
   final Dio _dio;
   final SharedPreferencesAsync _preferences;
@@ -117,7 +118,9 @@ class GenerationGalleryStore {
 
   Future<void> removeRecord(String generationId) async {
     final entries = await _readEntries();
-    final target = entries.where((entry) => entry.generationId == generationId);
+    final target = entries
+        .where((entry) => entry.generationId == generationId)
+        .toList(growable: false);
     for (final entry in target) {
       await _deleteGenerationDirectory(entry.accountScope, generationId);
     }
@@ -126,12 +129,26 @@ class GenerationGalleryStore {
         if (entry.generationId != generationId) entry,
     ];
     await _writeEntries(updated);
+    final updatedScopes = updated.map((entry) => entry.accountScope).toSet();
+    for (final scope in target.map((entry) => entry.accountScope).toSet()) {
+      if (!updatedScopes.contains(scope)) {
+        await _writeEntriesForScope(scope, const []);
+      }
+    }
   }
 
   Future<GenerationGalleryMediaRecord> upsertReadyItem(
     TemplateGenerationResult generation,
   ) async {
+    return _upsertReadyItem(generation);
+  }
+
+  Future<GenerationGalleryMediaRecord> _upsertReadyItem(
+    TemplateGenerationResult generation, {
+    String? accountScopeOverride,
+  }) async {
     final accountScope =
+        accountScopeOverride ??
         _resolveAccountScope(generation.userId) ??
         await readCurrentAccountScope();
     if (accountScope == null || !generation.isCompleted) {
@@ -163,7 +180,7 @@ class GenerationGalleryStore {
     return next;
   }
 
-  Future<void> markDeletedLocally(String generationId) async {
+  Future<void> markDeletedLocally(String generationId, {String? userId}) async {
     final entries = await _readEntries();
     var changed = false;
     final updated = <GenerationGalleryMediaRecord>[];
@@ -174,7 +191,7 @@ class GenerationGalleryStore {
       }
 
       changed = true;
-      _cancelDownload(generationId);
+      _cancelDownload(_downloadKey(entry.accountScope, generationId));
       await _deleteGenerationDirectory(entry.accountScope, generationId);
       updated.add(
         entry.copyWith(
@@ -189,6 +206,31 @@ class GenerationGalleryStore {
       );
     }
 
+    if (!changed) {
+      final accountScope =
+          _resolveAccountScope(userId) ?? await readCurrentAccountScope();
+      if (accountScope == null) {
+        return;
+      }
+
+      final nowUtc = DateTime.now().toUtc();
+      updated.add(
+        GenerationGalleryMediaRecord(
+          generationId: generationId,
+          accountScope: accountScope,
+          userId: userId ?? accountScope,
+          status: 'deleted',
+          updatedAtUtc: nowUtc,
+          lastSyncedAtUtc: nowUtc,
+          version: 1,
+          isDeletedLocally: true,
+          isDownloadComplete: false,
+          pendingServerDelete: true,
+        ),
+      );
+      changed = true;
+    }
+
     if (changed) {
       await _writeEntries(updated);
     }
@@ -201,26 +243,36 @@ class GenerationGalleryStore {
       return null;
     }
 
-    final generationId = generation.generationId;
-    final existing = _inFlightDownloads[generationId];
+    final accountScope =
+        _resolveAccountScope(generation.userId) ??
+        await readCurrentAccountScope();
+    final downloadKey = _downloadKey(
+      accountScope ?? '',
+      generation.generationId,
+    );
+    final existing = _inFlightDownloads[downloadKey];
     if (existing != null) {
       return existing;
     }
 
-    final future = _materializeGenerationMediaInternal(generation);
-    _inFlightDownloads[generationId] = future;
+    final future = _materializeGenerationMediaInternal(
+      generation,
+      accountScopeOverride: accountScope,
+      downloadKey: downloadKey,
+    );
+    _inFlightDownloads[downloadKey] = future;
     try {
       return await future;
     } finally {
-      _inFlightDownloads.remove(generationId);
-      _downloadCancelTokens.remove(generationId);
+      _inFlightDownloads.remove(downloadKey);
+      _downloadCancelTokens.remove(downloadKey);
     }
   }
 
   Future<void> cancelActiveDownloads() async {
-    final generationIds = _downloadCancelTokens.keys.toList(growable: false);
-    for (final generationId in generationIds) {
-      _cancelDownload(generationId);
+    final downloadKeys = _downloadCancelTokens.keys.toList(growable: false);
+    for (final downloadKey in downloadKeys) {
+      _cancelDownload(downloadKey);
     }
   }
 
@@ -236,8 +288,7 @@ class GenerationGalleryStore {
 
   Future<void> purgeAllScopes() async {
     await cancelActiveDownloads();
-    final entries = await _readEntries();
-    final scopes = entries.map((entry) => entry.accountScope).toSet();
+    final scopes = await _readKnownAccountScopes();
     for (final scope in scopes) {
       await _preferences.remove(_entriesKeyForScope(scope));
       await _deleteScopeDirectory(scope);
@@ -254,9 +305,14 @@ class GenerationGalleryStore {
   }
 
   Future<GenerationGalleryMediaRecord?> _materializeGenerationMediaInternal(
-    TemplateGenerationResult generation,
-  ) async {
-    final baseEntry = await upsertReadyItem(generation);
+    TemplateGenerationResult generation, {
+    required String? accountScopeOverride,
+    required String downloadKey,
+  }) async {
+    final baseEntry = await _upsertReadyItem(
+      generation,
+      accountScopeOverride: accountScopeOverride,
+    );
     if (baseEntry.isDeletedLocally) {
       return baseEntry;
     }
@@ -268,7 +324,7 @@ class GenerationGalleryStore {
     await _cleanupGenerationArtifacts(generationDirectory);
 
     final cancelToken = CancelToken();
-    _downloadCancelTokens[generation.generationId] = cancelToken;
+    _downloadCancelTokens[downloadKey] = cancelToken;
 
     var previewLocalPath = baseEntry.previewLocalPath;
     var outputLocalPath = baseEntry.outputLocalPath;
@@ -352,14 +408,16 @@ class GenerationGalleryStore {
     final extension = extensionFromUrl(safeUri.toString()).trim().isEmpty
         ? fallbackExtension
         : extensionFromUrl(safeUri.toString());
+    final urlStamp = _stableUrlStamp(safeUri.toString());
     final fileName = sanitizeFileName(
-      '$prefix.$extension',
-      fallback: '$prefix.$fallbackExtension',
+      '${prefix}_$urlStamp.$extension',
+      fallback: '${prefix}_$urlStamp.$fallbackExtension',
     );
     final targetFile = File(
       '${targetDirectory.path}${Platform.pathSeparator}$fileName',
     );
     if (await _hasUsableFile(targetFile)) {
+      await _deleteStaleFilesForPrefix(targetDirectory, prefix, targetFile);
       return targetFile;
     }
 
@@ -387,7 +445,34 @@ class GenerationGalleryStore {
       await targetFile.delete();
     }
     await tempFile.rename(targetFile.path);
+    await _deleteStaleFilesForPrefix(targetDirectory, prefix, targetFile);
     return targetFile;
+  }
+
+  Future<void> _deleteStaleFilesForPrefix(
+    Directory targetDirectory,
+    String prefix,
+    File retainedFile,
+  ) async {
+    if (!await targetDirectory.exists()) {
+      return;
+    }
+
+    final retainedPath = retainedFile.path;
+    await for (final entity in targetDirectory.list()) {
+      if (entity is! File || entity.path == retainedPath) {
+        continue;
+      }
+
+      final fileName = _basename(entity.path);
+      final isLegacyFile = fileName.startsWith('$prefix.');
+      final isStampedFile = fileName.startsWith('${prefix}_');
+      if (!isLegacyFile && !isStampedFile) {
+        continue;
+      }
+
+      await entity.delete();
+    }
   }
 
   Future<bool> _hasUsableFile(File file) async {
@@ -396,7 +481,13 @@ class GenerationGalleryStore {
         return false;
       }
       final stat = await file.stat();
-      return stat.type == FileSystemEntityType.file && stat.size > 0;
+      if (stat.type != FileSystemEntityType.file || stat.size <= 0) {
+        return false;
+      }
+      final header = await file.openRead(0, 16).toList();
+      return _hasSupportedMediaSignature([
+        for (final chunk in header) ...chunk,
+      ]);
     } on Object {
       return false;
     }
@@ -409,10 +500,73 @@ class GenerationGalleryStore {
     }
     try {
       final file = File(normalized);
-      return file.existsSync() && file.lengthSync() > 0;
+      if (!file.existsSync() || file.lengthSync() <= 0) {
+        return false;
+      }
+      final handle = file.openSync();
+      try {
+        final header = handle.readSync(16);
+        return _hasSupportedMediaSignature(header);
+      } finally {
+        handle.closeSync();
+      }
     } on Object {
       return false;
     }
+  }
+
+  bool _hasSupportedMediaSignature(List<int> header) {
+    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
+      return true;
+    }
+    if (_startsWith(header, const [
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+    ])) {
+      return true;
+    }
+    if (header.length >= 12 &&
+        _asciiEquals(header, 0, 'RIFF') &&
+        _asciiEquals(header, 8, 'WEBP')) {
+      return true;
+    }
+    if (_asciiEquals(header, 0, 'GIF8')) {
+      return true;
+    }
+    if (header.length >= 12 && _asciiEquals(header, 4, 'ftyp')) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _startsWith(List<int> bytes, List<int> prefix) {
+    if (bytes.length < prefix.length) {
+      return false;
+    }
+    for (var index = 0; index < prefix.length; index++) {
+      if (bytes[index] != prefix[index]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _asciiEquals(List<int> bytes, int offset, String value) {
+    if (bytes.length < offset + value.length) {
+      return false;
+    }
+    for (var index = 0; index < value.length; index++) {
+      if (bytes[offset + index] != value.codeUnitAt(index)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<List<GenerationGalleryMediaRecord>> _readEntries() async {
@@ -467,15 +621,69 @@ class GenerationGalleryStore {
     List<GenerationGalleryMediaRecord> entries,
   ) async {
     try {
+      final prunedEntries = await _pruneEntriesForScope(accountScope, entries);
       await _preferences.setString(
         _entriesKeyForScope(accountScope),
         jsonEncode(
-          entries.map((entry) => entry.toJson()).toList(growable: false),
+          prunedEntries.map((entry) => entry.toJson()).toList(growable: false),
         ),
       );
     } on Object catch (error, stackTrace) {
       _logStoreFailure('write_entries', error, stackTrace);
     }
+  }
+
+  Future<List<GenerationGalleryMediaRecord>> _pruneEntriesForScope(
+    String accountScope,
+    List<GenerationGalleryMediaRecord> entries,
+  ) async {
+    if (entries.length <= _maxEntriesPerScope) {
+      return entries;
+    }
+
+    final ordered = List<GenerationGalleryMediaRecord>.from(entries)
+      ..sort((left, right) {
+        final bySyncedAt = right.lastSyncedAtUtc.compareTo(
+          left.lastSyncedAtUtc,
+        );
+        if (bySyncedAt != 0) {
+          return bySyncedAt;
+        }
+        return right.updatedAtUtc.compareTo(left.updatedAtUtc);
+      });
+
+    final retained = <GenerationGalleryMediaRecord>[];
+    final retainedIds = <String>{};
+
+    for (final entry in ordered) {
+      if (entry.pendingServerDelete && retainedIds.add(entry.generationId)) {
+        retained.add(entry);
+      }
+    }
+
+    for (final entry in ordered) {
+      if (retained.length >= _maxEntriesPerScope) {
+        break;
+      }
+      if (retainedIds.add(entry.generationId)) {
+        retained.add(entry);
+      }
+    }
+
+    final retainedIdSet = retained.map((entry) => entry.generationId).toSet();
+    for (final entry in ordered) {
+      if (retainedIdSet.contains(entry.generationId)) {
+        continue;
+      }
+      if (!entry.isDeletedLocally) {
+        await _deleteGenerationDirectory(accountScope, entry.generationId);
+      }
+    }
+
+    retained.sort(
+      (left, right) => right.updatedAtUtc.compareTo(left.updatedAtUtc),
+    );
+    return retained;
   }
 
   Future<GenerationGalleryMediaRecord?> _updateEntry(
@@ -527,6 +735,21 @@ class GenerationGalleryStore {
     return '$_entriesKeyPrefix$accountScope';
   }
 
+  Future<Set<String>> _readKnownAccountScopes() async {
+    try {
+      final keys = await _preferences.getKeys();
+      return keys
+          .where((key) => key.startsWith(_entriesKeyPrefix))
+          .map((key) => key.substring(_entriesKeyPrefix.length))
+          .where((scope) => scope.trim().isNotEmpty)
+          .toSet();
+    } on Object catch (error, stackTrace) {
+      _logStoreFailure('read_known_account_scopes', error, stackTrace);
+      final entries = await _readEntries();
+      return entries.map((entry) => entry.accountScope).toSet();
+    }
+  }
+
   String? _resolveAccountScope(String? rawUserId) {
     final value = rawUserId?.trim();
     return value == null || value.isEmpty ? null : value;
@@ -537,10 +760,15 @@ class GenerationGalleryStore {
     String generationId,
   ) async {
     final root = await _rootDirectoryResolver();
+    final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
+    final generationSegment = _safePathSegment(
+      generationId,
+      fallback: 'generation',
+    );
     final directory = Directory(
       '${root.path}${Platform.pathSeparator}'
       '$_generationScopeRoot${Platform.pathSeparator}'
-      '$accountScope${Platform.pathSeparator}$generationId',
+      '$scopeSegment${Platform.pathSeparator}$generationSegment',
     );
     await directory.create(recursive: true);
     return directory;
@@ -551,10 +779,15 @@ class GenerationGalleryStore {
     String generationId,
   ) async {
     final root = await _rootDirectoryResolver();
+    final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
+    final generationSegment = _safePathSegment(
+      generationId,
+      fallback: 'generation',
+    );
     final directory = Directory(
       '${root.path}${Platform.pathSeparator}'
       '$_generationScopeRoot${Platform.pathSeparator}'
-      '$accountScope${Platform.pathSeparator}$generationId',
+      '$scopeSegment${Platform.pathSeparator}$generationSegment',
     );
     if (await directory.exists()) {
       await directory.delete(recursive: true);
@@ -563,9 +796,10 @@ class GenerationGalleryStore {
 
   Future<void> _deleteScopeDirectory(String accountScope) async {
     final root = await _rootDirectoryResolver();
+    final scopeSegment = _safePathSegment(accountScope, fallback: 'account');
     final directory = Directory(
       '${root.path}${Platform.pathSeparator}'
-      '$_generationScopeRoot${Platform.pathSeparator}$accountScope',
+      '$_generationScopeRoot${Platform.pathSeparator}$scopeSegment',
     );
     if (await directory.exists()) {
       await directory.delete(recursive: true);
@@ -582,14 +816,20 @@ class GenerationGalleryStore {
     final root = await _rootDirectoryResolver();
     final scopeDirectory = Directory(
       '${root.path}${Platform.pathSeparator}'
-      '$_generationScopeRoot${Platform.pathSeparator}$accountScope',
+      '$_generationScopeRoot${Platform.pathSeparator}'
+      '${_safePathSegment(accountScope, fallback: 'account')}',
     );
     if (!await scopeDirectory.exists()) {
       return;
     }
 
     final entries = await _readEntriesForScope(accountScope);
-    final knownIds = entries.map((entry) => entry.generationId).toSet();
+    final knownIds = entries
+        .map(
+          (entry) =>
+              _safePathSegment(entry.generationId, fallback: 'generation'),
+        )
+        .toSet();
     await for (final entity in scopeDirectory.list()) {
       if (entity is! Directory) {
         continue;
@@ -647,6 +887,8 @@ class GenerationGalleryStore {
   }
 }
 
+const Object _copyWithUnset = Object();
+
 class GenerationGalleryMediaRecord {
   const GenerationGalleryMediaRecord({
     required this.generationId,
@@ -685,8 +927,8 @@ class GenerationGalleryMediaRecord {
   final bool pendingServerDelete;
 
   GenerationGalleryMediaRecord copyWith({
-    String? previewLocalPath,
-    String? outputLocalPath,
+    Object? previewLocalPath = _copyWithUnset,
+    Object? outputLocalPath = _copyWithUnset,
     bool? isDeletedLocally,
     bool? isDownloadComplete,
     DateTime? lastSyncedAtUtc,
@@ -705,8 +947,12 @@ class GenerationGalleryMediaRecord {
       templateType: templateType,
       previewRemoteUrl: previewRemoteUrl,
       outputRemoteUrl: outputRemoteUrl,
-      previewLocalPath: previewLocalPath,
-      outputLocalPath: outputLocalPath,
+      previewLocalPath: identical(previewLocalPath, _copyWithUnset)
+          ? this.previewLocalPath
+          : previewLocalPath as String?,
+      outputLocalPath: identical(outputLocalPath, _copyWithUnset)
+          ? this.outputLocalPath
+          : outputLocalPath as String?,
       isDeletedLocally: isDeletedLocally ?? this.isDeletedLocally,
       isDownloadComplete: isDownloadComplete ?? this.isDownloadComplete,
       pendingServerDelete: pendingServerDelete ?? this.pendingServerDelete,
@@ -827,4 +1073,35 @@ bool _isLikelyVideoUrl(String? rawUrl) {
       query.contains('format=mp4') ||
       query.contains('ext=mp4') ||
       query.contains('contenttype=video');
+}
+
+String _stableUrlStamp(String value) {
+  var hash = 0x811c9dc5;
+  for (final codeUnit in value.codeUnits) {
+    hash = (hash ^ codeUnit) & 0xffffffff;
+    hash = (hash * 0x01000193) & 0xffffffff;
+  }
+  return hash.toRadixString(16).padLeft(8, '0');
+}
+
+String _safePathSegment(String value, {required String fallback}) {
+  final trimmed = value.trim();
+  final sanitized = sanitizeFileName(trimmed, fallback: fallback);
+  final isSpecialDirectory = sanitized == '.' || sanitized == '..';
+  if (!isSpecialDirectory && sanitized == trimmed) {
+    return sanitized;
+  }
+
+  final base = isSpecialDirectory ? fallback : sanitized;
+  final boundedBase = base.length <= 80 ? base : base.substring(0, 80);
+  return '${boundedBase}_${_stableUrlStamp(trimmed)}';
+}
+
+String _downloadKey(String accountScope, String generationId) {
+  return '$accountScope\u{1F}$generationId';
+}
+
+String _basename(String path) {
+  final parts = path.split(Platform.pathSeparator);
+  return parts.isEmpty ? path : parts.last;
 }

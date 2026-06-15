@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
@@ -103,26 +104,43 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       ref.read(templateGenerationRepositoryProvider);
   GenerationGalleryStore get _galleryStore =>
       ref.read(generationGalleryStoreProvider);
-  RealtimeClient get _realtimeClient => ref.read(realtimeClientProvider);
+  RealtimeClient? _activeRealtimeClient;
   StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Future<void>? _realtimeConnectFuture;
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;
   bool _isScreenVisible = false;
   bool _isRealtimeConnected = false;
   bool _isLoadInFlight = false;
+  bool _hasScheduledLocalArtifactCleanup = false;
+  CancelToken? _activeLoadCancelToken;
+  CancelToken? _activeUnreadRefreshCancelToken;
+  _GenerationHistoryLoadRequest? _pendingLoadRequest;
+  Completer<void>? _pendingLoadCompleter;
+  Set<String> _locallyDeletedGenerationIds = const {};
+  Set<String> _locallyDeletedUnreadGenerationIds = const {};
+  Set<String> _locallyReadGenerationIds = const {};
+  Set<String> _locallyReadUnreadGenerationIds = const {};
   int _autoRefreshFailureStreak = 0;
 
   @override
   GenerationHistoryState build() {
     ref.watch(templateGenerationRepositoryProvider);
-    ref.watch(generationGalleryStoreProvider);
-    ref.watch(realtimeClientProvider);
+    final galleryStore = ref.watch(generationGalleryStoreProvider);
+    _activeRealtimeClient = ref.watch(realtimeClientProvider);
     ref.onDispose(() {
       _isScreenVisible = false;
       _offlineBannerTimer?.cancel();
       _offlineBannerTimer = null;
       _autoRefreshTimer?.cancel();
       _autoRefreshTimer = null;
+      _cancelActiveLoad(
+        'generation_history_disposed',
+        clearPending: true,
+        clearLoadingState: false,
+      );
+      _cancelActiveUnreadRefresh('generation_history_disposed');
+      unawaited(galleryStore.cancelActiveDownloads());
       _pauseRealtime();
     });
     Future.microtask(() async {
@@ -147,19 +165,27 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     return const GenerationHistoryState();
   }
 
-  void setScreenVisible(bool visible) {
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {
     if (_isScreenVisible == visible) {
       return;
     }
 
     _isScreenVisible = visible;
     if (visible) {
+      _scheduleLocalArtifactCleanup();
       _startAutoRefresh();
       unawaited(_resumeRealtimeIfNeeded());
       return;
     }
 
     _stopAutoRefresh();
+    _cancelActiveLoad(
+      'generation_history_hidden',
+      clearPending: true,
+      clearLoadingState: clearLoadingState,
+    );
+    _cancelActiveUnreadRefresh('generation_history_hidden');
+    unawaited(_galleryStore.cancelActiveDownloads());
     _pauseRealtime();
   }
 
@@ -167,8 +193,18 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     GenerationHistoryFilter? filter,
     bool refresh = false,
   }) async {
+    final requestedFilter = filter ?? state.filter;
     if (_isLoadInFlight) {
-      return;
+      if (!refresh && requestedFilter == state.filter && state.isLoading) {
+        return;
+      }
+
+      _pendingLoadRequest = _GenerationHistoryLoadRequest(
+        filter: requestedFilter,
+        refresh: refresh,
+      );
+      final completer = _pendingLoadCompleter ??= Completer<void>();
+      return completer.future;
     }
 
     _isLoadInFlight = true;
@@ -178,10 +214,12 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         return;
       }
 
-      final nextFilter = filter ?? state.filter;
+      final nextFilter = requestedFilter;
+      final wasOfflineBeforeLoad = state.syncFailed;
       final deletedGenerationIds = await _galleryStore
           .loadDeletedGenerationIds();
       final localReadyRecords = await _galleryStore.loadLocalReadyItems();
+      _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
       if (state.isLoading && !refresh && nextFilter == state.filter) {
         return;
       }
@@ -243,19 +281,41 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       }
 
       try {
+        final loadCancelToken = _startLoadCancelToken();
         await _flushPendingServerDeletes();
-        final wasOffline = state.syncFailed;
+        if (!ref.mounted || loadCancelToken.isCancelled) {
+          _completeCancelledLoad();
+          return;
+        }
+
         final remoteItems = await _repository.fetchGenerations(
           status: nextFilter.apiStatus,
           take: 50,
+          cancelToken: loadCancelToken,
         );
         final items = _decorateWithLocalMedia(
           remoteItems,
           deletedGenerationIds,
           localReadyRecords,
         );
-        final unreadCount = await _repository.fetchUnreadGenerationCount();
+        final unreadCount = await _repository.fetchUnreadGenerationCount(
+          cancelToken: loadCancelToken,
+        );
+        _reconcileLocallyReadIds(remoteItems);
+        _locallyDeletedUnreadGenerationIds =
+            await _loadDeletedUnreadGenerationIds(
+              deletedGenerationIds: deletedGenerationIds,
+              remoteItems: remoteItems,
+            );
         if (!ref.mounted) {
+          return;
+        }
+        final visibleUnreadCount = _visibleUnreadCount(unreadCount);
+        if (!ref.mounted) {
+          return;
+        }
+        if (loadCancelToken.isCancelled) {
+          _completeCancelledLoad();
           return;
         }
 
@@ -266,22 +326,26 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         final nowUtc = DateTime.now().toUtc();
         state = state.copyWith(
           items: items,
-          unreadCount: unreadCount,
+          unreadCount: visibleUnreadCount,
           isLoading: false,
           syncFailed: false,
-          showOfflineBanner: wasOffline && items.isNotEmpty,
-          isConnectionRecovered: wasOffline && items.isNotEmpty,
+          showOfflineBanner: wasOfflineBeforeLoad && items.isNotEmpty,
+          isConnectionRecovered: wasOfflineBeforeLoad && items.isNotEmpty,
           lastSyncedAtUtc: nowUtc,
           cachedItemsByFilter: updatedCache,
           clearError: true,
         );
         _registerAutoRefreshSuccess();
 
-        if (wasOffline && items.isNotEmpty) {
+        if (wasOfflineBeforeLoad && items.isNotEmpty) {
           _scheduleOfflineBannerHide();
         }
         unawaited(_syncCompletedMedia(items));
       } catch (error) {
+        if (_isCancelledRequest(error)) {
+          _completeCancelledLoad();
+          return;
+        }
         _registerAutoRefreshFailure();
         if (state.items.isNotEmpty) {
           _offlineBannerTimer?.cancel();
@@ -303,8 +367,119 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         );
       }
     } finally {
+      _clearActiveLoadCancelToken();
       _isLoadInFlight = false;
+      _drainPendingLoad();
     }
+  }
+
+  void _completeCancelledLoad() {
+    if (!ref.mounted || !state.isLoading) {
+      return;
+    }
+
+    state = state.copyWith(isLoading: false);
+  }
+
+  CancelToken _startLoadCancelToken() {
+    _cancelActiveLoad('generation_history_superseded', clearPending: false);
+    final cancelToken = CancelToken();
+    _activeLoadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _clearActiveLoadCancelToken() {
+    _activeLoadCancelToken = null;
+  }
+
+  void _cancelActiveLoad(
+    String reason, {
+    required bool clearPending,
+    bool clearLoadingState = true,
+  }) {
+    final cancelToken = _activeLoadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel(reason);
+    }
+    _activeLoadCancelToken = null;
+    if (clearPending && clearLoadingState) {
+      _completeCancelledLoad();
+    }
+
+    if (!clearPending) {
+      return;
+    }
+
+    final pendingCompleter = _pendingLoadCompleter;
+    _pendingLoadRequest = null;
+    _pendingLoadCompleter = null;
+    if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+      pendingCompleter.complete();
+    }
+  }
+
+  CancelToken _startUnreadRefreshCancelToken() {
+    _cancelActiveUnreadRefresh('generation_history_unread_superseded');
+    final cancelToken = CancelToken();
+    _activeUnreadRefreshCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveUnreadRefresh(String reason) {
+    final cancelToken = _activeUnreadRefreshCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel(reason);
+    }
+    _activeUnreadRefreshCancelToken = null;
+  }
+
+  void _drainPendingLoad() {
+    final pendingRequest = _pendingLoadRequest;
+    final pendingCompleter = _pendingLoadCompleter;
+    _pendingLoadRequest = null;
+    _pendingLoadCompleter = null;
+    if (pendingRequest == null) {
+      return;
+    }
+
+    if (!ref.mounted) {
+      if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+        pendingCompleter.complete();
+      }
+      return;
+    }
+
+    unawaited(() async {
+      try {
+        await load(
+          filter: pendingRequest.filter,
+          refresh: pendingRequest.refresh,
+        );
+        if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+          pendingCompleter.complete();
+        }
+      } catch (error, stackTrace) {
+        if (pendingCompleter != null && !pendingCompleter.isCompleted) {
+          pendingCompleter.completeError(error, stackTrace);
+        }
+      }
+    }());
+  }
+
+  void _scheduleLocalArtifactCleanup() {
+    if (_hasScheduledLocalArtifactCleanup) {
+      return;
+    }
+
+    _hasScheduledLocalArtifactCleanup = true;
+    final galleryStore = _galleryStore;
+    unawaited(() async {
+      try {
+        await galleryStore.cleanupCurrentAccountArtifacts();
+      } on Object {
+        // Cache cleanup is opportunistic; history loading remains authoritative.
+      }
+    }());
   }
 
   void _startAutoRefresh() {
@@ -386,22 +561,34 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       return;
     }
 
+    final cancelToken = _startUnreadRefreshCancelToken();
     try {
-      final unreadCount = await _repository.fetchUnreadGenerationCount();
-      if (!ref.mounted) {
+      final unreadCount = await _repository.fetchUnreadGenerationCount(
+        cancelToken: cancelToken,
+      );
+      if (!ref.mounted || !_isScreenVisible || cancelToken.isCancelled) {
         return;
       }
 
-      state = state.copyWith(unreadCount: unreadCount);
-    } catch (_) {}
+      state = state.copyWith(unreadCount: _visibleUnreadCount(unreadCount));
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || cancelToken.isCancelled) {
+        return;
+      }
+    } catch (_) {
+    } finally {
+      if (identical(_activeUnreadRefreshCancelToken, cancelToken)) {
+        _activeUnreadRefreshCancelToken = null;
+      }
+    }
   }
 
   Future<void> markRead(String generationId) async {
-    await _repository.markGenerationRead(generationId);
-    if (!ref.mounted) {
-      return;
-    }
-
+    final wasUnread =
+        _findGeneration(generationId)?.isUnread ??
+        state.items.any(
+          (item) => item.generationId == generationId && item.isUnread,
+        );
     final updated = _markReadInList(state.items, generationId);
     final updatedCache = _markReadInCaches(
       state.cachedItemsByFilter,
@@ -410,14 +597,40 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     state = state.copyWith(
       items: updated,
       cachedItemsByFilter: updatedCache,
-      unreadCount: state.unreadCount > 0 ? state.unreadCount - 1 : 0,
+      unreadCount: wasUnread && state.unreadCount > 0
+          ? state.unreadCount - 1
+          : state.unreadCount,
     );
+    if (wasUnread) {
+      _locallyReadGenerationIds = {..._locallyReadGenerationIds, generationId};
+      _locallyReadUnreadGenerationIds = {
+        ..._locallyReadUnreadGenerationIds,
+        generationId,
+      };
+    }
+
+    try {
+      await _repository.markGenerationRead(generationId);
+      _locallyReadUnreadGenerationIds = {
+        for (final id in _locallyReadUnreadGenerationIds)
+          if (id != generationId) id,
+      };
+    } on Object {
+      // Keep the optimistic read state; the server count is reconciled on sync.
+    }
   }
 
   Future<void> deleteGeneration(String generationId) async {
-    final wasUnread = state.items.any(
-      (item) => item.generationId == generationId && item.isUnread,
-    );
+    _locallyDeletedGenerationIds = {
+      ..._locallyDeletedGenerationIds,
+      generationId,
+    };
+    final targetGeneration = _findGeneration(generationId);
+    final wasUnread =
+        targetGeneration?.isUnread ??
+        state.items.any(
+          (item) => item.generationId == generationId && item.isUnread,
+        );
 
     final updatedItems = _removeGenerationFromList(state.items, generationId);
     final updatedCache = _removeGenerationFromCaches(
@@ -433,8 +646,20 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           : state.unreadCount,
       clearError: true,
     );
+    if (wasUnread) {
+      _locallyDeletedUnreadGenerationIds = {
+        ..._locallyDeletedUnreadGenerationIds,
+        generationId,
+      };
+    }
 
-    await _galleryStore.markDeletedLocally(generationId);
+    await _galleryStore.markDeletedLocally(
+      generationId,
+      userId: targetGeneration?.userId,
+    );
+    if (!ref.mounted) {
+      return;
+    }
 
     try {
       await _repository.deleteGeneration(generationId);
@@ -444,7 +669,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
 
       await _galleryStore.clearPendingServerDelete(generationId);
     } on Object {
-      rethrow;
+      // Local tombstone remains visible immediately; server delete retries on sync.
     }
   }
 
@@ -476,7 +701,13 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       final generation = TemplateGenerationDto.fromJson(
         Map<String, dynamic>.from(event.payload),
       ).toDomain();
+      if (_locallyDeletedGenerationIds.contains(generation.generationId)) {
+        return;
+      }
       _upsertGeneration(generation);
+      unawaited(
+        _repository.upsertCachedGeneration(_applyLocalReadState(generation)),
+      );
       if (generation.isCompleted) {
         unawaited(_syncCompletedMedia([generation]));
       }
@@ -489,22 +720,43 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       return;
     }
 
-    _realtimeSubscription ??= _realtimeClient.events.listen(
+    final realtimeClient = _activeRealtimeClient;
+    if (realtimeClient == null) {
+      return;
+    }
+
+    _realtimeSubscription ??= realtimeClient.events.listen(
       _handleRealtimeEvent,
     );
     if (_isRealtimeConnected) {
       return;
     }
 
+    final connectFuture = _realtimeConnectFuture;
+    if (connectFuture != null) {
+      await connectFuture;
+      return;
+    }
+
     try {
-      await _realtimeClient.connect();
+      final nextConnectFuture = realtimeClient.connect();
+      _realtimeConnectFuture = nextConnectFuture;
+      await nextConnectFuture;
       if (!ref.mounted) {
+        return;
+      }
+
+      if (!_isScreenVisible ||
+          !identical(_activeRealtimeClient, realtimeClient)) {
+        unawaited(realtimeClient.disconnect());
         return;
       }
 
       _isRealtimeConnected = true;
     } on Object {
       // Realtime is best-effort; gallery remains available via manual refresh.
+    } finally {
+      _realtimeConnectFuture = null;
     }
   }
 
@@ -513,9 +765,13 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     _realtimeSubscription = null;
 
     if (_isRealtimeConnected) {
-      unawaited(_realtimeClient.disconnect());
+      final realtimeClient = _activeRealtimeClient;
+      if (realtimeClient != null) {
+        unawaited(realtimeClient.disconnect());
+      }
       _isRealtimeConnected = false;
     }
+    _realtimeConnectFuture = null;
   }
 
   void _upsertGeneration(TemplateGenerationResult generation) {
@@ -559,13 +815,15 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       (item) => item.generationId == generation.generationId,
     );
     final existing = previous.isEmpty ? null : previous.first;
-    final localizedGeneration = existing == null
-        ? generation
-        : generation.copyWith(
-            localPreviewPath: existing.localPreviewPath,
-            localOutputPath: existing.localOutputPath,
-            isLocalMediaReady: existing.isLocalMediaReady,
-          );
+    final localizedGeneration = _applyLocalReadState(
+      existing == null
+          ? generation
+          : generation.copyWith(
+              localPreviewPath: existing.localPreviewPath,
+              localOutputPath: existing.localOutputPath,
+              isLocalMediaReady: existing.isLocalMediaReady,
+            ),
+    );
     final next = [
       for (final item in source)
         if (item.generationId != generation.generationId) item,
@@ -626,6 +884,122 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     ];
   }
 
+  Set<String> _deletedUnreadGenerationIds(
+    List<TemplateGenerationResult> remoteItems,
+    Set<String> deletedGenerationIds,
+  ) {
+    if (deletedGenerationIds.isEmpty) {
+      return const {};
+    }
+
+    return remoteItems
+        .where(
+          (item) =>
+              item.isUnread && deletedGenerationIds.contains(item.generationId),
+        )
+        .map((item) => item.generationId)
+        .toSet();
+  }
+
+  Future<Set<String>> _loadDeletedUnreadGenerationIds({
+    required Set<String> deletedGenerationIds,
+    required List<TemplateGenerationResult> remoteItems,
+  }) async {
+    if (deletedGenerationIds.isEmpty) {
+      return const {};
+    }
+
+    final deletedUnreadIds = <String>{};
+    void collect(List<TemplateGenerationResult>? items) {
+      if (items == null || items.isEmpty) {
+        return;
+      }
+
+      deletedUnreadIds.addAll(
+        _deletedUnreadGenerationIds(items, deletedGenerationIds),
+      );
+    }
+
+    collect(remoteItems);
+    collect(state.items);
+    for (final items in state.cachedItemsByFilter.values) {
+      collect(items);
+    }
+
+    if (deletedUnreadIds.length < deletedGenerationIds.length) {
+      collect(await _repository.readCachedGenerations());
+    }
+
+    return deletedUnreadIds;
+  }
+
+  int _visibleUnreadCount(int unreadCount) {
+    if (unreadCount <= 0) {
+      return unreadCount;
+    }
+
+    final locallyHiddenUnreadIds = {
+      ..._locallyDeletedUnreadGenerationIds,
+      ..._locallyReadUnreadGenerationIds,
+    };
+    if (locallyHiddenUnreadIds.isEmpty) {
+      return unreadCount;
+    }
+
+    final adjusted = unreadCount - locallyHiddenUnreadIds.length;
+    return adjusted < 0 ? 0 : adjusted;
+  }
+
+  void _reconcileLocallyReadIds(List<TemplateGenerationResult> remoteItems) {
+    if ((_locallyReadGenerationIds.isEmpty &&
+            _locallyReadUnreadGenerationIds.isEmpty) ||
+        remoteItems.isEmpty) {
+      return;
+    }
+
+    final serverReadIds = remoteItems
+        .where(
+          (item) =>
+              (_locallyReadGenerationIds.contains(item.generationId) ||
+                  _locallyReadUnreadGenerationIds.contains(
+                    item.generationId,
+                  )) &&
+              !item.isUnread,
+        )
+        .map((item) => item.generationId)
+        .toSet();
+    if (serverReadIds.isEmpty) {
+      return;
+    }
+
+    _locallyReadGenerationIds = {
+      for (final id in _locallyReadGenerationIds)
+        if (!serverReadIds.contains(id)) id,
+    };
+    _locallyReadUnreadGenerationIds = {
+      for (final id in _locallyReadUnreadGenerationIds)
+        if (!serverReadIds.contains(id)) id,
+    };
+  }
+
+  TemplateGenerationResult? _findGeneration(String generationId) {
+    for (final item in state.items) {
+      if (item.generationId == generationId) {
+        return item;
+      }
+    }
+
+    for (final items in state.cachedItemsByFilter.values) {
+      for (final item in items) {
+        if (item.generationId == generationId) {
+          return item;
+        }
+      }
+    }
+
+    return null;
+  }
+
   List<TemplateGenerationResult> _decorateWithLocalMedia(
     List<TemplateGenerationResult> source,
     Set<String> deletedGenerationIds,
@@ -644,44 +1018,79 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         .map((item) {
           final localRecord = localById[item.generationId];
           if (localRecord == null || localRecord.isDeletedLocally) {
-            return item.copyWith(
-              clearLocalPreviewPath: true,
-              clearLocalOutputPath: true,
-              isLocalMediaReady: false,
+            return _applyLocalReadState(
+              item.copyWith(
+                clearLocalPreviewPath: true,
+                clearLocalOutputPath: true,
+                isLocalMediaReady: false,
+              ),
             );
           }
 
-          return item.copyWith(
-            localPreviewPath: localRecord.previewLocalPath,
-            localOutputPath: localRecord.outputLocalPath,
-            isLocalMediaReady: localRecord.isDownloadComplete,
+          return _applyLocalReadState(
+            item.copyWith(
+              localPreviewPath: localRecord.previewLocalPath,
+              localOutputPath: localRecord.outputLocalPath,
+              isLocalMediaReady: localRecord.isDownloadComplete,
+            ),
           );
         })
         .toList(growable: false);
   }
 
+  TemplateGenerationResult _applyLocalReadState(
+    TemplateGenerationResult generation,
+  ) {
+    if (!_locallyReadGenerationIds.contains(generation.generationId)) {
+      return generation;
+    }
+
+    return generation.copyWith(isUnread: false);
+  }
+
   Future<void> _flushPendingServerDeletes() async {
     final pendingDeletes = await _galleryStore.loadPendingServerDeleteIds();
     for (final generationId in pendingDeletes) {
+      final cancelToken = _activeLoadCancelToken;
+      if (!ref.mounted || cancelToken == null || cancelToken.isCancelled) {
+        return;
+      }
+
       try {
-        await _repository.deleteGeneration(generationId);
+        await _repository.deleteGeneration(
+          generationId,
+          cancelToken: cancelToken,
+        );
+        if (!ref.mounted || cancelToken.isCancelled) {
+          return;
+        }
+
         await _galleryStore.clearPendingServerDelete(generationId);
-      } on Object {
+      } on Object catch (error) {
+        if (_isCancelledRequest(error) ||
+            !ref.mounted ||
+            cancelToken.isCancelled) {
+          return;
+        }
         // Keep tombstone locally and retry on a later sync.
+        return;
       }
     }
   }
 
   Future<void> _syncCompletedMedia(List<TemplateGenerationResult> items) async {
     for (final generation in items) {
-      if (!generation.isCompleted) {
+      if (!_isScreenVisible || !generation.isCompleted) {
         continue;
       }
 
       final localRecord = await _galleryStore.materializeGenerationMedia(
         generation,
       );
-      if (!ref.mounted || localRecord == null || localRecord.isDeletedLocally) {
+      if (!ref.mounted ||
+          !_isScreenVisible ||
+          localRecord == null ||
+          localRecord.isDeletedLocally) {
         continue;
       }
 
@@ -736,6 +1145,16 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 }
 
+class _GenerationHistoryLoadRequest {
+  const _GenerationHistoryLoadRequest({
+    required this.filter,
+    required this.refresh,
+  });
+
+  final GenerationHistoryFilter filter;
+  final bool refresh;
+}
+
 String _historyLoadErrorMessage(Object error) {
   if (error is AppException) {
     final message = error.message.trim();
@@ -764,4 +1183,8 @@ bool _isSafeHistoryErrorKey(String value) {
   return value == 'templates.connection_timeout' ||
       value == 'templates.server_timeout' ||
       value == 'templates.request_failed';
+}
+
+bool _isCancelledRequest(Object error) {
+  return error is DioException && CancelToken.isCancel(error);
 }

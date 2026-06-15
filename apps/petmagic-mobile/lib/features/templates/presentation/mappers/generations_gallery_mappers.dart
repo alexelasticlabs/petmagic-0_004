@@ -3,6 +3,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 String subtitleForFilter(
   AppLocalizations text,
@@ -114,9 +115,9 @@ Color statusColor(PetMagicColors colors, TemplateGenerationResult generation) {
 }
 
 String? previewUrl(TemplateGenerationResult generation) {
-  final output = _cleanUrl(generation.outputUrl);
-  final source = _cleanUrl(generation.sourceImageAsset?.url);
-  final normalized = _cleanUrl(generation.normalizedImageUrl);
+  final output = _safeMediaUrl(generation.outputUrl);
+  final source = _safeMediaUrl(generation.sourceImageAsset?.url);
+  final normalized = _safeMediaUrl(generation.normalizedImageUrl);
   final generationIsVideo = isVideoGeneration(generation);
 
   if (generationIsVideo) {
@@ -149,8 +150,12 @@ bool isVideoGeneration(TemplateGenerationResult generation) {
 }
 
 bool canRenderImagePreview(String? url) {
-  final normalized = _cleanUrl(url);
+  final normalized = _safeMediaUrl(url);
   return normalized != null && !_isLikelyVideoUrl(normalized);
+}
+
+String? _safeMediaUrl(String? raw) {
+  return parseSafeGenerationMediaUri(raw)?.toString();
 }
 
 String? _cleanUrl(String? raw) {

@@ -212,6 +212,8 @@ class _OfflineCacheBanner extends ConsumerWidget {
                     .read(generationHistoryControllerProvider.notifier)
                     .load(refresh: true),
                 style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 36),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                 ),
                 child: Text(text.retryAction),
@@ -295,11 +297,10 @@ Future<void> _showReadyCardActions(
   AppLocalizations text,
   WidgetRef ref,
   TemplateGenerationResult generation,
+  _GenerationsGalleryPageState galleryState,
 ) async {
   final colors = context.petMagicColors;
-  final galleryState = context
-      .findAncestorStateOfType<_GenerationsGalleryPageState>();
-  final isMediaActionInFlight = galleryState?._isMediaActionInFlight ?? false;
+  final isMediaActionInFlight = galleryState._isMediaActionInFlight;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -339,7 +340,9 @@ Future<void> _showReadyCardActions(
                               .markRead(generation.generationId);
                         }
                         context.push(
-                          '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                          GenerationStatusPage.routeFor(
+                            generation.generationId,
+                          ),
                         );
                       },
                     ),
@@ -352,7 +355,7 @@ Future<void> _showReadyCardActions(
                               Navigator.of(sheetContext).pop();
                               unawaited(
                                 _saveGenerationToGallery(
-                                  context,
+                                  galleryState,
                                   text,
                                   ref,
                                   generation,
@@ -369,7 +372,7 @@ Future<void> _showReadyCardActions(
                               Navigator.of(sheetContext).pop();
                               unawaited(
                                 _shareGenerationFile(
-                                  context,
+                                  galleryState,
                                   text,
                                   ref,
                                   generation,
@@ -402,7 +405,16 @@ Future<void> _showReadyCardActions(
                       title: Text(text.generationStatusReportProblemAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.push(SupportChatPage.routePath);
+                        context.push(
+                          SupportChatPage.routeFor(
+                            initialMessage:
+                                _buildGenerationProblemReportMessage(
+                                  text,
+                                  generation,
+                                ),
+                            relatedGenerationId: generation.generationId,
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -461,7 +473,9 @@ Future<void> _showFailedCardActions(
                               .markRead(generation.generationId);
                         }
                         context.push(
-                          '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+                          GenerationStatusPage.routeFor(
+                            generation.generationId,
+                          ),
                         );
                       },
                     ),
@@ -478,7 +492,16 @@ Future<void> _showFailedCardActions(
                       title: Text(text.generationStatusContactSupportAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.push(SupportChatPage.routePath);
+                        context.push(
+                          SupportChatPage.routeFor(
+                            initialMessage:
+                                _buildGenerationProblemReportMessage(
+                                  text,
+                                  generation,
+                                ),
+                            relatedGenerationId: generation.generationId,
+                          ),
+                        );
                       },
                     ),
                   ],
@@ -493,31 +516,32 @@ Future<void> _showFailedCardActions(
 }
 
 Future<void> _saveGenerationToGallery(
-  BuildContext context,
+  _GenerationsGalleryPageState galleryState,
   AppLocalizations text,
   WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
-  final galleryState = context
-      .findAncestorStateOfType<_GenerationsGalleryPageState>();
-  final mediaActionCancelToken = galleryState?._startMediaAction();
-  if (galleryState == null || mediaActionCancelToken == null) {
+  final mediaActionCancelToken = galleryState._startMediaAction();
+  if (mediaActionCancelToken == null) {
     return;
   }
+  final context = galleryState.context;
 
   final outputUrl = generation.outputUrl;
-  if (outputUrl == null || outputUrl.isEmpty) {
+  final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+  if (safeOutputUri == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForSave);
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
+  final safeOutputUrl = safeOutputUri.toString();
 
-  final fileName = _buildGenerationFileName(generation, outputUrl);
+  final fileName = _buildGenerationFileName(generation, safeOutputUrl);
   try {
     final wasSaved = await ref
         .read(generationStatusMediaActionsProvider)
         .saveToGallery(
-          mediaUrl: outputUrl,
+          mediaUrl: safeOutputUrl,
           fileName: fileName,
           isVideo: isVideoGeneration(generation),
           albumName: 'PetMagic',
@@ -552,31 +576,32 @@ Future<void> _saveGenerationToGallery(
 }
 
 Future<void> _shareGenerationFile(
-  BuildContext context,
+  _GenerationsGalleryPageState galleryState,
   AppLocalizations text,
   WidgetRef ref,
   TemplateGenerationResult generation,
 ) async {
-  final galleryState = context
-      .findAncestorStateOfType<_GenerationsGalleryPageState>();
-  final mediaActionCancelToken = galleryState?._startMediaAction();
-  if (galleryState == null || mediaActionCancelToken == null) {
+  final mediaActionCancelToken = galleryState._startMediaAction();
+  if (mediaActionCancelToken == null) {
     return;
   }
+  final context = galleryState.context;
 
   final outputUrl = generation.outputUrl;
-  if (outputUrl == null || outputUrl.isEmpty) {
+  final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+  if (safeOutputUri == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
+  final safeOutputUrl = safeOutputUri.toString();
 
   try {
     await ref
         .read(generationStatusMediaActionsProvider)
         .share(
-          mediaUrl: outputUrl,
-          fileName: _buildGenerationFileName(generation, outputUrl),
+          mediaUrl: safeOutputUrl,
+          fileName: _buildGenerationFileName(generation, safeOutputUrl),
           title: generation.templateTitle ?? text.generationStatusResultTitle,
           cancelToken: mediaActionCancelToken,
         );
@@ -614,11 +639,19 @@ Future<void> _copyGenerationLink(
     return;
   }
 
-  await Clipboard.setData(ClipboardData(text: safeUri.toString()));
-  if (!context.mounted) {
+  try {
+    await Clipboard.setData(ClipboardData(text: safeUri.toString()));
+  } on Object {
+    if (!context.mounted) {
+      return;
+    }
+    _notifySoon(context, text.generationStatusShareFailedMessage);
     return;
   }
 
+  if (!context.mounted) {
+    return;
+  }
   _notifySoon(context, text.generationStatusLinkCopiedMessage);
 }
 
@@ -655,11 +688,35 @@ String _buildGenerationFileName(
     generation.templateTitle,
     fallback: 'petmagic_result',
   );
+  final normalizedGenerationId = sanitizeFileName(
+    generation.generationId,
+    fallback: 'generation',
+  );
   final extensionFromRemote = extensionFromUrl(outputUrl);
   final extension = extensionFromRemote.isEmpty
       ? (isVideoGeneration(generation) ? 'mp4' : 'jpg')
       : extensionFromRemote;
-  return '${normalizedTitle}_${generation.generationId}.$extension';
+  return '${normalizedTitle}_$normalizedGenerationId.$extension';
+}
+
+String _buildGenerationProblemReportMessage(
+  AppLocalizations text,
+  TemplateGenerationResult generation,
+) {
+  final title = generation.templateTitle?.trim().isNotEmpty == true
+      ? generation.templateTitle!.trim()
+      : text.generationStatusUntitledFallback;
+  final type = isVideoGeneration(generation)
+      ? text.videoLabel
+      : text.imageLabel;
+  final lines = <String>[
+    text.generationStatusReportProblemAction,
+    '${text.supportTicketFormRelatedGenerationLabel}: ${generation.generationId}',
+    '${text.generationStatusDetailsTitle}: $title',
+    '${text.generationStatusTypeLabel}: $type',
+    '${text.generationStatusTitle}: ${generation.status.name}',
+  ];
+  return lines.join('\n');
 }
 
 void _notifySoon(BuildContext context, String message) {
