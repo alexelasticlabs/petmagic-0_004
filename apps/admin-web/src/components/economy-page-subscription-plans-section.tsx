@@ -17,6 +17,7 @@ import {
   normalizeEconomyPlanNameInput,
   normalizeEconomyPlanProductIdInput,
   normalizeEconomyPriceInput,
+  isSubscriptionPlanDraftDirty,
   toSubscriptionPlanDraft,
   updateSubscriptionPlanDraft,
   type SubscriptionPlanDraft,
@@ -100,6 +101,8 @@ export function EconomyPageSubscriptionPlansSection({
                 const draft = planDrafts[plan.planId] ?? toSubscriptionPlanDraft(plan);
                 const isSavingPlan = savePlanPending && savePlanId === plan.planId;
                 const isPlanDraftLocked = savePlanPending;
+                const isSavePlanDisabled =
+                  isPlanDraftLocked || !isSubscriptionPlanDraftDirty(plan, draft);
 
                 return (
                   <tr key={plan.planId}>
@@ -264,7 +267,7 @@ export function EconomyPageSubscriptionPlansSection({
                       </div>
                     </td>
                     <td>
-                      <Button onClick={() => onSavePlan(plan.planId)} disabled={isPlanDraftLocked}>
+                      <Button onClick={() => onSavePlan(plan.planId)} disabled={isSavePlanDisabled}>
                         {isSavingPlan ? text.savingAction : text.saveAction}
                       </Button>
                     </td>

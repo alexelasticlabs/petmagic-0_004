@@ -1,4 +1,11 @@
-import { type Dispatch, type ReactNode, type SetStateAction, useState } from "react";
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { AdminCard, AdminStateCard, adminTableStyles } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
@@ -10,6 +17,7 @@ import {
   ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH,
   ECONOMY_PROVIDER_REGION_MAX_LENGTH,
   ECONOMY_PROVIDER_VERSION_MAX_LENGTH,
+  isProviderConfigDraftDirty,
   normalizeEconomyPercentInput,
   toProviderConfigDraft,
   updateProviderConfigDraft,
@@ -105,6 +113,21 @@ export function EconomyPageProviderConfigsSection({
   const configurationPendingDelete = configurationPendingDeleteId
     ? providerConfigs.find((config) => config.configurationId === configurationPendingDeleteId)
     : null;
+  const providerConfigIds = useMemo(
+    () => new Set(providerConfigs.map((config) => config.configurationId)),
+    [providerConfigs]
+  );
+  useEffect(() => {
+    if (
+      !configurationPendingDeleteId ||
+      providerConfigIds.has(configurationPendingDeleteId) ||
+      deleteProviderConfigPending
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => setConfigurationPendingDeleteId(null));
+  }, [configurationPendingDeleteId, deleteProviderConfigPending, providerConfigIds]);
   const isCreateProviderConfigInvalid =
     !createProviderDraft.provider.trim() ||
     !createProviderDraft.platform.trim() ||
@@ -411,7 +434,9 @@ export function EconomyPageProviderConfigsSection({
                   cloneProviderConfigPending ||
                   deleteProviderConfigPending;
                 const isSaveProviderConfigDisabled =
-                  isProviderConfigDraftLocked || isProviderConfigInvalid;
+                  isProviderConfigDraftLocked ||
+                  isProviderConfigInvalid ||
+                  !isProviderConfigDraftDirty(config, draft);
                 const cloneRegion = cloneRegionDrafts[config.configurationId] ?? "";
                 const isCloneProviderConfigDisabled =
                   isProviderConfigDraftLocked || !cloneRegion.trim();

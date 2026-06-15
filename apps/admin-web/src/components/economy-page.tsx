@@ -1,7 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
@@ -33,6 +41,9 @@ import {
   canCancelSubscription,
   canRefundPurchase,
   createDefaultProviderConfigDraft,
+  isPackDraftDirty,
+  isProviderConfigDraftDirty,
+  isSubscriptionPlanDraftDirty,
   normalizeEconomyIntegerInput,
   normalizeEconomyPackDisplayNameInput,
   normalizeEconomyPriceInput,
@@ -52,6 +63,7 @@ import {
   type SubscriptionPlanDraft,
 } from "@/components/economy-page.helpers";
 import styles from "@/components/economy-page.module.css";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { Button } from "@/components/ui/button";
 import { useEconomyPageController } from "@/components/use-economy-page-controller";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -75,6 +87,7 @@ import {
   type AdminEconomySubscription,
   type AdminWatermarkSettings,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -89,6 +102,7 @@ const WATERMARK_TEXT_MAX_LENGTH = 80;
 const WATERMARK_COST_MAX_LENGTH = 6;
 const WATERMARK_OPACITY_MAX_LENGTH = 4;
 const WATERMARK_LOGO_URL_MAX_LENGTH = 2_048;
+const WATERMARK_FORM_ID = "economy-watermark-settings-form";
 
 type TableOrEmptyProps = {
   hasItems: boolean;
@@ -102,6 +116,19 @@ function TableOrEmpty({ hasItems, emptyTitle, children }: TableOrEmptyProps) {
   }
 
   return <>{children}</>;
+}
+
+function formatEconomyLogText(value: string | null | undefined, maxLength = 96) {
+  const trimmed = value?.trim();
+  return trimmed ? sanitizeSensitiveText(trimmed, maxLength) : undefined;
+}
+
+function getEconomyActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error instanceof Error ? sanitizeSensitiveText(error.message, 160) : "unknown_error",
+  };
 }
 
 function WatermarkPreviewPanel({
@@ -142,8 +169,13 @@ function WatermarkPreviewPanel({
           style={previewStyle}
         >
           {sourceUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={sourceUrl} alt={title} className={styles.watermarkPreviewMedia} />
+            <TemplateSecureMedia
+              url={sourceUrl}
+              kind="image"
+              alt={title}
+              className={styles.watermarkPreviewMedia}
+              logContext={{ surface: `economy-watermark-${kind}` }}
+            />
           ) : (
             <div className={styles.watermarkPreviewPlaceholder}>
               {kind === "image"
@@ -162,8 +194,14 @@ function WatermarkPreviewPanel({
               data-size={size}
             >
               {settings.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={settings.logoUrl} alt="" className={styles.watermarkPreviewLogo} />
+                <TemplateSecureMedia
+                  url={settings.logoUrl}
+                  kind="image"
+                  alt=""
+                  ariaHidden
+                  className={styles.watermarkPreviewLogo}
+                  logContext={{ surface: "economy-watermark-logo" }}
+                />
               ) : null}
               <span>{badgeText}</span>
             </div>
@@ -432,6 +470,12 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       return;
     }
 
+    const pack = packs.find((item) => item.packId === packId);
+    const draft = drafts[packId] ?? (pack ? toDraft(pack) : null);
+    if (!pack || !draft || !isPackDraftDirty(pack, draft)) {
+      return;
+    }
+
     savePackMutation.mutate(packId);
   }
 
@@ -440,11 +484,24 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       return;
     }
 
+    const plan = subscriptionPlans.find((item) => item.planId === planId);
+    const draft = planDrafts[planId] ?? (plan ? toSubscriptionPlanDraft(plan) : null);
+    if (!plan || !draft || !isSubscriptionPlanDraftDirty(plan, draft)) {
+      return;
+    }
+
     savePlanMutation.mutate(planId);
   }
 
   function requestSaveProviderConfig(configurationId: string) {
     if (saveProviderConfigMutation.isPending) {
+      return;
+    }
+
+    const config = providerConfigs.find((item) => item.configurationId === configurationId);
+    const draft =
+      providerConfigDrafts[configurationId] ?? (config ? toProviderConfigDraft(config) : null);
+    if (!config || !draft || !isProviderConfigDraftDirty(config, draft)) {
       return;
     }
 
@@ -587,7 +644,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, subscription) => {
+      clientLogger.error("economy.cancel_subscription_failed", {
+        subscriptionId: formatEconomyLogText(subscription?.subscriptionId),
+        userId: formatEconomyLogText(subscription?.userId),
+        provider: formatEconomyLogText(subscription?.provider, 48),
+        status: formatEconomyLogText(subscription?.status, 48),
+        ...getEconomyActionErrorDetails(error),
+      });
       setFeedback({
         tone: "danger",
         message: getAdminErrorMessage(error, text.cancelSubscriptionError),
@@ -621,7 +685,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, purchase) => {
+      clientLogger.error("economy.refund_purchase_failed", {
+        orderId: formatEconomyLogText(purchase?.orderId),
+        userId: formatEconomyLogText(purchase?.userId),
+        provider: formatEconomyLogText(purchase?.paymentProvider, 48),
+        status: formatEconomyLogText(purchase?.status, 48),
+        ...getEconomyActionErrorDetails(error),
+      });
       setFeedback({
         tone: "danger",
         message: getAdminErrorMessage(error, text.refundPurchaseError),
@@ -674,6 +745,51 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   const isCancelSubscriptionSubmitting =
     isCancelSubscriptionInFlight || cancelSubscriptionMutation.isPending;
   const isRefundPurchaseSubmitting = isRefundPurchaseInFlight || refundPurchaseMutation.isPending;
+  const visiblePurchaseIds = useMemo(
+    () => new Set(purchaseItems.map((purchase) => purchase.orderId)),
+    [purchaseItems]
+  );
+  const visibleSubscriptionIds = useMemo(
+    () => new Set(subscriptionItems.map((subscription) => subscription.subscriptionId)),
+    [subscriptionItems]
+  );
+
+  useEffect(() => {
+    if (
+      !refundTarget ||
+      isRefundPurchaseSubmitting ||
+      visiblePurchaseIds.has(refundTarget.orderId)
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => setRefundTarget(null));
+  }, [isRefundPurchaseSubmitting, refundTarget, visiblePurchaseIds]);
+
+  useEffect(() => {
+    if (
+      !cancelTarget ||
+      isCancelSubscriptionSubmitting ||
+      visibleSubscriptionIds.has(cancelTarget.subscriptionId)
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => setCancelTarget(null));
+  }, [cancelTarget, isCancelSubscriptionSubmitting, visibleSubscriptionIds]);
+
+  if (!canManageEconomy) {
+    return (
+      <AdminPage className={styles.page}>
+        <AdminPageHero eyebrow={text.eyebrow} title={text.title} description={text.description} />
+        <AdminStateCard
+          tone="info"
+          title={text.loadingTitle}
+          description={text.loadingDescription}
+        />
+      </AdminPage>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -686,6 +802,14 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         />
       </AdminPage>
     );
+  }
+
+  function requestEconomyRetry() {
+    if (!canManageEconomy || isFetching) {
+      return;
+    }
+
+    void refetchAll().catch(() => undefined);
   }
 
   if (hasBlockingError) {
@@ -701,13 +825,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
               type="button"
               variant="secondary"
               disabled={!canManageEconomy || isFetching}
-              onClick={() => {
-                if (!canManageEconomy) {
-                  return;
-                }
-
-                void refetchAll().catch(() => undefined);
-              }}
+              onClick={requestEconomyRetry}
             >
               {locale === "ru" ? "Повторить" : "Retry"}
             </Button>
@@ -727,6 +845,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     }
 
     saveWatermarkMutation.mutate();
+  }
+
+  function handleWatermarkSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    requestSaveWatermark();
   }
 
   return (
@@ -790,13 +913,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
               type="button"
               variant="secondary"
               disabled={!canManageEconomy || isFetching}
-              onClick={() => {
-                if (!canManageEconomy) {
-                  return;
-                }
-
-                void refetchAll().catch(() => undefined);
-              }}
+              onClick={requestEconomyRetry}
             >
               {locale === "ru" ? "Повторить" : "Retry"}
             </Button>
@@ -836,6 +953,8 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                   const isSavingRow =
                     savePackMutation.isPending && savePackMutation.variables === pack.packId;
                   const isPackDraftLocked = savePackMutation.isPending;
+                  const isSavePackDisabled =
+                    isPackDraftLocked || !isPackDraftDirty(pack, draft);
                   return (
                     <tr key={pack.packId}>
                       <td>
@@ -931,7 +1050,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                       <td>
                         <Button
                           onClick={() => requestSavePack(pack.packId)}
-                          disabled={isPackDraftLocked}
+                          disabled={isSavePackDisabled}
                         >
                           {isSavingRow ? text.savingAction : text.saveAction}
                         </Button>
@@ -1005,6 +1124,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 onChange={setPurchaseStatus}
                 options={purchaseStatusOptions[locale]}
                 className={styles.compactSelect}
+                disabled={purchasesIsFetching || purchasesIsRefreshing}
               />
               <AdminSelectField
                 label={text.purchaseProviderFilterLabel}
@@ -1012,11 +1132,13 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 onChange={setPurchaseProvider}
                 options={subscriptionProviderOptions[locale]}
                 className={styles.compactSelect}
+                disabled={purchasesIsFetching || purchasesIsRefreshing}
               />
               <label className={styles.filterField}>
                 <span>{text.searchFilterLabel}</span>
                 <input
                   className={styles.input}
+                  disabled={purchasesIsFetching || purchasesIsRefreshing}
                   value={purchaseSearch}
                   onChange={(event) =>
                     setPurchaseSearch(event.target.value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH))
@@ -1134,9 +1256,9 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         }
         action={
           <Button
-            type="button"
+            type="submit"
+            form={WATERMARK_FORM_ID}
             disabled={isSaveWatermarkDisabled}
-            onClick={requestSaveWatermark}
           >
             {saveWatermarkMutation.isPending
               ? text.savingAction
@@ -1152,7 +1274,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
             title={locale === "ru" ? "Загружаем watermark" : "Loading watermark settings"}
           />
         ) : (
-          <div className={styles.rewardFields}>
+          <form
+            id={WATERMARK_FORM_ID}
+            className={styles.rewardFields}
+            onSubmit={handleWatermarkSubmit}
+          >
             <div className={styles.formRow}>
               <label className={styles.checkboxField}>
                 <input
@@ -1285,7 +1411,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
               </label>
             </div>
             <WatermarkPreviewPanel locale={locale} settings={effectiveWatermarkDraft} />
-          </div>
+          </form>
         )}
       </AdminCard>
 

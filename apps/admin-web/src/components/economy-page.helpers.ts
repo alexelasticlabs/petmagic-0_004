@@ -104,6 +104,18 @@ export function toDraft(pack: AdminCurrencyPack): PackDraft {
   };
 }
 
+export function isPackDraftDirty(pack: AdminCurrencyPack, draft: PackDraft): boolean {
+  const originalDraft = toDraft(pack);
+  return (
+    draft.displayName !== originalDraft.displayName ||
+    draft.priceAmount !== originalDraft.priceAmount ||
+    draft.grantedSpark !== originalDraft.grantedSpark ||
+    draft.bonusSpark !== originalDraft.bonusSpark ||
+    draft.sortOrder !== originalDraft.sortOrder ||
+    draft.isActive !== originalDraft.isActive
+  );
+}
+
 export function updateDraft(
   setDrafts: Dispatch<SetStateAction<Record<string, PackDraft>>>,
   packId: string,
@@ -165,6 +177,25 @@ export function toSubscriptionPlanDraft(plan: AdminSubscriptionPlan): Subscripti
     stripePriceId: normalizeEconomyPlanProductIdInput(plan.stripePriceId ?? ""),
     displayOrder: plan.displayOrder.toString(),
   };
+}
+
+export function isSubscriptionPlanDraftDirty(
+  plan: AdminSubscriptionPlan,
+  draft: SubscriptionPlanDraft
+): boolean {
+  const originalDraft = toSubscriptionPlanDraft(plan);
+  return (
+    draft.name !== originalDraft.name ||
+    draft.priceAmount !== originalDraft.priceAmount ||
+    draft.currencyCode !== originalDraft.currencyCode ||
+    draft.monthlyTokenLimit !== originalDraft.monthlyTokenLimit ||
+    draft.isRecommended !== originalDraft.isRecommended ||
+    draft.isActive !== originalDraft.isActive ||
+    draft.appleProductId !== originalDraft.appleProductId ||
+    draft.googleProductId !== originalDraft.googleProductId ||
+    draft.stripePriceId !== originalDraft.stripePriceId ||
+    draft.displayOrder !== originalDraft.displayOrder
+  );
 }
 
 export function updateSubscriptionPlanDraft(
@@ -275,6 +306,30 @@ export function toProviderConfigDraft(
     mode: config.mode,
     notes: config.notes ?? "",
   };
+}
+
+export function isProviderConfigDraftDirty(
+  config: AdminPaymentProviderConfiguration,
+  draft: ProviderConfigDraft
+): boolean {
+  const originalDraft = toProviderConfigDraft(config);
+  return (
+    draft.region !== originalDraft.region ||
+    draft.isEnabled !== originalDraft.isEnabled ||
+    draft.isRecommended !== originalDraft.isRecommended ||
+    draft.isSelectedByDefault !== originalDraft.isSelectedByDefault ||
+    draft.requiresExternalWarning !== originalDraft.requiresExternalWarning ||
+    draft.requiresStoreDisclosure !== originalDraft.requiresStoreDisclosure ||
+    draft.allowedFromAppVersion !== originalDraft.allowedFromAppVersion ||
+    draft.externalCheckoutAllowed !== originalDraft.externalCheckoutAllowed ||
+    draft.bonusTokensPercent !== originalDraft.bonusTokensPercent ||
+    draft.displayLabel !== originalDraft.displayLabel ||
+    draft.displaySubtitle !== originalDraft.displaySubtitle ||
+    draft.warningTitle !== originalDraft.warningTitle ||
+    draft.warningMessage !== originalDraft.warningMessage ||
+    draft.mode !== originalDraft.mode ||
+    draft.notes !== originalDraft.notes
+  );
 }
 
 export function toProviderConfigCreatePayload(

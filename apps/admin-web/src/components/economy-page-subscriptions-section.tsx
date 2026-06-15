@@ -108,6 +108,7 @@ export function EconomyPageSubscriptionsSection({
               onChange={setSubscriptionProvider}
               options={subscriptionProviderOptions[locale]}
               className={styles.compactSelect}
+              disabled={subscriptionsIsFetching || subscriptionsIsRefreshing}
             />
             <AdminSelectField
               label={text.statusColumn}
@@ -115,11 +116,13 @@ export function EconomyPageSubscriptionsSection({
               onChange={setSubscriptionStatus}
               options={subscriptionStatusOptions[locale]}
               className={styles.compactSelect}
+              disabled={subscriptionsIsFetching || subscriptionsIsRefreshing}
             />
             <label className={styles.filterField}>
               <span>{text.searchFilterLabel}</span>
               <input
                 className={styles.input}
+                disabled={subscriptionsIsFetching || subscriptionsIsRefreshing}
                 value={subscriptionSearch}
                 onChange={(event) =>
                   setSubscriptionSearch(
@@ -230,6 +233,7 @@ export function EconomyPageSubscriptionsSection({
               onChange={setEventProvider}
               options={subscriptionProviderOptions[locale]}
               className={styles.compactSelect}
+              disabled={subscriptionsIsFetching || subscriptionsIsRefreshing}
             />
             <AdminSelectField
               label={text.statusColumn}
@@ -237,6 +241,7 @@ export function EconomyPageSubscriptionsSection({
               onChange={setEventStatus}
               options={eventStatusOptions[locale]}
               className={styles.compactSelect}
+              disabled={subscriptionsIsFetching || subscriptionsIsRefreshing}
             />
           </div>
         }

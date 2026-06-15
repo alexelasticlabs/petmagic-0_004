@@ -40,6 +40,20 @@
   font: inherit;
 }
 
+.input:focus-visible,
+.checkboxField input:focus-visible,
+.pagerButton:focus-visible,
+.dangerButton:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
 .checkboxField {
   display: inline-flex;
   gap: 0.5rem;
@@ -353,12 +367,12 @@
 }
 
 .positive {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
   font-weight: 600;
 }
 
 .negative {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 86%, var(--text-strong));
   font-weight: 600;
 }
 

@@ -4,6 +4,9 @@ import {
   canCancelSubscription,
   canRefundPurchase,
   createDefaultProviderConfigDraft,
+  isPackDraftDirty,
+  isProviderConfigDraftDirty,
+  isSubscriptionPlanDraftDirty,
   normalizeEconomyCurrencyInput,
   normalizeEconomyIntegerInput,
   normalizeEconomyPackDisplayNameInput,
@@ -16,6 +19,7 @@ import {
   toProviderConfigCreatePayload,
   toProviderConfigMatchPayload,
   toProviderConfigPayload,
+  toProviderConfigDraft,
   toSubscriptionPlanDraft,
   toSubscriptionPlanPayload,
   type EconomyValidationText,
@@ -24,6 +28,7 @@ import type {
   AdminCurrencyPack,
   AdminEconomyPurchase,
   AdminEconomySubscription,
+  AdminPaymentProviderConfiguration,
   AdminSubscriptionPlan,
 } from "@/lib/api-client";
 
@@ -103,7 +108,76 @@ function createSubscriptionPlan(
   };
 }
 
+function createProviderConfig(
+  patch: Partial<AdminPaymentProviderConfiguration> = {}
+): AdminPaymentProviderConfiguration {
+  return {
+    configurationId: "config-1",
+    provider: "stripe",
+    platform: "web",
+    region: "US",
+    isEnabled: true,
+    isRecommended: false,
+    isSelectedByDefault: true,
+    requiresExternalWarning: false,
+    requiresStoreDisclosure: false,
+    allowedFromAppVersion: "1.0.0",
+    externalCheckoutAllowed: true,
+    bonusTokensPercent: 10,
+    displayLabel: "Stripe",
+    displaySubtitle: "Card checkout",
+    warningTitle: null,
+    warningMessage: null,
+    mode: "live",
+    notes: null,
+    updatedAtUtc: "2026-06-06T12:00:00Z",
+    ...patch,
+  };
+}
+
 describe("economy action guards", () => {
+  it("detects whether a pack draft differs from the backend pack", () => {
+    const pack = createCurrencyPack();
+
+    expect(isPackDraftDirty(pack, toDraft(pack))).toBe(false);
+    expect(isPackDraftDirty(pack, { ...toDraft(pack), displayName: "Starter plus" })).toBe(true);
+    expect(isPackDraftDirty(pack, { ...toDraft(pack), priceAmount: "10.99" })).toBe(true);
+    expect(isPackDraftDirty(pack, { ...toDraft(pack), isActive: false })).toBe(true);
+  });
+
+  it("detects whether a subscription plan draft differs from the backend plan", () => {
+    const plan = createSubscriptionPlan();
+
+    expect(isSubscriptionPlanDraftDirty(plan, toSubscriptionPlanDraft(plan))).toBe(false);
+    expect(
+      isSubscriptionPlanDraftDirty(plan, { ...toSubscriptionPlanDraft(plan), name: "Premium plus" })
+    ).toBe(true);
+    expect(
+      isSubscriptionPlanDraftDirty(plan, { ...toSubscriptionPlanDraft(plan), priceAmount: "24.99" })
+    ).toBe(true);
+    expect(
+      isSubscriptionPlanDraftDirty(plan, { ...toSubscriptionPlanDraft(plan), isRecommended: false })
+    ).toBe(true);
+  });
+
+  it("detects whether a provider config draft differs from the backend config", () => {
+    const config = createProviderConfig();
+
+    expect(isProviderConfigDraftDirty(config, toProviderConfigDraft(config))).toBe(false);
+    expect(
+      isProviderConfigDraftDirty(config, { ...toProviderConfigDraft(config), region: "DE" })
+    ).toBe(true);
+    expect(
+      isProviderConfigDraftDirty(config, {
+        ...toProviderConfigDraft(config),
+        externalCheckoutAllowed: false,
+      })
+    ).toBe(true);
+    expect(
+      isProviderConfigDraftDirty(config, { ...toProviderConfigDraft(config), notes: "QA route" })
+    ).toBe(true);
+  });
+
   it("allows refunds only when backend marks the purchase refundable", () => {
     expect(canRefundPurchase(createPurchase({ canRefund: true }))).toBe(true);
     expect(canRefundPurchase(createPurchase({ canRefund: false }))).toBe(false);
