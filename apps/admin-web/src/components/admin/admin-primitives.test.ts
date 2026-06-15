@@ -27,6 +27,20 @@ describe("admin primitives responsive layout", () => {
     expect(source).not.toContain("var(--status-color, #");
   });
 
+  it("keeps shared primitive typography and surfaces on theme tokens", () => {
+    const source = readFileSync(primitivesCssPath, "utf8");
+    const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
+
+    expect(source).toContain("letter-spacing: 0;");
+    expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(source).not.toContain("rgba(");
+    expect(source).not.toContain("radial-gradient");
+    expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
+    expect(nonZeroLetterSpacingRules).toEqual([]);
+  });
+
   it("keeps shared data tables usable on narrow screens and long pages", () => {
     const source = readFileSync(primitivesCssPath, "utf8");
 
@@ -40,5 +54,20 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain("background: var(--surface-1);");
     expect(source).toContain("@media (max-width: 640px)");
     expect(source).toContain(".table {\n    min-width: 42rem;");
+  });
+
+  it("keeps native admin select fields locked when option data is empty", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+    const css = readFileSync(primitivesCssPath, "utf8");
+
+    expect(source).toContain("const hasOptions = options.length > 0;");
+    expect(source).toContain("const isSelectDisabled = disabled || !hasOptions;");
+    expect(source).toContain("disabled={isSelectDisabled}");
+    expect(source).toContain("if (isSelectDisabled) {\n            return;\n          }");
+    expect(source).not.toContain("disabled={disabled}");
+
+    expect(css).toContain(".selectControl:disabled {");
+    expect(css).toContain("cursor: not-allowed;");
+    expect(css).toContain("background: var(--surface-2);");
   });
 });

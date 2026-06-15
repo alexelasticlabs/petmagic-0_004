@@ -17,14 +17,26 @@ describe("admin confirmation dialog", () => {
 
     expect(source).toContain("const titleId = useId();");
     expect(source).toContain("const descriptionId = useId();");
+    expect(source).toContain("const dialogRef = useRef<HTMLElement>(null);");
     expect(source).toContain("const cancelButtonRef = useRef<HTMLButtonElement>(null);");
     expect(source).toContain("const previouslyFocusedElementRef = useRef<HTMLElement | null>(null);");
     expect(source).toContain("document.body.style.overflow = \"hidden\";");
     expect(source).toContain("document.body.style.overflow = previousOverflow;");
     expect(source).toContain("cancelButtonRef.current?.focus();");
     expect(source).toContain("previouslyFocusedElementRef.current?.focus();");
+    expect(source).toContain('if (event.key !== "Tab") {');
+    expect(source).toContain("const focusableElements = dialogRef.current?.querySelectorAll<HTMLElement>(");
+    expect(source).toContain("dialogRef.current?.focus();");
+    expect(source).toContain("const firstElement = focusableElements[0];");
+    expect(source).toContain("const lastElement = focusableElements[focusableElements.length - 1];");
+    expect(source).toContain("if (event.shiftKey && document.activeElement === firstElement)");
+    expect(source).toContain("if (!event.shiftKey && document.activeElement === lastElement)");
+    expect(source).toContain("lastElement.focus();");
+    expect(source).toContain("firstElement.focus();");
     expect(source).toContain("aria-labelledby={titleId}");
     expect(source).toContain("aria-describedby={descriptionId}");
+    expect(source).toContain("ref={dialogRef}");
+    expect(source).toContain("tabIndex={-1}");
     expect(source).toContain("ref={cancelButtonRef}");
     expect(source).not.toContain('aria-labelledby="admin-confirmation-title"');
     expect(source).not.toContain('id="admin-confirmation-title"');

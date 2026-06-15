@@ -47,7 +47,7 @@
 
 .welcome {
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(1.2rem, 2vw, 1.5rem);
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-strong);
   letter-spacing: 0;
@@ -104,7 +104,7 @@
   margin-left: 5px;
   font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   color: var(--text-muted);
 }
 
@@ -286,6 +286,10 @@
 }
 
 @media (max-width: 480px) {
+  .welcome {
+    font-size: 1.28rem;
+  }
+
   .body {
     align-items: flex-start;
     padding: 1.5rem 1rem 1rem;

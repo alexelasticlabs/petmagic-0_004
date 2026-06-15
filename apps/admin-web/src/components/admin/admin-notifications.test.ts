@@ -157,6 +157,16 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("right: 0.75rem;");
     expect(source).toContain("left: 0.75rem;");
     expect(source).toContain("max-height: calc(100dvh - 5.5rem);");
+    expect(source).toContain(".notificationPanelHeader {\n    display: grid;");
+    expect(source).toContain(".notificationFilters {\n    display: grid;");
+    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr));");
+    expect(source).toContain("@media (max-width: 420px)");
+    expect(source).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(source).toContain(".notificationCardMeta {\n  display: flex;");
+    expect(source).toContain("flex-wrap: wrap;");
+    expect(source).toContain(".notificationCardTitle {\n  font-size: 0.86rem;");
+    expect(source).toContain(".notificationCardMessage {\n  font-size: 0.79rem;");
+    expect(source).toContain("overflow-wrap: anywhere;");
   });
 
   it("keeps sidebar notification badges theme-token based", () => {
@@ -167,5 +177,22 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("color: var(--text-inverse);");
     expect(source).not.toContain("background: rgba(239, 68, 68, 0.88);");
     expect(source).not.toContain("color: #fff;");
+  });
+
+  it("keeps admin shell typography and chrome on theme tokens", () => {
+    const source = readFileSync(adminShellStylesPath, "utf8");
+    const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
+
+    expect(source).toContain("letter-spacing: 0;");
+    expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(source).not.toContain("rgba(");
+    expect(source).not.toContain("radial-gradient");
+    expect(nonZeroLetterSpacingRules).toEqual([]);
+    expect(source).toContain(".topbarTitle {");
+    expect(source).toContain("font-size: 1.05rem;");
+    expect(source).toContain(".topbarTitle {\n    font-size: 0.98rem;");
+    expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
   });
 });

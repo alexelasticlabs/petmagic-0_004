@@ -26,10 +26,14 @@ describe("admin login screen visual contract", () => {
     expect(styles).not.toMatch(/#[0-9a-fA-F]{3,8}/);
   });
 
-  it("keeps compact login headings from using negative letter spacing", () => {
+  it("keeps compact login shell typography from using decorative letter spacing", () => {
     const styles = readFileSync(loginScreenStylesPath, "utf8");
+    const nonZeroLetterSpacingRules = [...styles.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1].trim())
+      .filter((value) => value !== "0");
 
+    expect(nonZeroLetterSpacingRules).toEqual([]);
     expect(styles).toContain("letter-spacing: 0;");
-    expect(styles).not.toContain("letter-spacing: -");
+    expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
   });
 });

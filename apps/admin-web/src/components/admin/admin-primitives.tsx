@@ -247,6 +247,9 @@ export function AdminSelectField({
   disabled,
   className,
 }: AdminSelectFieldProps) {
+  const hasOptions = options.length > 0;
+  const isSelectDisabled = disabled || !hasOptions;
+
   return (
     <label className={joinClassNames(styles.selectField, className)}>
       <span className={styles.selectLabel}>{label}</span>
@@ -254,8 +257,14 @@ export function AdminSelectField({
         id={id}
         name={name}
         value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        disabled={isSelectDisabled}
+        onChange={(event) => {
+          if (isSelectDisabled) {
+            return;
+          }
+
+          onChange(event.target.value);
+        }}
         className={styles.selectControl}
       >
         {options.map((option) => (

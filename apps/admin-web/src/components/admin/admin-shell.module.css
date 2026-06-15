@@ -60,7 +60,7 @@
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-strong);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .brandCaption {
@@ -97,7 +97,7 @@
   color: var(--text-muted);
   font-size: 0.66rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   line-height: 1.2;
   text-transform: uppercase;
 }
@@ -325,10 +325,10 @@
 
 .topbarTitle {
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(0.9375rem, 0.875rem + 0.25vw, 1.125rem);
+  font-size: 1.05rem;
   font-weight: 500;
   line-height: 1.25;
-  letter-spacing: 0.005em;
+  letter-spacing: 0;
   color: var(--text-strong);
 }
 
@@ -579,7 +579,7 @@
 .notificationEyebrow {
   font-size: 0.7rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-subtle);
 }
@@ -602,6 +602,7 @@
   gap: 0.34rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .notificationTextButton {
@@ -626,6 +627,7 @@
 }
 
 .notificationFilterChip {
+  max-width: 100%;
   min-height: 1.95rem;
   padding: 0.38rem 0.68rem;
   border: 1px solid var(--admin-border);
@@ -636,6 +638,7 @@
   font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
+  overflow-wrap: anywhere;
 }
 
 .notificationFilterChipActive {
@@ -666,7 +669,7 @@
 .notificationGroupTitle {
   font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-subtle);
 }
@@ -719,6 +722,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .notificationCardMetaLead {
@@ -726,6 +730,7 @@
   align-items: center;
   gap: 0.38rem;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .notificationPinnedMark {
@@ -738,7 +743,7 @@
   color: var(--danger-soft-fg);
   font-size: 0.64rem;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -750,7 +755,7 @@
   border-radius: 999px;
   font-size: 0.67rem;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -794,12 +799,14 @@
   font-size: 0.86rem;
   font-weight: 700;
   color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
 .notificationCardMessage {
   font-size: 0.79rem;
   line-height: 1.5;
   color: var(--text-soft);
+  overflow-wrap: anywhere;
 }
 
 .notificationEmptyState {
@@ -916,6 +923,7 @@
   }
 
   .backdrop {
+    display: block;
     position: fixed;
     inset: 0;
     background: color-mix(in srgb, var(--surface-0) 62%, transparent);
@@ -961,6 +969,10 @@
     gap: 0.85rem;
   }
 
+  .topbarTitle {
+    font-size: 0.98rem;
+  }
+
   .topbarActions {
     width: 100%;
     justify-content: space-between;
@@ -979,9 +991,35 @@
     left: 0.75rem;
     width: auto;
     max-height: calc(100dvh - 5.5rem);
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .notificationPanelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .notificationHeaderActions {
+    justify-content: flex-start;
+  }
+
+  .notificationFilters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .notificationFilterChip {
+    justify-content: center;
   }
 
   .userRole {
     display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .notificationFilters {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
