@@ -1,0 +1,116 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,
+  ADMIN_FEEDBACK_FILTER_MAX_LENGTH,
+  normalizeAdminFeedbackQuery,
+  updateAdminFeedback,
+} from "@/lib/api-client.feedback";
+
+describe("api-client.feedback query normalization", () => {
+  const originalPublicApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const originalInternalApiBaseUrl = process.env.INTERNAL_API_BASE_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = "https://api.example.com";
+    process.env.INTERNAL_API_BASE_URL = "https://api.example.com";
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    process.env.NEXT_PUBLIC_API_BASE_URL = originalPublicApiBaseUrl;
+    process.env.INTERNAL_API_BASE_URL = originalInternalApiBaseUrl;
+  });
+
+  it("bounds feedback filters for stable cache keys and backend requests", () => {
+    const overlongCategory = "c".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
+    const overlongPlatform = "p".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
+    const overlongTemplateId = "t".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
+    const overlongUserId = "u".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH + 20);
+
+    expect(
+      normalizeAdminFeedbackQuery({
+        status: "All",
+        priority: "All",
+        type: "All",
+        category: ` ${overlongCategory} `,
+        platform: ` ${overlongPlatform} `,
+        templateId: ` ${overlongTemplateId} `,
+        userId: ` ${overlongUserId} `,
+        skip: -10.8,
+        take: 500.2,
+      })
+    ).toEqual({
+      status: undefined,
+      priority: undefined,
+      type: undefined,
+      category: "c".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
+      platform: "p".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
+      templateId: "t".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
+      userId: "u".repeat(ADMIN_FEEDBACK_FILTER_MAX_LENGTH),
+      fromUtc: undefined,
+      toUtc: undefined,
+      generationId: undefined,
+      skip: 0,
+      take: 100,
+    });
+  });
+
+  it("drops unsupported enum filters before backend requests", () => {
+    expect(
+      normalizeAdminFeedbackQuery({
+        status: "Deleted" as never,
+        priority: "Urgent" as never,
+        type: "Other" as never,
+        category: " billing ",
+        skip: 0,
+        take: 25,
+      })
+    ).toEqual({
+      status: undefined,
+      priority: undefined,
+      type: undefined,
+      category: "billing",
+      platform: undefined,
+      templateId: undefined,
+      userId: undefined,
+      fromUtc: undefined,
+      toUtc: undefined,
+      generationId: undefined,
+      skip: 0,
+      take: 25,
+    });
+  });
+
+  it("bounds admin feedback notes before sending update payloads", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        id: "feedback-1",
+        type: "General",
+        category: "general",
+        sourceScreen: "admin",
+        status: "InReview",
+        priority: "High",
+        createdAtUtc: "2026-06-15T00:00:00.000Z",
+        canRefund: false,
+      })
+    );
+    const overlongNote = "n".repeat(ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH + 50);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await updateAdminFeedback("feedback/one", {
+      status: "InReview",
+      priority: "High",
+      adminNote: overlongNote,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(String(url)).toBe("https://api.example.com/api/admin/feedback/feedback%2Fone");
+    expect(init?.method).toBe("PUT");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      status: "InReview",
+      priority: "High",
+      adminNote: "n".repeat(ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH),
+    });
+  });
+});
