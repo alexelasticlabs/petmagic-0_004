@@ -12,7 +12,7 @@ export default function Loading() {
   const text = getDictionary(locale);
 
   return (
-    <AdminPage>
+    <AdminPage aria-busy="true" aria-live="polite">
       <AdminPageHero title="PetMagic Admin" description={text.adminLoadingDescription} />
       <AdminStateCard tone="info" title={text.loading} description={text.adminLoadingDescription} />
     </AdminPage>

@@ -6,8 +6,16 @@ type ToastProps = {
 };
 
 export function Toast({ message, type }: ToastProps) {
+  const isError = type === "error";
+
   return (
-    <div className={`ui-toast ui-toast--${type}`} role="status" aria-live="polite">
+    <div
+      className={`ui-toast ui-toast--${type}`}
+      role={isError ? "alert" : "status"}
+      aria-live={isError ? "assertive" : "polite"}
+      aria-atomic="true"
+      aria-relevant="additions text"
+    >
       {message}
     </div>
   );

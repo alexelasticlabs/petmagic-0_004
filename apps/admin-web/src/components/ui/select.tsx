@@ -36,12 +36,34 @@ export function Select({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const listboxId = useId();
+  const hasOptions = options.length > 0;
+  const isSelectDisabled = disabled || !hasOptions;
   const selectedOption = options.find((option) => option.value === value) ?? options[0];
+  const effectiveAriaLabel = ariaLabel ?? selectedOption?.label ?? "Select";
   const selectedIndex = Math.max(
     0,
     options.findIndex((option) => option.value === selectedOption?.value)
   );
-  const isMenuOpen = isOpen && !disabled;
+  const isMenuOpen = isOpen && !isSelectDisabled;
+
+  useEffect(() => {
+    if (!isSelectDisabled) {
+      return;
+    }
+
+    let isCurrent = true;
+    queueMicrotask(() => {
+      if (!isCurrent) {
+        return;
+      }
+
+      setIsOpen(false);
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isSelectDisabled]);
 
   useEffect(() => {
     if (!isMenuOpen) {
@@ -88,7 +110,7 @@ export function Select({
   }
 
   function openMenu(index = selectedIndex) {
-    if (disabled) {
+    if (isSelectDisabled) {
       return;
     }
 
@@ -106,7 +128,7 @@ export function Select({
   }
 
   function selectValue(nextValue: string) {
-    if (disabled) {
+    if (isSelectDisabled) {
       return;
     }
 
@@ -135,11 +157,11 @@ export function Select({
         className={`${styles.trigger} ${isMenuOpen ? styles.triggerOpen : ""}`.trim()}
         aria-haspopup="listbox"
         aria-expanded={isMenuOpen}
-        aria-controls={listboxId}
-        aria-label={ariaLabel}
-        disabled={disabled}
+        aria-controls={isMenuOpen ? listboxId : undefined}
+        aria-label={effectiveAriaLabel}
+        disabled={isSelectDisabled}
         onClick={() => {
-          if (disabled) {
+          if (isSelectDisabled) {
             return;
           }
 
@@ -151,7 +173,7 @@ export function Select({
           openMenu();
         }}
         onKeyDown={(event) => {
-          if (disabled) {
+          if (isSelectDisabled) {
             return;
           }
 
@@ -192,7 +214,7 @@ export function Select({
       </button>
 
       {isMenuOpen ? (
-        <div id={listboxId} className={styles.menu} role="listbox" aria-label={ariaLabel}>
+        <div id={listboxId} className={styles.menu} role="listbox" aria-label={effectiveAriaLabel}>
           {options.map((option, index) => {
             const isSelected = option.value === value;
 

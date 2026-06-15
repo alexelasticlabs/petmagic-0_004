@@ -35,7 +35,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
     clientLogger.error("admin.error_boundary_triggered", {
       name: error.name,
       digest: error.digest,
-      error,
+      scope: "locale",
     });
   }, [error]);
 

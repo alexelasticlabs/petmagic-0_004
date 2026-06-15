@@ -353,8 +353,36 @@ export const ruDictionary: Dictionary = {
   uploadingMedia: "Загрузка файла...",
   mediaUploadHint:
     "После загрузки URL, имя файла, тип, размер и длительность медиа заполняются автоматически.",
+  previewAssetVideoBadge: "Видео preview",
+  previewAssetCoverBadge: "Обложка",
+  previewAssetFileTooLarge: "Файл слишком большой. Максимальный размер preview - 32 MB.",
+  previewAssetFileTypeError: "Можно загрузить только image/* или video/* файл.",
+  templateTestActionsAdminOnly: "Тестовые генерации шаблонов доступны только Admin.",
+  templateTestInFlightMessage:
+    "Дождитесь завершения текущей тестовой генерации перед заменой фото.",
+  templateTestChoosePhotoFirst: "Сначала выберите тестовое фото питомца.",
+  templateTestImageFileTypeError: "Можно загрузить только image/* файл.",
+  templateTestImageFileTooLarge:
+    "Файл слишком большой. Максимальный размер тестового фото - 8 MB.",
+  templateTestHistoryEmpty: "История тестовых запусков появится после первого запуска.",
+  templateTestStartFailed: "Не удалось запустить тестовую генерацию.",
+  templateTestInvalidStatus:
+    "Тест недоступен: проверьте статус и обязательные поля шаблона в редакторе.",
+  templateTestImageModelRequired:
+    "Для image-теста нужно выбрать корректную image model в редакторе шаблона.",
+  templateTestReferenceMotionRequired:
+    "Для видео-теста нужно загрузить reference motion в редакторе шаблона.",
+  templateTestPreprocessingModelRequired:
+    "Для видео-теста нужно выбрать preprocessing model в редакторе шаблона.",
+  templateTestKlingModelRequired: "Для видео-теста нужно выбрать Kling model в редакторе шаблона.",
+  templateTestCharacterOrientationRequired:
+    "Для видео-теста нужно указать длительность референса, чтобы вычислилась ориентация персонажа.",
   referenceMotionUploadHint:
     "Для референсного движения поддерживается только MP4, чтобы длительность и ориентация персонажа рассчитывались надежно.",
+  referenceMotionSourceBadge: "Источник движения",
+  referenceMotionFileTooLarge:
+    "Файл слишком большой. Максимальный размер референсного видео - 128 MB.",
+  referenceMotionFileTypeError: "Поддерживаются только MP4 video файлы.",
   mediaDropzoneHint: "Кликните по области или перетащите файл сюда.",
   selectedFileLabel: "Выбранный файл",
   chooseFile: "Выбрать файл",
@@ -403,6 +431,20 @@ export const ruDictionary: Dictionary = {
   templateActivated: "Шаблон сохранен и активирован.",
   editorAccessFreeHint: "Доступно всем пользователям.",
   editorAccessPremiumHint: "Только для Premium пользователей.",
+  editorGenerationResultInputTitle: "Вход из результата генерации",
+  editorGenerationResultSupported: "Поддерживается",
+  editorGenerationResultUnsupported: "Не поддерживается",
+  editorGenerationResultInputHint:
+    "Позволяет запускать этот шаблон из уже готового результата генерации.",
+  editorGenerationResultRecommended: "Рекомендован",
+  editorGenerationResultNotRecommended: "Не рекомендован",
+  editorGenerationResultRecommendedHint:
+    "Повышает приоритет этого шаблона после генерации изображения.",
+  editorRequiredInputMediaTypeLabel: "Требуемый тип входного медиа",
+  editorInputMediaTypeImageLabel: "Изображение",
+  editorInputMediaTypeImageHint: "Готовый результат генерации изображения",
+  editorInputMediaTypeVideoLabel: "Видео",
+  editorInputMediaTypeVideoHint: "Зарезервировано для будущего входа из видео-результата",
   editorReviewReadyHint: "Шаблон выглядит цельным и готовым к следующему шагу публикации.",
   editorReviewIncompleteHint:
     "Перед публикацией лучше закрыть незаполненные медиа или AI-блоки, чтобы карточка выглядела завершённой.",

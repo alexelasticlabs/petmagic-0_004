@@ -44,12 +44,23 @@ describe("moderation page sensitive display", () => {
     const stylesSource = readFileSync(moderationStylesPath, "utf8");
 
     expect(source).toContain("queueQuery.refetch().catch(() => undefined)");
-    expect(source).toContain("disabled={!canModerate || queueQuery.isFetching}");
+    expect(source).toContain("disabled={!canModerate || isQueueContextLocked || queueQuery.isFetching}");
+    expect(source).toContain("function requestQueueRetry()");
     expect(source).toContain(
-      "if (!canModerate) {\n                  return;\n                }\n\n                void queueQuery.refetch().catch(() => undefined);"
+      "if (!canModerate || isQueueContextLocked || queueQuery.isFetching) {\n      return;\n    }"
     );
+    expect(source).toContain("onClick={requestQueueRetry}");
+    expect(source).toContain("void queueQuery.refetch().catch(() => undefined);");
     expect(source).toContain("description={getAdminErrorMessage(queueQuery.error, text.error)}");
     expect(source).toContain('aria-busy={queueQuery.isFetching ? "true" : undefined}');
+    expect(source).toContain("const visibleItems = queueQuery.isPlaceholderData ? [] : items;");
+    expect(source).toContain(
+      "const isQueueRefreshing = queueQuery.isFetching && queueQuery.isPlaceholderData;"
+    );
+    expect(source).toContain("queueQuery.isLoading || isQueueRefreshing ? (");
+    expect(source).toContain(") : visibleItems.length === 0 ? (");
+    expect(source).toContain("visibleItems.map((item) => (");
+    expect(source).not.toContain("items.map((item) => (");
     expect(source).toContain("<span className={styles.pageInfo}>");
     expect(source).toContain('pageLabel: isRu ? "Страница" : "Page"');
     expect(source).toContain(
@@ -58,28 +69,61 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain(
       'nextPageLabel: isRu ? "Следующая страница очереди" : "Next queue page"'
     );
+    expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
+    expect(source).toContain('className={`${styles.button} ${styles.pagerButton}`}');
     expect(source).toContain("{text.pageLabel} {page + 1}");
-    expect(source).toContain("disabled={page === 0 || queueQuery.isFetching}");
+    expect(source).toContain("disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}");
     expect(source).toContain("aria-label={text.previousPageLabel}");
-    expect(source).toContain("disabled={!queueQuery.data?.hasMore || queueQuery.isFetching}");
+    expect(source).toContain("title={text.previousPageLabel}");
+    expect(source).toContain(
+      "disabled={!queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching}"
+    );
     expect(source).toContain("aria-label={text.nextPageLabel}");
+    expect(source).toContain("title={text.nextPageLabel}");
+    expect(source).toContain(
+      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />'
+    );
+    expect(source).toContain(
+      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />'
+    );
+    expect(source).not.toContain("{text.previous}");
+    expect(source).not.toContain("{text.next}");
     expect(stylesSource).toContain("@media (max-width: 520px)");
     expect(stylesSource).toContain(".pageInfo {\n    width: 100%;\n    margin-right: 0;");
-    expect(stylesSource).toContain(".pager .button {\n    flex: 1 1 8rem;");
+    expect(stylesSource).toContain(".pagerButton");
+    expect(stylesSource).toContain(".pageIconPrevious");
+    expect(stylesSource).toContain(".pageIconNext");
+    expect(stylesSource).toContain(".pager .button:not(.pagerButton) {\n    flex: 1 1 8rem;");
+    expect(stylesSource).toContain(".pagerButton {\n    flex: 0 0 auto;");
   });
 
   it("uses localized display labels for moderation actions and statuses", () => {
     const source = readFileSync(moderationPagePath, "utf8");
 
     expect(source).toContain('eyebrow: isRu ? "Безопасность контента" : "Content safety"');
+    expect(source).toContain('? "шаблон, сообщение, user/generation id"');
     expect(source).toContain('approve: isRu ? "Одобрить" : "Approve"');
     expect(source).toContain('reject: isRu ? "Отклонить" : "Reject"');
+    expect(source).toContain('next: isRu ? "Вперёд" : "Next"');
     expect(source).toContain('statusPending: isRu ? "Ожидает" : "Pending"');
     expect(source).toContain('statusApproved: isRu ? "Одобрено" : "Approved"');
     expect(source).toContain('statusRejected: isRu ? "Отклонено" : "Rejected"');
+    expect(source).toContain('workspaceBadge: isRu ? "Модератор" : "Moderator"');
+    expect(source).toContain('approveItemLabel: isRu ? "Одобрить элемент" : "Approve item"');
+    expect(source).toContain('rejectItemLabel: isRu ? "Отклонить элемент" : "Reject item"');
+    expect(source).toContain('badge={<AdminBadge tone="info">{text.workspaceBadge}</AdminBadge>}');
+    expect(source).toContain(
+      "aria-label={`${text.approveItemLabel}: ${formatModerationText("
+    );
+    expect(source).toContain(
+      "aria-label={`${text.rejectItemLabel}: ${formatModerationText("
+    );
     expect(source).toContain("formatModerationStatus(item.status, text)");
     expect(source).toContain("formatModerationEvent(item.eventType, text)");
     expect(source).toContain("formatTemplateType(item.templateType, text)");
+    expect(source).not.toContain('? "template, message, user/generation id"');
+    expect(source).not.toContain('next: isRu ? "Вперед" : "Next"');
+    expect(source).not.toContain('badge={<AdminBadge tone="info">Moderator</AdminBadge>}');
   });
 
   it("uses theme tokens for moderation status badge colors", () => {
@@ -120,6 +164,10 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain(
       "const isDecisionSubmitting = isDecisionInFlight || decisionMutation.isPending;"
     );
+    expect(source).toContain("const isDecisionDraftOpen = Boolean(decision);");
+    expect(source).toContain(
+      "const isQueueContextLocked = isDecisionDraftOpen || isDecisionSubmitting;"
+    );
     expect(source).toContain("enabled: canModerate");
     expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
     expect(source).toContain(
@@ -149,15 +197,35 @@ describe("moderation page sensitive display", () => {
     );
     expect(source).toContain("decisionInFlightRef.current = true;");
     expect(source).toContain("setIsDecisionInFlight(true);");
+    expect(source).toContain("function resetDecisionDraft()");
+    expect(source).toContain(
+      "if (decisionInFlightRef.current || decisionMutation.isPending) {\n      return;\n    }\n\n    setDecision(null);\n    setReason(\"\");\n    setReasonError(null);"
+    );
+    expect(source).toContain("function resetQueueContext(nextPage = 0)");
+    expect(source).toContain("if (isQueueContextLocked) {\n      return;\n    }");
+    expect(source).toContain("resetDecisionDraft();\n    setPage(nextPage);");
+    expect(source).toContain("resetQueueContext();");
+    expect(source).toContain("onClick={() => resetQueueContext(Math.max(0, page - 1))}");
+    expect(source).toContain("onClick={() => resetQueueContext(page + 1)}");
+    expect(source).toContain(
+      "const visibleEventIdSignature = visibleItems.map((item) => item.eventId).join(\"|\");"
+    );
+    expect(source).toContain("visibleEventIdSignature.split(\"|\").includes(decision.item.eventId)");
+    expect(source).toContain("queueMicrotask(() => {");
     expect(source).toContain("isSubmitting={isDecisionSubmitting}");
     expect(source).toContain("disabled={isDecisionSubmitting}");
     expect(source).toContain("if (!decisionInFlightRef.current && !decisionMutation.isPending) {");
     expect(source).toContain("confirmDisabled={!canModerate || !isReasonValid}");
+    expect(source).toContain("disabled={isQueueContextLocked}");
+    expect(source).toContain("await Promise.allSettled([");
     expect(source).toContain(
-      'await queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] });'
+      'queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] })'
     );
     expect(source).toContain(
-      "await queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) });"
+      "queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) })"
+    );
+    expect(source).not.toContain(
+      'await queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] });\n      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) });'
     );
     expect(source).toContain("throw new Error(text.decisionMissing)");
     expect(source).toContain('!canModerate || item.status !== "pending" || isDecisionSubmitting');
@@ -176,8 +244,22 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("const router = useRouter();");
     expect(source).toContain("ensureAdminSession(locale, router);");
     expect(source).toContain("enabled: canModerate");
-    expect(source).toContain("!canModerate ? (\n        <AdminStateCard title={text.loading} />");
+    expect(source).toContain("{!canModerate ? <AdminStateCard title={text.loading} /> : null}");
+    expect(source).toContain("{canModerate ? (\n      <AdminCard title={text.filtersTitle}>");
+    expect(source).toContain("{canModerate ? (\n        queueQuery.isLoading || isQueueRefreshing ? (");
     expect(source).not.toContain("enabled: Boolean(session)");
     expect(source).not.toContain("disabled={!session || queueQuery.isFetching}");
+  });
+
+  it("keeps local moderation form controls accessible in locked and keyboard states", () => {
+    const stylesSource = readFileSync(moderationStylesPath, "utf8");
+
+    expect(stylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible,\n.button:focus-visible");
+    expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
+    expect(stylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
+    expect(stylesSource).toContain("cursor: not-allowed;");
+    expect(stylesSource).toContain("opacity: 0.62;");
+    expect(stylesSource).not.toContain("rgba(");
+    expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
   });
 });

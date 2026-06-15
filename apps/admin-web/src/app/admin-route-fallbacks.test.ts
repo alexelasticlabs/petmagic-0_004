@@ -22,12 +22,20 @@ describe("admin route fallbacks", () => {
     const errorStyles = readFileSync(errorStylesPath, "utf8");
     const globalErrorSource = readFileSync(globalErrorPagePath, "utf8");
     const globalErrorStyles = readFileSync(globalErrorStylesPath, "utf8");
+    const nonZeroGlobalErrorLetterSpacing = [
+      ...globalErrorStyles.matchAll(/letter-spacing:\s*([^;]+);/g),
+    ]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
     const loadingSource = readFileSync(loadingPagePath, "utf8");
 
     expect(errorSource).toContain("title={text.adminErrorTitle}");
     expect(errorSource).toContain("description={text.adminErrorDescription}");
+    expect(errorSource).toContain('scope: "locale"');
     expect(errorSource).not.toContain("description={error.message}");
     expect(errorSource).not.toContain("message: error.message");
+    expect(errorSource).not.toContain("\n      error,");
+    expect(errorSource).not.toContain("stack: error.stack");
     expect(errorSource).not.toContain("description={text.navDashboard}");
     expect(errorSource).toContain("useAuthSession()");
     expect(errorSource).toContain("getDefaultAdminPath(locale, session?.user.roles)");
@@ -44,6 +52,8 @@ describe("admin route fallbacks", () => {
     expect(globalErrorSource).toContain('import styles from "./global-error.module.css"');
     expect(globalErrorSource).toContain("className={styles.body}");
     expect(globalErrorSource).toContain("className={styles.panel}");
+    expect(globalErrorSource).toContain('aria-describedby="global-error-description"');
+    expect(globalErrorSource).toContain('id="global-error-description"');
     expect(globalErrorSource).toContain("className={styles.primaryAction}");
     expect(globalErrorSource).toContain("className={styles.secondaryAction}");
     expect(globalErrorSource).toContain("onClick={reset}");
@@ -59,8 +69,18 @@ describe("admin route fallbacks", () => {
     expect(globalErrorStyles).toContain("@media (max-width: 520px)");
     expect(globalErrorStyles).toContain(".primaryAction");
     expect(globalErrorStyles).toContain(".secondaryAction");
+    expect(globalErrorStyles).toContain("--global-error-surface-0: var(--surface-0");
+    expect(globalErrorStyles).toContain("--global-error-accent: var(--accent");
+    expect(globalErrorStyles).toContain("min-height: 100dvh;");
+    expect(globalErrorStyles).not.toContain("rgba(");
+    expect(globalErrorStyles).not.toContain("radial-gradient");
+    expect(globalErrorStyles).not.toContain("100vh");
+    expect(globalErrorStyles).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(globalErrorStyles).not.toMatch(/font-size:\s*[^;]*vw/);
+    expect(nonZeroGlobalErrorLetterSpacing).toEqual([]);
 
     expect(loadingSource).toContain("description={text.adminLoadingDescription}");
+    expect(loadingSource).toContain('<AdminPage aria-busy="true" aria-live="polite">');
     expect(loadingSource).not.toContain("description={text.navDashboard}");
   });
 

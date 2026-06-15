@@ -350,8 +350,33 @@ export const enDictionary: Dictionary = {
   uploadingMedia: "Uploading file...",
   mediaUploadHint:
     "After upload, media URL, file name, type, size, and duration are filled automatically.",
+  previewAssetVideoBadge: "Video preview",
+  previewAssetCoverBadge: "Cover asset",
+  previewAssetFileTooLarge: "File is too large. The maximum preview size is 32 MB.",
+  previewAssetFileTypeError: "Only image/* or video/* files are supported.",
+  templateTestActionsAdminOnly: "Template test generations are available to Admin only.",
+  templateTestInFlightMessage:
+    "Wait for the current template test generation to finish before replacing the photo.",
+  templateTestChoosePhotoFirst: "Choose a test pet photo first.",
+  templateTestImageFileTypeError: "Only image/* files are supported.",
+  templateTestImageFileTooLarge: "File is too large. The maximum test photo size is 8 MB.",
+  templateTestHistoryEmpty: "Test run history will appear after the first run starts.",
+  templateTestStartFailed: "Failed to start the test generation.",
+  templateTestInvalidStatus:
+    "Test is unavailable. Check template status and required fields in the editor.",
+  templateTestImageModelRequired: "Image test requires a valid image model in the template editor.",
+  templateTestReferenceMotionRequired:
+    "Video test requires a reference motion asset in the template editor.",
+  templateTestPreprocessingModelRequired:
+    "Video test requires a preprocessing model in the template editor.",
+  templateTestKlingModelRequired: "Video test requires a Kling model in the template editor.",
+  templateTestCharacterOrientationRequired:
+    "Video test requires reference duration so character orientation can be resolved.",
   referenceMotionUploadHint:
     "Reference motion supports MP4 only so duration and character orientation can be calculated reliably.",
+  referenceMotionSourceBadge: "Motion source",
+  referenceMotionFileTooLarge: "File is too large. The maximum reference motion size is 128 MB.",
+  referenceMotionFileTypeError: "Only MP4 video files are supported.",
   mediaDropzoneHint: "Click the area or drag a file here.",
   selectedFileLabel: "Selected file",
   chooseFile: "Choose file",
@@ -401,6 +426,18 @@ export const enDictionary: Dictionary = {
   templateActivated: "Template saved and activated.",
   editorAccessFreeHint: "Available to all users.",
   editorAccessPremiumHint: "Only for Premium users.",
+  editorGenerationResultInputTitle: "Generation result input",
+  editorGenerationResultSupported: "Supported",
+  editorGenerationResultUnsupported: "Not supported",
+  editorGenerationResultInputHint: "Allows completed generation results to start this template.",
+  editorGenerationResultRecommended: "Recommended",
+  editorGenerationResultNotRecommended: "Not recommended",
+  editorGenerationResultRecommendedHint: "Prioritizes this template after image generation.",
+  editorRequiredInputMediaTypeLabel: "Required input media type",
+  editorInputMediaTypeImageLabel: "Image",
+  editorInputMediaTypeImageHint: "Completed image result",
+  editorInputMediaTypeVideoLabel: "Video",
+  editorInputMediaTypeVideoHint: "Reserved for future video-result input",
   editorReviewReadyHint: "The template feels cohesive and ready for the next publishing step.",
   editorReviewIncompleteHint:
     "Before publishing, close the remaining media or AI gaps so the card reads as complete.",

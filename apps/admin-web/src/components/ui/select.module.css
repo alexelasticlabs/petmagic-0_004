@@ -19,9 +19,9 @@
   justify-content: space-between;
   gap: 0.58rem;
   border: 1px solid var(--border-soft);
-  border-radius: 0.59rem;
+  border-radius: var(--radius-sm);
   padding: 0.52rem 0.66rem;
-  background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-2) 100%);
+  background: var(--surface-2);
   color: var(--text-strong);
   text-align: left;
   cursor: pointer;
@@ -40,6 +40,23 @@
   background: var(--surface-hover);
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
+}
+
+.trigger:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
+  box-shadow: none;
+  transform: none;
+}
+
+.trigger:disabled:hover {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  box-shadow: none;
+  transform: none;
 }
 
 .triggerOpen {
@@ -116,23 +133,41 @@
   left: 0;
   right: 0;
   z-index: 60;
+  max-height: min(22rem, calc(100dvh - 8rem));
   display: grid;
   gap: 0.28rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 0.38rem;
   border: 1px solid var(--border-strong);
-  border-radius: 0.65rem;
-  background: linear-gradient(180deg, var(--surface-1) 0%, var(--surface-1) 100%);
-  box-shadow: 0 14px 28px color-mix(in srgb, var(--surface-0) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-strong);
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 42%, transparent) transparent;
   backdrop-filter: blur(10px);
   transform-origin: top center;
   animation: menuFadeIn 160ms ease;
+}
+
+.menu::-webkit-scrollbar {
+  width: 0.55rem;
+}
+
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.menu::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 34%, transparent);
 }
 
 .option {
   width: 100%;
   display: block;
   border: 1px solid var(--border-soft);
-  border-radius: 0.58rem;
+  border-radius: var(--radius-sm);
   padding: 0.58rem 0.68rem;
   background: var(--surface-2);
   color: var(--text-soft);
@@ -232,7 +267,7 @@
   padding: 0.18rem 0.4rem;
   font-size: 0.58rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -301,6 +336,7 @@
 @media (max-width: 720px) {
   .menu {
     position: static;
+    max-height: min(20rem, calc(100dvh - 10rem));
     margin-top: 0.55rem;
   }
 
@@ -316,6 +352,19 @@
 
   .optionMeta {
     align-self: flex-start;
+  }
+
+  .triggerMeta {
+    align-self: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .value,
+  .triggerDescription {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 
