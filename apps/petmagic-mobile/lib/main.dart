@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 
 const bool _skipFirebase = bool.fromEnvironment('PETMAGIC_SKIP_FIREBASE');
@@ -25,6 +26,7 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   GoogleFonts.config.allowRuntimeFetching = false;
   _installGlobalErrorHandlers();
+  configureDecodedImageCacheBudget();
 
   await runZonedGuarded<Future<void>>(
     () async {

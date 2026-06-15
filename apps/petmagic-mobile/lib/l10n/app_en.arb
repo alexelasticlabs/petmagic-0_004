@@ -1163,8 +1163,7 @@
       "templateTitle": {}
     }
   },
-  "shellActiveGenerationFallback": "result"
-,
+  "shellActiveGenerationFallback": "result",
   "walletStripeCardBrandsLabel": "Visa • Mastercard",
   "walletStripeWalletsLabel": "Apple Pay • Google Pay",
   "walletPackUsageNote": "Used for photo and video generations",
@@ -1242,16 +1241,6 @@
     }
   },
   "premiumCheckoutTotalLabel": "Total",
-  "debugStripeSmokeTestTitle": "Stripe PaymentSheet Test",
-  "debugStripeSmokeTestSubtitle": "Minimal screen to diagnose tap and focus behavior in PaymentSheet.",
-  "debugStripeSmokeTestOpenAction": "Open Stripe PaymentSheet",
-  "debugStripeSmokeTestOpeningAction": "Opening...",
-  "debugStripeSmokeTestMethodUnavailable": "Stripe payment method is unavailable.",
-  "debugStripeSmokeTestNoPlans": "No Premium plans with Stripe enabled were found.",
-  "debugStripeSmokeTestPrepareFailed": "Failed to prepare PaymentSheet checkout.",
-  "debugStripeSmokeTestOpenedSuccess": "PaymentSheet opened successfully.",
-  "debugStripeSmokeTestDismissedOrFailed": "PaymentSheet was dismissed or failed.",
-  "debugStripeSmokeTestVerifyFailed": "Payment verification failed.",
   "premiumBenefitAiGenerationsTitle": "30 AI generations",
   "premiumBenefitAiGenerationsSubtitle": "every month",
   "premiumBenefitPremiumTemplatesTitle": "Premium templates",
@@ -1267,7 +1256,9 @@
   "subscriptionCancelConfirmBody": "Premium will stay active until {date}. New charges will be disabled.",
   "@subscriptionCancelConfirmBody": {
     "placeholders": {
-      "date": { "type": "String" }
+      "date": {
+        "type": "String"
+      }
     }
   },
   "subscriptionCancelConfirmAction": "Confirm cancellation",
@@ -1290,13 +1281,17 @@
   "generationStatusRemoveWatermarkSheetBody": "Use {cost} credit for this result, or upgrade to Premium for clean downloads.",
   "@generationStatusRemoveWatermarkSheetBody": {
     "placeholders": {
-      "cost": { "type": "int" }
+      "cost": {
+        "type": "int"
+      }
     }
   },
   "generationStatusRemoveWatermarkUseCredit": "Use {cost} credit",
   "@generationStatusRemoveWatermarkUseCredit": {
     "placeholders": {
-      "cost": { "type": "int" }
+      "cost": {
+        "type": "int"
+      }
     }
   },
   "generationStatusRemoveWatermarkFailed": "Could not remove watermark. Please try again.",

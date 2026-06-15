@@ -447,7 +447,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           haptic: PressableScaleHaptic.selection,
           onTap: () => context.push(
-            '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+            GenerationStatusPage.routeFor(generation.generationId),
           ),
           child: DecoratedBox(
             decoration: BoxDecoration(

@@ -9,7 +9,11 @@ const _localDebugHosts = <String>{
   'host.docker.internal',
 };
 
-Uri? parseSafeExternalUri(String? rawValue, {Set<String>? allowedHttpsHosts}) {
+Uri? parseSafeExternalUri(
+  String? rawValue, {
+  Set<String>? allowedHttpsHosts,
+  bool allowLocalHttp = kDebugMode,
+}) {
   final trimmed = rawValue?.trim();
   if (trimmed == null || trimmed.isEmpty) {
     return null;
@@ -20,7 +24,11 @@ Uri? parseSafeExternalUri(String? rawValue, {Set<String>? allowedHttpsHosts}) {
     return null;
   }
 
-  return isAllowedExternalUri(uri, allowedHttpsHosts: allowedHttpsHosts)
+  return isAllowedExternalUri(
+        uri,
+        allowedHttpsHosts: allowedHttpsHosts,
+        allowLocalHttp: allowLocalHttp,
+      )
       ? uri
       : null;
 }
@@ -40,6 +48,7 @@ Uri? parseSafeGenerationMediaUri(String? rawValue) {
   return parseSafeExternalUri(
     rawValue,
     allowedHttpsHosts: generationMediaAllowedHosts(),
+    allowLocalHttp: AppConfig.allowLocalMediaHttp,
   );
 }
 
@@ -57,7 +66,11 @@ Uri? parseSafePremiumExternalUri(String? rawValue) {
   );
 }
 
-bool isAllowedExternalUri(Uri uri, {Set<String>? allowedHttpsHosts}) {
+bool isAllowedExternalUri(
+  Uri uri, {
+  Set<String>? allowedHttpsHosts,
+  bool allowLocalHttp = kDebugMode,
+}) {
   final scheme = uri.scheme.toLowerCase();
   final host = uri.host.toLowerCase();
   if (host.isEmpty) {
@@ -79,7 +92,7 @@ bool isAllowedExternalUri(Uri uri, {Set<String>? allowedHttpsHosts}) {
     return normalizedAllowedHosts.contains(host);
   }
 
-  if (scheme != 'http' || !kDebugMode) {
+  if (scheme != 'http' || !allowLocalHttp) {
     return false;
   }
 

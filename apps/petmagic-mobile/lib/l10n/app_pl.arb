@@ -1189,16 +1189,6 @@
   "premiumBestValueBadge": "NAJLEPSZA WARTOŚĆ",
   "premiumStorePaymentDisclaimerTitle": "Bezpieczna płatność za pośrednictwem App Store / Google Play",
   "premiumStorePaymentDisclaimerBody": "Płatność zostanie pobrana z Twojego konta App Store/Google Play. Subskrypcja odnawia się automatycznie, chyba że zostanie anulowana przed datą odnowienia.",
-  "debugStripeSmokeTestTitle": "Test Stripe PaymentSheet",
-  "debugStripeSmokeTestSubtitle": "Minimalny ekran do diagnostyki dotyku i fokusu w PaymentSheet.",
-  "debugStripeSmokeTestOpenAction": "Otwórz Stripe PaymentSheet",
-  "debugStripeSmokeTestOpeningAction": "Otwieranie...",
-  "debugStripeSmokeTestMethodUnavailable": "Metoda płatności Stripe jest niedostępna.",
-  "debugStripeSmokeTestNoPlans": "Nie znaleziono planów Premium z włączonym Stripe.",
-  "debugStripeSmokeTestPrepareFailed": "Nie udało się przygotować płatności PaymentSheet.",
-  "debugStripeSmokeTestOpenedSuccess": "PaymentSheet został otwarty pomyślnie.",
-  "debugStripeSmokeTestDismissedOrFailed": "PaymentSheet został zamknięty lub zakończył się błędem.",
-  "debugStripeSmokeTestVerifyFailed": "Weryfikacja płatności nie powiodła się.",
   "premiumBenefitAiGenerationsTitle": "30 pokoleń sztucznej inteligencji",
   "premiumBenefitAiGenerationsSubtitle": "co miesiąc",
   "premiumBenefitPremiumTemplatesTitle": "Szablony premium",
@@ -1214,7 +1204,9 @@
   "subscriptionCancelConfirmBody": "Premium pozostanie aktywne do {date}. Nowe opłaty zostaną wyłączone.",
   "@subscriptionCancelConfirmBody": {
     "placeholders": {
-      "date": { "type": "String" }
+      "date": {
+        "type": "String"
+      }
     }
   },
   "subscriptionCancelConfirmAction": "Potwierdź anulowanie",

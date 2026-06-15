@@ -1163,8 +1163,7 @@
       "templateTitle": {}
     }
   },
-  "shellActiveGenerationFallback": "результат"
-,
+  "shellActiveGenerationFallback": "результат",
   "walletStripeCardBrandsLabel": "Visa • Mastercard",
   "walletStripeWalletsLabel": "Apple Pay • Google Pay",
   "walletPackUsageNote": "Используется для генерации фото и видео.",
@@ -1242,16 +1241,6 @@
     }
   },
   "premiumCheckoutTotalLabel": "Итого",
-  "debugStripeSmokeTestTitle": "Тест Stripe PaymentSheet",
-  "debugStripeSmokeTestSubtitle": "Минимальный экран для диагностики касаний и фокуса в PaymentSheet.",
-  "debugStripeSmokeTestOpenAction": "Открыть Stripe PaymentSheet",
-  "debugStripeSmokeTestOpeningAction": "Открываем...",
-  "debugStripeSmokeTestMethodUnavailable": "Метод оплаты Stripe недоступен.",
-  "debugStripeSmokeTestNoPlans": "Планы Premium с включенным Stripe не найдены.",
-  "debugStripeSmokeTestPrepareFailed": "Не удалось подготовить оплату через PaymentSheet.",
-  "debugStripeSmokeTestOpenedSuccess": "PaymentSheet успешно открыт.",
-  "debugStripeSmokeTestDismissedOrFailed": "PaymentSheet был закрыт или завершился ошибкой.",
-  "debugStripeSmokeTestVerifyFailed": "Не удалось проверить оплату.",
   "premiumBenefitAiGenerationsTitle": "30 AI-генераций",
   "premiumBenefitAiGenerationsSubtitle": "каждый месяц",
   "premiumBenefitPremiumTemplatesTitle": "Premium-шаблоны",
@@ -1267,7 +1256,9 @@
   "subscriptionCancelConfirmBody": "Premium останется активным до {date}. Новые списания будут отключены.",
   "@subscriptionCancelConfirmBody": {
     "placeholders": {
-      "date": { "type": "String" }
+      "date": {
+        "type": "String"
+      }
     }
   },
   "subscriptionCancelConfirmAction": "Подтвердить",
