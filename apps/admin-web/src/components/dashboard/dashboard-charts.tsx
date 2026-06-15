@@ -33,74 +33,92 @@ export function RevenueChart({
   }));
 
   return (
-    <svg viewBox="0 0 610 240" className={styles.chartSvg} aria-label={ariaLabel}>
-      <defs>
-        <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--success)" stopOpacity="0.28" />
-          <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {yLabels.map(({ y }) => (
-        <line
-          key={y}
-          x1="42"
-          y1={y}
-          x2="570"
-          y2={y}
-          stroke="var(--border-soft)"
-          strokeWidth="1"
-          strokeDasharray="4 4"
-        />
-      ))}
-      {yLabels.map(({ y, label }) => (
-        <text
-          key={`y-label-${y}`}
-          x="36"
-          y={y + 4}
-          textAnchor="end"
-          fill="var(--text-muted)"
-          fontSize="10"
-          fontFamily="system-ui"
-        >
-          {label}
-        </text>
-      ))}
-      <polygon points={areaPoints} fill="url(#dashboardRevenueGradient)" />
-      <polyline
-        points={points}
-        stroke="var(--success)"
-        strokeWidth="2.4"
-        fill="none"
-        strokeLinejoin="round"
-      />
-      {points.split(" ").map((point, index) => {
-        const [x, y] = point.split(",").map(Number);
-        return (
-          <circle
-            key={index}
-            cx={x}
-            cy={y}
-            r="3.6"
-            fill="var(--success)"
-            stroke="var(--surface-1)"
-            strokeWidth="1.6"
+    <>
+      <svg viewBox="0 0 610 240" className={styles.chartSvg} aria-label={ariaLabel}>
+        <defs>
+          <linearGradient id="dashboardRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--success)" stopOpacity="0.28" />
+            <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {yLabels.map(({ y }) => (
+          <line
+            key={y}
+            x1="42"
+            y1={y}
+            x2="570"
+            y2={y}
+            stroke="var(--border-soft)"
+            strokeWidth="1"
+            strokeDasharray="4 4"
           />
-        );
-      })}
-      {xPositions.map((x, index) => (
-        <text
-          key={x}
-          x={x}
-          y={220}
-          textAnchor="middle"
-          fill="var(--text-muted)"
-          fontSize="10"
-          fontFamily="system-ui"
-        >
-          {xLabels[index]}
-        </text>
-      ))}
-    </svg>
+        ))}
+        {yLabels.map(({ y, label }) => (
+          <text
+            key={`y-label-${y}`}
+            x="36"
+            y={y + 4}
+            textAnchor="end"
+            fill="var(--text-muted)"
+            fontSize="10"
+            fontFamily="system-ui"
+          >
+            {label}
+          </text>
+        ))}
+        <polygon points={areaPoints} fill="url(#dashboardRevenueGradient)" />
+        <polyline
+          points={points}
+          stroke="var(--success)"
+          strokeWidth="2.4"
+          fill="none"
+          strokeLinejoin="round"
+        />
+        {points.split(" ").map((point, index) => {
+          const [x, y] = point.split(",").map(Number);
+          return (
+            <circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="3.6"
+              fill="var(--success)"
+              stroke="var(--surface-1)"
+              strokeWidth="1.6"
+            />
+          );
+        })}
+        {xPositions.map((x, index) => (
+          <text
+            key={x}
+            x={x}
+            y={220}
+            textAnchor="middle"
+            fill="var(--text-muted)"
+            fontSize="10"
+            fontFamily="system-ui"
+          >
+            {xLabels[index]}
+          </text>
+        ))}
+      </svg>
+      <table className={styles.chartDataTable} aria-label={ariaLabel}>
+        <thead>
+          <tr>
+            <th scope="col">Date</th>
+            <th scope="col">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {normalizedValues.map((value, index) => (
+            <tr key={`${xLabels[index]}-${index}`}>
+              <td>{xLabels[index]}</td>
+              <td>{formatChartCurrencyAmount(value, normalizeChartCurrencyCode(currencyCode), "standard", 2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }
 

@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import {
   ArrowUpSmallIcon,
@@ -60,6 +60,13 @@ type DashboardViewProps = { locale: Locale };
 type DashboardActivityType = "new" | "update" | "register" | "cancel";
 type DashboardStatIcon = "people" | "cart" | "dollar" | "trendUp";
 type DashboardOrderStatusType = "new" | "processing" | "delivered" | "cancelled";
+
+const DASHBOARD_ORDER_STATUS_COLORS: Record<DashboardOrderStatusType, string> = {
+  new: "var(--success)",
+  processing: "var(--info)",
+  delivered: "var(--brand)",
+  cancelled: "var(--danger)",
+};
 
 type DashboardStatItem = {
   label: string;
@@ -139,6 +146,10 @@ type DashboardViewModel = {
   orders: DashboardOrderItem[];
   activities: DashboardActivityItem[];
   userDistribution: DashboardUserDistributionItem[];
+  feedErrors: {
+    purchases: boolean;
+    supportConversations: boolean;
+  };
 };
 
 const STAT_ICONS: Record<DashboardStatIcon, ReactNode> = {
@@ -180,14 +191,23 @@ export function DashboardView({ locale }: DashboardViewProps) {
   }, [locale, router, session]);
 
   const viewModel = dashboardQuery.data;
-  const statusColors = {
-    new: "var(--success)",
-    processing: "var(--info)",
-    delivered: "var(--brand)",
-    cancelled: "var(--danger)",
-  };
+  const copy = useMemo(() => getDashboardCopy(locale), [locale]);
+  const isShowingStaleDashboard = Boolean(viewModel && dashboardQuery.isError);
+  const retryLabel = dashboardQuery.isFetching
+    ? locale === "ru"
+      ? "Обновляем..."
+      : "Refreshing..."
+    : locale === "ru"
+      ? "Повторить"
+      : "Retry";
 
-  const copy = getDashboardCopy(locale);
+  function requestDashboardRetry() {
+    if (!canViewDashboard || dashboardQuery.isFetching) {
+      return;
+    }
+
+    void dashboardQuery.refetch().catch(() => undefined);
+  }
 
   if (!viewModel) {
     return (
@@ -221,16 +241,10 @@ export function DashboardView({ locale }: DashboardViewProps) {
             dashboardQuery.isError ? (
               <Button
                 variant="primary"
-                onClick={() => {
-                  if (!canViewDashboard) {
-                    return;
-                  }
-
-                  void dashboardQuery.refetch().catch(() => undefined);
-                }}
+                onClick={requestDashboardRetry}
                 disabled={!canViewDashboard || dashboardQuery.isFetching}
               >
-                {locale === "ru" ? "Повторить" : "Retry"}
+                {retryLabel}
               </Button>
             ) : undefined
           }
@@ -246,6 +260,27 @@ export function DashboardView({ locale }: DashboardViewProps) {
         title={viewModel.hero.title}
         description={viewModel.hero.description}
       />
+
+      {isShowingStaleDashboard ? (
+        <AdminStateCard
+          tone="warning"
+          title={locale === "ru" ? "Данные могут быть устаревшими" : "Data may be stale"}
+          description={
+            locale === "ru"
+              ? "Показываем последнюю загруженную версию дашборда, потому что обновление KPI завершилось ошибкой."
+              : "Showing the last loaded dashboard because the KPI refresh failed."
+          }
+          action={
+            <Button
+              variant="secondary"
+              onClick={requestDashboardRetry}
+              disabled={!canViewDashboard || dashboardQuery.isFetching}
+            >
+              {retryLabel}
+            </Button>
+          }
+        />
+      ) : null}
 
       <AdminPageGrid columns="four" className={styles.statsGrid}>
         {viewModel.stats.map((stat) => (
@@ -306,7 +341,26 @@ export function DashboardView({ locale }: DashboardViewProps) {
             </Link>
           }
         >
-          {viewModel.orders.length > 0 ? (
+          {viewModel.feedErrors.purchases ? (
+            <AdminStateCard
+              tone="warning"
+              title={locale === "ru" ? "Заказы временно недоступны" : "Orders temporarily unavailable"}
+              description={
+                locale === "ru"
+                  ? "KPI дашборда загружены, но лента последних платежей не ответила."
+                  : "Dashboard KPIs loaded, but the recent payments feed did not respond."
+              }
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={requestDashboardRetry}
+                  disabled={!canViewDashboard || dashboardQuery.isFetching}
+                >
+                  {retryLabel}
+                </Button>
+              }
+            />
+          ) : viewModel.orders.length > 0 ? (
             <div className={adminTableStyles.tableWrap}>
               <table className={adminTableStyles.table}>
                 <thead>
@@ -324,7 +378,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
                       <td>{order.user}</td>
                       <td className={adminTableStyles.numeric}>{order.amount}</td>
                       <td>
-                        <AdminStatusBadge color={statusColors[order.statusType]}>
+                        <AdminStatusBadge color={DASHBOARD_ORDER_STATUS_COLORS[order.statusType]}>
                           {order.status}
                         </AdminStatusBadge>
                       </td>
@@ -386,6 +440,27 @@ export function DashboardView({ locale }: DashboardViewProps) {
           }
           description={viewModel.activitySection.description}
         >
+          {viewModel.feedErrors.purchases || viewModel.feedErrors.supportConversations ? (
+            <AdminStateCard
+              tone="warning"
+              className={styles.feedWarning}
+              title={locale === "ru" ? "Часть активности недоступна" : "Some activity is unavailable"}
+              description={
+                locale === "ru"
+                  ? "Показываем доступные события; недоступные ленты можно перезагрузить."
+                  : "Showing available events; unavailable feeds can be retried."
+              }
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={requestDashboardRetry}
+                  disabled={!canViewDashboard || dashboardQuery.isFetching}
+                >
+                  {retryLabel}
+                </Button>
+              }
+            />
+          ) : null}
           {viewModel.activities.length > 0 ? (
             <ul className={styles.activityList}>
               {viewModel.activities.map((activity) => (
@@ -398,7 +473,7 @@ export function DashboardView({ locale }: DashboardViewProps) {
                 </li>
               ))}
             </ul>
-          ) : (
+          ) : viewModel.feedErrors.purchases || viewModel.feedErrors.supportConversations ? null : (
             <AdminStateCard
               tone="info"
               title={locale === "ru" ? "Активности пока нет" : "No recent activity"}
@@ -416,26 +491,31 @@ export function DashboardView({ locale }: DashboardViewProps) {
 }
 
 async function loadDashboardViewModel(locale: Locale, signal?: AbortSignal): Promise<DashboardViewModel> {
-  const [
-    usersResult,
-    purchases,
-    supportConversations,
-    moderationQueueCount,
-    generationMetrics,
-    economyMetrics,
-  ] = await Promise.all([
+  const requiredDataPromise = Promise.all([
     fetchDashboardUsers(signal),
-    fetchDashboardPurchases(signal),
-    fetchDashboardSupportConversations(signal),
     fetchPendingModerationQueueCount(signal),
     fetchAdminTemplateGenerationMetrics(signal),
     fetchAdminEconomyDashboardMetrics(signal),
   ]);
+  const optionalFeedPromise = Promise.allSettled([
+    fetchDashboardPurchases(signal),
+    fetchDashboardSupportConversations(signal),
+  ] as const);
+
+  const [
+    [usersResult, moderationQueueCount, generationMetrics, economyMetrics],
+    [purchasesResult, supportConversationsResult],
+  ] = await Promise.all([requiredDataPromise, optionalFeedPromise]);
 
   throwIfAborted(signal);
 
   const users = usersResult.items;
   const userMetrics = usersResult.metrics;
+  const purchasesUnavailable = purchasesResult.status === "rejected";
+  const supportConversationsUnavailable = supportConversationsResult.status === "rejected";
+  const purchases = purchasesResult.status === "fulfilled" ? purchasesResult.value : [];
+  const supportConversations =
+    supportConversationsResult.status === "fulfilled" ? supportConversationsResult.value : [];
 
   return buildDashboardFromData(
     locale,
@@ -445,7 +525,11 @@ async function loadDashboardViewModel(locale: Locale, signal?: AbortSignal): Pro
     economyMetrics,
     purchases,
     supportConversations,
-    moderationQueueCount
+    moderationQueueCount,
+    {
+      purchases: purchasesUnavailable,
+      supportConversations: supportConversationsUnavailable,
+    }
   );
 }
 
@@ -503,7 +587,8 @@ function buildDashboardFromData(
   economyMetrics: AdminEconomyDashboardMetrics,
   purchases: AdminEconomyPurchase[],
   supportConversations: AdminSupportConversationSummary[],
-  moderationQueueCount: number
+  moderationQueueCount: number,
+  feedErrors: DashboardViewModel["feedErrors"]
 ): DashboardViewModel {
   const copy = getDashboardCopy(locale);
   const purchasesSorted = [...purchases].sort((left, right) => {
@@ -672,6 +757,7 @@ function buildDashboardFromData(
     orders,
     activities,
     userDistribution,
+    feedErrors,
   };
 }
 
@@ -910,15 +996,16 @@ function formatDashboardLabel(value: string | null | undefined, maxLength = 80):
 
 function shortOrderId(orderId: string): string {
   const compact = formatDashboardLabel(orderId, 64).replace(/-/g, "");
-  return `#${compact.slice(0, 8).toUpperCase()}`;
+  return compact ? `#${compact.slice(0, 8).toUpperCase()}` : "#UNKNOWN";
 }
 
 function shortUserId(userId: string): string {
-  return formatDashboardLabel(userId, 32).slice(0, 8);
+  return formatDashboardLabel(userId, 32).slice(0, 8) || "unknown";
 }
 
 function shortConversationId(conversationId: string): string {
-  return `#${formatDashboardLabel(conversationId, 32).slice(0, 6).toUpperCase()}`;
+  const compact = formatDashboardLabel(conversationId, 32).slice(0, 6).toUpperCase();
+  return compact ? `#${compact}` : "#UNKNOWN";
 }
 
 function formatRelativeTime(value: string | null | undefined, locale: Locale): string {

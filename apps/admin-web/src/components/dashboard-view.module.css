@@ -25,9 +25,16 @@
 
 .cardTitleWithIcon,
 .cardActionLink {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
+}
+
+.cardTitleWithIcon span,
+.cardActionLink span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cardTitleIcon,
@@ -49,7 +56,8 @@
   color: var(--info);
   font-weight: 600;
   font-size: 0.78rem;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
+  text-align: right;
   text-transform: uppercase;
 }
 
@@ -70,6 +78,19 @@
   width: 100%;
   height: 12.5rem;
   display: block;
+}
+
+.chartDataTable {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .donutLayout {
@@ -148,6 +169,10 @@
   list-style: none;
 }
 
+.feedWarning {
+  margin-bottom: 0.7rem;
+}
+
 .activityItem {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -177,7 +202,7 @@
 }
 
 .activityIconSuccess {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
 }
 
 .activityIconInfo {
@@ -189,7 +214,7 @@
 }
 
 .activityIconDanger {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 86%, var(--text-strong));
 }
 
 .activityBody {
@@ -240,11 +265,32 @@
     height: 11.5rem;
   }
 
+  .cardActionLink {
+    text-align: left;
+  }
+
   .donutLayout {
     grid-template-columns: 1fr;
   }
 
   .donutSvg {
     width: min(11rem, 100%);
+  }
+
+  .legendItem {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .legendLabel {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .legendPercent,
+  .legendCount {
+    grid-column: 2;
   }
 }

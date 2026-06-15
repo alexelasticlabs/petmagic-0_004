@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { CaretDownIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -15,6 +16,7 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/generations-page.module.css";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
@@ -85,24 +87,30 @@ function getCopy(locale: Locale) {
     details: isRu ? "Детали" : "Details",
     showDetails: isRu ? "Показать" : "Show",
     hideDetails: isRu ? "Скрыть" : "Hide",
-    before: isRu ? "Before" : "Before",
-    after: isRu ? "After" : "After",
+    before: isRu ? "До" : "Before",
+    after: isRu ? "После" : "After",
     compareReady: isRu ? "Доступно" : "Available",
     compareUnavailable: isRu ? "Недоступно" : "Unavailable",
-    compareState: isRu ? "Compare" : "Compare",
+    compareState: isRu ? "Сравнение" : "Compare",
     sourceType: isRu ? "Источник" : "Source type",
-    inputAsset: isRu ? "Input asset" : "Input asset",
-    resultAsset: isRu ? "Result asset" : "Result asset",
-    pet: isRu ? "Pet" : "Pet",
-    petPhoto: isRu ? "Pet photo" : "Pet photo",
+    inputAsset: isRu ? "Входной asset" : "Input asset",
+    resultAsset: isRu ? "Результат asset" : "Result asset",
+    pet: isRu ? "Питомец" : "Pet",
+    petPhoto: isRu ? "Фото питомца" : "Pet photo",
     previewMissing: isRu ? "Превью недоступно" : "Preview unavailable",
-    debugTitle: isRu ? "Debug" : "Debug",
+    debugTitle: isRu ? "Отладка" : "Debug",
     emptyTitle: isRu ? "Генераций не найдено" : "No generations found",
     emptyDescription: isRu
       ? "Измените фильтры или дождитесь новых заданий генерации."
       : "Adjust filters or wait for new generation jobs.",
     loadingTitle: isRu ? "Загрузка генераций" : "Loading generations",
     errorTitle: isRu ? "Не удалось загрузить генерации" : "Failed to load generations",
+    metricsErrorTitle: isRu
+      ? "Сводка генераций временно недоступна"
+      : "Generation summary temporarily unavailable",
+    metricsErrorDescription: isRu
+      ? "История генераций загружается отдельно; повторите запрос, чтобы обновить верхние счётчики."
+      : "Generation history loads separately; retry to refresh the top counters.",
     retry: isRu ? "Повторить" : "Retry",
     job: isRu ? "Задание" : "Job",
     user: isRu ? "Пользователь" : "User",
@@ -113,14 +121,17 @@ function getCopy(locale: Locale) {
     attempts: isRu ? "Попытки" : "Attempts",
     failure: isRu ? "Ошибка" : "Failure",
     watermark: isRu ? "Watermark" : "Watermark",
-    watermarkClean: isRu ? "Clean" : "Clean",
-    watermarkApplied: isRu ? "Watermarked" : "Watermarked",
+    watermarkClean: isRu ? "Без watermark" : "Clean",
+    watermarkApplied: isRu ? "С watermark" : "Watermarked",
     watermarkNotRequired: isRu ? "Не требуется" : "Not required",
     watermarkRemoved: isRu ? "Снят" : "Removed",
     watermarkPending: isRu ? "Подготовка" : "Preparing",
     watermarkUnlockedBy: isRu ? "кем" : "by",
-    grantClean: isRu ? "Grant clean" : "Grant clean",
-    grantingClean: isRu ? "Granting..." : "Granting...",
+    grantClean: isRu ? "Выдать clean" : "Grant clean",
+    grantingClean: isRu ? "Выдаём..." : "Granting...",
+    grantCleanError: isRu
+      ? "Не удалось выдать clean download."
+      : "Failed to grant clean download.",
     created: isRu ? "Создана" : "Created",
     completedAt: isRu ? "Завершена" : "Completed",
     noFailure: isRu ? "Нет" : "None",
@@ -133,8 +144,11 @@ function getCopy(locale: Locale) {
     of: isRu ? "из" : "of",
     templateImage: isRu ? "Изображение" : "Image",
     templateVideo: isRu ? "Видео" : "Video",
-    feedbackTab: isRu ? "Feedback" : "Feedback",
+    feedbackTab: isRu ? "Отзывы" : "Feedback",
     feedbackEmpty: isRu ? "Feedback по генерации пока нет" : "No feedback for this generation yet",
+    feedbackError: isRu
+      ? "Не удалось загрузить feedback по этой генерации"
+      : "Failed to load feedback for this generation",
   };
 }
 
@@ -249,6 +263,7 @@ function GenerationRow({
   text,
   onGrantClean,
   grantingGenerationId,
+  grantCleanPending,
   isExpanded,
   onToggleDetails,
 }: {
@@ -257,6 +272,7 @@ function GenerationRow({
   text: ReturnType<typeof getCopy>;
   onGrantClean: (generationId: string) => void;
   grantingGenerationId: string | null;
+  grantCleanPending: boolean;
   isExpanded: boolean;
   onToggleDetails: (generationId: string) => void;
 }) {
@@ -267,6 +283,9 @@ function GenerationRow({
   const generationIdText = formatShortId(item.generationId);
   const userIdText = formatShortId(item.userId);
   const templateIdText = formatShortId(item.templateId);
+  const detailsPanelId = `generation-details-${item.generationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const toggleDetailsLabel = `${isExpanded ? text.hideDetails : text.showDetails}: ${generationIdText}`;
+  const grantCleanLabel = `${text.grantClean}: ${generationIdText}`;
   const parentTitle = item.parentTemplateTitle
     ? sanitizeSensitiveText(item.parentTemplateTitle, 48)
     : item.similarToGenerationId
@@ -312,6 +331,14 @@ function GenerationRow({
   });
   const feedbackItems = feedbackQuery.data?.items ?? [];
 
+  function requestFeedbackRetry() {
+    if (feedbackQuery.isFetching) {
+      return;
+    }
+
+    void feedbackQuery.refetch().catch(() => undefined);
+  }
+
   return (
     <>
       <tr>
@@ -324,6 +351,10 @@ function GenerationRow({
               type="button"
               className={styles.inlineAction}
               onClick={() => onToggleDetails(item.generationId)}
+              aria-expanded={isExpanded}
+              aria-controls={detailsPanelId}
+              aria-label={toggleDetailsLabel}
+              title={toggleDetailsLabel}
             >
               {isExpanded ? text.hideDetails : text.showDetails}
             </button>
@@ -382,8 +413,10 @@ function GenerationRow({
               <button
                 type="button"
                 className={styles.inlineAction}
-                disabled={grantingGenerationId === item.generationId}
+                disabled={grantCleanPending}
                 onClick={() => onGrantClean(item.generationId)}
+                aria-label={grantCleanLabel}
+                title={grantCleanLabel}
               >
                 {grantingGenerationId === item.generationId ? text.grantingClean : text.grantClean}
               </button>
@@ -396,17 +429,24 @@ function GenerationRow({
       {isExpanded ? (
         <tr>
           <td colSpan={12} className={styles.detailsCell}>
-            <div className={styles.detailsPanel}>
+            <div className={styles.detailsPanel} id={detailsPanelId}>
               <div className={styles.previewGrid}>
                 <section className={styles.previewCard}>
                   <header>
                     <strong>{text.before}</strong>
                   </header>
                   {item.inputPreviewUrl ? (
-                    <img
+                    <TemplateSecureMedia
                       className={styles.previewImage}
-                      src={item.inputPreviewUrl}
+                      url={item.inputPreviewUrl}
+                      kind="image"
                       alt={text.before}
+                      width={512}
+                      height={512}
+                      logContext={{
+                        surface: "generations-before-preview",
+                        templateId: item.templateId,
+                      }}
                     />
                   ) : (
                     <div className={styles.previewFallback}>{text.previewMissing}</div>
@@ -417,10 +457,17 @@ function GenerationRow({
                     <strong>{text.after}</strong>
                   </header>
                   {item.resultPreviewUrl ? (
-                    <img
+                    <TemplateSecureMedia
                       className={styles.previewImage}
-                      src={item.resultPreviewUrl}
+                      url={item.resultPreviewUrl}
+                      kind="image"
                       alt={text.after}
+                      width={512}
+                      height={512}
+                      logContext={{
+                        surface: "generations-after-preview",
+                        templateId: item.templateId,
+                      }}
                     />
                   ) : (
                     <div className={styles.previewFallback}>{text.previewMissing}</div>
@@ -468,6 +515,22 @@ function GenerationRow({
                 </header>
                 {feedbackQuery.isLoading ? (
                   <p>{text.loadingTitle}</p>
+                ) : feedbackQuery.isError ? (
+                  <AdminStateCard
+                    tone="warning"
+                    title={text.feedbackError}
+                    description={getAdminErrorMessage(feedbackQuery.error, text.feedbackError)}
+                    action={
+                      <button
+                        type="button"
+                        className={styles.button}
+                        disabled={feedbackQuery.isFetching}
+                        onClick={requestFeedbackRetry}
+                      >
+                        {text.retry}
+                      </button>
+                    }
+                  />
                 ) : feedbackItems.length === 0 ? (
                   <p>{text.feedbackEmpty}</p>
                 ) : (
@@ -509,7 +572,11 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
   const [provider, setProvider] = useState("");
   const [user, setUser] = useState("");
   const [search, setSearch] = useState("");
-  const [expandedGenerationId, setExpandedGenerationId] = useState<string | null>(null);
+  const [expandedGeneration, setExpandedGeneration] = useState<{
+    queryKey: string;
+    generationId: string;
+  } | null>(null);
+  const [grantCleanError, setGrantCleanError] = useState<string | null>(null);
 
   const debouncedProvider = useDebouncedValue(provider, 350);
   const debouncedUser = useDebouncedValue(user, 350);
@@ -531,6 +598,9 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
       }),
     [debouncedProvider, debouncedSearch, debouncedUser, pageIndex, status]
   );
+  const queryKey = JSON.stringify(query);
+  const expandedGenerationId =
+    expandedGeneration?.queryKey === queryKey ? expandedGeneration.generationId : null;
 
   const generationsQuery = useQuery({
     queryKey: adminQueryKeys.templateGenerations(query),
@@ -546,17 +616,84 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
     staleTime: 30_000,
   });
 
-  const page = generationsQuery.data;
-  const items = page?.items ?? [];
-  const totalCount = page?.totalCount ?? 0;
-  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const visiblePage = generationsQuery.isPlaceholderData ? undefined : generationsQuery.data;
+  const visibleItems = useMemo(() => visiblePage?.items ?? [], [visiblePage]);
+  const visibleTotalCount = visiblePage?.totalCount ?? 0;
+  const visiblePageCount = Math.max(1, Math.ceil(visibleTotalCount / PAGE_SIZE));
+  const visibleGenerationIds = useMemo(
+    () => new Set(visibleItems.map((item) => item.generationId)),
+    [visibleItems]
+  );
+  const isGenerationsRefreshing = generationsQuery.isFetching && generationsQuery.isPlaceholderData;
+  const areGenerationFiltersLocked = generationsQuery.isFetching;
   const generationMetrics = generationMetricsQuery.data ?? null;
   const grantCleanMutation = useMutation({
     mutationFn: grantAdminGenerationCleanDownload,
+    onMutate: () => {
+      setGrantCleanError(null);
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) }),
+      ]);
+    },
+    onError: (error) => {
+      setGrantCleanError(getAdminErrorMessage(error, text.grantCleanError));
     },
   });
+  const grantingGenerationId = grantCleanMutation.variables ?? null;
+  const isGrantCleanLocked = grantCleanMutation.isPending || generationsQuery.isFetching;
+
+  useEffect(() => {
+    if (!expandedGenerationId || visibleGenerationIds.has(expandedGenerationId)) {
+      return;
+    }
+
+    queueMicrotask(() => setExpandedGeneration(null));
+  }, [expandedGenerationId, visibleGenerationIds]);
+
+  function resetGenerationListContext(nextPageIndex = 0) {
+    setExpandedGeneration(null);
+    setPageIndex(nextPageIndex);
+  }
+
+  function requestGenerationMetricsRetry() {
+    if (!canViewGenerations || generationMetricsQuery.isFetching) {
+      return;
+    }
+
+    void generationMetricsQuery.refetch().catch(() => undefined);
+  }
+
+  function requestGenerationsRetry() {
+    if (!canViewGenerations || generationsQuery.isFetching) {
+      return;
+    }
+
+    void generationsQuery.refetch().catch(() => undefined);
+  }
+
+  function requestGrantClean(generationId: string) {
+    if (!canViewGenerations || isGrantCleanLocked) {
+      return;
+    }
+
+    grantCleanMutation.mutate(generationId);
+  }
+
+  if (!canViewGenerations) {
+    return (
+      <section className={styles.page}>
+        <AdminPageHero
+          eyebrow={text.eyebrow}
+          title={text.title}
+          description={text.description}
+          badge={<AdminBadge tone="danger">{text.adminOnly}</AdminBadge>}
+        />
+        <AdminStateCard tone="info" title={text.loadingTitle} />
+      </section>
+    );
+  }
 
   return (
     <section className={styles.page}>
@@ -605,6 +742,28 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
         />
       </div>
 
+      {generationMetricsQuery.isError ? (
+        <AdminStateCard
+          className={styles.metricsWarning}
+          tone="warning"
+          title={text.metricsErrorTitle}
+          description={getAdminErrorMessage(
+            generationMetricsQuery.error,
+            text.metricsErrorDescription
+          )}
+          action={
+            <button
+              type="button"
+              className={styles.button}
+              disabled={!canViewGenerations || generationMetricsQuery.isFetching}
+              onClick={requestGenerationMetricsRetry}
+            >
+              {text.retry}
+            </button>
+          }
+        />
+      ) : null}
+
       <AdminCard title={text.filtersTitle} description={text.filtersDescription}>
         <div className={styles.filters}>
           <label className={styles.field}>
@@ -612,9 +771,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <input
               className={styles.input}
               value={search}
+              disabled={areGenerationFiltersLocked}
               onChange={(event) => {
                 setSearch(event.target.value.slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH));
-                setPageIndex(0);
+                resetGenerationListContext();
               }}
               maxLength={GENERATION_SEARCH_FILTER_MAX_LENGTH}
               placeholder={text.searchPlaceholder}
@@ -625,9 +785,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <select
               className={styles.select}
               value={status}
+              disabled={areGenerationFiltersLocked}
               onChange={(event) => {
                 setStatus(event.target.value as StatusFilter);
-                setPageIndex(0);
+                resetGenerationListContext();
               }}
             >
               {statusOptions.map((option) => (
@@ -642,9 +803,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <input
               className={styles.input}
               value={provider}
+              disabled={areGenerationFiltersLocked}
               onChange={(event) => {
                 setProvider(event.target.value.slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH));
-                setPageIndex(0);
+                resetGenerationListContext();
               }}
               maxLength={GENERATION_PROVIDER_FILTER_MAX_LENGTH}
               placeholder={text.providerPlaceholder}
@@ -655,9 +817,10 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <input
               className={styles.input}
               value={user}
+              disabled={areGenerationFiltersLocked}
               onChange={(event) => {
                 setUser(event.target.value.slice(0, GENERATION_USER_FILTER_MAX_LENGTH));
-                setPageIndex(0);
+                resetGenerationListContext();
               }}
               maxLength={GENERATION_USER_FILTER_MAX_LENGTH}
               placeholder={text.userPlaceholder}
@@ -666,7 +829,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
         </div>
       </AdminCard>
 
-      {generationsQuery.isLoading ? (
+      {generationsQuery.isLoading || isGenerationsRefreshing ? (
         <AdminStateCard title={text.loadingTitle} />
       ) : generationsQuery.isError ? (
         <AdminStateCard
@@ -678,19 +841,13 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
               type="button"
               className={styles.button}
               disabled={!canViewGenerations || generationsQuery.isFetching}
-              onClick={() => {
-                if (!canViewGenerations) {
-                  return;
-                }
-
-                void generationsQuery.refetch().catch(() => undefined);
-              }}
+              onClick={requestGenerationsRetry}
             >
               {text.retry}
             </button>
           }
         />
-      ) : items.length === 0 ? (
+      ) : visibleItems.length === 0 ? (
         <AdminStateCard title={text.emptyTitle} description={text.emptyDescription} />
       ) : (
         <AdminCard
@@ -698,11 +855,14 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <span className={styles.tableHeader}>
               <span className={styles.tableTitle}>{text.tableTitle}</span>
               <span className={styles.tableMeta}>
-                {totalCount} total / {formatDateTime(page?.generatedAtUtc, locale)}
+                {visibleTotalCount} total / {formatDateTime(visiblePage?.generatedAtUtc, locale)}
               </span>
             </span>
           }
         >
+          {grantCleanError ? (
+            <AdminStateCard tone="warning" title={grantCleanError} />
+          ) : null}
           <div
             className={adminTableStyles.tableWrap}
             aria-busy={generationsQuery.isFetching ? "true" : undefined}
@@ -725,18 +885,21 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {visibleItems.map((item) => (
                   <GenerationRow
                     key={item.generationId}
                     item={item}
                     locale={locale}
                     text={text}
-                    grantingGenerationId={grantCleanMutation.variables ?? null}
-                    onGrantClean={(generationId) => grantCleanMutation.mutate(generationId)}
+                    grantingGenerationId={grantingGenerationId}
+                    grantCleanPending={isGrantCleanLocked}
+                    onGrantClean={requestGrantClean}
                     isExpanded={expandedGenerationId === item.generationId}
                     onToggleDetails={(generationId) =>
-                      setExpandedGenerationId((current) =>
-                        current === generationId ? null : generationId
+                      setExpandedGeneration((current) =>
+                        current?.queryKey === queryKey && current.generationId === generationId
+                          ? null
+                          : { queryKey, generationId }
                       )
                     }
                   />
@@ -746,25 +909,27 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
           </div>
           <div className={styles.pager}>
             <span className={styles.pageInfo}>
-              {text.page} {pageIndex + 1} {text.of} {pageCount}
+              {text.page} {pageIndex + 1} {text.of} {visiblePageCount}
             </span>
             <button
               type="button"
-              className={styles.button}
+              className={`${styles.button} ${styles.pagerButton}`}
               disabled={pageIndex === 0 || generationsQuery.isFetching}
               aria-label={text.previousPageLabel}
-              onClick={() => setPageIndex((value) => Math.max(0, value - 1))}
+              title={text.previousPageLabel}
+              onClick={() => resetGenerationListContext(Math.max(0, pageIndex - 1))}
             >
-              {text.previous}
+              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
             </button>
             <button
               type="button"
-              className={styles.button}
-              disabled={!page?.hasMore || generationsQuery.isFetching}
+              className={`${styles.button} ${styles.pagerButton}`}
+              disabled={!visiblePage?.hasMore || generationsQuery.isFetching}
               aria-label={text.nextPageLabel}
-              onClick={() => setPageIndex((value) => value + 1)}
+              title={text.nextPageLabel}
+              onClick={() => resetGenerationListContext(pageIndex + 1)}
             >
-              {text.next}
+              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
             </button>
           </div>
         </AdminCard>

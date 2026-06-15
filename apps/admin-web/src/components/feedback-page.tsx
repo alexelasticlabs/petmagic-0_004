@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { CaretDownIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -14,9 +15,12 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import styles from "@/components/feedback-page.module.css";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
+  ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,
+  ADMIN_FEEDBACK_FILTER_MAX_LENGTH,
   fetchAdminFeedback,
   fetchAdminFeedbackDetails,
   fetchAdminUser,
@@ -80,10 +84,10 @@ function copy(locale: Locale) {
     type: isRu ? "Тип" : "Type",
     category: isRu ? "Категория" : "Category",
     platform: isRu ? "Платформа" : "Platform",
-    templateId: isRu ? "Template id" : "Template id",
-    userId: isRu ? "User id" : "User id",
-    from: isRu ? "From" : "From",
-    to: isRu ? "To" : "To",
+    templateId: isRu ? "ID шаблона" : "Template id",
+    userId: isRu ? "ID пользователя" : "User id",
+    from: isRu ? "С даты" : "From",
+    to: isRu ? "По дату" : "To",
     user: isRu ? "Пользователь" : "User",
     date: isRu ? "Дата" : "Date",
     rating: isRu ? "Рейтинг" : "Rating",
@@ -96,17 +100,32 @@ function copy(locale: Locale) {
     error: isRu ? "Не удалось загрузить feedback" : "Failed to load feedback",
     detailsLoading: isRu ? "Загрузка деталей feedback" : "Loading feedback details",
     detailsError: isRu ? "Не удалось загрузить детали feedback" : "Failed to load feedback details",
+    userContextErrorTitle: isRu
+      ? "Контекст пользователя временно недоступен"
+      : "User context temporarily unavailable",
+    userContextErrorDescription: isRu
+      ? "Детали feedback загружены, но профиль или аналитика пользователя не ответили."
+      : "Feedback details loaded, but the user profile or analytics did not respond.",
     retry: isRu ? "Повторить" : "Retry",
     save: isRu ? "Сохранить" : "Save",
-    saveError: isRu ? "Не удалось сохранить изменения feedback." : "Failed to save feedback changes.",
-    refund: isRu ? "Refund credits" : "Refund credits",
-    refunded: isRu ? "Refund issued" : "Refund issued",
+    saveError: isRu
+      ? "Не удалось сохранить изменения feedback."
+      : "Failed to save feedback changes.",
+    refund: isRu ? "Вернуть кредиты" : "Refund credits",
+    refunded: isRu ? "Кредиты возвращены" : "Refund issued",
     refundError: isRu ? "Не удалось вернуть кредиты." : "Failed to refund credits.",
-    note: isRu ? "Admin note" : "Admin note",
+    note: isRu ? "Заметка администратора" : "Admin note",
     generation: isRu ? "Генерация" : "Generation",
-    input: isRu ? "Input" : "Input",
-    result: isRu ? "Result" : "Result",
+    input: isRu ? "Входные данные" : "Input",
+    result: isRu ? "Результат" : "Result",
     technical: isRu ? "Технический контекст" : "Technical context",
+    planCredits: isRu ? "План / кредиты" : "Plan / credits",
+    source: isRu ? "Источник" : "Source",
+    app: isRu ? "Версия приложения" : "App",
+    device: isRu ? "Устройство" : "Device",
+    provider: isRu ? "Провайдер" : "Provider",
+    errorCode: isRu ? "Код ошибки" : "Error",
+    credits: isRu ? "кредитов" : "credits",
     all: isRu ? "Все" : "All",
     previous: isRu ? "Назад" : "Previous",
     next: isRu ? "Вперёд" : "Next",
@@ -189,7 +208,20 @@ function FeedbackRow({
         <AdminStatusBadge color={toneForPriority(item.priority)}>{item.priority}</AdminStatusBadge>
       </td>
       <td>
-        {item.previewUrl ? <img className={styles.preview} src={item.previewUrl} alt="" /> : "-"}
+        {item.previewUrl ? (
+          <TemplateSecureMedia
+            className={styles.preview}
+            url={item.previewUrl}
+            kind="image"
+            alt=""
+            ariaHidden
+            width={72}
+            height={72}
+            logContext={{ surface: "feedback-list-preview" }}
+          />
+        ) : (
+          "-"
+        )}
       </td>
       <td className={styles.message}>
         {item.message ? sanitizeSensitiveText(item.message, 180) : "-"}
@@ -203,7 +235,15 @@ function FeedbackRow({
   );
 }
 
-function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; locale: Locale }) {
+function DetailsPanel({
+  details,
+  isDetailsFetching,
+  locale,
+}: {
+  details: AdminFeedbackDetails;
+  isDetailsFetching: boolean;
+  locale: Locale;
+}) {
   const text = copy(locale);
   const queryClient = useQueryClient();
   const [status, setStatus] = useState((details.status as FeedbackStatus) || "New");
@@ -212,8 +252,10 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
   const updateMutation = useMutation({
     mutationFn: () => updateAdminFeedback(details.id, { status, priority, adminNote }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] }),
+      ]);
     },
   });
   const refundMutation = useMutation({
@@ -223,10 +265,34 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
         reason: `Feedback refund ${details.id}`,
       }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] }),
+      ]);
     },
   });
+  const isFeedbackActionLocked =
+    updateMutation.isPending || refundMutation.isPending || isDetailsFetching;
+  const isFeedbackDraftDirty =
+    status !== ((details.status as FeedbackStatus) || "New") ||
+    priority !== ((details.priority as FeedbackPriority) || "Low") ||
+    adminNote !== (details.adminNote ?? "");
+  const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;
+  const isRefundFeedbackDisabled = !details.canRefund || isFeedbackActionLocked;
+  const requestSaveFeedback = () => {
+    if (isSaveFeedbackDisabled) {
+      return;
+    }
+
+    updateMutation.mutate();
+  };
+  const requestRefundFeedback = () => {
+    if (isRefundFeedbackDisabled) {
+      return;
+    }
+
+    refundMutation.mutate();
+  };
   const userQuery = useQuery({
     queryKey: details.userId
       ? adminQueryKeys.userDetail(details.userId)
@@ -255,44 +321,90 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
     (userAnalyticsQuery.isLoading
       ? text.userContextLoading
       : (userAnalyticsQuery.data?.summary.walletBalance ?? "-"));
+  const hasUserContextError = Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError);
+  const isUserContextFetching = userQuery.isFetching || userAnalyticsQuery.isFetching;
 
   return (
     <AdminCard title={text.details}>
-      <div className={styles.details}>
-        <div className={styles.detailGrid}>
-          <Detail label={text.type} value={details.type} />
-          <Detail label={text.category} value={details.category} />
-          <Detail label={text.rating} value={ratingLabel(details.rating)} />
-          <Detail label={text.user} value={userQuery.data?.email ?? shortId(details.userId)} />
-          <Detail label="Plan / credits" value={`${userPlan} / ${userCredits}`} />
-          <Detail label="Source" value={details.sourceScreen} />
-          <Detail label={text.platform} value={details.platform ?? "-"} />
-          <Detail label="App" value={details.appVersion ?? "-"} />
-          <Detail label="Device" value={details.deviceModel ?? "-"} />
-          <Detail
-            label="Provider"
-            value={details.providerName ?? details.generation?.providerName ?? "-"}
-          />
-          <Detail label="Error" value={details.errorCode ?? details.generation?.errorCode ?? "-"} />
-          <Detail label={text.message} value={details.message ?? "-"} />
-          <Detail label={text.date} value={formatDateTime(details.createdAtUtc, locale)} />
+      <div className={styles.details} aria-busy={isDetailsFetching ? "true" : undefined}>
+        <div className={styles.detailsMain}>
+          <div className={styles.detailGrid}>
+            <Detail label={text.type} value={details.type} />
+            <Detail label={text.category} value={details.category} />
+            <Detail label={text.rating} value={ratingLabel(details.rating)} />
+            <Detail label={text.user} value={userQuery.data?.email ?? shortId(details.userId)} />
+            <Detail label={text.planCredits} value={`${userPlan} / ${userCredits}`} />
+            <Detail label={text.source} value={details.sourceScreen} />
+            <Detail label={text.platform} value={details.platform ?? "-"} />
+            <Detail label={text.app} value={details.appVersion ?? "-"} />
+            <Detail label={text.device} value={details.deviceModel ?? "-"} />
+            <Detail
+              label={text.provider}
+              value={details.providerName ?? details.generation?.providerName ?? "-"}
+            />
+            <Detail
+              label={text.errorCode}
+              value={details.errorCode ?? details.generation?.errorCode ?? "-"}
+            />
+            <Detail label={text.message} value={details.message ?? "-"} />
+            <Detail label={text.date} value={formatDateTime(details.createdAtUtc, locale)} />
+          </div>
+          {hasUserContextError ? (
+            <AdminStateCard
+              tone="warning"
+              title={text.userContextErrorTitle}
+              description={getAdminErrorMessage(
+                userQuery.error ?? userAnalyticsQuery.error,
+                text.userContextErrorDescription
+              )}
+              action={
+                <button
+                  className={styles.button}
+                  type="button"
+                  disabled={isUserContextFetching}
+                  onClick={() => {
+                    void Promise.allSettled([
+                      userQuery.refetch(),
+                      userAnalyticsQuery.refetch(),
+                    ]);
+                  }}
+                >
+                  {text.retry}
+                </button>
+              }
+            />
+          ) : null}
         </div>
         <div>
           {details.generation ? (
             <>
               <div className={styles.previewGrid}>
                 {details.generation.inputPreviewUrl ? (
-                  <img
+                  <TemplateSecureMedia
                     className={styles.largePreview}
-                    src={details.generation.inputPreviewUrl}
+                    url={details.generation.inputPreviewUrl}
+                    kind="image"
                     alt={text.input}
+                    width={512}
+                    height={512}
+                    logContext={{
+                      surface: "feedback-generation-input-preview",
+                      templateId: details.generation.templateId,
+                    }}
                   />
                 ) : null}
                 {details.generation.resultPreviewUrl ? (
-                  <img
+                  <TemplateSecureMedia
                     className={styles.largePreview}
-                    src={details.generation.resultPreviewUrl}
+                    url={details.generation.resultPreviewUrl}
+                    kind="image"
                     alt={text.result}
+                    width={512}
+                    height={512}
+                    logContext={{
+                      surface: "feedback-generation-result-preview",
+                      templateId: details.generation.templateId,
+                    }}
                   />
                 ) : null}
               </div>
@@ -300,7 +412,7 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
                 <span>{text.generation}</span>
                 <strong>
                   {shortId(details.generation.generationId)} / {details.generation.creditsCharged}{" "}
-                  credits
+                  {text.credits}
                 </strong>
               </div>
             </>
@@ -310,6 +422,7 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
             <select
               className={styles.select}
               value={status}
+              disabled={isFeedbackActionLocked}
               onChange={(event) => setStatus(event.target.value as FeedbackStatus)}
             >
               {statusOptions
@@ -324,6 +437,7 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
             <select
               className={styles.select}
               value={priority}
+              disabled={isFeedbackActionLocked}
               onChange={(event) => setPriority(event.target.value as FeedbackPriority)}
             >
               {priorityOptions
@@ -338,7 +452,11 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
             <textarea
               className={styles.textarea}
               value={adminNote}
-              onChange={(event) => setAdminNote(event.target.value)}
+              maxLength={ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH}
+              disabled={isFeedbackActionLocked}
+              onChange={(event) =>
+                setAdminNote(event.target.value.slice(0, ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH))
+              }
             />
           </div>
           {updateMutation.isError ? (
@@ -357,16 +475,16 @@ function DetailsPanel({ details, locale }: { details: AdminFeedbackDetails; loca
             <button
               className={styles.button}
               type="button"
-              disabled={updateMutation.isPending || refundMutation.isPending}
-              onClick={() => updateMutation.mutate()}
+              disabled={isSaveFeedbackDisabled}
+              onClick={requestSaveFeedback}
             >
               {text.save}
             </button>
             <button
               className={`${styles.button} ${details.canRefund ? styles.danger : ""}`}
               type="button"
-              disabled={!details.canRefund || updateMutation.isPending || refundMutation.isPending}
-              onClick={() => refundMutation.mutate()}
+              disabled={isRefundFeedbackDisabled}
+              onClick={requestRefundFeedback}
             >
               {details.refund ? text.refunded : text.refund}
             </button>
@@ -454,8 +572,78 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
     enabled: canView && Boolean(selectedId),
   });
   const pageData = feedbackQuery.data;
+  const visiblePageData = feedbackQuery.isPlaceholderData ? undefined : pageData;
+  const visibleFeedbackItems = useMemo(
+    () => visiblePageData?.items ?? [],
+    [visiblePageData]
+  );
+  const isFeedbackRefreshing = feedbackQuery.isFetching && feedbackQuery.isPlaceholderData;
   const isFeedbackFetching = feedbackQuery.isFetching;
+  const areFeedbackFiltersLocked = isFeedbackFetching;
   const isDetailsFetching = detailsQuery.isFetching;
+  const visibleFeedbackIds = useMemo(
+    () => new Set(visibleFeedbackItems.map((item) => item.id)),
+    [visibleFeedbackItems]
+  );
+
+  useEffect(() => {
+    if (!visiblePageData || !selectedId || visibleFeedbackIds.has(selectedId)) {
+      return;
+    }
+
+    queueMicrotask(() => setSelectedId(null));
+  }, [selectedId, visibleFeedbackIds, visiblePageData]);
+
+  function resetFeedbackSelection(nextPage = 0) {
+    setSelectedId(null);
+    setPage(nextPage);
+  }
+
+  function requestFeedbackPageChange(nextPage: number) {
+    if (isFeedbackFetching) {
+      return;
+    }
+
+    if (nextPage < 0) {
+      return;
+    }
+
+    if (nextPage > page && !visiblePageData?.hasMore) {
+      return;
+    }
+
+    resetFeedbackSelection(nextPage);
+  }
+
+  function requestFeedbackRetry() {
+    if (isFeedbackFetching) {
+      return;
+    }
+
+    void feedbackQuery.refetch().catch(() => undefined);
+  }
+
+  function requestDetailsRetry() {
+    if (isDetailsFetching) {
+      return;
+    }
+
+    void detailsQuery.refetch().catch(() => undefined);
+  }
+
+  if (!canView) {
+    return (
+      <main className={styles.page}>
+        <AdminPageHero
+          eyebrow={text.eyebrow}
+          title={text.title}
+          description={text.description}
+          badge={<AdminBadge tone="info">0</AdminBadge>}
+        />
+        <AdminStateCard title={text.loading} />
+      </main>
+    );
+  }
 
   return (
     <main className={styles.page}>
@@ -463,7 +651,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
         eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
-        badge={<AdminBadge tone="info">{pageData?.totalCount ?? 0}</AdminBadge>}
+        badge={<AdminBadge tone="info">{visiblePageData?.totalCount ?? 0}</AdminBadge>}
       />
       <AdminCard title={text.filters}>
         <div className={styles.filters}>
@@ -471,77 +659,90 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
             label={text.status}
             value={status}
             options={statusOptions}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setStatus(value as typeof status);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Select
             label={text.priority}
             value={priority}
             options={priorityOptions}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setPriority(value as typeof priority);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Select
             label={text.type}
             value={type}
             options={typeOptions}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setType(value as typeof type);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.category}
             value={category}
+            maxLength={ADMIN_FEEDBACK_FILTER_MAX_LENGTH}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setCategory(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.platform}
             value={platform}
+            maxLength={ADMIN_FEEDBACK_FILTER_MAX_LENGTH}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setPlatform(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.templateId}
             value={templateId}
+            maxLength={ADMIN_FEEDBACK_FILTER_MAX_LENGTH}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setTemplateId(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.userId}
             value={userId}
+            maxLength={ADMIN_FEEDBACK_FILTER_MAX_LENGTH}
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setUserId(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.from}
             value={fromUtc}
             type="date"
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setFromUtc(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
           <Field
             label={text.to}
             value={toUtc}
             type="date"
+            disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setToUtc(value);
-              setPage(0);
+              resetFeedbackSelection();
             }}
           />
         </div>
@@ -551,12 +752,12 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
           <div className={styles.tableHeader}>
             <h2 className={styles.tableTitle}>{text.table}</h2>
             <span className={styles.meta}>
-              {pageData ? `${pageData.items.length} / ${pageData.totalCount}` : ""}
+              {visiblePageData ? `${visibleFeedbackItems.length} / ${visiblePageData.totalCount}` : ""}
             </span>
           </div>
         }
       >
-        {feedbackQuery.isLoading ? (
+        {feedbackQuery.isLoading || isFeedbackRefreshing ? (
           <AdminStateCard title={text.loading} />
         ) : feedbackQuery.isError ? (
           <AdminStateCard
@@ -567,15 +768,13 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
                 className={styles.button}
                 type="button"
                 disabled={isFeedbackFetching}
-                onClick={() => {
-                  void feedbackQuery.refetch().catch(() => undefined);
-                }}
+                onClick={requestFeedbackRetry}
               >
                 {text.retry}
               </button>
             }
           />
-        ) : !pageData?.items.length ? (
+        ) : visibleFeedbackItems.length === 0 ? (
           <AdminStateCard title={text.empty} />
         ) : (
           <div className={adminTableStyles.tableWrap}>
@@ -597,7 +796,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {pageData.items.map((item) => (
+                {visibleFeedbackItems.map((item) => (
                   <FeedbackRow
                     key={item.id}
                     item={item}
@@ -612,22 +811,28 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
         )}
         <div className={styles.actions}>
           <button
-            className={styles.button}
+            className={`${styles.button} ${styles.pagerButton}`}
             type="button"
             disabled={page === 0 || isFeedbackFetching}
             aria-label={text.previousPageLabel}
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            title={text.previousPageLabel}
+            onClick={() => {
+              requestFeedbackPageChange(page - 1);
+            }}
           >
-            {text.previous}
+            <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
           </button>
           <button
-            className={styles.button}
+            className={`${styles.button} ${styles.pagerButton}`}
             type="button"
-            disabled={!pageData?.hasMore || isFeedbackFetching}
+            disabled={!visiblePageData?.hasMore || isFeedbackFetching}
             aria-label={text.nextPageLabel}
-            onClick={() => setPage((current) => current + 1)}
+            title={text.nextPageLabel}
+            onClick={() => {
+              requestFeedbackPageChange(page + 1);
+            }}
           >
-            {text.next}
+            <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
           </button>
         </div>
       </AdminCard>
@@ -642,16 +847,25 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
               className={styles.button}
               type="button"
               disabled={isDetailsFetching}
-              onClick={() => {
-                void detailsQuery.refetch().catch(() => undefined);
-              }}
+              onClick={requestDetailsRetry}
             >
               {text.retry}
             </button>
           }
         />
       ) : detailsQuery.data ? (
-        <DetailsPanel key={detailsQuery.data.id} details={detailsQuery.data} locale={locale} />
+        <DetailsPanel
+          key={[
+            detailsQuery.data.id,
+            detailsQuery.data.status,
+            detailsQuery.data.priority,
+            detailsQuery.data.reviewedAtUtc ?? "",
+            detailsQuery.data.adminNote ?? "",
+          ].join(":")}
+          details={detailsQuery.data}
+          isDetailsFetching={isDetailsFetching}
+          locale={locale}
+        />
       ) : null}
     </main>
   );
@@ -661,11 +875,15 @@ function Field({
   label,
   value,
   type = "text",
+  maxLength,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
   type?: string;
+  maxLength?: number;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -675,7 +893,15 @@ function Field({
         className={styles.input}
         type={type}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        maxLength={maxLength}
+        disabled={disabled}
+        onChange={(event) =>
+          onChange(
+            typeof maxLength === "number"
+              ? event.target.value.slice(0, maxLength)
+              : event.target.value
+          )
+        }
       />
     </label>
   );
@@ -685,11 +911,13 @@ function Select({
   label,
   value,
   options,
+  disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
   options: readonly string[];
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -698,6 +926,7 @@ function Select({
       <select
         className={styles.select}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       >
         {options.map((option) => (

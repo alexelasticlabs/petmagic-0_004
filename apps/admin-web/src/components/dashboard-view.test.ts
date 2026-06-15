@@ -9,16 +9,36 @@ const dashboardChartsPath = fileURLToPath(
 const dashboardStylesPath = fileURLToPath(new URL("./dashboard-view.module.css", import.meta.url));
 
 describe("dashboard production data handling", () => {
-  it("fails the dashboard query instead of silently substituting zero metrics", () => {
+  it("fails required KPI data instead of silently substituting zero metrics", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
-    expect(source).toContain("await Promise.all([");
-    expect(source).not.toContain("Promise.allSettled");
+    expect(source).toContain("const requiredDataPromise = Promise.all([");
+    expect(source).toContain("fetchDashboardUsers(signal)");
+    expect(source).toContain("fetchPendingModerationQueueCount(signal)");
+    expect(source).toContain("fetchAdminTemplateGenerationMetrics(signal)");
+    expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
     expect(source).not.toContain("getEmptyGenerationMetrics");
     expect(source).not.toContain("generatedAtUtc: new Date(0).toISOString()");
   });
 
-  it("exposes retry and empty states for dashboard failures and empty live sections", () => {
+  it("keeps optional dashboard feeds partial and locally retryable", () => {
+    const source = readFileSync(dashboardViewPath, "utf8");
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(source).toContain("const optionalFeedPromise = Promise.allSettled([");
+    expect(source).toContain("fetchDashboardPurchases(signal)");
+    expect(source).toContain("fetchDashboardSupportConversations(signal)");
+    expect(source).toContain('feedErrors: {');
+    expect(source).toContain('purchases: purchasesUnavailable');
+    expect(source).toContain('supportConversations: supportConversationsUnavailable');
+    expect(source).toContain("viewModel.feedErrors.purchases ? (");
+    expect(source).toContain("Orders temporarily unavailable");
+    expect(source).toContain("Some activity is unavailable");
+    expect(source).toContain("dashboardQuery.refetch().catch(() => undefined)");
+    expect(stylesSource).toContain(".feedWarning");
+  });
+
+  it("exposes retry, busy, and empty states for dashboard failures and empty live sections", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
     expect(source).toContain(
@@ -31,10 +51,20 @@ describe("dashboard production data handling", () => {
     expect(source).toContain('import { adminQueryKeys } from "@/lib/admin-query-keys";');
     expect(source).toContain("queryKey: adminQueryKeys.dashboard(locale)");
     expect(source).toContain(
-      "if (!canViewDashboard) {\n                    return;\n                  }\n\n                  void dashboardQuery.refetch().catch(() => undefined);"
+      "function requestDashboardRetry() {\n    if (!canViewDashboard || dashboardQuery.isFetching) {\n      return;\n    }\n\n    void dashboardQuery.refetch().catch(() => undefined);"
     );
-    expect(source).toContain("dashboardQuery.refetch().catch(() => undefined)");
+    expect(source).toContain("onClick={requestDashboardRetry}");
     expect(source).toContain("disabled={!canViewDashboard || dashboardQuery.isFetching}");
+    expect(source).toContain("const retryLabel = dashboardQuery.isFetching");
+    expect(source).toContain(
+      "const isShowingStaleDashboard = Boolean(viewModel && dashboardQuery.isError);"
+    );
+    expect(source).toContain("{isShowingStaleDashboard ? (");
+    expect(source).toContain("Data may be stale");
+    expect(source).toContain("Showing the last loaded dashboard because the KPI refresh failed.");
+    expect(source).toContain('"Обновляем..."');
+    expect(source).toContain('"Refreshing..."');
+    expect(source).toContain("{retryLabel}");
     expect(source).toContain("No payments yet");
     expect(source).toContain("No recent activity");
     expect(source).toContain("Recent payments will appear here after the first successful purchase.");
@@ -128,6 +158,12 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("sanitizeSensitiveText(safeCurrencyCode, 12)");
     expect(chartSource).toContain("function normalizeChartCurrencyCode(value: string)");
     expect(chartSource).toContain("function formatChartCurrencyAmount(");
+    expect(chartSource).toContain("className={styles.chartDataTable}");
+    expect(chartSource).toContain("<th scope=\"col\">Date</th>");
+    expect(chartSource).toContain("<th scope=\"col\">Revenue</th>");
+    expect(chartSource).toContain(
+      'formatChartCurrencyAmount(value, normalizeChartCurrencyCode(currencyCode), "standard", 2)'
+    );
     expect(source).not.toContain("currency: currencyCode,");
     expect(chartSource).not.toContain("currency: currencyCode,");
   });
@@ -137,6 +173,9 @@ describe("dashboard production data handling", () => {
     const chartSource = readFileSync(dashboardChartsPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
     const visualSource = [source, chartSource, stylesSource].join("\n");
+    const nonZeroLetterSpacingRules = [...stylesSource.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1]?.trim())
+      .filter((value) => value !== "0");
 
     expect(source).toContain('accentColor: "var(--success)"');
     expect(source).toContain('color: "var(--brand)"');
@@ -145,9 +184,19 @@ describe("dashboard production data handling", () => {
     expect(chartSource).toContain('stroke="var(--border-soft)"');
     expect(chartSource).toContain('fill="var(--text-muted)"');
     expect(stylesSource).toContain("color: var(--accent-strong);");
+    expect(stylesSource).toContain(".chartDataTable");
+    expect(stylesSource).toContain("clip-path: inset(50%);");
+    expect(stylesSource).toContain(
+      "color: color-mix(in srgb, var(--success) 82%, var(--text-strong));"
+    );
+    expect(stylesSource).toContain(
+      "color: color-mix(in srgb, var(--danger) 86%, var(--text-strong));"
+    );
     expect(stylesSource).toContain("border-bottom: 1px solid var(--border-soft);");
+    expect(stylesSource).toContain("letter-spacing: 0;");
     expect(visualSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(visualSource).not.toContain("rgba(");
+    expect(nonZeroLetterSpacingRules).toEqual([]);
   });
 
   it("keeps dashboard icons and tone colors in shared components and CSS module classes", () => {
@@ -175,6 +224,29 @@ describe("dashboard production data handling", () => {
     expect(source).not.toContain("CSSProperties");
   });
 
+  it("keeps dashboard legend labels readable on narrow screens", () => {
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".legendItem {\n    grid-template-columns: auto minmax(0, 1fr);");
+    expect(stylesSource).toContain(".legendLabel {\n    overflow: visible;");
+    expect(stylesSource).toContain("text-overflow: clip;");
+    expect(stylesSource).toContain("white-space: normal;");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
+    expect(stylesSource).toContain(".legendPercent,\n  .legendCount {\n    grid-column: 2;");
+  });
+
+  it("keeps dashboard card titles and actions from overflowing narrow headers", () => {
+    const stylesSource = readFileSync(dashboardStylesPath, "utf8");
+
+    expect(stylesSource).toContain(".cardTitleWithIcon,\n.cardActionLink {\n  min-width: 0;");
+    expect(stylesSource).toContain(".cardTitleWithIcon span,\n.cardActionLink span {\n  min-width: 0;");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
+    expect(stylesSource).toContain("text-align: right;");
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".cardActionLink {\n    text-align: left;");
+  });
+
   it("sanitizes dashboard user, support, and identifier labels before rendering", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
 
@@ -186,8 +258,11 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("${formatDashboardUserLabel(item)} registered in the system");
     expect(source).toContain("formatDashboardLabel(item.status, 48)");
     expect(source).toContain("formatDashboardLabel(orderId, 64).replace");
-    expect(source).toContain("formatDashboardLabel(userId, 32).slice(0, 8)");
-    expect(source).toContain("formatDashboardLabel(conversationId, 32).slice(0, 6)");
+    expect(source).toContain(
+      'return compact ? `#${compact.slice(0, 8).toUpperCase()}` : "#UNKNOWN";'
+    );
+    expect(source).toContain('return formatDashboardLabel(userId, 32).slice(0, 8) || "unknown";');
+    expect(source).toContain('return compact ? `#${compact}` : "#UNKNOWN";');
     expect(source).not.toContain("user ? getAdminUserDisplayName(user) : shortUserId(item.userId)");
     expect(source).not.toContain("${getAdminUserDisplayName(item)} registered in the system");
     expect(source).not.toContain(": ${item.status}`");

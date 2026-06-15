@@ -10,18 +10,48 @@ import type {
   UpdateFeedbackAdminPayload,
 } from "./api-client.types";
 
-const FILTER_MAX = 120;
+export const ADMIN_FEEDBACK_FILTER_MAX_LENGTH = 120;
+export const ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH = 2000;
+
+const ADMIN_FEEDBACK_STATUSES = ["New", "InReview", "Resolved", "Dismissed"] as const;
+const ADMIN_FEEDBACK_PRIORITIES = ["Low", "Medium", "High", "Critical"] as const;
+const ADMIN_FEEDBACK_TYPES = [
+  "GenerationResult",
+  "GenerationFailure",
+  "BugReport",
+  "FeatureRequest",
+  "PaymentIssue",
+  "General",
+] as const;
 
 function clean(value?: string): string | undefined {
   const trimmed = value?.trim();
-  return trimmed ? trimmed.slice(0, FILTER_MAX) : undefined;
+  return trimmed ? trimmed.slice(0, ADMIN_FEEDBACK_FILTER_MAX_LENGTH) : undefined;
+}
+
+function cleanAllowed<const T extends string>(value: string | undefined, allowed: readonly T[]): T | undefined {
+  const cleaned = clean(value);
+  return cleaned && allowed.includes(cleaned as T) ? (cleaned as T) : undefined;
+}
+
+function normalizeAdminFeedbackUpdatePayload(
+  payload: UpdateFeedbackAdminPayload
+): UpdateFeedbackAdminPayload {
+  return {
+    ...payload,
+    adminNote:
+      typeof payload.adminNote === "string"
+        ? payload.adminNote.slice(0, ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH)
+        : payload.adminNote,
+  };
 }
 
 export function normalizeAdminFeedbackQuery(query: AdminFeedbackQuery = {}): AdminFeedbackQuery {
   return {
-    status: query.status && query.status !== "All" ? query.status : undefined,
-    priority: query.priority && query.priority !== "All" ? query.priority : undefined,
-    type: query.type && query.type !== "All" ? query.type : undefined,
+    status: query.status === "All" ? undefined : cleanAllowed(query.status, ADMIN_FEEDBACK_STATUSES),
+    priority:
+      query.priority === "All" ? undefined : cleanAllowed(query.priority, ADMIN_FEEDBACK_PRIORITIES),
+    type: query.type === "All" ? undefined : cleanAllowed(query.type, ADMIN_FEEDBACK_TYPES),
     category: clean(query.category),
     generationId: clean(query.generationId),
     templateId: clean(query.templateId),
@@ -79,7 +109,7 @@ export async function updateAdminFeedback(
 ): Promise<AdminFeedbackDetails> {
   return apiRequest<AdminFeedbackDetails>(`/api/admin/feedback/${encodePathSegment(feedbackId)}`, {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalizeAdminFeedbackUpdatePayload(payload)),
   });
 }
 

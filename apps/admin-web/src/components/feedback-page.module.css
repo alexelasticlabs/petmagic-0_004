@@ -37,6 +37,25 @@
   font-size: 0.85rem;
 }
 
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible,
+.button:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .textarea {
   min-height: 5rem;
   resize: vertical;
@@ -87,6 +106,12 @@
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
   gap: 1rem;
+}
+
+.detailsMain {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
 .detailGrid {
@@ -152,6 +177,29 @@
   cursor: not-allowed;
 }
 
+.pagerButton {
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding-inline: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.pageIconPrevious {
+  transform: rotate(90deg);
+}
+
+.pageIconNext {
+  transform: rotate(-90deg);
+}
+
 .danger {
   color: var(--danger);
 }
@@ -159,6 +207,28 @@
 @media (max-width: 920px) {
   .filters,
   .details {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .tableHeader,
+  .actions {
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-direction: column;
+  }
+
+  .actions .button:not(.pagerButton) {
+    width: 100%;
+  }
+
+  .pagerButton {
+    width: auto;
+  }
+
+  .detailGrid,
+  .previewGrid {
     grid-template-columns: 1fr;
   }
 }

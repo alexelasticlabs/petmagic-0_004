@@ -25,6 +25,10 @@
   gap: 0.68rem;
 }
 
+.metricsWarning {
+  margin-top: -0.12rem;
+}
+
 .label {
   color: var(--text-muted);
   font-size: 0.74rem;
@@ -44,11 +48,22 @@
   font-size: 0.85rem;
 }
 
-.input:focus,
-.select:focus {
-  outline: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  outline-offset: 1px;
+.input:focus-visible,
+.select:focus-visible,
+.button:focus-visible,
+.inlineAction:focus-visible {
+  outline: none;
   border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled,
+.select:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .tableHeader {
@@ -305,6 +320,29 @@
   cursor: not-allowed;
 }
 
+.pagerButton {
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding-inline: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.pageIconPrevious {
+  transform: rotate(90deg);
+}
+
+.pageIconNext {
+  transform: rotate(-90deg);
+}
+
 @media (max-width: 980px) {
   .filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -327,8 +365,12 @@
     width: 100%;
   }
 
-  .pager .button {
+  .pager .button:not(.pagerButton) {
     width: 100%;
+  }
+
+  .pagerButton {
+    width: auto;
   }
 
   .previewGrid {
