@@ -64,6 +64,23 @@ void main() {
       expect(parseSafeExternalUri('http://10.0.0.42:5000/health'), isNotNull);
       expect(parseSafeExternalUri('http://example.com/unsafe'), isNull);
     });
+
+    test('rejects local http when local http is explicitly disabled', () {
+      expect(
+        parseSafeExternalUri(
+          'http://127.0.0.1:5000/media/template.mp4',
+          allowLocalHttp: false,
+        ),
+        isNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'http://example.com/media/template.mp4',
+          allowLocalHttp: true,
+        ),
+        isNull,
+      );
+    });
   });
 
   group('premiumExternalAllowedHosts', () {

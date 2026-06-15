@@ -73,4 +73,38 @@ void main() {
       contains('APS_ENVIRONMENT = production'),
     );
   });
+
+  test('iOS deployment target stays compatible with Firebase SPM plugins', () {
+    final podfile = File('ios/Podfile').readAsStringSync();
+    final debugConfig = File('ios/Flutter/Debug.xcconfig').readAsStringSync();
+    final releaseConfig = File(
+      'ios/Flutter/Release.xcconfig',
+    ).readAsStringSync();
+    final project = File(
+      'ios/Runner.xcodeproj/project.pbxproj',
+    ).readAsStringSync();
+
+    expect(podfile, contains("platform :ios, '15.0'"));
+    expect(debugConfig, contains('IPHONEOS_DEPLOYMENT_TARGET = 15.0'));
+    expect(releaseConfig, contains('IPHONEOS_DEPLOYMENT_TARGET = 15.0'));
+    expect(
+      RegExp(r'IPHONEOS_DEPLOYMENT_TARGET = 13\.0;').hasMatch(project),
+      isFalse,
+    );
+  });
+
+  test('iOS Firebase placeholder does not abort native plugin startup', () {
+    final googleServiceInfo = File(
+      'ios/Runner/GoogleService-Info.plist',
+    ).readAsStringSync();
+    final apiKey = RegExp(
+      r'<key>API_KEY</key>\s*<string>([^<]+)</string>',
+    ).firstMatch(googleServiceInfo)?.group(1);
+
+    expect(apiKey, isNotNull);
+    expect(apiKey, isNot(contains('replace-with')));
+    expect(apiKey, hasLength(39));
+    expect(apiKey, startsWith('A'));
+    expect(RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(apiKey!), isTrue);
+  });
 }

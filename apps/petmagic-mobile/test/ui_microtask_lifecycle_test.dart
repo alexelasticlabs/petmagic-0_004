@@ -6,7 +6,6 @@ void main() {
   test('ui initState microtasks guard provider reads after disposal', () {
     final files = {
       'lib/features/premium/presentation/premium_page.dart',
-      'lib/features/premium/presentation/stripe_paymentsheet_smoke_test_page.dart',
       'lib/features/profile/presentation/password_reset_page.dart',
       'lib/features/profile/presentation/password_change_page.dart',
       'lib/features/wallet/presentation/wallet_page.dart',

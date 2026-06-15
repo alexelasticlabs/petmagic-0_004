@@ -6,5 +6,7 @@ void main() {
     expect(AppConfig.mediaCacheMaxBytesSafe, 120 * 1024 * 1024);
     expect(AppConfig.mediaCacheStalePeriod, const Duration(hours: 24));
     expect(AppConfig.mediaTempFileTtl, const Duration(hours: 24));
+    expect(AppConfig.decodedImageCacheMaxObjectsSafe, 200);
+    expect(AppConfig.decodedImageCacheMaxBytesSafe, 48 * 1024 * 1024);
   });
 }

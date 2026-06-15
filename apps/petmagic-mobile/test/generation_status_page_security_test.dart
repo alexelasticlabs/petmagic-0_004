@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -23,6 +24,10 @@ void main() {
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+  });
+
+  tearDown(() async {
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   test('generation status load errors are mapped before reaching UI state', () {
@@ -81,6 +86,10 @@ void main() {
     ).readAsStringSync();
 
     expect(source, contains('CachedNetworkImageProvider('));
+    expect(
+      source,
+      contains('ResizeImage(\n        FileImage(localOutputFile)'),
+    );
     expect(source, contains('maxWidth: _aspectRatioProbeCacheWidth'));
     expect(source, contains('void _detachAspectRatioListener()'));
     expect(source, contains('stream.removeListener(listener)'));
@@ -120,83 +129,110 @@ void main() {
       sectionsSource,
       isNot(contains('VideoPlayerController.networkUrl(Uri.parse(url))')),
     );
-    expect(pageSource, contains("_recordCompareAnalytics(generation, 'compare_clicked')"));
+    expect(
+      pageSource,
+      contains("_recordCompareAnalytics(generation, 'compare_clicked')"),
+    );
     expect(sectionsSource, contains('class _BeforeAfterCompareViewer'));
   });
 
-  testWidgets('generation status shows compare action only for eligible image result', (
-    tester,
-  ) async {
-    await tester.binding.setSurfaceSize(const Size(390, 900));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  test(
+    'generation status local media sync checks page lifecycle before apply',
+    () {
+      final source = File(
+        'lib/features/templates/presentation/generation_status_page.dart',
+      ).readAsStringSync();
+      final materializeBody = _methodBody(
+        source,
+        'Future<void> _materializeLocalMediaAndRefresh',
+      );
+      final lifecycleGuardBody = _methodBody(
+        source,
+        'bool _canApplyLocalMediaSync',
+      );
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          templateGenerationRepositoryProvider.overrideWithValue(
-            _FakeTemplateGenerationRepository(
-              _generation(
-                canCompareBeforeAfter: true,
-                inputPreviewUrl:
-                    'https://cdn.petmagic.test/before.jpg?signature=secret',
-                resultPreviewUrl:
-                    'https://cdn.petmagic.test/after.jpg?signature=secret',
+      expect(materializeBody, contains('if (!_canApplyLocalMediaSync() ||'));
+      expect(lifecycleGuardBody, contains('!mounted || !_isPageActive'));
+      expect(lifecycleGuardBody, contains('AppLifecycleState.resumed'));
+      expect(source, contains('_isPageActive = false;'));
+      expect(source, contains('_cancelActiveLocalMediaDownloads();'));
+    },
+  );
+
+  testWidgets(
+    'generation status shows compare action only for eligible image result',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(
+              _FakeTemplateGenerationRepository(
+                _generation(
+                  canCompareBeforeAfter: true,
+                  inputPreviewUrl:
+                      'https://cdn.petmagic.test/before.jpg?signature=secret',
+                  resultPreviewUrl:
+                      'https://cdn.petmagic.test/after.jpg?signature=secret',
+                ),
               ),
             ),
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            _IdleGenerationHistoryController.new,
-          ),
-        ],
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          locale: const Locale('en'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
           ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const GenerationStatusPage(generationId: 'generation-1'),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
-    expect(find.text('Compare'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.text('Compare'), findsOneWidget);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          templateGenerationRepositoryProvider.overrideWithValue(
-            _FakeTemplateGenerationRepository(_generation()),
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            _IdleGenerationHistoryController.new,
-          ),
-        ],
-        child: MaterialApp(
-          theme: AppTheme.dark(),
-          locale: const Locale('en'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(
+              _FakeTemplateGenerationRepository(_generation()),
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
           ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const GenerationStatusPage(generationId: 'generation-1'),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpAndSettle();
-    expect(find.text('Compare'), findsNothing);
-  });
+      await tester.pumpAndSettle();
+      expect(find.text('Compare'), findsNothing);
+    },
+  );
 
   testWidgets('generation status cancels active status load on disposal', (
     tester,
@@ -285,6 +321,189 @@ void main() {
 
     await tester.pumpWidget(const SizedBox.shrink());
     expect(mediaActions.shareCancelToken?.isCancelled, isTrue);
+  });
+
+  testWidgets(
+    'generation status rejects unsafe media access URLs before save and share',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final repository = _FakeTemplateGenerationRepository(
+        _generation(),
+        mediaAccessUrl: 'javascript:alert(1)',
+      );
+      final mediaActions = _RecordingGenerationStatusMediaActions();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
+            generationStatusMediaActionsProvider.overrideWithValue(
+              mediaActions,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      final text = AppLocalizations.of(
+        tester.element(find.byType(GenerationStatusPage)),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(text.generationStatusSaveAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repository.fetchDownloadCalls, 1);
+      expect(mediaActions.saveCalls, 0);
+      await PetMagicNotificationCenter.instance.clearQueue();
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(text.supportChatShareAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(repository.fetchShareCalls, 1);
+      expect(mediaActions.shareCalls, 0);
+      await PetMagicNotificationCenter.instance.clearQueue();
+      await tester.pump();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'generation status fallback media file names sanitize title and id',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final repository = _FakeTemplateGenerationRepository(
+        _generation(
+          generationId: 'g/ready #1?x=2',
+          templateTitle: 'Movie *Star* / Pet?',
+        ),
+        mediaAccessFileName: '',
+      );
+      final mediaActions = _RecordingGenerationStatusMediaActions();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
+            generationStatusMediaActionsProvider.overrideWithValue(
+              mediaActions,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'g/ready #1?x=2'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      final text = AppLocalizations.of(
+        tester.element(find.byType(GenerationStatusPage)),
+      );
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(text.generationStatusSaveAction));
+      await tester.pump();
+
+      expect(mediaActions.savedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+      await PetMagicNotificationCenter.instance.clearQueue();
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(text.supportChatShareAction));
+      await tester.pump();
+
+      expect(mediaActions.sharedFileNames, [
+        'Movie_Star_Pet_g_ready_1_x_2.jpg',
+      ]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('generation status cancels active local media sync on disposal', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final store = _DelayedGenerationGalleryStore();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(
+            _FakeTemplateGenerationRepository(_generation()),
+          ),
+          generationGalleryStoreProvider.overrideWithValue(store),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const GenerationStatusPage(generationId: 'generation-1'),
+        ),
+      ),
+    );
+
+    await store.materializeStarted.future;
+    expect(store.cancelActiveDownloadsCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(store.cancelActiveDownloadsCalls, greaterThanOrEqualTo(1));
+
+    store.materializeCompleter.complete(null);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -419,18 +638,12 @@ void main() {
       );
       expect(completionCall.generationId, 'generation-1');
       expect(completionCall.templateId, featured.templateId);
-      expect(
-        completionCall.metadata,
-        containsPair('source', 'auto'),
-      );
+      expect(completionCall.metadata, containsPair('source', 'auto'));
       expect(
         completionCall.metadata,
         containsPair('screen', 'generation_status'),
       );
-      expect(
-        completionCall.metadata,
-        containsPair('userPlan', 'premium'),
-      );
+      expect(completionCall.metadata, containsPair('userPlan', 'premium'));
     },
   );
 
@@ -674,6 +887,8 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   _FakeTemplateGenerationRepository(
     this.generation, {
     this.removeWatermarkStatusCode,
+    this.mediaAccessUrl = 'https://cdn.petmagic.test/result.jpg',
+    this.mediaAccessFileName = 'result.jpg',
   }) : super(
          dio: Dio(),
          sessionStorage: AuthSessionStorage(),
@@ -682,9 +897,13 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
 
   TemplateGenerationResult generation;
   final int? removeWatermarkStatusCode;
+  final String mediaAccessUrl;
+  final String mediaAccessFileName;
   final List<String> analyticsEvents = [];
   final List<_AnalyticsCall> analyticsCalls = [];
   final List<String> removeWatermarkCalls = [];
+  int fetchDownloadCalls = 0;
+  int fetchShareCalls = 0;
 
   @override
   Future<TemplateGenerationResult> fetchGeneration(
@@ -703,14 +922,28 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   }
 
   @override
+  Future<GenerationMediaAccessResult> fetchDownloadUrl(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    fetchDownloadCalls++;
+    return GenerationMediaAccessResult(
+      mediaUrl: mediaAccessUrl,
+      hasWatermark: false,
+      fileName: mediaAccessFileName,
+    );
+  }
+
+  @override
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
     CancelToken? cancelToken,
   }) async {
-    return const GenerationMediaAccessResult(
-      mediaUrl: 'https://cdn.petmagic.test/result.jpg',
+    fetchShareCalls++;
+    return GenerationMediaAccessResult(
+      mediaUrl: mediaAccessUrl,
       hasWatermark: false,
-      fileName: 'result.jpg',
+      fileName: mediaAccessFileName,
     );
   }
 
@@ -846,7 +1079,70 @@ class _DelayedGenerationStatusMediaActions
   }
 }
 
+class _RecordingGenerationStatusMediaActions
+    extends GenerationStatusMediaActions {
+  int saveCalls = 0;
+  int shareCalls = 0;
+  final savedFileNames = <String>[];
+  final sharedFileNames = <String>[];
+
+  @override
+  Future<bool> saveToGallery({
+    required String mediaUrl,
+    required String fileName,
+    required bool isVideo,
+    required String albumName,
+    required CancelToken cancelToken,
+  }) async {
+    saveCalls++;
+    savedFileNames.add(fileName);
+    return true;
+  }
+
+  @override
+  Future<void> share({
+    required String mediaUrl,
+    required String fileName,
+    required String title,
+    required CancelToken cancelToken,
+  }) async {
+    shareCalls++;
+    sharedFileNames.add(fileName);
+  }
+}
+
+class _DelayedGenerationGalleryStore extends GenerationGalleryStore {
+  _DelayedGenerationGalleryStore()
+    : super(
+        dio: Dio(),
+        preferences: SharedPreferencesAsync(),
+        sessionStorage: AuthSessionStorage(),
+        rootDirectoryResolver: () async => Directory.systemTemp,
+      );
+
+  final materializeStarted = Completer<void>();
+  final materializeCompleter = Completer<GenerationGalleryMediaRecord?>();
+  int cancelActiveDownloadsCalls = 0;
+
+  @override
+  Future<GenerationGalleryMediaRecord?> materializeGenerationMedia(
+    TemplateGenerationResult generation,
+  ) async {
+    if (!materializeStarted.isCompleted) {
+      materializeStarted.complete();
+    }
+    return materializeCompleter.future;
+  }
+
+  @override
+  Future<void> cancelActiveDownloads() async {
+    cancelActiveDownloadsCalls++;
+  }
+}
+
 TemplateGenerationResult _generation({
+  String generationId = 'generation-1',
+  String templateTitle = 'Movie Star Pet Poster',
   TemplateGenerationStatus status = TemplateGenerationStatus.completed,
   bool hasWatermark = false,
   bool canRemoveWatermark = false,
@@ -862,7 +1158,7 @@ TemplateGenerationResult _generation({
 }) {
   final now = DateTime.utc(2026, 5, 25, 14, 30);
   return TemplateGenerationResult(
-    generationId: 'generation-1',
+    generationId: generationId,
     userId: 'user-1',
     templateId: 'template-1',
     status: status,
@@ -873,7 +1169,7 @@ TemplateGenerationResult _generation({
     completedAtUtc: now,
     failureCode: failureCode,
     userMediaExpired: false,
-    templateTitle: 'Movie Star Pet Poster',
+    templateTitle: templateTitle,
     templateType: 'image',
     outputUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
     hasWatermark: hasWatermark,

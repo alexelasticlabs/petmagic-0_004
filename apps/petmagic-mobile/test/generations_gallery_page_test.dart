@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -16,8 +17,9 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -51,6 +53,37 @@ void main() {
       findsAtLeastNWidgets(1),
     );
 
+    expect(find.text('Little Space Explorer'), findsOneWidget);
+    expect(find.text('Movie Star Pet Poster'), findsOneWidget);
+    expect(find.text('Hidden Ready'), findsNothing);
+
+    final showMore = find.text(text.generationStatusShowMoreAction(1));
+    final galleryScrollable = find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      showMore,
+      120,
+      scrollable: galleryScrollable,
+    );
+    await tester.tap(showMore);
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Hidden Ready'),
+      120,
+      scrollable: galleryScrollable,
+    );
+    expect(find.text('Hidden Ready'), findsOneWidget);
+
+    final collapse = find.text(text.generationStatusCollapseAction);
+    await tester.ensureVisible(collapse);
+    await tester.tap(collapse);
+    await tester.pumpAndSettle();
+
     expect(find.text('Hidden Ready'), findsNothing);
   });
 
@@ -69,6 +102,106 @@ void main() {
     expect(find.text(text.authSignInRequired), findsOneWidget);
     expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
     expect(find.text(text.profileSignInAction), findsOneWidget);
+  });
+
+  testWidgets('gallery renders loading error and empty states', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final loadingHarness = _GalleryHarness(
+      initialState: const GenerationHistoryState(isLoading: true),
+    );
+    addTearDown(loadingHarness.router.dispose);
+
+    await tester.pumpWidget(loadingHarness.app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    final errorHarness = _GalleryHarness(
+      initialState: const GenerationHistoryState(
+        errorMessage: 'Network is unavailable',
+      ),
+    );
+    addTearDown(errorHarness.router.dispose);
+
+    await tester.pumpWidget(errorHarness.app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    final text = _text(tester);
+    expect(find.text('Network is unavailable'), findsOneWidget);
+    expect(find.text(text.retryAction), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    final emptyHarness = _GalleryHarness(items: const []);
+    addTearDown(emptyHarness.router.dispose);
+
+    await tester.pumpWidget(emptyHarness.app());
+    await tester.pumpAndSettle();
+    expect(find.text(text.generationStatusEmptyTitle), findsOneWidget);
+    expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
+  });
+
+  testWidgets('gallery renders offline and recovered data banners', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final now = DateTime.utc(2026, 5, 25, 14, 30);
+    final item = _generation(
+      generationId: 'g-ready-offline',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Offline Ready',
+      templateType: 'image',
+      tokenCost: 6,
+      outputUrl: 'https://cdn.petmagic.test/offline-ready.jpg',
+      updatedAtUtc: now,
+    );
+    final offlineHarness = _GalleryHarness(
+      initialState: GenerationHistoryState(
+        items: [item],
+        showOfflineBanner: true,
+        lastSyncedAtUtc: now,
+      ),
+    );
+    addTearDown(offlineHarness.router.dispose);
+
+    await tester.pumpWidget(offlineHarness.app());
+    await tester.pumpAndSettle();
+    var text = _text(tester);
+    expect(find.text(text.generationStatusOfflineBannerTitle), findsOneWidget);
+    expect(find.text(text.generationStatusOnlineBannerTitle), findsNothing);
+    expect(find.text(text.retryAction), findsOneWidget);
+    expect(find.text('Offline Ready'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    final recoveredHarness = _GalleryHarness(
+      initialState: GenerationHistoryState(
+        items: [item],
+        showOfflineBanner: true,
+        isConnectionRecovered: true,
+        lastSyncedAtUtc: now,
+      ),
+    );
+    addTearDown(recoveredHarness.router.dispose);
+
+    await tester.pumpWidget(recoveredHarness.app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    text = _text(tester);
+    expect(find.text(text.generationStatusOnlineBannerTitle), findsOneWidget);
+    expect(find.text(text.generationStatusOfflineBannerTitle), findsNothing);
+    expect(find.text(text.retryAction), findsNothing);
+    expect(find.text('Offline Ready'), findsOneWidget);
   });
 
   testWidgets('filter chips call load and show filtered items', (tester) async {
@@ -95,11 +228,95 @@ void main() {
     expect(find.text('Little Space Explorer'), findsNothing);
   });
 
+  testWidgets('active filter renders progress and ETA without mixed items', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness();
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final activeChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterActive,
+    );
+    await tester.ensureVisible(activeChip);
+    await tester.tap(activeChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(harness.controller.loadCalls.last, GenerationHistoryFilter.active);
+    expect(find.text('Little Space Explorer'), findsOneWidget);
+    expect(find.text('Movie Star Pet Poster'), findsNothing);
+    expect(find.text('Funny Hoodie'), findsNothing);
+    expect(find.text(text.templateFlowStepCreateMagic), findsOneWidget);
+    expect(find.text('65%'), findsOneWidget);
+    expect(
+      find.text(text.generationStatusEtaEstimated('1-2 мин')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('failed filter renders reason and recovery actions', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness();
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final failedChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterFailed,
+    );
+    await tester.ensureVisible(failedChip);
+    await tester.tap(failedChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(harness.controller.loadCalls.last, GenerationHistoryFilter.failed);
+    expect(find.text('Funny Hoodie'), findsOneWidget);
+    expect(find.text('Movie Star Pet Poster'), findsNothing);
+    expect(find.text('Little Space Explorer'), findsNothing);
+    expect(find.text(text.generationStatusFailedTitle), findsOneWidget);
+    expect(
+      find.text(text.generationStatusFailureTechnicalHint),
+      findsOneWidget,
+    );
+    expect(find.text(text.generationStatusTokensRefundedShort), findsOneWidget);
+    expect(
+      find.text(text.generationStatusPickAnotherPhotoAction),
+      findsOneWidget,
+    );
+    expect(
+      find.text(text.generationStatusContactSupportAction),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('ready card action sheet exposes all actions and opens details', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
+    final platformCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          platformCalls.add(call);
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
 
     final harness = _GalleryHarness();
     addTearDown(harness.router.dispose);
@@ -122,13 +339,323 @@ void main() {
     expect(find.text(text.generationStatusOpenStatusAction), findsOneWidget);
     expect(find.text(text.generationStatusSaveAction), findsOneWidget);
     expect(find.text(text.supportChatShareAction), findsOneWidget);
+    expect(find.text(text.generationStatusCopyLinkAction), findsOneWidget);
     expect(find.text(text.generationStatusDeleteAction), findsOneWidget);
     expect(find.text(text.generationStatusReportProblemAction), findsOneWidget);
+
+    await tester.tap(find.text(text.generationStatusCopyLinkAction));
+    await tester.pump();
+
+    final clipboardCall = platformCalls.lastWhere(
+      (call) => call.method == 'Clipboard.setData',
+    );
+    expect(clipboardCall.arguments, {
+      'text': 'https://cdn.petmagic.test/ready-1.jpg',
+    });
+    await tester.pump(const Duration(seconds: 3));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text(text.generationStatusOpenStatusAction));
     await tester.pumpAndSettle();
 
+    expect(harness.controller.markReadCalls, contains('g-ready-1'));
     expect(find.text('status:g-ready-1'), findsOneWidget);
+  });
+
+  testWidgets('ready card copy link handles clipboard failures', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final platformCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          platformCalls.add(call);
+          if (call.method == 'Clipboard.setData') {
+            throw PlatformException(code: 'clipboard_unavailable');
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    final harness = _GalleryHarness();
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusCopyLinkAction));
+    await tester.pump();
+
+    expect(
+      platformCalls.where((call) => call.method == 'Clipboard.setData'),
+      hasLength(1),
+    );
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card report problem opens support route', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness();
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusReportProblemAction));
+    await tester.pumpAndSettle();
+
+    expect(find.text('support-route'), findsOneWidget);
+    expect(find.text('support-generation:g-ready-1'), findsOneWidget);
+    expect(
+      find.textContaining(text.supportTicketFormRelatedGenerationLabel),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card save action saves safe media URL', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = _DelayedGenerationStatusMediaActions();
+    final harness = _GalleryHarness(mediaActions: mediaActions);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await tester.pump();
+
+    expect(mediaActions.saveCalls, 1);
+    expect(mediaActions.savedUrls, ['https://cdn.petmagic.test/ready-1.jpg']);
+    expect(mediaActions.shareCalls, 0);
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card media actions sanitize generated file names', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = _DelayedGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final generation = _generation(
+      generationId: 'g/ready #1?x=2',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Movie *Star* / Pet?',
+      templateType: 'image',
+      tokenCost: 6,
+      outputUrl: 'https://cdn.petmagic.test/ready-name.jpg',
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+    );
+    final harness = _GalleryHarness(
+      items: [generation],
+      mediaActions: mediaActions,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await tester.pump();
+
+    expect(mediaActions.savedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await tester.pump();
+
+    expect(mediaActions.sharedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'ready card tap opens details without waiting for markRead sync',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final markReadCompleter = Completer<void>();
+      final harness = _GalleryHarness(markReadCompleter: markReadCompleter);
+      addTearDown(harness.router.dispose);
+
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      final text = _text(tester);
+
+      final readyChip = find.widgetWithText(
+        ChoiceChip,
+        text.generationStatusFilterReady,
+      );
+      await tester.ensureVisible(readyChip);
+      await tester.tap(readyChip, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Movie Star Pet Poster'));
+      await tester.pumpAndSettle();
+
+      expect(harness.controller.markReadCalls, ['g-ready-1']);
+      expect(find.text('status:g-ready-1'), findsOneWidget);
+
+      markReadCompleter.complete();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('ready card delete removes item and updates unread badge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness(
+      items: [
+        _generation(
+          generationId: 'g-ready-delete',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Delete Me',
+          templateType: 'image',
+          tokenCost: 6,
+          outputUrl: 'https://cdn.petmagic.test/delete-me.jpg',
+          updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+          isUnread: true,
+        ),
+      ],
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    expect(find.text('Delete Me'), findsOneWidget);
+    expect(find.text(text.generationStatusUnreadCount(1)), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusDeleteAction));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(harness.controller.deleteGenerationCalls, ['g-ready-delete']);
+    expect(find.text('Delete Me'), findsNothing);
+    expect(find.text(text.generationStatusUnreadCount(1)), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready filter keeps a large creations grid lazy', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final now = DateTime.utc(2026, 5, 25, 14, 30);
+    final harness = _GalleryHarness(
+      items: List<TemplateGenerationResult>.generate(
+        300,
+        (index) => _generation(
+          generationId: 'g-ready-$index',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Ready Pet $index',
+          templateType: 'image',
+          tokenCost: 6,
+          updatedAtUtc: now.subtract(Duration(minutes: index)),
+        ),
+      ),
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(harness.controller.loadCalls.last, GenerationHistoryFilter.ready);
+    expect(find.text('Ready Pet 0'), findsOneWidget);
+    expect(find.text('Ready Pet 299'), findsNothing);
+    expect(
+      find.byIcon(Icons.more_vert_rounded).evaluate().length,
+      lessThan(60),
+    );
+
+    final scrollable = tester.state<ScrollableState>(
+      find.byType(Scrollable).first,
+    );
+    expect(scrollable.position.maxScrollExtent, greaterThan(1000));
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+    await tester.pump();
+
+    expect(
+      find.byIcon(Icons.more_vert_rounded).evaluate().length,
+      lessThan(60),
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('gallery cancels active media share on disposal', (tester) async {
@@ -167,6 +694,157 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
 
     expect(mediaActions.shareCancelToken?.isCancelled, isTrue);
+  });
+
+  testWidgets('gallery cancels active media save on disposal', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = _DelayedGenerationStatusMediaActions(delaySave: true);
+    final harness = _GalleryHarness(mediaActions: mediaActions);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await mediaActions.saveStarted.future;
+
+    expect(mediaActions.saveCalls, 1);
+    expect(mediaActions.saveCancelToken?.isCancelled, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+
+    expect(mediaActions.saveCancelToken?.isCancelled, isTrue);
+  });
+
+  testWidgets('ready card blocks duplicate media actions while one is active', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final mediaActions = _DelayedGenerationStatusMediaActions();
+    final harness = _GalleryHarness(mediaActions: mediaActions);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await mediaActions.shareStarted.future;
+    await tester.pumpAndSettle();
+
+    expect(mediaActions.shareCalls, 1);
+    expect(mediaActions.saveCalls, 0);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text(text.generationStatusSaveAction),
+      warnIfMissed: false,
+    );
+    await tester.tap(
+      find.text(text.supportChatShareAction),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+
+    expect(mediaActions.shareCalls, 1);
+    expect(mediaActions.saveCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    expect(mediaActions.shareCancelToken?.isCancelled, isTrue);
+  });
+
+  testWidgets('ready card media actions reject unsafe output URLs', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final platformCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          platformCalls.add(call);
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    final mediaActions = _DelayedGenerationStatusMediaActions();
+    final harness = _GalleryHarness(
+      items: [
+        _generation(
+          generationId: 'g-ready-unsafe',
+          status: TemplateGenerationStatus.completed,
+          templateTitle: 'Unsafe Ready',
+          templateType: 'image',
+          tokenCost: 6,
+          outputUrl: 'javascript:alert(1)',
+          updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+        ),
+      ],
+      mediaActions: mediaActions,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await tester.pump();
+
+    expect(mediaActions.saveCalls, 0);
+    expect(mediaActions.savedUrls, isEmpty);
+    await tester.pump(const Duration(seconds: 3));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await tester.pump();
+
+    expect(mediaActions.shareCalls, 0);
+    expect(mediaActions.sharedUrls, isEmpty);
+    await tester.pump(const Duration(seconds: 3));
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusCopyLinkAction));
+    await tester.pump();
+
+    expect(
+      platformCalls.where((call) => call.method == 'Clipboard.setData'),
+      isEmpty,
+    );
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('active card open button marks read and opens details', (
@@ -228,6 +906,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('support-route'), findsOneWidget);
+    expect(find.text('support-generation:g-failed-1'), findsOneWidget);
   });
 
   testWidgets('gallery does not force refresh when tab is hidden and shown', (
@@ -260,6 +939,21 @@ void main() {
     expect(harness.controller.refreshCalls, isEmpty);
     expect(harness.controller.loadCalls, [GenerationHistoryFilter.all]);
   });
+
+  testWidgets('gallery premium upsell fits narrow widths', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(360, 740));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final harness = _GalleryHarness(hasPremiumAccess: false);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('Экспорт без водяного знака'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 AppLocalizations _text(WidgetTester tester) {
@@ -270,9 +964,16 @@ AppLocalizations _text(WidgetTester tester) {
 class _GalleryHarness {
   _GalleryHarness({
     List<TemplateGenerationResult>? items,
+    GenerationHistoryState? initialState,
     this.mediaActions,
     this.authenticated = true,
-  }) : controller = _FakeGenerationHistoryController(items ?? _sampleItems()),
+    this.hasPremiumAccess,
+    Completer<void>? markReadCompleter,
+  }) : controller = _FakeGenerationHistoryController(
+         items ?? initialState?.items ?? _sampleItems(),
+         initialState: initialState,
+         markReadCompleter: markReadCompleter,
+       ),
        router = GoRouter(
          initialLocation: GenerationsGalleryPage.routePath,
          routes: [
@@ -301,9 +1002,27 @@ class _GalleryHarness {
            ),
            GoRoute(
              path: SupportChatPage.routePath,
-             pageBuilder: (context, state) => const NoTransitionPage(
-               child: Scaffold(body: Center(child: Text('support-route'))),
-             ),
+             pageBuilder: (context, state) {
+               final query = state.uri.queryParameters;
+               return NoTransitionPage(
+                 child: Scaffold(
+                   body: Center(
+                     child: Column(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         const Text('support-route'),
+                         Text(
+                           'support-generation:${query[SupportChatPage.relatedGenerationIdQueryParam] ?? ''}',
+                         ),
+                         Text(
+                           'support-message:${query[SupportChatPage.initialMessageQueryParam] ?? ''}',
+                         ),
+                       ],
+                     ),
+                   ),
+                 ),
+               );
+             },
            ),
          ],
        );
@@ -312,6 +1031,7 @@ class _GalleryHarness {
   final GoRouter router;
   final GenerationStatusMediaActions? mediaActions;
   final bool authenticated;
+  final bool? hasPremiumAccess;
 
   Widget app() {
     return ProviderScope(
@@ -322,7 +1042,11 @@ class _GalleryHarness {
               : _UnauthenticatedAppLaunchController.new,
         ),
         generationHistoryControllerProvider.overrideWith(() => controller),
-        walletControllerProvider.overrideWith(_IdleWalletController.new),
+        walletControllerProvider.overrideWith(
+          hasPremiumAccess == null
+              ? _IdleWalletController.new
+              : () => _StaticWalletController(isPremium: hasPremiumAccess!),
+        ),
         realtimeClientProvider.overrideWith(
           (ref) => const NoopRealtimeClient(),
         ),
@@ -381,19 +1105,56 @@ class _IdleWalletController extends WalletController {
   Future<void> load({bool refresh = false}) async {}
 }
 
+class _StaticWalletController extends WalletController {
+  _StaticWalletController({required this.isPremium});
+
+  final bool isPremium;
+
+  @override
+  WalletState build() {
+    return WalletState(
+      wallet: WalletStateModel(
+        userId: 'user-1',
+        balance: 20,
+        adRewardsRemainingToday: 0,
+        isPremium: isPremium,
+        updatedAtUtc: DateTime.utc(2026, 6, 15),
+      ),
+    );
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {}
+}
+
 class _FakeGenerationHistoryController extends GenerationHistoryController {
-  _FakeGenerationHistoryController(this._allItems);
+  _FakeGenerationHistoryController(
+    this._allItems, {
+    GenerationHistoryState? initialState,
+    Completer<void>? markReadCompleter,
+  }) : _initialState = initialState,
+       _markReadCompleter = markReadCompleter;
 
   final List<TemplateGenerationResult> _allItems;
+  final GenerationHistoryState? _initialState;
+  final Completer<void>? _markReadCompleter;
   final List<GenerationHistoryFilter> loadCalls = [];
   final List<GenerationHistoryFilter> refreshCalls = [];
   final List<String> markReadCalls = [];
+  final List<String> deleteGenerationCalls = [];
 
   @override
   GenerationHistoryState build() {
+    final initialState = _initialState;
+    if (initialState != null) {
+      return initialState;
+    }
     final unread = _allItems.where((item) => item.isUnread).length;
     return GenerationHistoryState(items: _allItems, unreadCount: unread);
   }
+
+  @override
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {}
 
   @override
   Future<void> load({
@@ -405,6 +1166,9 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
       refreshCalls.add(nextFilter);
     }
     loadCalls.add(nextFilter);
+    if (_initialState != null) {
+      return;
+    }
     final filtered = _applyFilter(nextFilter);
 
     state = state.copyWith(
@@ -419,6 +1183,11 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
   @override
   Future<void> markRead(String generationId) async {
     markReadCalls.add(generationId);
+    final completer = _markReadCompleter;
+    if (completer != null && !completer.isCompleted) {
+      await completer.future;
+    }
+
     final updated = [
       for (final item in state.items)
         if (item.generationId == generationId)
@@ -465,6 +1234,21 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
     );
   }
 
+  @override
+  Future<void> deleteGeneration(String generationId) async {
+    deleteGenerationCalls.add(generationId);
+    _allItems.removeWhere((item) => item.generationId == generationId);
+    final updated = [
+      for (final item in state.items)
+        if (item.generationId != generationId) item,
+    ];
+
+    state = state.copyWith(
+      items: updated,
+      unreadCount: updated.where((item) => item.isUnread).length,
+    );
+  }
+
   List<TemplateGenerationResult> _applyFilter(GenerationHistoryFilter filter) {
     return switch (filter) {
       GenerationHistoryFilter.all => List<TemplateGenerationResult>.from(
@@ -482,8 +1266,44 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
 
 class _DelayedGenerationStatusMediaActions
     extends GenerationStatusMediaActions {
+  _DelayedGenerationStatusMediaActions({
+    this.delaySave = false,
+    this.delayShare = true,
+  });
+
+  final bool delaySave;
+  final bool delayShare;
+  final saveStarted = Completer<void>();
   final shareStarted = Completer<void>();
+  CancelToken? saveCancelToken;
   CancelToken? shareCancelToken;
+  int saveCalls = 0;
+  int shareCalls = 0;
+  final savedUrls = <String>[];
+  final sharedUrls = <String>[];
+  final savedFileNames = <String>[];
+  final sharedFileNames = <String>[];
+
+  @override
+  Future<bool> saveToGallery({
+    required String mediaUrl,
+    required String fileName,
+    required bool isVideo,
+    required String albumName,
+    required CancelToken cancelToken,
+  }) {
+    saveCalls++;
+    savedUrls.add(mediaUrl);
+    savedFileNames.add(fileName);
+    saveCancelToken = cancelToken;
+    if (!saveStarted.isCompleted) {
+      saveStarted.complete();
+    }
+    if (!delaySave) {
+      return Future.value(true);
+    }
+    return cancelToken.whenCancel.then((_) => false);
+  }
 
   @override
   Future<void> share({
@@ -492,9 +1312,15 @@ class _DelayedGenerationStatusMediaActions
     required String title,
     required CancelToken cancelToken,
   }) {
+    shareCalls++;
+    sharedUrls.add(mediaUrl);
+    sharedFileNames.add(fileName);
     shareCancelToken = cancelToken;
     if (!shareStarted.isCompleted) {
       shareStarted.complete();
+    }
+    if (!delayShare) {
+      return Future.value();
     }
     return cancelToken.whenCancel.then((_) {});
   }
@@ -533,6 +1359,7 @@ List<TemplateGenerationResult> _sampleItems() {
       templateTitle: 'Movie Star Pet Poster',
       templateType: 'image',
       tokenCost: 6,
+      outputUrl: 'https://cdn.petmagic.test/ready-1.jpg',
       updatedAtUtc: now.subtract(const Duration(minutes: 2)),
       isUnread: true,
     ),

@@ -35,16 +35,43 @@ void main() {
       expect(autoRefreshBody, contains('if (!ref.mounted)'));
       expect(offlineBannerBody, contains('if (!ref.mounted)'));
       expect(unreadBody, contains('if (!ref.mounted || !_isScreenVisible)'));
-      expect(markReadBody, contains('if (!ref.mounted)'));
       expect(
-        markReadBody.indexOf('await _repository.markGenerationRead'),
-        lessThan(markReadBody.indexOf('if (!ref.mounted)')),
+        markReadBody.indexOf('state = state.copyWith'),
+        lessThan(markReadBody.indexOf('await _repository.markGenerationRead')),
+      );
+      expect(
+        markReadBody.substring(
+          markReadBody.indexOf('await _repository.markGenerationRead'),
+        ),
+        isNot(contains('state =')),
       );
       expect(deleteBody, contains('if (!ref.mounted)'));
-      expect(
-        deleteBody.indexOf('await _repository.deleteGeneration'),
-        lessThan(deleteBody.indexOf('if (!ref.mounted)')),
+      final markDeletedIndex = deleteBody.indexOf(
+        'await _galleryStore.markDeletedLocally',
       );
+      final guardAfterTombstoneIndex = deleteBody.indexOf(
+        'if (!ref.mounted)',
+        markDeletedIndex,
+      );
+      final serverDeleteIndex = deleteBody.indexOf(
+        'await _repository.deleteGeneration',
+      );
+      final guardAfterServerDeleteIndex = deleteBody.indexOf(
+        'if (!ref.mounted)',
+        serverDeleteIndex,
+      );
+      final clearPendingIndex = deleteBody.indexOf(
+        'await _galleryStore.clearPendingServerDelete',
+      );
+      expect(markDeletedIndex, isNonNegative);
+      expect(guardAfterTombstoneIndex, isNonNegative);
+      expect(serverDeleteIndex, isNonNegative);
+      expect(guardAfterServerDeleteIndex, isNonNegative);
+      expect(clearPendingIndex, isNonNegative);
+      expect(markDeletedIndex, lessThan(guardAfterTombstoneIndex));
+      expect(guardAfterTombstoneIndex, lessThan(serverDeleteIndex));
+      expect(serverDeleteIndex, lessThan(guardAfterServerDeleteIndex));
+      expect(guardAfterServerDeleteIndex, lessThan(clearPendingIndex));
       expect(realtimeBody, contains('if (!ref.mounted || !_isScreenVisible)'));
       expect(realtimeBody, contains('if (!ref.mounted)'));
       expect(eventBody, contains('if (!ref.mounted || !_isScreenVisible)'));

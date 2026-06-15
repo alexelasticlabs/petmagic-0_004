@@ -643,6 +643,11 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
+  Future<void> upsertCachedGeneration(
+    TemplateGenerationResult generation,
+  ) async {}
+
+  @override
   Future<void> clearLocalCache() async {}
 
   @override
@@ -650,20 +655,27 @@ class _FakeTemplateGenerationRepository
     String? status,
     int? skip,
     int? take,
+    CancelToken? cancelToken,
   }) async {
     return const [];
   }
 
   @override
-  Future<int> fetchUnreadGenerationCount() async {
+  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) async {
     return 0;
   }
 
   @override
-  Future<void> markGenerationRead(String generationId) async {}
+  Future<void> markGenerationRead(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {}
 
   @override
-  Future<void> deleteGeneration(String generationId) async {}
+  Future<void> deleteGeneration(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {}
 
   @override
   Future<void> submitGenerationFeedback({
