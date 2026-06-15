@@ -1,5 +1,6 @@
 "use client";
 
+import { CaretDownIcon } from "@/components/admin/admin-icons";
 import { AdminCard, AdminStatusBadge } from "@/components/admin/admin-primitives";
 import {
   formatDateTime,
@@ -59,6 +60,14 @@ export function PromoCodeActivationsCard({
   onNextActivationsPage,
   onShowLatestActivations,
 }: PromoCodeActivationsCardProps) {
+  function requestActivationsRetry() {
+    if (activationsIsFetching) {
+      return;
+    }
+
+    void onRefetchActivations();
+  }
+
   return (
     <AdminCard
       title={text.promoCodesRecentUsageTitle}
@@ -79,11 +88,6 @@ export function PromoCodeActivationsCard({
           <strong>{text.promoCodesRecentUsageTitle}</strong>
           <span>{text.promoCodesActivationsLoading}</span>
         </div>
-      ) : !hasAnyRedemptions ? (
-        <div className={styles.usageEmpty}>
-          <strong>{text.promoCodesRecentUsageTitle}</strong>
-          <span>{text.promoCodesRecentUsageEmpty}</span>
-        </div>
       ) : activationsIsError ? (
         <div className={styles.usageWarning}>
           <span>{text.promoCodesActivationsError}</span>
@@ -91,10 +95,15 @@ export function PromoCodeActivationsCard({
             variant="secondary"
             size="sm"
             disabled={activationsIsFetching}
-            onClick={() => void onRefetchActivations()}
+            onClick={requestActivationsRetry}
           >
             {text.promoCodesRefreshAction}
           </Button>
+        </div>
+      ) : !hasAnyRedemptions ? (
+        <div className={styles.usageEmpty}>
+          <strong>{text.promoCodesRecentUsageTitle}</strong>
+          <span>{text.promoCodesRecentUsageEmpty}</span>
         </div>
       ) : (
         <>
@@ -141,7 +150,12 @@ export function PromoCodeActivationsCard({
 
           <div className={styles.usageActions}>
             {canExpandActivations ? (
-              <Button variant="secondary" size="sm" onClick={onShowAllActivations}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onShowAllActivations}
+                disabled={activationsIsFetching}
+              >
                 {text.promoCodesViewAllActivationsAction}
               </Button>
             ) : null}
@@ -153,22 +167,31 @@ export function PromoCodeActivationsCard({
                   size="sm"
                   onClick={onPreviousActivationsPage}
                   disabled={!canGoToPreviousActivationsPage || activationsIsFetching}
+                  aria-label={text.promoCodesPreviousAction}
+                  title={text.promoCodesPreviousAction}
                 >
-                  {text.promoCodesPreviousAction}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={onNextActivationsPage}
                   disabled={!canGoToNextActivationsPage || activationsIsFetching}
+                  aria-label={text.promoCodesNextAction}
+                  title={text.promoCodesNextAction}
                 >
-                  {text.promoCodesNextAction}
+                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
                 </Button>
               </>
             ) : null}
 
             {showAllActivations ? (
-              <Button variant="ghost" size="sm" onClick={onShowLatestActivations}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onShowLatestActivations}
+                disabled={activationsIsFetching}
+              >
                 {text.promoCodesShowLatestActivationsAction}
               </Button>
             ) : null}

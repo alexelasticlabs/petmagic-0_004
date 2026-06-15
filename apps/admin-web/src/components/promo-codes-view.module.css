@@ -75,7 +75,7 @@
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(1.28rem, 1.02rem + 0.42vw, 1.56rem);
+  font-size: 1.5rem;
   font-weight: 600;
   line-height: 1.18;
 }
@@ -90,10 +90,11 @@
 .tableCard {
   border-color: var(--border-soft);
   background:
-    radial-gradient(
-      circle at top left,
-      color-mix(in srgb, var(--accent) 14%, transparent),
-      transparent 34%
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent) 7%, var(--surface-1)) 0%,
+      color-mix(in srgb, var(--surface-1) 96%, var(--surface-2)) 38%,
+      color-mix(in srgb, var(--surface-1) 96%, var(--surface-2)) 100%
     ),
     color-mix(in srgb, var(--surface-1) 96%, var(--surface-2));
 }
@@ -110,10 +111,11 @@
   inset: -40% auto auto -18%;
   width: 8rem;
   height: 8rem;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--accent) 20%, transparent),
-    transparent 70%
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 18%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 8%, transparent) 46%,
+    transparent 100%
   );
   opacity: 0;
   transition: opacity 220ms ease;
@@ -292,7 +294,7 @@
   color: var(--text-muted);
   font-size: 0.64rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .searchInput,
@@ -344,6 +346,13 @@
   color: var(--text-subtle);
 }
 
+.searchInput:disabled,
+.input:disabled {
+  color: var(--text-soft);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
 .input[readonly] {
   color: var(--text-soft);
 }
@@ -361,7 +370,7 @@
   color: var(--text-muted);
   font-size: 0.66rem;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -389,7 +398,7 @@
 }
 
 .tableRow:focus-visible td {
-  outline: 1px solid color-mix(in srgb, var(--success) 42%, transparent);
+  outline: 2px solid var(--border-accent);
   outline-offset: -1px;
 }
 
@@ -561,6 +570,12 @@
   background: var(--surface-hover);
 }
 
+.actionsMenuItem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  background: var(--surface-hover);
+}
+
 .actionsMenuItem:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -647,7 +662,7 @@
 .form {
   display: grid;
   gap: 0.95rem;
-  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
   overflow-y: auto;
   padding-right: 0.16rem;
 }
@@ -747,15 +762,33 @@
 }
 
 .usageTableWrap {
+  position: relative;
   width: 100%;
+  min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 42%, transparent) transparent;
   border: 1px solid var(--border-soft);
   border-radius: 0.86rem;
 }
 
+.usageTableWrap::-webkit-scrollbar {
+  height: 0.55rem;
+}
+
+.usageTableWrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.usageTableWrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 34%, transparent);
+}
+
 .usageTable {
   width: 100%;
-  min-width: 30rem;
+  min-width: clamp(24rem, 82vw, 30rem);
   border-collapse: collapse;
 }
 
@@ -764,7 +797,7 @@
   border-bottom: 1px solid var(--border-soft);
   text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0;
   font-size: 0.66rem;
   color: var(--text-muted);
 }
@@ -851,9 +884,9 @@
 
 .editorDrawer {
   width: min(46rem, 100%);
-  height: 100%;
+  height: min(100%, calc(100dvh - 1.8rem));
   border: 1px solid var(--border-soft);
-  border-radius: 1.05rem;
+  border-radius: var(--radius);
   background: var(--surface-1);
   box-shadow: var(--shadow-strong);
   overflow: hidden;
@@ -886,6 +919,10 @@
 }
 
 @media (max-width: 860px) {
+  .pageTitle {
+    font-size: 1.3rem;
+  }
+
   .filterBar,
   .formGrid,
   .inlineField,
@@ -937,6 +974,7 @@
 
   .editorDrawer {
     width: 100%;
+    height: min(100%, calc(100dvh - 1.12rem));
   }
 
   .formActionsSticky {
@@ -970,7 +1008,7 @@
 .codeInput {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.88rem;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
 }
 
 .quickChips {
@@ -1027,6 +1065,13 @@
   align-items: center;
   gap: 0.22rem;
   color: var(--text-soft);
+}
+
+.formSummaryIcon {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: 0 0 auto;
+  color: var(--accent);
 }
 
 .formSummaryItem strong {

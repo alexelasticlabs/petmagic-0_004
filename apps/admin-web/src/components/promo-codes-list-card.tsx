@@ -57,7 +57,9 @@ type PromoCodesListCardProps = {
   hasCodes: boolean;
   hasFilteredCodes: boolean;
   canManagePromoCodes: boolean;
+  promoCodesActionLocked: boolean;
   promoCodesQueryIsFetching: boolean;
+  promoCodesQueryIsRefreshing: boolean;
   autoRefreshMs: number;
   dataUpdatedAt: number;
   pagedCodes: AdminRedeemCode[];
@@ -104,7 +106,9 @@ export function PromoCodesListCard({
   hasCodes,
   hasFilteredCodes,
   canManagePromoCodes,
+  promoCodesActionLocked,
   promoCodesQueryIsFetching,
+  promoCodesQueryIsRefreshing,
   autoRefreshMs,
   dataUpdatedAt,
   pagedCodes,
@@ -144,6 +148,7 @@ export function PromoCodesListCard({
         >
           {statusTabs.map((tab, index) => {
             const isActiveTab = statusFilter === tab.value;
+            const isStatusTabDisabled = isActiveTab || promoCodesQueryIsFetching;
 
             return (
               <button
@@ -152,8 +157,13 @@ export function PromoCodesListCard({
                 role="tab"
                 aria-selected={isActiveTab}
                 className={`${styles.statusTab}${isActiveTab ? ` ${styles.statusTabActive}` : ""}`}
+                disabled={isStatusTabDisabled}
                 onClick={() => onStatusTabChange(tab.value)}
                 onKeyDown={(event) => {
+                  if (isStatusTabDisabled) {
+                    return;
+                  }
+
                   if (
                     event.key !== "ArrowLeft" &&
                     event.key !== "ArrowRight" &&
@@ -189,14 +199,22 @@ export function PromoCodesListCard({
           <Button
             variant="secondary"
             onClick={onExport}
-            disabled={!hasFilteredCodes || !canManagePromoCodes}
+            disabled={!hasFilteredCodes || !canManagePromoCodes || promoCodesQueryIsFetching}
           >
             <DownloadIcon className={styles.actionIcon} /> {text.promoCodesExportAction}
           </Button>
-          <Button variant="secondary" onClick={onRefresh} disabled={promoCodesQueryIsFetching}>
+          <Button
+            variant="secondary"
+            onClick={onRefresh}
+            disabled={!canManagePromoCodes || promoCodesQueryIsFetching}
+          >
             <RefreshIcon className={styles.actionIcon} /> {text.promoCodesRefreshAction}
           </Button>
-          <Button variant="primary" onClick={onOpenCreatePanel} disabled={!canManagePromoCodes}>
+          <Button
+            variant="primary"
+            onClick={onOpenCreatePanel}
+            disabled={!canManagePromoCodes || promoCodesActionLocked}
+          >
             {text.promoCodesCreateAction}
           </Button>
           <PromoCodesAutoRefreshBadge
@@ -214,6 +232,7 @@ export function PromoCodesListCard({
           <span className={styles.fieldLabel}>{text.promoCodesSearchPlaceholder}</span>
           <input
             className={styles.searchInput}
+            disabled={promoCodesQueryIsFetching}
             value={search}
             onChange={(event) =>
               onSearchChange(event.target.value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH))
@@ -230,6 +249,7 @@ export function PromoCodesListCard({
             onChange={(value) => onStatusFilterChange(value as PromoStatusFilter)}
             ariaLabel={text.promoCodesStatusFilterLabel}
             showSelectedDescription={false}
+            disabled={promoCodesQueryIsFetching}
           />
         </div>
         <div className={styles.selectField}>
@@ -240,6 +260,7 @@ export function PromoCodesListCard({
             onChange={(value) => onRewardFilterChange(value as "all" | AdminRedeemRewardKind)}
             ariaLabel={text.promoCodesRewardTypeLabel}
             showSelectedDescription={false}
+            disabled={promoCodesQueryIsFetching}
           />
         </div>
         <div className={styles.selectField}>
@@ -250,11 +271,18 @@ export function PromoCodesListCard({
             onChange={(value) => onSortModeChange(value as PromoSortMode)}
             ariaLabel={text.promoCodesSortLabel}
             showSelectedDescription={false}
+            disabled={promoCodesQueryIsFetching}
           />
         </div>
       </AdminFilterBar>
 
-      {!hasCodes ? (
+      {promoCodesQueryIsRefreshing ? (
+        <AdminStateCard
+          tone="info"
+          title={text.navPromoCodes}
+          description={text.promoCodesLoadingDescription}
+        />
+      ) : !hasCodes ? (
         <AdminStateCard
           tone="info"
           title={text.navPromoCodes}
@@ -266,7 +294,12 @@ export function PromoCodesListCard({
           title={text.navPromoCodes}
           description={text.promoCodesNoResults}
           action={
-            <Button variant="secondary" size="sm" onClick={onResetFilters}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onResetFilters}
+              disabled={promoCodesQueryIsFetching}
+            >
               {text.resetForm}
             </Button>
           }
@@ -298,6 +331,7 @@ export function PromoCodesListCard({
                   );
                   const actionBusy = busyCodeId === code.redeemCodeId;
                   const campaignMeta = formatCampaignMeta(code);
+                  const actionsMenuLabel = `${text.promoCodesActionsMenuLabel}: ${codeValue}`;
                   const usagePercent = Math.min(
                     100,
                     Math.round((code.redeemedCount / Math.max(1, code.maxRedemptions)) * 100)
@@ -392,13 +426,14 @@ export function PromoCodesListCard({
                             variant="ghost"
                             size="sm"
                             className={styles.actionMenuTrigger}
-                            aria-label={text.promoCodesActionsMenuLabel}
+                            aria-label={actionsMenuLabel}
                             aria-haspopup="menu"
                             aria-expanded={actionsMenuCodeId === code.redeemCodeId}
+                            title={actionsMenuLabel}
                             onClick={(event) =>
                               onToggleActionsMenu(code.redeemCodeId, event.currentTarget)
                             }
-                            disabled={actionBusy}
+                            disabled={actionBusy || promoCodesQueryIsFetching}
                           >
                             <MoreHorizontalIcon className={styles.inlineIcon} />
                           </Button>
@@ -422,7 +457,7 @@ export function PromoCodesListCard({
                 variant="secondary"
                 size="sm"
                 onClick={onPreviousPage}
-                disabled={currentPage <= 1}
+                disabled={currentPage <= 1 || promoCodesQueryIsFetching}
                 aria-label={text.promoCodesPreviousAction}
                 title={text.promoCodesPreviousAction}
               >
@@ -443,6 +478,7 @@ export function PromoCodesListCard({
                         : `Page ${formatNumber(pageNumber, locale)}`
                     }
                     onClick={() => onSelectPage(pageNumber)}
+                    disabled={promoCodesQueryIsFetching}
                   >
                     {formatNumber(pageNumber, locale)}
                   </Button>
@@ -453,7 +489,7 @@ export function PromoCodesListCard({
                 variant="secondary"
                 size="sm"
                 onClick={onNextPage}
-                disabled={currentPage >= totalPages}
+                disabled={currentPage >= totalPages || promoCodesQueryIsFetching}
                 aria-label={text.promoCodesNextAction}
                 title={text.promoCodesNextAction}
               >
@@ -468,6 +504,7 @@ export function PromoCodesListCard({
                 onChange={(value) => onPageSizeChange(Number(value))}
                 ariaLabel={locale === "ru" ? "Размер страницы" : "Page size"}
                 showSelectedDescription={false}
+                disabled={promoCodesQueryIsFetching}
               />
             </div>
           </div>

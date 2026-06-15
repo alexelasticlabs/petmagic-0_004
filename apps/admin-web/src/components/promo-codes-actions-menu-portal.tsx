@@ -40,6 +40,16 @@ export function PromoCodesActionsMenuPortal({
     return null;
   }
 
+  const actionCodeLabel = actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`;
+  const copyActionLabel = `${text.promoCodesCopyAction}: ${actionCodeLabel}`;
+  const editActionLabel = `${text.editTemplate}: ${actionCodeLabel}`;
+  const viewActivationsLabel = `${text.promoCodesViewActivationsAction}: ${actionCodeLabel}`;
+  const restoreActionLabel = `${text.promoCodesRestoreAction}: ${actionCodeLabel}`;
+  const toggleStateActionLabel = `${
+    actionsMenuCode.isActive ? text.promoCodesPauseAction : text.promoCodesResumeAction
+  }: ${actionCodeLabel}`;
+  const archiveActionLabel = `${text.archive}: ${actionCodeLabel}`;
+
   return createPortal(
     <div
       className={styles.actionsMenuPortal}
@@ -60,6 +70,9 @@ export function PromoCodesActionsMenuPortal({
               type="button"
               className={styles.actionsMenuItem}
               onClick={() => onViewActivations(actionsMenuCode)}
+              disabled={isActionsMenuBusy}
+              aria-label={viewActivationsLabel}
+              title={viewActivationsLabel}
             >
               {text.promoCodesViewActivationsAction}
             </button>
@@ -68,6 +81,8 @@ export function PromoCodesActionsMenuPortal({
               className={styles.actionsMenuItem}
               onClick={() => onRestore(actionsMenuCode)}
               disabled={isActionsMenuBusy}
+              aria-label={restoreActionLabel}
+              title={restoreActionLabel}
             >
               {text.promoCodesRestoreAction}
             </button>
@@ -80,6 +95,9 @@ export function PromoCodesActionsMenuPortal({
               onClick={() =>
                 void onCopyCode(actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`)
               }
+              disabled={isActionsMenuBusy}
+              aria-label={copyActionLabel}
+              title={copyActionLabel}
             >
               {text.promoCodesCopyAction}
             </button>
@@ -87,6 +105,9 @@ export function PromoCodesActionsMenuPortal({
               type="button"
               className={styles.actionsMenuItem}
               onClick={() => onEdit(actionsMenuCode)}
+              disabled={isActionsMenuBusy}
+              aria-label={editActionLabel}
+              title={editActionLabel}
             >
               {text.editTemplate}
             </button>
@@ -94,6 +115,9 @@ export function PromoCodesActionsMenuPortal({
               type="button"
               className={styles.actionsMenuItem}
               onClick={() => onViewActivations(actionsMenuCode)}
+              disabled={isActionsMenuBusy}
+              aria-label={viewActivationsLabel}
+              title={viewActivationsLabel}
             >
               {text.promoCodesViewActivationsAction}
             </button>
@@ -102,6 +126,8 @@ export function PromoCodesActionsMenuPortal({
               className={styles.actionsMenuItem}
               onClick={() => onToggleState(actionsMenuCode)}
               disabled={isActionsMenuBusy}
+              aria-label={toggleStateActionLabel}
+              title={toggleStateActionLabel}
             >
               {actionsMenuCode.isActive ? text.promoCodesPauseAction : text.promoCodesResumeAction}
             </button>
@@ -110,6 +136,8 @@ export function PromoCodesActionsMenuPortal({
               className={`${styles.actionsMenuItem} ${styles.actionsMenuItemDanger}`}
               onClick={() => onArchive(actionsMenuCode)}
               disabled={!actionsMenuCode.isActive || isActionsMenuBusy}
+              aria-label={archiveActionLabel}
+              title={archiveActionLabel}
             >
               {text.archive}
             </button>

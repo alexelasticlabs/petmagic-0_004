@@ -459,8 +459,12 @@ export function getUserLabels(userId: string, user?: AdminUserDetail) {
 
 export async function copyTextToClipboard(value: string) {
   if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // Fall back to the legacy path below; some browsers expose Clipboard API but reject writes.
+    }
   }
 
   const input = document.createElement("textarea");
@@ -470,8 +474,14 @@ export async function copyTextToClipboard(value: string) {
   input.style.left = "-9999px";
   document.body.append(input);
   input.select();
-  document.execCommand("copy");
-  input.remove();
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("Clipboard fallback copy failed");
+    }
+  } finally {
+    input.remove();
+  }
 }
 
 export function buildPromoCodesCsv(

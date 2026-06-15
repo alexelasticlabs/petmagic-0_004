@@ -64,6 +64,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const DEFAULT_PAGE_SIZE = 10;
 const PROMO_CODES_AUTO_REFRESH_MS = 15_000;
@@ -85,8 +86,16 @@ function useDebouncedValue(value: string, delayMs: number) {
   return debounced;
 }
 
+function getPromoClientErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error instanceof Error ? sanitizeSensitiveText(error.message, 160) : "unknown_error",
+  };
+}
+
 export function PromoCodesView({ locale }: { locale: Locale }) {
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const archiveActionLabel = locale === "ru" ? "Архивировать" : "Archive";
   const tokenUnit = "PawSpark";
   const router = useRouter();
@@ -142,24 +151,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     return () => window.clearTimeout(timer);
   }, [feedback]);
 
-  useEffect(() => {
-    if (!isEditorOpen) {
-      return;
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsEditorOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isEditorOpen]);
-
   const promoCodesQueryParams = useMemo(
     () =>
       normalizeAdminRedeemCodesQuery({
@@ -211,7 +202,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     refetchOnWindowFocus: false,
   });
 
-  const promoCodesPage = promoCodesQuery.data;
+  const promoCodesPage = promoCodesQuery.isPlaceholderData ? undefined : promoCodesQuery.data;
   const promoCodes = promoCodesPage?.items ?? EMPTY_PROMO_CODES;
   const nowMs = promoCodesQuery.dataUpdatedAt || fallbackNowMs;
   const selectedCode = useMemo(
@@ -246,12 +237,14 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     staleTime: 20_000,
   });
 
+  const activationsPageData = activationsQuery.isPlaceholderData ? undefined : activationsQuery.data;
   const visibleRedemptions = useMemo(
-    () => activationsQuery.data?.items ?? EMPTY_REDEMPTIONS,
-    [activationsQuery.data?.items]
+    () => activationsPageData?.items ?? EMPTY_REDEMPTIONS,
+    [activationsPageData?.items]
   );
   const redemptionsForView = activationsQuery.isError ? EMPTY_REDEMPTIONS : visibleRedemptions;
-  const hasMoreRedemptions = Boolean(activationsQuery.data?.hasMore);
+  const hasMoreRedemptions = Boolean(activationsPageData?.hasMore);
+  const isActivationsRefreshing = activationsQuery.isFetching && activationsQuery.isPlaceholderData;
   const hasAnyRedemptions = (selectedCode?.redeemedCount ?? 0) > 0;
   const canExpandActivations =
     !showAllActivations && (selectedCode?.redeemedCount ?? 0) > ACTIVATIONS_PREVIEW_LIMIT;
@@ -296,7 +289,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       setShowAllActivations(false);
       setActivationsPage(1);
       setForm(toPromoForm(code));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -323,7 +318,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       setShowAllActivations(false);
       setActivationsPage(1);
       setForm(toPromoForm(code));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -356,7 +353,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         setSelectedCodeSnapshot(code);
         setForm(toPromoForm(code));
       }
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot }),
+      ]);
     },
     onError: (error, variables) => {
       const fallback =
@@ -386,7 +385,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         setSelectedCodeSnapshot(code);
         setForm(toPromoForm(code));
       }
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyRedeemCodesRoot }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -421,7 +422,95 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     updateMutation.isPending ||
     statusMutation.isPending ||
     archiveMutation.isPending;
+  const isPromoCodesRefreshing = promoCodesQuery.isFetching && promoCodesQuery.isPlaceholderData;
   const isPromoRefreshFetching = promoCodesQuery.isFetching || promoMetricsQuery.isFetching;
+  const visiblePromoCodeIds = useMemo(
+    () => new Set(promoCodes.map((code) => code.redeemCodeId)),
+    [promoCodes]
+  );
+
+  useEffect(() => {
+    if (!isEditorOpen) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (isMutating) {
+        event.preventDefault();
+        return;
+      }
+
+      setIsEditorOpen(false);
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isEditorOpen, isMutating]);
+
+  useEffect(() => {
+    if (!promoCodesPage || isPromoCodesRefreshing || isMutating) {
+      return;
+    }
+
+    const shouldCloseActionsMenu =
+      actionsMenuCodeId !== null && !visiblePromoCodeIds.has(actionsMenuCodeId);
+    const shouldCloseArchiveConfirmation =
+      codePendingArchive !== null && !visiblePromoCodeIds.has(codePendingArchive.redeemCodeId);
+
+    if (!shouldCloseActionsMenu && !shouldCloseArchiveConfirmation) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (shouldCloseActionsMenu) {
+        closeActionsMenu();
+      }
+
+      if (shouldCloseArchiveConfirmation) {
+        setCodePendingArchive(null);
+      }
+    });
+  }, [
+    actionsMenuCodeId,
+    closeActionsMenu,
+    codePendingArchive,
+    isMutating,
+    isPromoCodesRefreshing,
+    promoCodesPage,
+    visiblePromoCodeIds,
+  ]);
+
+  function requestRefreshPromoCodes() {
+    if (!canManagePromoCodes || isPromoRefreshFetching) {
+      return;
+    }
+
+    void Promise.allSettled([promoCodesQuery.refetch(), promoMetricsQuery.refetch()]);
+  }
+
+  function requestRefreshPromoMetrics() {
+    if (!canManagePromoCodes || isPromoRefreshFetching) {
+      return;
+    }
+
+    void promoMetricsQuery.refetch().catch(() => undefined);
+  }
+
+  function resetSelectedPromoCode(nextPage = 1) {
+    setSelectedCodeId(null);
+    setSelectedCodeSnapshot(null);
+    setShowAllActivations(false);
+    setActivationsPage(1);
+    setPage(nextPage);
+    closeActionsMenu();
+  }
 
   const shownRangeStart = hasFilteredCodes ? (currentPage - 1) * pageSize + 1 : 0;
   const shownRangeEnd = hasFilteredCodes ? shownRangeStart + promoCodes.length - 1 : 0;
@@ -470,6 +559,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       return;
     }
 
+    if (isMutating) {
+      return;
+    }
+
     setPanelMode("create");
     setIsEditorOpen(true);
     setSelectedCodeId(null);
@@ -482,6 +575,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   }
 
   function handleCloseEditor() {
+    if (isMutating) {
+      return;
+    }
+
     setIsEditorOpen(false);
     closeActionsMenu();
   }
@@ -525,7 +622,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       await copyTextToClipboard(code);
       setFeedback({ tone: "info", message: text.promoCodesCopied });
     } catch (error) {
-      clientLogger.warn("promo.copy_failed", { error });
+      clientLogger.warn("promo.copy_failed", getPromoClientErrorDetails(error));
       setFeedback({ tone: "danger", message: text.promoCodesUpdateError });
     }
     closeActionsMenu();
@@ -554,8 +651,10 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     const link = document.createElement("a");
     link.href = url;
     link.download = `promo-codes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setFeedback({ tone: "info", message: text.promoCodesExported });
   }
 
@@ -739,14 +838,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             <Button
               variant="secondary"
               disabled={!canManagePromoCodes || isPromoRefreshFetching}
-              onClick={() => {
-                if (!canManagePromoCodes) {
-                  return;
-                }
-
-                void promoCodesQuery.refetch().catch(() => undefined);
-                void promoMetricsQuery.refetch().catch(() => undefined);
-              }}
+              onClick={requestRefreshPromoCodes}
             >
               {text.promoCodesRefreshAction}
             </Button>
@@ -790,13 +882,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             <Button
               variant="secondary"
               disabled={!canManagePromoCodes || isPromoRefreshFetching}
-              onClick={() => {
-                if (!canManagePromoCodes) {
-                  return;
-                }
-
-                void promoMetricsQuery.refetch().catch(() => undefined);
-              }}
+              onClick={requestRefreshPromoMetrics}
             >
               {text.promoCodesRefreshAction}
             </Button>
@@ -864,7 +950,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           hasCodes={hasCodes}
           hasFilteredCodes={hasFilteredCodes}
           canManagePromoCodes={canManagePromoCodes}
+          promoCodesActionLocked={isMutating}
           promoCodesQueryIsFetching={isPromoRefreshFetching}
+          promoCodesQueryIsRefreshing={isPromoCodesRefreshing}
           autoRefreshMs={PROMO_CODES_AUTO_REFRESH_MS}
           dataUpdatedAt={promoCodesQuery.dataUpdatedAt}
           pagedCodes={pagedCodes}
@@ -880,49 +968,42 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           pageSize={pageSize}
           onStatusTabChange={(value) => {
             setStatusFilter(value);
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onSearchChange={(value) => {
             setSearch(value.slice(0, PROMO_CODES_SEARCH_MAX_LENGTH));
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onStatusFilterChange={(value) => {
             setStatusFilter(value);
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onRewardFilterChange={(value) => {
             setRewardFilter(value);
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onSortModeChange={(value) => {
             setSortMode(value);
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onPageSizeChange={(value) => {
             setPageSize(value);
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onResetFilters={() => {
             setSearch("");
             setStatusFilter("all");
             setRewardFilter("all");
-            setPage(1);
+            resetSelectedPromoCode();
           }}
           onExport={handleExport}
-          onRefresh={() => {
-            if (!canManagePromoCodes) {
-              return;
-            }
-
-            void promoCodesQuery.refetch().catch(() => undefined);
-            void promoMetricsQuery.refetch().catch(() => undefined);
-          }}
+          onRefresh={requestRefreshPromoCodes}
           onOpenCreatePanel={handleOpenCreatePanel}
           onFocusUsage={handleFocusUsage}
           onToggleActionsMenu={handleToggleActionsMenu}
-          onPreviousPage={() => setPage(Math.max(1, currentPage - 1))}
-          onNextPage={() => setPage(Math.min(totalPages, currentPage + 1))}
-          onSelectPage={setPage}
+          onPreviousPage={() => resetSelectedPromoCode(Math.max(1, currentPage - 1))}
+          onNextPage={() => resetSelectedPromoCode(Math.min(totalPages, currentPage + 1))}
+          onSelectPage={resetSelectedPromoCode}
         />
 
         <PromoCodeActivationsCard
@@ -930,7 +1011,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           locale={locale}
           selectedCode={selectedCode}
           selectedStatusLabel={selectedStatus?.label}
-          activationsIsLoading={activationsQuery.isLoading}
+          activationsIsLoading={activationsQuery.isLoading || isActivationsRefreshing}
           activationsIsError={activationsQuery.isError}
           activationsIsFetching={activationsQuery.isFetching}
           redemptionsForView={redemptionsForView}

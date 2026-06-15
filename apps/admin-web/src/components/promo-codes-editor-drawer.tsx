@@ -2,6 +2,7 @@
 
 import { type Dispatch, type FormEvent, type SetStateAction } from "react";
 
+import { CalendarIcon, PeopleIcon, PromoCodeIcon } from "@/components/admin/admin-icons";
 import { AdminCard } from "@/components/admin/admin-primitives";
 import {
   PROMO_CAMPAIGN_FIELD_MAX_LENGTH,
@@ -71,10 +72,11 @@ export function PromoCodesEditorDrawer({
     Boolean(form.startsAtUtc) &&
     Boolean(form.expiresAtUtc) &&
     new Date(form.startsAtUtc).getTime() > new Date(form.expiresAtUtc).getTime();
-  const isSubmitDisabled = isMutating || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow;
+  const isFormLocked = isMutating;
+  const isSubmitDisabled = isFormLocked || isCodeInvalid || hasInvalidNumber || hasInvalidDateWindow;
 
   return (
-    <div className={styles.drawerBackdrop} onClick={onClose}>
+    <div className={styles.drawerBackdrop} onClick={isMutating ? undefined : onClose}>
       <aside
         className={styles.editorDrawer}
         role="dialog"
@@ -87,7 +89,7 @@ export function PromoCodesEditorDrawer({
           description={text.promoCodesFormCardDescription}
           className={styles.formCard}
         >
-          <form className={styles.form} onSubmit={onSubmit}>
+          <form className={styles.form} onSubmit={onSubmit} aria-busy={isFormLocked}>
             <section className={styles.formSection}>
               <header className={styles.formSectionHeader}>
                 <h3 className={styles.formSectionTitle}>{text.promoCodesSectionMainTitle}</h3>
@@ -109,14 +111,14 @@ export function PromoCodesEditorDrawer({
                         code: event.target.value.toUpperCase().slice(0, PROMO_CODE_MAX_LENGTH),
                       }))
                     }
-                    readOnly={panelMode === "edit"}
+                    readOnly={panelMode === "edit" || isFormLocked}
                   />
                   <Button
                     type="button"
                     variant="secondary"
                     size="sm"
                     onClick={onGenerateCode}
-                    disabled={panelMode === "edit"}
+                    disabled={panelMode === "edit" || isFormLocked}
                   >
                     {text.promoCodesGenerateCodeAction}
                   </Button>
@@ -137,6 +139,7 @@ export function PromoCodesEditorDrawer({
                       description: event.target.value.slice(0, PROMO_DESCRIPTION_MAX_LENGTH),
                     }))
                   }
+                  disabled={isFormLocked}
                 />
               </label>
 
@@ -150,6 +153,7 @@ export function PromoCodesEditorDrawer({
                   }
                   ariaLabel={text.promoCodesStatusFieldLabel}
                   showSelectedDescription={false}
+                  disabled={isFormLocked}
                 />
               </label>
             </section>
@@ -171,6 +175,7 @@ export function PromoCodesEditorDrawer({
                         rewardKind: event.target.value as AdminRedeemRewardKind,
                       }))
                     }
+                    disabled={isFormLocked}
                   >
                     <option value="spark">{text.promoCodesRewardTypeSparkOption}</option>
                   </select>
@@ -195,6 +200,7 @@ export function PromoCodesEditorDrawer({
                         rewardValue: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                   <div className={styles.quickChips}>
                     {[50, 100, 250, 500, 1000].map((v) => (
@@ -205,6 +211,7 @@ export function PromoCodesEditorDrawer({
                         onClick={() =>
                           setForm((current) => ({ ...current, rewardValue: String(v) }))
                         }
+                        disabled={isFormLocked}
                       >
                         {v}
                       </button>
@@ -238,6 +245,7 @@ export function PromoCodesEditorDrawer({
                         maxRedemptions: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                   <div className={styles.quickChips}>
                     {[50, 100, 500, 1000].map((v) => (
@@ -248,6 +256,7 @@ export function PromoCodesEditorDrawer({
                         onClick={() =>
                           setForm((current) => ({ ...current, maxRedemptions: String(v) }))
                         }
+                        disabled={isFormLocked}
                       >
                         {v}
                       </button>
@@ -272,6 +281,7 @@ export function PromoCodesEditorDrawer({
                         maxRedemptionsPerUser: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                   <div className={styles.quickChips}>
                     {[1, 2, 3, 5].map((v) => (
@@ -282,6 +292,7 @@ export function PromoCodesEditorDrawer({
                         onClick={() =>
                           setForm((current) => ({ ...current, maxRedemptionsPerUser: String(v) }))
                         }
+                        disabled={isFormLocked}
                       >
                         {v}
                       </button>
@@ -308,6 +319,7 @@ export function PromoCodesEditorDrawer({
                       onChange={(event) =>
                         setForm((current) => ({ ...current, startsAtUtc: event.target.value }))
                       }
+                      disabled={isFormLocked}
                     />
                     <Button
                       type="button"
@@ -325,6 +337,7 @@ export function PromoCodesEditorDrawer({
                                 .slice(0, 16),
                         }))
                       }
+                      disabled={isFormLocked}
                     >
                       {form.startsAtUtc ? text.resetForm : text.promoCodesPickDateAction}
                     </Button>
@@ -342,6 +355,7 @@ export function PromoCodesEditorDrawer({
                       onChange={(event) =>
                         setForm((current) => ({ ...current, expiresAtUtc: event.target.value }))
                       }
+                      disabled={isFormLocked}
                     />
                     <Button
                       type="button"
@@ -359,6 +373,7 @@ export function PromoCodesEditorDrawer({
                                 .slice(0, 16),
                         }))
                       }
+                      disabled={isFormLocked}
                     >
                       {form.expiresAtUtc
                         ? text.promoCodesNoExpiryAction
@@ -394,6 +409,7 @@ export function PromoCodesEditorDrawer({
                         minimumSuccessfulPurchases: normalizePromoIntegerInput(event.target.value),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                   <span className={styles.helperText}>{text.promoCodesMinimumPurchasesHint}</span>
                 </label>
@@ -410,6 +426,7 @@ export function PromoCodesEditorDrawer({
                         campaignName: event.target.value.slice(0, PROMO_CAMPAIGN_FIELD_MAX_LENGTH),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                 </label>
                 <label className={styles.formField}>
@@ -428,6 +445,7 @@ export function PromoCodesEditorDrawer({
                         ),
                       }))
                     }
+                    disabled={isFormLocked}
                   />
                 </label>
               </div>
@@ -435,14 +453,16 @@ export function PromoCodesEditorDrawer({
 
             <div className={styles.formSummary} aria-label={text.promoCodesFormSummaryLabel}>
               <span className={styles.formSummaryItem}>
-                🎁 <strong>{form.rewardValue || "—"}</strong>
+                <PromoCodeIcon className={styles.formSummaryIcon} />
+                <strong>{form.rewardValue || "—"}</strong>
                 {" PawSpark"}
               </span>
               <span className={styles.formSummarySep} aria-hidden="true">
                 ·
               </span>
               <span className={styles.formSummaryItem}>
-                🔢 {text.promoCodesSummaryLimitLabel}{" "}
+                <PeopleIcon className={styles.formSummaryIcon} />
+                {text.promoCodesSummaryLimitLabel}{" "}
                 <strong>{form.maxRedemptions || "—"}</strong>
                 {" ("}
                 <strong>{form.maxRedemptionsPerUser || "—"}</strong>
@@ -452,7 +472,7 @@ export function PromoCodesEditorDrawer({
                 ·
               </span>
               <span className={styles.formSummaryItem}>
-                📅{" "}
+                <CalendarIcon className={styles.formSummaryIcon} />
                 {form.expiresAtUtc
                   ? form.expiresAtUtc.replace("T", " ")
                   : text.promoCodesNoExpiryAction}
