@@ -695,7 +695,7 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        if (!Enum.TryParse<SupportConversationStatus>(request.Status, true, out var status))
+        if (!TryParseNamedEnum<SupportConversationStatus>(request.Status, out var status))
         {
             return TypedResults.Problem(
                 title: "support.status_invalid",
@@ -761,7 +761,7 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        if (!Enum.TryParse<SupportConversationPriority>(request.Priority, true, out var priority))
+        if (!TryParseNamedEnum<SupportConversationPriority>(request.Priority, out var priority))
         {
             return TypedResults.Problem(
                 title: "support.priority_invalid",
@@ -788,6 +788,33 @@ public static partial class SupportChatEndpoints
         }
 
         return TypedResults.Ok(result.Value);
+    }
+
+    private static bool TryParseNamedEnum<TEnum>(string? raw, out TEnum value)
+        where TEnum : struct, Enum
+    {
+        value = default;
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        var trimmed = raw.Trim();
+        if (IsIntegerLiteral(trimmed))
+        {
+            return false;
+        }
+
+        return Enum.TryParse<TEnum>(trimmed, ignoreCase: true, out value)
+            && Enum.IsDefined(value);
+    }
+
+    private static bool IsIntegerLiteral(string value)
+    {
+        var start = value[0] is '+' or '-' ? 1 : 0;
+        return start < value.Length
+            && value[start..].All(static character => character is >= '0' and <= '9');
     }
 
     private static async Task<Results<Ok<SupportTicketContextResponse>, ProblemHttpResult>> GetAdminTicketContextAsync(

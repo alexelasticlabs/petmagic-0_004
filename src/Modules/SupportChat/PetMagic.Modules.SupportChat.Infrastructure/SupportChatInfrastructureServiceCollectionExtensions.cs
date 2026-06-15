@@ -10,11 +10,17 @@ namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 public static class SupportChatInfrastructureServiceCollectionExtensions
 {
-    public static IServiceCollection AddSupportChatInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    private static readonly TimeSpan PushHttpClientTimeout = TimeSpan.FromSeconds(30);
+
+    public static IServiceCollection AddSupportChatInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isProduction = false)
     {
         var attachmentStorageOptions = BuildSupportAttachmentStorageOptions(
             configuration.GetSection("SupportChat:AttachmentStorage"));
         var pushOptions = BuildSupportChatPushOptions(configuration);
+        ValidateProductionPushConfiguration(pushOptions, isProduction);
 
         services.AddDbContext<SupportChatDbContext>(options =>
         {
@@ -27,7 +33,8 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         services.AddScoped<SupportAttachmentCleanupProcessor>();
         services.AddScoped<ISupportPushTokenService, SupportPushTokenService>();
         services.AddScoped<NoopSupportChatPushNotificationSender>();
-        services.AddHttpClient<FcmSupportChatPushNotificationSender>();
+        services.AddHttpClient<FcmSupportChatPushNotificationSender>(client =>
+            client.Timeout = PushHttpClientTimeout);
         services.AddScoped<ISupportChatPushNotificationSender>(serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<SupportChatPushOptions>();
@@ -182,6 +189,17 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
                 ?? ReadValue(templateSection, "ServiceAccountJsonPath", "FIREBASE_SERVICE_ACCOUNT_JSON_PATH")
                 ?? string.Empty
         };
+    }
+
+    private static void ValidateProductionPushConfiguration(SupportChatPushOptions options, bool isProduction)
+    {
+        if (!isProduction || !options.Enabled || options.IsConfigured)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "SupportChat Firebase push is enabled but Firebase project id or service account configuration is missing.");
     }
 
     private static string? ReadValue(IConfigurationSection section, string key, string environmentVariable)

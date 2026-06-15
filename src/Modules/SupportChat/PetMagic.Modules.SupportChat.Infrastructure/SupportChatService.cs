@@ -174,7 +174,7 @@ public sealed partial class SupportChatService(
             var requestedStatuses = new HashSet<SupportConversationStatus>();
             foreach (var statusFilter in requestedStatusFilters)
             {
-                if (!Enum.TryParse<SupportConversationStatus>(statusFilter, true, out var status))
+                if (!TryParseNamedEnum<SupportConversationStatus>(statusFilter, out var status))
                 {
                     return Result.Failure<SupportConversationInboxPageResponse>(InvalidStatus);
                 }
@@ -196,7 +196,7 @@ public sealed partial class SupportChatService(
 
         if (!string.IsNullOrWhiteSpace(query.Source))
         {
-            if (!Enum.TryParse<SupportConversationSource>(query.Source, true, out var source))
+            if (!TryParseNamedEnum<SupportConversationSource>(query.Source, out var source))
             {
                 return Result.Failure<SupportConversationInboxPageResponse>(InvalidSource);
             }
@@ -209,7 +209,7 @@ public sealed partial class SupportChatService(
 
         if (!string.IsNullOrWhiteSpace(query.Priority))
         {
-            if (!Enum.TryParse<SupportConversationPriority>(query.Priority, true, out var priority))
+            if (!TryParseNamedEnum<SupportConversationPriority>(query.Priority, out var priority))
             {
                 return Result.Failure<SupportConversationInboxPageResponse>(InvalidPriority);
             }
@@ -236,7 +236,9 @@ public sealed partial class SupportChatService(
         }
 
         var page = Math.Max(1, query.Page);
-        var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var pageSize = query.PageSize <= 0
+            ? 50
+            : Math.Clamp(query.PageSize, 1, 100);
 
         var normalizedSort = query.Sort?.Trim().ToLowerInvariant();
         if (normalizedSort is not (null or "" or "default" or "priority" or "waiting" or "updated" or "created"))
@@ -244,7 +246,18 @@ public sealed partial class SupportChatService(
             return Result.Failure<SupportConversationInboxPageResponse>(InvalidSort);
         }
 
-        var totalCount = await conversationsQuery.CountAsync(cancellationToken);
+        var totalCount = await conversationsQuery.LongCountAsync(cancellationToken);
+        var boundedTotalCount = totalCount > int.MaxValue ? int.MaxValue : (int)totalCount;
+        var offset = ((long)page - 1L) * pageSize;
+        if (offset >= totalCount || offset > int.MaxValue)
+        {
+            return Result.Success(new SupportConversationInboxPageResponse(
+                [],
+                page,
+                pageSize,
+                boundedTotalCount,
+                false));
+        }
 
         var orderedConversationsQuery = normalizedSort switch
         {
@@ -280,7 +293,7 @@ public sealed partial class SupportChatService(
         };
 
         var conversationRows = await orderedConversationsQuery
-            .Skip((page - 1) * pageSize)
+            .Skip((int)offset)
             .Take(pageSize)
             .Select(conversation => new
             {
@@ -379,8 +392,8 @@ public sealed partial class SupportChatService(
             summaries,
             page,
             pageSize,
-            totalCount,
-            page * pageSize < totalCount));
+            boundedTotalCount,
+            offset + summaries.Count < totalCount));
     }
 
     public async Task<Result<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(CancellationToken cancellationToken)
