@@ -39,7 +39,38 @@ void main() {
       ).readAsStringSync();
 
       expect(parentSource, contains("import 'dart:async';"));
+      expect(
+        parentSource,
+        contains(
+          "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
+        ),
+      );
       expect(source, contains('int _initializeRequestVersion = 0;'));
+      expect(source, contains('bool _hasPreviewSlot = false;'));
+      expect(
+        source,
+        contains(
+          'class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>\n'
+          '    with WidgetsBindingObserver',
+        ),
+      );
+      expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
+      expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
+      expect(source, contains('void didChangeAppLifecycleState'));
+      expect(source, contains('state == AppLifecycleState.resumed'));
+      expect(source, contains('_isVisibleEnoughToLoad &&'));
+      expect(source, contains('state == AppLifecycleState.paused'));
+      expect(source, contains('state == AppLifecycleState.hidden'));
+      expect(source, contains('unawaited(_disposeVideoController());'));
+      expect(
+        source,
+        contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+      );
+      expect(
+        source,
+        contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
+      );
+      expect(source, contains('void _releasePreviewSlot()'));
       expect(
         source,
         contains('_isCurrentVideoRequest(requestVersion, url, controller)'),

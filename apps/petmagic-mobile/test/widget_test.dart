@@ -29,9 +29,15 @@ import 'package:petmagic_mobile/features/support/data/support_chat_realtime_clie
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
@@ -749,6 +755,165 @@ void main() {
   });
 
   testWidgets(
+    'app router registers pet details creations and generation status routes',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({
+        _onboardingSeenKey: true,
+        _sessionKey: _buildSessionJson(),
+      });
+
+      final generationRepository = _RouterTemplateGenerationRepository();
+      final container = ProviderContainer(
+        overrides: [
+          dioProvider.overrideWith(
+            (ref) => Dio(BaseOptions(baseUrl: 'https://petmagic.test')),
+          ),
+          authSessionStorageProvider.overrideWith(
+            (ref) =>
+                _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
+          ),
+          templateGenerationRepositoryProvider.overrideWithValue(
+            generationRepository,
+          ),
+          templatesRepositoryProvider.overrideWith(
+            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
+          ),
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          profileRepositoryProvider.overrideWith(
+            (ref) => _FakeProfileRepository(),
+          ),
+          externalAuthRepositoryProvider.overrideWith(
+            (ref) => _FakeExternalAuthRepository(),
+          ),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(appLaunchControllerProvider.notifier).markSignedIn();
+      final router = container.read(appRouterProvider);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await _pumpFrames(tester);
+
+      router.go(MyPetsPage.routePath);
+      await _pumpFrames(tester);
+      expect(find.byType(MyPetsPage), findsOneWidget);
+
+      router.go(PetDetailsPage.location('pet-router'));
+      await _pumpFrames(tester);
+      expect(find.byType(PetDetailsPage), findsOneWidget);
+      expect(
+        tester.widget<PetDetailsPage>(find.byType(PetDetailsPage)).petId,
+        'pet-router',
+      );
+
+      const encodedPetId = 'pet/router #1?x=2';
+      router.go(PetDetailsPage.location(encodedPetId));
+      await _pumpFrames(tester);
+      expect(find.byType(PetDetailsPage), findsOneWidget);
+      expect(
+        tester.widget<PetDetailsPage>(find.byType(PetDetailsPage)).petId,
+        encodedPetId,
+      );
+
+      router.go(GenerationsGalleryPage.routePath);
+      await _pumpFrames(tester);
+      expect(find.byType(GenerationsGalleryPage), findsOneWidget);
+
+      router.go(GenerationStatusPage.routeFor('generation-router'));
+      await _pumpFrames(tester);
+      expect(find.byType(GenerationStatusPage), findsOneWidget);
+      expect(
+        tester
+            .widget<GenerationStatusPage>(find.byType(GenerationStatusPage))
+            .generationId,
+        'generation-router',
+      );
+
+      const encodedGenerationId = 'generation/router #1?x=2';
+      router.go(GenerationStatusPage.routeFor(encodedGenerationId));
+      await _pumpFrames(tester);
+      expect(find.byType(GenerationStatusPage), findsOneWidget);
+      expect(
+        tester
+            .widget<GenerationStatusPage>(find.byType(GenerationStatusPage))
+            .generationId,
+        encodedGenerationId,
+      );
+
+      final resultInputUri = Uri.parse(
+        GenerationResultInputPage.routeFor(encodedGenerationId),
+      );
+      expect(resultInputUri.pathSegments, [
+        'generation-results',
+        encodedGenerationId,
+        'use-input',
+      ]);
+      expect(resultInputUri.query, isEmpty);
+      expect(resultInputUri.fragment, isEmpty);
+
+      final supportUri = Uri.parse(
+        SupportChatPage.routeFor(
+          initialMessage: 'Report\n$encodedGenerationId',
+          relatedGenerationId: encodedGenerationId,
+        ),
+      );
+      expect(supportUri.path, SupportChatPage.routePath);
+      expect(
+        supportUri.queryParameters[SupportChatPage.initialMessageQueryParam],
+        'Report\n$encodedGenerationId',
+      );
+      expect(
+        supportUri.queryParameters[SupportChatPage
+            .relatedGenerationIdQueryParam],
+        encodedGenerationId,
+      );
+
+      generationRepository.fetchGenerationCalls.clear();
+      generationRepository.fetchCompatibleTemplateCalls.clear();
+      router.go(GenerationResultInputPage.routeFor(encodedGenerationId));
+      await _pumpFrames(tester);
+      expect(find.byType(GenerationResultInputPage), findsOneWidget);
+      expect(
+        tester
+            .widget<GenerationResultInputPage>(
+              find.byType(GenerationResultInputPage),
+            )
+            .generationId,
+        encodedGenerationId,
+      );
+      expect(generationRepository.fetchGenerationCalls, [encodedGenerationId]);
+      expect(generationRepository.fetchCompatibleTemplateCalls, [
+        encodedGenerationId,
+      ]);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(minutes: 1, milliseconds: 1));
+    },
+  );
+
+  testWidgets(
     'authenticated user can open legal detail pages from profile settings',
     (tester) async {
       SharedPreferences.setMockInitialValues({
@@ -1054,12 +1219,47 @@ void main() {
         supportRepository.lastOpenedInitialMessage,
         'Need help with tokens',
       );
+      expect(supportRepository.lastOpenedRelatedGenerationId, isNull);
       expect(state.conversation, isNotNull);
       expect(
         state.conversation?.messages.any(
           (message) => message.body == 'Need help with tokens',
         ),
         isTrue,
+      );
+    },
+  );
+
+  test(
+    'support chat controller attaches related generation to first message',
+    () async {
+      final supportRepository = _FakeSupportChatRepository(
+        hasConversation: false,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+      await controller.initialize();
+      await controller.sendMessage(
+        'Generation issue',
+        localeTag: 'en',
+        relatedGenerationId: 'generation-router',
+      );
+
+      expect(supportRepository.openConversationCalls, 1);
+      expect(
+        supportRepository.lastOpenedRelatedGenerationId,
+        'generation-router',
       );
     },
   );
@@ -1178,6 +1378,52 @@ void main() {
     expect(find.text('PetMagic Support'), findsWidgets);
     expect(find.text('We usually reply within 24 hours'), findsWidgets);
     expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
+  });
+
+  testWidgets('support chat page preloads generation report context', (
+    tester,
+  ) async {
+    final supportRepository = _FakeSupportChatRepository(
+      hasConversation: false,
+    );
+
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supportChatRepositoryProvider.overrideWith(
+            (ref) => supportRepository,
+          ),
+          supportChatRealtimeClientProvider.overrideWith(
+            (ref) => const _FakeSupportChatRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          home: const SupportChatPage(
+            initialMessage: 'Report a problem\nRelated generation: g-ready-1',
+            relatedGenerationId: 'g-ready-1',
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    final composer = tester.widget<TextField>(find.byType(TextField).last);
+    expect(
+      composer.controller?.text,
+      'Report a problem\nRelated generation: g-ready-1',
+    );
   });
 
   testWidgets('support chat page shows welcome actions for empty chat', (

@@ -95,6 +95,18 @@ class _IdleGenerationHistoryController extends GenerationHistoryController {
   GenerationHistoryState build() {
     return const GenerationHistoryState();
   }
+
+  @override
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {}
+
+  @override
+  Future<void> load({
+    GenerationHistoryFilter? filter,
+    bool refresh = false,
+  }) async {}
+
+  @override
+  Future<void> markRead(String generationId) async {}
 }
 
 class _ThrowingGuestLaunchController extends AppLaunchController {
@@ -260,6 +272,29 @@ class _FakeTemplatesRepository implements TemplatesRepository {
       TemplatesFeedPage(items: items, nextCursor: null, hasMore: false);
 
   @override
+  void cancelPendingFeedRequest() {}
+
+  @override
+  void cancelPendingRandomTemplateRequest() {}
+
+  @override
+  void cancelPendingMetadataRequests() {}
+
+  @override
+  Future<TemplateItem> fetchTemplate(String templateId) async {
+    return items.firstWhere((item) => item.templateId == templateId);
+  }
+
+  @override
+  Future<TemplateItem?> fetchRandomTemplate({
+    required TemplateRandomMode mode,
+    required String? category,
+    required bool includePremium,
+  }) async {
+    return items.isEmpty ? null : items.first;
+  }
+
+  @override
   Future<List<TemplateItem>> readSyncedCatalogItems() async => items;
 
   @override
@@ -295,6 +330,99 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   Future<int> syncCatalog({int? knownRemoteVersion}) async {
     return knownRemoteVersion ?? 1;
   }
+}
+
+class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
+  _RouterTemplateGenerationRepository()
+    : super(
+        dio: Dio(),
+        sessionStorage: AuthSessionStorage(),
+        preferences: SharedPreferencesAsync(),
+      );
+
+  final List<String> fetchGenerationCalls = [];
+  final List<String> fetchCompatibleTemplateCalls = [];
+
+  @override
+  Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+    return [
+      PetProfile(
+        id: 'pet-router',
+        name: 'Router Pet',
+        type: 'dog',
+        breed: 'Corgi',
+        avatarUrl: 'https://cdn.petmagic.app/router-pet.jpg',
+        photosCount: 1,
+        generationsCount: 1,
+        createdAtUtc: DateTime.utc(2035),
+        updatedAtUtc: DateTime.utc(2035),
+      ),
+    ];
+  }
+
+  @override
+  Future<List<PetPhoto>> fetchPetPhotos(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<List<TemplateGenerationResult>> fetchPetGenerations(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    return const [];
+  }
+
+  @override
+  Future<TemplateGenerationResult> fetchGeneration(
+    String generationId, {
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    fetchGenerationCalls.add(generationId);
+    final now = DateTime.utc(2035, 1, 1, 12);
+    return TemplateGenerationResult(
+      generationId: generationId,
+      userId: 'user-1',
+      templateId: 'template-router',
+      status: TemplateGenerationStatus.completed,
+      tokenCost: 1,
+      attemptCount: 1,
+      createdAtUtc: now,
+      updatedAtUtc: now,
+      completedAtUtc: now,
+      userMediaExpired: false,
+      templateTitle: 'Router generation',
+      templateType: 'image',
+      outputUrl: 'https://cdn.petmagic.app/router-generation.jpg',
+      resultPreviewUrl: 'https://cdn.petmagic.app/router-generation-thumb.jpg',
+    );
+  }
+
+  @override
+  Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
+    String resultId, {
+    CancelToken? cancelToken,
+  }) async {
+    fetchCompatibleTemplateCalls.add(resultId);
+    return CompatibleGenerationTemplates(
+      resultId: resultId,
+      inputMediaType: TemplateType.image,
+      templates: const [],
+    );
+  }
+
+  @override
+  Future<void> recordAnalyticsEvent({
+    required String templateId,
+    required String eventType,
+    String? generationId,
+    Map<String, Object?> metadata = const {},
+    CancelToken? cancelToken,
+  }) async {}
 }
 
 class _FakeProfileRepository extends ProfileRepository {
@@ -596,6 +724,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   String? lastSentBody;
   int openConversationCalls = 0;
   String? lastOpenedInitialMessage;
+  String? lastOpenedRelatedGenerationId;
   late SupportChatConversation _conversation = SupportChatConversation(
     conversationId: 'conversation-1',
     initiatorUserId: 'user-1',
@@ -641,6 +770,7 @@ class _FakeSupportChatRepository extends SupportChatRepository {
   }) async {
     openConversationCalls += 1;
     lastOpenedInitialMessage = initialMessage;
+    lastOpenedRelatedGenerationId = relatedGenerationId;
     if (!_hasConversation) {
       _hasConversation = true;
       final now = DateTime.utc(2026, 1, 1, 10, 10);
