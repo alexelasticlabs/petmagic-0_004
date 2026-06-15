@@ -92,6 +92,8 @@ public interface ITemplatesService
 
     Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken);
 
+    Task<Result<PublicRandomTemplateResponse>> GetPublicRandomTemplateAsync(PublicRandomTemplateQuery query, CancellationToken cancellationToken);
+
     Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken);
 
     Task<Result<PublicTemplateOfTheDayResponse>> GetPublicTemplateOfTheDayAsync(DateOnly? date, string? locale, CancellationToken cancellationToken);

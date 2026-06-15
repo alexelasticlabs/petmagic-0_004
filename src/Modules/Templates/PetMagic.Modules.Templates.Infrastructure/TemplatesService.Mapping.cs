@@ -21,6 +21,19 @@ internal sealed partial class TemplatesService
             || normalized.EndsWith(".m4v", StringComparison.Ordinal);
     }
 
+    private static string? ResolvePublicThumbnailUrl(string? previewUrl, string? previewContentType)
+    {
+        if (string.IsNullOrWhiteSpace(previewUrl))
+        {
+            return null;
+        }
+
+        var contentType = previewContentType?.Trim().ToLowerInvariant() ?? string.Empty;
+        return contentType.StartsWith("video/", StringComparison.Ordinal) || IsVideoAssetUrl(previewUrl)
+            ? null
+            : previewUrl;
+    }
+
     private static PublicTemplateCatalogMetadataResponse MapPublicCatalogMetadataItem(TemplateItem template, string? locale)
     {
         var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
@@ -169,6 +182,7 @@ internal sealed partial class TemplatesService
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)
     {
         var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
 
         return new PublicTemplateListItemResponse(
             template.Id,
@@ -180,15 +194,18 @@ internal sealed partial class TemplatesService
             DeserializeTags(template.Tags),
             template.IsPremium,
             template.TokenCost,
-            GetAsset(template, TemplateAssetKind.Preview),
+            previewAsset,
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
             template.SupportsGenerationResultInput,
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength);
+            template.DefaultVariationStrength,
+            ResolvePublicThumbnailUrl(
+                previewAsset?.Url,
+                previewAsset?.ContentType));
     }
 
     private static PublicTemplateListItemResponse MapPublicListItem(
@@ -206,6 +223,11 @@ internal sealed partial class TemplatesService
         TemplateStatus status,
         string? musicDescription,
         double? referenceVideoDurationSeconds,
+        bool supportsGenerationResultInput,
+        TemplateType? requiredInputMediaType,
+        bool recommendedAfterImageGeneration,
+        bool supportsGenerateSimilar,
+        string? defaultVariationStrength,
         DateTime createdAtUtc,
         DateTime updatedAtUtc,
         string? previewUrl,
@@ -252,12 +274,97 @@ internal sealed partial class TemplatesService
             previewAsset,
             musicDescription,
             referenceVideoDurationSeconds,
-            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements));
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
+            supportsGenerationResultInput,
+            requiredInputMediaType?.ToString(),
+            recommendedAfterImageGeneration,
+            supportsGenerateSimilar,
+            NormalizePublicVariationStrength(defaultVariationStrength),
+            ThumbnailUrl: ResolvePublicThumbnailUrl(previewUrl, previewContentType));
+    }
+
+    private static PublicTemplateFeedItemResponse MapPublicFeedItem(
+        Guid templateId,
+        TemplateType templateType,
+        string title,
+        string shortDescription,
+        string? localizedTextsJson,
+        string? petPhotoRequirements,
+        string category,
+        string tags,
+        bool isPremium,
+        int tokenCost,
+        TemplatePromoBadgeMode promoBadgeMode,
+        TemplateStatus status,
+        string? musicDescription,
+        double? referenceVideoDurationSeconds,
+        bool supportsGenerationResultInput,
+        TemplateType? requiredInputMediaType,
+        bool recommendedAfterImageGeneration,
+        bool supportsGenerateSimilar,
+        string? defaultVariationStrength,
+        long version,
+        DateTime createdAtUtc,
+        DateTime updatedAtUtc,
+        string? previewUrl,
+        string? previewFileName,
+        string? previewContentType,
+        long? previewFileSizeBytes,
+        double? previewDurationSeconds,
+        string? locale)
+    {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
+            ? null
+            : new TemplateAssetResponse(
+                previewUrl,
+                previewFileName ?? string.Empty,
+                previewContentType ?? string.Empty,
+                previewFileSizeBytes,
+                previewDurationSeconds);
+
+        return new PublicTemplateFeedItemResponse(
+            templateId,
+            templateType.ToString(),
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
+            category,
+            ResolveEffectivePromoBadge(
+                promoBadgeMode,
+                createdAtUtc,
+                updatedAtUtc,
+                status,
+                isPremium,
+                tokenCost,
+                [
+                    title,
+                    shortDescription,
+                    category,
+                    tags,
+                    musicDescription
+                ],
+                DateTime.UtcNow),
+            DeserializeTags(tags),
+            isPremium,
+            tokenCost,
+            previewAsset,
+            musicDescription,
+            referenceVideoDurationSeconds,
+            ResolvePublicThumbnailUrl(previewUrl, previewContentType),
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
+            supportsGenerationResultInput,
+            requiredInputMediaType?.ToString(),
+            recommendedAfterImageGeneration,
+            supportsGenerateSimilar,
+            NormalizePublicVariationStrength(defaultVariationStrength),
+            version,
+            updatedAtUtc);
     }
 
     private static PublicTemplateResponse MapPublicResponse(TemplateItem template, string? locale)
     {
         var localizedTexts = TemplateLocalizationTranslator.Resolve(template.Title, template.ShortDescription, template.LocalizedTextsJson, locale);
+        var previewAsset = GetAsset(template, TemplateAssetKind.Preview);
 
         return new PublicTemplateResponse(
             template.Id,
@@ -269,15 +376,100 @@ internal sealed partial class TemplatesService
             DeserializeTags(template.Tags),
             template.IsPremium,
             template.TokenCost,
-            GetAsset(template, TemplateAssetKind.Preview),
+            previewAsset,
             template.MusicDescription,
             template.ReferenceVideoDurationSeconds,
-                localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(template.PetPhotoRequirements),
             template.SupportsGenerationResultInput,
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength);
+            template.DefaultVariationStrength,
+            ResolvePublicThumbnailUrl(
+                previewAsset?.Url,
+                previewAsset?.ContentType));
+    }
+
+    private static PublicTemplateResponse MapPublicResponse(
+        Guid templateId,
+        TemplateType templateType,
+        string title,
+        string shortDescription,
+        string? localizedTextsJson,
+        string? petPhotoRequirements,
+        string category,
+        string tags,
+        bool isPremium,
+        int tokenCost,
+        TemplatePromoBadgeMode promoBadgeMode,
+        TemplateStatus status,
+        string? musicDescription,
+        double? referenceVideoDurationSeconds,
+        bool supportsGenerationResultInput,
+        TemplateType? requiredInputMediaType,
+        bool recommendedAfterImageGeneration,
+        bool supportsGenerateSimilar,
+        string? defaultVariationStrength,
+        DateTime createdAtUtc,
+        DateTime updatedAtUtc,
+        string? previewUrl,
+        string? previewFileName,
+        string? previewContentType,
+        long? previewFileSizeBytes,
+        double? previewDurationSeconds,
+        string? locale)
+    {
+        var localizedTexts = TemplateLocalizationTranslator.Resolve(title, shortDescription, localizedTextsJson, locale);
+        var previewAsset = string.IsNullOrWhiteSpace(previewUrl)
+            ? null
+            : new TemplateAssetResponse(
+                previewUrl,
+                previewFileName ?? string.Empty,
+                previewContentType ?? string.Empty,
+                previewFileSizeBytes,
+                previewDurationSeconds);
+
+        return new PublicTemplateResponse(
+            templateId,
+            templateType.ToString(),
+            localizedTexts.Title,
+            localizedTexts.ShortDescription,
+            category,
+            ResolveEffectivePromoBadge(
+                promoBadgeMode,
+                createdAtUtc,
+                updatedAtUtc,
+                status,
+                isPremium,
+                tokenCost,
+                [
+                    title,
+                    shortDescription,
+                    category,
+                    tags,
+                    musicDescription
+                ],
+                DateTime.UtcNow),
+            DeserializeTags(tags),
+            isPremium,
+            tokenCost,
+            previewAsset,
+            musicDescription,
+            referenceVideoDurationSeconds,
+            localizedTexts.PetPhotoRequirements ?? DeserializeRequirements(petPhotoRequirements),
+            supportsGenerationResultInput,
+            requiredInputMediaType?.ToString(),
+            recommendedAfterImageGeneration,
+            supportsGenerateSimilar,
+            NormalizePublicVariationStrength(defaultVariationStrength),
+            ResolvePublicThumbnailUrl(
+                previewAsset?.Url,
+                previewAsset?.ContentType));
+    }
+
+    private static string NormalizePublicVariationStrength(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "medium" : value;
     }
 
     private static TemplatePromoBadgeMode ParsePromoBadgeMode(string raw)

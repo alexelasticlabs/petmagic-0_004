@@ -176,6 +176,41 @@ internal sealed partial class TemplatesService
         return Math.Min(pageSize.Value, PublicCatalogMaxPageSize);
     }
 
+    private static string? NormalizePublicCategoryFilter(string? category)
+    {
+        return NormalizePublicTextFilter(category, PublicCategoryFilterMaxLength);
+    }
+
+    private static string? NormalizePublicSearchFilter(string? search)
+    {
+        return NormalizePublicTextFilter(search, PublicSearchFilterMaxLength);
+    }
+
+    private static string? NormalizePublicTextFilter(string? value, int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Length <= maxLength
+            ? normalized
+            : normalized[..maxLength];
+    }
+
+    private static string[] NormalizePublicTagFilters(IEnumerable<string>? tags)
+    {
+        var normalizedTags = NormalizeTags(tags ?? []);
+        if (normalizedTags.Length > PublicTagFilterMaxCount
+            || normalizedTags.Any(tag => tag.Length > PublicTagFilterMaxLength))
+        {
+            return [PublicImpossibleTagFilter];
+        }
+
+        return normalizedTags;
+    }
+
     private async Task<long> GetCurrentCatalogVersionAsync(CancellationToken cancellationToken)
     {
         var snapshot = await GetCurrentCatalogVersionSnapshotAsync(cancellationToken);
@@ -250,32 +285,45 @@ internal sealed partial class TemplatesService
             return null;
         }
 
-        var parts = rawCursor.Trim().Split(':', 2, StringSplitOptions.TrimEntries);
-        if (parts.Length != 2
+        var parts = rawCursor.Trim().Split(':', 3, StringSplitOptions.TrimEntries);
+        if (parts.Length is not (2 or 3)
             || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks)
             || ticks < DateTime.MinValue.Ticks
             || ticks > DateTime.MaxValue.Ticks
-            || !Guid.TryParseExact(parts[1], "N", out var templateId))
+            || !Guid.TryParseExact(parts[^1], "N", out var templateId))
         {
             return null;
         }
 
-        return new PublicFeedCursor(new DateTime(ticks, DateTimeKind.Utc), templateId);
+        long? version = null;
+        if (parts.Length == 3)
+        {
+            if (!long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedVersion)
+                || parsedVersion < 0)
+            {
+                return null;
+            }
+
+            version = parsedVersion;
+        }
+
+        return new PublicFeedCursor(new DateTime(ticks, DateTimeKind.Utc), version, templateId);
     }
 
     private static string FormatPublicFeedCursor(TemplateItem template)
     {
-        return FormatPublicFeedCursor(template.UpdatedAtUtc, template.Id);
+        return FormatPublicFeedCursor(template.UpdatedAtUtc, template.Version, template.Id);
     }
 
-    private static string FormatPublicFeedCursor(DateTime updatedAtUtc, Guid templateId)
+    private static string FormatPublicFeedCursor(DateTime updatedAtUtc, long version, Guid templateId)
     {
-        return string.Create(CultureInfo.InvariantCulture, $"{updatedAtUtc.Ticks}:{templateId:N}");
+        return string.Create(CultureInfo.InvariantCulture, $"{updatedAtUtc.Ticks}:{version}:{templateId:N}");
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags)
     {
         return [.. tags
+            .SelectMany(tag => tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(tag => tag.Trim())
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
             .Distinct(StringComparer.OrdinalIgnoreCase)];

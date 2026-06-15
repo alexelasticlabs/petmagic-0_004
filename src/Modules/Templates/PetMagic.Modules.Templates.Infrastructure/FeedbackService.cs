@@ -144,6 +144,11 @@ internal sealed class FeedbackService(
         AdminFeedbackQuery query,
         CancellationToken cancellationToken)
     {
+        if (!TryValidateAdminFilters(query, out var filterError))
+        {
+            return Result.Failure<AdminFeedbackPageResponse>(filterError);
+        }
+
         var skip = Math.Max(0, query.Skip ?? 0);
         var take = Math.Clamp(query.Take ?? DefaultTake, 1, MaxTake);
         var rows = ApplyAdminFilters(dbContext.TemplateGenerationFeedback.AsNoTracking(), query);
@@ -206,13 +211,23 @@ internal sealed class FeedbackService(
         var changed = false;
         if (!string.IsNullOrWhiteSpace(command.Status))
         {
-            feedback.Status = NormalizeStatus(command.Status);
+            if (!TryNormalizeStatus(command.Status, out var normalizedStatus))
+            {
+                return Result.Failure<AdminFeedbackDetailsResponse>(TemplatesErrors.InvalidFeedbackStatus);
+            }
+
+            feedback.Status = normalizedStatus;
             changed = true;
         }
 
         if (!string.IsNullOrWhiteSpace(command.Priority))
         {
-            feedback.Priority = NormalizePriority(command.Priority);
+            if (!TryNormalizePriority(command.Priority, out var normalizedPriority))
+            {
+                return Result.Failure<AdminFeedbackDetailsResponse>(TemplatesErrors.InvalidFeedbackPriority);
+            }
+
+            feedback.Priority = normalizedPriority;
             changed = true;
         }
 
@@ -345,17 +360,20 @@ internal sealed class FeedbackService(
     {
         if (!string.IsNullOrWhiteSpace(filters.Status))
         {
-            query = query.Where(x => x.Status == NormalizeStatus(filters.Status));
+            _ = TryNormalizeStatus(filters.Status, out var status);
+            query = query.Where(x => x.Status == status);
         }
 
         if (!string.IsNullOrWhiteSpace(filters.Priority))
         {
-            query = query.Where(x => x.Priority == NormalizePriority(filters.Priority));
+            _ = TryNormalizePriority(filters.Priority, out var priority);
+            query = query.Where(x => x.Priority == priority);
         }
 
         if (!string.IsNullOrWhiteSpace(filters.Type))
         {
-            query = query.Where(x => x.Type == NormalizeType(filters.Type));
+            _ = TryNormalizeType(filters.Type, allowUnknownAsGeneral: false, out var type);
+            query = query.Where(x => x.Type == type);
         }
 
         if (!string.IsNullOrWhiteSpace(filters.Category))
@@ -568,32 +586,64 @@ internal sealed class FeedbackService(
 
     private static string NormalizeType(string value)
     {
-        var normalized = NormalizeText(value, 32);
-        return normalized switch
-        {
-            "GenerationResult" or "GenerationFailure" or "BugReport" or "FeatureRequest" or "PaymentIssue" or "General" => normalized,
-            _ => "General"
-        };
+        _ = TryNormalizeType(value, allowUnknownAsGeneral: true, out var normalized);
+        return normalized;
     }
 
-    private static string NormalizeStatus(string? value)
+    private static bool TryValidateAdminFilters(AdminFeedbackQuery query, out Error error)
     {
-        var normalized = NormalizeText(value ?? "New", 24);
-        return normalized switch
+        if (!string.IsNullOrWhiteSpace(query.Status)
+            && !TryNormalizeStatus(query.Status, out _))
         {
-            "New" or "InReview" or "Resolved" or "Dismissed" => normalized,
-            _ => "New"
-        };
+            error = TemplatesErrors.InvalidFeedbackStatus;
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Priority)
+            && !TryNormalizePriority(query.Priority, out _))
+        {
+            error = TemplatesErrors.InvalidFeedbackPriority;
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Type)
+            && !TryNormalizeType(query.Type, allowUnknownAsGeneral: false, out _))
+        {
+            error = TemplatesErrors.InvalidFeedbackType;
+            return false;
+        }
+
+        error = Error.None;
+        return true;
     }
 
-    private static string NormalizePriority(string? value)
+    private static bool TryNormalizeType(string value, bool allowUnknownAsGeneral, out string normalized)
     {
-        var normalized = NormalizeText(value ?? "Low", 24);
-        return normalized switch
+        normalized = NormalizeText(value, 32);
+        if (normalized is "GenerationResult" or "GenerationFailure" or "BugReport" or "FeatureRequest" or "PaymentIssue" or "General")
         {
-            "Low" or "Medium" or "High" or "Critical" => normalized,
-            _ => "Low"
-        };
+            return true;
+        }
+
+        if (allowUnknownAsGeneral)
+        {
+            normalized = "General";
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryNormalizeStatus(string? value, out string normalized)
+    {
+        normalized = NormalizeText(value ?? "New", 24);
+        return normalized is "New" or "InReview" or "Resolved" or "Dismissed";
+    }
+
+    private static bool TryNormalizePriority(string? value, out string normalized)
+    {
+        normalized = NormalizeText(value ?? "Low", 24);
+        return normalized is "Low" or "Medium" or "High" or "Critical";
     }
 
     private static string ResolvePriority(string type, string category, int? rating)

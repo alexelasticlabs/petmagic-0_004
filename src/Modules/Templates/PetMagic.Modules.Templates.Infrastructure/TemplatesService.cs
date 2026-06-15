@@ -29,6 +29,11 @@ internal sealed partial class TemplatesService(
     private const int PublicCatalogMaxPageSize = 100;
     private const int PublicLegacyListMaxTake = 100;
     private const int PublicCatalogMaxDeltaChanges = 500;
+    private const int PublicCategoryFilterMaxLength = 64;
+    private const int PublicSearchFilterMaxLength = 120;
+    private const int PublicTagFilterMaxLength = 32;
+    private const int PublicTagFilterMaxCount = 12;
+    private const string PublicImpossibleTagFilter = "__petmagic_invalid_public_tag_filter__";
 
-    private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, Guid TemplateId);
+    private sealed record PublicFeedCursor(DateTime UpdatedAtUtc, long? Version, Guid TemplateId);
 }

@@ -17,17 +17,21 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 
 public static class PublicTemplateEndpoints
 {
+    private const string PublicCatalogCacheControl = "public, max-age=10";
+    private const string PublicCategoriesCacheControl = "public, max-age=60";
+
     public static IEndpointRouteBuilder MapPublicTemplateEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Templates")
             .RequireRateLimiting("templates");
 
-        group.MapGet("/", ListAsync).AllowAnonymous();
+        group.MapGet("", ListAsync).AllowAnonymous();
         group.MapGet("/catalog-version", GetCatalogVersionAsync).AllowAnonymous();
         group.MapGet("/changes", GetCatalogChangesAsync).AllowAnonymous();
         group.MapGet("/categories", ListCategoriesAsync).AllowAnonymous();
         group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
+        group.MapGet("/random", GetRandomTemplateAsync).AllowAnonymous();
         group.MapGet("/template-of-the-day", GetTemplateOfTheDayAsync).AllowAnonymous();
         group.MapGet("/events", StreamEventsAsync).AllowAnonymous();
         group.MapGet("/{templateId:guid}", GetAsync).AllowAnonymous();
@@ -65,10 +69,12 @@ public static class PublicTemplateEndpoints
                     tags,
                     premiumOnly),
                 cancellationToken);
+            SetPublicCatalogCacheHeaders(httpContext);
             return TypedResults.Ok(pagedResult.Value);
         }
 
         var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, ResolveLocalePreference(httpContext, locale), cancellationToken);
+        SetPublicCatalogCacheHeaders(httpContext);
         return TypedResults.Ok(result.Value);
     }
 
@@ -77,7 +83,7 @@ public static class PublicTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
-        httpContext.Response.Headers.CacheControl = "public, max-age=10";
+        SetPublicCatalogCacheHeaders(httpContext);
 
         var result = await service.GetPublicCatalogVersionAsync(cancellationToken);
         return TypedResults.Ok(result.Value);
@@ -98,7 +104,7 @@ public static class PublicTemplateEndpoints
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        httpContext.Response.Headers.CacheControl = "public, max-age=10";
+        SetPublicCatalogCacheHeaders(httpContext);
 
         var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, ResolveLocalePreference(httpContext, locale), cancellationToken);
         return TypedResults.Ok(result.Value);
@@ -109,48 +115,59 @@ public static class PublicTemplateEndpoints
         ITemplateFeedRealtimeService realtimeService,
         CancellationToken cancellationToken)
     {
-        httpContext.Response.StatusCode = StatusCodes.Status200OK;
-        httpContext.Response.ContentType = "text/event-stream";
-        httpContext.Response.Headers.CacheControl = "no-cache, no-store";
-        httpContext.Response.Headers.Connection = "keep-alive";
-        httpContext.Response.Headers.Append("X-Accel-Buffering", "no");
-
-        var subscription = realtimeService.Subscribe(cancellationToken);
-
-        await httpContext.Response.StartAsync(cancellationToken);
-        await httpContext.Response.WriteAsync(": connected\n\n", cancellationToken);
-        await httpContext.Response.Body.FlushAsync(cancellationToken);
-
-        while (!cancellationToken.IsCancellationRequested)
+        try
         {
-            var waitToReadTask = subscription.WaitToReadAsync(cancellationToken).AsTask();
-            var keepAliveTask = Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
-            var completedTask = await Task.WhenAny(waitToReadTask, keepAliveTask);
+            httpContext.Response.StatusCode = StatusCodes.Status200OK;
+            httpContext.Response.ContentType = "text/event-stream";
+            httpContext.Response.Headers.CacheControl = "no-cache, no-store";
+            httpContext.Response.Headers.Connection = "keep-alive";
+            httpContext.Response.Headers.Append("X-Accel-Buffering", "no");
 
-            if (completedTask == keepAliveTask)
-            {
-                await httpContext.Response.WriteAsync(": keepalive\n\n", cancellationToken);
-                await httpContext.Response.Body.FlushAsync(cancellationToken);
-                continue;
-            }
+            var subscription = realtimeService.Subscribe(cancellationToken);
 
-            if (!await waitToReadTask)
-            {
-                break;
-            }
+            await httpContext.Response.StartAsync(cancellationToken);
+            await httpContext.Response.WriteAsync(": connected\n\n", cancellationToken);
+            await httpContext.Response.Body.FlushAsync(cancellationToken);
 
-            while (subscription.TryRead(out var realtimeEvent))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                await WriteEventAsync(httpContext, realtimeEvent, cancellationToken);
+                var waitToReadTask = subscription.WaitToReadAsync(cancellationToken).AsTask();
+                var keepAliveTask = Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+                var completedTask = await Task.WhenAny(waitToReadTask, keepAliveTask);
+
+                if (completedTask == keepAliveTask)
+                {
+                    await httpContext.Response.WriteAsync(": keepalive\n\n", cancellationToken);
+                    await httpContext.Response.Body.FlushAsync(cancellationToken);
+                    continue;
+                }
+
+                if (!await waitToReadTask)
+                {
+                    break;
+                }
+
+                while (subscription.TryRead(out var realtimeEvent))
+                {
+                    await WriteEventAsync(httpContext, realtimeEvent, cancellationToken);
+                }
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested || httpContext.RequestAborted.IsCancellationRequested)
+        {
+        }
+        catch (System.IO.IOException) when (cancellationToken.IsCancellationRequested || httpContext.RequestAborted.IsCancellationRequested)
+        {
         }
     }
 
     private static async Task<Ok<IReadOnlyList<PublicTemplateCategoryResponse>>> ListCategoriesAsync(
+        HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListPublicCategoriesAsync(cancellationToken);
+        httpContext.Response.Headers.CacheControl = PublicCategoriesCacheControl;
         return TypedResults.Ok(result.Value);
     }
 
@@ -171,7 +188,7 @@ public static class PublicTemplateEndpoints
         {
             return TypedResults.Problem(
                 title: "templates.invalid_type",
-                detail: "Query parameter type must be Image or Video.",
+                detail: "Query parameter type must be Image, Video, or all.",
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
@@ -195,6 +212,7 @@ public static class PublicTemplateEndpoints
                 ResolveLocalePreference(httpContext, locale)),
             cancellationToken);
 
+        SetPublicCatalogCacheHeaders(httpContext);
         return TypedResults.Ok(result.Value);
     }
 
@@ -210,6 +228,33 @@ public static class PublicTemplateEndpoints
             ResolveLocalePreference(httpContext, locale),
             cancellationToken);
 
+        SetPublicCatalogCacheHeaders(httpContext);
+        return TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PublicRandomTemplateResponse>, ProblemHttpResult>> GetRandomTemplateAsync(
+        HttpContext httpContext,
+        [FromQuery] string? type,
+        [FromQuery] string? category,
+        [FromQuery] bool? includePremium,
+        [FromQuery] string? locale,
+        [FromServices] ITemplatesService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseOptionalTemplateType(type, out var templateType))
+        {
+            return InvalidTemplateTypeProblem();
+        }
+
+        var result = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(
+                templateType,
+                category,
+                includePremium ?? true,
+                ResolveLocalePreference(httpContext, locale)),
+            cancellationToken);
+
+        SetPublicCatalogCacheHeaders(httpContext);
         return TypedResults.Ok(result.Value);
     }
 
@@ -220,12 +265,24 @@ public static class PublicTemplateEndpoints
             return false;
         }
 
-        var parts = rawCursor.Trim().Split(':', 2, StringSplitOptions.TrimEntries);
-        return parts.Length != 2
+        var parts = rawCursor.Trim().Split(':', 3, StringSplitOptions.TrimEntries);
+        if (parts.Length is not (2 or 3)
             || !long.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var ticks)
             || ticks < DateTime.MinValue.Ticks
             || ticks > DateTime.MaxValue.Ticks
-            || !Guid.TryParseExact(parts[1], "N", out _);
+            || !Guid.TryParseExact(parts[^1], "N", out _))
+        {
+            return true;
+        }
+
+        return parts.Length == 3
+            && (!long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var version)
+                || version < 0);
+    }
+
+    private static void SetPublicCatalogCacheHeaders(HttpContext httpContext)
+    {
+        httpContext.Response.Headers.CacheControl = PublicCatalogCacheControl;
     }
 
     private static bool TryParseOptionalTemplateType(string? rawType, out TemplateType? templateType)
@@ -237,6 +294,11 @@ public static class PublicTemplateEndpoints
         }
 
         var normalizedType = rawType.Trim();
+        if (string.Equals(normalizedType, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         if (!Enum.GetNames<TemplateType>().Any(name =>
                 string.Equals(name, normalizedType, StringComparison.OrdinalIgnoreCase)))
         {
@@ -251,7 +313,7 @@ public static class PublicTemplateEndpoints
     {
         return TypedResults.Problem(
             title: "templates.invalid_type",
-            detail: "Query parameter type must be Image or Video.",
+            detail: "Query parameter type must be Image, Video, or all.",
             statusCode: StatusCodes.Status400BadRequest);
     }
 

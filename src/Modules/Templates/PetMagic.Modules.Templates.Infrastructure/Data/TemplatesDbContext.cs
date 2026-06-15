@@ -86,6 +86,12 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => new { x.Status, x.UpdatedAtUtc, x.Id })
                 .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
                 .HasFilter(""" "DeletedAtUtc" IS NULL """);
+            entity.HasIndex(x => new { x.Status, x.TemplateType, x.IsPremium, x.UpdatedAtUtc, x.Version, x.Id })
+                .HasDatabaseName("IX_templates_items_PublicFeedFilters")
+                .HasFilter(""" "DeletedAtUtc" IS NULL """);
+            entity.HasIndex(x => new { x.Status, x.Category, x.UpdatedAtUtc, x.Version, x.Id })
+                .HasDatabaseName("IX_templates_items_PublicFeedCategoryOrder")
+                .HasFilter(""" "DeletedAtUtc" IS NULL """);
         });
 
         builder.Entity<TemplateCatalogChange>(entity =>

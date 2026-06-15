@@ -80,6 +80,7 @@ internal sealed class TemplateGenerationJobProcessor(
             return recoveredStaleJob;
         }
 
+        var claimStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var job = await ClaimNextAsync(cancellationToken);
 
         if (job is null)
@@ -96,7 +97,9 @@ internal sealed class TemplateGenerationJobProcessor(
         using (CorrelationContext.Push(correlationId))
         using (BeginJobScope(job, correlationId))
         {
-            logger.LogInformation("Template generation job claimed. ElapsedMs={ElapsedMs}", 0);
+            logger.LogInformation(
+                "Template generation job claimed. ElapsedMs={ElapsedMs}",
+                ElapsedMsSince(claimStartedAt));
         }
 
         TemplateGenerationMetrics.RecordJobClaimed(job);
@@ -132,6 +135,7 @@ internal sealed class TemplateGenerationJobProcessor(
             return true;
         }
 
+        var recoveryStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         MarkQueuedForRecovery(staleJob, now);
         try
         {
@@ -141,7 +145,9 @@ internal sealed class TemplateGenerationJobProcessor(
             using (CorrelationContext.Push(correlationId))
             using (BeginJobScope(staleJob, correlationId))
             {
-                logger.LogWarning("Stale template generation job recovered for retry. ElapsedMs={ElapsedMs}", 0);
+                logger.LogWarning(
+                    "Stale template generation job recovered for retry. ElapsedMs={ElapsedMs}",
+                    ElapsedMsSince(recoveryStartedAt));
             }
 
             dbContext.ChangeTracker.Clear();
@@ -152,7 +158,7 @@ internal sealed class TemplateGenerationJobProcessor(
             logger.LogWarning(
                 exception,
                 "Stale template generation job recovery was skipped because its lock changed. ElapsedMs={ElapsedMs}",
-                0);
+                ElapsedMsSince(recoveryStartedAt));
             dbContext.ChangeTracker.Clear();
         }
 
@@ -377,9 +383,7 @@ internal sealed class TemplateGenerationJobProcessor(
         using var correlationScope = CorrelationContext.Push(correlationId);
         using var jobScope = BeginJobScope(job, correlationId);
 
-        logger.LogInformation(
-            "Template generation job started. ElapsedMs={ElapsedMs}",
-            0);
+        logger.LogInformation("Template generation job started.");
 
         try
         {

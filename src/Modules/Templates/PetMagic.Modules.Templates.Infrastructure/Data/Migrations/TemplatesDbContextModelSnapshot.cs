@@ -1057,6 +1057,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
                         .HasFilter(" \"DeletedAtUtc\" IS NULL ");
 
+                    b.HasIndex("Status", "TemplateType", "IsPremium", "UpdatedAtUtc", "Version", "Id")
+                        .HasDatabaseName("IX_templates_items_PublicFeedFilters")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
+                    b.HasIndex("Status", "Category", "UpdatedAtUtc", "Version", "Id")
+                        .HasDatabaseName("IX_templates_items_PublicFeedCategoryOrder")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
                     b.HasIndex("SupportsGenerationResultInput", "RequiredInputMediaType", "Status")
                         .HasDatabaseName("IX_templates_items_generation_result_input");
 

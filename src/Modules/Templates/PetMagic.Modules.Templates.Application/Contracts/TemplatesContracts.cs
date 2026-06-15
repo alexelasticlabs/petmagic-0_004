@@ -982,7 +982,31 @@ public sealed record PublicTemplateListItemResponse(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    string? ThumbnailUrl = null);
+
+public sealed record PublicTemplateFeedItemResponse(
+    Guid TemplateId,
+    string TemplateType,
+    string Title,
+    string ShortDescription,
+    string Category,
+    string? EffectivePromoBadge,
+    string[] Tags,
+    bool IsPremium,
+    int TokenCost,
+    TemplateAssetResponse? PreviewAsset,
+    string? MusicDescription,
+    double? ReferenceVideoDurationSeconds,
+    string? ThumbnailUrl = null,
+    IReadOnlyList<string>? PetPhotoRequirements = null,
+    bool SupportsGenerationResultInput = false,
+    string? RequiredInputMediaType = null,
+    bool RecommendedAfterImageGeneration = false,
+    bool SupportsGenerateSimilar = true,
+    string DefaultVariationStrength = "medium",
+    long Version = 0,
+    DateTime? UpdatedAtUtc = null);
 
 public sealed record PublicTemplateCategoryResponse(
     string Name);
@@ -1039,10 +1063,19 @@ public sealed record PublicTemplatesFeedQuery(
     string? Locale);
 
 public sealed record PublicTemplatesFeedResponse(
-    IReadOnlyList<PublicTemplateListItemResponse> Items,
+    IReadOnlyList<PublicTemplateFeedItemResponse> Items,
     string? NextCursor,
     bool HasMore,
     DateTime GeneratedAtUtc);
+
+public sealed record PublicRandomTemplateQuery(
+    TemplateType? Type,
+    string? Category,
+    bool IncludePremium,
+    string? Locale);
+
+public sealed record PublicRandomTemplateResponse(
+    PublicTemplateListItemResponse? Template);
 
 public sealed record PublicTemplateResponse(
     Guid TemplateId,
@@ -1062,7 +1095,8 @@ public sealed record PublicTemplateResponse(
     string? RequiredInputMediaType = null,
     bool RecommendedAfterImageGeneration = false,
     bool SupportsGenerateSimilar = true,
-    string DefaultVariationStrength = "medium");
+    string DefaultVariationStrength = "medium",
+    string? ThumbnailUrl = null);
 
 public sealed record CompatibleGenerationTemplateResponse(
     Guid Id,

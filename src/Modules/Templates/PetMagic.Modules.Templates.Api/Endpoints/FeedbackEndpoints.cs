@@ -77,7 +77,7 @@ public static class FeedbackEndpoints
             : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminFeedbackPageResponse>> ListAdminFeedbackAsync(
+    private static async Task<Results<Ok<AdminFeedbackPageResponse>, ProblemHttpResult>> ListAdminFeedbackAsync(
         [FromQuery] string? status,
         [FromQuery] string? priority,
         [FromQuery] string? type,
@@ -96,7 +96,7 @@ public static class FeedbackEndpoints
         var result = await service.ListAdminAsync(
             new AdminFeedbackQuery(status, priority, type, category, generationId, templateId, platform, fromUtc, toUtc, userId, skip, take),
             cancellationToken);
-        return TypedResults.Ok(result.Value);
+        return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<AdminFeedbackDetailsResponse>, ProblemHttpResult>> GetAdminFeedbackAsync(
@@ -136,13 +136,13 @@ public static class FeedbackEndpoints
         return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<TemplateFeedbackSummaryResponse>> GetTemplateFeedbackSummaryAsync(
+    private static async Task<Results<Ok<TemplateFeedbackSummaryResponse>, ProblemHttpResult>> GetTemplateFeedbackSummaryAsync(
         Guid templateId,
         [FromServices] IFeedbackService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetTemplateSummaryAsync(templateId, cancellationToken);
-        return TypedResults.Ok(result.Value);
+        return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
     private static (Guid? UserId, Error? Error) TryGetSubject(HttpContext context)

@@ -18,6 +18,8 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 public static class TemplatesInfrastructureServiceCollectionExtensions
 {
+    private static readonly TimeSpan ExternalHttpClientTimeout = TimeSpan.FromSeconds(30);
+
     public static IServiceCollection AddTemplatesInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
         var section = configuration.GetSection(TemplatesOptions.SectionName);
@@ -162,9 +164,9 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddGenerationBilling(services);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
-        services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName);
+        services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient);
         services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
-        services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>();
+        services.AddHttpClient<FcmTemplateGenerationPushNotificationSender>(ConfigureExternalHttpClient);
         services.AddScoped<ITemplateGenerationPushNotificationSender>(serviceProvider =>
         {
             var pushOptions = serviceProvider.GetRequiredService<TemplatesOptions>().FirebasePush;
@@ -281,7 +283,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 Id = Guid.Parse("9CA5BE83-5919-491E-95FE-8AB5C3772232"),
                 TemplateType = TemplateType.Image,
                 Title = "Cozy Portrait",
-                ShortDescription = "Placeholder image template card for admin and public catalog flows.",
+                ShortDescription = "Cozy image template card for admin and public catalog flows.",
                 PetPhotoRequirements = "One pet in the photo\nClear face\nGood lighting",
                 Category = "Portrait",
                 Tags = "cozy,portrait",
@@ -309,7 +311,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 Id = Guid.Parse("39C5F7A0-74AE-4DE6-84F4-82B842D63FA0"),
                 TemplateType = TemplateType.Video,
                 Title = "Viral Dance",
-                ShortDescription = "Premium motion-control template stub with calculated orientation.",
+                ShortDescription = "Premium motion-control template with calculated orientation.",
                 PetPhotoRequirements = "Full body visible\nPet facing camera\nNo cropped head or legs",
                 Category = "Dance",
                 Tags = "viral,dance",
@@ -497,7 +499,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 throw new InvalidOperationException("FAL AI provider is selected but FAL_AI_API_KEY is missing.");
             }
 
-            services.AddHttpClient(FalQueueClient.HttpClientName);
+            services.AddHttpClient(FalQueueClient.HttpClientName, client =>
+                client.Timeout = TimeSpan.FromSeconds(Math.Max(30, options.Fal.StartTimeoutSeconds + 30)));
             services.AddScoped<FalQueueClient>();
             services.AddScoped<IImagePreprocessor, FalImagePreprocessor>();
             services.AddScoped<IImageGenerator, FalImageGenerator>();
@@ -520,7 +523,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     {
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fal))
         {
-            services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName);
+            services.AddHttpClient(HttpGeneratedMediaImporter.HttpClientName, ConfigureExternalHttpClient);
             services.AddSingleton<IGeneratedMediaImporter, HttpGeneratedMediaImporter>();
             return;
         }
@@ -533,6 +536,9 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         throw new InvalidOperationException($"Unsupported templates AI provider '{options.AiProvider}'.");
     }
+
+    private static void ConfigureExternalHttpClient(HttpClient client) =>
+        client.Timeout = ExternalHttpClientTimeout;
 
     private static void AddGenerationBilling(IServiceCollection services)
     {

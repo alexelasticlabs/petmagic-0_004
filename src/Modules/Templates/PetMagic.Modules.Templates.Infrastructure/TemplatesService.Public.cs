@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
@@ -13,8 +15,8 @@ internal sealed partial class TemplatesService
     {
         var page = NormalizePublicCatalogPage(query.Page);
         var pageSize = NormalizePublicCatalogPageSize(query.PageSize);
-        var normalizedCategory = query.Category?.Trim();
-        var normalizedTags = NormalizeTags(query.Tags ?? []);
+        var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
+        var normalizedTags = NormalizePublicTagFilters(query.Tags);
 
         var baseQuery = dbContext.TemplateItems
             .AsNoTracking()
@@ -23,22 +25,29 @@ internal sealed partial class TemplatesService
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
             .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
-        if (!string.IsNullOrWhiteSpace(normalizedCategory))
-        {
-            var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
-            baseQuery = baseQuery.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
-        }
+        baseQuery = await ApplyPublicCategoryFilterAsync(baseQuery, normalizedCategory, cancellationToken);
 
         baseQuery = ApplyTemplateTagFilter(baseQuery, normalizedTags);
 
         var totalCount = await baseQuery.LongCountAsync(cancellationToken);
-        var offset = (page - 1) * pageSize;
+        var offset = ((long)page - 1) * pageSize;
+        if (offset > int.MaxValue)
+        {
+            return Result.Success(new PublicTemplatesCatalogPageResponse(
+                [],
+                page,
+                pageSize,
+                false,
+                totalCount,
+                DateTime.UtcNow));
+        }
 
-        var pageItems = await baseQuery
+        var filtered = await baseQuery
             .OrderByDescending(template => template.UpdatedAtUtc)
+            .ThenByDescending(template => template.Version)
             .ThenByDescending(template => template.Id)
-            .Skip(offset)
-            .Take(pageSize)
+            .Skip((int)offset)
+            .Take(pageSize + 1)
             .Select(template => new
             {
                 template.Id,
@@ -63,7 +72,8 @@ internal sealed partial class TemplatesService
             })
             .ToArrayAsync(cancellationToken);
 
-        var hasMore = totalCount > offset + pageItems.Length;
+        var pageItems = filtered.Take(pageSize).ToArray();
+        var hasMore = filtered.Length > pageSize;
 
         return Result.Success(new PublicTemplatesCatalogPageResponse(
                 [.. pageItems.Select(item => MapPublicCatalogMetadataItem(
@@ -212,14 +222,18 @@ internal sealed partial class TemplatesService
         return Result.Success(new PublicTemplatesCatalogChangesResponse(
             normalizedSinceVersion,
             toVersion,
-            [.. upserts.Values.OrderByDescending(item => item.UpdatedAtUtc).ThenByDescending(item => item.Id)],
+            [.. upserts.Values
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .ThenByDescending(item => item.Version)
+                .ThenByDescending(item => item.Id)],
             [.. deletedIds],
             false));
     }
 
     public async Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, string? locale, CancellationToken cancellationToken)
     {
-        var normalizedTags = NormalizeTags(tags ?? []);
+        var normalizedCategory = NormalizePublicCategoryFilter(category);
+        var normalizedTags = NormalizePublicTagFilters(tags ?? []);
         var query = dbContext.TemplateItems
             .AsNoTracking()
             .Where(x => x.DeletedAtUtc == null)
@@ -227,11 +241,7 @@ internal sealed partial class TemplatesService
             .Where(x => !type.HasValue || x.TemplateType == type.Value)
             .Where(x => !premiumOnly.HasValue || !premiumOnly.Value || x.IsPremium);
 
-        if (!string.IsNullOrWhiteSpace(category))
-        {
-            var normalizedCategoryUpper = category.Trim().ToUpperInvariant();
-            query = query.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
-        }
+        query = await ApplyPublicCategoryFilterAsync(query, normalizedCategory, cancellationToken);
 
         query = ApplyTemplateTagFilter(query, normalizedTags);
 
@@ -256,6 +266,11 @@ internal sealed partial class TemplatesService
                 template.Status,
                 template.MusicDescription,
                 template.ReferenceVideoDurationSeconds,
+                template.SupportsGenerationResultInput,
+                template.RequiredInputMediaType,
+                template.RecommendedAfterImageGeneration,
+                template.SupportsGenerateSimilar,
+                template.DefaultVariationStrength,
                 template.CreatedAtUtc,
                 template.UpdatedAtUtc,
                 Preview = template.Assets
@@ -288,6 +303,11 @@ internal sealed partial class TemplatesService
                 template.Status,
                 template.MusicDescription,
                 template.ReferenceVideoDurationSeconds,
+                template.SupportsGenerationResultInput,
+                template.RequiredInputMediaType,
+                template.RecommendedAfterImageGeneration,
+                template.SupportsGenerateSimilar,
+                template.DefaultVariationStrength,
                 template.CreatedAtUtc,
                 template.UpdatedAtUtc,
                 template.Preview?.Url,
@@ -317,9 +337,9 @@ internal sealed partial class TemplatesService
     {
         var take = NormalizePublicFeedTake(query.Take);
         var cursor = TryParsePublicFeedCursor(query.Cursor);
-        var normalizedCategory = query.Category?.Trim();
-        var normalizedSearch = query.Search?.Trim();
-        var normalizedTags = NormalizeTags(query.Tags);
+        var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
+        var normalizedSearch = NormalizePublicSearchFilter(query.Search);
+        var normalizedTags = NormalizePublicTagFilters(query.Tags);
 
         var filteredQuery = dbContext.TemplateItems
             .AsNoTracking()
@@ -328,11 +348,7 @@ internal sealed partial class TemplatesService
             .Where(x => !query.Type.HasValue || x.TemplateType == query.Type.Value)
             .Where(x => !query.PremiumOnly.HasValue || !query.PremiumOnly.Value || x.IsPremium);
 
-        if (!string.IsNullOrWhiteSpace(normalizedCategory))
-        {
-            var normalizedCategoryUpper = normalizedCategory.ToUpperInvariant();
-            filteredQuery = filteredQuery.Where(template => (template.Category ?? string.Empty).ToUpper() == normalizedCategoryUpper);
-        }
+        filteredQuery = await ApplyPublicCategoryFilterAsync(filteredQuery, normalizedCategory, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
@@ -347,13 +363,19 @@ internal sealed partial class TemplatesService
 
         if (cursor is not null)
         {
-            filteredQuery = filteredQuery.Where(template =>
-                template.UpdatedAtUtc < cursor.UpdatedAtUtc
-                || (template.UpdatedAtUtc == cursor.UpdatedAtUtc && template.Id.CompareTo(cursor.TemplateId) < 0));
+            filteredQuery = cursor.Version.HasValue
+                ? filteredQuery.Where(template =>
+                    template.UpdatedAtUtc < cursor.UpdatedAtUtc
+                    || (template.UpdatedAtUtc == cursor.UpdatedAtUtc && template.Version < cursor.Version.Value)
+                    || (template.UpdatedAtUtc == cursor.UpdatedAtUtc
+                        && template.Version == cursor.Version.Value
+                        && template.Id.CompareTo(cursor.TemplateId) < 0))
+                : filteredQuery.Where(template => template.UpdatedAtUtc < cursor.UpdatedAtUtc);
         }
 
         var orderedQuery = filteredQuery
             .OrderByDescending(template => template.UpdatedAtUtc)
+            .ThenByDescending(template => template.Version)
             .ThenByDescending(template => template.Id);
 
         var filtered = await ApplyTemplateTagFilter(orderedQuery, normalizedTags)
@@ -370,10 +392,16 @@ internal sealed partial class TemplatesService
                 template.Tags,
                 template.IsPremium,
                 template.TokenCost,
+                template.Version,
                 template.PromoBadgeMode,
                 template.Status,
                 template.MusicDescription,
                 template.ReferenceVideoDurationSeconds,
+                template.SupportsGenerationResultInput,
+                template.RequiredInputMediaType,
+                template.RecommendedAfterImageGeneration,
+                template.SupportsGenerateSimilar,
+                template.DefaultVariationStrength,
                 template.CreatedAtUtc,
                 template.UpdatedAtUtc,
                 Preview = template.Assets
@@ -393,11 +421,11 @@ internal sealed partial class TemplatesService
         var pageItems = filtered.Take(take).ToArray();
         var hasMore = filtered.Length > take;
         var nextCursor = hasMore && pageItems.Length > 0
-            ? FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Id)
+            ? FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Version, pageItems[^1].Id)
             : null;
 
         return Result.Success(new PublicTemplatesFeedResponse(
-            [.. pageItems.Select(template => MapPublicListItem(
+            [.. pageItems.Select(template => MapPublicFeedItem(
                 template.Id,
                 template.TemplateType,
                 template.Title,
@@ -412,6 +440,12 @@ internal sealed partial class TemplatesService
                 template.Status,
                 template.MusicDescription,
                 template.ReferenceVideoDurationSeconds,
+                template.SupportsGenerationResultInput,
+                template.RequiredInputMediaType,
+                template.RecommendedAfterImageGeneration,
+                template.SupportsGenerateSimilar,
+                template.DefaultVariationStrength,
+                template.Version,
                 template.CreatedAtUtc,
                 template.UpdatedAtUtc,
                 template.Preview?.Url,
@@ -425,6 +459,110 @@ internal sealed partial class TemplatesService
             DateTime.UtcNow));
     }
 
+    public async Task<Result<PublicRandomTemplateResponse>> GetPublicRandomTemplateAsync(
+        PublicRandomTemplateQuery query,
+        CancellationToken cancellationToken)
+    {
+        var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
+
+        var filteredQuery = dbContext.TemplateItems
+            .AsNoTracking()
+            .Where(template => template.DeletedAtUtc == null)
+            .Where(template => template.Status == TemplateStatus.Active)
+            .Where(template => !query.Type.HasValue || template.TemplateType == query.Type.Value)
+            .Where(template => query.IncludePremium || !template.IsPremium)
+            .Where(template => template.Assets.Any(asset =>
+                asset.AssetKind == TemplateAssetKind.Preview
+                && asset.Url != null
+                && asset.Url.Trim() != string.Empty));
+
+        filteredQuery = await ApplyPublicCategoryFilterAsync(filteredQuery, normalizedCategory, cancellationToken);
+
+        var totalCount = await filteredQuery.CountAsync(cancellationToken);
+        if (totalCount <= 0)
+        {
+            return Result.Success(new PublicRandomTemplateResponse(null));
+        }
+
+        var offset = RandomNumberGenerator.GetInt32(totalCount);
+        var item = await filteredQuery
+            .OrderByDescending(template => template.UpdatedAtUtc)
+            .ThenByDescending(template => template.Id)
+            .Skip(offset)
+            .Take(1)
+            .Select(template => new
+            {
+                template.Id,
+                template.TemplateType,
+                template.Title,
+                template.ShortDescription,
+                template.LocalizedTextsJson,
+                template.PetPhotoRequirements,
+                template.Category,
+                template.Tags,
+                template.IsPremium,
+                template.TokenCost,
+                template.PromoBadgeMode,
+                template.Status,
+                template.MusicDescription,
+                template.ReferenceVideoDurationSeconds,
+                template.SupportsGenerationResultInput,
+                template.RequiredInputMediaType,
+                template.RecommendedAfterImageGeneration,
+                template.SupportsGenerateSimilar,
+                template.DefaultVariationStrength,
+                template.CreatedAtUtc,
+                template.UpdatedAtUtc,
+                Preview = template.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.FileName,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (item is null)
+        {
+            return Result.Success(new PublicRandomTemplateResponse(null));
+        }
+
+        return Result.Success(new PublicRandomTemplateResponse(
+            MapPublicListItem(
+                item.Id,
+                item.TemplateType,
+                item.Title,
+                item.ShortDescription,
+                item.LocalizedTextsJson,
+                item.PetPhotoRequirements,
+                item.Category,
+                item.Tags,
+                item.IsPremium,
+                item.TokenCost,
+                item.PromoBadgeMode,
+                item.Status,
+                item.MusicDescription,
+                item.ReferenceVideoDurationSeconds,
+                item.SupportsGenerationResultInput,
+                item.RequiredInputMediaType,
+                item.RecommendedAfterImageGeneration,
+                item.SupportsGenerateSimilar,
+                item.DefaultVariationStrength,
+                item.CreatedAtUtc,
+                item.UpdatedAtUtc,
+                item.Preview?.Url,
+                item.Preview?.FileName,
+                item.Preview?.ContentType,
+                item.Preview?.FileSizeBytes,
+                item.Preview?.DurationSeconds,
+                query.Locale)));
+    }
+
     private static IQueryable<TemplateItem> ApplyTemplateTagFilter(IQueryable<TemplateItem> query, string[] normalizedTags)
     {
         foreach (var tag in normalizedTags)
@@ -436,14 +574,106 @@ internal sealed partial class TemplatesService
         return query;
     }
 
+    private async Task<IQueryable<TemplateItem>> ApplyPublicCategoryFilterAsync(
+        IQueryable<TemplateItem> query,
+        string? normalizedCategory,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedCategory))
+        {
+            return query;
+        }
+
+        var categoryKey = NormalizeCategoryKey(normalizedCategory);
+        var canonicalCategory = await dbContext.TemplateCategories
+            .AsNoTracking()
+            .Where(category => category.NormalizedName == categoryKey)
+            .Select(category => category.Name)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(canonicalCategory))
+        {
+            return query.Where(template => template.Category == canonicalCategory);
+        }
+
+        return query.Where(template => (template.Category ?? string.Empty).ToUpper() == categoryKey);
+    }
+
     public async Task<Result<PublicTemplateResponse>> GetPublicAsync(Guid templateId, string? locale, CancellationToken cancellationToken)
     {
-        var template = await FindTemplateAsync(templateId, cancellationToken);
-        if (template is null || template.DeletedAtUtc is not null || template.Status != TemplateStatus.Active)
+        var template = await dbContext.TemplateItems
+            .AsNoTracking()
+            .Where(x => x.Id == templateId)
+            .Where(x => x.DeletedAtUtc == null)
+            .Where(x => x.Status == TemplateStatus.Active)
+            .Select(x => new
+            {
+                x.Id,
+                x.TemplateType,
+                x.Title,
+                x.ShortDescription,
+                x.LocalizedTextsJson,
+                x.PetPhotoRequirements,
+                x.Category,
+                x.Tags,
+                x.IsPremium,
+                x.TokenCost,
+                x.PromoBadgeMode,
+                x.Status,
+                x.MusicDescription,
+                x.ReferenceVideoDurationSeconds,
+                x.SupportsGenerationResultInput,
+                x.RequiredInputMediaType,
+                x.RecommendedAfterImageGeneration,
+                x.SupportsGenerateSimilar,
+                x.DefaultVariationStrength,
+                x.CreatedAtUtc,
+                x.UpdatedAtUtc,
+                Preview = x.Assets
+                    .Where(asset => asset.AssetKind == TemplateAssetKind.Preview)
+                    .Select(asset => new
+                    {
+                        asset.Url,
+                        asset.FileName,
+                        asset.ContentType,
+                        asset.FileSizeBytes,
+                        asset.DurationSeconds
+                    })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (template is null)
         {
             return Result.Failure<PublicTemplateResponse>(TemplatesErrors.NotFound);
         }
 
-        return Result.Success(MapPublicResponse(template, locale));
+        return Result.Success(MapPublicResponse(
+            template.Id,
+            template.TemplateType,
+            template.Title,
+            template.ShortDescription,
+            template.LocalizedTextsJson,
+            template.PetPhotoRequirements,
+            template.Category,
+            template.Tags,
+            template.IsPremium,
+            template.TokenCost,
+            template.PromoBadgeMode,
+            template.Status,
+            template.MusicDescription,
+            template.ReferenceVideoDurationSeconds,
+            template.SupportsGenerationResultInput,
+            template.RequiredInputMediaType,
+            template.RecommendedAfterImageGeneration,
+            template.SupportsGenerateSimilar,
+            template.DefaultVariationStrength,
+            template.CreatedAtUtc,
+            template.UpdatedAtUtc,
+            template.Preview?.Url,
+            template.Preview?.FileName,
+            template.Preview?.ContentType,
+            template.Preview?.FileSizeBytes,
+            template.Preview?.DurationSeconds,
+            locale));
     }
 }

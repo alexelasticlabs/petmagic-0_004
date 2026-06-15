@@ -43,6 +43,9 @@ internal static class TemplatesErrors
     public static readonly Error FeedbackForbidden = new("feedback.forbidden", "Feedback target does not belong to the current user.");
     public static readonly Error FeedbackRefundUnavailable = new("feedback.refund_unavailable", "Feedback cannot be refunded.");
     public static readonly Error FeedbackRefundAlreadyIssued = new("feedback.refund_already_issued", "Credits were already refunded for this feedback or generation.");
+    public static readonly Error InvalidFeedbackStatus = new("feedback.invalid_status", "Feedback status is invalid.");
+    public static readonly Error InvalidFeedbackPriority = new("feedback.invalid_priority", "Feedback priority is invalid.");
+    public static readonly Error InvalidFeedbackType = new("feedback.invalid_type", "Feedback type is invalid.");
     public static readonly Error InvalidPushToken = new("templates.push_token_invalid", "Push device token is invalid.");
     public static readonly Error GeneratedMediaImportFailed = new("templates.generated_media_import_failed", "Generated media could not be imported into storage.");
     public static readonly Error GeneratedMediaTooLarge = new("templates.generated_media_too_large", "Generated media exceeds the maximum allowed size.");

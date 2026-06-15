@@ -1271,11 +1271,7 @@ internal sealed class TemplateGenerationService(
                 cancellationToken);
         }
 
-        var queuePosition = await dbContext.TemplateGenerationJobs
-            .AsNoTracking()
-            .CountAsync(x => x.Status == TemplateGenerationStatus.Queued
-                && x.QueuedAtUtc < job.QueuedAtUtc,
-                cancellationToken) + 1;
+        var queuePosition = await CalculateQueuePositionAsync(job, cancellationToken);
 
         return await SignUserMediaUrlsAsync(
             await ApplyCompareAccessAsync(
@@ -1320,19 +1316,33 @@ internal sealed class TemplateGenerationService(
         }
 
         var latestQueuedAtUtc = queuedJobs.Max(x => x.QueuedAtUtc);
-        var queuedAtUtcValues = await dbContext.TemplateGenerationJobs
+        var queuedOrderKeys = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .Where(x => x.Status == TemplateGenerationStatus.Queued
                 && x.QueuedAtUtc <= latestQueuedAtUtc)
-            .Select(x => x.QueuedAtUtc)
+            .Select(x => new
+            {
+                x.Id,
+                x.QueuedAtUtc
+            })
             .ToArrayAsync(cancellationToken);
 
-        var positionByQueuedAtUtc = new Dictionary<DateTime, int>();
-        var olderQueuedCount = 0;
-        foreach (var group in queuedAtUtcValues.GroupBy(x => x).OrderBy(x => x.Key))
+        var positionByQueuedJobId = queuedOrderKeys
+            .OrderBy(x => x.QueuedAtUtc)
+            .ThenBy(x => x.Id)
+            .Select((job, index) => new
+            {
+                job.Id,
+                Position = index + 1
+            })
+            .ToDictionary(x => x.Id, x => x.Position);
+
+        var fallbackPositionByQueuedAtUtc = new Dictionary<DateTime, int>();
+        foreach (var group in queuedOrderKeys.GroupBy(x => x.QueuedAtUtc).OrderBy(x => x.Key))
         {
-            positionByQueuedAtUtc[group.Key] = olderQueuedCount + 1;
-            olderQueuedCount += group.Count();
+            fallbackPositionByQueuedAtUtc[group.Key] = group
+                .Select(x => positionByQueuedJobId.GetValueOrDefault(x.Id, 1))
+                .Min();
         }
 
         var items = new List<TemplateGenerationResponse>(jobs.Count);
@@ -1352,7 +1362,9 @@ internal sealed class TemplateGenerationService(
                 continue;
             }
 
-            var queuePosition = positionByQueuedAtUtc.GetValueOrDefault(job.QueuedAtUtc, 1);
+            var queuePosition = positionByQueuedJobId.GetValueOrDefault(
+                job.Id,
+                fallbackPositionByQueuedAtUtc.GetValueOrDefault(job.QueuedAtUtc, 1));
             items.Add(await SignUserMediaUrlsAsync(
                 ApplyCompareAccess(
                     ApplyWatermarkAccess(
@@ -1367,6 +1379,28 @@ internal sealed class TemplateGenerationService(
         }
 
         return items;
+    }
+
+    private async Task<int> CalculateQueuePositionAsync(
+        TemplateGenerationJob job,
+        CancellationToken cancellationToken)
+    {
+        var olderQueuedCount = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .CountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && x.QueuedAtUtc < job.QueuedAtUtc,
+                cancellationToken);
+
+        var tiedQueuedIds = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && x.QueuedAtUtc == job.QueuedAtUtc)
+            .Select(x => x.Id)
+            .ToArrayAsync(cancellationToken);
+
+        Array.Sort(tiedQueuedIds);
+        var tiedIndex = Array.IndexOf(tiedQueuedIds, job.Id);
+        return olderQueuedCount + Math.Max(0, tiedIndex) + 1;
     }
 
     private async Task<TemplateGenerationResponse> ApplyCompareAccessAsync(
