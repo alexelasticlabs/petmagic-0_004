@@ -63,5 +63,49 @@ public sealed class RateLimitProblemResponseTests
         Assert.Equal("RATE_LIMIT_EXCEEDED", body!["title"]?.ToString());
         Assert.Equal("RATE_LIMIT_EXCEEDED", body["code"]?.ToString());
         Assert.Equal("rate-limit-correlation", body["correlationId"]?.ToString());
+        Assert.False(string.IsNullOrWhiteSpace(body["traceId"]?.ToString()));
+    }
+
+    [Fact]
+    public async Task RateLimitRejection_ShouldCreateCorrelationIdWhenHeaderIsMissing()
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            EnvironmentName = Environments.Development,
+            ApplicationName = typeof(RateLimitProblemResponseTests).Assembly.FullName,
+        });
+        builder.WebHost.UseTestServer();
+        builder.Services.AddRateLimiter(options =>
+        {
+            options.OnRejected = RateLimitProblemResponse.WriteAsync;
+            options.AddPolicy("limited", _ =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    "missing-correlation-tests",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 1,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    }));
+        });
+
+        await using var app = builder.Build();
+        app.UseRateLimiter();
+        app.MapGet("/limited", () => Results.Ok()).RequireRateLimiting("limited");
+        await app.StartAsync();
+
+        using var firstResponse = await app.GetTestClient().GetAsync("/limited");
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+
+        using var response = await app.GetTestClient().GetAsync("/limited");
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues(CorrelationId.HeaderName, out var headerValues));
+        var correlationId = Assert.Single(headerValues);
+        Assert.False(string.IsNullOrWhiteSpace(correlationId));
+        Assert.NotNull(body);
+        Assert.Equal(correlationId, body!["correlationId"]?.ToString());
+        Assert.False(string.IsNullOrWhiteSpace(body["traceId"]?.ToString()));
     }
 }

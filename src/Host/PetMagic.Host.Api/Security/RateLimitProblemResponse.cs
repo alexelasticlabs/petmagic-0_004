@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 
@@ -23,9 +24,8 @@ public static class RateLimitProblemResponse
             response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
         }
 
-        var correlationId = context.HttpContext.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var value)
-            ? value as string
-            : null;
+        var correlationId = ResolveCorrelationId(context.HttpContext);
+        var traceId = Activity.Current?.TraceId.ToString() ?? context.HttpContext.TraceIdentifier;
         var problem = new ProblemDetails
         {
             Status = StatusCodes.Status429TooManyRequests,
@@ -33,11 +33,24 @@ public static class RateLimitProblemResponse
             Detail = "Too many requests. Please retry later."
         };
         problem.Extensions["code"] = "RATE_LIMIT_EXCEEDED";
-        if (!string.IsNullOrWhiteSpace(correlationId))
-        {
-            problem.Extensions["correlationId"] = correlationId;
-        }
+        problem.Extensions["traceId"] = traceId;
+        problem.Extensions["correlationId"] = correlationId;
 
         await response.WriteAsync(JsonSerializer.Serialize(problem, JsonOptions), cancellationToken);
+    }
+
+    private static string ResolveCorrelationId(HttpContext httpContext)
+    {
+        if (httpContext.Items.TryGetValue(CorrelationId.HttpContextItemKey, out var value)
+            && value is string correlationId
+            && CorrelationId.IsValid(correlationId))
+        {
+            return correlationId;
+        }
+
+        correlationId = CorrelationId.NormalizeOrCreate(httpContext.Request.Headers[CorrelationId.HeaderName]);
+        httpContext.Items[CorrelationId.HttpContextItemKey] = correlationId;
+        httpContext.Response.Headers[CorrelationId.HeaderName] = correlationId;
+        return correlationId;
     }
 }
