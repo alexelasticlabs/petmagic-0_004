@@ -15,7 +15,7 @@
 
 .search {
   display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.6rem;
   align-items: end;
 }
@@ -32,6 +32,12 @@
   font-weight: 600;
 }
 
+.hint {
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  line-height: 1.35;
+}
+
 .input {
   width: 100%;
   min-height: 2.35rem;
@@ -44,10 +50,19 @@
   font-size: 0.85rem;
 }
 
-.input:focus {
-  outline: 2px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  outline-offset: 1px;
+.input:focus-visible,
+.button:focus-visible {
+  outline: none;
   border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .button {
@@ -104,6 +119,28 @@
   display: flex;
   gap: 0.4rem;
   align-items: center;
+}
+
+.pagerButton {
+  min-width: 2.35rem;
+  padding-inline: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.pageIconPrevious {
+  transform: rotate(90deg);
+}
+
+.pageIconNext {
+  transform: rotate(-90deg);
 }
 
 .userRow {
@@ -167,9 +204,19 @@
   }
 
   .pagerActions {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    justify-content: flex-start;
     width: 100%;
+  }
+
+  .pagerButton {
+    flex: 0 0 auto;
+  }
+
+  .userName {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .userRow > .button {

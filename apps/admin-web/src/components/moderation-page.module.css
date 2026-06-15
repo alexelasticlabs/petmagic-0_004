@@ -37,6 +37,25 @@
   font-size: 0.84rem;
 }
 
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible,
+.button:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .textarea {
   min-height: 5.5rem;
   resize: vertical;
@@ -108,6 +127,29 @@
   margin-right: auto;
 }
 
+.pagerButton {
+  min-width: 2.35rem;
+  min-height: 2.35rem;
+  padding-inline: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pageIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.pageIconPrevious {
+  transform: rotate(90deg);
+}
+
+.pageIconNext {
+  transform: rotate(-90deg);
+}
+
 @media (max-width: 760px) {
   .filters {
     grid-template-columns: 1fr;
@@ -124,7 +166,11 @@
     margin-right: 0;
   }
 
-  .pager .button {
+  .pager .button:not(.pagerButton) {
     flex: 1 1 8rem;
+  }
+
+  .pagerButton {
+    flex: 0 0 auto;
   }
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { CaretDownIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -25,6 +26,7 @@ import {
   useAuthSession,
   type UserListItem,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import {
@@ -39,6 +41,7 @@ type RoleManagementPageProps = {
 };
 
 type PendingAction = {
+  targetUserId: string;
   title: string;
   description: string;
   confirmLabel: string;
@@ -69,8 +72,13 @@ function getCopy(locale: Locale) {
     searchDescription: isRu ? "Поиск по email, id или имени." : "Search by email, id, or name.",
     searchLabel: isRu ? "Пользователь" : "User",
     searchPlaceholder: isRu ? "email, user id или имя" : "email, user id, or name",
+    searchHint: isRu
+      ? "Введите минимум 2 символа. Поиск обновится автоматически."
+      : "Enter at least 2 characters. Search updates automatically.",
     loading: isRu ? "Загрузка ролей" : "Loading roles",
     error: isRu ? "Не удалось загрузить роли" : "Failed to load roles",
+    adminsError: isRu ? "Не удалось загрузить Admin" : "Failed to load admins",
+    moderatorsError: isRu ? "Не удалось загрузить Moderator" : "Failed to load moderators",
     searchError: isRu ? "Не удалось выполнить поиск пользователей" : "Failed to search users",
     emptyAdmins: isRu ? "Admin не найдены" : "No admins found",
     emptyModerators: isRu ? "Moderator не найдены" : "No moderators found",
@@ -78,7 +86,8 @@ function getCopy(locale: Locale) {
     noSearchResults: isRu ? "Пользователи не найдены" : "No users found",
     assign: isRu ? "Назначить" : "Assign",
     revoke: isRu ? "Снять Moderator" : "Remove Moderator",
-    adminAlreadyPrivileged: isRu ? "Admin" : "Admin",
+    adminAlreadyPrivileged: isRu ? "Уже Admin" : "Already Admin",
+    moderatorAlreadyPrivileged: isRu ? "Уже Moderator" : "Already Moderator",
     cancel: isRu ? "Отмена" : "Cancel",
     confirmAssignTitle: isRu ? "Назначить Moderator?" : "Assign Moderator?",
     confirmAssignDescription: isRu
@@ -121,6 +130,15 @@ function useDebouncedValue(value: string, delayMs: number) {
 
 function userDisplayName(user: UserListItem) {
   return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
+}
+
+function getRoleActionErrorDetails(error: unknown, targetUserId: string) {
+  return {
+    targetUserId: shortIdentifier(targetUserId),
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error instanceof Error ? sanitizeSensitiveText(error.message, 160) : "unknown_error",
+  };
 }
 
 function UserRoles({ roles }: { roles: readonly string[] }) {
@@ -200,21 +218,23 @@ function RolePager({
       <div className={styles.pagerActions}>
         <button
           type="button"
-          className={styles.button}
+          className={`${styles.button} ${styles.pagerButton}`}
           disabled={pageIndex === 0 || isFetching}
           aria-label={text.previousPageLabel}
+          title={text.previousPageLabel}
           onClick={onPrevious}
         >
-          {text.previous}
+          <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
         </button>
         <button
           type="button"
-          className={styles.button}
+          className={`${styles.button} ${styles.pagerButton}`}
           disabled={!hasMore || isFetching}
           aria-label={text.nextPageLabel}
+          title={text.nextPageLabel}
           onClick={onNext}
         >
-          {text.next}
+          <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
         </button>
       </div>
     </div>
@@ -236,6 +256,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   const roleActionInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const debouncedSearch = useDebouncedValue(search, 350);
+  const normalizedSearch = debouncedSearch.trim();
 
   useEffect(() => {
     if (!toast) {
@@ -274,21 +295,56 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   });
 
   const searchQueryParams = useMemo(
-    () => ({ search: debouncedSearch, take: 12 }),
-    [debouncedSearch]
+    () => ({ search: normalizedSearch, take: 12 }),
+    [normalizedSearch]
   );
   const searchQuery = useQuery({
     queryKey: adminQueryKeys.users(searchQueryParams),
     queryFn: ({ signal }) => fetchUsers(searchQueryParams, signal),
-    enabled: canManageRoles && debouncedSearch.trim().length >= 2,
+    enabled: canManageRoles && normalizedSearch.length >= 2,
     placeholderData: keepPreviousData,
   });
 
   const isLoading = adminsQuery.isLoading || moderatorsQuery.isLoading;
   const isError = adminsQuery.isError || moderatorsQuery.isError;
+  const isRoleRetryFetching = adminsQuery.isFetching || moderatorsQuery.isFetching;
+  const isRoleDataFetching = isRoleRetryFetching || searchQuery.isFetching;
+  const isRoleActionDisabled = isSubmitting || isRoleDataFetching;
+
+  function requestRoleListsRetry() {
+    if (!canManageRoles || isRoleRetryFetching) {
+      return;
+    }
+
+    void Promise.allSettled([adminsQuery.refetch(), moderatorsQuery.refetch()]);
+  }
+
+  function requestAdminsRetry() {
+    if (!canManageRoles || adminsQuery.isFetching) {
+      return;
+    }
+
+    void adminsQuery.refetch().catch(() => undefined);
+  }
+
+  function requestModeratorsRetry() {
+    if (!canManageRoles || moderatorsQuery.isFetching) {
+      return;
+    }
+
+    void moderatorsQuery.refetch().catch(() => undefined);
+  }
+
+  function requestSearchRetry() {
+    if (!canManageRoles || searchQuery.isFetching) {
+      return;
+    }
+
+    void searchQuery.refetch().catch(() => undefined);
+  }
 
   async function refreshRoleQueries(userId?: string) {
-    await Promise.all([
+    await Promise.allSettled([
       queryClient.invalidateQueries({
         queryKey: adminQueryKeys.usersRoot,
       }),
@@ -300,7 +356,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   }
 
   async function runPendingAction() {
-    if (!pendingAction || roleActionInFlightRef.current || isSubmitting) {
+    if (!pendingAction || isRoleActionDisabled || isRoleActionLocked()) {
       return;
     }
 
@@ -315,11 +371,37 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
       setToast({ type: "success", message: text.saved });
       setPendingAction(null);
     } catch (error) {
+      clientLogger.warn(
+        "roles.action_failed",
+        getRoleActionErrorDetails(error, pendingAction.targetUserId)
+      );
       setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) });
     } finally {
       roleActionInFlightRef.current = false;
       setIsSubmitting(false);
     }
+  }
+
+  function isRoleActionLocked(): boolean {
+    return roleActionInFlightRef.current || isSubmitting;
+  }
+
+  function resetPendingRoleAction() {
+    if (isRoleActionLocked()) {
+      return;
+    }
+
+    setPendingAction(null);
+  }
+
+  function setAdminsPageContext(nextPage: number) {
+    resetPendingRoleAction();
+    setAdminsPage(Math.max(0, nextPage));
+  }
+
+  function setModeratorsPageContext(nextPage: number) {
+    resetPendingRoleAction();
+    setModeratorsPage(Math.max(0, nextPage));
   }
 
   function assertCanManageRoles(): boolean {
@@ -333,11 +415,12 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   }
 
   function confirmAssignModerator(user: UserListItem) {
-    if (!assertCanManageRoles()) {
+    if (isRoleActionDisabled || isRoleActionLocked() || !assertCanManageRoles()) {
       return;
     }
 
     setPendingAction({
+      targetUserId: user.userId,
       title: text.confirmAssignTitle,
       description: `${text.confirmAssignDescription} ${userDisplayName(user)}`,
       confirmLabel: text.assign,
@@ -350,11 +433,12 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
   }
 
   function confirmRevokeModerator(user: UserListItem) {
-    if (!assertCanManageRoles()) {
+    if (isRoleActionDisabled || isRoleActionLocked() || !assertCanManageRoles()) {
       return;
     }
 
     setPendingAction({
+      targetUserId: user.userId,
       title: text.confirmRevokeTitle,
       description: `${text.confirmRevokeDescription} ${userDisplayName(user)}`,
       confirmLabel: text.revoke,
@@ -370,11 +454,43 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
     });
   }
 
-  const admins = adminsQuery.data?.items ?? [];
-  const moderators = moderatorsQuery.data?.items ?? [];
+  const adminsPageData = adminsQuery.isPlaceholderData ? undefined : adminsQuery.data;
+  const moderatorsPageData = moderatorsQuery.isPlaceholderData ? undefined : moderatorsQuery.data;
+  const admins = adminsPageData?.items ?? [];
+  const moderators = moderatorsPageData?.items ?? [];
   const searchResults = searchQuery.data?.items ?? [];
-  const isRoleRetryFetching = adminsQuery.isFetching || moderatorsQuery.isFetching;
-  const isSearchActive = debouncedSearch.trim().length >= 2;
+  const isSearchActive = normalizedSearch.length >= 2;
+  const isAdminsRefreshing = adminsQuery.isFetching && adminsQuery.isPlaceholderData;
+  const isModeratorsRefreshing = moderatorsQuery.isFetching && moderatorsQuery.isPlaceholderData;
+  const isSearchRefreshing = searchQuery.isFetching && searchQuery.isPlaceholderData;
+  const visibleSearchResults = isSearchActive && !isSearchRefreshing ? searchResults : [];
+  const visibleActionUserIdSignature = [
+    ...moderators.map((user) => user.userId),
+    ...visibleSearchResults.map((user) => user.userId),
+  ].join("|");
+  const hasAnyRoleData = Boolean(adminsQuery.data || moderatorsQuery.data);
+  const hasBlockingRoleError = isError && !hasAnyRoleData;
+
+  useEffect(() => {
+    if (
+      !pendingAction ||
+      roleActionInFlightRef.current ||
+      isSubmitting ||
+      isModeratorsRefreshing ||
+      isSearchRefreshing ||
+      visibleActionUserIdSignature.split("|").includes(pendingAction.targetUserId)
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => setPendingAction(null));
+  }, [
+    isModeratorsRefreshing,
+    isSearchRefreshing,
+    isSubmitting,
+    pendingAction,
+    visibleActionUserIdSignature,
+  ]);
 
   return (
     <section className={styles.page}>
@@ -387,24 +503,17 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
 
       {!canManageRoles || isLoading ? (
         <AdminStateCard title={text.loading} />
-      ) : isError ? (
+      ) : hasBlockingRoleError ? (
         <AdminStateCard
           title={text.error}
+          description={getAdminErrorMessage(adminsQuery.error ?? moderatorsQuery.error, text.error)}
           tone="danger"
           action={
             <button
               type="button"
               className={styles.button}
               disabled={!canManageRoles || isRoleRetryFetching}
-              onClick={() => {
-                if (!canManageRoles) {
-                  return;
-                }
-
-                void Promise.all([adminsQuery.refetch(), moderatorsQuery.refetch()]).catch(
-                  () => undefined
-                );
-              }}
+              onClick={requestRoleListsRetry}
             >
               {text.retry}
             </button>
@@ -414,28 +523,68 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
         <div className={styles.grid}>
           <AdminCard title={text.adminsTitle} description={text.adminsDescription}>
             <div className={styles.userList}>
-              {admins.length === 0 ? <AdminStateCard title={text.emptyAdmins} /> : null}
+              {isAdminsRefreshing ? (
+                <AdminStateCard title={text.loading} />
+              ) : adminsQuery.isError ? (
+                <AdminStateCard
+                  title={text.adminsError}
+                  description={getAdminErrorMessage(adminsQuery.error, text.adminsError)}
+                  tone="warning"
+                  action={
+                    <button
+                      type="button"
+                      className={styles.button}
+                      disabled={!canManageRoles || adminsQuery.isFetching}
+                      onClick={requestAdminsRetry}
+                    >
+                      {text.retry}
+                    </button>
+                  }
+                />
+              ) : admins.length === 0 ? (
+                <AdminStateCard title={text.emptyAdmins} />
+              ) : null}
               {admins.map((user) => (
                 <UserRow key={user.userId} user={user} locale={locale} />
               ))}
             </div>
-            {adminsQuery.data && adminsQuery.data.totalCount > 0 ? (
+            {adminsPageData && adminsPageData.totalCount > 0 ? (
               <RolePager
                 locale={locale}
                 pageIndex={adminsPage}
                 pageSize={PAGE_SIZE}
-                totalCount={adminsQuery.data.totalCount}
-                hasMore={adminsQuery.data.hasMore}
+                totalCount={adminsPageData.totalCount}
+                hasMore={adminsPageData.hasMore}
                 isFetching={adminsQuery.isFetching}
-                onPrevious={() => setAdminsPage((currentPage) => Math.max(0, currentPage - 1))}
-                onNext={() => setAdminsPage((currentPage) => currentPage + 1)}
+                onPrevious={() => setAdminsPageContext(adminsPage - 1)}
+                onNext={() => setAdminsPageContext(adminsPage + 1)}
               />
             ) : null}
           </AdminCard>
 
           <AdminCard title={text.moderatorsTitle} description={text.moderatorsDescription}>
             <div className={styles.userList}>
-              {moderators.length === 0 ? <AdminStateCard title={text.emptyModerators} /> : null}
+              {isModeratorsRefreshing ? (
+                <AdminStateCard title={text.loading} />
+              ) : moderatorsQuery.isError ? (
+                <AdminStateCard
+                  title={text.moderatorsError}
+                  description={getAdminErrorMessage(moderatorsQuery.error, text.moderatorsError)}
+                  tone="warning"
+                  action={
+                    <button
+                      type="button"
+                      className={styles.button}
+                      disabled={!canManageRoles || moderatorsQuery.isFetching}
+                      onClick={requestModeratorsRetry}
+                    >
+                      {text.retry}
+                    </button>
+                  }
+                />
+              ) : moderators.length === 0 ? (
+                <AdminStateCard title={text.emptyModerators} />
+              ) : null}
               {moderators.map((user) => (
                 <UserRow
                   key={user.userId}
@@ -446,7 +595,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                       type="button"
                       className={`${styles.button} ${styles.buttonDanger}`}
                       aria-label={`${text.revokeModeratorLabel} ${userDisplayName(user)}`}
-                      disabled={!canManageRoles || isSubmitting}
+                      disabled={!canManageRoles || isRoleActionDisabled}
                       onClick={() => confirmRevokeModerator(user)}
                     >
                       {text.revoke}
@@ -455,16 +604,16 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                 />
               ))}
             </div>
-            {moderatorsQuery.data && moderatorsQuery.data.totalCount > 0 ? (
+            {moderatorsPageData && moderatorsPageData.totalCount > 0 ? (
               <RolePager
                 locale={locale}
                 pageIndex={moderatorsPage}
                 pageSize={PAGE_SIZE}
-                totalCount={moderatorsQuery.data.totalCount}
-                hasMore={moderatorsQuery.data.hasMore}
+                totalCount={moderatorsPageData.totalCount}
+                hasMore={moderatorsPageData.hasMore}
                 isFetching={moderatorsQuery.isFetching}
-                onPrevious={() => setModeratorsPage((currentPage) => Math.max(0, currentPage - 1))}
-                onNext={() => setModeratorsPage((currentPage) => currentPage + 1)}
+                onPrevious={() => setModeratorsPageContext(moderatorsPage - 1)}
+                onNext={() => setModeratorsPageContext(moderatorsPage + 1)}
               />
             ) : null}
           </AdminCard>
@@ -480,16 +629,23 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                 type="search"
                 autoComplete="off"
                 className={styles.input}
+                aria-describedby="role-search-hint"
                 value={search}
-                onChange={(event) => setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH))}
+                onChange={(event) => {
+                  resetPendingRoleAction();
+                  setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));
+                }}
                 maxLength={USER_SEARCH_MAX_LENGTH}
                 placeholder={text.searchPlaceholder}
               />
+              <span id="role-search-hint" className={styles.hint}>
+                {text.searchHint}
+              </span>
             </label>
           </div>
           <div className={styles.userList}>
             {!isSearchActive ? <AdminStateCard title={text.emptySearch} /> : null}
-            {isSearchActive && searchQuery.isLoading ? (
+            {isSearchActive && (searchQuery.isLoading || isSearchRefreshing) ? (
               <AdminStateCard title={text.loading} />
             ) : null}
             {isSearchActive && searchQuery.isError ? (
@@ -502,13 +658,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                     type="button"
                     className={styles.button}
                     disabled={!canManageRoles || searchQuery.isFetching}
-                    onClick={() => {
-                      if (!canManageRoles) {
-                        return;
-                      }
-
-                      void searchQuery.refetch().catch(() => undefined);
-                    }}
+                    onClick={requestSearchRetry}
                   >
                     {text.retry}
                   </button>
@@ -517,11 +667,12 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
             ) : null}
             {isSearchActive &&
             !searchQuery.isLoading &&
+            !isSearchRefreshing &&
             !searchQuery.isError &&
-            searchResults.length === 0 ? (
+            visibleSearchResults.length === 0 ? (
               <AdminStateCard title={text.noSearchResults} />
             ) : null}
-            {searchResults.map((user) => {
+            {visibleSearchResults.map((user) => {
               const isAdmin = user.roles.includes("Admin");
               const isModerator = user.roles.includes("Moderator");
               return (
@@ -534,13 +685,13 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                       type="button"
                       className={styles.button}
                       aria-label={`${text.assignModeratorLabel} ${userDisplayName(user)}`}
-                      disabled={!canManageRoles || isAdmin || isModerator || isSubmitting}
+                      disabled={!canManageRoles || isAdmin || isModerator || isRoleActionDisabled}
                       onClick={() => confirmAssignModerator(user)}
                     >
                       {isAdmin
                         ? text.adminAlreadyPrivileged
                         : isModerator
-                          ? "Moderator"
+                          ? text.moderatorAlreadyPrivileged
                           : text.assign}
                     </button>
                   }

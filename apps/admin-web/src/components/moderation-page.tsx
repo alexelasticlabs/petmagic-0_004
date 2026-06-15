@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { CaretDownIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -57,7 +58,7 @@ function getCopy(locale: Locale) {
     status: isRu ? "Статус" : "Status",
     search: isRu ? "Поиск" : "Search",
     searchPlaceholder: isRu
-      ? "template, message, user/generation id"
+      ? "шаблон, сообщение, user/generation id"
       : "template, message, user/generation id",
     queueTitle: isRu ? "Очередь" : "Queue",
     loading: isRu ? "Загрузка очереди" : "Loading queue",
@@ -86,7 +87,7 @@ function getCopy(locale: Locale) {
       ? "Укажите причину решения: минимум 3 символа."
       : "Enter a decision reason: at least 3 characters.",
     previous: isRu ? "Назад" : "Previous",
-    next: isRu ? "Вперед" : "Next",
+    next: isRu ? "Вперёд" : "Next",
     pageLabel: isRu ? "Страница" : "Page",
     previousPageLabel: isRu ? "Предыдущая страница очереди" : "Previous queue page",
     nextPageLabel: isRu ? "Следующая страница очереди" : "Next queue page",
@@ -100,6 +101,9 @@ function getCopy(locale: Locale) {
     templateImage: isRu ? "Изображение" : "Image",
     templateVideo: isRu ? "Видео" : "Video",
     userPrefix: isRu ? "пользователь" : "user",
+    workspaceBadge: isRu ? "Модератор" : "Moderator",
+    approveItemLabel: isRu ? "Одобрить элемент" : "Approve item",
+    rejectItemLabel: isRu ? "Отклонить элемент" : "Reject item",
   };
 }
 
@@ -209,8 +213,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
       setDecision(null);
       setReason("");
       setReasonError(null);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] });
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["admin", "moderation"] }),
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) }),
+      ]);
     },
     onError: (error) =>
       setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) }),
@@ -221,7 +227,30 @@ export function ModerationPage({ locale }: ModerationPageProps) {
   });
 
   const isDecisionSubmitting = isDecisionInFlight || decisionMutation.isPending;
+  const isDecisionDraftOpen = Boolean(decision);
+  const isQueueContextLocked = isDecisionDraftOpen || isDecisionSubmitting;
   const items = queueQuery.data?.items ?? [];
+  const visibleItems = queueQuery.isPlaceholderData ? [] : items;
+  const isQueueRefreshing = queueQuery.isFetching && queueQuery.isPlaceholderData;
+  const visibleEventIdSignature = visibleItems.map((item) => item.eventId).join("|");
+
+  useEffect(() => {
+    if (
+      !decision ||
+      decisionInFlightRef.current ||
+      decisionMutation.isPending ||
+      isQueueRefreshing ||
+      visibleEventIdSignature.split("|").includes(decision.item.eventId)
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setDecision(null);
+      setReason("");
+      setReasonError(null);
+    });
+  }, [decision, decisionMutation.isPending, isQueueRefreshing, visibleEventIdSignature]);
 
   function assertCanModerate(): boolean {
     if (canModerate) {
@@ -269,15 +298,45 @@ export function ModerationPage({ locale }: ModerationPageProps) {
     decisionMutation.mutate();
   }
 
+  function resetDecisionDraft() {
+    if (decisionInFlightRef.current || decisionMutation.isPending) {
+      return;
+    }
+
+    setDecision(null);
+    setReason("");
+    setReasonError(null);
+  }
+
+  function resetQueueContext(nextPage = 0) {
+    if (isQueueContextLocked) {
+      return;
+    }
+
+    resetDecisionDraft();
+    setPage(nextPage);
+  }
+
+  function requestQueueRetry() {
+    if (!canModerate || isQueueContextLocked || queueQuery.isFetching) {
+      return;
+    }
+
+    void queueQuery.refetch().catch(() => undefined);
+  }
+
   return (
     <section className={styles.page}>
       <AdminPageHero
         eyebrow={text.eyebrow}
         title={text.title}
         description={text.description}
-        badge={<AdminBadge tone="info">Moderator</AdminBadge>}
+        badge={<AdminBadge tone="info">{text.workspaceBadge}</AdminBadge>}
       />
 
+      {!canModerate ? <AdminStateCard title={text.loading} /> : null}
+
+      {canModerate ? (
       <AdminCard title={text.filtersTitle}>
         <div className={styles.filters}>
           <label className={styles.field}>
@@ -285,9 +344,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             <select
               className={styles.select}
               value={status}
+              disabled={isQueueContextLocked}
               onChange={(event) => {
                 setStatus(event.target.value as StatusFilter);
-                setPage(0);
+                resetQueueContext();
               }}
             >
               <option value="pending">{text.statusPending}</option>
@@ -301,9 +361,10 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             <input
               className={styles.input}
               value={search}
+              disabled={isQueueContextLocked}
               onChange={(event) => {
                 setSearch(event.target.value.slice(0, MODERATION_SEARCH_MAX_LENGTH));
-                setPage(0);
+                resetQueueContext();
               }}
               maxLength={MODERATION_SEARCH_MAX_LENGTH}
               placeholder={text.searchPlaceholder}
@@ -311,37 +372,31 @@ export function ModerationPage({ locale }: ModerationPageProps) {
           </label>
         </div>
       </AdminCard>
+      ) : null}
 
-      {!canModerate ? (
-        <AdminStateCard title={text.loading} />
-      ) : queueQuery.isLoading ? (
-        <AdminStateCard title={text.loading} />
-      ) : queueQuery.isError ? (
-        <AdminStateCard
-          title={text.error}
-          description={getAdminErrorMessage(queueQuery.error, text.error)}
-          tone="danger"
-          action={
-            <button
-              type="button"
-              className={styles.button}
-              disabled={!canModerate || queueQuery.isFetching}
-              onClick={() => {
-                if (!canModerate) {
-                  return;
-                }
-
-                void queueQuery.refetch().catch(() => undefined);
-              }}
-            >
-              {text.retry}
-            </button>
-          }
-        />
-      ) : items.length === 0 ? (
-        <AdminStateCard title={text.empty} />
-      ) : (
-        <AdminCard title={text.queueTitle}>
+      {canModerate ? (
+        queueQuery.isLoading || isQueueRefreshing ? (
+          <AdminStateCard title={text.loading} />
+        ) : queueQuery.isError ? (
+          <AdminStateCard
+            title={text.error}
+            description={getAdminErrorMessage(queueQuery.error, text.error)}
+            tone="danger"
+            action={
+              <button
+                type="button"
+                className={styles.button}
+                disabled={!canModerate || isQueueContextLocked || queueQuery.isFetching}
+                onClick={requestQueueRetry}
+              >
+                {text.retry}
+              </button>
+            }
+          />
+        ) : visibleItems.length === 0 ? (
+          <AdminStateCard title={text.empty} />
+        ) : (
+          <AdminCard title={text.queueTitle}>
           <div
             className={adminTableStyles.tableWrap}
             aria-busy={queueQuery.isFetching ? "true" : undefined}
@@ -359,7 +414,7 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {visibleItems.map((item) => (
                   <tr key={item.eventId}>
                     <td>
                       <strong>{formatModerationText(item.templateTitle, "-", 120)}</strong>
@@ -399,6 +454,11 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={styles.button}
+                          aria-label={`${text.approveItemLabel}: ${formatModerationText(
+                            item.templateTitle,
+                            item.eventId,
+                            80
+                          )}`}
                           disabled={
                             !canModerate || item.status !== "pending" || isDecisionSubmitting
                           }
@@ -409,6 +469,11 @@ export function ModerationPage({ locale }: ModerationPageProps) {
                         <button
                           type="button"
                           className={`${styles.button} ${styles.danger}`}
+                          aria-label={`${text.rejectItemLabel}: ${formatModerationText(
+                            item.templateTitle,
+                            item.eventId,
+                            80
+                          )}`}
                           disabled={
                             !canModerate || item.status !== "pending" || isDecisionSubmitting
                           }
@@ -429,25 +494,28 @@ export function ModerationPage({ locale }: ModerationPageProps) {
             </span>
             <button
               type="button"
-              className={styles.button}
-              disabled={page === 0 || queueQuery.isFetching}
+              className={`${styles.button} ${styles.pagerButton}`}
+              disabled={page === 0 || isQueueContextLocked || queueQuery.isFetching}
               aria-label={text.previousPageLabel}
-              onClick={() => setPage((current) => Math.max(0, current - 1))}
+              title={text.previousPageLabel}
+              onClick={() => resetQueueContext(Math.max(0, page - 1))}
             >
-              {text.previous}
+              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
             </button>
             <button
               type="button"
-              className={styles.button}
-              disabled={!queueQuery.data?.hasMore || queueQuery.isFetching}
+              className={`${styles.button} ${styles.pagerButton}`}
+              disabled={!queueQuery.data?.hasMore || isQueueContextLocked || queueQuery.isFetching}
               aria-label={text.nextPageLabel}
-              onClick={() => setPage((current) => current + 1)}
+              title={text.nextPageLabel}
+              onClick={() => resetQueueContext(page + 1)}
             >
-              {text.next}
+              <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
             </button>
           </div>
-        </AdminCard>
-      )}
+          </AdminCard>
+        )
+      ) : null}
 
       <ConfirmationDialog
         open={Boolean(decision)}
