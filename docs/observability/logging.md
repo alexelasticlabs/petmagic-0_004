@@ -68,7 +68,7 @@ Excluded endpoints:
 
 ## Exceptions
 
-Unhandled API exceptions are logged by the global exception middleware at `Error` with the exception object. The HTTP request logger still emits the structured 500 request event, but it does not attach the exception object, so one failure does not produce duplicate stack traces. Production responses do not expose stack traces. Every error response includes `correlationId`.
+Unhandled API exceptions are logged by the global exception middleware at `Error` with the exception object. The HTTP request logger still emits the structured 500 request event, but it does not attach the exception object, so one failure does not produce duplicate stack traces. Production responses do not expose stack traces. Every error response includes `correlationId` and `traceId`.
 
 ## Worker Logs
 
@@ -93,6 +93,8 @@ Generation worker `Error` events:
 - failed after all retries
 
 Never log provider payloads, signed URLs, API keys, prompts with raw user data, request bodies, or response bodies.
+
+External provider calls must use bounded named or typed `HttpClient` registrations. Log safe provider stage/status context when a timeout occurs, but never include request bodies, response bodies, signed URLs, or credentials.
 
 ## Payments
 

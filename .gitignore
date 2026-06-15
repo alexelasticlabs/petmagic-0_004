@@ -67,7 +67,9 @@ Thumbs.db
 # Temporary
 temp/
 tmp/
+.tmp/
 artifacts/load/
+artifacts/mobile-template-feed/
 artifacts/query-plans/
 artifacts/watermark-*.json
 artifacts/watermark-*.env
