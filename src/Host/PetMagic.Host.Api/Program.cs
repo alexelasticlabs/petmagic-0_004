@@ -90,7 +90,11 @@ try
 
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
     var allowAnyCorsInDevelopment = builder.Environment.IsDevelopment();
+    HostApiProductionConfigurationValidator.ValidateDefaultConnectionString(builder.Configuration, builder.Environment);
+    HostApiProductionConfigurationValidator.ValidateJwtSigningKey(builder.Configuration, builder.Environment);
     HostApiProductionConfigurationValidator.ValidateCorsAllowedOrigins(allowedOrigins, builder.Environment);
+    HostApiProductionConfigurationValidator.ValidatePublicMediaBaseUrls(builder.Configuration, builder.Environment);
+    HostApiProductionConfigurationValidator.ValidateNoPublicServerSecrets(builder.Configuration, builder.Environment);
 
     builder.Services.AddCors(options =>
     {
@@ -237,7 +241,7 @@ try
         .AddEconomyApiModule()
         .AddIdentityInfrastructure(builder.Configuration, builder.Environment)
         .AddIdentityApiModule()
-        .AddSupportChatInfrastructure(builder.Configuration)
+        .AddSupportChatInfrastructure(builder.Configuration, builder.Environment.IsProduction())
         .AddSupportChatApiModule()
         .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
         .AddTemplatesApiModule();
@@ -351,8 +355,8 @@ try
             }
         }
     });
-    app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseRateLimiter();
     app.UseMiddleware<LegalAcceptanceEnforcementMiddleware>();
     app.UseAuthorization();
     app.UseMiddleware<RequestLogContextMiddleware>();
