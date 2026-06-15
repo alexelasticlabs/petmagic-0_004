@@ -226,6 +226,26 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Contains("support.assignment_invalid", body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("status=1", "support.status_invalid")]
+    [InlineData("status=-1", "support.status_invalid")]
+    [InlineData("source=1", "support.source_invalid")]
+    [InlineData("source=-1", "support.source_invalid")]
+    [InlineData("priority=1", "support.priority_invalid")]
+    [InlineData("priority=-1", "support.priority_invalid")]
+    public async Task AdminInbox_ShouldRejectNumericEnumFilters(string query, string expectedErrorCode)
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        using var response = await application.CreateClient(AdminId, "Admin")
+            .GetAsync($"/api/admin/support/tickets?{query}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains(expectedErrorCode, body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task AdminTicketEndpoints_ShouldExposeQueueActionsAndContext()
     {
@@ -818,8 +838,11 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.NotNull(retriedMessage.AttachmentUrl);
     }
 
-    [Fact]
-    public async Task UpdateStatusEndpoint_ShouldRejectInvalidStatusValues()
+    [Theory]
+    [InlineData("NotARealStatus")]
+    [InlineData("1")]
+    [InlineData("-1")]
+    public async Task UpdateStatusEndpoint_ShouldRejectInvalidStatusValues(string status)
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
 
@@ -830,9 +853,31 @@ public sealed class SupportChatEndpointsIntegrationTests
 
         using var invalidStatusResponse = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/status",
-            new UpdateSupportConversationStatusRequest("NotARealStatus"));
+            new UpdateSupportConversationStatusRequest(status));
 
         Assert.Equal(HttpStatusCode.BadRequest, invalidStatusResponse.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("-1")]
+    public async Task UpdateMetadataEndpoint_ShouldRejectNumericPriorityValues(string priority)
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Wrong charge", SupportConversationPriority.Normal));
+
+        using var invalidPriorityResponse = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/metadata",
+            new { priority, tags = Array.Empty<string>() });
+
+        Assert.Equal(HttpStatusCode.BadRequest, invalidPriorityResponse.StatusCode);
+
+        var body = await invalidPriorityResponse.Content.ReadAsStringAsync();
+        Assert.Contains("support.priority_invalid", body);
     }
 
     [Fact]

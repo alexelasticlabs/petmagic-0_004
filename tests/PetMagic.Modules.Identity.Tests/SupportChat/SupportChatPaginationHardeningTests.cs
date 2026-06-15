@@ -17,7 +17,13 @@ public sealed class SupportChatPaginationHardeningTests
         Assert.Contains("\"priority\" => conversationsQuery", source, StringComparison.Ordinal);
         Assert.Contains("\"waiting\" => conversationsQuery", source, StringComparison.Ordinal);
         Assert.Contains(".ThenByDescending(x => x.Id)", source, StringComparison.Ordinal);
-        Assert.Contains("orderedConversationsQuery\n            .Skip((page - 1) * pageSize)", source, StringComparison.Ordinal);
+        Assert.Contains("var totalCount = await conversationsQuery.LongCountAsync(cancellationToken);", source, StringComparison.Ordinal);
+        Assert.Contains("var boundedTotalCount = totalCount > int.MaxValue ? int.MaxValue : (int)totalCount;", source, StringComparison.Ordinal);
+        Assert.Contains("var offset = ((long)page - 1L) * pageSize;", source, StringComparison.Ordinal);
+        Assert.Contains("offset >= totalCount || offset > int.MaxValue", source, StringComparison.Ordinal);
+        Assert.Contains("orderedConversationsQuery\n            .Skip((int)offset)", source, StringComparison.Ordinal);
+        Assert.Contains("offset + summaries.Count < totalCount", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Skip((page - 1) * pageSize)", source, StringComparison.Ordinal);
         Assert.Contains(
             ".OrderByDescending(message => message.CreatedAtUtc)\n                    .ThenByDescending(message => message.Id)",
             source,
@@ -57,7 +63,7 @@ public sealed class SupportChatPaginationHardeningTests
             "if (normalizedSort is not (null or \"\" or \"default\" or \"priority\" or \"waiting\" or \"updated\" or \"created\"))",
             StringComparison.Ordinal);
         var countIndex = source.IndexOf(
-            "var totalCount = await conversationsQuery.CountAsync(cancellationToken);",
+            "var totalCount = await conversationsQuery.LongCountAsync(cancellationToken);",
             StringComparison.Ordinal);
 
         Assert.True(sortValidationIndex >= 0, "Support inbox sort validation was not found.");

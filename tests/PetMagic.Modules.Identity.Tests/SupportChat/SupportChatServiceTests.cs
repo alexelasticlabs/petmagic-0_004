@@ -401,7 +401,11 @@ public sealed class SupportChatServiceTests
 
     [Theory]
     [InlineData(null, "not-a-source", null, "support.source_invalid")]
+    [InlineData(null, "1", null, "support.source_invalid")]
+    [InlineData(null, "-1", null, "support.source_invalid")]
     [InlineData(null, null, "not-a-priority", "support.priority_invalid")]
+    [InlineData(null, null, "1", "support.priority_invalid")]
+    [InlineData(null, null, "-1", "support.priority_invalid")]
     [InlineData("not-a-sort", null, null, "support.sort_invalid")]
     public async Task ListAdminInboxAsync_ShouldReturnFieldSpecificFilterErrors(
         string? sort,
@@ -422,6 +426,89 @@ public sealed class SupportChatServiceTests
 
         Assert.True(result.IsFailure);
         Assert.Equal(expectedErrorCode, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ListAdminInboxAsync_ShouldRejectNumericStatusFilters()
+    {
+        var store = CreateStore();
+
+        await using var scope = await store.CreateScopeAsync();
+        var result = await scope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Statuses: ["1", "-1"]),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("support.status_invalid", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ListAdminInboxAsync_ShouldReturnEmptyPageForOverflowSizedPage()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+
+            Assert.True(openResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var result = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(null, Page: int.MaxValue, PageSize: 100),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value.Items);
+        Assert.Equal(int.MaxValue, result.Value.Page);
+        Assert.Equal(100, result.Value.PageSize);
+        Assert.Equal(1, result.Value.TotalCount);
+        Assert.False(result.Value.HasMore);
+    }
+
+    [Fact]
+    public async Task ListAdminInboxAsync_ShouldUseDefaultPageSizeForNonPositivePageSize()
+    {
+        var store = CreateStore();
+
+        var firstUserId = Guid.NewGuid();
+        var secondUserId = Guid.NewGuid();
+        await SeedUserAsync(store, firstUserId, "first@petmagic.test", "First User");
+        await SeedUserAsync(store, secondUserId, "second@petmagic.test", "Second User");
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            var firstOpenResult = await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(firstUserId, "Need help one", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            var secondOpenResult = await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(secondUserId, "Need help two", SupportConversationPriority.Normal),
+                CancellationToken.None);
+
+            Assert.True(firstOpenResult.IsSuccess);
+            Assert.True(secondOpenResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var result = await verificationScope.CreateService().ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(null, Page: 0, PageSize: 0),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.Page);
+        Assert.Equal(50, result.Value.PageSize);
+        Assert.Equal(2, result.Value.Items.Count);
+        Assert.Equal(2, result.Value.TotalCount);
+        Assert.False(result.Value.HasMore);
     }
 
     [Fact]
