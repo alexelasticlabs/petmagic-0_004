@@ -176,14 +176,22 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     staleTime: 60_000,
   });
 
+  const visiblePurchasesPage = purchasesQuery.isPlaceholderData ? undefined : purchasesQuery.data;
+  const visibleSubscriptionsPage = subscriptionsQuery.isPlaceholderData
+    ? undefined
+    : subscriptionsQuery.data;
+  const purchasesIsRefreshing = purchasesQuery.isFetching && purchasesQuery.isPlaceholderData;
+  const subscriptionsIsRefreshing =
+    subscriptionsQuery.isFetching && subscriptionsQuery.isPlaceholderData;
+
   const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
   const purchaseItems = useMemo(
-    () => purchasesQuery.data?.items ?? [],
-    [purchasesQuery.data?.items]
+    () => visiblePurchasesPage?.items ?? [],
+    [visiblePurchasesPage?.items]
   );
   const subscriptionItems = useMemo(
-    () => subscriptionsQuery.data?.items ?? [],
-    [subscriptionsQuery.data?.items]
+    () => visibleSubscriptionsPage?.items ?? [],
+    [visibleSubscriptionsPage?.items]
   );
   const subscriptionPlans = subscriptionPlansQuery.data ?? [];
   const providerConfigs = providerConfigsQuery.data ?? [];
@@ -198,7 +206,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
       return;
     }
 
-    await Promise.all([
+    await Promise.allSettled([
       ledgerQuery.refetch(),
       purchasesQuery.refetch(),
       subscriptionsQuery.refetch(),
@@ -312,6 +320,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     purchaseSearch,
     purchaseStatus,
     purchasesIsFetching: purchasesQuery.isFetching,
+    purchasesIsRefreshing,
     premiumMetrics,
     setEventProvider,
     setEventStatus,
@@ -328,12 +337,13 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     subscriptionItems,
     subscriptionPage,
     subscriptionSearch,
-    subscriptionsHasMore: subscriptionsQuery.data?.hasMore ?? false,
+    subscriptionsHasMore: visibleSubscriptionsPage?.hasMore ?? false,
     subscriptionsIsFetching: subscriptionsQuery.isFetching,
+    subscriptionsIsRefreshing,
     subscriptionPlans,
     subscriptionProvider,
     subscriptionStatus,
-    purchasesHasMore: purchasesQuery.data?.hasMore ?? false,
+    purchasesHasMore: visiblePurchasesPage?.hasMore ?? false,
     refetchAll,
   };
 }

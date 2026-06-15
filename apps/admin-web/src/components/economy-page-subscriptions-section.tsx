@@ -36,6 +36,7 @@ type EconomyPageSubscriptionsSectionProps = {
   subscriptionsHasMore: boolean;
   subscriptionItems: AdminEconomySubscription[];
   subscriptionsIsFetching: boolean;
+  subscriptionsIsRefreshing: boolean;
   cancelSubscriptionPending: boolean;
   subscriptionEvents: AdminSubscriptionEvent[];
   setSubscriptionProvider: (value: string) => void;
@@ -79,6 +80,7 @@ export function EconomyPageSubscriptionsSection({
   subscriptionsHasMore,
   subscriptionItems,
   subscriptionsIsFetching,
+  subscriptionsIsRefreshing,
   cancelSubscriptionPending,
   subscriptionEvents,
   setSubscriptionProvider,
@@ -131,84 +133,90 @@ export function EconomyPageSubscriptionsSection({
           </div>
         }
       >
-        <TableOrEmpty hasItems={subscriptionItems.length > 0} emptyTitle={text.noSubscriptions}>
-          <div className={adminTableStyles.tableWrap}>
-            <table className={adminTableStyles.table}>
-              <thead>
-                <tr>
-                  <th>{text.userColumn}</th>
-                  <th>{text.planColumn}</th>
-                  <th>{text.providerColumn}</th>
-                  <th>{text.statusColumn}</th>
-                  <th>{text.renewalColumn}</th>
-                  <th>{text.actionsColumn}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {subscriptionItems.map((item) => (
-                  <tr key={item.subscriptionId}>
-                    <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{safeText(item.planName || item.planId)}</strong>
-                        <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.packMeta}>
-                        <strong>{humanizeProvider(item.provider, locale)}</strong>
-                        <span>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={styles.statusStack}>
-                        <AdminStatusBadge color={statusColor(item.status)}>
-                          {humanizeStatus(item.status, locale)}
-                        </AdminStatusBadge>
-                        {item.cancelAtPeriodEnd ? (
-                          <AdminStatusBadge color="var(--warning)">
-                            {text.cancelAtPeriodEndLabel}
-                          </AdminStatusBadge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td>{formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
-                        onClick={() => onCancelSubscription(item)}
-                      >
-                        {text.cancelSubscriptionAction}
-                      </button>
-                    </td>
+        {subscriptionsIsRefreshing ? (
+          <AdminStateCard tone="info" title={text.loadingTitle} />
+        ) : (
+          <TableOrEmpty hasItems={subscriptionItems.length > 0} emptyTitle={text.noSubscriptions}>
+            <div className={adminTableStyles.tableWrap}>
+              <table className={adminTableStyles.table}>
+                <thead>
+                  <tr>
+                    <th>{text.userColumn}</th>
+                    <th>{text.planColumn}</th>
+                    <th>{text.providerColumn}</th>
+                    <th>{text.statusColumn}</th>
+                    <th>{text.renewalColumn}</th>
+                    <th>{text.actionsColumn}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className={styles.pager}>
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={subscriptionPage === 0 || subscriptionsIsFetching}
-              aria-label={text.previousSubscriptionsPageLabel}
-              onClick={() => setSubscriptionPage((current) => Math.max(0, current - 1))}
-            >
-              {text.previousPage}
-            </button>
-            <button
-              type="button"
-              className={styles.pagerButton}
-              disabled={!subscriptionsHasMore || subscriptionsIsFetching}
-              aria-label={text.nextSubscriptionsPageLabel}
-              onClick={() => setSubscriptionPage((current) => current + 1)}
-            >
-              {text.nextPage}
-            </button>
-          </div>
-        </TableOrEmpty>
+                </thead>
+                <tbody>
+                  {subscriptionItems.map((item) => (
+                    <tr key={item.subscriptionId}>
+                      <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{safeText(item.planName || item.planId)}</strong>
+                          <span>{`${item.monthlyTokensGranted}/${item.monthlyTokenLimit} ${text.tokensShort}`}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.packMeta}>
+                          <strong>{humanizeProvider(item.provider, locale)}</strong>
+                          <span>{`${safeText(item.purchaseChannel, 48)} • ${safeText(item.region, 32)}`}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <div className={styles.statusStack}>
+                          <AdminStatusBadge color={statusColor(item.status)}>
+                            {humanizeStatus(item.status, locale)}
+                          </AdminStatusBadge>
+                          {item.cancelAtPeriodEnd ? (
+                            <AdminStatusBadge color="var(--warning)">
+                              {text.cancelAtPeriodEndLabel}
+                            </AdminStatusBadge>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>
+                        {formatDateTime(item.currentPeriodEndUtc ?? item.updatedAtUtc, locale)}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={styles.dangerButton}
+                          disabled={cancelSubscriptionPending || !canCancelSubscription(item)}
+                          onClick={() => onCancelSubscription(item)}
+                        >
+                          {text.cancelSubscriptionAction}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className={styles.pager}>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={subscriptionPage === 0 || subscriptionsIsFetching}
+                aria-label={text.previousSubscriptionsPageLabel}
+                onClick={() => setSubscriptionPage((current) => Math.max(0, current - 1))}
+              >
+                {text.previousPage}
+              </button>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                disabled={!subscriptionsHasMore || subscriptionsIsFetching}
+                aria-label={text.nextSubscriptionsPageLabel}
+                onClick={() => setSubscriptionPage((current) => current + 1)}
+              >
+                {text.nextPage}
+              </button>
+            </div>
+          </TableOrEmpty>
+        )}
       </AdminCard>
 
       <AdminCard

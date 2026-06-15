@@ -85,6 +85,10 @@ type EconomyPageProps = {
 
 const watermarkPositionOptions = ["bottom-right", "bottom-left", "top-right", "top-left"] as const;
 const watermarkSizeOptions = ["small", "medium", "large"] as const;
+const WATERMARK_TEXT_MAX_LENGTH = 80;
+const WATERMARK_COST_MAX_LENGTH = 6;
+const WATERMARK_OPACITY_MAX_LENGTH = 4;
+const WATERMARK_LOGO_URL_MAX_LENGTH = 2_048;
 
 type TableOrEmptyProps = {
   hasItems: boolean;
@@ -212,6 +216,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     purchaseSearch,
     purchaseStatus,
     purchasesIsFetching,
+    purchasesIsRefreshing,
     premiumMetrics,
     purchasesHasMore,
     setEventProvider,
@@ -229,6 +234,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     subscriptionPage,
     subscriptionItems,
     subscriptionsIsFetching,
+    subscriptionsIsRefreshing,
     subscriptionSearch,
     subscriptionsHasMore,
     subscriptionPlans,
@@ -320,7 +326,9 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (pack) => {
       setFeedback({ tone: "success", message: text.packSaved });
       setDrafts((current) => ({ ...current, [pack.packId]: toDraft(pack) }));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPacks });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyPacks }),
+      ]);
     },
     onError: (error) => {
       setFeedback({ tone: "danger", message: getAdminErrorMessage(error, text.packSaveError) });
@@ -343,7 +351,9 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         message: locale === "ru" ? "Настройки watermark сохранены" : "Watermark settings saved",
       });
       setWatermarkDraft(settings);
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateWatermarkSettings });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateWatermarkSettings }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -370,7 +380,9 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (plan) => {
       setFeedback({ tone: "success", message: text.planSaved });
       setPlanDrafts((current) => ({ ...current, [plan.planId]: toSubscriptionPlanDraft(plan) }));
-      await queryClient.invalidateQueries({ queryKey: adminQueryKeys.economySubscriptionPlans });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: adminQueryKeys.economySubscriptionPlans }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -401,9 +413,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         ...current,
         [config.configurationId]: toProviderConfigDraft(config),
       }));
-      await queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-      });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
+        }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -447,9 +461,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async () => {
       setFeedback({ tone: "success", message: text.providerConfigCreated });
       setCreateProviderDraft(createDefaultProviderConfigDraft());
-      await queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-      });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
+        }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -467,9 +483,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (_, variables) => {
       setFeedback({ tone: "success", message: text.providerConfigCloned });
       setCloneRegionDrafts((current) => ({ ...current, [variables.configurationId]: "" }));
-      await queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-      });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
+        }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -486,9 +504,11 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     },
     onSuccess: async () => {
       setFeedback({ tone: "success", message: text.providerConfigDeleted });
-      await queryClient.invalidateQueries({
-        queryKey: adminQueryKeys.economyPaymentProviderConfigs,
-      });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: adminQueryKeys.economyPaymentProviderConfigs,
+        }),
+      ]);
     },
     onError: (error) => {
       setFeedback({
@@ -552,7 +572,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (_, subscription) => {
       setFeedback({ tone: "success", message: text.cancelSubscriptionSuccess });
       setCancelTarget(null);
-      await Promise.all([
+      await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "subscription-events"] }),
         queryClient.invalidateQueries({
@@ -591,7 +611,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (_, purchase) => {
       setFeedback({ tone: "success", message: text.refundPurchaseSuccess });
       setRefundTarget(null);
-      await Promise.all([
+      await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "purchases"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "economy", "ledger"] }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.economyDashboardMetrics }),
@@ -698,6 +718,16 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   }
 
   const effectiveWatermarkDraft = watermarkDraft ?? watermarkQuery.data ?? null;
+  const isSaveWatermarkDisabled =
+    !canManageEconomy || !effectiveWatermarkDraft || saveWatermarkMutation.isPending;
+
+  function requestSaveWatermark() {
+    if (isSaveWatermarkDisabled) {
+      return;
+    }
+
+    saveWatermarkMutation.mutate();
+  }
 
   return (
     <AdminPage className={styles.page}>
@@ -805,6 +835,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                   const draft = drafts[pack.packId] ?? toDraft(pack);
                   const isSavingRow =
                     savePackMutation.isPending && savePackMutation.variables === pack.packId;
+                  const isPackDraftLocked = savePackMutation.isPending;
                   return (
                     <tr key={pack.packId}>
                       <td>
@@ -823,6 +854,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           }
                           maxLength={ECONOMY_PACK_DISPLAY_NAME_MAX_LENGTH}
                           className={styles.input}
+                          disabled={isPackDraftLocked}
                         />
                       </td>
                       <td>
@@ -836,6 +868,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           maxLength={ECONOMY_PACK_PRICE_MAX_LENGTH}
                           inputMode="decimal"
                           className={styles.input}
+                          disabled={isPackDraftLocked}
                         />
                       </td>
                       <td>
@@ -849,6 +882,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
+                          disabled={isPackDraftLocked}
                         />
                       </td>
                       <td>
@@ -862,6 +896,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
+                          disabled={isPackDraftLocked}
                         />
                       </td>
                       <td>
@@ -875,6 +910,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                           maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                           inputMode="numeric"
                           className={styles.input}
+                          disabled={isPackDraftLocked}
                         />
                       </td>
                       <td>
@@ -887,6 +923,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                                 isActive: event.target.checked,
                               })
                             }
+                            disabled={isPackDraftLocked}
                           />
                           <span>{draft.isActive ? text.activeState : text.inactiveState}</span>
                         </label>
@@ -894,7 +931,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                       <td>
                         <Button
                           onClick={() => requestSavePack(pack.packId)}
-                          disabled={savePackMutation.isPending}
+                          disabled={isPackDraftLocked}
                         >
                           {isSavingRow ? text.savingAction : text.saveAction}
                         </Button>
@@ -991,93 +1028,100 @@ export function EconomyPage({ locale }: EconomyPageProps) {
             </div>
           }
         >
-          <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
-            <div className={adminTableStyles.tableWrap}>
-              <table className={adminTableStyles.table}>
-                <thead>
-                  <tr>
-                    <th>{text.timeColumn}</th>
-                    <th>{text.userColumn}</th>
-                    <th>{text.productTypeColumn}</th>
-                    <th>{text.packColumn}</th>
-                    <th>{text.providerColumn}</th>
-                    <th>{text.amountColumn}</th>
-                    <th>{text.statusColumn}</th>
-                    <th>{text.refundStatusColumn}</th>
-                    <th>{text.actionsColumn}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {purchaseItems.map((item) => {
-                    const canRefund = canRefundPurchase(item);
+          {purchasesIsRefreshing ? (
+            <AdminStateCard tone="info" title={text.loadingTitle} />
+          ) : (
+            <TableOrEmpty hasItems={purchaseItems.length > 0} emptyTitle={text.noPurchases}>
+              <div className={adminTableStyles.tableWrap}>
+                <table className={adminTableStyles.table}>
+                  <thead>
+                    <tr>
+                      <th>{text.timeColumn}</th>
+                      <th>{text.userColumn}</th>
+                      <th>{text.productTypeColumn}</th>
+                      <th>{text.packColumn}</th>
+                      <th>{text.providerColumn}</th>
+                      <th>{text.amountColumn}</th>
+                      <th>{text.statusColumn}</th>
+                      <th>{text.refundStatusColumn}</th>
+                      <th>{text.actionsColumn}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchaseItems.map((item) => {
+                      const canRefund = canRefundPurchase(item);
 
-                    return (
-                      <tr key={item.orderId}>
-                        <td>{formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}</td>
-                        <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
-                        <td>{safeText(item.productType ?? "TokenPack")}</td>
-                        <td>
-                          <div className={styles.packMeta}>
-                            <strong>{safeText(item.packDisplayName)}</strong>
-                            <span>
-                              {item.tokenAmount ?? item.sparkToGrant} {text.tokensShort}
-                            </span>
-                          </div>
-                        </td>
-                        <td>{humanizeProvider(item.paymentProvider, locale)}</td>
-                        <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
-                        <td>
-                          <AdminStatusBadge color={statusColor(item.status)}>
-                            {humanizeStatus(item.status, locale)}
-                          </AdminStatusBadge>
-                        </td>
-                        <td>
-                          {safeText(
-                            item.refundStatus ?? (item.status === "refunded" ? "refunded" : "none")
-                          )}
-                        </td>
-                        <td>
-                          {canRefund ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              disabled={isRefundPurchaseSubmitting}
-                              onClick={() => requestRefundPurchase(item)}
-                            >
-                              {text.refundPurchaseAction}
-                            </Button>
-                          ) : (
-                            <span className={styles.mutedText}>-</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className={styles.pager}>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={purchasePage === 0 || purchasesIsFetching}
-                aria-label={text.previousPurchasesPageLabel}
-                onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
-              >
-                {text.previousPage}
-              </button>
-              <button
-                type="button"
-                className={styles.pagerButton}
-                disabled={!purchasesHasMore || purchasesIsFetching}
-                aria-label={text.nextPurchasesPageLabel}
-                onClick={() => setPurchasePage((current) => current + 1)}
-              >
-                {text.nextPage}
-              </button>
-            </div>
-          </TableOrEmpty>
+                      return (
+                        <tr key={item.orderId}>
+                          <td>
+                            {formatDateTime(item.confirmedAtUtc ?? item.createdAtUtc, locale)}
+                          </td>
+                          <td className={adminTableStyles.mono}>{shortGuid(item.userId)}</td>
+                          <td>{safeText(item.productType ?? "TokenPack")}</td>
+                          <td>
+                            <div className={styles.packMeta}>
+                              <strong>{safeText(item.packDisplayName)}</strong>
+                              <span>
+                                {item.tokenAmount ?? item.sparkToGrant} {text.tokensShort}
+                              </span>
+                            </div>
+                          </td>
+                          <td>{humanizeProvider(item.paymentProvider, locale)}</td>
+                          <td>{formatCurrency(item.priceAmount, locale, item.currencyCode)}</td>
+                          <td>
+                            <AdminStatusBadge color={statusColor(item.status)}>
+                              {humanizeStatus(item.status, locale)}
+                            </AdminStatusBadge>
+                          </td>
+                          <td>
+                            {safeText(
+                              item.refundStatus ??
+                                (item.status === "refunded" ? "refunded" : "none")
+                            )}
+                          </td>
+                          <td>
+                            {canRefund ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="danger"
+                                disabled={isRefundPurchaseSubmitting}
+                                onClick={() => requestRefundPurchase(item)}
+                              >
+                                {text.refundPurchaseAction}
+                              </Button>
+                            ) : (
+                              <span className={styles.mutedText}>-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className={styles.pager}>
+                <button
+                  type="button"
+                  className={styles.pagerButton}
+                  disabled={purchasePage === 0 || purchasesIsFetching}
+                  aria-label={text.previousPurchasesPageLabel}
+                  onClick={() => setPurchasePage((current) => Math.max(0, current - 1))}
+                >
+                  {text.previousPage}
+                </button>
+                <button
+                  type="button"
+                  className={styles.pagerButton}
+                  disabled={!purchasesHasMore || purchasesIsFetching}
+                  aria-label={text.nextPurchasesPageLabel}
+                  onClick={() => setPurchasePage((current) => current + 1)}
+                >
+                  {text.nextPage}
+                </button>
+              </div>
+            </TableOrEmpty>
+          )}
         </AdminCard>
       </AdminPageGrid>
 
@@ -1091,8 +1135,8 @@ export function EconomyPage({ locale }: EconomyPageProps) {
         action={
           <Button
             type="button"
-            disabled={!canManageEconomy || !effectiveWatermarkDraft || saveWatermarkMutation.isPending}
-            onClick={() => saveWatermarkMutation.mutate()}
+            disabled={isSaveWatermarkDisabled}
+            onClick={requestSaveWatermark}
           >
             {saveWatermarkMutation.isPending
               ? text.savingAction
@@ -1145,21 +1189,31 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 <input
                   className={styles.input}
                   value={effectiveWatermarkDraft.text}
-                  maxLength={80}
-                  onChange={(event) => updateWatermarkDraft({ text: event.target.value })}
+                  maxLength={WATERMARK_TEXT_MAX_LENGTH}
+                  onChange={(event) =>
+                    updateWatermarkDraft({
+                      text: event.target.value.slice(0, WATERMARK_TEXT_MAX_LENGTH),
+                    })
+                  }
                 />
               </label>
               <label className={styles.field}>
                 <span>{locale === "ru" ? "Cost in credits" : "Cost in credits"}</span>
                 <input
                   className={styles.input}
+                  type="text"
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={WATERMARK_COST_MAX_LENGTH}
                   value={String(effectiveWatermarkDraft.costCredits)}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const value = event.target.value
+                      .replace(/\D+/g, "")
+                      .slice(0, WATERMARK_COST_MAX_LENGTH);
                     updateWatermarkDraft({
-                      costCredits: Math.max(1, Number.parseInt(event.target.value, 10) || 1),
-                    })
-                  }
+                      costCredits: Math.max(1, Number.parseInt(value, 10) || 1),
+                    });
+                  }}
                 />
               </label>
             </div>
@@ -1168,16 +1222,22 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 <span>{locale === "ru" ? "Opacity" : "Opacity"}</span>
                 <input
                   className={styles.input}
+                  type="text"
                   inputMode="decimal"
+                  maxLength={WATERMARK_OPACITY_MAX_LENGTH}
                   value={String(effectiveWatermarkDraft.opacity)}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const value = event.target.value
+                      .replace(/[^\d.]+/g, "")
+                      .replace(/(\..*)\./g, "$1")
+                      .slice(0, WATERMARK_OPACITY_MAX_LENGTH);
                     updateWatermarkDraft({
                       opacity: Math.min(
                         0.65,
-                        Math.max(0.45, Number.parseFloat(event.target.value) || 0.55)
+                        Math.max(0.45, Number.parseFloat(value) || 0.55)
                       ),
-                    })
-                  }
+                    });
+                  }}
                 />
               </label>
               <label className={styles.field}>
@@ -1185,7 +1245,12 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 <input
                   className={styles.input}
                   value={effectiveWatermarkDraft.logoUrl ?? ""}
-                  onChange={(event) => updateWatermarkDraft({ logoUrl: event.target.value })}
+                  maxLength={WATERMARK_LOGO_URL_MAX_LENGTH}
+                  onChange={(event) =>
+                    updateWatermarkDraft({
+                      logoUrl: event.target.value.slice(0, WATERMARK_LOGO_URL_MAX_LENGTH),
+                    })
+                  }
                 />
               </label>
             </div>
@@ -1287,6 +1352,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
           subscriptionsHasMore={subscriptionsHasMore}
           subscriptionItems={subscriptionItems}
           subscriptionsIsFetching={subscriptionsIsFetching}
+          subscriptionsIsRefreshing={subscriptionsIsRefreshing}
           cancelSubscriptionPending={isCancelSubscriptionSubmitting}
           subscriptionEvents={subscriptionEvents}
           setSubscriptionProvider={setSubscriptionProvider}

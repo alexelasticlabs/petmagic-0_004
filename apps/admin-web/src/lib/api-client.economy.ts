@@ -48,6 +48,34 @@ export type AdminRedeemCodesQuery = {
 export const ECONOMY_QUERY_FILTER_MAX_LENGTH = 120;
 export const ECONOMY_REFUND_REASON_MAX_LENGTH = 240;
 
+const ECONOMY_PAYMENT_PROVIDERS = ["stripe", "app_store", "google_play"] as const;
+const ECONOMY_PURCHASE_STATUSES = ["pending", "succeeded", "failed", "refunded"] as const;
+const ECONOMY_SUBSCRIPTION_STATUSES = [
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+  "expired",
+] as const;
+const ECONOMY_SUBSCRIPTION_EVENT_STATUSES = [
+  "active",
+  "canceled",
+  "expired",
+  "processed",
+  "failed",
+] as const;
+const REDEEM_CODE_STATUSES = [
+  "draft",
+  "scheduled",
+  "active",
+  "paused",
+  "exhausted",
+  "expired",
+  "archived",
+] as const;
+const REDEEM_CODE_REWARD_KINDS = ["spark"] as const;
+const REDEEM_CODE_SORTS = ["updated", "usage", "reward", "code", "expiry"] as const;
+
 function normalizePagedValue(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value)
     ? Math.max(0, Math.floor(value))
@@ -64,14 +92,27 @@ function normalizeFilterValue(value: string | undefined): string | undefined {
   return value?.trim().slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH) || undefined;
 }
 
+function normalizeAllowedFilter<const T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+  omitted: readonly string[] = ["all"]
+): T | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized || omitted.includes(normalized)) {
+    return undefined;
+  }
+
+  return allowed.includes(normalized as T) ? (normalized as T) : undefined;
+}
+
 export function normalizeAdminEconomyPurchasesQuery(
   params: AdminEconomyPurchasesQuery = {}
 ): AdminEconomyPurchasesQuery {
   return {
     skip: normalizePagedValue(params.skip),
     take: normalizeTakeValue(params.take),
-    status: normalizeFilterValue(params.status),
-    provider: normalizeFilterValue(params.provider),
+    status: normalizeAllowedFilter(params.status, ECONOMY_PURCHASE_STATUSES),
+    provider: normalizeAllowedFilter(params.provider, ECONOMY_PAYMENT_PROVIDERS),
     search: normalizeFilterValue(params.search),
     userId: normalizeFilterValue(params.userId),
   };
@@ -83,8 +124,8 @@ export function normalizeAdminEconomySubscriptionsQuery(
   return {
     skip: normalizePagedValue(params.skip),
     take: normalizeTakeValue(params.take),
-    status: normalizeFilterValue(params.status),
-    provider: normalizeFilterValue(params.provider),
+    status: normalizeAllowedFilter(params.status, ECONOMY_SUBSCRIPTION_STATUSES),
+    provider: normalizeAllowedFilter(params.provider, ECONOMY_PAYMENT_PROVIDERS),
     search: normalizeFilterValue(params.search),
   };
 }
@@ -96,9 +137,9 @@ export function normalizeAdminRedeemCodesQuery(
     skip: normalizePagedValue(params.skip),
     take: normalizeTakeValue(params.take),
     search: normalizeFilterValue(params.search),
-    status: normalizeFilterValue(params.status),
-    rewardKind: normalizeFilterValue(params.rewardKind),
-    sort: normalizeFilterValue(params.sort),
+    status: normalizeAllowedFilter(params.status, REDEEM_CODE_STATUSES),
+    rewardKind: normalizeAllowedFilter(params.rewardKind, REDEEM_CODE_REWARD_KINDS),
+    sort: normalizeAllowedFilter(params.sort, REDEEM_CODE_SORTS, []),
   };
 }
 
@@ -371,8 +412,11 @@ export async function fetchAdminSubscriptionEvents(
 ): Promise<OffsetPagedResponse<AdminSubscriptionEvent>> {
   const normalizedSkip = normalizePagedValue(params?.skip);
   const normalizedTake = normalizeTakeValue(params?.take);
-  const normalizedProvider = normalizeFilterValue(params?.provider);
-  const normalizedStatus = normalizeFilterValue(params?.status);
+  const normalizedProvider = normalizeAllowedFilter(params?.provider, ECONOMY_PAYMENT_PROVIDERS);
+  const normalizedStatus = normalizeAllowedFilter(
+    params?.status,
+    ECONOMY_SUBSCRIPTION_EVENT_STATUSES
+  );
   const search = new URLSearchParams();
   if (normalizedSkip !== undefined) search.set("skip", String(normalizedSkip));
   if (normalizedTake !== undefined) search.set("take", String(normalizedTake));

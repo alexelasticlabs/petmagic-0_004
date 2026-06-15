@@ -99,6 +99,7 @@ export function EconomyPageSubscriptionPlansSection({
               {subscriptionPlans.map((plan) => {
                 const draft = planDrafts[plan.planId] ?? toSubscriptionPlanDraft(plan);
                 const isSavingPlan = savePlanPending && savePlanId === plan.planId;
+                const isPlanDraftLocked = savePlanPending;
 
                 return (
                   <tr key={plan.planId}>
@@ -116,6 +117,7 @@ export function EconomyPageSubscriptionPlansSection({
                         }
                         maxLength={ECONOMY_PLAN_NAME_MAX_LENGTH}
                         className={styles.input}
+                        disabled={isPlanDraftLocked}
                       />
                     </td>
                     <td>
@@ -130,6 +132,7 @@ export function EconomyPageSubscriptionPlansSection({
                           maxLength={ECONOMY_PACK_PRICE_MAX_LENGTH}
                           inputMode="decimal"
                           className={styles.input}
+                          disabled={isPlanDraftLocked}
                         />
                         <input
                           value={draft.currencyCode}
@@ -140,6 +143,7 @@ export function EconomyPageSubscriptionPlansSection({
                           }
                           className={styles.input}
                           maxLength={3}
+                          disabled={isPlanDraftLocked}
                         />
                       </div>
                     </td>
@@ -158,6 +162,7 @@ export function EconomyPageSubscriptionPlansSection({
                             maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                             inputMode="numeric"
                             className={styles.input}
+                            disabled={isPlanDraftLocked}
                           />
                         </label>
                       </div>
@@ -173,6 +178,7 @@ export function EconomyPageSubscriptionPlansSection({
                         maxLength={ECONOMY_PACK_INTEGER_MAX_LENGTH}
                         inputMode="numeric"
                         className={styles.input}
+                        disabled={isPlanDraftLocked}
                       />
                     </td>
                     <td>
@@ -190,6 +196,7 @@ export function EconomyPageSubscriptionPlansSection({
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
+                            disabled={isPlanDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -205,6 +212,7 @@ export function EconomyPageSubscriptionPlansSection({
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
+                            disabled={isPlanDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -220,6 +228,7 @@ export function EconomyPageSubscriptionPlansSection({
                             }
                             maxLength={ECONOMY_PLAN_PRODUCT_ID_MAX_LENGTH}
                             className={styles.input}
+                            disabled={isPlanDraftLocked}
                           />
                         </label>
                       </div>
@@ -235,6 +244,7 @@ export function EconomyPageSubscriptionPlansSection({
                                 isActive: event.target.checked,
                               })
                             }
+                            disabled={isPlanDraftLocked}
                           />
                           <span>{draft.isActive ? text.activeState : text.inactiveState}</span>
                         </label>
@@ -247,13 +257,14 @@ export function EconomyPageSubscriptionPlansSection({
                                 isRecommended: event.target.checked,
                               })
                             }
+                            disabled={isPlanDraftLocked}
                           />
                           <span>{text.recommendedState}</span>
                         </label>
                       </div>
                     </td>
                     <td>
-                      <Button onClick={() => onSavePlan(plan.planId)} disabled={savePlanPending}>
+                      <Button onClick={() => onSavePlan(plan.planId)} disabled={isPlanDraftLocked}>
                         {isSavingPlan ? text.savingAction : text.saveAction}
                       </Button>
                     </td>

@@ -65,15 +65,48 @@ describe("api-client.economy query normalization", () => {
         skip: 200.8,
         take: 200.4,
         status: " Active ",
-        provider: "  ",
+        provider: " STRIPE ",
         search: " sub_123 ",
       })
     ).toEqual({
       skip: 200,
       take: 200,
-      status: "Active",
-      provider: undefined,
+      status: "active",
+      provider: "stripe",
       search: "sub_123",
+    });
+  });
+
+  it("drops unsupported economy filters before backend requests", () => {
+    expect(
+      normalizeAdminEconomyPurchasesQuery({
+        status: "chargeback",
+        provider: "paypal",
+        search: " order ",
+        skip: 1.8,
+        take: 25.2,
+      })
+    ).toEqual({
+      skip: 1,
+      take: 25,
+      status: undefined,
+      provider: undefined,
+      search: "order",
+      userId: undefined,
+    });
+
+    expect(
+      normalizeAdminEconomySubscriptionsQuery({
+        status: "paused",
+        provider: "apple",
+        search: " subscription ",
+      })
+    ).toEqual({
+      skip: undefined,
+      take: undefined,
+      status: undefined,
+      provider: undefined,
+      search: "subscription",
     });
   });
 
@@ -96,6 +129,24 @@ describe("api-client.economy query normalization", () => {
       status: "active",
       rewardKind: "spark",
       sort: "usage",
+    });
+  });
+
+  it("drops unsupported redeem code filters before list and metric requests", () => {
+    expect(
+      normalizeAdminRedeemCodesQuery({
+        search: " promo ",
+        status: "deleted",
+        rewardKind: "premium_days",
+        sort: "random",
+      })
+    ).toEqual({
+      skip: undefined,
+      take: undefined,
+      search: "promo",
+      status: undefined,
+      rewardKind: undefined,
+      sort: undefined,
     });
   });
 
@@ -159,12 +210,36 @@ describe("api-client.economy query normalization", () => {
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
       `https://api.example.com/api/admin/economy/ledger?skip=4&take=20&source=${"l".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}&userId=${"u".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}`,
-      `https://api.example.com/api/admin/economy/subscription-events?provider=${"p".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}&status=${"s".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}`,
+      "https://api.example.com/api/admin/economy/subscription-events",
       "https://api.example.com/api/admin/economy/redeem-codes?skip=30&take=10&search=launch&status=active&rewardKind=spark&sort=usage",
       "https://api.example.com/api/admin/economy/redeem-codes/metrics?search=launch&status=active&rewardKind=spark",
       `https://api.example.com/api/admin/economy/redeem-codes/redeem-1/activations?skip=10&take=200&userId=${"a".repeat(ECONOMY_QUERY_FILTER_MAX_LENGTH)}`,
     ]);
     expect(redeemCodes.totalCount).toBe(0);
+  });
+
+  it("drops unsupported subscription event filters before request URLs", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], skip: 0, take: 20, hasMore: false, totalCount: 0 })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAdminSubscriptionEvents({
+      provider: "paypal",
+      status: "ignored",
+      take: 20,
+    });
+
+    await fetchAdminSubscriptionEvents({
+      provider: " APP_STORE ",
+      status: " Processed ",
+      take: 20,
+    });
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/economy/subscription-events?take=20",
+      "https://api.example.com/api/admin/economy/subscription-events?take=20&provider=app_store&status=processed",
+    ]);
   });
 
   it("requests backend redeem code metrics with abort support", async () => {

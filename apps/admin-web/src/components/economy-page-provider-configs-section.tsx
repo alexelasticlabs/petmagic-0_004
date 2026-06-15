@@ -149,7 +149,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="stripe"
+                placeholder={text.providerCodePlaceholder}
                 maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
@@ -164,7 +164,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="web"
+                placeholder={text.platformCodePlaceholder}
                 maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
@@ -179,7 +179,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="US"
+                placeholder={text.providerRegionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
               />
             </label>
@@ -194,7 +194,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="live"
+                placeholder={text.providerModePlaceholder}
                 maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
@@ -212,6 +212,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
+                placeholder={text.providerAppVersionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
               />
             </label>
@@ -229,6 +230,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
+                placeholder={text.providerBonusPlaceholder}
                 maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
               />
             </label>
@@ -311,7 +313,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="stripe"
+                placeholder={text.providerCodePlaceholder}
                 maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
@@ -326,7 +328,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="ios"
+                placeholder={text.platformCodePlaceholder}
                 maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
               />
             </label>
@@ -341,7 +343,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="DE"
+                placeholder={text.providerRegionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
               />
             </label>
@@ -356,7 +358,7 @@ export function EconomyPageProviderConfigsSection({
                   }))
                 }
                 className={styles.input}
-                placeholder="1.0.0"
+                placeholder={text.providerAppVersionPlaceholder}
                 maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
               />
             </label>
@@ -404,6 +406,15 @@ export function EconomyPageProviderConfigsSection({
                 const isSavingConfig =
                   saveProviderConfigPending && saveProviderConfigId === config.configurationId;
                 const isProviderConfigInvalid = isPaymentRouteDraftInvalid(draft);
+                const isProviderConfigDraftLocked =
+                  saveProviderConfigPending ||
+                  cloneProviderConfigPending ||
+                  deleteProviderConfigPending;
+                const isSaveProviderConfigDisabled =
+                  isProviderConfigDraftLocked || isProviderConfigInvalid;
+                const cloneRegion = cloneRegionDrafts[config.configurationId] ?? "";
+                const isCloneProviderConfigDisabled =
+                  isProviderConfigDraftLocked || !cloneRegion.trim();
 
                 return (
                   <tr key={config.configurationId}>
@@ -423,6 +434,7 @@ export function EconomyPageProviderConfigsSection({
                         }
                         className={styles.input}
                         maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+                        disabled={isProviderConfigDraftLocked}
                       />
                     </td>
                     <td>
@@ -430,6 +442,7 @@ export function EconomyPageProviderConfigsSection({
                         <input
                           type="checkbox"
                           checked={draft.isEnabled}
+                          disabled={isProviderConfigDraftLocked}
                           onChange={(event) =>
                             updateProviderConfigDraft(
                               setProviderConfigDrafts,
@@ -449,6 +462,7 @@ export function EconomyPageProviderConfigsSection({
                           <input
                             type="checkbox"
                             checked={draft.externalCheckoutAllowed}
+                            disabled={isProviderConfigDraftLocked}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
@@ -463,6 +477,7 @@ export function EconomyPageProviderConfigsSection({
                           <input
                             type="checkbox"
                             checked={draft.isRecommended}
+                            disabled={isProviderConfigDraftLocked}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
@@ -479,6 +494,7 @@ export function EconomyPageProviderConfigsSection({
                           <input
                             type="checkbox"
                             checked={draft.isSelectedByDefault}
+                            disabled={isProviderConfigDraftLocked}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
@@ -493,6 +509,7 @@ export function EconomyPageProviderConfigsSection({
                           <input
                             type="checkbox"
                             checked={draft.requiresExternalWarning}
+                            disabled={isProviderConfigDraftLocked}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
@@ -507,6 +524,7 @@ export function EconomyPageProviderConfigsSection({
                           <input
                             type="checkbox"
                             checked={draft.requiresStoreDisclosure}
+                            disabled={isProviderConfigDraftLocked}
                             onChange={(event) =>
                               updateProviderConfigDraft(
                                 setProviderConfigDrafts,
@@ -534,6 +552,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             maxLength={ECONOMY_PROVIDER_VERSION_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -556,6 +575,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             maxLength={ECONOMY_PROVIDER_BONUS_PERCENT_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                       </div>
@@ -577,6 +597,7 @@ export function EconomyPageProviderConfigsSection({
                             }
                             className={styles.input}
                             maxLength={ECONOMY_PROVIDER_CODE_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -595,6 +616,7 @@ export function EconomyPageProviderConfigsSection({
                             className={styles.input}
                             placeholder={humanizeProvider(config.provider, locale)}
                             maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -615,6 +637,7 @@ export function EconomyPageProviderConfigsSection({
                             className={styles.input}
                             placeholder={text.noDescription}
                             maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -633,6 +656,7 @@ export function EconomyPageProviderConfigsSection({
                             className={styles.input}
                             placeholder={text.noDescription}
                             maxLength={ECONOMY_PROVIDER_LABEL_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -653,6 +677,7 @@ export function EconomyPageProviderConfigsSection({
                             className={styles.input}
                             placeholder={text.noDescription}
                             maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                         <label className={styles.field}>
@@ -671,6 +696,7 @@ export function EconomyPageProviderConfigsSection({
                             className={styles.input}
                             placeholder={text.noDescription}
                             maxLength={ECONOMY_PROVIDER_MESSAGE_MAX_LENGTH}
+                            disabled={isProviderConfigDraftLocked}
                           />
                         </label>
                       </div>
@@ -679,19 +705,19 @@ export function EconomyPageProviderConfigsSection({
                       <div className={styles.tableActions}>
                         <Button
                           onClick={() => {
-                            if (saveProviderConfigPending || isProviderConfigInvalid) {
+                            if (isSaveProviderConfigDisabled) {
                               return;
                             }
 
                             onSaveProviderConfig(config.configurationId);
                           }}
-                          disabled={saveProviderConfigPending || isProviderConfigInvalid}
+                          disabled={isSaveProviderConfigDisabled}
                         >
                           {isSavingConfig ? text.savingAction : text.saveAction}
                         </Button>
 
                         <input
-                          value={cloneRegionDrafts[config.configurationId] ?? ""}
+                          value={cloneRegion}
                           onChange={(event) =>
                             setCloneRegionDrafts((current) => ({
                               ...current,
@@ -703,25 +729,22 @@ export function EconomyPageProviderConfigsSection({
                           className={styles.input}
                           placeholder={text.cloneRegionPlaceholder}
                           maxLength={ECONOMY_PROVIDER_REGION_MAX_LENGTH}
+                          disabled={isProviderConfigDraftLocked}
                         />
 
                         <Button
                           onClick={() => {
-                            const cloneRegion = (cloneRegionDrafts[config.configurationId] ?? "")
-                              .trim();
-                            if (cloneProviderConfigPending || !cloneRegion) {
+                            const nextCloneRegion = cloneRegion.trim();
+                            if (isCloneProviderConfigDisabled) {
                               return;
                             }
 
                             onCloneProviderConfig({
                               configurationId: config.configurationId,
-                              region: cloneRegion,
+                              region: nextCloneRegion,
                             });
                           }}
-                          disabled={
-                            cloneProviderConfigPending ||
-                            !(cloneRegionDrafts[config.configurationId] ?? "").trim()
-                          }
+                          disabled={isCloneProviderConfigDisabled}
                         >
                           {cloneProviderConfigPending &&
                           cloneProviderConfigId === config.configurationId
@@ -731,13 +754,13 @@ export function EconomyPageProviderConfigsSection({
 
                         <Button
                           onClick={() => {
-                            if (deleteProviderConfigPending) {
+                            if (isProviderConfigDraftLocked) {
                               return;
                             }
 
                             setConfigurationPendingDeleteId(config.configurationId);
                           }}
-                          disabled={deleteProviderConfigPending}
+                          disabled={isProviderConfigDraftLocked}
                           variant="danger"
                         >
                           {deleteProviderConfigPending &&
