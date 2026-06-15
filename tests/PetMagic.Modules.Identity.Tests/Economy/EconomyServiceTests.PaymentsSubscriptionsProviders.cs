@@ -640,7 +640,7 @@ public sealed partial class EconomyServiceTests
                 PurchaseChannel = "web",
                 Region = "US",
                 PlanId = "monthly",
-                Status = "active",
+                Status = "Active",
                 ExternalSubscriptionId = "sub_secret_should_not_be_searched",
                 CurrentPeriodStartUtc = now.AddDays(-3),
                 CurrentPeriodEndUtc = now.AddDays(27),
@@ -657,7 +657,7 @@ public sealed partial class EconomyServiceTests
                 PurchaseChannel = "in_app",
                 Region = "US",
                 PlanId = "yearly",
-                Status = "active",
+                Status = "Active",
                 CurrentPeriodStartUtc = now.AddDays(-7),
                 CurrentPeriodEndUtc = now.AddDays(358),
                 MonthlyTokenLimit = 700,
@@ -681,6 +681,59 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("stripe", item.Provider);
         Assert.Equal("monthly", item.PlanId);
         Assert.Equal("PetMagic Premium Monthly", item.PlanName);
+    }
+
+    [Fact]
+    public async Task GetAdminSubscriptionEventsAsync_ShouldFilterCanonicalStatusesFromAdminQuery()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var subscriptionId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.SubscriptionEventLogs.AddRange(
+            new SubscriptionEventLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                UserSubscriptionId = subscriptionId,
+                Provider = "stripe",
+                EventType = "customer.subscription.updated",
+                Status = "Active",
+                ExternalEventId = "evt_active",
+                ExternalSubscriptionId = "sub_active",
+                CreatedAtUtc = now,
+                ProcessedAtUtc = now,
+            },
+            new SubscriptionEventLog
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                UserSubscriptionId = Guid.NewGuid(),
+                Provider = "stripe",
+                EventType = "customer.subscription.deleted",
+                Status = "Expired",
+                ExternalEventId = "evt_expired",
+                ExternalSubscriptionId = "sub_expired",
+                CreatedAtUtc = now.AddMinutes(-1),
+                ProcessedAtUtc = now.AddMinutes(-1),
+            });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetAdminSubscriptionEventsAsync(
+            0,
+            10,
+            "stripe",
+            "active",
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value.Items);
+        Assert.Equal(userId, item.UserId);
+        Assert.Equal(subscriptionId, item.UserSubscriptionId);
+        Assert.Equal("Active", item.Status);
+        Assert.Equal("evt_active", item.ExternalEventId);
     }
 
     [Fact]

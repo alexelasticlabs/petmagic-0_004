@@ -60,6 +60,28 @@ public sealed class EconomyAdminRedeemCodeServiceHardeningTests
         Assert.Contains(".OrderBy(code => code.ExpiresAtUtc == null)", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AdminRedeemCodeMetrics_ShouldAggregateCodeCountsInSingleDatabaseQuery()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Economy",
+            "PetMagic.Modules.Economy.Infrastructure",
+            "EconomyAdminRedeemCodeService.cs"));
+
+        Assert.Contains("var codeStats = await codesQuery", source, StringComparison.Ordinal);
+        Assert.Contains(".GroupBy(_ => 1)", source, StringComparison.Ordinal);
+        Assert.Contains("TotalCodes = group.Count()", source, StringComparison.Ordinal);
+        Assert.Contains("ActiveCodes = group.Count(code =>", source, StringComparison.Ordinal);
+        Assert.Contains("CreatedLast7d = group.Count(code => code.CreatedAtUtc >= sevenDaysAgo)", source, StringComparison.Ordinal);
+        Assert.Contains("ActiveTouchedLast7d = group.Count(code =>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("var totalCodes = await codesQuery.CountAsync(cancellationToken);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("await codesQuery.CountAsync(code => code.CreatedAtUtc >= sevenDaysAgo, cancellationToken)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("await ApplyRedeemCodeStatusFilter(codesQuery, \"active\", now).CountAsync", source, StringComparison.Ordinal);
+    }
+
     private static int CountOccurrences(string source, string value)
     {
         var count = 0;

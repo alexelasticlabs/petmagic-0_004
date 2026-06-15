@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Options;
+using PetMagic.Modules.Economy.Infrastructure.Payments;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
@@ -49,6 +50,22 @@ public sealed class EconomyInfrastructureConfigurationTests
         Assert.Equal(StripeLiveSecretKey, options.StripeLiveSecretKey);
         Assert.Equal(StripeLivePublishableKey, options.StripeLivePublishableKey);
         Assert.Equal(StripeWebhookSecret, options.StripeLiveWebhookSecret);
+    }
+
+    [Fact]
+    public void AddEconomyInfrastructure_ShouldConfigureExternalHttpClientTimeouts()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration([]);
+
+        services.AddEconomyInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(StripePaymentGateway.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(StoreSubscriptionVerifier.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient("EconomyFcm").Timeout);
     }
 
     private static string StripeTestSecretKey => "sk_" + "test_should_not_start";

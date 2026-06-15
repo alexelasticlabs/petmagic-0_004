@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
@@ -67,6 +68,45 @@ public sealed class EconomyApiStartupSmokeTests
         await using var app = await EconomyApiStartupTestApplication.CreateAsync();
 
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
+    }
+
+    [Theory]
+    [InlineData("/api/admin/economy/purchases?status=chargeback", "economy.purchase_status_invalid")]
+    [InlineData("/api/admin/economy/purchases?provider=paypal", "economy.payment_provider_invalid")]
+    [InlineData("/api/admin/economy/subscriptions?status=paused", "economy.subscription_status_invalid")]
+    [InlineData("/api/admin/economy/subscriptions?provider=apple", "economy.payment_provider_invalid")]
+    [InlineData("/api/admin/economy/subscription-events?status=ignored", "economy.subscription_event_status_invalid")]
+    [InlineData("/api/admin/economy/subscription-events?provider=paypal", "economy.payment_provider_invalid")]
+    public async Task AdminEconomyListEndpoints_ShouldRejectInvalidFiltersBeforeServiceResolution(
+        string path,
+        string expectedProblemTitle)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        using var response = await app.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(expectedProblemTitle, body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/api/admin/economy/redeem-codes?status=deleted", "economy.redeem_code_status_invalid")]
+    [InlineData("/api/admin/economy/redeem-codes?rewardKind=premium_days", "economy.redeem_code_reward_kind_invalid")]
+    [InlineData("/api/admin/economy/redeem-codes?sort=random", "economy.redeem_code_sort_invalid")]
+    [InlineData("/api/admin/economy/redeem-codes/metrics?status=deleted", "economy.redeem_code_status_invalid")]
+    [InlineData("/api/admin/economy/redeem-codes/metrics?rewardKind=premium_days", "economy.redeem_code_reward_kind_invalid")]
+    public async Task AdminRedeemCodeEndpoints_ShouldRejectInvalidFiltersBeforeServiceResolution(
+        string path,
+        string expectedProblemTitle)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        using var response = await app.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains(expectedProblemTitle, body, StringComparison.Ordinal);
     }
 
     private sealed class EconomyApiStartupTestApplication : IAsyncDisposable
@@ -189,6 +229,9 @@ public sealed class EconomyApiStartupSmokeTests
                 .Order(StringComparer.Ordinal)
                 .ToArray();
         }
+
+        public Task<HttpResponseMessage> GetAsync(string path) =>
+            app.GetTestClient().GetAsync(path);
 
         public async ValueTask DisposeAsync()
         {
