@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -13,6 +14,62 @@ namespace PetMagic.Modules.Economy.Api.Endpoints;
 
 public static class AdminEconomyEndpoints
 {
+    private static readonly string[] PurchaseStatusFilters = ["pending", "succeeded", "failed", "refunded"];
+
+    private static readonly string[] PaymentProviderFilters = ["stripe", "app_store", "google_play"];
+
+    private static readonly string[] SubscriptionStatusFilters =
+    [
+        "active",
+        "trialing",
+        "graceperiod",
+        "grace_period",
+        "grace-period",
+        "pastdue",
+        "past_due",
+        "past-due",
+        "canceled",
+        "cancelled",
+        "expired",
+        "refunded",
+        "revoked",
+        "pending"
+    ];
+
+    private static readonly string[] SubscriptionEventStatusFilters =
+    [
+        "active",
+        "trialing",
+        "graceperiod",
+        "grace_period",
+        "grace-period",
+        "pastdue",
+        "past_due",
+        "past-due",
+        "canceled",
+        "cancelled",
+        "expired",
+        "processed",
+        "failed",
+        "pending"
+    ];
+
+    private static readonly string[] RedeemCodeStatusFilters =
+    [
+        "all",
+        "draft",
+        "scheduled",
+        "active",
+        "paused",
+        "exhausted",
+        "expired",
+        "archived"
+    ];
+
+    private static readonly string[] RedeemCodeRewardKindFilters = ["all", "spark"];
+
+    private static readonly string[] RedeemCodeSortModes = ["updated", "usage", "reward", "code", "expiry"];
+
     public static IEndpointRouteBuilder MapAdminEconomyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/admin/economy")
@@ -90,9 +147,16 @@ public static class AdminEconomyEndpoints
         [FromQuery] string? provider,
         [FromQuery] string? search,
         [FromQuery] Guid? userId,
-        [FromServices] IEconomyService service,
+        [FromServices] IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
+        var invalidFilterProblem = ValidatePurchaseFilters(status, provider);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
+        var service = serviceProvider.GetRequiredService<IEconomyService>();
         var result = await service.GetAdminPurchaseHistoryAsync(skip ?? 0, take ?? 50, status, provider, search, userId, cancellationToken);
         if (result.IsFailure)
         {
@@ -195,9 +259,16 @@ public static class AdminEconomyEndpoints
         [FromQuery] string? status,
         [FromQuery] string? provider,
         [FromQuery] string? search,
-        [FromServices] IEconomyService service,
+        [FromServices] IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
+        var invalidFilterProblem = ValidateSubscriptionFilters(status, provider);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
+        var service = serviceProvider.GetRequiredService<IEconomyService>();
         var result = await service.GetAdminSubscriptionsAsync(skip ?? 0, take ?? 50, status, provider, search, cancellationToken);
         if (result.IsFailure)
         {
@@ -228,9 +299,16 @@ public static class AdminEconomyEndpoints
         [FromQuery] int? take,
         [FromQuery] string? provider,
         [FromQuery] string? status,
-        [FromServices] IEconomyService service,
+        [FromServices] IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
+        var invalidFilterProblem = ValidateSubscriptionEventFilters(status, provider);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
+        var service = serviceProvider.GetRequiredService<IEconomyService>();
         var result = await service.GetAdminSubscriptionEventsAsync(skip ?? 0, take ?? 50, provider, status, cancellationToken);
         if (result.IsFailure)
         {
@@ -483,31 +561,137 @@ public static class AdminEconomyEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<OffsetPagedResponse<AdminRedeemCodeResponse>>> ListRedeemCodesAsync(
-        [FromQuery] int skip,
-        [FromQuery] int take,
+    private static async Task<Results<Ok<OffsetPagedResponse<AdminRedeemCodeResponse>>, ProblemHttpResult>> ListRedeemCodesAsync(
+        [FromQuery] int? skip,
+        [FromQuery] int? take,
         [FromQuery] string? search,
         [FromQuery] string? status,
         [FromQuery] string? rewardKind,
         [FromQuery] string? sort,
-        [FromServices] IEconomyService service,
+        [FromServices] IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
-        var query = new AdminRedeemCodeListQuery(skip, take, search, status, rewardKind, sort);
+        var invalidFilterProblem = ValidateRedeemCodeFilters(status, rewardKind, sort);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
+        var query = new AdminRedeemCodeListQuery(skip ?? 0, take ?? 50, search, status, rewardKind, sort);
+        var service = serviceProvider.GetRequiredService<IEconomyService>();
         var result = await service.ListAdminRedeemCodesAsync(query, cancellationToken);
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminRedeemCodeMetricsResponse>> GetRedeemCodeMetricsAsync(
+    private static async Task<Results<Ok<AdminRedeemCodeMetricsResponse>, ProblemHttpResult>> GetRedeemCodeMetricsAsync(
         [FromQuery] string? search,
         [FromQuery] string? status,
         [FromQuery] string? rewardKind,
-        [FromServices] IEconomyService service,
+        [FromServices] IServiceProvider serviceProvider,
         CancellationToken cancellationToken)
     {
+        var invalidFilterProblem = ValidateRedeemCodeFilters(status, rewardKind, null);
+        if (invalidFilterProblem is not null)
+        {
+            return invalidFilterProblem;
+        }
+
         var query = new AdminRedeemCodeListQuery(Search: search, Status: status, RewardKind: rewardKind);
+        var service = serviceProvider.GetRequiredService<IEconomyService>();
         var result = await service.GetAdminRedeemCodeMetricsAsync(query, cancellationToken);
         return TypedResults.Ok(result.Value);
+    }
+
+    private static ProblemHttpResult? ValidateRedeemCodeFilters(string? status, string? rewardKind, string? sort)
+    {
+        if (!IsAllowedOptionalFilter(status, RedeemCodeStatusFilters))
+        {
+            return TypedResults.Problem(
+                title: "economy.redeem_code_status_invalid",
+                detail: "Query parameter status must be all, draft, scheduled, active, paused, exhausted, expired, or archived.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!IsAllowedOptionalFilter(rewardKind, RedeemCodeRewardKindFilters))
+        {
+            return TypedResults.Problem(
+                title: "economy.redeem_code_reward_kind_invalid",
+                detail: "Query parameter rewardKind must be all or spark.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (!IsAllowedOptionalFilter(sort, RedeemCodeSortModes))
+        {
+            return TypedResults.Problem(
+                title: "economy.redeem_code_sort_invalid",
+                detail: "Query parameter sort must be updated, usage, reward, code, or expiry.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return null;
+    }
+
+    private static ProblemHttpResult? ValidatePurchaseFilters(string? status, string? provider)
+    {
+        if (!IsAllowedOptionalFilter(status, PurchaseStatusFilters))
+        {
+            return TypedResults.Problem(
+                title: "economy.purchase_status_invalid",
+                detail: "Query parameter status must be pending, succeeded, failed, or refunded.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return ValidatePaymentProviderFilter(provider);
+    }
+
+    private static ProblemHttpResult? ValidateSubscriptionFilters(string? status, string? provider)
+    {
+        if (!IsAllowedOptionalFilter(status, SubscriptionStatusFilters))
+        {
+            return TypedResults.Problem(
+                title: "economy.subscription_status_invalid",
+                detail: "Query parameter status is not supported for admin subscription filtering.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return ValidatePaymentProviderFilter(provider);
+    }
+
+    private static ProblemHttpResult? ValidateSubscriptionEventFilters(string? status, string? provider)
+    {
+        if (!IsAllowedOptionalFilter(status, SubscriptionEventStatusFilters))
+        {
+            return TypedResults.Problem(
+                title: "economy.subscription_event_status_invalid",
+                detail: "Query parameter status is not supported for admin subscription event filtering.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return ValidatePaymentProviderFilter(provider);
+    }
+
+    private static ProblemHttpResult? ValidatePaymentProviderFilter(string? provider)
+    {
+        if (IsAllowedOptionalFilter(provider, PaymentProviderFilters))
+        {
+            return null;
+        }
+
+        return TypedResults.Problem(
+            title: "economy.payment_provider_invalid",
+            detail: "Query parameter provider must be stripe, app_store, or google_play.",
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static bool IsAllowedOptionalFilter(string? rawValue, string[] allowedValues)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return true;
+        }
+
+        var normalized = rawValue.Trim().ToLowerInvariant();
+        return allowedValues.Contains(normalized, StringComparer.Ordinal);
     }
 
     private static async Task<Results<Ok<OffsetPagedResponse<AdminRedeemCodeRedemptionResponse>>, ProblemHttpResult>> ListRedeemCodeActivationsAsync(

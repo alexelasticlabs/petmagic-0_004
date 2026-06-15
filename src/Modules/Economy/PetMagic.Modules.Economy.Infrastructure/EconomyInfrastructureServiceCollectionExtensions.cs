@@ -13,6 +13,8 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 public static class EconomyInfrastructureServiceCollectionExtensions
 {
+    private static readonly TimeSpan ExternalHttpClientTimeout = TimeSpan.FromSeconds(30);
+
     public static IServiceCollection AddEconomyInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration,
@@ -124,9 +126,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
-        services.AddHttpClient(StripePaymentGateway.HttpClientName);
-        services.AddHttpClient(StoreSubscriptionVerifier.HttpClientName);
-        services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName);
+        services.AddHttpClient(StripePaymentGateway.HttpClientName, ConfigureExternalHttpClient);
+        services.AddHttpClient(StoreSubscriptionVerifier.HttpClientName, ConfigureExternalHttpClient);
+        services.AddHttpClient(FcmEconomyPushNotificationSender.HttpClientName, ConfigureExternalHttpClient);
         services.AddSingleton<IPaymentGateway>(serviceProvider =>
             new StripePaymentGateway(
                 economyOptions,
@@ -146,6 +148,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         return services;
     }
+
+    private static void ConfigureExternalHttpClient(HttpClient client) =>
+        client.Timeout = ExternalHttpClientTimeout;
 
     private static int ParseInt(string? raw, int fallback)
     {

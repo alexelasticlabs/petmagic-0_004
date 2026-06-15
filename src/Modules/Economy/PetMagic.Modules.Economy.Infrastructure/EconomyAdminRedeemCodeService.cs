@@ -182,8 +182,27 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
 
         codesQuery = ApplyRedeemCodeStatusFilter(codesQuery, normalizedStatus, now);
 
-        var totalCodes = await codesQuery.CountAsync(cancellationToken);
-        if (totalCodes == 0)
+        var codeStats = await codesQuery
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                TotalCodes = group.Count(),
+                ActiveCodes = group.Count(code =>
+                    code.IsActive &&
+                    code.RedeemedCount < code.MaxRedemptions &&
+                    (!code.ExpiresAtUtc.HasValue || code.ExpiresAtUtc.Value > now) &&
+                    (!code.StartsAtUtc.HasValue || code.StartsAtUtc.Value <= now)),
+                CreatedLast7d = group.Count(code => code.CreatedAtUtc >= sevenDaysAgo),
+                ActiveTouchedLast7d = group.Count(code =>
+                    code.IsActive &&
+                    code.RedeemedCount < code.MaxRedemptions &&
+                    (!code.ExpiresAtUtc.HasValue || code.ExpiresAtUtc.Value > now) &&
+                    (!code.StartsAtUtc.HasValue || code.StartsAtUtc.Value <= now) &&
+                    code.UpdatedAtUtc >= sevenDaysAgo)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (codeStats is null)
         {
             return Result.Success(new AdminRedeemCodeMetricsResponse(0, 0, 0, 0, 0, 0, 0, 0));
         }
@@ -206,13 +225,12 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(new AdminRedeemCodeMetricsResponse(
-            totalCodes,
-            await ApplyRedeemCodeStatusFilter(codesQuery, "active", now).CountAsync(cancellationToken),
+            codeStats.TotalCodes,
+            codeStats.ActiveCodes,
             redemptionStats?.TotalUses ?? 0,
             redemptionStats?.TotalGranted ?? 0,
-            await codesQuery.CountAsync(code => code.CreatedAtUtc >= sevenDaysAgo, cancellationToken),
-            await ApplyRedeemCodeStatusFilter(codesQuery, "active", now)
-                .CountAsync(code => code.UpdatedAtUtc >= sevenDaysAgo, cancellationToken),
+            codeStats.CreatedLast7d,
+            codeStats.ActiveTouchedLast7d,
             redemptionStats?.UsesLast7d ?? 0,
             redemptionStats?.GrantedLast7d ?? 0));
     }

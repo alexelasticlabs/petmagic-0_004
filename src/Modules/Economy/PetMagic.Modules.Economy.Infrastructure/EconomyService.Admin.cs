@@ -326,9 +326,7 @@ public sealed partial class EconomyService
     {
         var normalizedSkip = Math.Max(0, skip);
         var normalizedTake = NormalizeTake(take, 50, 200);
-        var normalizedStatus = string.IsNullOrWhiteSpace(status)
-            ? null
-            : status.Trim().ToLowerInvariant();
+        var normalizedStatus = NormalizeSubscriptionStatusFilter(status);
         var normalizedProvider = string.IsNullOrWhiteSpace(provider)
             ? null
             : provider.Trim().ToLowerInvariant();
@@ -408,6 +406,30 @@ public sealed partial class EconomyService
             .ToListAsync(cancellationToken);
 
         return Result.Success(ToPaged(items, normalizedSkip, normalizedTake));
+    }
+
+    private static string? NormalizeSubscriptionStatusFilter(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return null;
+        }
+
+        return status.Trim().ToLowerInvariant() switch
+        {
+            "active" => "Active",
+            "trialing" => "Trialing",
+            "graceperiod" or "grace_period" or "grace-period" => "GracePeriod",
+            "pastdue" or "past_due" or "past-due" => "PastDue",
+            "canceled" or "cancelled" => "Canceled",
+            "expired" => "Expired",
+            "refunded" => "Refunded",
+            "revoked" => "Revoked",
+            "pending" => "Pending",
+            "processed" => "Processed",
+            "failed" => "Failed",
+            var normalized => normalized,
+        };
     }
 
     private static string? NormalizeRefundReason(string? reason)
@@ -583,9 +605,7 @@ public sealed partial class EconomyService
         var normalizedProvider = string.IsNullOrWhiteSpace(provider)
             ? null
             : provider.Trim().ToLowerInvariant();
-        var normalizedStatus = string.IsNullOrWhiteSpace(status)
-            ? null
-            : status.Trim().ToLowerInvariant();
+        var normalizedStatus = NormalizeSubscriptionStatusFilter(status);
 
         var query = dbContext.SubscriptionEventLogs
             .AsNoTracking()
