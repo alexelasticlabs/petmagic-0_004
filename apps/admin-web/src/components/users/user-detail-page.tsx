@@ -139,9 +139,21 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
     mutationFn: ({ petId, status }: { petId: string; status: "active" | "hidden" }) =>
       changeAdminUserPetStatus(userId, petId, status),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin", "users", userId, "pets"] });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ["admin", "users", userId, "pets"] }),
+      ]);
     },
   });
+  function requestPetStatusChange(pet: AdminUserPet) {
+    if (!canViewUserProfile || petStatusMutation.isPending) {
+      return;
+    }
+
+    petStatusMutation.mutate({
+      petId: pet.id,
+      status: pet.status === "active" ? "hidden" : "active",
+    });
+  }
 
   useEffect(() => {
     ensureAdminSession(locale, router, { requiredRole: "Admin" });
@@ -367,12 +379,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                       variant="secondary"
                       size="sm"
                       disabled={!canViewUserProfile || petStatusMutation.isPending}
-                      onClick={() =>
-                        petStatusMutation.mutate({
-                          petId: pet.id,
-                          status: pet.status === "active" ? "hidden" : "active",
-                        })
-                      }
+                      onClick={() => requestPetStatusChange(pet)}
                     >
                       {pet.status === "active" ? petText.hide : petText.restore}
                     </Button>
@@ -585,11 +592,23 @@ function AdminPetDetails({
       status: "active" | "hidden";
     }) => changeAdminUserPetPhotoStatus(userId, pet.id, photoId, status),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["admin", "users", userId, "pets", pet.id, "photos"],
-      });
+      await Promise.allSettled([
+        queryClient.invalidateQueries({
+          queryKey: ["admin", "users", userId, "pets", pet.id, "photos"],
+        }),
+      ]);
     },
   });
+  function requestPhotoStatusChange(photo: AdminUserPetPhoto) {
+    if (!canManagePets || photoStatusMutation.isPending) {
+      return;
+    }
+
+    photoStatusMutation.mutate({
+      photoId: photo.id,
+      status: photo.status === "active" ? "hidden" : "active",
+    });
+  }
 
   const photos = photosQuery.data ?? [];
   const generations = generationsQuery.data ?? [];
@@ -638,12 +657,7 @@ function AdminPetDetails({
                 variant="secondary"
                 size="sm"
                 disabled={!canManagePets || photoStatusMutation.isPending}
-                onClick={() =>
-                  photoStatusMutation.mutate({
-                    photoId: photo.id,
-                    status: photo.status === "active" ? "hidden" : "active",
-                  })
-                }
+                onClick={() => requestPhotoStatusChange(photo)}
               >
                 {photo.status === "active" ? text.hidePhoto : text.restorePhoto}
               </Button>

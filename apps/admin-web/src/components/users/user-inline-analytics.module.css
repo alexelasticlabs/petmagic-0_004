@@ -125,3 +125,25 @@
   }
 }
 
+@media (max-width: 640px) {
+  .header,
+  .identity {
+    min-width: 0;
+  }
+
+  .identity h3,
+  .identity p {
+    overflow-wrap: anywhere;
+  }
+
+  .profileLink {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .timelineHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+

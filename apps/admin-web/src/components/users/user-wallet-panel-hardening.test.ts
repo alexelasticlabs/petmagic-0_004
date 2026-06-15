@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const walletPanelPath = fileURLToPath(new URL("./user-wallet-panel.tsx", import.meta.url));
+const walletPanelStylesPath = fileURLToPath(
+  new URL("./user-wallet-panel.module.css", import.meta.url)
+);
 const detailPagePath = fileURLToPath(new URL("./user-detail-page.tsx", import.meta.url));
 const inlineAnalyticsPath = fileURLToPath(new URL("./user-inline-analytics.tsx", import.meta.url));
 
@@ -52,5 +55,15 @@ describe("user wallet panel hardening", () => {
 
     expect(detailSource).toContain("canAdjustWallet={canViewUserProfile}");
     expect(inlineSource).toContain("canAdjustWallet={canViewUserProfile}");
+  });
+
+  it("keeps wallet controls and ledger cards usable on phone screens", () => {
+    const stylesSource = readFileSync(walletPanelStylesPath, "utf8");
+
+    expect(stylesSource).toContain("@media (max-width: 560px)");
+    expect(stylesSource).toContain(".kpiGrid {\n    grid-template-columns: minmax(0, 1fr);");
+    expect(stylesSource).toContain(".actions > * {\n    width: 100%;");
+    expect(stylesSource).toContain(".cardHeader,\n  .meta");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
   });
 });

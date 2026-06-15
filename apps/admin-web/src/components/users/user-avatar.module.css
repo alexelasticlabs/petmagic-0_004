@@ -6,13 +6,11 @@
   overflow: hidden;
   border-radius: 999px;
   border: 1px solid var(--border-soft);
-  background:
-    radial-gradient(
-      circle at 30% 25%,
-      color-mix(in srgb, var(--accent) 18%, transparent),
-      transparent 55%
-    ),
-    linear-gradient(145deg, var(--surface-2), var(--surface-raised));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-2) 88%, var(--accent) 12%),
+    var(--surface-raised)
+  );
   box-shadow: var(--shadow-card);
   color: var(--text-strong);
   font-weight: 600;

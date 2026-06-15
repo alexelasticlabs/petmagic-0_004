@@ -13,6 +13,19 @@ describe("admin user profile retry states", () => {
     expect(source).toContain("isFetching: userQuery.isFetching || analyticsQuery.isFetching");
   });
 
+  it("refreshes user detail and analytics independently before surfacing failures", () => {
+    const source = readFileSync(profileHookPath, "utf8");
+
+    expect(source).toContain("await Promise.allSettled([");
+    expect(source).toContain("userQuery.refetch()");
+    expect(source).toContain("analyticsQuery.refetch()");
+    expect(source).toContain('if (userResult.status === "rejected")');
+    expect(source).toContain('if (analyticsResult.status === "rejected")');
+    expect(source).toContain("if (userResult.value.isError)");
+    expect(source).toContain("if (analyticsResult.value.isError)");
+    expect(source).not.toContain("await Promise.all([\n      userQuery.refetch()");
+  });
+
   it("keeps user detail error state retryable and disabled while refetching", () => {
     const source = readFileSync(detailPagePath, "utf8");
 

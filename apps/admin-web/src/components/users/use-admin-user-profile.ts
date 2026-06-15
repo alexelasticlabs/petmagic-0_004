@@ -42,17 +42,25 @@ export function useAdminUserProfile({ enabled = true, userId }: UseAdminUserProf
       return;
     }
 
-    const [userResult, analyticsResult] = await Promise.all([
+    const [userResult, analyticsResult] = await Promise.allSettled([
       userQuery.refetch(),
       analyticsQuery.refetch(),
     ]);
 
-    if (userResult.isError) {
-      throw userResult.error;
+    if (userResult.status === "rejected") {
+      throw userResult.reason;
     }
 
-    if (analyticsResult.isError) {
-      throw analyticsResult.error;
+    if (analyticsResult.status === "rejected") {
+      throw analyticsResult.reason;
+    }
+
+    if (userResult.value.isError) {
+      throw userResult.value.error;
+    }
+
+    if (analyticsResult.value.isError) {
+      throw analyticsResult.value.error;
     }
   }
 

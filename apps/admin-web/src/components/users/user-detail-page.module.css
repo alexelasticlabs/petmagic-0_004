@@ -191,3 +191,41 @@
     padding-right: 0;
   }
 }
+
+@media (max-width: 640px) {
+  .backLink,
+  .errorActions > * {
+    width: 100%;
+  }
+
+  .errorActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .profileHeader,
+  .profileCopy,
+  .profileMeta {
+    min-width: 0;
+  }
+
+  .profileTitle,
+  .profileEmail {
+    overflow-wrap: anywhere;
+  }
+
+  .timelineHeader,
+  .dataHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timelineHeader span,
+  .dataHeader span {
+    text-align: left;
+  }
+
+  .petMediaGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

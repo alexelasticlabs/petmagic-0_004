@@ -62,6 +62,8 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
 
   const isLoading = usersQuery.isLoading;
   const isFetching = usersQuery.isFetching;
+  const isRefreshing = usersQuery.isFetching && usersQuery.isPlaceholderData;
+  const visibleUsersPage = usersQuery.isPlaceholderData ? undefined : usersQuery.data;
   const error = actionError ?? (usersQuery.isError ? text.errorLoadingUsers : null);
 
   async function refreshUsers() {
@@ -76,6 +78,25 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
     }
 
     return refreshedUsers;
+  }
+
+  async function refreshUsersAfterAction(userId: string) {
+    try {
+      const refreshedUsers = await usersQuery.refetch();
+      if (refreshedUsers.isError) {
+        clientLogger.warn("users.action_refresh_failed", {
+          userId,
+          error: refreshedUsers.error,
+        });
+      }
+
+      return refreshedUsers;
+    } catch (error) {
+      clientLogger.warn("users.action_refresh_failed", {
+        userId,
+        error,
+      });
+    }
   }
 
   async function runAction(
@@ -93,9 +114,9 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
 
     try {
       await action();
-      await refreshUsers();
+      await Promise.allSettled([refreshUsersAfterAction(userId)]);
 
-      await Promise.all([
+      await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(userId) }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics }),
@@ -133,12 +154,13 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
     error,
     hasSession: canManageRoles,
     isFetching,
+    isRefreshing,
     isLoading,
     refreshUsers,
     runAction,
     toast,
-    users: usersQuery.data?.items ?? [],
-    usersPage: usersQuery.data ?? {
+    users: visibleUsersPage?.items ?? [],
+    usersPage: visibleUsersPage ?? {
       items: [],
       skip: usersQueryParams.skip ?? 0,
       take: usersQueryParams.take ?? 100,

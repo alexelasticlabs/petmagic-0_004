@@ -71,7 +71,7 @@
 .textarea {
   width: 100%;
   border: 1px solid var(--border-soft);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text-strong);
   padding: 0.8rem 0.95rem;
@@ -158,5 +158,21 @@
 @media (max-width: 760px) {
   .kpiGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .kpiGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .actions > * {
+    width: 100%;
+  }
+
+  .cardHeader,
+  .meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

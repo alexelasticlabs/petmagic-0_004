@@ -22,10 +22,12 @@ describe("user avatar URL exposure", () => {
     expect(source).toContain("border: 1px solid var(--border-soft)");
     expect(source).toContain("var(--surface-2)");
     expect(source).toContain("var(--surface-raised)");
+    expect(source).toContain("color-mix(in srgb, var(--surface-2) 88%, var(--accent) 12%)");
     expect(source).toContain("box-shadow: var(--shadow-card)");
     expect(source).toContain("color: var(--text-strong)");
     expect(source).toContain("letter-spacing: 0");
     expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(source).not.toContain("rgba(");
+    expect(source).not.toContain("radial-gradient");
   });
 });
