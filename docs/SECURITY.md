@@ -16,6 +16,8 @@ Never commit real values for:
 
 `.env` is ignored by Git. `.env.example` must contain placeholders only. Production deployments should inject values at runtime through the deployment platform or secret manager.
 
+Do not publish server-only secret names through browser-facing configuration. `NEXT_PUBLIC_*` values are bundled into the admin web client; production startup rejects `NEXT_PUBLIC_STRIPE_SECRET_KEY`, `NEXT_PUBLIC_FAL_AI_API_KEY`, `NEXT_PUBLIC_R2_SECRET_KEY`, JWT/bootstrap/admin secrets, OAuth client secrets, store private keys, Firebase service account payloads, and other server-only secret suffixes. Keep public client configuration limited to safe values such as API base URLs.
+
 If a real credential is committed or logged:
 
 1. Revoke or rotate the credential immediately.
@@ -41,6 +43,7 @@ Production must fail fast when unsafe defaults are present:
 - configured `Cors:AllowedOrigins`;
 - no `BootstrapAdmin:Password`;
 - production Stripe, App Store, Google Play, and provider secrets;
+- no server-only secret names exposed through `NEXT_PUBLIC_*`;
 - production-safe template storage, AI provider, and billing provider;
 - backend with `Templates__GenerationWorkerEnabled=false`;
 - generation worker with `Templates__GenerationWorkerEnabled=true`.

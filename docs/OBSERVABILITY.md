@@ -45,3 +45,7 @@ The backend CI validates these rules with `promtool check rules`.
 ## Correlation IDs
 
 The API accepts inbound `X-Correlation-ID`, stores it on `HttpContext`, includes it in structured Serilog request logs, and propagates it on outbound `HttpClient` calls through `CorrelationIdDelegatingHandler`. Generation jobs persist the current correlation id so worker logs and lifecycle events can be tied back to the originating API request.
+
+## External Providers
+
+Provider calls must use named or typed `HttpClient` registrations with explicit timeouts. Stripe, App Store/Google Play verification, FCM push, FAL queue, generated media import, and localization calls are bounded so unstable networks fail predictably instead of pinning API requests or workers indefinitely.
