@@ -13,6 +13,35 @@ public sealed class RepositorySecretHygieneTests
         @"\b\d{6,}-[a-z0-9]+\.apps\.googleusercontent\.com\b",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
+    private static readonly Regex ReverseGoogleOauthClientIdPattern = new(
+        @"\bcom\.googleusercontent\.apps\.\d{6,}-[a-z0-9]+\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static readonly Regex ServerSecretValuePattern = new(
+        @"\b(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{8,}\b|\bwhsec_[0-9A-Za-z]{8,}\b|-----BEGIN (?:RSA |EC |)PRIVATE KEY-----",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly string[] ServerOnlyConfigurationKeys =
+    [
+        "STRIPE_SECRET_KEY",
+        "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_TEST_SECRET_KEY",
+        "STRIPE_LIVE_SECRET_KEY",
+        "STRIPE_TEST_WEBHOOK_SECRET",
+        "STRIPE_LIVE_WEBHOOK_SECRET",
+        "FAL_AI_API_KEY",
+        "R2_SECRET_KEY",
+        "R2_ACCESS_KEY_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "APPLE_CLIENT_SECRET",
+        "JWT_SIGNING_KEY",
+        "BOOTSTRAP_ADMIN_PASSWORD",
+        "GOOGLE_PLAY_PRIVATE_KEY_PEM",
+        "APP_STORE_SHARED_SECRET",
+        "FIREBASE_SERVICE_ACCOUNT_JSON",
+        "FIREBASE_SERVICE_ACCOUNT_JSON_PATH"
+    ];
+
     [Fact]
     public void Repository_ShouldNotTrackDatabaseBackups()
     {
@@ -71,6 +100,7 @@ public sealed class RepositorySecretHygieneTests
 
             Assert.DoesNotMatch(FirebaseApiKeyPattern, content);
             Assert.DoesNotMatch(GoogleOauthClientIdPattern, content);
+            Assert.DoesNotMatch(ReverseGoogleOauthClientIdPattern, content);
             Assert.DoesNotContain("petmagic-f036b", content, StringComparison.OrdinalIgnoreCase);
         }
     }
@@ -108,6 +138,32 @@ public sealed class RepositorySecretHygieneTests
                 Assert.DoesNotContain($"{forbiddenKey}=", content, StringComparison.Ordinal);
                 Assert.DoesNotContain($"NEXT_PUBLIC_{forbiddenKey}=", content, StringComparison.Ordinal);
             }
+        }
+    }
+
+    [Fact]
+    public void ClientSourceAndConfig_ShouldNotContainServerOnlySecrets()
+    {
+        var repositoryRoot = FindRepositoryRoot();
+        var clientFiles = EnumerateClientSourceAndConfigFiles(repositoryRoot).ToArray();
+
+        Assert.NotEmpty(clientFiles);
+
+        foreach (var clientFile in clientFiles)
+        {
+            var content = File.ReadAllText(clientFile);
+
+            foreach (var forbiddenKey in ServerOnlyConfigurationKeys)
+            {
+                Assert.DoesNotContain(forbiddenKey, content, StringComparison.Ordinal);
+                Assert.DoesNotContain($"NEXT_PUBLIC_{forbiddenKey}", content, StringComparison.Ordinal);
+            }
+
+            Assert.DoesNotMatch(ServerSecretValuePattern, content);
+            Assert.DoesNotMatch(FirebaseApiKeyPattern, content);
+            Assert.DoesNotMatch(GoogleOauthClientIdPattern, content);
+            Assert.DoesNotMatch(ReverseGoogleOauthClientIdPattern, content);
+            Assert.DoesNotContain("petmagic-f036b", content, StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -178,6 +234,85 @@ public sealed class RepositorySecretHygieneTests
         }
 
         throw new InvalidOperationException("Could not locate repository root.");
+    }
+
+    private static IEnumerable<string> EnumerateClientSourceAndConfigFiles(string repositoryRoot)
+    {
+        var adminRoot = Path.Combine(repositoryRoot, "apps", "admin-web");
+        foreach (var file in EnumerateFiles(Path.Combine(adminRoot, "src"), ["*.ts", "*.tsx", "*.js", "*.jsx"]))
+        {
+            if (IsClientTestFile(file))
+            {
+                continue;
+            }
+
+            yield return file;
+        }
+
+        foreach (var file in Directory.GetFiles(adminRoot, ".env*.example", SearchOption.TopDirectoryOnly))
+        {
+            yield return file;
+        }
+
+        foreach (var file in new[]
+                 {
+                     Path.Combine(adminRoot, "Dockerfile"),
+                     Path.Combine(adminRoot, "next.config.ts")
+                 })
+        {
+            if (File.Exists(file))
+            {
+                yield return file;
+            }
+        }
+
+        var mobileRoot = Path.Combine(repositoryRoot, "apps", "petmagic-mobile");
+        foreach (var file in EnumerateFiles(Path.Combine(mobileRoot, "lib"), ["*.dart"]))
+        {
+            if (IsClientTestFile(file))
+            {
+                continue;
+            }
+
+            yield return file;
+        }
+
+        foreach (var file in new[]
+                 {
+                     Path.Combine(mobileRoot, "android", "app", "google-services.json"),
+                     Path.Combine(mobileRoot, "ios", "Runner", "GoogleService-Info.plist"),
+                     Path.Combine(mobileRoot, "ios", "Runner", "Info.plist")
+                 })
+        {
+            if (File.Exists(file))
+            {
+                yield return file;
+            }
+        }
+    }
+
+    private static bool IsClientTestFile(string file)
+    {
+        var fileName = Path.GetFileName(file);
+        return fileName.Contains(".test.", StringComparison.OrdinalIgnoreCase)
+            || fileName.Contains(".spec.", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith("_test.dart", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> EnumerateFiles(string directory, IReadOnlyCollection<string> patterns)
+    {
+        if (!Directory.Exists(directory))
+        {
+            yield break;
+        }
+
+        foreach (var pattern in patterns)
+        {
+            foreach (var file in Directory.GetFiles(directory, pattern, SearchOption.AllDirectories))
+            {
+                yield return file;
+            }
+        }
     }
 
     private static void AssertHostUsesDotnetEnvironmentForDotEnv(string programPath)

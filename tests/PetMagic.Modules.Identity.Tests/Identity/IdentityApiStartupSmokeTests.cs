@@ -35,7 +35,7 @@ public sealed class IdentityApiStartupSmokeTests
     [InlineData("POST", "/api/auth/password-reset/request", "auth-password-reset")]
     [InlineData("POST", "/api/auth/me/password-change/request", "auth-password-reset")]
     [InlineData("GET", "/api/auth/me", "auth")]
-    [InlineData("GET", "/api/admin/users/", "admin")]
+    [InlineData("GET", "/api/admin/users", "admin")]
     public async Task IdentityEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
         string routePattern,
@@ -138,18 +138,32 @@ public sealed class IdentityApiStartupSmokeTests
 
         public string? GetRateLimitPolicy(string method, string routePattern)
         {
+            var normalizedRoutePattern = NormalizeRoutePattern(routePattern);
             var endpoint = app.Services
                 .GetRequiredService<EndpointDataSource>()
                 .Endpoints
                 .OfType<RouteEndpoint>()
                 .Single(endpoint =>
-                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    string.Equals(
+                        NormalizeRoutePattern(endpoint.RoutePattern.RawText),
+                        normalizedRoutePattern,
+                        StringComparison.Ordinal)
                     && endpoint.Metadata
                         .GetRequiredMetadata<IHttpMethodMetadata>()
                         .HttpMethods
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
 
             return endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
+        }
+
+        private static string NormalizeRoutePattern(string? routePattern)
+        {
+            if (string.IsNullOrWhiteSpace(routePattern) || routePattern == "/")
+            {
+                return routePattern ?? string.Empty;
+            }
+
+            return routePattern.TrimEnd('/');
         }
 
         public string[] GetApiRoutesWithoutRateLimit()

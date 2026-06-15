@@ -144,6 +144,33 @@ public sealed class TemplatesInfrastructureConfigurationTests
     }
 
     [Fact]
+    public void AddTemplatesInfrastructure_ShouldConfigureExternalHttpClientTimeouts()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.example.test",
+            ["Templates:Fal:ApiKey"] = "test-fal-key",
+            ["Templates:Fal:StartTimeoutSeconds"] = "120"
+        });
+
+        services.AddTemplatesInfrastructure(configuration);
+
+        using var provider = services.BuildServiceProvider();
+        var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
+
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(150), httpClientFactory.CreateClient(FalQueueClient.HttpClientName).Timeout);
+        Assert.Equal(TimeSpan.FromSeconds(30), httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName).Timeout);
+    }
+
+    [Fact]
     public void AddTemplatesInfrastructure_ShouldNotRegisterGenerationWorker_WhenDisabled()
     {
         var services = CreateServices();
