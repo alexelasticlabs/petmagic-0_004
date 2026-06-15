@@ -254,6 +254,72 @@ public sealed partial class TemplatesServiceTests
         Assert.NotNull(details.Value.Refund);
     }
 
+    [Theory]
+    [InlineData("status", "not_open")]
+    [InlineData("priority", "urgent")]
+    [InlineData("type", "Other")]
+    public async Task ListAdminAsync_ShouldRejectInvalidAdminFiltersWithoutFallback(string filterName, string filterValue)
+    {
+        await using var dbContext = CreateDbContext();
+        var feedbackService = CreateFeedbackService(dbContext);
+
+        var query = filterName switch
+        {
+            "status" => new AdminFeedbackQuery(filterValue, null, null, null, null, null, null, null, null, null, null, null),
+            "priority" => new AdminFeedbackQuery(null, filterValue, null, null, null, null, null, null, null, null, null, null),
+            _ => new AdminFeedbackQuery(null, null, filterValue, null, null, null, null, null, null, null, null, null)
+        };
+
+        var result = await feedbackService.ListAdminAsync(query, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal($"feedback.invalid_{filterName}", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task UpdateAdminAsync_ShouldRejectInvalidStatusAndPriorityWithoutFallback()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var feedbackService = CreateFeedbackService(dbContext);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+
+        Assert.True(submitted.IsSuccess);
+
+        var invalidStatus = await feedbackService.UpdateAdminAsync(
+            new UpdateFeedbackAdminCommand(submitted.Value.FeedbackId, Guid.NewGuid(), "not_open", null, null),
+            CancellationToken.None);
+        var invalidPriority = await feedbackService.UpdateAdminAsync(
+            new UpdateFeedbackAdminCommand(submitted.Value.FeedbackId, Guid.NewGuid(), null, "urgent", null),
+            CancellationToken.None);
+
+        Assert.True(invalidStatus.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedbackStatus.Code, invalidStatus.Error.Code);
+        Assert.True(invalidPriority.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedbackPriority.Code, invalidPriority.Error.Code);
+
+        var persisted = await dbContext.TemplateGenerationFeedback.SingleAsync();
+        Assert.Equal("New", persisted.Status);
+        Assert.Equal("Medium", persisted.Priority);
+    }
+
     private static FeedbackService CreateFeedbackService(TemplatesDbContext dbContext)
     {
         return CreateFeedbackService(dbContext, out _);

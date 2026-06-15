@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -459,7 +460,75 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(expectedRequirements, publicDetail.Value.PetPhotoRequirements);
         var feedItem = Assert.Single(publicFeed.Value.Items);
         Assert.Equal(created.Value.TemplateId, feedItem.TemplateId);
-        Assert.Equal(expectedRequirements, feedItem.PetPhotoRequirements);
+        Assert.Equal("Clean Portrait", feedItem.Title);
+    }
+
+    [Fact]
+    public async Task PublicTemplateResponses_ShouldExposeGenerationInputCapabilitiesConsistently()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Capability Portrait",
+                "Template with generation-result input capabilities",
+                "Capability",
+                ["capability"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/capability-portrait.jpg", "capability-portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString(),
+                ["Clear pet face"],
+                true,
+                TemplateType.Video.ToString(),
+                true,
+                false,
+                "high"),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var detail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
+        var legacyList = await service.ListPublicAsync(null, "Capability", ["capability"], null, null, CancellationToken.None);
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Capability", ["capability"], null, null, 10, null, null),
+            CancellationToken.None);
+        var random = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(null, "Capability", true, null),
+            CancellationToken.None);
+
+        Assert.True(detail.IsSuccess);
+        Assert.True(legacyList.IsSuccess);
+        Assert.True(feed.IsSuccess);
+        Assert.True(random.IsSuccess);
+
+        AssertDetailCapabilities(detail.Value);
+        AssertListCapabilities(Assert.Single(legacyList.Value));
+        Assert.Equal(created.Value.TemplateId, Assert.Single(feed.Value.Items).TemplateId);
+        Assert.NotNull(random.Value.Template);
+        AssertListCapabilities(random.Value.Template!);
+
+        static void AssertDetailCapabilities(PublicTemplateResponse item)
+        {
+            Assert.True(item.SupportsGenerationResultInput);
+            Assert.Equal(TemplateType.Video.ToString(), item.RequiredInputMediaType);
+            Assert.True(item.RecommendedAfterImageGeneration);
+            Assert.False(item.SupportsGenerateSimilar);
+            Assert.Equal("high", item.DefaultVariationStrength);
+        }
+
+        static void AssertListCapabilities(PublicTemplateListItemResponse item)
+        {
+            Assert.True(item.SupportsGenerationResultInput);
+            Assert.Equal(TemplateType.Video.ToString(), item.RequiredInputMediaType);
+            Assert.True(item.RecommendedAfterImageGeneration);
+            Assert.False(item.SupportsGenerateSimilar);
+            Assert.Equal("high", item.DefaultVariationStrength);
+        }
     }
 
     [Fact]
@@ -531,6 +600,379 @@ public sealed partial class TemplatesServiceTests
         Assert.Null(secondPage.Value.NextCursor);
         var item = Assert.Single(secondPage.Value.Items);
         Assert.Equal(oldestId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldSearchAcrossTitleDescriptionCategoryTagsAndRequirements()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var titleMatchId = await CreateActiveImageTemplateAsync(
+            service,
+            "Aurora Title Signal",
+            "Portrait",
+            ["gallery"]);
+        var categoryMatchId = await CreateActiveImageTemplateAsync(
+            service,
+            "Category Search Candidate",
+            "CategorySignal",
+            ["gallery"]);
+        var tagMatchId = await CreateActiveImageTemplateAsync(
+            service,
+            "Tag Search Candidate",
+            "Portrait",
+            ["tag-signal"]);
+        await CreateActiveImageTemplateAsync(
+            service,
+            "Unrelated Candidate",
+            "Portrait",
+            ["gallery"]);
+
+        var descriptionMatch = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Description Search Candidate",
+                "Contains midnight-description-token only here.",
+                "Portrait",
+                ["gallery"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/description-search.jpg", "description-search.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+        var requirementsMatch = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Requirements Search Candidate",
+                "Neutral description",
+                "Portrait",
+                ["gallery"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/requirements-search.jpg", "requirements-search.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString(),
+                ["Side profile with left ear visible"]),
+            CancellationToken.None);
+
+        Assert.True(descriptionMatch.IsSuccess);
+        Assert.True(requirementsMatch.IsSuccess);
+
+        async Task<Guid> SingleSearchResultAsync(string search)
+        {
+            var feed = await service.ListPublicFeedAsync(
+                new PublicTemplatesFeedQuery(null, null, [], null, search, 10, null, null),
+                CancellationToken.None);
+
+            Assert.True(feed.IsSuccess);
+            var item = Assert.Single(feed.Value.Items);
+            return item.TemplateId;
+        }
+
+        Assert.Equal(titleMatchId, await SingleSearchResultAsync("aurora title"));
+        Assert.Equal(descriptionMatch.Value.TemplateId, await SingleSearchResultAsync("midnight-description-token"));
+        Assert.Equal(categoryMatchId, await SingleSearchResultAsync("categorysignal"));
+        Assert.Equal(tagMatchId, await SingleSearchResultAsync("tag-signal"));
+        Assert.Equal(requirementsMatch.Value.TemplateId, await SingleSearchResultAsync("left ear visible"));
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSameTimestampUsingVersionCursor()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var updatedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+
+        var oldestVersionId = await CreateActiveImageTemplateAsync(service, "Same Time One", "Portrait", ["stable"]);
+        var middleVersionId = await CreateActiveImageTemplateAsync(service, "Same Time Two", "Portrait", ["stable"]);
+        var newestVersionId = await CreateActiveImageTemplateAsync(service, "Same Time Three", "Portrait", ["stable"]);
+
+        await SetUpdatedAtUtcAsync(dbContext, oldestVersionId, updatedAtUtc);
+        await SetUpdatedAtUtcAsync(dbContext, middleVersionId, updatedAtUtc);
+        await SetUpdatedAtUtcAsync(dbContext, newestVersionId, updatedAtUtc);
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["stable"], null, "same time", 2, null, null),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.NotNull(firstPage.Value.NextCursor);
+        Assert.Equal(3, firstPage.Value.NextCursor.Split(':').Length);
+        Assert.Equal([newestVersionId, middleVersionId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["stable"], null, "same time", 2, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Null(secondPage.Value.NextCursor);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(oldestVersionId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldPageTemplatesWithSameTimestampAndVersionUsingIdCursor()
+    {
+        await using var dbContext = CreateDbContext();
+        var updatedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        var version = 42L;
+        var highestId = Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff");
+        var middleId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var lowestId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        dbContext.TemplateItems.AddRange(
+            CreatePublicFeedTemplate(highestId, "Same Cursor Three", updatedAtUtc, version),
+            CreatePublicFeedTemplate(middleId, "Same Cursor Two", updatedAtUtc, version),
+            CreatePublicFeedTemplate(lowestId, "Same Cursor One", updatedAtUtc, version));
+        await dbContext.SaveChangesAsync(CancellationToken.None);
+
+        var service = CreateService(dbContext);
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cursor"], null, "same cursor", 2, null, null),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.NotNull(firstPage.Value.NextCursor);
+        Assert.Equal([highestId, middleId], [.. firstPage.Value.Items.Select(item => item.TemplateId)]);
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Portrait", ["cursor"], null, "same cursor", 2, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.False(secondPage.Value.HasMore);
+        Assert.Null(secondPage.Value.NextCursor);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(lowestId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldBoundPublicSearchAndCategoryFilters()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var title = new string('A', 120);
+        var category = new string('C', 64);
+
+        var templateId = await CreateActiveImageTemplateAsync(service, title, category, ["bounded"]);
+
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(
+                null,
+                category + new string('x', 200),
+                ["bounded"],
+                null,
+                title + new string('z', 200),
+                10,
+                null,
+                null),
+            CancellationToken.None);
+
+        Assert.True(feed.IsSuccess);
+        var item = Assert.Single(feed.Value.Items);
+        Assert.Equal(templateId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicCatalogQueries_ShouldNotBroadenWhenTagFiltersAreOutOfBounds()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        await CreateActiveImageTemplateAsync(service, "Bounded Portrait", "Portrait", ["cozy"]);
+
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, null, [new string('x', 33)], null, null, 10, null, null),
+            CancellationToken.None);
+        var legacyList = await service.ListPublicAsync(
+            null,
+            null,
+            [new string('x', 33)],
+            null,
+            null,
+            CancellationToken.None);
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 10, null, null, null, [.. Enumerable.Range(0, 13).Select(index => $"tag{index}")]),
+            CancellationToken.None);
+
+        Assert.True(feed.IsSuccess);
+        Assert.True(legacyList.IsSuccess);
+        Assert.True(catalog.IsSuccess);
+        Assert.Empty(feed.Value.Items);
+        Assert.Empty(legacyList.Value);
+        Assert.Empty(catalog.Value.Items);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldStayBoundedAndStableWithMoreThanThousandTemplates()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+        var templates = new List<TemplateItem>(capacity: 1005);
+
+        for (var index = 0; index < 1005; index++)
+        {
+            var templateId = Guid.CreateVersion7();
+            var updatedAtUtc = utcNow.AddSeconds(-index);
+            templates.Add(new TemplateItem
+            {
+                Id = templateId,
+                Version = index + 1,
+                TemplateType = index % 5 == 0 ? TemplateType.Video : TemplateType.Image,
+                Title = $"Scale Portrait {index:D4}",
+                ShortDescription = $"Scale test template {index:D4}",
+                Category = index % 2 == 0 ? "Scale" : "Other",
+                Tags = index % 3 == 0 ? "scale,pet" : "pet",
+                IsPremium = false,
+                TokenCost = 20,
+                Status = TemplateStatus.Active,
+                PromoBadgeMode = TemplatePromoBadgeMode.Auto,
+                MusicDescription = index % 5 == 0 ? "Loop" : null,
+                ReferenceVideoDurationSeconds = index % 5 == 0 ? 5 : null,
+                ImageModel = "openai/gpt-image-2/edit",
+                ImagePrompt = "Keep the same pet.",
+                CreatedAtUtc = updatedAtUtc.AddMinutes(-1),
+                UpdatedAtUtc = updatedAtUtc,
+                Assets =
+                [
+                    new TemplateAsset
+                    {
+                        Id = Guid.CreateVersion7(),
+                        TemplateId = templateId,
+                        AssetKind = TemplateAssetKind.Preview,
+                        Url = index % 5 == 0
+                            ? $"https://cdn.example.com/scale-{index:D4}.mp4"
+                            : $"https://cdn.example.com/scale-{index:D4}.jpg",
+                        FileName = index % 5 == 0
+                            ? $"scale-{index:D4}.mp4"
+                            : $"scale-{index:D4}.jpg",
+                        ContentType = index % 5 == 0 ? "video/mp4" : "image/jpeg",
+                        FileSizeBytes = index % 5 == 0 ? 524_288 : 48_000,
+                        DurationSeconds = index % 5 == 0 ? 5 : null
+                    }
+                ]
+            });
+        }
+
+        dbContext.TemplateItems.AddRange(templates);
+        await dbContext.SaveChangesAsync(CancellationToken.None);
+
+        var firstPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Scale", [], null, "scale portrait", 1000, null, null),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.Equal(50, firstPage.Value.Items.Count);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.NotNull(firstPage.Value.NextCursor);
+        Assert.Equal(
+            [.. firstPage.Value.Items.Select(item => item.TemplateId)],
+            [.. firstPage.Value.Items.Select(item => item.TemplateId).Distinct()]);
+        Assert.All(firstPage.Value.Items, item =>
+        {
+            Assert.Equal("Scale", item.Category);
+            Assert.Contains("Scale Portrait", item.Title);
+            if (item.TemplateType == TemplateType.Video.ToString())
+            {
+                Assert.Null(item.ThumbnailUrl);
+            }
+            else
+            {
+                Assert.Equal(item.PreviewAsset?.Url, item.ThumbnailUrl);
+            }
+        });
+
+        var secondPage = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Scale", [], null, "scale portrait", 50, firstPage.Value.NextCursor, null),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.Equal(50, secondPage.Value.Items.Count);
+        Assert.DoesNotContain(
+            secondPage.Value.Items,
+            item => firstPage.Value.Items.Any(first => first.TemplateId == item.TemplateId));
+        Assert.True(
+            firstPage.Value.Items.Last().Title.CompareTo(secondPage.Value.Items.First().Title) < 0,
+            "Second cursor page should continue after the first page in updatedAt desc order.");
+    }
+
+    [Fact]
+    public async Task GetPublicRandomTemplateAsync_ShouldFilterByTypeCategoryAndPremiumAvailability()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var freeTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Free Portrait",
+            "Portrait",
+            ["random", "free"]);
+
+        var premiumTemplate = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Premium Portrait",
+                "Premium portrait",
+                "Portrait",
+                ["random", "premium"],
+                true,
+                60,
+                TemplatePromoBadgeMode.New.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/premium-portrait.jpg", "premium-portrait.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(premiumTemplate.IsSuccess);
+
+        var freeRandom = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(TemplateType.Image, "portrait", false, null),
+            CancellationToken.None);
+
+        Assert.True(freeRandom.IsSuccess);
+        Assert.NotNull(freeRandom.Value.Template);
+        Assert.Equal(freeTemplateId, freeRandom.Value.Template!.TemplateId);
+        Assert.False(freeRandom.Value.Template.IsPremium);
+        Assert.Equal(freeRandom.Value.Template.PreviewAsset?.Url, freeRandom.Value.Template.ThumbnailUrl);
+
+        var noVideoInPortrait = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(TemplateType.Video, "Portrait", true, null),
+            CancellationToken.None);
+
+        Assert.True(noVideoInPortrait.IsSuccess);
+        Assert.Null(noVideoInPortrait.Value.Template);
+    }
+
+    [Fact]
+    public async Task GetPublicRandomTemplateAsync_ShouldBoundCategoryFilter()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var boundedCategory = new string('a', 64);
+        var templateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Bounded Random",
+            boundedCategory,
+            ["random", "bounded"]);
+
+        var overlongCategory = boundedCategory + "ignored";
+        var random = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(TemplateType.Image, overlongCategory, true, null),
+            CancellationToken.None);
+
+        Assert.True(random.IsSuccess);
+        Assert.NotNull(random.Value.Template);
+        Assert.Equal(templateId, random.Value.Template!.TemplateId);
+        Assert.Equal(boundedCategory, random.Value.Template.Category);
     }
 
     [Fact]
@@ -842,6 +1284,207 @@ public sealed partial class TemplatesServiceTests
         Assert.True(item.IsPremium);
         Assert.Equal(1, catalog.Value.TotalCount);
         Assert.False(catalog.Value.HasMore);
+    }
+
+    [Fact]
+    public async Task ListPublicCatalogAsync_ShouldUseExtraRowForHasMoreWithoutReturningIt()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var utcNow = DateTime.UtcNow;
+
+        var oldestId = await CreateActiveImageTemplateAsync(service, "Catalog Old", "Portrait", ["catalog-page"]);
+        var middleId = await CreateActiveImageTemplateAsync(service, "Catalog Middle", "Portrait", ["catalog-page"]);
+        var newestId = await CreateActiveImageTemplateAsync(service, "Catalog New", "Portrait", ["catalog-page"]);
+
+        await SetUpdatedAtUtcAsync(dbContext, oldestId, utcNow.AddMinutes(-30));
+        await SetUpdatedAtUtcAsync(dbContext, middleId, utcNow.AddMinutes(-20));
+        await SetUpdatedAtUtcAsync(dbContext, newestId, utcNow.AddMinutes(-10));
+
+        var firstPage = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 2, TemplateType.Image, "Portrait", null, ["catalog-page"]),
+            CancellationToken.None);
+
+        Assert.True(firstPage.IsSuccess);
+        Assert.True(firstPage.Value.HasMore);
+        Assert.Equal(3, firstPage.Value.TotalCount);
+        Assert.Equal(2, firstPage.Value.Items.Count);
+        Assert.Equal([newestId, middleId], [.. firstPage.Value.Items.Select(item => item.Id)]);
+        Assert.DoesNotContain(firstPage.Value.Items, item => item.Id == oldestId);
+
+        var secondPage = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(2, 2, TemplateType.Image, "Portrait", null, ["catalog-page"]),
+            CancellationToken.None);
+
+        Assert.True(secondPage.IsSuccess);
+        Assert.False(secondPage.Value.HasMore);
+        var item = Assert.Single(secondPage.Value.Items);
+        Assert.Equal(oldestId, item.Id);
+        Assert.Equal(3, secondPage.Value.TotalCount);
+    }
+
+    [Fact]
+    public async Task ListPublicCatalogAsync_ShouldUseFeedVersionTieBreakOrder()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var updatedAtUtc = DateTime.UtcNow;
+
+        var lowestVersionId = await CreateActiveImageTemplateAsync(
+            service,
+            "Catalog Same Time One",
+            "Portrait",
+            ["catalog-version"]);
+        var middleVersionId = await CreateActiveImageTemplateAsync(
+            service,
+            "Catalog Same Time Two",
+            "Portrait",
+            ["catalog-version"]);
+        var highestVersionId = await CreateActiveImageTemplateAsync(
+            service,
+            "Catalog Same Time Three",
+            "Portrait",
+            ["catalog-version"]);
+
+        var lowestVersion = await dbContext.TemplateItems.SingleAsync(x => x.Id == lowestVersionId);
+        var middleVersion = await dbContext.TemplateItems.SingleAsync(x => x.Id == middleVersionId);
+        var highestVersion = await dbContext.TemplateItems.SingleAsync(x => x.Id == highestVersionId);
+        lowestVersion.UpdatedAtUtc = updatedAtUtc;
+        lowestVersion.Version = 10;
+        middleVersion.UpdatedAtUtc = updatedAtUtc;
+        middleVersion.Version = 20;
+        highestVersion.UpdatedAtUtc = updatedAtUtc;
+        highestVersion.Version = 30;
+        await dbContext.SaveChangesAsync(CancellationToken.None);
+
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(
+                1,
+                3,
+                TemplateType.Image,
+                "Portrait",
+                null,
+                ["catalog-version"]),
+            CancellationToken.None);
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(
+                TemplateType.Image,
+                "Portrait",
+                ["catalog-version"],
+                null,
+                null,
+                3,
+                null,
+                null),
+            CancellationToken.None);
+
+        Assert.True(catalog.IsSuccess);
+        Assert.True(feed.IsSuccess);
+        Assert.Equal(
+            [highestVersionId, middleVersionId, lowestVersionId],
+            [.. catalog.Value.Items.Select(item => item.Id)]);
+        Assert.Equal(
+            [.. feed.Value.Items.Select(item => item.TemplateId)],
+            [.. catalog.Value.Items.Select(item => item.Id)]);
+    }
+
+    [Fact]
+    public async Task PublicCatalogCategoryFilters_ShouldUseCanonicalCategoryWithoutBroadening()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var portraitTemplateId = await CreateActiveImageTemplateAsync(
+            service,
+            "Canonical Portrait",
+            "Portrait",
+            ["canonical"]);
+        await CreateActiveImageTemplateAsync(
+            service,
+            "Other Portrait",
+            "Other",
+            ["canonical"]);
+
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 20, null, "portrait", null, ["canonical"]),
+            CancellationToken.None);
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "portrait", ["canonical"], null, null, 10, null, null),
+            CancellationToken.None);
+        var legacyList = await service.ListPublicAsync(
+            null,
+            "portrait",
+            ["canonical"],
+            null,
+            null,
+            CancellationToken.None);
+        var unknownCategory = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 20, null, "missing", null, ["canonical"]),
+            CancellationToken.None);
+
+        Assert.True(catalog.IsSuccess);
+        Assert.True(feed.IsSuccess);
+        Assert.True(legacyList.IsSuccess);
+        Assert.True(unknownCategory.IsSuccess);
+
+        var catalogItem = Assert.Single(catalog.Value.Items);
+        Assert.Equal(portraitTemplateId, catalogItem.Id);
+        Assert.Equal("Portrait", catalogItem.Category);
+
+        var feedItem = Assert.Single(feed.Value.Items);
+        Assert.Equal(portraitTemplateId, feedItem.TemplateId);
+        Assert.Equal("Portrait", feedItem.Category);
+
+        var legacyItem = Assert.Single(legacyList.Value);
+        Assert.Equal(portraitTemplateId, legacyItem.TemplateId);
+        Assert.Equal("Portrait", legacyItem.Category);
+        Assert.Empty(unknownCategory.Value.Items);
+    }
+
+    [Fact]
+    public async Task ListPublicFeedAsync_ShouldReturnMobileCapabilityAndVersionFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Capability Feed",
+                "Feed capability template",
+                "Capability",
+                ["feed", "capability"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/capability-feed.jpg", "capability-feed.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString(),
+                ["front-facing pet", "clear lighting"],
+                SupportsGenerationResultInput: true,
+                RequiredInputMediaType: TemplateType.Image.ToString(),
+                RecommendedAfterImageGeneration: true,
+                SupportsGenerateSimilar: false,
+                DefaultVariationStrength: "high"),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var feed = await service.ListPublicFeedAsync(
+            new PublicTemplatesFeedQuery(null, "Capability", ["feed"], null, null, 10, null, null),
+            CancellationToken.None);
+
+        Assert.True(feed.IsSuccess);
+        var item = Assert.Single(feed.Value.Items);
+        Assert.Equal(created.Value.TemplateId, item.TemplateId);
+        Assert.Equal(["front-facing pet", "clear lighting"], item.PetPhotoRequirements);
+        Assert.True(item.SupportsGenerationResultInput);
+        Assert.Equal(TemplateType.Image.ToString(), item.RequiredInputMediaType);
+        Assert.True(item.RecommendedAfterImageGeneration);
+        Assert.False(item.SupportsGenerateSimilar);
+        Assert.Equal("high", item.DefaultVariationStrength);
+        Assert.True(item.Version > 0);
+        Assert.NotNull(item.UpdatedAtUtc);
     }
 
     [Fact]

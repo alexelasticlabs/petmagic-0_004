@@ -8,6 +8,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
@@ -85,6 +86,42 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(created.IsSuccess);
         return created.Value.TemplateId;
+    }
+
+    private static TemplateItem CreatePublicFeedTemplate(Guid templateId, string title, DateTime updatedAtUtc, long version)
+    {
+        var slug = title.ToLowerInvariant().Replace(' ', '-');
+        return new TemplateItem
+        {
+            Id = templateId,
+            Version = version,
+            TemplateType = TemplateType.Image,
+            Title = title,
+            ShortDescription = $"{title} description",
+            Category = "Portrait",
+            Tags = "cursor,stable",
+            IsPremium = false,
+            TokenCost = 20,
+            Status = TemplateStatus.Active,
+            PromoBadgeMode = TemplatePromoBadgeMode.New,
+            ImageModel = "openai/gpt-image-2/edit",
+            ImagePrompt = "Keep the same pet.",
+            CreatedAtUtc = updatedAtUtc.AddMinutes(-1),
+            UpdatedAtUtc = updatedAtUtc,
+            Assets =
+            [
+                new TemplateAsset
+                {
+                    Id = Guid.CreateVersion7(),
+                    TemplateId = templateId,
+                    AssetKind = TemplateAssetKind.Preview,
+                    Url = $"https://cdn.example.com/{slug}.jpg",
+                    FileName = $"{slug}.jpg",
+                    ContentType = "image/jpeg",
+                    FileSizeBytes = 48_000
+                }
+            ]
+        };
     }
 
     private sealed class TestHttpClientFactory(HttpClient httpClient) : IHttpClientFactory

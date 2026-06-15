@@ -946,9 +946,10 @@ public sealed partial class TemplatesServiceTests
         var userId = Guid.NewGuid();
         var now = DateTime.UtcNow;
         var olderForeignQueuedJobId = Guid.NewGuid();
-        var firstQueuedJobId = Guid.NewGuid();
-        var secondQueuedJobId = Guid.NewGuid();
+        var firstQueuedJobId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        var secondQueuedJobId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         var processingJobId = Guid.NewGuid();
+        var tiedQueuedAtUtc = now.AddMinutes(-3);
 
         dbContext.TemplateGenerationJobs.AddRange(
             new TemplateGenerationJob
@@ -977,7 +978,7 @@ public sealed partial class TemplatesServiceTests
                 SourceImageFileName = "queued-a.jpg",
                 SourceImageContentType = "image/jpeg",
                 CreatedAtUtc = now.AddMinutes(-4),
-                QueuedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = tiedQueuedAtUtc,
                 UpdatedAtUtc = now.AddMinutes(-4),
                 ChargedAtUtc = now.AddMinutes(-4)
             },
@@ -992,7 +993,7 @@ public sealed partial class TemplatesServiceTests
                 SourceImageFileName = "queued-b.jpg",
                 SourceImageContentType = "image/jpeg",
                 CreatedAtUtc = now.AddMinutes(-3),
-                QueuedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = tiedQueuedAtUtc,
                 UpdatedAtUtc = now.AddMinutes(-3),
                 ChargedAtUtc = now.AddMinutes(-3)
             },
@@ -1033,6 +1034,80 @@ public sealed partial class TemplatesServiceTests
         var processing = Assert.Single(history.Value, x => x.GenerationId == processingJobId);
         Assert.Null(processing.QueuePosition);
         Assert.Null(processing.EstimatedWaitSeconds);
+    }
+
+    [Fact]
+    public async Task GetAsync_ShouldUseGenerationIdTieBreakerForQueuedPosition()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var options = CreateTemplatesOptions(globalMaxConcurrentGenerations: 2, estimatedImageGenerationSeconds: 40);
+        var generationService = CreateGenerationService(dbContext, options);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Queued Status Portrait", "Portrait", ["queue-status"]);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var olderForeignQueuedJobId = Guid.NewGuid();
+        var firstQueuedJobId = Guid.Parse("00000000-0000-0000-0000-000000000101");
+        var secondQueuedJobId = Guid.Parse("00000000-0000-0000-0000-000000000102");
+        var tiedQueuedAtUtc = now.AddMinutes(-3);
+
+        dbContext.TemplateGenerationJobs.AddRange(
+            new TemplateGenerationJob
+            {
+                Id = olderForeignQueuedJobId,
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/foreign-status-queued.jpg",
+                SourceImageFileName = "foreign-status-queued.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-5),
+                QueuedAtUtc = now.AddMinutes(-5),
+                UpdatedAtUtc = now.AddMinutes(-5),
+                ChargedAtUtc = now.AddMinutes(-5)
+            },
+            new TemplateGenerationJob
+            {
+                Id = firstQueuedJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/status-queued-a.jpg",
+                SourceImageFileName = "status-queued-a.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-4),
+                QueuedAtUtc = tiedQueuedAtUtc,
+                UpdatedAtUtc = now.AddMinutes(-4),
+                ChargedAtUtc = now.AddMinutes(-4)
+            },
+            new TemplateGenerationJob
+            {
+                Id = secondQueuedJobId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/status-queued-b.jpg",
+                SourceImageFileName = "status-queued-b.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-3),
+                QueuedAtUtc = tiedQueuedAtUtc,
+                UpdatedAtUtc = now.AddMinutes(-3),
+                ChargedAtUtc = now.AddMinutes(-3)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var firstQueued = await generationService.GetAsync(userId, firstQueuedJobId, isPremium: false, CancellationToken.None);
+        var secondQueued = await generationService.GetAsync(userId, secondQueuedJobId, isPremium: false, CancellationToken.None);
+
+        Assert.True(firstQueued.IsSuccess);
+        Assert.True(secondQueued.IsSuccess);
+        Assert.Equal(2, firstQueued.Value.QueuePosition);
+        Assert.Equal(40, firstQueued.Value.EstimatedWaitSeconds);
+        Assert.Equal(3, secondQueued.Value.QueuePosition);
+        Assert.Equal(60, secondQueued.Value.EstimatedWaitSeconds);
     }
 
     [Fact]

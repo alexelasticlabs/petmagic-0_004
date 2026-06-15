@@ -66,7 +66,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var publicBeforeActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
-            "/api/templates/?type=Video");
+            "/api/templates?type=Video");
 
         Assert.Empty(publicBeforeActivation);
 
@@ -120,7 +120,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var publicAfterActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
-            "/api/templates/?type=Video");
+            "/api/templates?type=Video");
 
         var listedPublicItem = Assert.Single(publicAfterActivation);
         Assert.Equal(templateId, listedPublicItem.TemplateId);
@@ -143,7 +143,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var publicAfterDelete = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
-            "/api/templates/?type=Video");
+            "/api/templates?type=Video");
 
         Assert.Empty(publicAfterDelete);
     }
@@ -246,7 +246,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var publicList = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
             application.Client,
-            "/api/templates/?type=Image");
+            "/api/templates?type=Image");
 
         var listedPublicItem = Assert.Single(publicList);
         Assert.Equal(templateId, listedPublicItem.TemplateId);
@@ -272,14 +272,14 @@ public sealed partial class TemplatesApiIntegrationTests
         await using var application = await TestApplication.CreateAsync();
 
         var first = await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy One", "Magic", ["cozy", "magic"]);
-        var second = await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy Two", "Magic", ["cozy", "premium"]);
+        var second = await CreateActiveImageTemplateAsync(application.Client, "Magic Cozy Two", "Magic", ["cozy", "magic", "premium"]);
         await CreateActiveImageTemplateAsync(application.Client, "Surf Buddy", "Fun", ["surf"]);
 
         application.Client.DefaultRequestHeaders.Authorization = null;
 
         var firstPage = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
             application.Client,
-            "/api/templates/feed?type=Image&take=1&tags=cozy&search=magic");
+            "/api/templates/feed?type=Image&take=1&tags=cozy,magic&search=magic");
 
         Assert.True(firstPage.HasMore);
         Assert.NotNull(firstPage.NextCursor);
@@ -289,13 +289,116 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var secondPage = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
             application.Client,
-            $"/api/templates/feed?type=Image&take=1&tags=cozy&search=magic&cursor={Uri.EscapeDataString(firstPage.NextCursor!)}");
+            $"/api/templates/feed?type=Image&take=1&tags=cozy,magic&search=magic&cursor={Uri.EscapeDataString(firstPage.NextCursor!)}");
 
         Assert.False(secondPage.HasMore);
         Assert.Null(secondPage.NextCursor);
         var secondPageItem = Assert.Single(secondPage.Items);
         Assert.Contains(secondPageItem.TemplateId, new[] { first.TemplateId, second.TemplateId });
         Assert.NotEqual(firstPageItem.TemplateId, secondPageItem.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicRandomTemplate_ShouldRespectAllTypeCategoryAndPremiumAvailability()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var free = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Random Free Magic",
+            "Magic",
+            ["random", "free"]);
+        await CreateActivePremiumImageTemplateAsync(
+            application.Client,
+            "Random Premium Magic",
+            "Magic",
+            ["random", "premium"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        var random = await GetFromJsonAsync<PublicRandomTemplateResponse>(
+            application.Client,
+            "/api/templates/random?type=all&category=magic&includePremium=false");
+
+        Assert.NotNull(random.Template);
+        Assert.Equal(free.TemplateId, random.Template!.TemplateId);
+        Assert.False(random.Template.IsPremium);
+        Assert.Equal(random.Template.PreviewAsset?.Url, random.Template.ThumbnailUrl);
+    }
+
+    [Fact]
+    public async Task PublicTemplateCatalogEndpoints_ShouldAcceptAllTypeFilter()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "All Type Portrait",
+            "AllTypes",
+            ["all-type"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        var feed = await GetFromJsonAsync<PublicTemplatesFeedResponse>(
+            application.Client,
+            "/api/templates/feed?type=all&category=AllTypes&take=10");
+        var catalog = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
+            application.Client,
+            "/api/templates?type=all&category=AllTypes&page=1&pageSize=10");
+
+        Assert.Contains(feed.Items, item => item.TemplateId == created.TemplateId);
+        Assert.Contains(catalog.Items, item => item.Id == created.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicTemplateCatalogEndpoint_ShouldKeepTrailingSlashAlias()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Legacy Slash Portrait",
+            "LegacySlash",
+            ["legacy-slash"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        var catalog = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+            application.Client,
+            "/api/templates/?type=Image&category=LegacySlash");
+
+        var item = Assert.Single(catalog);
+        Assert.Equal(created.TemplateId, item.TemplateId);
+    }
+
+    [Fact]
+    public async Task PublicTemplateCatalogEndpoints_ShouldExposeShortCacheHeadersForAnonymousHotPaths()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Cached Magic Portrait",
+            "Cached",
+            ["cache"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        await AssertCacheControlAsync("/api/templates?type=Image&category=Cached", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates?type=Image&category=Cached&page=1&pageSize=10", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/feed?type=Image&category=Cached&take=10", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/random?type=Image&category=Cached", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/catalog-version", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/changes?sinceVersion=0", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/template-of-the-day", "public, max-age=10");
+        await AssertCacheControlAsync("/api/templates/categories", "public, max-age=60");
+
+        async Task AssertCacheControlAsync(string path, string expected)
+        {
+            using var response = await application.Client.GetAsync(path);
+            await EnsureSuccessStatusCodeAsync(response, path);
+            Assert.Equal(expected, response.Headers.CacheControl?.ToString());
+        }
     }
 
     [Fact]
@@ -349,7 +452,61 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.True(root.TryGetProperty("generatedAtUtc", out _));
         Assert.False(hasMore.GetBoolean());
 
+        var allowedRootProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "items",
+            "nextCursor",
+            "hasMore",
+            "generatedAtUtc"
+        };
+        var rootProperties = root.EnumerateObject()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(allowedRootProperties.Count, rootProperties.Count);
+        Assert.Subset(allowedRootProperties, rootProperties);
+
         var item = Assert.Single(items.EnumerateArray());
+        var allowedItemProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "templateId",
+            "templateType",
+            "title",
+            "shortDescription",
+            "category",
+            "effectivePromoBadge",
+            "tags",
+            "isPremium",
+            "tokenCost",
+            "previewAsset",
+            "musicDescription",
+            "referenceVideoDurationSeconds",
+            "thumbnailUrl",
+            "petPhotoRequirements",
+            "supportsGenerationResultInput",
+            "requiredInputMediaType",
+            "recommendedAfterImageGeneration",
+            "supportsGenerateSimilar",
+            "defaultVariationStrength",
+            "version",
+            "updatedAtUtc"
+        };
+        var itemProperties = item.EnumerateObject()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(allowedItemProperties.Count, itemProperties.Count);
+        Assert.Subset(allowedItemProperties, itemProperties);
+        Assert.DoesNotContain("imageModel", itemProperties);
+        Assert.DoesNotContain("imagePrompt", itemProperties);
+        Assert.DoesNotContain("preprocessingModel", itemProperties);
+        Assert.DoesNotContain("preprocessingPrompt", itemProperties);
+        Assert.DoesNotContain("klingModel", itemProperties);
+        Assert.DoesNotContain("klingPrompt", itemProperties);
+        Assert.DoesNotContain("keepOriginalSound", itemProperties);
+        Assert.DoesNotContain("referenceMotionAsset", itemProperties);
+        Assert.DoesNotContain("estimatedProviderCostUsd", itemProperties);
+        Assert.DoesNotContain("createdAtUtc", itemProperties);
         Assert.Equal(created.TemplateId, item.GetProperty("templateId").GetGuid());
         Assert.Equal("Image", item.GetProperty("templateType").GetString());
         Assert.Equal("Contract Feed Portrait", item.GetProperty("title").GetString());
@@ -357,22 +514,127 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Contract", item.GetProperty("category").GetString());
         Assert.False(item.GetProperty("isPremium").GetBoolean());
         Assert.Equal(20, item.GetProperty("tokenCost").GetInt32());
+        Assert.Equal(
+            ["Clear pet face", "Good lighting"],
+            [.. item.GetProperty("petPhotoRequirements").EnumerateArray().Select(requirement => requirement.GetString()!)]);
+        Assert.False(item.GetProperty("supportsGenerationResultInput").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("requiredInputMediaType").ValueKind);
+        Assert.False(item.GetProperty("recommendedAfterImageGeneration").GetBoolean());
+        Assert.True(item.GetProperty("supportsGenerateSimilar").GetBoolean());
+        Assert.Equal("medium", item.GetProperty("defaultVariationStrength").GetString());
+        Assert.True(item.GetProperty("version").GetInt64() > 0);
+        Assert.Equal(JsonValueKind.String, item.GetProperty("updatedAtUtc").ValueKind);
 
         var preview = item.GetProperty("previewAsset");
+        var allowedPreviewProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "url",
+            "fileName",
+            "contentType",
+            "fileSizeBytes",
+            "durationSeconds"
+        };
+        var previewProperties = preview.EnumerateObject()
+            .Select(property => property.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        Assert.Equal(allowedPreviewProperties.Count, previewProperties.Count);
+        Assert.Subset(allowedPreviewProperties, previewProperties);
         Assert.Equal(previewAsset.Url, preview.GetProperty("url").GetString());
         Assert.Equal("contract-feed.jpg", preview.GetProperty("fileName").GetString());
         Assert.Equal("image/jpeg", preview.GetProperty("contentType").GetString());
-
-        Assert.Equal(
-            ["Clear pet face", "Good lighting"],
-            [.. item.GetProperty("petPhotoRequirements").EnumerateArray().Select(requirement => requirement.GetString() ?? string.Empty)]);
+        Assert.Equal(previewAsset.Url, item.GetProperty("thumbnailUrl").GetString());
 
         var typedResponse = JsonSerializer.Deserialize<PublicTemplatesFeedResponse>(body, JsonOptions);
         Assert.NotNull(typedResponse);
         var typedItem = Assert.Single(typedResponse.Items);
         Assert.Equal(created.TemplateId, typedItem.TemplateId);
         Assert.Equal(previewAsset.Url, typedItem.PreviewAsset?.Url);
-        Assert.Equal(["Clear pet face", "Good lighting"], typedItem.PetPhotoRequirements);
+        Assert.Equal(previewAsset.Url, typedItem.ThumbnailUrl);
+        Assert.True(typedItem.SupportsGenerateSimilar);
+        Assert.True(typedItem.Version > 0);
+        Assert.NotNull(typedItem.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public async Task PublicTemplatesFeed_ShouldExposeVideoPreviewWithoutThumbnailFallback()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "preview.mp4",
+            "video/mp4",
+            TemplateAssetKind.Preview,
+            "feed-video-preview-content"u8.ToArray());
+        var referenceAsset = await UploadMediaAsync(
+            application.Client,
+            "reference.mp4",
+            "video/mp4",
+            TemplateAssetKind.ReferenceMotion,
+            "feed-video-reference-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/video",
+            new CreateVideoTemplateCommand(
+                "Contract Feed Video",
+                "Contract feed video description",
+                "VideoContract",
+                ["contract", "video"],
+                false,
+                30,
+                TemplatePromoBadgeMode.New.ToString(),
+                "Looped video soundtrack",
+                new TemplateAssetCommand(
+                    previewAsset.Url,
+                    previewAsset.FileName,
+                    previewAsset.ContentType,
+                    previewAsset.FileSizeBytes,
+                    previewAsset.DurationSeconds),
+                new TemplateAssetCommand(
+                    referenceAsset.Url,
+                    referenceAsset.FileName,
+                    referenceAsset.ContentType,
+                    referenceAsset.FileSizeBytes,
+                    referenceAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "Gentle loop.",
+                false,
+                TemplateStatus.Active.ToString()));
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        using var response = await application.Client.GetAsync(
+            "/api/templates/feed?type=Video&category=VideoContract&take=10");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var document = JsonDocument.Parse(body);
+        var item = Assert.Single(document.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(created.TemplateId, item.GetProperty("templateId").GetGuid());
+        Assert.Equal("Video", item.GetProperty("templateType").GetString());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("thumbnailUrl").ValueKind);
+
+        var preview = item.GetProperty("previewAsset");
+        Assert.Equal(previewAsset.Url, preview.GetProperty("url").GetString());
+        Assert.Equal("video/mp4", preview.GetProperty("contentType").GetString());
+        Assert.Equal(4.5, preview.GetProperty("durationSeconds").GetDouble());
+        Assert.Equal(8.75, item.GetProperty("referenceVideoDurationSeconds").GetDouble());
+
+        var typedResponse = JsonSerializer.Deserialize<PublicTemplatesFeedResponse>(body, JsonOptions);
+        Assert.NotNull(typedResponse);
+        var typedItem = Assert.Single(typedResponse.Items);
+        Assert.Equal(created.TemplateId, typedItem.TemplateId);
+        Assert.Equal(TemplateType.Video.ToString(), typedItem.TemplateType);
+        Assert.Null(typedItem.ThumbnailUrl);
+        Assert.Equal(previewAsset.Url, typedItem.PreviewAsset?.Url);
+        Assert.Equal("video/mp4", typedItem.PreviewAsset?.ContentType);
+        Assert.Equal(4.5, typedItem.PreviewAsset?.DurationSeconds);
+        Assert.Equal(8.75, typedItem.ReferenceVideoDurationSeconds);
     }
 
     [Theory]
@@ -393,10 +655,12 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Theory]
-    [InlineData("/api/templates/?type=Document")]
-    [InlineData("/api/templates/?type=1")]
+    [InlineData("/api/templates?type=Document")]
+    [InlineData("/api/templates?type=1")]
     [InlineData("/api/templates/feed?type=Document")]
     [InlineData("/api/templates/feed?type=1")]
+    [InlineData("/api/templates/random?type=Document")]
+    [InlineData("/api/templates/random?type=1")]
     public async Task PublicTemplateCatalogEndpoints_ShouldReturnProblem_WhenTypeFilterIsInvalid(string path)
     {
         await using var application = await TestApplication.CreateAsync();
@@ -408,7 +672,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.invalid_type", body);
-        Assert.Contains("Image or Video", body);
+        Assert.Contains("Image, Video, or all", body);
     }
 
     [Theory]
@@ -425,7 +689,26 @@ public sealed partial class TemplatesApiIntegrationTests
         using var response = await application.Client.GetAsync(path);
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.True(
+            response.StatusCode == HttpStatusCode.BadRequest,
+            $"Expected 400 problem details, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
+        Assert.Contains(expectedCode, body);
+    }
+
+    [Theory]
+    [InlineData("/api/admin/feedback?status=Deleted", "feedback.invalid_status")]
+    [InlineData("/api/admin/feedback?priority=Urgent", "feedback.invalid_priority")]
+    [InlineData("/api/admin/feedback?type=Other", "feedback.invalid_type")]
+    public async Task AdminFeedback_ShouldReturnProblem_WhenFilterIsInvalid(string path, string expectedCode)
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        using var response = await application.Client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.True(
+            response.StatusCode == HttpStatusCode.BadRequest,
+            $"Expected 400 problem details, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
         Assert.Contains(expectedCode, body);
     }
 
@@ -516,7 +799,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var page = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
-            "/api/templates?page=1&pageSize=20&type=Image&category=Contract&tags=contract&tags=premium&premiumOnly=true");
+            "/api/templates?page=1&pageSize=20&type=Image&category=Contract&tags=contract,premium&premiumOnly=true");
 
         var item = Assert.Single(page.Items);
         Assert.Equal(premium.TemplateId, item.Id);
@@ -524,6 +807,35 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.True(item.IsPremium);
         Assert.Equal(1, page.TotalCount);
         Assert.False(page.HasMore);
+    }
+
+    [Fact]
+    public async Task PublicPagedTemplateCatalog_ShouldClampPageSizeAndHandleOutOfRangePages()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        await CreateActiveImageTemplateAsync(application.Client, "Contract Bounds", "Contract", ["contract"]);
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        var normalized = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
+            application.Client,
+            "/api/templates?page=-10&pageSize=5000&type=Image&category=Contract");
+
+        Assert.Equal(1, normalized.Page);
+        Assert.Equal(100, normalized.PageSize);
+        Assert.True(normalized.TotalCount >= 1);
+        Assert.Contains(normalized.Items, item => item.Title == "Contract Bounds");
+
+        var outOfRange = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
+            application.Client,
+            "/api/templates?page=2147483647&pageSize=100&type=Image&category=Contract");
+
+        Assert.Equal(2147483647, outOfRange.Page);
+        Assert.Equal(100, outOfRange.PageSize);
+        Assert.Equal(normalized.TotalCount, outOfRange.TotalCount);
+        Assert.False(outOfRange.HasMore);
+        Assert.Empty(outOfRange.Items);
     }
 
     private static async Task<AdminTemplateResponse> CreateActivePremiumImageTemplateAsync(

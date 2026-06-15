@@ -165,6 +165,117 @@ public sealed class AdminTemplateEndpointHardeningTests
         Assert.DoesNotContain("adminGroup.MapGet(\"/\", ListAdminPetsAsync)", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PublicTemplateEndpoints_ShouldRegisterDocumentedCollectionRoute()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PublicTemplateEndpoints.cs"));
+
+        Assert.Contains("group.MapGet(\"\", ListAsync)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("group.MapGet(\"/\", ListAsync)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateDetail_ShouldUseReadOnlyFilteredPreviewProjection()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.Public.cs"));
+        var method = ExtractMethodBody(source, "GetPublicAsync");
+
+        Assert.Contains(".AsNoTracking()", method, StringComparison.Ordinal);
+        Assert.Contains(".Select(x => new", method, StringComparison.Ordinal);
+        Assert.Contains("asset.AssetKind == TemplateAssetKind.Preview", method, StringComparison.Ordinal);
+        Assert.Contains("x.DeletedAtUtc == null", method, StringComparison.Ordinal);
+        Assert.Contains("x.Status == TemplateStatus.Active", method, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Include(x => x.Assets)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindTemplateAsync(templateId", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateFeed_ShouldUseProviderSafeVersionCursor()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.Public.cs"));
+        var method = ExtractMethodBody(source, "ListPublicFeedAsync");
+
+        Assert.Contains(".ThenByDescending(template => template.Version)", method, StringComparison.Ordinal);
+        Assert.Contains("template.Version < cursor.Version.Value", method, StringComparison.Ordinal);
+        Assert.Contains("template.Id.CompareTo(cursor.TemplateId) < 0", method, StringComparison.Ordinal);
+        Assert.Contains("FormatPublicFeedCursor(pageItems[^1].UpdatedAtUtc, pageItems[^1].Version, pageItems[^1].Id)", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateCatalog_ShouldGuardHugePageOffsetsBeforeSkip()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.Public.cs"));
+        var method = ExtractMethodBody(source, "ListPublicCatalogAsync");
+
+        Assert.Contains("var totalCount = await baseQuery.LongCountAsync(cancellationToken);", method, StringComparison.Ordinal);
+        Assert.Contains("var offset = ((long)page - 1) * pageSize;", method, StringComparison.Ordinal);
+        Assert.Contains("if (offset > int.MaxValue)", method, StringComparison.Ordinal);
+        Assert.Contains(".Skip((int)offset)", method, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Skip((page - 1) * pageSize)", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateCatalog_ShouldUseExtraRowForHasMore()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.Public.cs"));
+        var method = ExtractMethodBody(source, "ListPublicCatalogAsync");
+
+        Assert.Contains(".Take(pageSize + 1)", method, StringComparison.Ordinal);
+        Assert.Contains("var pageItems = filtered.Take(pageSize).ToArray();", method, StringComparison.Ordinal);
+        Assert.Contains("var hasMore = filtered.Length > pageSize;", method, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Take(pageSize)\n            .Select(template => new", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("var hasMore = totalCount > offset + pageItems.Length;", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicTemplateEvents_ShouldTreatClientDisconnectsAsNormalCompletion()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PublicTemplateEndpoints.cs"));
+        var method = ExtractMethodBody(source, "private static async Task StreamEventsAsync");
+
+        Assert.Contains("catch (OperationCanceledException) when", method, StringComparison.Ordinal);
+        Assert.Contains("catch (System.IO.IOException) when", method, StringComparison.Ordinal);
+        Assert.Contains("httpContext.RequestAborted.IsCancellationRequested", method, StringComparison.Ordinal);
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

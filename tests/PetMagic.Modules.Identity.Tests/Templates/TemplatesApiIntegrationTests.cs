@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -18,6 +19,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -290,6 +293,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddSingleton<ITemplateWatermarkRenderer, PassthroughWatermarkRenderer>();
             builder.Services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
             builder.Services.AddSingleton<ITemplateGenerationPushNotificationSender, NoopPushNotificationSender>();
+            builder.Services.AddSingleton<IEconomyService>(_ => TestEconomyServiceProxy.Create());
             builder.Services
                 .AddHttpClient(TemplateLocalizationTranslator.HttpClientName)
                 .ConfigurePrimaryHttpMessageHandler(() => new UnavailableTranslationHandler());
@@ -297,6 +301,7 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<ITemplatesService, TemplatesService>();
             builder.Services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
             builder.Services.AddScoped<IPetsService, PetsService>();
+            builder.Services.AddScoped<IFeedbackService, FeedbackService>();
             builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();
             builder.Services.AddHostedService<TemplateGenerationWorker>();
@@ -503,6 +508,32 @@ public sealed partial class TemplatesApiIntegrationTests
         public Task<Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success(0));
+        }
+    }
+
+    private class TestEconomyServiceProxy : DispatchProxy
+    {
+        public static IEconomyService Create()
+        {
+            return Create<IEconomyService, TestEconomyServiceProxy>();
+        }
+
+        protected override object Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IEconomyService.CreditAsync)
+                && args is [CreditBalanceCommand command, CancellationToken])
+            {
+                return Task.FromResult(Result.Success(new WalletOperationResponse(
+                    command.UserId,
+                    command.Amount,
+                    command.Amount,
+                    command.Source,
+                    DateTime.UtcNow,
+                    null,
+                    0)));
+            }
+
+            throw new NotSupportedException(targetMethod?.Name ?? "Unknown economy method");
         }
     }
 
