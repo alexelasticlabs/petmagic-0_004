@@ -106,7 +106,7 @@
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-heading), sans-serif;
-  font-size: clamp(1.4rem, 1.18rem + 0.42vw, 1.7rem);
+  font-size: 1.55rem;
   font-weight: 600;
   line-height: 1.1;
 }
@@ -305,7 +305,7 @@
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -697,7 +697,7 @@
   color: color-mix(in srgb, var(--success) 85%, var(--text-strong));
   font-size: 0.95rem;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .dropOverlayIcon {
@@ -814,7 +814,7 @@
   color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .dayGroup {
@@ -876,12 +876,27 @@
   position: absolute;
   right: 6px;
   bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   background: color-mix(in srgb, var(--surface-0) 75%, transparent);
   color: var(--text-inverse);
   font-size: 0.66rem;
   font-weight: 700;
   border-radius: 999px;
   padding: 1px 6px;
+}
+
+.messageVideoDurationIcon {
+  width: 0.72rem;
+  height: 0.72rem;
+  flex: 0 0 auto;
+}
+
+.messageReplyActionIcon {
+  width: 0.92rem;
+  height: 0.92rem;
+  flex: 0 0 auto;
 }
 
 .messageVideo {
@@ -969,7 +984,7 @@
   background: color-mix(in srgb, var(--info) 16%, var(--surface-2));
   color: color-mix(in srgb, var(--info) 62%, var(--text-strong));
   font-size: 0.76rem;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .messageImageButton,
@@ -1040,9 +1055,12 @@
   background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
   border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));
   color: var(--toast-success-fg);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+}
+
+.supportFileIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
 }
 
 .messageAttachmentMeta,
@@ -1094,7 +1112,7 @@
   color: var(--text-soft);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .messageAttachmentStatus_uploading,
@@ -1498,7 +1516,7 @@
   color: var(--danger-soft-fg);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1611,7 +1629,7 @@
   color: var(--danger-soft-fg);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -1906,6 +1924,42 @@
   font-size: 0.76rem;
 }
 
+.attachmentListMetaTop {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.attachmentListMetaTop strong {
+  min-width: 0;
+}
+
+.attachmentListTypeBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.22rem 0.42rem;
+  text-transform: uppercase;
+}
+
+.attachmentListMetaRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.attachmentListMetaHint {
+  overflow-wrap: anywhere;
+}
+
 .attachmentListActions {
   display: flex;
   flex-direction: column;
@@ -2097,7 +2151,7 @@
   justify-content: center;
   font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   color: var(--accent);
   background: linear-gradient(
     135deg,
@@ -2143,7 +2197,7 @@
   border-radius: 20px;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
   border: 1px solid var(--border-soft);
   color: var(--text-muted);
@@ -2312,7 +2366,7 @@
   color: var(--text-muted);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.09em;
+  letter-spacing: 0;
   text-transform: uppercase;
   opacity: 0.72;
 }
@@ -2413,7 +2467,7 @@
   font: inherit;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
   cursor: pointer;
   padding: 0;
@@ -2525,9 +2579,9 @@
   gap: 10px;
   padding: 0.9rem;
   border-radius: 1rem;
-  border: 1px solid rgba(34, 197, 94, 0.26);
+  border: 1px solid color-mix(in srgb, var(--success) 26%, var(--border-soft));
   background: var(--surface-1);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--surface-0) 46%, transparent);
 }
 
 .imageViewerHeader {
@@ -2552,7 +2606,7 @@
   height: auto;
   object-fit: contain;
   border-radius: 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, var(--border-soft));
 }
 
 .imageViewerVideo {
@@ -2561,8 +2615,8 @@
   max-height: calc(100vh - 14rem);
   height: auto;
   border-radius: 0.9rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: #000;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, var(--border-soft));
+  background: var(--surface-0);
 }
 
 .imageViewerMeta {
@@ -2584,7 +2638,7 @@
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2604,30 +2658,30 @@
 /* ── Focus-visible styles ── */
 
 .conversationRow:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
   outline-offset: 1px;
-  border-color: rgba(34, 197, 94, 0.72);
+  border-color: color-mix(in srgb, var(--success) 72%, var(--border-soft));
 }
 
 .sidePanelTab:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
   outline-offset: 1px;
 }
 
 .messageImageButton:focus-visible,
 .attachmentListThumbButton:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
   outline-offset: 2px;
   border-radius: 0.9rem;
 }
 
 .quickTemplateButton:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.72);
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
   outline-offset: 1px;
 }
 
 .attachmentActionButton:focus-visible {
-  outline: 2px solid rgba(34, 197, 94, 0.6);
+  outline: 2px solid color-mix(in srgb, var(--success) 60%, transparent);
   outline-offset: 2px;
   border-radius: 0.3rem;
 }
@@ -2636,7 +2690,7 @@
 
 .messages {
   scrollbar-width: thin;
-  scrollbar-color: rgba(34, 197, 94, 0.22) transparent;
+  scrollbar-color: color-mix(in srgb, var(--success) 22%, transparent) transparent;
 }
 
 .messages::-webkit-scrollbar {
@@ -2648,12 +2702,12 @@
 }
 
 .messages::-webkit-scrollbar-thumb {
-  background: rgba(34, 197, 94, 0.22);
+  background: color-mix(in srgb, var(--success) 22%, transparent);
   border-radius: 999px;
 }
 
 .messages::-webkit-scrollbar-thumb:hover {
-  background: rgba(34, 197, 94, 0.38);
+  background: color-mix(in srgb, var(--success) 38%, transparent);
 }
 
 /* Keep support workspace fully dark when theme is dark/default-dark. */
@@ -2671,15 +2725,15 @@
 :global(:root[data-theme="dark"]) .infoPanelFlat,
 :global(:root:not([data-theme="light"])) .actionsPanelFlat,
 :global(:root[data-theme="dark"]) .actionsPanelFlat {
-  background: color-mix(in srgb, var(--surface-1) 92%, #05080d 8%);
+  background: color-mix(in srgb, var(--surface-1) 92%, var(--surface-0) 8%);
 }
 
 :global(:root:not([data-theme="light"])) .chatShell,
 :global(:root[data-theme="dark"]) .chatShell {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--surface-1) 94%, #05080d 6%),
-    color-mix(in srgb, var(--surface-2) 92%, #04070c 8%)
+    color-mix(in srgb, var(--surface-1) 94%, var(--surface-0) 6%),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-0) 8%)
   );
 }
 
@@ -2711,18 +2765,18 @@
 :global(:root[data-theme="dark"]) .infoPanelStatTileFull,
 :global(:root:not([data-theme="light"])) .attachmentListItem,
 :global(:root[data-theme="dark"]) .attachmentListItem {
-  background: color-mix(in srgb, var(--surface-2) 86%, #04070c 14%);
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--surface-0) 14%);
 }
 
 :global(:root:not([data-theme="light"])) .systemEventCard,
 :global(:root[data-theme="dark"]) .systemEventCard {
-  background: color-mix(in srgb, var(--surface-2) 82%, #0a1018 18%);
+  background: color-mix(in srgb, var(--surface-2) 82%, var(--surface-3) 18%);
 }
 
 .templateCatalogList,
 .attachmentList {
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;
 }
 
 .templateCatalogList::-webkit-scrollbar,
@@ -2737,7 +2791,7 @@
 
 .templateCatalogList::-webkit-scrollbar-thumb,
 .attachmentList::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.3);
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: 999px;
 }
 
@@ -2763,7 +2817,11 @@
 :global(:root[data-theme="light"]) .inboxPane,
 :global(:root[data-theme="light"]) .chatShell,
 :global(:root[data-theme="light"]) .sideCard {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 253, 0.97));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, transparent),
+    color-mix(in srgb, var(--surface-2) 97%, var(--surface-3))
+  );
 }
 
 /* ── 4-column Full View Layout ── */
@@ -2853,7 +2911,7 @@
 .queueSubFilterActive {
   color: var(--text-strong);
   background: var(--surface-1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 /* ── Queue Row Redesign ── */
@@ -2863,7 +2921,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #3b82f6;
+  background: var(--accent);
   margin-left: 6px;
   vertical-align: middle;
   flex-shrink: 0;
@@ -2899,19 +2957,19 @@
 }
 
 .statusDot_New {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 .statusDot_InProgress {
-  background: #22c55e;
+  background: var(--success);
 }
 
 .statusDot_WaitingForUser {
-  background: #facc15;
+  background: var(--warning);
 }
 
 .statusDot_Closed {
-  background: #64748b;
+  background: var(--text-muted);
 }
 
 /* ── Chat Header Redesign ── */
@@ -2969,7 +3027,7 @@
 }
 
 .chatMetaSlaUrgent {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .avatarSm {
@@ -2981,9 +3039,13 @@
   justify-content: center;
   font-size: 0.76rem;
   font-weight: 700;
-  color: #e2f0ff;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.72), rgba(59, 130, 246, 0.56));
-  border: 1px solid rgba(59, 130, 246, 0.32);
+  color: var(--accent-contrast);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 72%, var(--surface-2)),
+    color-mix(in srgb, var(--info) 56%, var(--surface-2))
+  );
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border-soft));
   flex-shrink: 0;
   user-select: none;
 }
@@ -2996,7 +3058,7 @@
   overflow-y: auto;
   height: 100%;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;
 }
 
 .infoPanel::-webkit-scrollbar {
@@ -3008,7 +3070,7 @@
 }
 
 .infoPanel::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.3);
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: 999px;
 }
 
@@ -3023,7 +3085,7 @@
 .infoPanelSectionLabel {
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 6px;
@@ -3127,7 +3189,7 @@
   align-items: center;
   gap: 6px;
   padding: 14px 16px;
-  color: #3b82f6;
+  color: var(--accent);
   font-size: 0.8rem;
   font-weight: 500;
   text-decoration: none;
@@ -3155,7 +3217,7 @@
 .actionsPanelDangerTitle {
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -3170,7 +3232,7 @@
 }
 
 .actionsPanelDangerTitle {
-  color: #f87171;
+  color: var(--danger);
   margin-bottom: 2px;
 }
 
@@ -3180,10 +3242,10 @@
   gap: 8px;
   width: 100%;
   padding: 8px 12px;
-  border: 1px solid rgba(248, 81, 73, 0.3);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border-soft));
   border-radius: 8px;
-  background: rgba(248, 81, 73, 0.06);
-  color: #fca5a5;
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface-2));
+  color: var(--danger-soft-fg);
   font: inherit;
   font-size: 0.82rem;
   cursor: pointer;
@@ -3192,7 +3254,7 @@
 }
 
 .actionsPanelDangerBtn:hover:not(:disabled) {
-  background: rgba(248, 81, 73, 0.14);
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-2));
 }
 
 .actionsPanelDangerBtn:disabled {
@@ -3241,9 +3303,9 @@
 }
 
 :global(:root[data-theme="light"]) .paneCountBadge {
-  color: #14532d;
-  background: rgba(22, 163, 74, 0.12);
-  border-color: rgba(22, 163, 74, 0.34);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .chatFactChip {
@@ -3252,8 +3314,8 @@
 }
 
 :global(:root[data-theme="light"]) .messageAdmin {
-  background: rgba(22, 163, 74, 0.12);
-  border-color: rgba(22, 163, 74, 0.3);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .messageAdmin .messageBody,
@@ -3263,12 +3325,12 @@
 }
 
 :global(:root[data-theme="light"]) .messageAttachmentCard {
-  border-color: rgba(22, 163, 74, 0.22);
-  background: rgba(22, 163, 74, 0.08);
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 8%, var(--surface-1));
 }
 
 :global(:root[data-theme="light"]) .messageAttachmentStatusPill {
-  color: #334155;
+  color: var(--text-soft);
 }
 
 :global(:root[data-theme="light"]) .statusOverviewText,
@@ -3277,18 +3339,18 @@
 }
 
 :global(:root[data-theme="light"]) .workflowDangerZone {
-  background: rgba(220, 38, 38, 0.08);
-  border-color: rgba(220, 38, 38, 0.24);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--danger) 24%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .workflowDangerLabel {
-  color: #b91c1c;
+  color: var(--danger-soft-fg);
 }
 
 :global(:root[data-theme="light"]) .workflowDangerButton {
-  border-color: rgba(185, 28, 28, 0.45) !important;
-  background: rgba(185, 28, 28, 0.9) !important;
-  color: #fff5f5 !important;
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--danger) 90%, var(--surface-1)) !important;
+  color: var(--accent-contrast) !important;
 }
 
 :global(:root[data-theme="light"]) .sidePanelTab {
@@ -3297,33 +3359,33 @@
 }
 
 :global(:root[data-theme="light"]) .sidePanelTabActive {
-  color: #14532d;
-  border-color: rgba(22, 163, 74, 0.5);
-  background: rgba(22, 163, 74, 0.14);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 50%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-1));
 }
 
 :global(:root[data-theme="light"]) .slaPill_good {
-  color: #166534;
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.22);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .slaPill_warning {
-  color: #92400e;
-  background: rgba(250, 204, 21, 0.18);
-  border-color: rgba(217, 119, 6, 0.24);
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--warning) 24%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .slaPill_risk {
-  color: #c2410c;
-  background: rgba(249, 115, 22, 0.14);
-  border-color: rgba(234, 88, 12, 0.22);
+  color: color-mix(in srgb, var(--warning) 72%, var(--danger));
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--warning) 22%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .slaPill_critical {
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(220, 38, 38, 0.22);
+  color: var(--danger-soft-fg);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--danger) 22%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .templateListItem {
@@ -3335,7 +3397,7 @@
 :global(:root[data-theme="light"]) .imageViewerVideo,
 :global(:root[data-theme="light"]) .messageImage,
 :global(:root[data-theme="light"]) .attachmentPreviewImage {
-  border-color: rgba(15, 23, 42, 0.12);
+  border-color: color-mix(in srgb, var(--text-strong) 12%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .paneEyebrow {
@@ -3346,7 +3408,7 @@
 :global(:root[data-theme="light"]) .paneTitle {
   font-size: 1.08rem;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 :global(:root[data-theme="light"]) .paneDescription {
@@ -3408,13 +3470,13 @@
 }
 
 :global(:root[data-theme="light"]) .dangerActionBlock {
-  background: rgba(220, 38, 38, 0.06);
-  border-color: rgba(220, 38, 38, 0.22);
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--danger) 22%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .dangerActionBlock span,
 :global(:root[data-theme="light"]) .dangerActionToggle {
-  color: #b91c1c;
+  color: var(--danger-soft-fg);
 }
 
 :global(:root[data-theme="light"]) .metricTile {
@@ -3436,47 +3498,47 @@
 }
 
 :global(:root[data-theme="light"]) .conversationRowUnread {
-  background: color-mix(in srgb, var(--surface-1) 88%, rgba(22, 163, 74, 0.18) 12%);
-  border-color: rgba(22, 163, 74, 0.36);
+  background: color-mix(in srgb, var(--surface-1) 88%, var(--success) 12%);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .messageBot {
-  background: rgba(14, 165, 233, 0.09);
-  border-color: rgba(14, 165, 233, 0.34);
+  background: color-mix(in srgb, var(--info) 9%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--info) 34%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .inlineSystemLabel {
-  background: rgba(14, 116, 144, 0.08);
-  border-color: rgba(14, 116, 144, 0.25);
-  color: #0b5263;
+  background: color-mix(in srgb, var(--info) 8%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--info) 25%, var(--border-soft));
+  color: color-mix(in srgb, var(--info) 75%, var(--text-strong));
 }
 
 :global(:root[data-theme="light"]) .closedConversationPill {
-  border-color: rgba(100, 116, 139, 0.38);
-  background: rgba(100, 116, 139, 0.1);
+  border-color: color-mix(in srgb, var(--text-muted) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--text-muted) 10%, var(--surface-1));
   color: var(--text-soft);
 }
 
 :global(:root[data-theme="light"]) .closedComposerNotice {
-  background: color-mix(in srgb, var(--surface-1) 88%, #94a3b8 12%);
-  border-color: rgba(100, 116, 139, 0.28);
+  background: color-mix(in srgb, var(--surface-1) 88%, var(--text-muted) 12%);
+  border-color: color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .imageViewerOverlay {
-  background: color-mix(in srgb, rgba(240, 245, 255, 0.94) 100%, transparent);
+  background: color-mix(in srgb, var(--surface-overlay) 100%, transparent);
 }
 
 :global(:root[data-theme="light"]) .imageViewerPanel {
   background: var(--surface-0);
-  border-color: rgba(22, 163, 74, 0.3);
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
 }
 
 :global(:root[data-theme="light"]) .dropOverlay {
-  background: rgba(22, 163, 74, 0.06);
+  background: color-mix(in srgb, var(--success) 6%, transparent);
 }
 
 :global(:root[data-theme="light"]) .dropOverlayContent {
-  color: rgba(22, 163, 74, 0.9);
+  color: color-mix(in srgb, var(--success) 90%, var(--text-strong));
 }
 
 /* ── Avatar Color Variants (hash-based per user) ── */
@@ -3489,47 +3551,79 @@
 .avatarColor5,
 .avatarColor6,
 .avatarColor7 {
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .avatarColor0 {
-  background: linear-gradient(135deg, rgba(34, 197, 94, 0.82), rgba(22, 163, 74, 0.58));
-  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 82%, var(--surface-2)),
+    color-mix(in srgb, var(--brand) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
 }
 
 .avatarColor1 {
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.82), rgba(124, 58, 237, 0.58));
-  border-color: rgba(139, 92, 246, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--magenta) 82%, var(--surface-2)),
+    color-mix(in srgb, var(--accent) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--magenta) 30%, var(--border-soft));
 }
 
 .avatarColor2 {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.82), rgba(234, 88, 12, 0.58));
-  border-color: rgba(249, 115, 22, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--warning) 82%, var(--surface-2)),
+    color-mix(in srgb, var(--danger) 38%, var(--warning))
+  );
+  border-color: color-mix(in srgb, var(--warning) 30%, var(--border-soft));
 }
 
 .avatarColor3 {
-  background: linear-gradient(135deg, rgba(236, 72, 153, 0.82), rgba(219, 39, 119, 0.58));
-  border-color: rgba(236, 72, 153, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--danger) 72%, var(--magenta)),
+    color-mix(in srgb, var(--magenta) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border-soft));
 }
 
 .avatarColor4 {
-  background: linear-gradient(135deg, rgba(20, 184, 166, 0.82), rgba(13, 148, 136, 0.58));
-  border-color: rgba(20, 184, 166, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand) 76%, var(--info)),
+    color-mix(in srgb, var(--success) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--border-soft));
 }
 
 .avatarColor5 {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.82), rgba(139, 92, 246, 0.58));
-  border-color: rgba(167, 139, 250, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 64%, var(--magenta)),
+    color-mix(in srgb, var(--magenta) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
 }
 
 .avatarColor6 {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.82), rgba(37, 99, 235, 0.58));
-  border-color: rgba(59, 130, 246, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--info) 82%, var(--surface-2)),
+    color-mix(in srgb, var(--accent) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--info) 30%, var(--border-soft));
 }
 
 .avatarColor7 {
-  background: linear-gradient(135deg, rgba(217, 119, 6, 0.82), rgba(180, 83, 9, 0.58));
-  border-color: rgba(217, 119, 6, 0.3);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--neutral) 76%, var(--warning)),
+    color-mix(in srgb, var(--warning) 58%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--neutral) 30%, var(--border-soft));
 }
 
 /* ── Queue Footer ── */
@@ -3579,6 +3673,12 @@
   flex-shrink: 0;
 }
 
+.composerIconSvg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex: 0 0 auto;
+}
+
 .composerIconBtn:hover:not(:disabled) {
   background: var(--surface-2);
   color: var(--text-strong);
@@ -3600,12 +3700,12 @@
 }
 
 .composerSendChevron {
-  border: 1px solid rgba(59, 130, 246, 0.32);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border-soft));
   border-left: 0;
   border-radius: 0 6px 6px 0;
   width: 26px;
-  background: rgba(37, 99, 235, 0.1);
-  color: #60a5fa;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--accent);
   cursor: pointer;
   font-size: 0.72rem;
   transition: background 120ms ease;
@@ -3615,7 +3715,7 @@
 }
 
 .composerSendChevron:hover:not(:disabled) {
-  background: rgba(37, 99, 235, 0.2);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
 }
 
 .composerSendChevron:disabled {
@@ -3659,10 +3759,10 @@
   padding: 2px 0;
   cursor: pointer;
   font: inherit;
-  color: #f87171;
+  color: var(--danger);
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   text-align: left;
 }
@@ -3739,7 +3839,7 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 0.9rem;
-  background: rgba(15, 23, 42, 0.5);
+  background: color-mix(in srgb, var(--surface-0) 78%, var(--surface-2));
   margin-bottom: 4px;
 }
 
@@ -3790,7 +3890,7 @@
   border: 0;
   border-radius: 0;
   overflow: hidden;
-  background: rgba(15, 23, 42, 0.72);
+  background: color-mix(in srgb, var(--surface-0) 86%, var(--surface-2));
 }
 
 .messageMediaTileSingle {
@@ -3824,18 +3924,18 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(2, 6, 23, 0.58);
-  color: #fff;
+  background: color-mix(in srgb, var(--surface-0) 76%, transparent);
+  color: var(--text-strong);
   font-size: 1.45rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 
 .messageReplyBlock {
   align-items: center;
   min-height: 2.3rem;
   border-left: 0;
-  background: color-mix(in srgb, var(--surface-2) 78%, rgba(34, 197, 94, 0.16) 22%);
+  background: color-mix(in srgb, var(--surface-2) 78%, var(--success) 22%);
 }
 
 .replyThumbImage,
@@ -3852,11 +3952,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(34, 197, 94, 0.22);
-  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-2));
   color: var(--text-soft);
-  font-size: 0.64rem;
-  font-weight: 800;
+}
+
+.replyThumbSvg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
 }
 
 .composerShell {
@@ -3868,13 +3972,34 @@
 .composerReplyPreview {
   grid-template-columns: auto auto auto minmax(0, 1fr) auto;
   padding: 5px 7px;
-  border-color: rgba(34, 197, 94, 0.18);
-  background: color-mix(in srgb, var(--surface-2) 86%, rgba(34, 197, 94, 0.12) 14%);
+  border-color: color-mix(in srgb, var(--success) 18%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--success) 14%);
 }
 
 .composerReplyIcon {
-  color: rgba(52, 211, 153, 0.92);
-  font-size: 0.9rem;
+  color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composerReplyThumbSlot {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composerReplyThumbSlot:empty {
+  display: none;
+}
+
+.composerReplySvg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
 }
 
 .composerInputBar {
@@ -3908,7 +4033,7 @@
   width: 34px;
   height: 34px;
   border-radius: 0.8rem;
-  background: rgba(148, 163, 184, 0.1);
+  background: color-mix(in srgb, var(--text-muted) 10%, var(--surface-2));
 }
 
 .composerSendPrimary {
@@ -3977,9 +4102,13 @@
   min-width: 2.1rem;
   height: 2.1rem;
   padding: 0 0.8rem;
-  background: linear-gradient(160deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.12));
-  border-color: rgba(16, 185, 129, 0.34);
-  color: color-mix(in srgb, var(--text-strong) 86%, #0b5);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--success) 18%, var(--surface-2)),
+    color-mix(in srgb, var(--success) 12%, var(--surface-1))
+  );
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
   font-weight: 700;
 }
 
@@ -3994,13 +4123,13 @@
   min-height: 2rem;
   padding: 5px 6px;
   font-size: 0.73rem;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 .queueSubFilterActive {
   box-shadow:
-    0 1px 3px rgba(2, 6, 23, 0.18),
-    inset 0 0 0 1px rgba(16, 185, 129, 0.16);
+    0 1px 3px color-mix(in srgb, var(--surface-0) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--success) 16%, transparent);
 }
 
 .queueToolsRow {
@@ -4018,7 +4147,7 @@
 .queueToolField span {
   font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-muted);
 }
@@ -4036,8 +4165,8 @@
 }
 
 .queueToolField select:focus {
-  outline: 1px solid rgba(16, 185, 129, 0.45);
-  border-color: rgba(16, 185, 129, 0.45);
+  outline: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border-soft));
 }
 
 .list {
@@ -4061,23 +4190,23 @@
   background: linear-gradient(
     180deg,
     var(--surface-1),
-    color-mix(in srgb, var(--surface-2) 78%, #fff 22%)
+    color-mix(in srgb, var(--surface-2) 78%, var(--surface-1) 22%)
   );
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--surface-0) 6%, transparent);
 }
 
 .conversationRow:hover {
   transform: translateY(-1px);
   box-shadow:
-    0 6px 16px rgba(15, 23, 42, 0.08),
-    0 1px 2px rgba(15, 23, 42, 0.06);
+    0 6px 16px color-mix(in srgb, var(--surface-0) 8%, transparent),
+    0 1px 2px color-mix(in srgb, var(--surface-0) 6%, transparent);
 }
 
 .conversationRowActive {
-  border-color: rgba(16, 185, 129, 0.62);
+  border-color: color-mix(in srgb, var(--success) 62%, var(--border-soft));
   box-shadow:
-    inset 0 0 0 1px rgba(16, 185, 129, 0.22),
-    0 8px 18px rgba(16, 185, 129, 0.12);
+    inset 0 0 0 1px color-mix(in srgb, var(--success) 22%, transparent),
+    0 8px 18px color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .queueRowHeader {
@@ -4148,6 +4277,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   min-height: 1.45rem;
   padding: 0.14rem 0.48rem;
   border-radius: 999px;
@@ -4158,16 +4288,22 @@
   white-space: nowrap;
 }
 
+.queueBadgeIcon {
+  width: 0.78rem;
+  height: 0.78rem;
+  flex: 0 0 auto;
+}
+
 .queueCountBadgeIncoming {
-  color: #0f766e;
-  background: rgba(20, 184, 166, 0.15);
-  border-color: rgba(20, 184, 166, 0.3);
+  color: color-mix(in srgb, var(--success) 78%, var(--text-strong));
+  background: color-mix(in srgb, var(--success) 15%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
 }
 
 .queueCountBadgeUnread {
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.14);
-  border-color: rgba(59, 130, 246, 0.28);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-soft));
 }
 
 .queueRowFooter {
@@ -4192,28 +4328,34 @@
   white-space: nowrap;
 }
 
+.queueStatusIcon {
+  width: 0.84rem;
+  height: 0.84rem;
+  flex: 0 0 auto;
+}
+
 .queueStatusPill_New {
-  color: #1d4ed8;
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
 }
 
 .queueStatusPill_InProgress {
-  color: #047857;
-  background: rgba(16, 185, 129, 0.16);
-  border-color: rgba(16, 185, 129, 0.32);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 32%, var(--border-soft));
 }
 
 .queueStatusPill_WaitingForUser {
-  color: #9a3412;
-  background: rgba(251, 146, 60, 0.17);
-  border-color: rgba(251, 146, 60, 0.34);
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 17%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border-soft));
 }
 
 .queueStatusPill_Closed {
-  color: #475569;
-  background: rgba(148, 163, 184, 0.17);
-  border-color: rgba(148, 163, 184, 0.32);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 17%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--border-soft));
 }
 
 .slaPill {
@@ -4282,7 +4424,7 @@
   background: linear-gradient(
     180deg,
     var(--surface-1),
-    color-mix(in srgb, var(--surface-2) 82%, #fff 18%)
+    color-mix(in srgb, var(--surface-2) 82%, var(--surface-1) 18%)
   );
 }
 
@@ -4299,7 +4441,7 @@
   margin-bottom: 2px;
   font-size: 0.66rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
 }
 
 .infoPanelKvRow {
@@ -4333,8 +4475,8 @@
 }
 
 .infoPanelSelect:focus {
-  outline: 1px solid rgba(16, 185, 129, 0.48);
-  border-color: rgba(16, 185, 129, 0.48);
+  outline: 1px solid color-mix(in srgb, var(--success) 48%, transparent);
+  border-color: color-mix(in srgb, var(--success) 48%, var(--border-soft));
 }
 
 .infoPanelTagInputRow {
@@ -4355,8 +4497,8 @@
 }
 
 .infoPanelTagInput:focus {
-  outline: 1px solid rgba(16, 185, 129, 0.48);
-  border-color: rgba(16, 185, 129, 0.48);
+  outline: 1px solid color-mix(in srgb, var(--success) 48%, transparent);
+  border-color: color-mix(in srgb, var(--success) 48%, var(--border-soft));
 }
 
 .infoPanelTagsWrap {
@@ -4366,9 +4508,9 @@
 }
 
 .infoPanelTagChip {
-  border: 1px solid rgba(16, 185, 129, 0.28);
-  background: rgba(16, 185, 129, 0.12);
-  color: #047857;
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-2));
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
   border-radius: 999px;
   min-height: 1.6rem;
   padding: 0.14rem 0.52rem;
@@ -4403,8 +4545,8 @@
 }
 
 .infoPanelAttachmentItem:hover {
-  border-color: rgba(59, 130, 246, 0.38);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.16);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-soft));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .infoPanelAttachmentTop {
@@ -4462,8 +4604,8 @@
 }
 
 .infoPanelAttachmentCompactItem:hover {
-  border-color: rgba(59, 130, 246, 0.38);
-  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.16);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-soft));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 .infoPanelAttachmentCompactThumb {
@@ -4485,7 +4627,7 @@
   justify-content: center;
   font-size: 0.5rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   color: var(--text-muted);
   background: var(--surface-2);
 }
@@ -4558,9 +4700,9 @@
 }
 
 .supportPageTitle {
-  font-size: clamp(1.72rem, 1.54rem + 0.36vw, 2rem);
+  font-size: 1.9rem;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .supportPageSubtitle {
@@ -4575,14 +4717,14 @@
   gap: 8px;
   font-size: 0.82rem;
   font-weight: 600;
-  color: color-mix(in srgb, var(--text-muted) 84%, #166534 16%);
+  color: color-mix(in srgb, var(--text-muted) 84%, var(--success) 16%);
 }
 
 .supportPagePresenceDot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 68%, #22c55e 32%);
+  background: color-mix(in srgb, var(--accent) 68%, var(--success) 32%);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
@@ -4597,9 +4739,13 @@
   min-height: 3.15rem;
   padding-inline: 2.8rem 3.15rem;
   border-radius: 18px;
-  border: 1px solid rgba(203, 213, 225, 0.92);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, transparent),
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))
+  );
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--surface-0) 6%, transparent);
 }
 
 .supportPageHeroSearch .supportPageSearchInput {
@@ -4639,8 +4785,8 @@
   height: 1.4rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: rgba(241, 245, 249, 0.96);
-  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--text-muted) 26%, var(--border-soft));
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 700;
@@ -4661,10 +4807,14 @@
   width: 3rem;
   height: 3rem;
   border-radius: 16px;
-  border: 1px solid rgba(203, 213, 225, 0.92);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, transparent),
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))
+  );
   color: var(--text-strong);
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--surface-0) 5%, transparent);
   cursor: pointer;
 }
 
@@ -4681,8 +4831,8 @@
   height: 1rem;
   padding: 0 0.24rem;
   border-radius: 999px;
-  background: #ef4444;
-  color: #fff;
+  background: var(--danger);
+  color: var(--accent-contrast);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
@@ -4698,7 +4848,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--surface-0) 5%, transparent);
 }
 
 .supportPageActionIcon {
@@ -4715,9 +4865,13 @@
 .inboxPaneFlat,
 .chatShell,
 .infoPanelFlat {
-  border: 1px solid rgba(203, 213, 225, 0.88);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.07);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 26%, var(--border-soft));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, transparent),
+    color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))
+  );
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--surface-0) 7%, transparent);
 }
 
 .inboxPaneFlat,
@@ -4749,8 +4903,8 @@
   width: 2rem;
   height: 2rem;
   border-radius: 12px;
-  border: 1px solid rgba(203, 213, 225, 0.92);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-1) 98%, transparent);
   color: var(--text-strong);
   font-size: 0.92rem;
   line-height: 1;
@@ -4760,7 +4914,7 @@
 .queuePaneTitle {
   font-size: 1.95rem;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: 0;
 }
 
 .paneCountBadge {
@@ -4768,8 +4922,8 @@
   height: 2rem;
   padding-inline: 0.6rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 14%, #f8fafc 86%);
-  border-color: color-mix(in srgb, var(--accent) 24%, rgba(203, 213, 225, 0.9));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-soft));
   color: color-mix(in srgb, var(--accent) 68%, var(--text-strong) 32%);
 }
 
@@ -4779,8 +4933,8 @@
   gap: 4px;
   padding: 4px;
   border-radius: 16px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 95%, var(--surface-1));
 }
 
 .queueSubFilter,
@@ -4793,9 +4947,13 @@
 }
 
 .queueSubFilterActive {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(241, 245, 249, 0.95));
+  background: linear-gradient(
+    180deg,
+    var(--surface-1),
+    color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))
+  );
   color: var(--accent);
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);
 }
 
 .queueToolsRow {
@@ -4817,8 +4975,8 @@
   min-height: 2.4rem;
   padding-inline: 2.25rem 0.75rem;
   border-radius: 14px;
-  border: 1px solid rgba(203, 213, 225, 0.94);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-1) 98%, transparent);
 }
 
 .queueSearchIcon {
@@ -4856,8 +5014,8 @@
   min-height: 2.4rem;
   padding: 0 0.8rem;
   border-radius: 14px;
-  border: 1px solid rgba(203, 213, 225, 0.94);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-1) 98%, transparent);
   color: var(--text-strong);
   font: inherit;
   font-size: 0.78rem;
@@ -4866,8 +5024,8 @@
 }
 
 .queueUtilityButtonActive {
-  border-color: color-mix(in srgb, var(--accent) 30%, rgba(203, 213, 225, 0.94));
-  background: color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.98));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
   color: color-mix(in srgb, var(--accent) 72%, var(--text-strong) 28%);
 }
 
@@ -4892,15 +5050,15 @@
 .queueToolField span {
   font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   color: color-mix(in srgb, var(--text-muted) 86%, var(--text-strong) 14%);
 }
 
 .queueToolField select {
   min-height: 2.15rem;
   border-radius: 12px;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
   padding-inline: 0.55rem;
   font-size: 0.77rem;
 }
@@ -4919,9 +5077,9 @@
   gap: 12px;
   padding: 14px 12px;
   border-radius: 20px;
-  border: 1px solid rgba(226, 232, 240, 0.98);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--surface-0) 14%, transparent);
 }
 
 .conversationRowButton {
@@ -4930,10 +5088,10 @@
 }
 
 .conversationRowActive {
-  border-color: color-mix(in srgb, var(--accent) 34%, rgba(191, 219, 254, 0.95));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
-    0 20px 34px rgba(15, 23, 42, 0.08);
+    0 20px 34px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 .queueRowHeader {
@@ -4978,7 +5136,7 @@
 .queueFooter {
   margin-top: 0;
   padding-top: 10px;
-  border-top: 1px solid rgba(226, 232, 240, 0.95);
+  border-top: 1px solid var(--border-soft);
 }
 
 .queueFooterCount {
@@ -4998,8 +5156,8 @@
   display: grid;
   gap: 12px;
   padding: 18px 22px 14px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.94);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 250, 251, 0.95));
+  border-bottom: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
 }
 
 .chatHeaderIdentity {
@@ -5017,8 +5175,8 @@
   width: 2.4rem;
   height: 2.4rem;
   border-radius: 14px;
-  border: 1px solid rgba(203, 213, 225, 0.94);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
   color: var(--text-strong);
   font-size: 1.25rem;
   line-height: 1;
@@ -5041,7 +5199,7 @@
 .chatHeaderNameRow strong {
   font-size: 1.55rem;
   font-weight: 700;
-  letter-spacing: -0.04em;
+  letter-spacing: 0;
 }
 
 .chatHeaderBadges {
@@ -5058,18 +5216,18 @@
   min-height: 1.7rem;
   padding: 0.18rem 0.7rem;
   border-radius: 999px;
-  border: 1px solid rgba(251, 191, 36, 0.28);
-  background: rgba(254, 249, 195, 0.88);
-  color: #a16207;
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border-soft));
+  background: var(--warning-soft-bg);
+  color: var(--warning-soft-fg);
   font-size: 0.72rem;
   font-weight: 700;
   line-height: 1;
 }
 
 .chatHeaderSlaBadgeUrgent {
-  border-color: rgba(248, 113, 113, 0.3);
-  background: rgba(254, 226, 226, 0.88);
-  color: #dc2626;
+  border-color: color-mix(in srgb, var(--danger) 34%, var(--border-soft));
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-fg);
 }
 
 .chatHeaderSubtext {
@@ -5092,12 +5250,16 @@
 }
 
 .chatMetaDivider {
-  color: rgba(148, 163, 184, 0.96);
+  color: var(--text-subtle);
 }
 
 .messagesWrap {
   padding: 18px 20px 0;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.95));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 72%, transparent),
+    var(--surface-2)
+  );
 }
 
 .messages {
@@ -5131,26 +5293,26 @@
 
 .messageReplyBlock {
   border-radius: 14px;
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  background: rgba(248, 250, 252, 0.94);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
 }
 
 .messageUser .messageReplyBlock,
 .messageUser .messageAttachmentCard {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
-  border: 1px solid rgba(226, 232, 240, 0.98);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--surface-0) 12%, transparent);
 }
 
 .messageAdmin .messageReplyBlock,
 .messageAdmin .messageAttachmentCard {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent) 10%, #ffffff 90%),
-    color-mix(in srgb, var(--accent) 7%, #f0fdf4 93%)
+    color-mix(in srgb, var(--accent) 10%, var(--surface-1)),
+    color-mix(in srgb, var(--accent) 7%, var(--surface-2))
   );
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, rgba(226, 232, 240, 0.95));
-  box-shadow: 0 12px 26px rgba(16, 185, 129, 0.08);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border-soft));
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 .messageBody {
@@ -5169,8 +5331,8 @@
 
 .composerShell {
   padding: 16px 18px 18px;
-  border-top: 1px solid rgba(226, 232, 240, 0.95);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.98));
+  border-top: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
 }
 
 .composerInputBar {
@@ -5180,17 +5342,17 @@
   gap: 12px;
   padding: 10px 12px;
   border-radius: 18px;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 6%, transparent);
 }
 
 .composerIconBtn {
   width: 2.7rem;
   height: 2.7rem;
   border-radius: 14px;
-  background: rgba(241, 245, 249, 0.96);
-  border: 1px solid rgba(226, 232, 240, 0.98);
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
 }
 
 .composerTextarea {
@@ -5215,10 +5377,10 @@
   min-width: 2.35rem;
   min-height: 2.8rem;
   border: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.24);
+  border-left: 1px solid color-mix(in srgb, var(--accent-contrast) 24%, transparent);
   border-radius: 0 14px 14px 0;
-  background: color-mix(in srgb, var(--accent) 92%, #4338ca 8%);
-  color: #fff;
+  background: color-mix(in srgb, var(--accent) 92%, var(--accent-strong) 8%);
+  color: var(--accent-contrast);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -5259,7 +5421,7 @@
 .infoPanelSectionLink {
   font-size: 0.78rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--accent) 62%, #2563eb 38%);
+  color: var(--accent);
 }
 
 .infoPanelSectionLinkButton {
@@ -5268,7 +5430,7 @@
   font: inherit;
   font-size: 0.78rem;
   font-weight: 700;
-  color: color-mix(in srgb, var(--accent) 62%, #2563eb 38%);
+  color: var(--accent);
   cursor: pointer;
 }
 
@@ -5312,8 +5474,8 @@
   width: 9.5rem;
   min-height: 2.15rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(203, 213, 225, 0.96);
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
 }
 
 .infoPanelSelectWrap {
@@ -5327,7 +5489,7 @@
 }
 
 .infoPanelSlaValue {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .infoPanelAttachmentPreviewStrip {
@@ -5345,15 +5507,15 @@
   aspect-ratio: 1 / 1;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  background: rgba(248, 250, 252, 0.96);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--surface-0) 12%, transparent);
   color: inherit;
   cursor: pointer;
 }
 
 .infoPanelAttachmentPreviewTile:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, rgba(203, 213, 225, 0.96));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
 }
 
 .infoPanelAttachmentPreviewTile:disabled {
@@ -5372,10 +5534,8 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
   color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--text-muted) 14%);
 }
 
 .infoPanelAttachmentPreviewSize {
@@ -5387,8 +5547,8 @@
   min-height: 1.15rem;
   padding: 0 0.36rem;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.84);
-  color: #fff;
+  background: color-mix(in srgb, var(--surface-0) 84%, transparent);
+  color: var(--text-inverse);
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
@@ -5400,16 +5560,16 @@
   color: var(--text-strong);
   font-size: 1.2rem;
   font-weight: 800;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.96));
-  color: #fff;
+  background: linear-gradient(180deg, var(--surface-0), var(--surface-3));
+  color: var(--text-inverse);
 }
 
 .infoPanelTagAddChip {
   width: 1.9rem;
   height: 1.9rem;
   border-radius: 999px;
-  border: 1px solid rgba(203, 213, 225, 0.96);
-  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
   color: var(--text-strong);
   font-size: 1rem;
   line-height: 1;
@@ -5417,7 +5577,7 @@
 }
 
 .infoPanelTagAddChip:hover {
-  border-color: color-mix(in srgb, var(--accent) 30%, rgba(203, 213, 225, 0.96));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
 }
 
 .infoPanelTagsWrap {
@@ -5428,8 +5588,8 @@
 
 .infoPanelTagChip {
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, rgba(203, 213, 225, 0.96));
-  background: color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.98));
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
   color: color-mix(in srgb, var(--accent) 66%, var(--text-strong) 34%);
   padding: 0.2rem 0.56rem;
   min-height: 1.65rem;
@@ -5444,8 +5604,8 @@
 .infoPanelTagInput {
   min-height: 2.15rem;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(203, 213, 225, 0.96);
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
 }
 
 .infoPanelUserCard {
@@ -5470,9 +5630,9 @@
   min-height: 4.2rem;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(226, 232, 240, 0.96);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.95));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 6%, transparent);
 }
 
 .infoPanelStatTileButton {
@@ -5575,6 +5735,10 @@
 }
 
 @media (max-width: 780px) {
+  .supportPageTitle {
+    font-size: 1.52rem;
+  }
+
   .supportPageActions {
     flex-wrap: wrap;
   }
@@ -5624,7 +5788,7 @@
 
 .queuePaneTitle {
   font-size: 1.8rem;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
 }
 
 .paneCountBadge {
@@ -5664,7 +5828,7 @@
 
 .queueToolField span {
   font-size: 0.58rem;
-  letter-spacing: 0.09em;
+  letter-spacing: 0;
   margin-bottom: 0.12rem;
 }
 
@@ -5697,21 +5861,21 @@
 .conversationRow {
   padding: 0.72rem;
   border-radius: 14px;
-  border: 1px solid rgba(156, 163, 175, 0.35);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 252, 0.98));
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, var(--border-soft));
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--surface-0) 12%, transparent);
 }
 
 .conversationRow:hover {
-  border-color: rgba(59, 130, 246, 0.34);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.09);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--surface-0) 16%, transparent);
 }
 
 .conversationRowActive {
-  border-color: rgba(37, 99, 235, 0.42);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-soft));
   box-shadow:
-    0 0 0 2px rgba(37, 99, 235, 0.12),
-    0 10px 20px rgba(15, 23, 42, 0.1);
+    0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 10px 20px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 .queueRowHeader {
@@ -5801,20 +5965,24 @@
 .inboxPaneFlat,
 .infoPanelFlat,
 .chatShell {
-  border: 1px solid rgba(148, 163, 184, 0.34) !important;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft)) !important;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.9) inset,
-    0 14px 30px rgba(15, 23, 42, 0.08) !important;
+    0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent) inset,
+    0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent) !important;
 }
 
 .queuePaneHeader {
   padding-bottom: 0.52rem;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.7);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
 }
 
 .queueSubFilters {
-  border: 1px solid rgba(203, 213, 225, 0.82);
-  background: linear-gradient(180deg, rgba(249, 250, 251, 0.92), rgba(243, 244, 246, 0.8));
+  border: 1px solid color-mix(in srgb, var(--border-soft) 82%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 80%, var(--surface-0))
+  );
 }
 
 .queueSubFilter,
@@ -5824,20 +5992,24 @@
 }
 
 .queueSubFilterActive {
-  border-color: rgba(59, 130, 246, 0.26);
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border-soft));
 }
 
 .queueFiltersGrid {
   padding: 0.44rem;
-  border: 1px solid rgba(203, 213, 225, 0.74);
+  border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(244, 246, 250, 0.72));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 90%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 72%, var(--surface-0))
+  );
 }
 
 .queueToolField span {
   font-size: 0.57rem;
   font-weight: 800;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .queueToolField > div {
@@ -5847,19 +6019,19 @@
 .queueToolField > div > button {
   min-height: 2.05rem;
   border-radius: 10px;
-  border-color: rgba(203, 213, 225, 0.94);
-  background: rgba(255, 255, 255, 0.98);
+  border-color: color-mix(in srgb, var(--border-soft) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 98%, var(--surface-2));
   box-shadow: none;
 }
 
 .queueToolField > div > button:hover {
-  border-color: rgba(148, 163, 184, 0.9);
+  border-color: color-mix(in srgb, var(--text-muted) 72%, var(--border-soft));
   transform: none;
 }
 
 .queueToolField > div > div {
-  border: 1px solid rgba(148, 163, 184, 0.52);
-  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 52%, var(--border-soft));
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--surface-0) 20%, transparent);
 }
 
 .list {
@@ -5869,11 +6041,15 @@
 
 .conversationRow {
   position: relative;
-  border: 1px solid rgba(148, 163, 184, 0.33);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 33%, var(--border-soft));
   border-radius: 16px;
   padding: 0.76rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(246, 248, 252, 0.98));
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 99%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1))
+  );
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 10%, transparent);
 }
 
 .conversationRow::before {
@@ -5882,19 +6058,19 @@
   inset: 0;
   border-radius: 16px;
   pointer-events: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent);
 }
 
 .conversationRowActive {
-  border-color: rgba(37, 99, 235, 0.38);
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-soft));
   box-shadow:
-    0 0 0 2px rgba(37, 99, 235, 0.12),
-    0 12px 24px rgba(15, 23, 42, 0.1);
+    0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 12px 24px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 .queueRowHeader {
   padding-bottom: 0.42rem;
-  border-bottom: 1px dashed rgba(203, 213, 225, 0.82);
+  border-bottom: 1px dashed color-mix(in srgb, var(--border-soft) 82%, transparent);
 }
 
 .queueRowMeta {
@@ -5902,11 +6078,11 @@
 }
 
 .rowTitle {
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .rowPreview span {
-  color: #475569;
+  color: var(--text-soft);
 }
 
 .queueRowFooter {
@@ -5916,7 +6092,7 @@
 
 .queueStatusPill,
 .slaPill {
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, var(--border-soft));
   border-radius: 999px;
   min-height: 1.5rem;
   padding: 0.14rem 0.5rem;
@@ -5938,7 +6114,7 @@
   min-height: 1.36rem;
   padding: 0 0.46rem;
   border-radius: 999px;
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  border: 1px solid color-mix(in srgb, var(--border-soft) 80%, transparent);
   font-size: 0.65rem;
   font-weight: 700;
   line-height: 1;
@@ -5946,18 +6122,18 @@
 }
 
 .queueMetaChip {
-  background: rgba(59, 130, 246, 0.1);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.24);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-soft));
 }
 
 .queueMetaChipMuted {
-  background: rgba(248, 250, 252, 0.96);
-  color: #64748b;
+  background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));
+  color: var(--text-muted);
 }
 
 .queueFooter {
-  border-top: 1px solid rgba(203, 213, 225, 0.7);
+  border-top: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
   margin-top: 0.2rem;
   display: flex;
   flex-wrap: wrap;
@@ -5977,20 +6153,24 @@
 }
 
 .queuePagerButton {
+  min-width: 2.35rem;
   min-height: 2rem;
-  border: 1px solid rgba(148, 163, 184, 0.32);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 32%, var(--border-soft));
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.86);
+  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-2));
   color: var(--text-soft);
   padding: 0.36rem 0.58rem;
   font: inherit;
   font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .queuePagerButton:hover:not(:disabled) {
-  border-color: rgba(59, 130, 246, 0.45);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-soft));
   color: var(--text-strong);
 }
 
@@ -5999,13 +6179,31 @@
   opacity: 0.54;
 }
 
+.queuePagerIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.queuePagerIconPrevious {
+  transform: rotate(90deg);
+}
+
+.queuePagerIconNext {
+  transform: rotate(-90deg);
+}
+
 .infoPanel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.94));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 92%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))
+  );
 }
 
 .infoPanelSection {
   padding: 0.92rem;
-  border-bottom: 1px solid rgba(203, 213, 225, 0.72);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 72%, transparent);
 }
 
 .infoPanelSection:last-child {
@@ -6015,7 +6213,7 @@
 .infoPanelSectionTitle {
   font-size: 0.92rem;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .infoPanelSectionHeader {
@@ -6025,15 +6223,15 @@
 .infoPanelAttachmentPreviewTile,
 .infoPanelAttachmentPreviewMore {
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.34);
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--surface-0) 14%, transparent);
 }
 
 .infoPanelStatTile,
 .infoPanelStatTileFull {
-  border: 1px solid rgba(203, 213, 225, 0.74);
+  border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);
   border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 7%, transparent);
 }
 
 .actionsPanelBtn {
@@ -6041,15 +6239,19 @@
 }
 
 .attachmentListItem {
-  border: 1px solid rgba(148, 163, 184, 0.34);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 252, 0.96));
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1))
+  );
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--surface-0) 12%, transparent);
 }
 
 .attachmentListItem:hover {
-  border-color: rgba(59, 130, 246, 0.34);
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--surface-0) 18%, transparent);
 }
 
 .attachmentListMeta strong {
@@ -6077,10 +6279,11 @@
 
 .messagesWrap {
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at 16% 10%, rgba(148, 163, 184, 0.1) 0, transparent 30%),
-    radial-gradient(circle at 86% 90%, rgba(148, 163, 184, 0.08) 0, transparent 34%),
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.98));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 82%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-0))
+  );
 }
 
 .messages {
@@ -6098,19 +6301,19 @@
   border-radius: 16px;
   padding: 8px 10px 7px;
   border: 1px solid transparent;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--surface-0) 6%, transparent);
   overflow: hidden;
 }
 
 .messageTick {
   font-size: 0.74rem;
-  color: #94a3b8;
-  letter-spacing: -0.015em;
+  color: var(--text-muted);
+  letter-spacing: 0;
   transform: translateY(-0.25px);
 }
 
 .messageTickRead {
-  color: #0ea5a4;
+  color: color-mix(in srgb, var(--success) 72%, var(--accent));
   text-shadow: none;
 }
 
@@ -6124,9 +6327,9 @@
   display: inline-grid;
   place-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.42);
-  background: rgba(255, 255, 255, 0.92);
-  color: #475569;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-2));
+  color: var(--text-soft);
   font-size: 0.72rem;
   line-height: 1;
   opacity: 0.18;
@@ -6147,14 +6350,14 @@
 }
 
 .messageReplyAction:hover {
-  border-color: rgba(14, 116, 144, 0.42);
-  background: rgba(241, 245, 249, 0.96);
-  color: #0f172a;
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--text-strong);
 }
 
 .messageBody {
   position: relative;
-  color: #0f172a;
+  color: var(--text-strong);
   min-width: 0;
   padding: 0;
   border: none;
@@ -6171,13 +6374,21 @@
 }
 
 .messageItem.messageUser {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(241, 245, 251, 0.985));
-  border-color: rgba(148, 163, 184, 0.6);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 96%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 86%, var(--surface-1))
+  );
+  border-color: color-mix(in srgb, var(--text-muted) 46%, var(--border-soft));
 }
 
 .messageItem.messageAdmin {
-  background: linear-gradient(180deg, rgba(236, 252, 247, 0.98), rgba(224, 247, 240, 0.95));
-  border-color: rgba(148, 211, 199, 0.66);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--success) 13%, var(--surface-1)),
+    color-mix(in srgb, var(--success) 10%, var(--surface-2))
+  );
+  border-color: color-mix(in srgb, var(--success) 38%, var(--border-soft));
 }
 
 .messageReplyBlock {
@@ -6186,21 +6397,21 @@
   gap: 6px;
   border-radius: 9px;
   padding: 4px 6px 5px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 22%, var(--border-soft));
+  background: color-mix(in srgb, var(--text-muted) 10%, var(--surface-2));
   box-shadow: none;
 }
 
 .messageAdmin .messageReplyBlock {
-  border-color: rgba(16, 185, 129, 0.24);
-  background: rgba(16, 185, 129, 0.08);
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 9%, var(--surface-2));
 }
 
 .messageReplyBlock::before {
   width: 2px;
   border-radius: 2px;
   min-height: 100%;
-  background: rgba(14, 165, 233, 0.65);
+  background: color-mix(in srgb, var(--info) 68%, var(--accent));
 }
 
 .messageReplyBlockContent {
@@ -6210,13 +6421,13 @@
 }
 
 .messageReplyBlockLabel {
-  color: #475569;
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-strong));
   font-size: 0.7rem;
   line-height: 1.2;
 }
 
 .messageReplyBlockPreview {
-  color: #0f172a;
+  color: var(--text-strong);
   font-size: 0.78rem;
   line-height: 1.28;
   overflow-wrap: anywhere;
@@ -6224,11 +6435,11 @@
 }
 
 .messageAdmin .messageReplyBlockLabel {
-  color: #0f766e;
+  color: color-mix(in srgb, var(--success) 72%, var(--text-strong));
 }
 
 .messageAdmin .messageReplyBlockPreview {
-  color: #134e4a;
+  color: color-mix(in srgb, var(--success) 60%, var(--text-strong));
 }
 
 .messageMeta {
@@ -6238,7 +6449,7 @@
   width: fit-content;
   margin-top: 3px;
   padding-inline: 2px;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.71rem;
   line-height: 1;
   white-space: nowrap;
@@ -6262,4 +6473,180 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* Late dark-theme support workspace overrides must stay below final polish rules. */
+:global(:root:not([data-theme="light"])) .inboxPaneFlat,
+:global(:root[data-theme="dark"]) .inboxPaneFlat,
+:global(:root:not([data-theme="light"])) .infoPanelFlat,
+:global(:root[data-theme="dark"]) .infoPanelFlat,
+:global(:root:not([data-theme="light"])) .chatShell,
+:global(:root[data-theme="dark"]) .chatShell {
+  border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-0));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
+    0 14px 30px color-mix(in srgb, var(--surface-0) 46%, transparent) !important;
+}
+
+:global(:root:not([data-theme="light"])) .queuePaneHeader,
+:global(:root[data-theme="dark"]) .queuePaneHeader,
+:global(:root:not([data-theme="light"])) .queueFooter,
+:global(:root[data-theme="dark"]) .queueFooter,
+:global(:root:not([data-theme="light"])) .infoPanelSection,
+:global(:root[data-theme="dark"]) .infoPanelSection {
+  border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
+}
+
+:global(:root:not([data-theme="light"])) .queueSubFilters,
+:global(:root[data-theme="dark"]) .queueSubFilters,
+:global(:root:not([data-theme="light"])) .queueFiltersGrid,
+:global(:root[data-theme="dark"]) .queueFiltersGrid,
+:global(:root:not([data-theme="light"])) .composerShell,
+:global(:root[data-theme="dark"]) .composerShell,
+:global(:root:not([data-theme="light"])) .composerInputBar,
+:global(:root[data-theme="dark"]) .composerInputBar {
+  border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField span,
+:global(:root[data-theme="dark"]) .queueToolField span,
+:global(:root:not([data-theme="light"])) .rowPreview span,
+:global(:root[data-theme="dark"]) .rowPreview span,
+:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
+:global(:root[data-theme="dark"]) .queueMetaChipMuted,
+:global(:root:not([data-theme="light"])) .messageMeta,
+:global(:root[data-theme="dark"]) .messageMeta,
+:global(:root:not([data-theme="light"])) .messageTick,
+:global(:root[data-theme="dark"]) .messageTick,
+:global(:root:not([data-theme="light"])) .messageReplyBlockLabel,
+:global(:root[data-theme="dark"]) .messageReplyBlockLabel {
+  color: var(--text-muted);
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField > div > button,
+:global(:root[data-theme="dark"]) .queueToolField > div > button,
+:global(:root:not([data-theme="light"])) .composerIconBtn,
+:global(:root[data-theme="dark"]) .composerIconBtn,
+:global(:root:not([data-theme="light"])) .queuePagerButton,
+:global(:root[data-theme="dark"]) .queuePagerButton {
+  border-color: color-mix(in srgb, var(--border-soft) 84%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 90%, var(--surface-0));
+  color: var(--text-soft);
+  box-shadow: none;
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField > div > div,
+:global(:root[data-theme="dark"]) .queueToolField > div > div {
+  border-color: color-mix(in srgb, var(--border-soft) 74%, var(--surface-0));
+  background: var(--surface-2);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--surface-0) 54%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRow,
+:global(:root[data-theme="dark"]) .conversationRow,
+:global(:root:not([data-theme="light"])) .attachmentListItem,
+:global(:root[data-theme="dark"]) .attachmentListItem,
+:global(:root:not([data-theme="light"])) .infoPanelAttachmentPreviewTile,
+:global(:root[data-theme="dark"]) .infoPanelAttachmentPreviewTile,
+:global(:root:not([data-theme="light"])) .infoPanelAttachmentPreviewMore,
+:global(:root[data-theme="dark"]) .infoPanelAttachmentPreviewMore,
+:global(:root:not([data-theme="light"])) .infoPanelStatTile,
+:global(:root[data-theme="dark"]) .infoPanelStatTile,
+:global(:root:not([data-theme="light"])) .infoPanelStatTileFull,
+:global(:root[data-theme="dark"]) .infoPanelStatTileFull {
+  border-color: color-mix(in srgb, var(--border-soft) 80%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 44%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRow::before,
+:global(:root[data-theme="dark"]) .conversationRow::before {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRowActive,
+:global(:root[data-theme="dark"]) .conversationRowActive {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-soft));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 12px 24px color-mix(in srgb, var(--surface-0) 52%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueRowHeader,
+:global(:root[data-theme="dark"]) .queueRowHeader {
+  border-color: color-mix(in srgb, var(--border-soft) 66%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueStatusPill,
+:global(:root[data-theme="dark"]) .queueStatusPill,
+:global(:root:not([data-theme="light"])) .slaPill,
+:global(:root[data-theme="dark"]) .slaPill,
+:global(:root:not([data-theme="light"])) .queueMetaChip,
+:global(:root[data-theme="dark"]) .queueMetaChip,
+:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
+:global(:root[data-theme="dark"]) .queueMetaChipMuted {
+  border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 80%, var(--surface-0));
+}
+
+:global(:root:not([data-theme="light"])) .queueMetaChip,
+:global(:root[data-theme="dark"]) .queueMetaChip,
+:global(:root:not([data-theme="light"])) .messageReplyBlock::before,
+:global(:root[data-theme="dark"]) .messageReplyBlock::before,
+:global(:root:not([data-theme="light"])) .messageTickRead,
+:global(:root[data-theme="dark"]) .messageTickRead {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-2));
+}
+
+:global(:root:not([data-theme="light"])) .messagesWrap,
+:global(:root[data-theme="dark"]) .messagesWrap,
+:global(:root:not([data-theme="light"])) .infoPanel,
+:global(:root[data-theme="dark"]) .infoPanel {
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-0));
+}
+
+:global(:root:not([data-theme="light"])) .messageItem,
+:global(:root[data-theme="dark"]) .messageItem {
+  border-color: color-mix(in srgb, var(--border-soft) 76%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--surface-0) 40%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .messageBody,
+:global(:root[data-theme="dark"]) .messageBody,
+:global(:root:not([data-theme="light"])) .messageReplyBlockPreview,
+:global(:root[data-theme="dark"]) .messageReplyBlockPreview {
+  color: var(--text-strong);
+}
+
+:global(:root:not([data-theme="light"])) .messageAdmin,
+:global(:root[data-theme="dark"]) .messageAdmin {
+  border-color: color-mix(in srgb, var(--success) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 13%, var(--surface-2));
+}
+
+:global(:root:not([data-theme="light"])) .messageReplyAction,
+:global(:root[data-theme="dark"]) .messageReplyAction,
+:global(:root:not([data-theme="light"])) .messageReplyBlock,
+:global(:root[data-theme="dark"]) .messageReplyBlock {
+  border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 84%, var(--surface-0));
+  color: var(--text-soft);
+}
+
+:global(:root:not([data-theme="light"])) .messageAdmin .messageReplyBlock,
+:global(:root[data-theme="dark"]) .messageAdmin .messageReplyBlock {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--success) 10%, var(--surface-1));
+}
+
+:global(:root:not([data-theme="light"])) .messageAdmin .messageReplyBlockLabel,
+:global(:root[data-theme="dark"]) .messageAdmin .messageReplyBlockLabel,
+:global(:root:not([data-theme="light"])) .messageAdmin .messageReplyBlockPreview,
+:global(:root[data-theme="dark"]) .messageAdmin .messageReplyBlockPreview {
+  color: color-mix(in srgb, var(--success) 74%, var(--text-strong));
 }

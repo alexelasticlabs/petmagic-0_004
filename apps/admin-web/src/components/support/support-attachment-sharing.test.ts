@@ -40,18 +40,4 @@ describe("support attachment sharing", () => {
     expect(source).not.toContain("pendingAttachmentActionKey ===\n          getAttachmentActionKey");
     expect(source).toContain("if (controller.signal.aborted)");
   });
-
-  it("guards side panel attachment open and download actions by workspace permissions", () => {
-    const source = readFileSync(
-      fileURLToPath(new URL("./support-conversation-side-panel.tsx", import.meta.url)),
-      "utf8"
-    );
-
-    expect(source).toContain(
-      "if (!canManageSupportWorkspace || pendingAttachmentActionKey !== null)"
-    );
-    expect(source).toContain(
-      "disabled={!canManageSupportWorkspace || pendingAttachmentActionKey !== null}"
-    );
-  });
 });

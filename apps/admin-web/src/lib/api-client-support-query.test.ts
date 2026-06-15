@@ -67,6 +67,43 @@ describe("api-client.support query normalization", () => {
     );
   });
 
+  it("drops unsupported support inbox enum filters before backend requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportInbox(["New", "Deleted" as never], "everyone" as never, {
+      priority: "Urgent" as never,
+      sort: "oldest" as never,
+      search: " billing ",
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets?status=New&search=billing&page=1&pageSize=50"
+    );
+  });
+
+  it("canonicalizes support inbox enum filters before request URLs", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({ items: [], page: 1, pageSize: 50, totalCount: 0, hasMore: false })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSupportInbox("waitingforuser" as never, "UNASSIGNED" as never, {
+      priority: "high" as never,
+      sort: "UPDATED" as never,
+      page: 1,
+      pageSize: 50,
+    });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/support/tickets?status=WaitingForUser&assignment=unassigned&priority=High&sort=updated&page=1&pageSize=50"
+    );
+  });
+
   it("requests support inbox metrics with abort support", async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       Response.json({

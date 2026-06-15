@@ -32,8 +32,6 @@ import {
   markSupportConversationRead,
   sendSupportAttachment,
   sendSupportMessage,
-  setActive,
-  setPremium,
   SUPPORT_INBOX_SEARCH_MAX_LENGTH,
   SUPPORT_MESSAGE_BODY_MAX_LENGTH,
   updateSupportConversationMetadata,
@@ -42,6 +40,7 @@ import {
   type AdminEconomyPurchase,
   type AdminEconomyUserSubscriptionSummary,
   type AdminSupportConversation,
+  type AdminSupportConversationSummary,
   type AdminSupportInboxPage,
   type AdminSupportInboxMetrics,
   type AdminUserAnalytics,
@@ -190,7 +189,7 @@ export function useSupportConversationController({
   conversationId,
   queueStatusFilter = "all",
 }: UseSupportConversationControllerParams) {
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
@@ -202,10 +201,6 @@ export function useSupportConversationController({
     locale === "ru"
       ? "Действия поддержки доступны только Admin или Moderator."
       : "Support actions are available only to Admin or Moderator.";
-  const supportSubjectUserMissing =
-    locale === "ru"
-      ? "Карточка пользователя недоступна для этого обращения."
-      : "User context is unavailable for this conversation.";
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [queuePage, setQueuePage] = useState(1);
   const [searchQuery, setRawSearchQuery] = useState("");
@@ -239,7 +234,7 @@ export function useSupportConversationController({
   }, [setSelectedAttachment]);
 
   const refreshConversationData = useCallback(async () => {
-    await Promise.all([
+    await Promise.allSettled([
       queryClient.invalidateQueries({
         queryKey: adminQueryKeys.supportConversation(conversationId),
       }),
@@ -829,81 +824,6 @@ export function useSupportConversationController({
     },
   });
 
-  const setUserActiveMutation = useMutation({
-    mutationFn: async (isActive: boolean) => {
-      if (!subjectUserId || !canViewSubjectUserContext) {
-        throw new Error(supportSubjectUserMissing);
-      }
-
-      await setActive(subjectUserId, isActive);
-      return isActive;
-    },
-    onSuccess: async (isActive) => {
-      const message = isActive
-        ? locale === "ru"
-          ? "Пользователь активирован"
-          : "User activated"
-        : locale === "ru"
-          ? "Пользователь заблокирован"
-          : "User blocked";
-
-      setToast({
-        type: "success",
-        message,
-      });
-      pushSupportNotification("success", message);
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.supportConversation(conversationId),
-        }),
-      ]);
-    },
-    onError: (error) => {
-      pushSupportError(error);
-    },
-  });
-
-  const setUserPremiumMutation = useMutation({
-    mutationFn: async (isPremium: boolean) => {
-      if (!subjectUserId || !canViewSubjectUserContext) {
-        throw new Error(supportSubjectUserMissing);
-      }
-
-      await setPremium(subjectUserId, isPremium);
-      return isPremium;
-    },
-    onSuccess: async (isPremium) => {
-      const message = isPremium
-        ? locale === "ru"
-          ? "Премиум включен"
-          : "Premium granted"
-        : locale === "ru"
-          ? "Премиум отключен"
-          : "Premium revoked";
-
-      setToast({
-        type: "success",
-        message,
-      });
-      pushSupportNotification("success", message);
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.usersRoot }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(subjectUserId!) }),
-        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userAnalytics(subjectUserId!) }),
-        queryClient.invalidateQueries({
-          queryKey: adminQueryKeys.economyUserSubscriptionSummary(subjectUserId!),
-        }),
-      ]);
-    },
-    onError: (error) => {
-      pushSupportError(error);
-    },
-  });
-
   const userQuery = useQuery<AdminUserDetail>({
     queryKey: subjectUserId
       ? adminQueryKeys.userDetail(subjectUserId)
@@ -959,7 +879,7 @@ export function useSupportConversationController({
     retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
   });
 
-  const filteredInboxItems = useMemo(
+  const filteredInboxItems = useMemo<AdminSupportConversationSummary[]>(
     () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );
@@ -1199,8 +1119,6 @@ export function useSupportConversationController({
     isSendReplySubmitting,
     sessionUserId,
     sessionUserRoles,
-    setUserActiveMutation,
-    setUserPremiumMutation,
     setActiveSidePanelTab,
     setIsSidePanelOpen,
     setReply: setSupportReply,

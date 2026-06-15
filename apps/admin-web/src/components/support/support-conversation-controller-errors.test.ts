@@ -7,13 +7,7 @@ const controllerPath = fileURLToPath(
 );
 const supportPagePath = fileURLToPath(new URL("./support-conversation-page.tsx", import.meta.url));
 const supportInboxPagePath = fileURLToPath(new URL("./support-inbox-page.tsx", import.meta.url));
-const supportSidePanelPath = fileURLToPath(
-  new URL("./support-conversation-side-panel.tsx", import.meta.url)
-);
 const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
-const supportUiPrimitivesPath = fileURLToPath(
-  new URL("./support-conversation-ui-primitives.tsx", import.meta.url)
-);
 const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
 const selectPath = fileURLToPath(new URL("../ui/select.tsx", import.meta.url));
 const adminFollowupsPath = fileURLToPath(
@@ -35,7 +29,6 @@ describe("support conversation controller errors", () => {
   it("keeps support workspace fetches and actions role-guarded at the controller layer", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
     const pageSource = readFileSync(supportPagePath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
     const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
     const selectSource = readFileSync(selectPath, "utf8");
 
@@ -83,25 +76,19 @@ describe("support conversation controller errors", () => {
       "const isComposerDisabled = isConversationReadOnly || !canManageSupportWorkspace || isComposerBusy;"
     );
     expect(pageSource).toContain("if (isComposerDisabled) return;");
-    expect(sidePanelSource).toContain("if (!canManageSupportWorkspace) {\n      return;");
-    expect(sidePanelSource).toContain(
-      "const canRetrySubjectUserContext = canViewSubjectUserContext && !isSubjectUserDeleted;"
-    );
-    expect(sidePanelSource).toContain(
-      "!canRetrySubjectUserContext ||\n                      analyticsQuery.isFetching"
-    );
-    expect(sidePanelSource).toContain(
-      "if (!canRetrySubjectUserContext) {\n                        return;\n                      }\n\n                      void Promise.all(["
-    );
-    expect(sidePanelSource).toContain(
-      "disabled={!canManageSupportWorkspace || statusMutation.isPending}"
-    );
     expect(infoPanelSource).toContain("disabled={!canManageSupportWorkspace}");
     expect(infoPanelSource).toContain(
       "disabled={!canManageSupportWorkspace || statusMutation.isPending}"
     );
+    expect(infoPanelSource).toContain(
+      "!canManageSupportWorkspace ||\n      statusMutation.isPending ||\n      conversation.status === status"
+    );
+    expect(infoPanelSource).toContain(
+      "if (!canManageSupportWorkspace || pendingAttachmentOpenKey !== null)"
+    );
     expect(selectSource).toContain("disabled?: boolean;");
-    expect(selectSource).toContain("disabled={disabled}");
+    expect(selectSource).toContain("const isSelectDisabled = disabled || !hasOptions;");
+    expect(selectSource).toContain("disabled={isSelectDisabled}");
   });
 
   it("keeps support queue pagination on backend query params instead of a fixed first page", () => {
@@ -120,6 +107,26 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("setQueuePage((currentPage) => Math.max(1, currentPage - 1))");
     expect(pageSource).toContain("setQueuePage((currentPage) => currentPage + 1)");
     expect(pageSource).toContain("disabled={!canGoToNextQueuePage || inboxQuery.isFetching}");
+    expect(pageSource).toContain(
+      'aria-label={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}'
+    );
+    expect(pageSource).toContain(
+      'aria-label={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}'
+    );
+    expect(pageSource).toContain(
+      'title={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}'
+    );
+    expect(pageSource).toContain(
+      'title={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}'
+    );
+    expect(pageSource).toContain(
+      '<CaretDownIcon\n                        className={`${styles.queuePagerIcon} ${styles.queuePagerIconPrevious}`}'
+    );
+    expect(pageSource).toContain(
+      '<CaretDownIcon\n                        className={`${styles.queuePagerIcon} ${styles.queuePagerIconNext}`}'
+    );
+    expect(pageSource).not.toContain('{locale === "ru" ? "Назад" : "Previous"}');
+    expect(pageSource).not.toContain('{locale === "ru" ? "Вперёд" : "Next"}');
     expect(inboxPageSource).toContain("if (selectedConversationId) {");
   });
 
@@ -288,49 +295,17 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("keeps support user action confirmations open until backend mutations succeed", () => {
-    const source = readFileSync(supportSidePanelPath, "utf8");
-
-    expect(source).toContain("const confirmPendingUserAction = async () =>");
-    expect(source).toContain("await setUserActiveMutation.mutateAsync");
-    expect(source).toContain("await setUserPremiumMutation.mutateAsync");
-    expect(source).toContain("setPendingUserAction(null);");
-    expect(source).not.toContain(
-      "const action = pendingUserAction;\n    setPendingUserAction(null);"
-    );
-  });
-
-  it("hides support user-management dangerous actions from non-admin roles", () => {
+  it("does not expose removed support-side user mutations without a live UI consumer", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
 
-    expect(controllerSource).toContain("sessionUserRoles,");
-    expect(controllerSource).toContain(
-      'const canViewSubjectUserContext = sessionUserRoles.includes("Admin");'
-    );
-    expect(controllerSource).toContain("canViewSubjectUserContext,");
-    expect(sidePanelSource).toContain(
-      'const canManageSubjectUser = canViewSubjectUserContext && sessionUserRoles.includes("Admin");'
-    );
-    expect(sidePanelSource).toContain("{canManageSubjectUser ? (");
-    expect(sidePanelSource).not.toContain('roles.includes("Moderator")');
-  });
-
-  it("invalidates shared users cache after support-side user mutations", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
-    const matches =
-      controllerSource.match(
-        /queryClient\.invalidateQueries\({ queryKey: adminQueryKeys\.usersRoot }\)/g
-      ) ?? [];
-
-    expect(matches.length).toBeGreaterThanOrEqual(2);
-    expect(controllerSource).toContain("await setActive(subjectUserId, isActive);");
-    expect(controllerSource).toContain("await setPremium(subjectUserId, isPremium);");
+    expect(controllerSource).not.toContain("setUserActiveMutation");
+    expect(controllerSource).not.toContain("setUserPremiumMutation");
+    expect(controllerSource).not.toContain("await setActive(subjectUserId, isActive);");
+    expect(controllerSource).not.toContain("await setPremium(subjectUserId, isPremium);");
   });
 
   it("does not fetch or link admin-only user and economy context for support moderators", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
     const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
 
     expect(controllerSource).toContain(
@@ -339,11 +314,6 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain(
       "session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted"
     );
-    expect(sidePanelSource).toContain("{canViewSubjectUserContext ? (");
-    expect(sidePanelSource).toContain(
-      "<Link href={`/${locale}/economy`} className={styles.spLinkBtn}>"
-    );
-    expect(sidePanelSource).toContain(': "Profile unavailable"');
     expect(infoPanelSource).toContain(
       "{canViewSubjectUserContext && recentUserPurchases.length > 0 ? ("
     );
@@ -353,7 +323,6 @@ describe("support conversation controller errors", () => {
   it("encodes support route ids before building notification and queue hrefs", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
     const pageSource = readFileSync(supportPagePath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
 
     expect(controllerSource).toContain(
       "const supportConversationPathId = encodeURIComponent(conversationId);"
@@ -363,16 +332,8 @@ describe("support conversation controller errors", () => {
       "const supportConversationPathId = encodeURIComponent(item.conversationId);"
     );
     expect(pageSource).toContain("href={`/${locale}/support/${supportConversationPathId}`}");
-    expect(sidePanelSource).toContain(
-      "`/${locale}/support/${encodeURIComponent(conversation.conversationId)}`"
-    );
-    expect(sidePanelSource).toContain(
-      "`/${locale}/users/${encodeURIComponent(conversation.initiatorUserId)}`"
-    );
     expect(controllerSource).not.toContain("href: `/${locale}/support/${conversationId}`");
     expect(pageSource).not.toContain("href={`/${locale}/support/${item.conversationId}`}");
-    expect(sidePanelSource).not.toContain("`/${locale}/support/${conversation.conversationId}`");
-    expect(sidePanelSource).not.toContain("`/${locale}/users/${conversation.initiatorUserId}`");
   });
 
   it("encodes support message ids before using them as DOM jump targets", () => {
@@ -389,20 +350,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("keeps close-conversation confirmations open until status mutations succeed", () => {
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
     const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
-
-    expect(sidePanelSource).toContain("const confirmResolveConversation = async () =>");
-    expect(sidePanelSource).toContain(
-      "await statusMutation.mutateAsync(primaryStatusAction.status)"
-    );
-    expect(sidePanelSource).toContain("setShowResolveConfirm(false);");
-    expect(sidePanelSource).toContain(
-      "if (!canManageSupportWorkspace || !primaryStatusAction || statusMutation.isPending)"
-    );
-    expect(sidePanelSource).not.toContain(
-      "setShowResolveConfirm(false);\n                    if (primaryStatusAction) statusMutation.mutate(primaryStatusAction.status);"
-    );
 
     expect(infoPanelSource).toContain("const confirmPendingStatusChange = async () =>");
     expect(infoPanelSource).toContain("await statusMutation.mutateAsync(pendingStatusConfirm)");
@@ -440,19 +388,6 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("disables support context retries while refetching and swallows manual retry failures", () => {
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
-    const primitivesSource = readFileSync(supportUiPrimitivesPath, "utf8");
-
-    expect(primitivesSource).toContain("isRetrying?: boolean;");
-    expect(primitivesSource).toContain("isRetrying = false");
-    expect(primitivesSource).toContain("disabled={isRetrying}");
-    expect(sidePanelSource).toContain("analyticsQuery.isFetching ||");
-    expect(sidePanelSource).toContain("purchasesQuery.isFetching ||");
-    expect(sidePanelSource).toContain("subscriptionQuery.isFetching");
-    expect(sidePanelSource).toContain("]).catch(() => undefined);");
-  });
-
   it("guards support reply submits against read-only, pending, and empty composer states", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
 
@@ -474,13 +409,12 @@ describe("support conversation controller errors", () => {
     );
   });
 
-  it("uses user-facing support errors for missing subject user context", () => {
+  it("does not keep stale support-side subject-user mutation errors", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
 
-    expect(controllerSource).toContain("const supportSubjectUserMissing =");
-    expect(controllerSource).toContain("Карточка пользователя недоступна для этого обращения.");
-    expect(controllerSource).toContain("User context is unavailable for this conversation.");
-    expect(controllerSource).toContain("throw new Error(supportSubjectUserMissing);");
+    expect(controllerSource).not.toContain("supportSubjectUserMissing");
+    expect(controllerSource).not.toContain("Карточка пользователя недоступна для этого обращения.");
+    expect(controllerSource).not.toContain("User context is unavailable for this conversation.");
     expect(controllerSource).not.toContain('throw new Error("support.subject_user_missing")');
   });
 

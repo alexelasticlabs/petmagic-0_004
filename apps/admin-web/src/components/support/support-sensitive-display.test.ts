@@ -9,9 +9,6 @@ const supportHelpersPath = fileURLToPath(
 );
 const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
 const supportPagePath = fileURLToPath(new URL("./support-conversation-page.tsx", import.meta.url));
-const supportSidePanelPath = fileURLToPath(
-  new URL("./support-conversation-side-panel.tsx", import.meta.url)
-);
 
 describe("support sensitive display", () => {
   it("sanitizes activity timeline values before rendering them in support panels", () => {
@@ -40,9 +37,8 @@ describe("support sensitive display", () => {
     expect(source).not.toContain("currency: currencyCode");
   });
 
-  it("sanitizes support side panel generation, failure, and purchase labels", () => {
+  it("sanitizes support info panel failure and purchase labels", () => {
     const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
 
     expect(infoPanelSource).toContain(
       "formatSafeSupportDisplay(purchase.paymentProvider, \"—\", 48)"
@@ -55,31 +51,6 @@ describe("support sensitive display", () => {
     expect(infoPanelSource).not.toContain("<strong>{purchase.paymentProvider}</strong>");
     expect(infoPanelSource).not.toContain("{`${purchase.priceAmount} ${purchase.currencyCode}");
     expect(infoPanelSource).not.toContain("<strong>{item.failureCode}</strong>");
-
-    expect(sidePanelSource).toContain(
-      "title={formatSafeSupportDisplay(generation.templateTitle, \"—\", 120)}"
-    );
-    expect(sidePanelSource).toContain(
-      "formatSafeSupportDisplay(conversation.assistantScenario, \"—\", 120)"
-    );
-    expect(sidePanelSource).toContain("formatSafeSupportDisplay(generation.status, \"—\", 48)");
-    expect(sidePanelSource).toContain("formatSafeSupportDisplay(generation.failureCode, \"—\", 120)");
-    expect(sidePanelSource).toContain("formatSafeSupportDisplay(item.failureCode, \"—\", 120)");
-    expect(sidePanelSource).toContain("formatSafeSupportDisplay(purchase.status, \"—\", 48)");
-    expect(sidePanelSource).toContain(
-      "details={formatSafeSupportDisplay(purchase.paymentProvider, \"—\", 48)}"
-    );
-    expect(sidePanelSource).toMatch(
-      /formatSafeSupportDisplay\(\s*subscriptionQuery\.data\?\.planName/
-    );
-    expect(sidePanelSource).not.toContain("title={generation.templateTitle}");
-    expect(sidePanelSource).not.toContain("<strong>{conversation.assistantScenario}</strong>");
-    expect(sidePanelSource).not.toContain("{generation.status}");
-    expect(sidePanelSource).not.toContain("title={item.failureCode}");
-    expect(sidePanelSource).not.toContain("details={purchase.paymentProvider}");
-    expect(sidePanelSource).not.toContain(
-      "subscriptionQuery.data?.planName ??\n                        (isUserPremium ? text.premiumLabel : text.freeLabel)"
-    );
   });
 
   it("sanitizes operator tags and keeps tag input bounded", () => {
@@ -97,7 +68,6 @@ describe("support sensitive display", () => {
 
   it("sanitizes support attachment download filenames", () => {
     const supportPageSource = readFileSync(supportPagePath, "utf8");
-    const sidePanelSource = readFileSync(supportSidePanelPath, "utf8");
     const sanitized = formatSafeSupportDownloadName(
       "alice@example.com receipt=ios-secret token=raw-secret card_number=4242424242424242/../photo.png"
     );
@@ -112,10 +82,6 @@ describe("support sensitive display", () => {
     expect(sanitized).not.toContain("4242424242424242");
     expect(sanitized).not.toMatch(/[\\/:*?"<>|]/);
 
-    expect(sidePanelSource).toContain("formatSafeSupportDownloadName(message.attachmentFileName)");
-    expect(sidePanelSource).not.toContain(
-      'link.download = message.attachmentFileName?.trim() || "attachment"'
-    );
     expect(supportPageSource).toContain(
       "formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)"
     );

@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { SearchIcon, UploadIcon } from "@/components/admin/admin-icons";
+import {
+  BellIcon,
+  CancelCircleIcon,
+  CaretDownIcon,
+  ClockIcon,
+  FileIcon,
+  PaperclipIcon,
+  PlayCircleIcon,
+  ReplyIcon,
+  SearchIcon,
+  SupportIcon,
+  UploadIcon,
+} from "@/components/admin/admin-icons";
 import {
   AdminBadge,
   AdminCard,
@@ -294,11 +306,17 @@ export function SupportConversationPage({
     return styles[`avatarColor${hash}` as keyof typeof styles] ?? styles.avatarColor6;
   };
 
-  const queueStatusIcon = (status: SupportConversationStatus) => {
-    if (status === "New") return "✦";
-    if (status === "InProgress") return "▶";
-    if (status === "WaitingForUser") return "⏳";
-    return "✓";
+  const QueueStatusIcon = ({ status }: { status: SupportConversationStatus }) => {
+    if (status === "New") {
+      return <BellIcon className={styles.queueStatusIcon} />;
+    }
+    if (status === "InProgress") {
+      return <PlayCircleIcon className={styles.queueStatusIcon} />;
+    }
+    if (status === "WaitingForUser") {
+      return <ClockIcon className={styles.queueStatusIcon} />;
+    }
+    return <CancelCircleIcon className={styles.queueStatusIcon} />;
   };
 
   const closeFullscreenImage = () => {
@@ -713,7 +731,11 @@ export function SupportConversationPage({
 
     return (
       <span className={styles.replyThumbIcon} aria-hidden="true">
-        {attachment.mimeType.startsWith("video/") ? "▶" : "FILE"}
+        {attachment.mimeType.startsWith("video/") ? (
+          <PlayCircleIcon className={styles.replyThumbSvg} />
+        ) : (
+          <FileIcon className={styles.replyThumbSvg} />
+        )}
       </span>
     );
   };
@@ -813,7 +835,8 @@ export function SupportConversationPage({
             logContext={{ messageId: message.messageId, mimeType: attachment.mimeType }}
           />
           <span className={styles.messageVideoDurationBadge}>
-            ▶ {formatAttachmentDuration(attachment.durationSeconds)}
+            <PlayCircleIcon className={styles.messageVideoDurationIcon} />
+            {formatAttachmentDuration(attachment.durationSeconds)}
           </span>
           {overlayCount > 0 ? (
             <span className={styles.messageMediaMoreOverlay}>+{overlayCount}</span>
@@ -833,7 +856,9 @@ export function SupportConversationPage({
         }
         className={`${styles.messageAttachmentCard} ${styles.messageMediaFileTile}`}
       >
-        <div className={styles.messageAttachmentIcon}>FILE</div>
+        <div className={styles.messageAttachmentIcon}>
+          <FileIcon className={styles.supportFileIcon} />
+        </div>
         <div className={styles.messageAttachmentMeta}>
           <strong>{safeAttachmentName}</strong>
           <span>{formatFileSize(attachment.sizeBytes, locale)}</span>
@@ -935,7 +960,8 @@ export function SupportConversationPage({
                           : `New messages from users: ${incomingMessagesCount}`
                       }
                     >
-                      💬 {incomingMessagesCount}
+                      <SupportIcon className={styles.queueBadgeIcon} />
+                      {incomingMessagesCount}
                     </span>
                   ) : null}
                 </div>
@@ -1078,7 +1104,8 @@ export function SupportConversationPage({
                                       : `Messages from user: ${item.userUnreadCount}`
                                   }
                                 >
-                                  💬 {item.userUnreadCount}
+                                  <SupportIcon className={styles.queueBadgeIcon} />
+                                  {item.userUnreadCount}
                                 </span>
                               ) : null}
                               {item.adminUnreadCount > 0 ? (
@@ -1090,7 +1117,8 @@ export function SupportConversationPage({
                                       : `Unread for admin: ${item.adminUnreadCount}`
                                   }
                                 >
-                                  🔔 {item.adminUnreadCount}
+                                  <BellIcon className={styles.queueBadgeIcon} />
+                                  {item.adminUnreadCount}
                                 </span>
                               ) : null}
                             </div>
@@ -1100,7 +1128,7 @@ export function SupportConversationPage({
                           <span
                             className={`${styles.queueStatusPill} ${styles[`queueStatusPill_${item.status}` as keyof typeof styles]}`}
                           >
-                            <span aria-hidden="true">{queueStatusIcon(item.status)}</span>
+                            <QueueStatusIcon status={item.status} />
                             {statusLabel(item.status, text)}
                           </span>
                           {itemSla.waitLabel ? (
@@ -1177,17 +1205,25 @@ export function SupportConversationPage({
                       type="button"
                       className={styles.queuePagerButton}
                       disabled={!canGoToPreviousQueuePage || inboxQuery.isFetching}
+                      aria-label={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}
+                      title={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}
                       onClick={() => setQueuePage((currentPage) => Math.max(1, currentPage - 1))}
                     >
-                      {locale === "ru" ? "Назад" : "Previous"}
+                      <CaretDownIcon
+                        className={`${styles.queuePagerIcon} ${styles.queuePagerIconPrevious}`}
+                      />
                     </button>
                     <button
                       type="button"
                       className={styles.queuePagerButton}
                       disabled={!canGoToNextQueuePage || inboxQuery.isFetching}
+                      aria-label={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}
+                      title={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}
                       onClick={() => setQueuePage((currentPage) => currentPage + 1)}
                     >
-                      {locale === "ru" ? "Вперёд" : "Next"}
+                      <CaretDownIcon
+                        className={`${styles.queuePagerIcon} ${styles.queuePagerIconNext}`}
+                      />
                     </button>
                   </div>
                 </div>
@@ -1381,7 +1417,7 @@ export function SupportConversationPage({
                                     title={locale === "ru" ? "Ответить" : "Reply"}
                                     aria-label={locale === "ru" ? "Ответить" : "Reply"}
                                   >
-                                    ↩
+                                    <ReplyIcon className={styles.messageReplyActionIcon} />
                                   </button>
                                   {message.replyToMessageId || message.replyToPreview?.trim() ? (
                                     <button
@@ -1537,7 +1573,7 @@ export function SupportConversationPage({
                         <div className={styles.composerReplyPreview}>
                           <span className={styles.composerReplyAccent} aria-hidden="true" />
                           <span className={styles.composerReplyIcon} aria-hidden="true">
-                            ↩
+                            <ReplyIcon className={styles.composerReplySvg} />
                           </span>
                           <span className={styles.composerReplyThumbSlot}>
                             {renderReplyThumbnail(replyComposerAttachment)}
@@ -1599,7 +1635,9 @@ export function SupportConversationPage({
                               />
                             </button>
                           ) : (
-                            <div className={styles.attachmentPreviewFileIcon}>FILE</div>
+                            <div className={styles.attachmentPreviewFileIcon}>
+                              <FileIcon className={styles.supportFileIcon} />
+                            </div>
                           )}
                           <div className={styles.attachmentPreviewMeta}>
                             <span className={styles.subtle}>{text.selectedFileLabel}</span>
@@ -1651,7 +1689,7 @@ export function SupportConversationPage({
                           aria-label={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                           title={locale === "ru" ? "Прикрепить файл" : "Attach file"}
                         >
-                          📎
+                          <PaperclipIcon className={styles.composerIconSvg} />
                         </button>
                         <textarea
                           className={`${styles.textarea} ${styles.composerTextarea}`}

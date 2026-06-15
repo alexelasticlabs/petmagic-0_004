@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FileIcon } from "@/components/admin/admin-icons";
 import {
   formatAccountAge,
   formatDateTime,
@@ -349,7 +350,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                             }}
                           />
                         ) : (
-                          <span className={styles.infoPanelAttachmentPreviewIcon}>FILE</span>
+                          <span className={styles.infoPanelAttachmentPreviewIcon}>
+                            <FileIcon className={styles.supportFileIcon} />
+                          </span>
                         )}
                         <span className={styles.infoPanelAttachmentPreviewSize}>
                           {formatFileSize(attachment.sizeBytes, locale)}
@@ -630,7 +633,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                           />
                         </button>
                       ) : (
-                        <span className={styles.attachmentPreviewFileIcon}>FILE</span>
+                        <span className={styles.attachmentPreviewFileIcon}>
+                          <FileIcon className={styles.supportFileIcon} />
+                        </span>
                       )}
                       <div className={styles.attachmentListMeta}>
                         <div className={styles.attachmentListMetaTop}>

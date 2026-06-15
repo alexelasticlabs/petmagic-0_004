@@ -11,7 +11,12 @@ import { SupportConversationPage } from "@/components/support/support-conversati
 import styles from "@/components/support/support-page.module.css";
 import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
-import { fetchSupportInbox, useAuthSession, type AdminSupportInboxPage } from "@/lib/api-client";
+import {
+  fetchSupportInbox,
+  useAuthSession,
+  type AdminSupportConversationSummary,
+  type AdminSupportInboxPage,
+} from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type SupportInboxPageProps = {
@@ -24,7 +29,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   const sessionRoles = session?.user.roles ?? [];
   const canManageSupportWorkspace =
     sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +42,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     enabled: canManageSupportWorkspace,
   });
 
-  const sortedConversations = useMemo(
+  const sortedConversations = useMemo<AdminSupportConversationSummary[]>(
     () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );

@@ -29,12 +29,35 @@ export const SUPPORT_INBOX_SEARCH_MAX_LENGTH = 120;
 export const SUPPORT_MESSAGE_BODY_MAX_LENGTH = 2_000;
 export type SupportInboxSort = "default" | "priority" | "waiting" | "updated" | "created";
 
+const SUPPORT_INBOX_STATUSES = ["New", "InProgress", "WaitingForUser", "Closed"] as const;
+const SUPPORT_INBOX_ASSIGNMENTS = ["all", "mine", "unassigned"] as const;
+const SUPPORT_INBOX_PRIORITIES = ["Low", "Normal", "High"] as const;
+const SUPPORT_INBOX_SORTS = ["default", "priority", "waiting", "updated", "created"] as const;
+
 function normalizeSupportInboxSearch(value: string | undefined): string | undefined {
   return value?.trim().slice(0, SUPPORT_INBOX_SEARCH_MAX_LENGTH) || undefined;
 }
 
 function normalizeSupportMessageBody(value: string | undefined): string {
   return value?.trim().slice(0, SUPPORT_MESSAGE_BODY_MAX_LENGTH) ?? "";
+}
+
+function normalizeSupportOption<const T extends string>(
+  value: string | undefined,
+  allowed: readonly T[],
+  omitted: readonly string[] = []
+): T | undefined {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const normalizedKey = normalized.toLowerCase();
+  if (omitted.some((item) => item.toLowerCase() === normalizedKey)) {
+    return undefined;
+  }
+
+  return allowed.find((item) => item.toLowerCase() === normalizedKey);
 }
 
 export async function fetchSupportInbox(
@@ -51,19 +74,24 @@ export async function fetchSupportInbox(
 ): Promise<AdminSupportInboxPage> {
   const normalizedPage = normalizePositiveInteger(options?.page, 10_000);
   const normalizedPageSize = normalizePositiveInteger(options?.pageSize, 100);
+  const normalizedAssignment = normalizeSupportOption(assignment, SUPPORT_INBOX_ASSIGNMENTS) ?? "all";
+  const normalizedPriority = normalizeSupportOption(options?.priority, SUPPORT_INBOX_PRIORITIES);
+  const normalizedSort = normalizeSupportOption(options?.sort, SUPPORT_INBOX_SORTS, ["default"]);
   const searchParams = new URLSearchParams();
-  const statuses = Array.isArray(status) ? status : status ? [status] : [];
+  const statuses = (Array.isArray(status) ? status : status ? [status] : [])
+    .map((statusFilter) => normalizeSupportOption(statusFilter, SUPPORT_INBOX_STATUSES))
+    .filter((statusFilter): statusFilter is SupportConversationStatus => Boolean(statusFilter));
   for (const statusFilter of statuses) {
     searchParams.append("status", statusFilter);
   }
-  if (assignment !== "all") {
-    searchParams.set("assignment", assignment);
+  if (normalizedAssignment !== "all") {
+    searchParams.set("assignment", normalizedAssignment);
   }
-  if (options?.priority) {
-    searchParams.set("priority", options.priority);
+  if (normalizedPriority) {
+    searchParams.set("priority", normalizedPriority);
   }
-  if (options?.sort && options.sort !== "default") {
-    searchParams.set("sort", options.sort);
+  if (normalizedSort) {
+    searchParams.set("sort", normalizedSort);
   }
   const search = normalizeSupportInboxSearch(options?.search);
   if (search) {
