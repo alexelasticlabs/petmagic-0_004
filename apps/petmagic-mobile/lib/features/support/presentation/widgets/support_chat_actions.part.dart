@@ -406,6 +406,7 @@ extension _SupportChatPageActions on _SupportChatPageState {
       body,
       localeTag: localeTag,
       replyToMessageId: _replyToMessage?.messageId,
+      relatedGenerationId: widget.relatedGenerationId,
     );
     if (!mounted || !wasSent) {
       return;

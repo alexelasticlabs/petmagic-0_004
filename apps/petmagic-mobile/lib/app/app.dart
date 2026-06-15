@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
+import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/router/app_router.dart';
@@ -182,11 +183,14 @@ class PetMagicApp extends ConsumerWidget {
             ],
           ),
         );
+        final lifecycleAwareChild = DecodedImageCacheLifecycleObserver(
+          child: hostedChild,
+        );
         if (!AppConfig.enableFrameTelemetry) {
-          return hostedChild;
+          return lifecycleAwareChild;
         }
 
-        return AppPerformanceMonitor(child: hostedChild);
+        return AppPerformanceMonitor(child: lifecycleAwareChild);
       },
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: _supportedAppLocales,

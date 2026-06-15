@@ -234,8 +234,10 @@ class SupportChatController extends Notifier<SupportChatState> {
     String value, {
     required String localeTag,
     String? replyToMessageId,
+    String? relatedGenerationId,
   }) async {
     final body = value.trim();
+    final normalizedRelatedGenerationId = relatedGenerationId?.trim();
     final conversation = state.conversation;
     if (body.isEmpty || state.isSending) {
       return false;
@@ -256,6 +258,11 @@ class SupportChatController extends Notifier<SupportChatState> {
         final createdConversation = await _repository.openConversation(
           initialMessage: body,
           source: 'MobileChat',
+          relatedGenerationId:
+              normalizedRelatedGenerationId == null ||
+                  normalizedRelatedGenerationId.isEmpty
+              ? null
+              : normalizedRelatedGenerationId,
         );
         if (!ref.mounted) {
           return false;

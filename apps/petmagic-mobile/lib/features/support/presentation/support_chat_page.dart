@@ -47,9 +47,39 @@ const int _supportComposerAttachmentPreviewCacheExtent = 220;
 const int _supportRecentMediaThumbnailCacheExtent = 300;
 
 class SupportChatPage extends ConsumerStatefulWidget {
-  const SupportChatPage({super.key});
+  const SupportChatPage({
+    this.initialMessage,
+    this.relatedGenerationId,
+    super.key,
+  });
 
   static const routePath = '/profile/support/chat';
+  static const initialMessageQueryParam = 'initialMessage';
+  static const relatedGenerationIdQueryParam = 'relatedGenerationId';
+
+  final String? initialMessage;
+  final String? relatedGenerationId;
+
+  static String routeFor({
+    String? initialMessage,
+    String? relatedGenerationId,
+  }) {
+    final queryParameters = <String, String>{};
+    final normalizedInitialMessage = initialMessage?.trim();
+    if (normalizedInitialMessage != null &&
+        normalizedInitialMessage.isNotEmpty) {
+      queryParameters[initialMessageQueryParam] = normalizedInitialMessage;
+    }
+    final normalizedGenerationId = relatedGenerationId?.trim();
+    if (normalizedGenerationId != null && normalizedGenerationId.isNotEmpty) {
+      queryParameters[relatedGenerationIdQueryParam] = normalizedGenerationId;
+    }
+
+    return Uri(
+      path: routePath,
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    ).toString();
+  }
 
   @override
   ConsumerState<SupportChatPage> createState() => _SupportChatPageState();
@@ -131,6 +161,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     _scheduleLoadingFallbackIfNeeded();
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
+    _applyInitialMessage(widget.initialMessage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -139,6 +170,14 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       _controller.start();
       _controller.setScreenVisible(true);
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant SupportChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialMessage != oldWidget.initialMessage) {
+      _applyInitialMessage(widget.initialMessage, notify: true);
+    }
   }
 
   @override
@@ -191,6 +230,28 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       selection: TextSelection.collapsed(offset: value.length),
     );
     _messageFocusNode.requestFocus();
+  }
+
+  void _applyInitialMessage(String? value, {bool notify = false}) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return;
+    }
+    if (_messageController.text.trim() == normalized) {
+      return;
+    }
+
+    _messageController.value = TextEditingValue(
+      text: normalized,
+      selection: TextSelection.collapsed(offset: normalized.length),
+    );
+    if (notify && mounted) {
+      setState(() {
+        _composerHasText = true;
+      });
+      return;
+    }
+    _composerHasText = true;
   }
 
   void _handleComposerChanged() {

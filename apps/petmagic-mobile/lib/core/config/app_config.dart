@@ -42,6 +42,17 @@ class AppConfig {
     'PETMAGIC_MEDIA_TEMP_FILE_TTL_HOURS',
     defaultValue: 24,
   );
+  static const decodedImageCacheMaxObjects = int.fromEnvironment(
+    'PETMAGIC_DECODED_IMAGE_CACHE_MAX_OBJECTS',
+    defaultValue: 200,
+  );
+  static const decodedImageCacheMaxBytes = int.fromEnvironment(
+    'PETMAGIC_DECODED_IMAGE_CACHE_MAX_BYTES',
+    defaultValue: 48 * 1024 * 1024,
+  );
+  static const allowLocalMediaHttp = bool.fromEnvironment(
+    'PETMAGIC_ALLOW_LOCAL_MEDIA_HTTP',
+  );
 
   static Duration get mediaCacheStalePeriod {
     final safeHours = mediaCacheStalePeriodHours <= 0
@@ -61,6 +72,22 @@ class AppConfig {
     }
 
     return mediaCacheMaxBytes;
+  }
+
+  static int get decodedImageCacheMaxObjectsSafe {
+    if (decodedImageCacheMaxObjects <= 0) {
+      return 200;
+    }
+
+    return decodedImageCacheMaxObjects;
+  }
+
+  static int get decodedImageCacheMaxBytesSafe {
+    if (decodedImageCacheMaxBytes <= 0) {
+      return 48 * 1024 * 1024;
+    }
+
+    return decodedImageCacheMaxBytes;
   }
 
   static bool get enablePerformanceOverlay {

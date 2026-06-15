@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
-import 'package:petmagic_mobile/features/premium/presentation/stripe_paymentsheet_smoke_test_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
@@ -176,14 +174,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           child: const LegalAcceptanceGatePage(),
         ),
       ),
-      if (kDebugMode)
-        GoRoute(
-          path: StripePaymentSheetSmokeTestPage.routePath,
-          pageBuilder: (context, state) => _buildFadeSlidePage(
-            state: state,
-            child: const StripePaymentSheetSmokeTestPage(),
-          ),
-        ),
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state, navigationShell) => PetMagicShell(
@@ -389,8 +379,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: SupportChatPage.routePath,
-        pageBuilder: (context, state) =>
-            _buildFadeSlidePage(state: state, child: const SupportChatPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: SupportChatPage(
+            initialMessage: state
+                .uri
+                .queryParameters[SupportChatPage.initialMessageQueryParam],
+            relatedGenerationId: state
+                .uri
+                .queryParameters[SupportChatPage.relatedGenerationIdQueryParam],
+          ),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

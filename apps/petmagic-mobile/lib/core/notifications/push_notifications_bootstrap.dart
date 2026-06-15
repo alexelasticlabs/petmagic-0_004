@@ -280,15 +280,13 @@ class _PushNotificationsBootstrapState
     }
 
     if (uri.host == 'generations' && uri.pathSegments.isNotEmpty) {
-      _openRoute(
-        '${GenerationStatusPage.routePrefix}/${uri.pathSegments.first}',
-      );
+      _openRoute(GenerationStatusPage.routeFor(uri.pathSegments.first));
       return;
     }
 
     final generationId = uri.queryParameters['generationId'];
     if (generationId != null && generationId.isNotEmpty) {
-      _openRoute('${GenerationStatusPage.routePrefix}/$generationId');
+      _openRoute(GenerationStatusPage.routeFor(generationId));
     }
   }
 
