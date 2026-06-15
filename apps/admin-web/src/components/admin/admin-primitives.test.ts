@@ -53,7 +53,7 @@ describe("admin primitives responsive layout", () => {
     expect(source).toContain(".table th {\n  position: sticky;");
     expect(source).toContain("background: var(--surface-1);");
     expect(source).toContain("@media (max-width: 640px)");
-    expect(source).toContain(".table {\n    min-width: 42rem;");
+    expect(source).toContain(".table {\n    min-width: min(34rem, calc(100vw - 2rem));");
   });
 
   it("keeps native admin select fields locked when option data is empty", () => {
@@ -69,5 +69,16 @@ describe("admin primitives responsive layout", () => {
     expect(css).toContain(".selectControl:disabled {");
     expect(css).toContain("cursor: not-allowed;");
     expect(css).toContain("background: var(--surface-2);");
+  });
+
+  it("announces shared state cards with severity-aware live regions", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+
+    expect(source).toContain(
+      'const stateRole = tone === "danger" || tone === "warning" ? "alert" : "status";'
+    );
+    expect(source).toContain('const stateLiveMode = stateRole === "alert" ? "assertive" : "polite";');
+    expect(source).toContain("role={stateRole}");
+    expect(source).toContain("aria-live={stateLiveMode}");
   });
 });

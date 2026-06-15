@@ -35,5 +35,7 @@ describe("admin login screen visual contract", () => {
     expect(nonZeroLetterSpacingRules).toEqual([]);
     expect(styles).toContain("letter-spacing: 0;");
     expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
+    expect(styles).toContain("min-height: 100dvh;");
+    expect(styles).not.toContain("100vh");
   });
 });

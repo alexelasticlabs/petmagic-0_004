@@ -11,6 +11,9 @@ import {
 
 const adminTopbarPath = fileURLToPath(new URL("./admin-topbar.tsx", import.meta.url));
 const adminShellStylesPath = fileURLToPath(new URL("./admin-shell.module.css", import.meta.url));
+const adminNotificationsPath = fileURLToPath(
+  new URL("./admin-notifications.tsx", import.meta.url)
+);
 
 describe("admin notification sanitization", () => {
   it("masks sensitive values before notifications are persisted", () => {
@@ -109,6 +112,20 @@ describe("admin notification sanitization", () => {
     expect(key).not.toContain("x".repeat(240));
   });
 
+  it("avoids notification state updates when read actions do not change data", () => {
+    const source = readFileSync(adminNotificationsPath, "utf8");
+
+    expect(source).toContain("let didChange = false;");
+    expect(source).toContain("return didChange ? next : current;");
+    expect(source).toContain("if (item.id !== notificationId || item.read)");
+    expect(source).toContain("if (item.category !== category || item.read)");
+    expect(source).toContain("if (current.every((item) => !item.read))");
+    expect(source).toContain("return current.filter((item) => !item.read);");
+    expect(source).not.toContain(
+      "current.map((item) => (item.id === notificationId ? { ...item, read: true } : item))"
+    );
+  });
+
   it("sanitizes notification text again at the topbar render boundary", () => {
     const source = readFileSync(adminTopbarPath, "utf8");
 
@@ -139,11 +156,36 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("closeNotificationPanel({ restoreFocus: true });");
     expect(source).toContain("ref={notificationTriggerRef}");
     expect(source).toContain("aria-controls={isNotificationsOpen ? notificationPanelId : undefined}");
+    expect(source).toContain("const notificationTriggerLabel =");
+    expect(source).toContain('? "Закрыть уведомления"');
+    expect(source).toContain('? "Close notifications"');
+    expect(source).toContain("aria-label={notificationTriggerLabel}");
+    expect(source).toContain("title={notificationTriggerLabel}");
     expect(source).toContain("id={notificationPanelId}");
     expect(source).toContain("ref={notificationPanelRef}");
     expect(source).toContain("aria-labelledby={notificationPanelTitleId}");
     expect(source).toContain("tabIndex={-1}");
     expect(source).toContain("id={notificationPanelTitleId}");
+    expect(source).toContain("const notificationFiltersLabel =");
+    expect(source).toContain('? "Фильтры уведомлений"');
+    expect(source).toContain('role="toolbar"');
+    expect(source).toContain("aria-label={notificationFiltersLabel}");
+    expect(source).toContain("aria-pressed={notificationFilter === filterOption.value}");
+  });
+
+  it("counts topbar attention without dropping non-support unread notifications", () => {
+    const source = readFileSync(adminTopbarPath, "utf8");
+
+    expect(source).toContain(
+      "const unreadSupportNotificationCount = items.filter(\n    (item) => item.category === \"support\" && !item.read\n  ).length;"
+    );
+    expect(source).toContain(
+      "const unreadNonSupportNotificationCount = unreadCount - unreadSupportNotificationCount;"
+    );
+    expect(source).toContain(
+      "unreadNonSupportNotificationCount +\n    Math.max(unreadSupportNotificationCount, supportUnreadCount)"
+    );
+    expect(source).not.toContain("const totalAttentionCount = Math.max(unreadCount, supportUnreadCount);");
   });
 
   it("keeps the topbar notification dialog inside narrow viewports", () => {
@@ -194,5 +236,8 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("font-size: 1.05rem;");
     expect(source).toContain(".topbarTitle {\n    font-size: 0.98rem;");
     expect(source).not.toMatch(/font-size:\s*[^;]*vw/);
+    expect(source).toContain("min-height: 100dvh;");
+    expect(source).toContain("height: 100dvh;");
+    expect(source).not.toContain("100vh");
   });
 });

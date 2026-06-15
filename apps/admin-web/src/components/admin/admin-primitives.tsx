@@ -224,8 +224,15 @@ export function AdminStateCard({
   tone = "neutral",
   className,
 }: AdminStateCardProps) {
+  const stateRole = tone === "danger" || tone === "warning" ? "alert" : "status";
+  const stateLiveMode = stateRole === "alert" ? "assertive" : "polite";
+
   return (
-    <section className={joinClassNames(styles.stateCard, toneClass("stateCard", tone), className)}>
+    <section
+      className={joinClassNames(styles.stateCard, toneClass("stateCard", tone), className)}
+      role={stateRole}
+      aria-live={stateLiveMode}
+    >
       {icon ? <AdminIconTile icon={icon} tone={tone} /> : null}
       <div className={styles.stateCardBody}>
         {title ? <h2 className={styles.stateCardTitle}>{title}</h2> : null}

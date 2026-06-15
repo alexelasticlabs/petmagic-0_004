@@ -59,12 +59,17 @@ export function ConfirmationDialog({
   }, [open]);
 
   useEffect(() => {
-    if (!open || isSubmitting) {
+    if (!open) {
       return;
     }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (isSubmitting) {
+          event.preventDefault();
+          return;
+        }
+
         onCancel();
         return;
       }
@@ -111,6 +116,7 @@ export function ConfirmationDialog({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-busy={isSubmitting}
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}

@@ -949,7 +949,7 @@
   }
 
   .table {
-    min-width: 42rem;
+    min-width: min(34rem, calc(100vw - 2rem));
   }
 
   .table th {

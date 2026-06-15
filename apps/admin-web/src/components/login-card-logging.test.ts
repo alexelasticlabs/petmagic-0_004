@@ -24,6 +24,43 @@ describe("login card logging", () => {
     expect(source).not.toContain("setError(text.loginFailed);");
   });
 
+  it("submits the exact password value while normalizing only email", () => {
+    const source = readFileSync(loginCardPath, "utf8");
+
+    expect(source).toContain("const normalizedEmail = email.trim();");
+    expect(source).toContain("const submittedPassword = password;");
+    expect(source).toContain("const isPasswordValid = submittedPassword.length >= 1;");
+    expect(source).toContain("const session = await login(normalizedEmail, submittedPassword);");
+    expect(source).not.toContain("const normalizedPassword = password.trim();");
+    expect(source).not.toContain("login(normalizedEmail, normalizedPassword)");
+  });
+
+  it("keeps login copy centralized and locks mutable fields while submitting", () => {
+    const source = readFileSync(loginCardPath, "utf8");
+    const stylesSource = readFileSync(loginCardStylesPath, "utf8");
+
+    expect(source).toContain("const authText = {");
+    expect(source).toContain("emailPlaceholder: isRu ? \"Введите email\" : \"Enter email\"");
+    expect(source).toContain("passwordPlaceholder: isRu ? \"Введите пароль\" : \"Enter password\"");
+    expect(source).toContain("setError(authText.validationError);");
+    expect(source).toContain("setError(authText.noAccess);");
+    expect(source).toContain("aria-busy={isSubmitting}");
+    expect(source).toContain("placeholder={authText.emailPlaceholder}");
+    expect(source).toContain("placeholder={authText.passwordPlaceholder}");
+    expect(source).toContain("disabled={isSubmitting}");
+    expect(source).toContain(
+      "aria-label={showPassword ? authText.hidePassword : authText.showPassword}"
+    );
+    expect(source).toContain("{authText.contactText}");
+    expect(source).toContain("{authText.contactLinkText}");
+    expect(source).toContain("{authText.orText}");
+    expect(source).not.toContain('placeholder={isRu ? "Введите email" : "Enter email"}');
+    expect(source).not.toContain('placeholder={isRu ? "Введите пароль" : "Enter password"}');
+    expect(stylesSource).toContain(".input:disabled {");
+    expect(stylesSource).toContain(".eyeButton:disabled {");
+    expect(stylesSource).toContain("cursor: not-allowed;");
+  });
+
   it("prefetches the role-aware landing page for restored admin sessions", () => {
     const source = readFileSync(loginCardPath, "utf8");
 
@@ -36,10 +73,13 @@ describe("login card logging", () => {
     expect(source).not.toContain(": `/${locale}/dashboard`");
   });
 
-  it("keeps compact auth headings from using negative letter spacing", () => {
+  it("keeps compact auth typography from using decorative letter spacing", () => {
     const source = readFileSync(loginCardStylesPath, "utf8");
+    const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
+      .map((match) => match[1].trim())
+      .filter((value) => value !== "0");
 
+    expect(nonZeroLetterSpacingRules).toEqual([]);
     expect(source).toContain("letter-spacing: 0;");
-    expect(source).not.toContain("letter-spacing: -");
   });
 });

@@ -13,7 +13,7 @@
   --admin-page-max: 110rem;
   --admin-page-max-wide: 118rem;
   --admin-page-max-ultra: 126rem;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 15.5rem minmax(0, 1fr);
   background: var(--admin-bg);
@@ -27,7 +27,7 @@
 .sidebar {
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -263,6 +263,17 @@
   box-shadow: none;
 }
 
+.logoutButton:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.logoutButton:disabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: var(--admin-text-soft);
+}
+
 .main {
   min-width: 0;
   display: flex;
@@ -426,7 +437,7 @@
 }
 
 .authGate {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 1.5rem;
@@ -871,8 +882,18 @@
 }
 
 .localeCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 0.85rem;
   height: 0.85rem;
+  color: var(--admin-accent);
+  flex: 0 0 auto;
+}
+
+.localeCheck svg {
+  width: 100%;
+  height: 100%;
 }
 
 @media (min-width: 1600px) {
@@ -939,10 +960,12 @@
     width: min(15.5rem, calc(100vw - 2rem));
     transform: translateX(-102%);
     transition: transform 220ms ease;
+    pointer-events: none;
   }
 
   .sidebarOpen {
     transform: translateX(0);
+    pointer-events: auto;
   }
 
   .sidebarToggle {

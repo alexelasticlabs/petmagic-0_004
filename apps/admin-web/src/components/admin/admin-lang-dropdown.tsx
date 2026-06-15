@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
-import { CaretDownIcon, GlobeIcon } from "@/components/admin/admin-icons";
+import { CaretDownIcon, CheckIcon, GlobeIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/admin/admin-shell.module.css";
 import { type Locale } from "@/lib/i18n";
 
@@ -16,6 +16,11 @@ type AdminLangDropdownProps = {
 export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
+  const menuId = useId();
+  const languageLabel = locale === "ru" ? "Язык интерфейса" : "Interface language";
+  const triggerLabel =
+    locale === "ru" ? "Выбрать язык интерфейса" : "Choose interface language";
+  const currentLabel = locale === "ru" ? "Текущий язык" : "Current language";
 
   useEffect(() => {
     if (!open) {
@@ -50,6 +55,8 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
         onClick={() => setOpen((current) => !current)}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-controls={open ? menuId : undefined}
+        aria-label={triggerLabel}
       >
         <GlobeIcon className={styles.localeIcon} />
         <span>{locale === "ru" ? "Русский" : "English"}</span>
@@ -57,7 +64,7 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
       </button>
 
       {open ? (
-        <ul className={styles.localeMenu} role="listbox">
+        <ul id={menuId} className={styles.localeMenu} role="listbox" aria-label={languageLabel}>
           <li role="option" aria-selected={locale === "ru"}>
             <Link
               href={ruPath}
@@ -65,7 +72,11 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
               onClick={() => setOpen(false)}
             >
               <span>Русский</span>
-              {locale === "ru" ? <span className={styles.localeCheck}>✓</span> : null}
+              {locale === "ru" ? (
+                <span className={styles.localeCheck} aria-label={currentLabel}>
+                  <CheckIcon />
+                </span>
+              ) : null}
             </Link>
           </li>
           <li role="option" aria-selected={locale === "en"}>
@@ -75,7 +86,11 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
               onClick={() => setOpen(false)}
             >
               <span>English</span>
-              {locale === "en" ? <span className={styles.localeCheck}>✓</span> : null}
+              {locale === "en" ? (
+                <span className={styles.localeCheck} aria-label={currentLabel}>
+                  <CheckIcon />
+                </span>
+              ) : null}
             </Link>
           </li>
         </ul>

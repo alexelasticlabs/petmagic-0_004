@@ -7,7 +7,7 @@
 .title {
   margin-bottom: 0.4rem;
   font-family: var(--font-space-grotesk), sans-serif;
-  font-size: clamp(1.18rem, 2vw, 1.45rem);
+  font-size: 1.4rem;
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0;
@@ -47,7 +47,7 @@
 .fieldLabel {
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
   color: var(--text-soft);
 }
@@ -88,7 +88,7 @@
   color: var(--text-muted);
 }
 
-.input:focus {
+.input:focus-visible {
   outline: none;
   border-color: var(--border-accent);
   box-shadow: var(--focus-ring);
@@ -97,6 +97,14 @@
 .input:hover {
   border-color: var(--border-strong);
   background: var(--surface-hover);
+}
+
+.input:disabled {
+  border-color: var(--border-soft);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .inputPaddedRight {
@@ -136,6 +144,11 @@
   transform: none;
 }
 
+.eyeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .eyeButton:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -157,7 +170,7 @@
   font: inherit;
   font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
   cursor: pointer;
   box-shadow: none;
   transition:
@@ -205,7 +218,7 @@
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -288,6 +301,10 @@
 @media (max-width: 480px) {
   .formArea {
     width: 100%;
+  }
+
+  .title {
+    font-size: 1.22rem;
   }
 }
 

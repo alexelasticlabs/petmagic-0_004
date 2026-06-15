@@ -131,10 +131,25 @@ export function LoginCard({ locale }: LoginCardProps) {
   }, [existingSession]);
 
   const isRu = locale === "ru";
+  const authText = {
+    emailPlaceholder: isRu ? "Введите email" : "Enter email",
+    passwordPlaceholder: isRu ? "Введите пароль" : "Enter password",
+    validationError: isRu
+      ? "Введите корректный email и пароль."
+      : "Enter a valid email and password.",
+    noAccess: isRu
+      ? "Доступ к админ-панели есть только у ролей Admin или Moderator."
+      : "Admin panel access is available only for Admin or Moderator roles.",
+    hidePassword: isRu ? "Скрыть пароль" : "Hide password",
+    showPassword: isRu ? "Показать пароль" : "Show password",
+    contactText: isRu ? "Проблемы с доступом? " : "Access issues? ",
+    contactLinkText: isRu ? "Свяжитесь с администратором" : "Contact administrator",
+    orText: isRu ? "или" : "or",
+  };
   const normalizedEmail = email.trim();
-  const normalizedPassword = password.trim();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
-  const isPasswordValid = normalizedPassword.length >= 1;
+  const submittedPassword = password;
+  const isPasswordValid = submittedPassword.length >= 1;
   const canSubmit = isEmailValid && isPasswordValid && !isSubmitting;
 
   /* Dark skeleton while checking session */
@@ -160,11 +175,7 @@ export function LoginCard({ locale }: LoginCardProps) {
     }
 
     if (!isEmailValid || !isPasswordValid) {
-      setError(
-        locale === "ru"
-          ? "Введите корректный email и пароль."
-          : "Enter a valid email and password."
-      );
+      setError(authText.validationError);
       return;
     }
 
@@ -172,15 +183,11 @@ export function LoginCard({ locale }: LoginCardProps) {
     setError(null);
 
     try {
-      const session = await login(normalizedEmail, normalizedPassword);
+      const session = await login(normalizedEmail, submittedPassword);
 
       if (!hasAdminPanelAccess(session.user.roles)) {
         await logout();
-        setError(
-          locale === "ru"
-            ? "Доступ к админ-панели есть только у ролей Admin или Moderator."
-            : "Admin panel access is available only for Admin or Moderator roles."
-        );
+        setError(authText.noAccess);
         return;
       }
 
@@ -198,10 +205,6 @@ export function LoginCard({ locale }: LoginCardProps) {
     }
   }
 
-  const contactText = isRu ? "Проблемы с доступом? " : "Access issues? ";
-  const contactLinkText = isRu ? "Свяжитесь с администратором" : "Contact administrator";
-  const orText = isRu ? "или" : "or";
-
   return (
     <div className={styles.formArea}>
       <h2 className={styles.title}>{text.loginTitle}</h2>
@@ -213,7 +216,7 @@ export function LoginCard({ locale }: LoginCardProps) {
         </p>
       ) : null}
 
-      <form className={styles.form} onSubmit={onSubmit} noValidate>
+      <form className={styles.form} onSubmit={onSubmit} noValidate aria-busy={isSubmitting}>
         {/* Email */}
         <div className={styles.field}>
           <label className={styles.fieldLabel} htmlFor="login-email">
@@ -234,9 +237,10 @@ export function LoginCard({ locale }: LoginCardProps) {
                   setError(null);
                 }
               }}
-              placeholder={isRu ? "Введите email" : "Enter email"}
+              placeholder={authText.emailPlaceholder}
               required
               maxLength={254}
+              disabled={isSubmitting}
               aria-invalid={email.length > 0 && !isEmailValid}
               autoComplete="email"
             />
@@ -262,24 +266,18 @@ export function LoginCard({ locale }: LoginCardProps) {
                   setError(null);
                 }
               }}
-              placeholder={isRu ? "Введите пароль" : "Enter password"}
+              placeholder={authText.passwordPlaceholder}
               required
               maxLength={128}
+              disabled={isSubmitting}
               aria-invalid={password.length > 0 && !isPasswordValid}
               autoComplete="current-password"
             />
             <button
               type="button"
               className={styles.eyeButton}
-              aria-label={
-                showPassword
-                  ? isRu
-                    ? "Скрыть пароль"
-                    : "Hide password"
-                  : isRu
-                    ? "Показать пароль"
-                    : "Show password"
-              }
+              aria-label={showPassword ? authText.hidePassword : authText.showPassword}
+              disabled={isSubmitting}
               onClick={() => setShowPassword((c) => !c)}
             >
               {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -295,13 +293,13 @@ export function LoginCard({ locale }: LoginCardProps) {
       </form>
 
       <div className={styles.divider}>
-        <span>{orText}</span>
+        <span>{authText.orText}</span>
       </div>
 
       <p className={styles.contact}>
-        {contactText}
+        {authText.contactText}
         <a href="mailto:admin@petmagic.app" className={styles.contactLink}>
-          {contactLinkText}
+          {authText.contactLinkText}
         </a>
       </p>
     </div>

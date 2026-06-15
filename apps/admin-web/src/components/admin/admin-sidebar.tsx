@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useMemo } from "react";
 
 import {
   BrandMark,
@@ -27,8 +28,10 @@ type AdminSidebarProps = {
   locale: Locale;
   currentPath: string;
   isOpen: boolean;
+  isDrawerMode: boolean;
   onNavigate: () => void;
   onLogout: () => void;
+  logoutDisabled?: boolean;
   logoutLabel: string;
   supportUnreadCount?: number;
   roles?: readonly string[] | null;
@@ -93,15 +96,18 @@ export function AdminSidebar({
   locale,
   currentPath,
   isOpen,
+  isDrawerMode,
   onNavigate,
   onLogout,
+  logoutDisabled = false,
   logoutLabel,
   supportUnreadCount = 0,
   roles,
 }: AdminSidebarProps) {
-  const navItems = getAdminNavItems(locale, roles);
-  const navSections = buildNavSections(navItems, locale);
+  const navItems = useMemo(() => getAdminNavItems(locale, roles), [locale, roles]);
+  const navSections = useMemo(() => buildNavSections(navItems, locale), [locale, navItems]);
   const brandCaption = locale === "ru" ? "Операционная админ-зона" : "Operational admin workspace";
+  const navigationLabel = locale === "ru" ? "Навигация админ-панели" : "Admin navigation";
 
   function renderNavEntry(item: AdminNavEntry) {
     if (item.type === "group") {
@@ -180,7 +186,9 @@ export function AdminSidebar({
     <aside
       id="admin-sidebar"
       className={`${styles.sidebar}${isOpen ? ` ${styles.sidebarOpen}` : ""}`}
-      aria-label="Admin navigation"
+      aria-label={navigationLabel}
+      aria-hidden={isDrawerMode && !isOpen ? "true" : undefined}
+      inert={isDrawerMode && !isOpen}
     >
       <div className={styles.brand}>
         <BrandMark className={styles.brandMark} />
@@ -190,7 +198,7 @@ export function AdminSidebar({
         </div>
       </div>
 
-      <nav className={styles.nav} aria-label="Main navigation">
+      <nav className={styles.nav} aria-label={navigationLabel}>
         {navSections.map((section) => (
           <div key={section.key} className={styles.navSection}>
             <p className={styles.navSectionTitle}>{section.label}</p>
@@ -202,7 +210,12 @@ export function AdminSidebar({
       </nav>
 
       <div className={styles.sidebarFooter}>
-        <button type="button" className={styles.logoutButton} onClick={onLogout}>
+        <button
+          type="button"
+          className={styles.logoutButton}
+          onClick={onLogout}
+          disabled={logoutDisabled}
+        >
           <LogoutIcon className={styles.navIcon} />
           <span className={styles.navLabel}>{logoutLabel}</span>
         </button>

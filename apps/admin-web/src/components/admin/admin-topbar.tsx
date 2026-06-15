@@ -84,7 +84,23 @@ export function AdminTopbar({
       : theme === "dark"
         ? "Switch to light theme"
         : "Switch to dark theme";
-  const totalAttentionCount = Math.max(unreadCount, supportUnreadCount);
+  const sidebarToggleLabel =
+    locale === "ru"
+      ? sidebarOpen
+        ? "Закрыть навигацию"
+        : "Открыть навигацию"
+      : sidebarOpen
+        ? "Close navigation"
+        : "Open navigation";
+  const notificationFiltersLabel =
+    locale === "ru" ? "Фильтры уведомлений" : "Notification filters";
+  const unreadSupportNotificationCount = items.filter(
+    (item) => item.category === "support" && !item.read
+  ).length;
+  const unreadNonSupportNotificationCount = unreadCount - unreadSupportNotificationCount;
+  const totalAttentionCount =
+    unreadNonSupportNotificationCount +
+    Math.max(unreadSupportNotificationCount, supportUnreadCount);
   const filterOptions = useMemo(
     () => [
       { value: "all" as const, label: locale === "ru" ? "Все" : "All" },
@@ -132,6 +148,14 @@ export function AdminTopbar({
       notificationFilter === "support");
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
+  const notificationTriggerLabel =
+    locale === "ru"
+      ? isNotificationsOpen
+        ? "Закрыть уведомления"
+        : "Открыть уведомления"
+      : isNotificationsOpen
+        ? "Close notifications"
+        : "Open notifications";
 
   const closeNotificationPanel = useCallback((options?: { restoreFocus?: boolean }) => {
     setNotificationPanelPathname(null);
@@ -197,7 +221,8 @@ export function AdminTopbar({
         onClick={onToggleSidebar}
         aria-expanded={sidebarOpen}
         aria-controls="admin-sidebar"
-        aria-label={locale === "ru" ? "Открыть навигацию" : "Open navigation"}
+        aria-label={sidebarToggleLabel}
+        title={sidebarToggleLabel}
       >
         <MenuIcon className={styles.navIcon} />
       </button>
@@ -224,8 +249,8 @@ export function AdminTopbar({
             aria-haspopup="dialog"
             aria-expanded={isNotificationsOpen}
             aria-controls={isNotificationsOpen ? notificationPanelId : undefined}
-            aria-label={locale === "ru" ? "Открыть уведомления" : "Open notifications"}
-            title={locale === "ru" ? "Уведомления" : "Notifications"}
+            aria-label={notificationTriggerLabel}
+            title={notificationTriggerLabel}
           >
             <BellIcon className={styles.localeIcon} />
             {totalAttentionCount > 0 ? (
@@ -276,12 +301,17 @@ export function AdminTopbar({
                 </div>
               </div>
 
-              <div className={styles.notificationFilters}>
+              <div
+                className={styles.notificationFilters}
+                role="toolbar"
+                aria-label={notificationFiltersLabel}
+              >
                 {filterOptions.map((filterOption) => (
                   <button
                     key={filterOption.value}
                     type="button"
                     className={`${styles.notificationFilterChip} ${notificationFilter === filterOption.value ? styles.notificationFilterChipActive : ""}`}
+                    aria-pressed={notificationFilter === filterOption.value}
                     onClick={() => setNotificationFilter(filterOption.value)}
                   >
                     {filterOption.label}

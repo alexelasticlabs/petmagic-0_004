@@ -323,25 +323,61 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
   }, []);
 
   const markAsRead = useCallback((notificationId: string) => {
-    setItems((current) =>
-      current.map((item) => (item.id === notificationId ? { ...item, read: true } : item))
-    );
+    setItems((current) => {
+      let didChange = false;
+      const next = current.map((item) => {
+        if (item.id !== notificationId || item.read) {
+          return item;
+        }
+
+        didChange = true;
+        return { ...item, read: true };
+      });
+
+      return didChange ? next : current;
+    });
   }, []);
 
   const markCategoryAsRead = useCallback((category: AdminNotificationCategory) => {
-    setItems((current) =>
-      current.map((item) =>
-        item.category === category && !item.read ? { ...item, read: true } : item
-      )
-    );
+    setItems((current) => {
+      let didChange = false;
+      const next = current.map((item) => {
+        if (item.category !== category || item.read) {
+          return item;
+        }
+
+        didChange = true;
+        return { ...item, read: true };
+      });
+
+      return didChange ? next : current;
+    });
   }, []);
 
   const markAllAsRead = useCallback(() => {
-    setItems((current) => current.map((item) => (item.read ? item : { ...item, read: true })));
+    setItems((current) => {
+      let didChange = false;
+      const next = current.map((item) => {
+        if (item.read) {
+          return item;
+        }
+
+        didChange = true;
+        return { ...item, read: true };
+      });
+
+      return didChange ? next : current;
+    });
   }, []);
 
   const clearRead = useCallback(() => {
-    setItems((current) => current.filter((item) => !item.read));
+    setItems((current) => {
+      if (current.every((item) => !item.read)) {
+        return current;
+      }
+
+      return current.filter((item) => !item.read);
+    });
   }, []);
 
   const removeNotification = useCallback((notificationId: string) => {
