@@ -16,6 +16,14 @@ final templatesControllerProvider =
       TemplatesController.new,
     );
 
+final templateThumbnailWarmupProvider = Provider<Future<void> Function(String)>(
+  (ref) {
+    return (url) async {
+      await TemplateMediaCache.fetchThumbnailFile(url);
+    };
+  },
+);
+
 const Object _templateOfTheDayUnchanged = Object();
 
 class TemplatesState {
@@ -25,6 +33,7 @@ class TemplatesState {
     this.query = const TemplatesQuery(),
     this.catalogVersion = 0,
     this.currentPage = 1,
+    this.nextCursor,
     this.itemsQueryKey,
     this.cachedPagesByQueryKey = const {},
     this.hasMore = true,
@@ -43,6 +52,7 @@ class TemplatesState {
   final TemplatesQuery query;
   final int catalogVersion;
   final int currentPage;
+  final String? nextCursor;
   final String? itemsQueryKey;
   final Map<String, TemplatesFeedPage> cachedPagesByQueryKey;
   final bool hasMore;
@@ -65,6 +75,8 @@ class TemplatesState {
     TemplatesQuery? query,
     int? catalogVersion,
     int? currentPage,
+    String? nextCursor,
+    bool clearNextCursor = false,
     String? itemsQueryKey,
     bool clearItemsQueryKey = false,
     Map<String, TemplatesFeedPage>? cachedPagesByQueryKey,
@@ -86,6 +98,7 @@ class TemplatesState {
       query: query ?? this.query,
       catalogVersion: catalogVersion ?? this.catalogVersion,
       currentPage: currentPage ?? this.currentPage,
+      nextCursor: clearNextCursor ? null : nextCursor ?? this.nextCursor,
       itemsQueryKey: clearItemsQueryKey
           ? null
           : itemsQueryKey ?? this.itemsQueryKey,
@@ -112,6 +125,7 @@ class TemplatesState {
 class TemplatesController extends Notifier<TemplatesState> {
   static const _realtimeRefreshDebounce = Duration(milliseconds: 350);
   static const _warmupPreviewLimit = 6;
+  static const _maxInMemoryFeedCaches = 6;
 
   TemplatesRepository get _repository => ref.read(templatesRepositoryProvider);
   RealtimeClient? _activeRealtimeClient;
@@ -119,6 +133,10 @@ class TemplatesController extends Notifier<TemplatesState> {
   Timer? _realtimeRefreshTimer;
   bool _hasPendingRealtimeRefresh = false;
   int _requestVersion = 0;
+  Future<void>? _inFlightInitialLoad;
+  String? _inFlightInitialQueryKey;
+  bool? _inFlightInitialForceRefresh;
+  int? _inFlightInitialKnownCatalogVersion;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
 
@@ -172,7 +190,29 @@ class TemplatesController extends Notifier<TemplatesState> {
       return;
     }
 
+    _cancelActiveFeedWork();
     _pauseRealtime();
+  }
+
+  void _cancelActiveFeedWork() {
+    _requestVersion++;
+    _inFlightInitialLoad = null;
+    _inFlightInitialQueryKey = null;
+    _inFlightInitialForceRefresh = null;
+    _inFlightInitialKnownCatalogVersion = null;
+    _repository.cancelPendingFeedRequest();
+    _repository.cancelPendingMetadataRequests();
+    if (state.isLoading ||
+        state.isRefreshing ||
+        state.isLoadingMore ||
+        state.isTemplateOfTheDayLoading) {
+      state = state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        isLoadingMore: false,
+        isTemplateOfTheDayLoading: false,
+      );
+    }
   }
 
   void _handleRealtimeEvent(RealtimeEvent event) {
@@ -283,11 +323,51 @@ class TemplatesController extends Notifier<TemplatesState> {
   Future<void> loadInitial({
     bool forceRefresh = false,
     int? knownCatalogVersion,
-  }) async {
-    final requestVersion = ++_requestVersion;
+  }) {
     final query = state.query.copyWith(clearCursor: true, resetPage: true);
     final queryKey = query.cacheKey;
-    unawaited(_loadTemplateOfTheDay(requestVersion));
+    final inFlightInitialLoad = _inFlightInitialLoad;
+    if (inFlightInitialLoad != null &&
+        _inFlightInitialQueryKey == queryKey &&
+        _inFlightInitialForceRefresh == forceRefresh &&
+        _inFlightInitialKnownCatalogVersion == knownCatalogVersion) {
+      return inFlightInitialLoad;
+    }
+
+    late final Future<void> initialLoad;
+    initialLoad =
+        _loadInitial(
+          query,
+          queryKey,
+          forceRefresh: forceRefresh,
+          knownCatalogVersion: knownCatalogVersion,
+        ).whenComplete(() {
+          if (identical(_inFlightInitialLoad, initialLoad)) {
+            _inFlightInitialLoad = null;
+            _inFlightInitialQueryKey = null;
+            _inFlightInitialForceRefresh = null;
+            _inFlightInitialKnownCatalogVersion = null;
+          }
+        });
+
+    _inFlightInitialLoad = initialLoad;
+    _inFlightInitialQueryKey = queryKey;
+    _inFlightInitialForceRefresh = forceRefresh;
+    _inFlightInitialKnownCatalogVersion = knownCatalogVersion;
+
+    return initialLoad;
+  }
+
+  Future<void> _loadInitial(
+    TemplatesQuery query,
+    String queryKey, {
+    required bool forceRefresh,
+    int? knownCatalogVersion,
+  }) async {
+    final requestVersion = ++_requestVersion;
+    if (_shouldLoadTemplateOfTheDay(forceRefresh: forceRefresh)) {
+      unawaited(_loadTemplateOfTheDay(requestVersion));
+    }
 
     if (!forceRefresh) {
       final inMemoryCached = state.cachedPagesByQueryKey[queryKey];
@@ -296,31 +376,14 @@ class TemplatesController extends Notifier<TemplatesState> {
           query: query,
           items: inMemoryCached.items,
           currentPage: inMemoryCached.page,
+          nextCursor: inMemoryCached.nextCursor,
+          clearNextCursor: inMemoryCached.nextCursor == null,
           itemsQueryKey: queryKey,
           hasMore: inMemoryCached.hasMore,
           loadedFromCache: true,
           isLoading: false,
           isRefreshing: false,
-          clearError: true,
-        );
-        _resumePendingRealtimeRefreshIfNeeded();
-        return;
-      }
-
-      final cached = await _repository.readCachedFirstPage(query);
-      if (cached != null && requestVersion == _requestVersion) {
-        final updatedCache = Map<String, TemplatesFeedPage>.from(
-          state.cachedPagesByQueryKey,
-        )..[queryKey] = cached;
-        state = state.copyWith(
-          items: cached.items,
-          currentPage: cached.page,
-          itemsQueryKey: queryKey,
-          cachedPagesByQueryKey: updatedCache,
-          hasMore: cached.hasMore,
-          loadedFromCache: true,
-          isLoading: false,
-          isRefreshing: false,
+          isLoadingMore: false,
           clearError: true,
         );
         if (state.categories.isEmpty) {
@@ -329,59 +392,122 @@ class TemplatesController extends Notifier<TemplatesState> {
         _resumePendingRealtimeRefreshIfNeeded();
         return;
       }
+
+      final hasStaleVisibleItemsBeforeCache = state.itemsQueryKey != null
+          ? state.itemsQueryKey != queryKey
+          : state.items.isNotEmpty;
+      if (hasStaleVisibleItemsBeforeCache) {
+        state = state.copyWith(
+          query: query,
+          items: const [],
+          clearItemsQueryKey: true,
+          isLoading: true,
+          isRefreshing: false,
+          isLoadingMore: false,
+          loadedFromCache: false,
+          clearError: true,
+          currentPage: 1,
+          clearNextCursor: true,
+          hasMore: true,
+        );
+      }
+
+      final cached = await _repository.readCachedFirstPage(query);
+      if (cached != null && requestVersion == _requestVersion) {
+        final updatedCache = _rememberFeedPage(
+          state.cachedPagesByQueryKey,
+          queryKey,
+          cached,
+        );
+        state = state.copyWith(
+          query: query,
+          items: cached.items,
+          currentPage: cached.page,
+          nextCursor: cached.nextCursor,
+          clearNextCursor: cached.nextCursor == null,
+          itemsQueryKey: queryKey,
+          cachedPagesByQueryKey: updatedCache,
+          hasMore: cached.hasMore,
+          loadedFromCache: true,
+          isLoading: false,
+          isRefreshing: true,
+          isLoadingMore: false,
+          clearError: true,
+        );
+        if (state.categories.isEmpty) {
+          unawaited(_refreshCategories(requestVersion));
+        }
+      }
     }
 
     final isStaleVisibleItems = state.itemsQueryKey != null
         ? state.itemsQueryKey != queryKey
         : state.items.isNotEmpty;
 
-    state = state.copyWith(
-      query: query,
-      items: isStaleVisibleItems ? const [] : state.items,
-      clearItemsQueryKey: isStaleVisibleItems,
-      isLoading: !forceRefresh,
-      isRefreshing: forceRefresh,
-      loadedFromCache: false,
-      clearError: true,
-      currentPage: 1,
-      hasMore: true,
-    );
+    if (state.itemsQueryKey != queryKey || forceRefresh) {
+      state = state.copyWith(
+        query: query,
+        items: isStaleVisibleItems ? const [] : state.items,
+        clearItemsQueryKey: isStaleVisibleItems,
+        isLoading:
+            !forceRefresh && (isStaleVisibleItems || state.items.isEmpty),
+        isRefreshing: forceRefresh || state.items.isNotEmpty,
+        isLoadingMore: false,
+        loadedFromCache: false,
+        clearError: true,
+        currentPage: 1,
+        clearNextCursor: true,
+        hasMore: true,
+      );
+    }
 
     try {
-      final resolvedCatalogVersion = await _repository.syncCatalog(
-        knownRemoteVersion: knownCatalogVersion,
-      );
-
       final page = await _repository.fetchFeed(query);
       if (requestVersion != _requestVersion) return;
 
-      final updatedCache = Map<String, TemplatesFeedPage>.from(
+      final updatedCache = _rememberFeedPage(
         state.cachedPagesByQueryKey,
-      )..[queryKey] = page;
+        queryKey,
+        page,
+      );
       state = state.copyWith(
         items: page.items,
-        catalogVersion: resolvedCatalogVersion,
+        catalogVersion: knownCatalogVersion ?? state.catalogVersion,
         currentPage: page.page,
+        nextCursor: page.nextCursor,
+        clearNextCursor: page.nextCursor == null,
         itemsQueryKey: queryKey,
         cachedPagesByQueryKey: updatedCache,
         hasMore: page.hasMore,
         loadedFromCache: false,
         isLoading: false,
         isRefreshing: false,
+        isLoadingMore: false,
         clearError: true,
       );
-      unawaited(_warmupTemplatePreviews(page.items));
+      unawaited(
+        _warmupTemplatePreviews(
+          page.items,
+          requestVersion: requestVersion,
+          queryKey: queryKey,
+        ),
+      );
       if (state.categories.isEmpty || forceRefresh) {
         unawaited(_refreshCategories(requestVersion));
       }
     } on RequestCancelledException {
       if (requestVersion != _requestVersion) return;
-      state = state.copyWith(isLoading: false, isRefreshing: false);
+      state = state.copyWith(
+        isLoading: false,
+        isRefreshing: false,
+        isLoadingMore: false,
+      );
     } on AppException catch (error) {
       if (requestVersion != _requestVersion) return;
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
+        isLoadingMore: false,
         errorMessage: error.message,
       );
     } catch (error) {
@@ -389,6 +515,7 @@ class TemplatesController extends Notifier<TemplatesState> {
       state = state.copyWith(
         isLoading: false,
         isRefreshing: false,
+        isLoadingMore: false,
         errorMessage: 'templates.request_failed',
       );
     } finally {
@@ -396,16 +523,30 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
   }
 
+  bool _shouldLoadTemplateOfTheDay({required bool forceRefresh}) {
+    if (forceRefresh) {
+      return true;
+    }
+
+    return state.templateOfTheDay == null &&
+        state.templateOfTheDayError == null &&
+        !state.isTemplateOfTheDayLoading;
+  }
+
   Future<void> _refreshCategories(int requestVersion) async {
     try {
       final categories = _normalizeCategories(
         await _repository.fetchCategories(),
       );
-      if (!ref.mounted || requestVersion != _requestVersion) {
+      if (!ref.mounted ||
+          !_isScreenVisible ||
+          requestVersion != _requestVersion) {
         return;
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!ref.mounted || requestVersion != _requestVersion) {
+        if (!ref.mounted ||
+            !_isScreenVisible ||
+            requestVersion != _requestVersion) {
           return;
         }
         state = state.copyWith(categories: categories);
@@ -435,8 +576,8 @@ class TemplatesController extends Notifier<TemplatesState> {
       final previewUrl = _normalizeMediaUrl(
         template?.thumbnailUrl ?? template?.previewMediaUrl,
       );
-      if (previewUrl != null && !isVideoUrl(previewUrl)) {
-        unawaited(TemplateMediaCache.thumbnailCache.getSingleFile(previewUrl));
+      if (_isScreenVisible && previewUrl != null && !isVideoUrl(previewUrl)) {
+        unawaited(_warmTemplateOfTheDayThumbnail(previewUrl));
       }
     } on Object catch (error, stackTrace) {
       if (!ref.mounted || requestVersion != _requestVersion) {
@@ -458,21 +599,45 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
   }
 
+  Future<void> _warmTemplateOfTheDayThumbnail(String url) async {
+    try {
+      await ref.read(templateThumbnailWarmupProvider)(url);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateOfTheDay',
+        operation: 'thumbnail_warmup',
+        message: 'Template of the Day thumbnail warmup failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   Future<void> loadMore() async {
-    if (state.isLoadingMore || state.isLoading || !state.hasMore) {
+    final currentNextCursor = state.nextCursor;
+    if (state.isLoadingMore ||
+        state.isLoading ||
+        !state.hasMore ||
+        currentNextCursor == null ||
+        currentNextCursor.trim().isEmpty) {
       return;
     }
 
     final requestVersion = _requestVersion;
+    final queryKey = state.query.copyWith(resetPage: true).cacheKey;
     final query = state.query.copyWith(
       page: state.currentPage + 1,
-      clearCursor: true,
+      cursor: currentNextCursor,
     );
     state = state.copyWith(isLoadingMore: true, clearError: true);
 
     try {
       final page = await _repository.fetchFeed(query);
-      if (requestVersion != _requestVersion) {
+      final isCurrentQuery =
+          state.query.copyWith(resetPage: true).cacheKey == queryKey &&
+          state.itemsQueryKey == queryKey &&
+          state.nextCursor == currentNextCursor;
+      if (requestVersion != _requestVersion || !isCurrentQuery) {
         return;
       }
 
@@ -481,21 +646,29 @@ class TemplatesController extends Notifier<TemplatesState> {
         (item) => !existingIds.contains(item.templateId),
       );
       final mergedItems = [...state.items, ...appended];
-      final queryKey = state.query.copyWith(resetPage: true).cacheKey;
-      final updatedCache =
-          Map<String, TemplatesFeedPage>.from(state.cachedPagesByQueryKey)
-            ..[queryKey] = TemplatesFeedPage(
-              items: mergedItems,
-              hasMore: page.hasMore,
-              page: page.page,
-            );
+      final hasAdvancedCursor =
+          page.nextCursor != null && page.nextCursor != currentNextCursor;
+      final hasMore = page.hasMore && hasAdvancedCursor;
+      final cachedPage = TemplatesFeedPage(
+        items: mergedItems,
+        nextCursor: page.nextCursor,
+        hasMore: hasMore,
+        page: page.page,
+      );
+      final updatedCache = _rememberFeedPage(
+        state.cachedPagesByQueryKey,
+        queryKey,
+        cachedPage,
+      );
 
       state = state.copyWith(
         items: mergedItems,
         currentPage: page.page,
+        nextCursor: page.nextCursor,
+        clearNextCursor: page.nextCursor == null,
         itemsQueryKey: queryKey,
         cachedPagesByQueryKey: updatedCache,
-        hasMore: page.hasMore,
+        hasMore: hasMore,
         isLoadingMore: false,
         clearError: true,
       );
@@ -583,7 +756,27 @@ class TemplatesController extends Notifier<TemplatesState> {
     loadInitial();
   }
 
-  Future<void> _warmupTemplatePreviews(List<TemplateItem> items) async {
+  Map<String, TemplatesFeedPage> _rememberFeedPage(
+    Map<String, TemplatesFeedPage> current,
+    String queryKey,
+    TemplatesFeedPage page,
+  ) {
+    final updated = Map<String, TemplatesFeedPage>.from(current);
+    updated.remove(queryKey);
+    updated[queryKey] = page;
+
+    while (updated.length > _maxInMemoryFeedCaches) {
+      updated.remove(updated.keys.first);
+    }
+
+    return updated;
+  }
+
+  Future<void> _warmupTemplatePreviews(
+    List<TemplateItem> items, {
+    required int requestVersion,
+    required String queryKey,
+  }) async {
     final uniqueUrls = <String>{};
     for (final item in items.take(_warmupPreviewLimit)) {
       final thumbnailUrl = _normalizeMediaUrl(item.thumbnailUrl);
@@ -598,16 +791,27 @@ class TemplatesController extends Notifier<TemplatesState> {
     }
 
     for (final url in uniqueUrls) {
-      if (!ref.mounted || !_isScreenVisible) {
+      if (!_shouldContinuePreviewWarmup(requestVersion, queryKey)) {
         return;
       }
 
       try {
-        await TemplateMediaCache.thumbnailCache.getSingleFile(url);
+        await ref.read(templateThumbnailWarmupProvider)(url);
       } catch (_) {
         // Warmup is best-effort only.
       }
     }
+  }
+
+  bool _shouldContinuePreviewWarmup(int requestVersion, String queryKey) {
+    if (!ref.mounted ||
+        !_isScreenVisible ||
+        requestVersion != _requestVersion ||
+        state.itemsQueryKey != queryKey) {
+      return false;
+    }
+
+    return state.query.copyWith(resetPage: true).cacheKey == queryKey;
   }
 
   String? _normalizeMediaUrl(String? rawUrl) {

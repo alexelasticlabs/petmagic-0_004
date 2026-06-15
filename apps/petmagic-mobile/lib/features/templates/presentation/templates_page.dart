@@ -12,7 +12,9 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
+import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
@@ -21,7 +23,6 @@ import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart'
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_random_selector.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
@@ -40,6 +41,8 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 final _templateHomePetsProvider = FutureProvider.autoDispose<List<PetProfile>>((
   ref,
@@ -70,10 +73,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   final _permissionCoordinator = AppPermissionCoordinator();
   late final TemplatesController _templatesController;
   late final WalletController _walletController;
+  TemplatesRepository? _activeRandomTemplateRepository;
   Timer? _searchDebounce;
   DateTime? _lastRefreshAt;
   bool _disposed = false;
   bool _isRandomTemplateLoading = false;
+  bool _isAppResumed = true;
   bool? _isTabActive;
   final Set<String> _trackedTemplateOfTheDayViews = <String>{};
 
@@ -109,7 +114,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     _disposed = true;
     _templatesController.setScreenVisible(false);
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
-    _searchDebounce?.cancel();
+    _cancelPendingSearchDebounce();
+    _cancelPendingRandomTemplateRequest(clearLoadingState: false);
     _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -120,6 +126,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   void _handleLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _isAppResumed = true;
       _runAfterBuild(() {
         if (!mounted) {
           return;
@@ -132,10 +139,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       return;
     }
 
+    _isAppResumed = false;
     _runAfterBuild(() {
       if (!mounted) {
         return;
       }
+      _cancelPendingSearchDebounce();
+      _cancelPendingRandomTemplateRequest();
       _templatesController.setScreenVisible(false);
     });
   }
@@ -150,7 +160,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         (fromAppResume && _isRefreshStale(DateTime.now()));
 
     if (shouldRefresh) {
-      unawaited(_refreshFeed());
+      final shouldBypassCooldown =
+          _lastRefreshAt != null &&
+          (state.items.isEmpty || state.errorMessage != null);
+      unawaited(_refreshFeed(forceRefresh: shouldBypassCooldown));
     }
   }
 
@@ -169,6 +182,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       if (!isTabActive) {
+        _cancelPendingSearchDebounce();
+        _cancelPendingRandomTemplateRequest();
         _templatesController.setScreenVisible(false);
         return;
       }
@@ -198,6 +213,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(templatesControllerProvider);
+    _syncSearchFieldWithQuery(state.query.search);
     final wallet = ref.watch(
       walletControllerProvider.select((walletState) => walletState.wallet),
     );
@@ -214,11 +230,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final bottomInset = petMagicScrollableBottomInset(context);
     final templateOfTheDay = state.templateOfTheDay;
     final selectedPetId = _routeQueryParameter(context, 'petId');
+    final selectedPetPhotoId = _routeQueryParameter(context, 'petPhotoId');
     _trackTemplateOfTheDayViewed(templateOfTheDay);
-    final visibleItems = _promoteTemplateOfTheDay(
-      state.items,
-      templateOfTheDay?.templateId,
-    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -284,6 +297,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                       _CreateWithPetBlock(
                         pets: ref.watch(_templateHomePetsProvider),
                         selectedPetId: selectedPetId,
+                        selectedPetPhotoId: selectedPetPhotoId,
                       ),
                       _TemplateOfTheDaySlot(
                         template: templateOfTheDay,
@@ -347,7 +361,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
                 sliver: SliverGrid.builder(
-                  itemCount: visibleItems.length,
+                  itemCount: state.items.length,
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 5,
@@ -355,7 +369,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     childAspectRatio: 0.72,
                   ),
                   itemBuilder: (context, index) {
-                    final template = visibleItems[index];
+                    final template = state.items[index];
                     final isTodayPick =
                         templateOfTheDay?.templateId == template.templateId;
                     final templateIdentity = _templateCardIdentity(
@@ -437,8 +451,33 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   void _handleSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 360), () {
+      _searchDebounce = null;
+      if (!mounted) {
+        return;
+      }
       _templatesController.setSearch(value);
     });
+  }
+
+  void _cancelPendingSearchDebounce() {
+    _searchDebounce?.cancel();
+    _searchDebounce = null;
+  }
+
+  void _syncSearchFieldWithQuery(String? search) {
+    if (_searchDebounce?.isActive == true) {
+      return;
+    }
+
+    final nextText = search ?? '';
+    if (_searchController.text == nextText) {
+      return;
+    }
+
+    _searchController.value = TextEditingValue(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: nextText.length),
+    );
   }
 
   Future<void> _refreshFeed({bool forceRefresh = false}) async {
@@ -456,7 +495,15 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   Future<void> _handleTemplateSelected(
     TemplateItem template, {
     TemplateOfTheDayItem? templateOfTheDay,
+    bool fetchLatestDetails = true,
   }) async {
+    final previewTemplate = fetchLatestDetails
+        ? await _fetchTemplateDetailsOrFallback(template)
+        : template;
+    if (!mounted) {
+      return;
+    }
+
     final isAuthenticated = ref
         .read(appLaunchControllerProvider)
         .isAuthenticated;
@@ -465,7 +512,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final action = await context.push<TemplateDetailAction>(
       TemplatePreviewPage.routePath,
       extra: TemplatePreviewRouteArgs(
-        template: template,
+        template: previewTemplate,
         hasPremiumAccess: hasPremiumAccess,
         isAuthenticated: isAuthenticated,
       ),
@@ -475,9 +522,30 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     }
 
     await _startTemplateUploadFlow(
-      template,
+      previewTemplate,
       templateOfTheDay: templateOfTheDay,
     );
+  }
+
+  Future<TemplateItem> _fetchTemplateDetailsOrFallback(
+    TemplateItem template,
+  ) async {
+    try {
+      return await ref
+          .read(templatesRepositoryProvider)
+          .fetchTemplate(template.templateId);
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'templates',
+        operation: 'fetch_template_detail_before_preview',
+        message:
+            'Failed to fetch template detail before preview; using feed payload.',
+        context: {'templateId': template.templateId},
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return template;
+    }
   }
 
   Future<void> _handleTemplateOfTheDaySelected(
@@ -495,17 +563,17 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     }
 
     try {
-      final catalogItems = await ref
+      final template = await ref
           .read(templatesRepositoryProvider)
-          .readSyncedCatalogItems();
+          .fetchTemplate(featured.templateId);
       if (!mounted) {
         return;
       }
 
       await _openTemplateOfTheDayTemplate(
         featured,
-        _findTemplateById(catalogItems, featured.templateId) ??
-            featured.toFallbackTemplateItem(),
+        template,
+        fetchLatestDetails: false,
       );
     } catch (_) {
       if (!mounted) {
@@ -515,21 +583,27 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       await _openTemplateOfTheDayTemplate(
         featured,
         featured.toFallbackTemplateItem(),
+        fetchLatestDetails: false,
       );
     }
   }
 
   Future<void> _openTemplateOfTheDayTemplate(
     TemplateOfTheDayItem featured,
-    TemplateItem template,
-  ) async {
+    TemplateItem template, {
+    bool fetchLatestDetails = true,
+  }) async {
     unawaited(_recordTemplateOfTheDayAnalytics(featured, 'opened'));
-    await _handleTemplateSelected(template, templateOfTheDay: featured);
+    await _handleTemplateSelected(
+      template,
+      templateOfTheDay: featured,
+      fetchLatestDetails: fetchLatestDetails,
+    );
   }
 
   Future<void> _handleRandomTemplatePressed() async {
     final mode = await _showRandomTemplateModeSheet(context);
-    if (!mounted || mode == null) {
+    if (!mounted || !_canUseVisibleTemplatesUi || mode == null) {
       return;
     }
 
@@ -540,20 +614,27 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final text = AppLocalizations.of(context);
     final hasPremiumAccess =
         ref.read(walletControllerProvider).wallet?.isPremium ?? false;
+    final randomRepository = ref.read(templatesRepositoryProvider);
+    _activeRandomTemplateRepository = randomRepository;
 
     try {
-      final templates = await ref
-          .read(templatesRepositoryProvider)
-          .readSyncedCatalogItems();
-      if (!mounted) {
+      final activeCategory = ref
+          .read(templatesControllerProvider)
+          .query
+          .category;
+      final template = await randomRepository.fetchRandomTemplate(
+        mode: mode,
+        category: activeCategory,
+        includePremium: hasPremiumAccess,
+      );
+      if (identical(_activeRandomTemplateRepository, randomRepository)) {
+        _activeRandomTemplateRepository = null;
+      }
+
+      if (!mounted || !_canUseVisibleTemplatesUi) {
         return;
       }
 
-      final template = selectRandomTemplate(
-        templates,
-        mode: mode,
-        hasPremiumAccess: hasPremiumAccess,
-      );
       if (template == null) {
         PetMagicToast.show(
           context,
@@ -563,9 +644,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         return;
       }
 
-      await _handleTemplateSelected(template);
+      await _handleTemplateSelected(template, fetchLatestDetails: false);
     } catch (_) {
-      if (!mounted) {
+      if (!mounted || !_canUseVisibleTemplatesUi) {
         return;
       }
 
@@ -575,12 +656,39 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
         tone: PetMagicToastTone.warning,
       );
     } finally {
-      if (mounted) {
+      if (identical(_activeRandomTemplateRepository, randomRepository)) {
+        _activeRandomTemplateRepository = null;
+      }
+
+      if (mounted && _canUseVisibleTemplatesUi) {
         setState(() {
           _isRandomTemplateLoading = false;
         });
+      } else {
+        _isRandomTemplateLoading = false;
       }
     }
+  }
+
+  bool get _canUseVisibleTemplatesUi =>
+      mounted && _isAppResumed && _isTabActive == true;
+
+  void _cancelPendingRandomTemplateRequest({bool clearLoadingState = true}) {
+    final repository = _activeRandomTemplateRepository;
+    _activeRandomTemplateRepository = null;
+    repository?.cancelPendingRandomTemplateRequest();
+    if (!_isRandomTemplateLoading) {
+      return;
+    }
+
+    if (clearLoadingState && mounted) {
+      setState(() {
+        _isRandomTemplateLoading = false;
+      });
+      return;
+    }
+
+    _isRandomTemplateLoading = false;
   }
 
   Future<void> _startTemplateUploadFlow(
@@ -727,7 +835,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       router.push(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+        GenerationStatusPage.routeFor(generation.generationId),
         extra: featured,
       );
       return;
@@ -848,7 +956,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       context.go(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
+        GenerationStatusPage.routeFor(generation.generationId),
         extra: featured,
       );
     } on Object {
@@ -1189,28 +1297,6 @@ String _randomTemplateEmptyMessage(
   };
 }
 
-List<TemplateItem> _promoteTemplateOfTheDay(
-  List<TemplateItem> items,
-  String? templateId,
-) {
-  final normalizedId = templateId?.trim();
-  if (normalizedId == null || normalizedId.isEmpty || items.length < 2) {
-    return items;
-  }
-
-  final index = items.indexWhere((item) => item.templateId == normalizedId);
-  if (index <= 0) {
-    return items;
-  }
-
-  final promoted = items[index];
-  return [
-    promoted,
-    for (var itemIndex = 0; itemIndex < items.length; itemIndex++)
-      if (itemIndex != index) items[itemIndex],
-  ];
-}
-
 TemplateItem? _findTemplateById(Iterable<TemplateItem> items, String id) {
   final normalizedId = id.trim();
   if (normalizedId.isEmpty) {
@@ -1236,6 +1322,24 @@ String? _routeQueryParameter(BuildContext context, String key) {
   } catch (_) {
     return null;
   }
+}
+
+String _templatesPetShortcutLocation({
+  required String petId,
+  required String? selectedPetId,
+  required String? selectedPetPhotoId,
+}) {
+  final keepSelectedPhoto =
+      selectedPetId == petId &&
+      selectedPetPhotoId != null &&
+      selectedPetPhotoId.isNotEmpty;
+  return Uri(
+    path: TemplatesPage.routePath,
+    queryParameters: {
+      'petId': petId,
+      if (keepSelectedPhoto) 'petPhotoId': selectedPetPhotoId,
+    },
+  ).toString();
 }
 
 String _templateCardIdentity({
@@ -1669,10 +1773,20 @@ class _TemplateOfTheDayCard extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final imageUrl = _normalizeTemplateOfTheDayMediaUrl(
-      template.thumbnailUrl ??
-          (!template.isVideo ? template.previewMediaUrl : null),
+    final thumbnailUrl = _normalizeTemplateOfTheDayMediaUrl(
+      template.thumbnailUrl,
     );
+    final previewMediaUrl = _normalizeTemplateOfTheDayMediaUrl(
+      template.previewMediaUrl,
+    );
+    final videoPreviewUrl =
+        template.isVideo &&
+            previewMediaUrl != null &&
+            isVideoUrl(previewMediaUrl)
+        ? previewMediaUrl
+        : null;
+    final imageUrl =
+        thumbnailUrl ?? (!template.isVideo ? previewMediaUrl : null);
     final isPremiumLocked = template.isPremium && !hasPremiumAccess;
     return PetMagicInteractiveSurface(
       onTap: onPressed,
@@ -1705,16 +1819,41 @@ class _TemplateOfTheDayCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (imageUrl != null)
+                if (imageUrl != null || videoPreviewUrl != null)
                   Positioned.fill(
-                    child: CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      cacheManager: TemplateMediaCache.thumbnailCache,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.medium,
-                      fadeInDuration: AppTheme.motionFast,
-                      errorWidget: (context, url, error) =>
-                          const _TemplateOfTheDayMediaFallback(),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final cacheWidth = _templateMediaCacheDimension(
+                          constraints.maxWidth,
+                          MediaQuery.devicePixelRatioOf(context),
+                        );
+
+                        if (videoPreviewUrl != null) {
+                          return _TemplateOfTheDayVideoPreview(
+                            previewUrl: videoPreviewUrl,
+                            thumbnailUrl: thumbnailUrl,
+                            cacheWidth: cacheWidth,
+                          );
+                        }
+
+                        if (imageUrl != null) {
+                          return CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            cacheManager: TemplateMediaCache.thumbnailCache,
+                            memCacheWidth: cacheWidth,
+                            maxWidthDiskCache: cacheWidth,
+                            fit: BoxFit.cover,
+                            filterQuality: FilterQuality.medium,
+                            fadeInDuration: AppTheme.motionFast,
+                            placeholder: (context, url) =>
+                                const _TemplateOfTheDayMediaFallback(),
+                            errorWidget: (context, url, error) =>
+                                const _TemplateOfTheDayMediaFallback(),
+                          );
+                        }
+
+                        return const _TemplateOfTheDayMediaFallback();
+                      },
                     ),
                   )
                 else
@@ -1822,6 +1961,315 @@ class _TemplateOfTheDayCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TemplateOfTheDayVideoPreview extends StatefulWidget {
+  const _TemplateOfTheDayVideoPreview({
+    required this.previewUrl,
+    required this.thumbnailUrl,
+    required this.cacheWidth,
+  });
+
+  final String previewUrl;
+  final String? thumbnailUrl;
+  final int? cacheWidth;
+
+  @override
+  State<_TemplateOfTheDayVideoPreview> createState() =>
+      _TemplateOfTheDayVideoPreviewState();
+}
+
+class _TemplateOfTheDayVideoPreviewState
+    extends State<_TemplateOfTheDayVideoPreview>
+    with WidgetsBindingObserver {
+  static const double _loadVisibilityFraction = 0.18;
+  static const double _playVisibilityFraction = 0.58;
+
+  final Key _visibilityKey = UniqueKey();
+  VideoPlayerController? _controller;
+  bool _controllerInitInFlight = false;
+  bool _failedToLoad = false;
+  bool _isVisibleEnoughToLoad = false;
+  bool _shouldPlay = false;
+  bool _hasPreviewSlot = false;
+  int _initializeRequestVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TemplateOfTheDayVideoPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.previewUrl != widget.previewUrl) {
+      _failedToLoad = false;
+      unawaited(_disposeVideoController());
+      if (_isVisibleEnoughToLoad) {
+        unawaited(_initialize());
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isVisibleEnoughToLoad &&
+          _controller == null &&
+          !_controllerInitInFlight &&
+          !_failedToLoad) {
+        unawaited(_initialize());
+      }
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(_disposeVideoController());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _initializeRequestVersion++;
+    _controllerInitInFlight = false;
+    _releasePreviewSlot();
+    final controller = _controller;
+    _controller = null;
+    unawaited(controller?.dispose());
+    super.dispose();
+  }
+
+  void _handleVisibilityChanged(VisibilityInfo info) {
+    final visibleFraction = info.visibleFraction;
+    final shouldLoad = visibleFraction >= _loadVisibilityFraction;
+    final shouldPlay = visibleFraction >= _playVisibilityFraction;
+    if (shouldLoad == _isVisibleEnoughToLoad && shouldPlay == _shouldPlay) {
+      return;
+    }
+
+    _isVisibleEnoughToLoad = shouldLoad;
+    _shouldPlay = shouldPlay;
+
+    if (!shouldLoad) {
+      unawaited(_disposeVideoController());
+      return;
+    }
+
+    if (_controller == null && !_controllerInitInFlight && !_failedToLoad) {
+      unawaited(_initialize());
+      return;
+    }
+
+    unawaited(_syncPlaybackState());
+  }
+
+  Future<void> _initialize() async {
+    if (!_isVisibleEnoughToLoad || _controllerInitInFlight) {
+      return;
+    }
+
+    final requestVersion = ++_initializeRequestVersion;
+    final previewUrl = widget.previewUrl;
+    final safeUri = parseSafeGenerationMediaUri(previewUrl);
+    if (safeUri == null) {
+      if (mounted) {
+        setState(() => _failedToLoad = true);
+      }
+      return;
+    }
+
+    _controllerInitInFlight = true;
+    if (!MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
+      _controllerInitInFlight = false;
+      return;
+    }
+    _hasPreviewSlot = true;
+    if (mounted) {
+      setState(() => _failedToLoad = false);
+    }
+
+    VideoPlayerController? controller;
+    try {
+      controller = await createCachedTemplatePreviewVideoController(
+        previewUrl,
+        fallbackUri: safeUri,
+      );
+      if (!_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
+        await controller.dispose();
+        _releasePreviewSlot();
+        return;
+      }
+
+      _controller = controller;
+      await controller.setVolume(0);
+      await controller.setLooping(true);
+      await controller.initialize();
+      if (!_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
+        if (_controller == controller) {
+          _controller = null;
+        }
+        await controller.dispose();
+        _releasePreviewSlot();
+        return;
+      }
+
+      await _syncPlaybackState();
+      if (!_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
+        if (_controller == controller) {
+          _controller = null;
+        }
+        await controller.dispose();
+        _releasePreviewSlot();
+        return;
+      }
+
+      setState(() => _failedToLoad = false);
+    } catch (_) {
+      await controller?.dispose();
+      if (_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
+        _releasePreviewSlot();
+        setState(() {
+          _controller = null;
+          _failedToLoad = true;
+        });
+      }
+    } finally {
+      if (mounted && requestVersion == _initializeRequestVersion) {
+        _controllerInitInFlight = false;
+      }
+    }
+  }
+
+  Future<void> _disposeVideoController() async {
+    _initializeRequestVersion++;
+    _controllerInitInFlight = false;
+    _releasePreviewSlot();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      try {
+        await controller.pause();
+      } catch (_) {
+        // Best effort: the platform controller may already be gone.
+      }
+      await controller.dispose();
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _releasePreviewSlot() {
+    if (!_hasPreviewSlot) {
+      return;
+    }
+
+    MediaLifecyclePolicy.releaseVideoPreviewSlot();
+    _hasPreviewSlot = false;
+  }
+
+  Future<void> _syncPlaybackState() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    try {
+      if (_shouldPlay && !controller.value.isPlaying) {
+        await controller.play();
+      } else if (!_shouldPlay && controller.value.isPlaying) {
+        await controller.pause();
+      }
+    } catch (_) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  bool _isCurrentVideoRequestToken(int requestVersion, String previewUrl) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.previewUrl == previewUrl;
+  }
+
+  bool _isCurrentVideoRequest(
+    int requestVersion,
+    String previewUrl,
+    VideoPlayerController? controller,
+  ) {
+    return _isCurrentVideoRequestToken(requestVersion, previewUrl) &&
+        _controller == controller;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+
+    return VisibilityDetector(
+      key: _visibilityKey,
+      onVisibilityChanged: _handleVisibilityChanged,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _TemplateOfTheDayVideoFallback(
+            thumbnailUrl: widget.thumbnailUrl,
+            cacheWidth: widget.cacheWidth,
+          ),
+          if (!_failedToLoad &&
+              controller != null &&
+              controller.value.isInitialized)
+            FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller.value.size.width,
+                height: controller.value.size.height,
+                child: VideoPlayer(controller),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayVideoFallback extends StatelessWidget {
+  const _TemplateOfTheDayVideoFallback({
+    required this.thumbnailUrl,
+    required this.cacheWidth,
+  });
+
+  final String? thumbnailUrl;
+  final int? cacheWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = thumbnailUrl;
+    if (url == null || url.isEmpty) {
+      return const _TemplateOfTheDayMediaFallback();
+    }
+
+    return CachedNetworkImage(
+      imageUrl: url,
+      cacheManager: TemplateMediaCache.thumbnailCache,
+      memCacheWidth: cacheWidth,
+      maxWidthDiskCache: cacheWidth,
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      fadeInDuration: AppTheme.motionFast,
+      placeholder: (context, url) => const _TemplateOfTheDayMediaFallback(),
+      errorWidget: (context, url, error) =>
+          const _TemplateOfTheDayMediaFallback(),
     );
   }
 }
@@ -1974,11 +2422,24 @@ String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {
   return parseSafeGenerationMediaUri(candidate)?.toString();
 }
 
+int? _templateMediaCacheDimension(double logicalSize, double pixelRatio) {
+  if (!logicalSize.isFinite || logicalSize <= 0) {
+    return null;
+  }
+
+  return (logicalSize * pixelRatio).ceil();
+}
+
 class _CreateWithPetBlock extends StatelessWidget {
-  const _CreateWithPetBlock({required this.pets, required this.selectedPetId});
+  const _CreateWithPetBlock({
+    required this.pets,
+    required this.selectedPetId,
+    required this.selectedPetPhotoId,
+  });
 
   final AsyncValue<List<PetProfile>> pets;
   final String? selectedPetId;
+  final String? selectedPetPhotoId;
 
   @override
   Widget build(BuildContext context) {
@@ -2031,7 +2492,11 @@ class _CreateWithPetBlock extends StatelessWidget {
                           avatarUrl: pet.avatarUrl,
                           isSelected: selectedPetId == pet.id,
                           onPressed: () => context.go(
-                            '${TemplatesPage.routePath}?petId=${Uri.encodeComponent(pet.id)}',
+                            _templatesPetShortcutLocation(
+                              petId: pet.id,
+                              selectedPetId: selectedPetId,
+                              selectedPetPhotoId: selectedPetPhotoId,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -2115,6 +2580,8 @@ class _PetShortcutButton extends StatelessWidget {
   }
 }
 
+const int _petShortcutAvatarCacheWidth = 64;
+
 class _PetShortcutAvatar extends StatelessWidget {
   const _PetShortcutAvatar({this.avatarUrl, this.icon});
 
@@ -2134,6 +2601,9 @@ class _PetShortcutAvatar extends StatelessWidget {
           width: 26,
           height: 26,
           fit: BoxFit.cover,
+          memCacheWidth: _petShortcutAvatarCacheWidth,
+          maxWidthDiskCache: _petShortcutAvatarCacheWidth,
+          filterQuality: FilterQuality.medium,
           errorWidget: (_, _, _) => _PetShortcutIcon(iconData: iconData),
         ),
       );
@@ -2177,6 +2647,7 @@ class _SearchField extends StatelessWidget {
     final colors = context.petMagicColors;
 
     return TextField(
+      key: const ValueKey('templates-search-field'),
       controller: controller,
       onChanged: onChanged,
       textInputAction: TextInputAction.search,

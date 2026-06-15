@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
+import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
@@ -43,7 +43,8 @@ class TemplateCard extends StatefulWidget {
   State<TemplateCard> createState() => _TemplateCardState();
 }
 
-class _TemplateCardState extends State<TemplateCard> {
+class _TemplateCardState extends State<TemplateCard>
+    with WidgetsBindingObserver {
   static const Duration _disposeDelay = Duration(milliseconds: 900);
   static const double _prewarmVisibilityFraction = 0.28;
   static const double _playVisibilityFraction = 0.58;
@@ -55,8 +56,15 @@ class _TemplateCardState extends State<TemplateCard> {
   bool _isPressed = false;
   bool _videoLoadFailed = false;
   bool _videoControllerInitInFlight = false;
+  double _lastVisibleFraction = 0;
   int _previewRetryToken = 0;
   int _videoControllerRequestVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   @override
   void didUpdateWidget(covariant TemplateCard oldWidget) {
@@ -80,6 +88,7 @@ class _TemplateCardState extends State<TemplateCard> {
   @override
   void dispose() {
     _disposeTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _videoControllerRequestVersion++;
     _videoControllerInitInFlight = false;
     final controller = _videoController;
@@ -90,6 +99,20 @@ class _TemplateCardState extends State<TemplateCard> {
       _hasPreviewSlot = false;
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) {
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      _resumeVisiblePreviewAfterAppResume();
+      return;
+    }
+
+    _suspendPreviewForAppBackground();
   }
 
   @override
@@ -265,6 +288,7 @@ class _TemplateCardState extends State<TemplateCard> {
     }
 
     final visibleFraction = info.visibleFraction;
+    _lastVisibleFraction = visibleFraction;
     if (visibleFraction <= 0) {
       _isPreviewActive = false;
       _disposeTimer?.cancel();
@@ -298,6 +322,23 @@ class _TemplateCardState extends State<TemplateCard> {
     } else {
       unawaited(_syncPlaybackState());
     }
+  }
+
+  void _suspendPreviewForAppBackground() {
+    _isPreviewActive = false;
+    _disposeTimer?.cancel();
+    unawaited(_disposeVideoController());
+  }
+
+  void _resumeVisiblePreviewAfterAppResume() {
+    if (!TickerMode.valuesOf(context).enabled ||
+        _lastVisibleFraction <= _prewarmVisibilityFraction) {
+      return;
+    }
+
+    _disposeTimer?.cancel();
+    _isPreviewActive = _lastVisibleFraction > _playVisibilityFraction;
+    unawaited(_ensureVideoController());
   }
 
   Future<void> _syncPlaybackState() async {
@@ -337,11 +378,15 @@ class _TemplateCardState extends State<TemplateCard> {
       return;
     }
 
-    _videoController = null;
-    await controller.dispose();
     if (_hasPreviewSlot) {
       MediaLifecyclePolicy.releaseVideoPreviewSlot();
       _hasPreviewSlot = false;
+    }
+    _videoController = null;
+    try {
+      await controller.dispose();
+    } catch (_) {
+      // Native video disposal can race with platform lifecycle changes.
     }
     if (mounted) {
       setState(() {});
@@ -394,22 +439,27 @@ class _TemplateCardState extends State<TemplateCard> {
         return;
       }
 
-      _videoController = controller;
-      controller.setLooping(true);
-      controller.setVolume(0);
-      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.setVolume(0);
       if (!_isCurrentVideoControllerRequest(
-            requestVersion: requestVersion,
-            templateId: templateId,
-            previewUrl: previewUrl,
-          ) ||
-          _videoController != controller) {
-        if (_videoController == controller) {
-          _videoController = null;
-        }
+        requestVersion: requestVersion,
+        templateId: templateId,
+        previewUrl: previewUrl,
+      )) {
         await controller.dispose();
         return;
       }
+
+      await controller.initialize();
+      if (!_isCurrentVideoControllerRequest(
+        requestVersion: requestVersion,
+        templateId: templateId,
+        previewUrl: previewUrl,
+      )) {
+        await controller.dispose();
+        return;
+      }
+      _videoController = controller;
       setState(() {});
       _videoLoadFailed = false;
       await _syncPlaybackState();
@@ -452,19 +502,7 @@ class _TemplateCardState extends State<TemplateCard> {
   Future<VideoPlayerController> _createVideoController(
     String previewUrl,
   ) async {
-    File? cachedFile;
-    try {
-      cachedFile = await TemplateMediaCache.getCachedPreviewFile(previewUrl);
-      cachedFile ??= await TemplateMediaCache.fetchPreviewFile(previewUrl);
-    } catch (_) {
-      cachedFile = null;
-    }
-
-    if (cachedFile != null) {
-      return VideoPlayerController.file(cachedFile);
-    }
-
-    return VideoPlayerController.networkUrl(Uri.parse(previewUrl));
+    return createTemplatePreviewVideoController(previewUrl);
   }
 
   bool _isCurrentVideoControllerRequest({
@@ -485,6 +523,13 @@ class _TemplateCardState extends State<TemplateCard> {
   }
 }
 
+@visibleForTesting
+Future<VideoPlayerController> createTemplatePreviewVideoController(
+  String previewUrl,
+) async {
+  return createCachedTemplatePreviewVideoController(previewUrl);
+}
+
 class _TemplateMedia extends StatelessWidget {
   const _TemplateMedia({
     required this.template,
@@ -495,6 +540,10 @@ class _TemplateMedia extends StatelessWidget {
     required this.onRetry,
   });
 
+  static const int _minTemplateCardImageCacheWidth = 320;
+  static const int _defaultTemplateCardImageCacheWidth = 720;
+  static const int _maxTemplateCardImageCacheWidth = 1080;
+
   final TemplateItem template;
   final String renderContextKey;
   final VideoPlayerController? controller;
@@ -504,17 +553,10 @@ class _TemplateMedia extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final asset = template.previewAsset;
-    final thumbnailUrl = _normalizeTemplateMediaUrl(template.thumbnailUrl);
-    final assetUrl = _normalizeTemplateMediaUrl(asset?.url);
     final showVideo = controller != null && controller!.value.isInitialized;
-    final assetIsVideo = asset != null && isVideoPreview(asset);
-    final renderableThumbnailUrl =
-        thumbnailUrl != null && !isVideoUrl(thumbnailUrl) ? thumbnailUrl : null;
-    final fallbackImageUrl = assetUrl != null && !assetIsVideo
-        ? assetUrl
-        : null;
-    final imageUrl = renderableThumbnailUrl ?? fallbackImageUrl;
+    final imagePreview = _resolveTemplateImagePreview(template);
+    final imageUrl = imagePreview.imageUrl;
+    final assetIsVideo = imagePreview.assetIsVideo;
     final canRetry = imageUrl != null || assetIsVideo;
 
     return LayoutBuilder(
@@ -565,16 +607,43 @@ class _TemplateMedia extends StatelessWidget {
     );
   }
 
-  int? _cacheDimension(double logicalSize, double pixelRatio) {
-    if (!logicalSize.isFinite || logicalSize <= 0) {
-      return null;
+  int _cacheDimension(double logicalSize, double pixelRatio) {
+    if (!logicalSize.isFinite ||
+        logicalSize <= 0 ||
+        !pixelRatio.isFinite ||
+        pixelRatio <= 0) {
+      return _defaultTemplateCardImageCacheWidth;
     }
 
-    return (logicalSize * pixelRatio).ceil();
+    return (logicalSize * pixelRatio)
+        .clamp(_minTemplateCardImageCacheWidth, _maxTemplateCardImageCacheWidth)
+        .round();
   }
 }
 
-class _TemplateImageWithFallback extends StatelessWidget {
+({String? imageUrl, bool assetIsVideo}) _resolveTemplateImagePreview(
+  TemplateItem template,
+) {
+  final asset = template.previewAsset;
+  final thumbnailUrl = _normalizeTemplateMediaUrl(template.thumbnailUrl);
+  final assetUrl = _normalizeTemplateMediaUrl(asset?.url);
+  final assetIsVideo = asset != null && isVideoPreview(asset);
+  final renderableThumbnailUrl =
+      thumbnailUrl != null && !isVideoUrl(thumbnailUrl) ? thumbnailUrl : null;
+  final fallbackImageUrl = assetUrl != null && !assetIsVideo ? assetUrl : null;
+
+  return (
+    imageUrl: renderableThumbnailUrl ?? fallbackImageUrl,
+    assetIsVideo: assetIsVideo,
+  );
+}
+
+@visibleForTesting
+String? resolveTemplateCardImageUrlForTesting(TemplateItem template) {
+  return _resolveTemplateImagePreview(template).imageUrl;
+}
+
+class _TemplateImageWithFallback extends StatefulWidget {
   const _TemplateImageWithFallback({
     super.key,
     required this.imageUrl,
@@ -584,96 +653,85 @@ class _TemplateImageWithFallback extends StatelessWidget {
   });
 
   final String imageUrl;
-  final int? cacheWidth;
+  final int cacheWidth;
   final VoidCallback onRetry;
   final bool isVideoTemplate;
 
   @override
-  Widget build(BuildContext context) {
-    final cachedProvider = ResizeImage.resizeIfNeeded(
-      cacheWidth,
-      null,
-      CachedNetworkImageProvider(
-        imageUrl,
-        cacheManager: TemplateMediaCache.thumbnailCache,
-        maxWidth: cacheWidth,
-      ),
-    );
-
-    return ClipRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          const _MediaSkeletonPlaceholder(),
-          Image(
-            image: cachedProvider,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.medium,
-            frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-              final isReady = wasSynchronouslyLoaded || frame != null;
-              return AnimatedOpacity(
-                opacity: isReady ? 1 : 0,
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                child: child,
-              );
-            },
-            errorBuilder: (context, error, stackTrace) =>
-                _TemplateNetworkImageFallback(
-                  imageUrl: imageUrl,
-                  cacheWidth: cacheWidth,
-                  isVideoTemplate: isVideoTemplate,
-                  onRetry: onRetry,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
+  State<_TemplateImageWithFallback> createState() =>
+      _TemplateImageWithFallbackState();
 }
 
-class _TemplateNetworkImageFallback extends StatelessWidget {
-  const _TemplateNetworkImageFallback({
-    required this.imageUrl,
-    required this.cacheWidth,
-    required this.isVideoTemplate,
-    required this.onRetry,
-  });
+class _TemplateImageWithFallbackState
+    extends State<_TemplateImageWithFallback> {
+  late Future<File> _imageFileFuture;
 
-  final String imageUrl;
-  final int? cacheWidth;
-  final bool isVideoTemplate;
-  final VoidCallback onRetry;
+  @override
+  void initState() {
+    super.initState();
+    _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TemplateImageWithFallback oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageUrl != widget.imageUrl) {
+      _imageFileFuture = TemplateMediaCache.fetchThumbnailFile(widget.imageUrl);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        const _MediaSkeletonPlaceholder(),
-        Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          alignment: Alignment.center,
-          cacheWidth: cacheWidth,
-          filterQuality: FilterQuality.medium,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            final isReady = wasSynchronouslyLoaded || frame != null;
-            return AnimatedOpacity(
-              opacity: isReady ? 1 : 0,
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              child: child,
-            );
-          },
-          errorBuilder: (context, error, stackTrace) => _MediaErrorPlaceholder(
-            isVideo: isVideoTemplate,
-            onRetry: onRetry,
+    return FutureBuilder<File>(
+      future: _imageFileFuture,
+      builder: (context, snapshot) {
+        final file = snapshot.data;
+        if (file == null && snapshot.hasError) {
+          return _buildImageErrorPlaceholder();
+        }
+
+        return ClipRect(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              const _MediaSkeletonPlaceholder(),
+              if (file != null)
+                Image.file(
+                  file,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                  cacheWidth: widget.cacheWidth,
+                  filterQuality: FilterQuality.medium,
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                        final isReady = wasSynchronouslyLoaded || frame != null;
+                        return AnimatedOpacity(
+                          opacity: isReady ? 1 : 0,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOut,
+                          child: child,
+                        );
+                      },
+                  errorBuilder: (context, error, stackTrace) =>
+                      _buildImageErrorPlaceholder(),
+                ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  Widget _buildImageErrorPlaceholder() {
+    return _MediaErrorPlaceholder(
+      isVideo: widget.isVideoTemplate,
+      onRetry: _retryImageLoad,
+    );
+  }
+
+  void _retryImageLoad() {
+    unawaited(TemplateMediaCache.removeThumbnailFile(widget.imageUrl));
+    widget.onRetry();
   }
 }
 

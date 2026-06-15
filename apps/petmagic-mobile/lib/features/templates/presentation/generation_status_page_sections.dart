@@ -1,5 +1,9 @@
 part of 'generation_status_page.dart';
 
+const int _resultCardImageCacheWidth = 1080;
+const int _resultFullscreenImageCacheWidth = 1440;
+const int _beforeAfterCompareImageCacheWidth = 1024;
+
 File? _localMediaFile(String? path) {
   final normalized = path?.trim();
   if (normalized == null || normalized.isEmpty) {
@@ -344,7 +348,10 @@ class _ResultCardState extends State<_ResultCard> {
     final localOutputFile = _localMediaFile(widget.generation.localOutputPath);
     late final ImageProvider provider;
     if (localOutputFile != null) {
-      provider = FileImage(localOutputFile);
+      provider = ResizeImage(
+        FileImage(localOutputFile),
+        width: _aspectRatioProbeCacheWidth,
+      );
     } else {
       final url = widget.generation.outputUrl ?? '';
       if (url.isEmpty) {
@@ -430,11 +437,19 @@ class _ResultCardState extends State<_ResultCard> {
                                     },
                                   )
                                 : localOutputFile != null
-                                ? Image.file(localOutputFile, fit: BoxFit.cover)
+                                ? Image.file(
+                                    localOutputFile,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: _resultCardImageCacheWidth,
+                                    filterQuality: FilterQuality.medium,
+                                  )
                                 : CachedNetworkImage(
                                     imageUrl: safeMediaUrl,
                                     fit: BoxFit.cover,
-                                    memCacheWidth: 1080,
+                                    memCacheWidth: _resultCardImageCacheWidth,
+                                    maxWidthDiskCache:
+                                        _resultCardImageCacheWidth,
+                                    filterQuality: FilterQuality.medium,
                                     errorWidget: (context, url, error) =>
                                         _MediaPlaceholder(
                                           label:
@@ -1054,16 +1069,16 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
 
       final controller = VideoPlayerController.networkUrl(safeUri);
       _controller = controller;
-      controller.setLooping(true);
-      controller.setVolume(0);
+      await controller.setLooping(true);
+      await controller.setVolume(0);
       await _initializeController(requestVersion, url, controller);
       return;
     }
 
     final controller = VideoPlayerController.file(localFile);
     _controller = controller;
-    controller.setLooping(true);
-    controller.setVolume(0);
+    await controller.setLooping(true);
+    await controller.setVolume(0);
     await _initializeController(requestVersion, url, controller);
   }
 
@@ -1215,14 +1230,14 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
 
       final controller = VideoPlayerController.networkUrl(safeUri);
       _videoController = controller;
-      controller.setLooping(true);
+      await controller.setLooping(true);
       await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
       return;
     }
 
     final controller = VideoPlayerController.file(localFile);
     _videoController = controller;
-    controller.setLooping(true);
+    await controller.setLooping(true);
     await _initializeFullscreenVideo(requestVersion, mediaUrl, controller);
   }
 
@@ -1321,7 +1336,12 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                   ? InteractiveViewer(
                       minScale: 1,
                       maxScale: 4,
-                      child: Image.file(localMediaFile, fit: BoxFit.contain),
+                      child: Image.file(
+                        localMediaFile,
+                        fit: BoxFit.contain,
+                        cacheWidth: _resultFullscreenImageCacheWidth,
+                        filterQuality: FilterQuality.medium,
+                      ),
                     )
                   : safeMediaUrl == null
                   ? _MediaPlaceholder(label: text.templateFlowResultLoadFailed)
@@ -1331,7 +1351,9 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
                       child: CachedNetworkImage(
                         imageUrl: safeMediaUrl,
                         fit: BoxFit.contain,
-                        memCacheWidth: 1440,
+                        memCacheWidth: _resultFullscreenImageCacheWidth,
+                        maxWidthDiskCache: _resultFullscreenImageCacheWidth,
+                        filterQuality: FilterQuality.medium,
                         errorWidget: (context, url, error) => _MediaPlaceholder(
                           label: text.templateFlowResultLoadFailed,
                         ),
@@ -1493,11 +1515,11 @@ class _BeforeAfterCompareViewerState extends State<_BeforeAfterCompareViewer> {
     super.initState();
     _beforeProvider = CachedNetworkImageProvider(
       widget.beforeUrl,
-      maxWidth: 1024,
+      maxWidth: _beforeAfterCompareImageCacheWidth,
     );
     _afterProvider = CachedNetworkImageProvider(
       widget.afterUrl,
-      maxWidth: 1024,
+      maxWidth: _beforeAfterCompareImageCacheWidth,
     );
     _attachBeforeListener();
     _attachAfterListener();

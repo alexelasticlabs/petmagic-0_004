@@ -1261,22 +1261,35 @@ class _GenerationResultView extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(22),
-            child: outputUrl.isEmpty
-                ? _EmptyMediaBox(label: text.templateFlowResultUnavailable)
-                : template.isVideo
-                ? _NetworkVideoPreview(url: outputUrl)
-                : CachedNetworkImage(
-                    imageUrl: outputUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    placeholder: (context, url) =>
-                        _EmptyMediaBox(label: text.templateFlowLoadingResult),
-                    errorWidget: (context, url, error) => _EmptyMediaBox(
-                      label: text.templateFlowResultLoadFailed,
-                    ),
-                  ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final resultCacheWidth = _templatePreviewCacheDimension(
+                constraints.maxWidth,
+                MediaQuery.devicePixelRatioOf(context),
+              );
+
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: outputUrl.isEmpty
+                    ? _EmptyMediaBox(label: text.templateFlowResultUnavailable)
+                    : template.isVideo
+                    ? _NetworkVideoPreview(url: outputUrl)
+                    : CachedNetworkImage(
+                        imageUrl: outputUrl,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        memCacheWidth: resultCacheWidth,
+                        maxWidthDiskCache: resultCacheWidth,
+                        filterQuality: FilterQuality.medium,
+                        placeholder: (context, url) => _EmptyMediaBox(
+                          label: text.templateFlowLoadingResult,
+                        ),
+                        errorWidget: (context, url, error) => _EmptyMediaBox(
+                          label: text.templateFlowResultLoadFailed,
+                        ),
+                      ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 16),
@@ -1318,133 +1331,348 @@ class _AdaptiveTemplateMediaFrame extends StatelessWidget {
     final locale = Localizations.localeOf(context);
     final asset = template.previewAsset;
     final safeAssetUrl = parseSafeGenerationMediaUri(asset?.url)?.toString();
+    final safeThumbnailUrl = parseSafeGenerationMediaUri(
+      template.thumbnailUrl,
+    )?.toString();
     final ratio = template.isVideo ? 9 / 16 : 3 / 4;
 
-    Widget media;
-    if (asset == null || safeAssetUrl == null || safeAssetUrl.isEmpty) {
-      media = _TemplatePreviewPlaceholder(
-        isVideo: template.isVideo,
-        title: _templatePreviewMissingTitle(locale),
-        subtitle: _templatePreviewMissingSubtitle(
-          locale,
-          isVideo: template.isVideo,
-        ),
-      );
-    } else if (template.isVideo && isVideoPreview(asset)) {
-      media = _NetworkVideoPreview(url: safeAssetUrl);
-    } else {
-      media = CachedNetworkImage(
-        imageUrl: safeAssetUrl,
-        fit: BoxFit.cover,
-        alignment: Alignment.center,
-        placeholder: (context, url) =>
-            _EmptyMediaBox(label: text.templateFlowLoadingPreview),
-        errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
-          isVideo: template.isVideo,
-          title: _templatePreviewMissingTitle(locale),
-          subtitle: _templatePreviewMissingSubtitle(
-            locale,
-            isVideo: template.isVideo,
-          ),
-        ),
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cacheWidth = _templatePreviewCacheDimension(
+          constraints.maxWidth,
+          MediaQuery.devicePixelRatioOf(context),
+        );
+        final assetIsVideo = isVideoPreview(asset);
+        final imageUrl =
+            safeThumbnailUrl != null && !isVideoUrl(safeThumbnailUrl)
+            ? safeThumbnailUrl
+            : safeAssetUrl != null && !assetIsVideo
+            ? safeAssetUrl
+            : null;
 
-    return AspectRatio(
-      aspectRatio: ratio,
-      child: ClipRRect(borderRadius: BorderRadius.circular(22), child: media),
+        Widget media;
+        if (asset == null && imageUrl == null) {
+          media = _TemplatePreviewPlaceholder(
+            isVideo: template.isVideo,
+            title: _templatePreviewMissingTitle(locale),
+            subtitle: _templatePreviewMissingSubtitle(
+              locale,
+              isVideo: template.isVideo,
+            ),
+          );
+        } else if (template.isVideo && assetIsVideo && safeAssetUrl != null) {
+          media = _NetworkVideoPreview(
+            url: safeAssetUrl,
+            useSharedPreviewCache: true,
+          );
+        } else if (imageUrl != null) {
+          media = CachedNetworkImage(
+            imageUrl: imageUrl,
+            cacheManager: TemplateMediaCache.thumbnailCache,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            memCacheWidth: cacheWidth,
+            maxWidthDiskCache: cacheWidth,
+            filterQuality: FilterQuality.medium,
+            placeholder: (context, url) =>
+                _EmptyMediaBox(label: text.templateFlowLoadingPreview),
+            errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
+              isVideo: template.isVideo,
+              title: _templatePreviewMissingTitle(locale),
+              subtitle: _templatePreviewMissingSubtitle(
+                locale,
+                isVideo: template.isVideo,
+              ),
+            ),
+          );
+        } else {
+          media = _TemplatePreviewPlaceholder(
+            isVideo: template.isVideo,
+            title: _templatePreviewMissingTitle(locale),
+            subtitle: _templatePreviewMissingSubtitle(
+              locale,
+              isVideo: template.isVideo,
+            ),
+          );
+        }
+
+        return AspectRatio(
+          aspectRatio: ratio,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: media,
+          ),
+        );
+      },
     );
   }
 }
 
+int _templatePreviewCacheDimension(double logicalWidth, double pixelRatio) {
+  if (!logicalWidth.isFinite || logicalWidth <= 0) {
+    return 1080;
+  }
+
+  return (logicalWidth * pixelRatio).clamp(320, 1440).round();
+}
+
 class _NetworkVideoPreview extends StatefulWidget {
-  const _NetworkVideoPreview({required this.url});
+  const _NetworkVideoPreview({
+    required this.url,
+    this.useSharedPreviewCache = false,
+  });
 
   final String url;
+  final bool useSharedPreviewCache;
 
   @override
   State<_NetworkVideoPreview> createState() => _NetworkVideoPreviewState();
 }
 
-class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
+class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
+    with WidgetsBindingObserver {
+  static const double _loadVisibilityFraction = 0.18;
+  static const double _playVisibilityFraction = 0.58;
+
+  final Key _visibilityKey = UniqueKey();
+
   VideoPlayerController? _controller;
   bool _failedToLoad = false;
+  bool _controllerInitInFlight = false;
+  bool _isVisibleEnoughToLoad = false;
+  bool _shouldPlay = false;
+  bool _manualPaused = false;
+  bool _hasPreviewSlot = false;
   int _initializeRequestVersion = 0;
 
   @override
   void initState() {
     super.initState();
-    _initialize();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void didUpdateWidget(covariant _NetworkVideoPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.url != widget.url ||
+        oldWidget.useSharedPreviewCache != widget.useSharedPreviewCache) {
       final previous = _controller;
       _controller = null;
+      _controllerInitInFlight = false;
       _failedToLoad = false;
+      _manualPaused = false;
+      _initializeRequestVersion++;
+      _releasePreviewSlot();
       unawaited(previous?.dispose());
-      _initialize();
+      if (_isVisibleEnoughToLoad) {
+        unawaited(_initialize());
+      }
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _initializeRequestVersion++;
+    _controllerInitInFlight = false;
+    _releasePreviewSlot();
     final controller = _controller;
     _controller = null;
     unawaited(controller?.dispose());
     super.dispose();
   }
 
-  Future<void> _initialize() async {
-    final requestVersion = ++_initializeRequestVersion;
-    final url = widget.url;
-    setState(() => _failedToLoad = false);
-    final safeUri = parseSafeGenerationMediaUri(url);
-    if (safeUri == null) {
-      if (mounted) {
-        setState(() => _failedToLoad = true);
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_isVisibleEnoughToLoad &&
+          _controller == null &&
+          !_controllerInitInFlight &&
+          !_failedToLoad) {
+        unawaited(_initialize());
       }
       return;
     }
 
-    final controller = VideoPlayerController.networkUrl(safeUri);
-    _controller = controller;
-    controller.setVolume(0);
-    controller.setLooping(true);
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(_disposeVideoController());
+    }
+  }
+
+  void _handleVisibilityChanged(VisibilityInfo info) {
+    final visibleFraction = info.visibleFraction;
+    final shouldLoad = visibleFraction >= _loadVisibilityFraction;
+    final shouldPlay = visibleFraction >= _playVisibilityFraction;
+    if (shouldLoad == _isVisibleEnoughToLoad && shouldPlay == _shouldPlay) {
+      return;
+    }
+
+    _isVisibleEnoughToLoad = shouldLoad;
+    _shouldPlay = shouldPlay;
+
+    if (!shouldLoad) {
+      unawaited(_disposeVideoController());
+      return;
+    }
+
+    if (_controller == null && !_controllerInitInFlight && !_failedToLoad) {
+      unawaited(_initialize());
+      return;
+    }
+
+    unawaited(_syncPlaybackState());
+  }
+
+  Future<void> _initialize() async {
+    if (!_isVisibleEnoughToLoad || _controllerInitInFlight) {
+      return;
+    }
+
+    final requestVersion = ++_initializeRequestVersion;
+    final url = widget.url;
+    _controllerInitInFlight = true;
+    if (mounted) {
+      setState(() => _failedToLoad = false);
+    }
+
+    final safeUri = parseSafeGenerationMediaUri(url);
+    if (safeUri == null) {
+      if (mounted) {
+        setState(() {
+          _controllerInitInFlight = false;
+          _failedToLoad = true;
+        });
+      }
+      return;
+    }
+
+    VideoPlayerController? controller;
     try {
+      if (!MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()) {
+        _controllerInitInFlight = false;
+        return;
+      }
+      _hasPreviewSlot = true;
+
+      controller = await _createVideoController(url, safeUri);
+      if (!_isCurrentVideoRequestToken(requestVersion, url)) {
+        await controller.dispose();
+        return;
+      }
+
+      _controller = controller;
+      await controller.setVolume(0);
+      await controller.setLooping(true);
       await controller.initialize();
       if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();
         return;
       }
-      await controller.play();
+
+      await _syncPlaybackState();
       if (!_isCurrentVideoRequest(requestVersion, url, controller)) {
         await controller.dispose();
         return;
       }
-      setState(() {});
+      setState(() {
+        _failedToLoad = false;
+      });
     } catch (_) {
-      await controller.dispose();
+      await controller?.dispose();
       if (_isCurrentVideoRequest(requestVersion, url, controller)) {
+        _releasePreviewSlot();
         setState(() {
           _controller = null;
           _failedToLoad = true;
         });
       }
+    } finally {
+      if (mounted && requestVersion == _initializeRequestVersion) {
+        _controllerInitInFlight = false;
+      }
     }
+  }
+
+  Future<VideoPlayerController> _createVideoController(
+    String url,
+    Uri safeUri,
+  ) async {
+    if (!widget.useSharedPreviewCache) {
+      return VideoPlayerController.networkUrl(safeUri);
+    }
+
+    return createCachedTemplatePreviewVideoController(
+      url,
+      fallbackUri: safeUri,
+    );
+  }
+
+  Future<void> _disposeVideoController() async {
+    _initializeRequestVersion++;
+    _controllerInitInFlight = false;
+    _releasePreviewSlot();
+    final controller = _controller;
+    _controller = null;
+    if (controller != null) {
+      try {
+        await controller.pause();
+      } catch (_) {
+        // Disposal remains best-effort if the platform controller is already gone.
+      }
+      await controller.dispose();
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _releasePreviewSlot() {
+    if (!_hasPreviewSlot) {
+      return;
+    }
+
+    MediaLifecyclePolicy.releaseVideoPreviewSlot();
+    _hasPreviewSlot = false;
+  }
+
+  Future<void> _syncPlaybackState() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    final shouldPlay = _shouldPlay && !_manualPaused;
+    try {
+      if (shouldPlay && !controller.value.isPlaying) {
+        await controller.play();
+      } else if (!shouldPlay && controller.value.isPlaying) {
+        await controller.pause();
+      }
+    } catch (_) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  bool _isCurrentVideoRequestToken(int requestVersion, String url) {
+    return mounted &&
+        requestVersion == _initializeRequestVersion &&
+        widget.url == url;
   }
 
   bool _isCurrentVideoRequest(
     int requestVersion,
     String url,
-    VideoPlayerController controller,
+    VideoPlayerController? controller,
   ) {
-    return mounted &&
-        requestVersion == _initializeRequestVersion &&
-        widget.url == url &&
+    return _isCurrentVideoRequestToken(requestVersion, url) &&
         _controller == controller;
   }
 
@@ -1452,55 +1680,64 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview> {
   Widget build(BuildContext context) {
     final controller = _controller;
     final locale = Localizations.localeOf(context);
+    Widget child;
     if (_failedToLoad) {
-      return _TemplatePreviewPlaceholder(
+      child = _TemplatePreviewPlaceholder(
         isVideo: true,
         title: _templatePreviewMissingTitle(locale),
         subtitle: _templatePreviewMissingSubtitle(locale, isVideo: true),
       );
-    }
-
-    if (controller == null || !controller.value.isInitialized) {
-      return _EmptyMediaBox(
+    } else if (controller == null || !controller.value.isInitialized) {
+      child = _EmptyMediaBox(
         label: _isRussian(locale) ? 'Загружаем видео...' : 'Loading video...',
       );
-    }
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        FittedBox(
-          fit: BoxFit.cover,
-          child: SizedBox(
-            width: controller.value.size.width,
-            height: controller.value.size.height,
-            child: VideoPlayer(controller),
+    } else {
+      child = Stack(
+        fit: StackFit.expand,
+        children: [
+          FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: controller.value.size.width,
+              height: controller.value.size.height,
+              child: VideoPlayer(controller),
+            ),
           ),
-        ),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: IconButton.filledTonal(
-              onPressed: () async {
-                if (controller.value.isPlaying) {
-                  await controller.pause();
-                } else {
-                  await controller.play();
-                }
-                if (mounted) {
-                  setState(() {});
-                }
-              },
-              icon: Icon(
-                controller.value.isPlaying
-                    ? Icons.pause_rounded
-                    : Icons.play_arrow_rounded,
+          Align(
+            alignment: Alignment.bottomRight,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: IconButton.filledTonal(
+                onPressed: () async {
+                  if (controller.value.isPlaying) {
+                    _manualPaused = true;
+                    await controller.pause();
+                  } else {
+                    _manualPaused = false;
+                    if (_shouldPlay) {
+                      await controller.play();
+                    }
+                  }
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                icon: Icon(
+                  controller.value.isPlaying
+                      ? Icons.pause_rounded
+                      : Icons.play_arrow_rounded,
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      );
+    }
+
+    return VisibilityDetector(
+      key: _visibilityKey,
+      onVisibilityChanged: _handleVisibilityChanged,
+      child: child,
     );
   }
 }

@@ -93,6 +93,8 @@ class GenerationStatusPage extends ConsumerStatefulWidget {
   });
 
   static const routePrefix = '/generations';
+  static String routeFor(String generationId) =>
+      '$routePrefix/${Uri.encodeComponent(generationId)}';
 
   final String generationId;
   final TemplateOfTheDayItem? templateOfTheDay;
@@ -114,14 +116,17 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isGeneratingSimilar = false;
   String? _errorMessage;
   bool _isPollInFlight = false;
+  bool _isPageActive = true;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeMediaActionCancelToken;
+  late final GenerationGalleryStore _galleryStore;
   final Set<String> _recordedTemplateOfTheDayTerminalEvents = <String>{};
   final Set<String> _recordedFeedbackPromptEvents = <String>{};
 
   @override
   void initState() {
     super.initState();
+    _galleryStore = ref.read(generationGalleryStoreProvider);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
     _startPolling();
@@ -130,34 +135,42 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _isPageActive = true;
       _startPolling();
       unawaited(_load(silent: true));
       return;
     }
 
+    _isPageActive = false;
     _stopPolling();
+    _cancelActiveLocalMediaDownloads();
   }
 
   @override
   void dispose() {
+    _isPageActive = false;
     WidgetsBinding.instance.removeObserver(this);
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
+    _cancelActiveLocalMediaDownloads();
     super.dispose();
   }
 
   @override
   void deactivate() {
+    _isPageActive = false;
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
+    _cancelActiveLocalMediaDownloads();
     super.deactivate();
   }
 
   @override
   void activate() {
     super.activate();
+    _isPageActive = true;
     _startPolling();
     unawaited(_load(silent: true));
   }
@@ -665,13 +678,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         _showInfo(text.generationStatusResultUnavailableForSave);
         return;
       }
+      final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+      if (safeOutputUri == null) {
+        _showInfo(text.generationStatusResultUnavailableForSave);
+        return;
+      }
+      final safeOutputUrl = safeOutputUri.toString();
 
       final wasSaved = await ref
           .read(generationStatusMediaActionsProvider)
           .saveToGallery(
-            mediaUrl: outputUrl,
+            mediaUrl: safeOutputUrl,
             fileName: access.fileName.isEmpty
-                ? _buildOutputFileName(generation, outputUrl)
+                ? _buildOutputFileName(generation, safeOutputUrl)
                 : access.fileName,
             isVideo: isVideoGeneration(generation),
             albumName: 'PetMagic',
@@ -789,7 +808,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         return;
       }
 
-      context.go('${GenerationStatusPage.routePrefix}/${next.generationId}');
+      context.go(GenerationStatusPage.routeFor(next.generationId));
     } on AppException catch (error) {
       if (!mounted) {
         return;
@@ -941,13 +960,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         _showInfo(text.generationStatusResultUnavailableForShare);
         return;
       }
+      final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+      if (safeOutputUri == null) {
+        _showInfo(text.generationStatusResultUnavailableForShare);
+        return;
+      }
+      final safeOutputUrl = safeOutputUri.toString();
 
       await ref
           .read(generationStatusMediaActionsProvider)
           .share(
-            mediaUrl: outputUrl,
+            mediaUrl: safeOutputUrl,
             fileName: access.fileName.isEmpty
-                ? _buildOutputFileName(generation, outputUrl)
+                ? _buildOutputFileName(generation, safeOutputUrl)
                 : access.fileName,
             title: generation.templateTitle ?? text.generationStatusResultTitle,
             cancelToken: mediaActionCancelToken,
@@ -1272,6 +1297,20 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _activeLoadCancelToken = null;
   }
 
+  void _cancelActiveLocalMediaDownloads() {
+    unawaited(_galleryStore.cancelActiveDownloads());
+  }
+
+  bool _canApplyLocalMediaSync() {
+    if (!mounted || !_isPageActive) {
+      return false;
+    }
+
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    return lifecycleState == null ||
+        lifecycleState == AppLifecycleState.resumed;
+  }
+
   Future<void> _copyResultLink(TemplateGenerationResult generation) async {
     final text = AppLocalizations.of(context);
     final outputUrl = generation.outputUrl;
@@ -1420,11 +1459,15 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       generation.templateTitle,
       fallback: 'petmagic_result',
     );
+    final normalizedGenerationId = sanitizeFileName(
+      generation.generationId,
+      fallback: 'generation',
+    );
     final extensionFromRemote = extensionFromUrl(outputUrl);
     final extension = extensionFromRemote.isEmpty
         ? _defaultOutputExtension(generation)
         : extensionFromRemote;
-    return '${normalizedTitle}_${generation.generationId}.$extension';
+    return '${normalizedTitle}_$normalizedGenerationId.$extension';
   }
 
   String _defaultOutputExtension(TemplateGenerationResult generation) {
@@ -1568,10 +1611,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   Future<void> _materializeLocalMediaAndRefresh(
     TemplateGenerationResult generation,
   ) async {
-    final localRecord = await ref
-        .read(generationGalleryStoreProvider)
-        .materializeGenerationMedia(generation);
-    if (!mounted || localRecord == null || localRecord.isDeletedLocally) {
+    final localRecord = await _galleryStore.materializeGenerationMedia(
+      generation,
+    );
+    if (!_canApplyLocalMediaSync() ||
+        localRecord == null ||
+        localRecord.isDeletedLocally) {
       return;
     }
 

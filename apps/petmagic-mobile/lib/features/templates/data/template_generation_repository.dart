@@ -85,7 +85,10 @@ class TemplateGenerationRepository {
       throw const AppException('templates.source_image_too_large');
     }
 
-    final contentType = await _detectSourceImageContentType(sourceImage.path);
+    final contentType = await _detectSourceImageContentType(
+      sourceImage.path,
+      unavailableMessage: 'templates.source_image_unavailable',
+    );
     if (contentType == null) {
       throw const AppException('templates.source_image_type_not_allowed');
     }
@@ -117,9 +120,10 @@ class TemplateGenerationRepository {
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
+    final encodedGenerationId = _apiPathSegment(generationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
-        '/api/generations/$generationId',
+        '/api/generations/$encodedGenerationId',
         options: authenticatedRequestOptions(
           session.accessToken,
           correlationId: correlationId,
@@ -135,9 +139,10 @@ class TemplateGenerationRepository {
     String resultId, {
     CancelToken? cancelToken,
   }) async {
+    final encodedResultId = _apiPathSegment(resultId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
-        '/api/generation-results/$resultId/compatible-templates',
+        '/api/generation-results/$encodedResultId/compatible-templates',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -179,11 +184,12 @@ class TemplateGenerationRepository {
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
+    final encodedSourceGenerationId = _apiPathSegment(sourceGenerationId);
     final idempotencyKey =
         'similar-$sourceGenerationId-${DateTime.now().microsecondsSinceEpoch}';
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/generations/$sourceGenerationId/generate-similar',
+        '/api/generations/$encodedSourceGenerationId/generate-similar',
         data: {'variationStrength': variationStrength},
         options: authenticatedRequestOptions(
           session.accessToken,
@@ -279,9 +285,10 @@ class TemplateGenerationRepository {
     String? breed,
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.put<Map<String, dynamic>>(
-        '/api/pets/$petId',
+        '/api/pets/$encodedPetId',
         data: {'name': name, 'type': type, 'breed': ?breed},
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
@@ -293,9 +300,10 @@ class TemplateGenerationRepository {
   }
 
   Future<void> deletePet(String petId, {CancelToken? cancelToken}) async {
+    final encodedPetId = _apiPathSegment(petId);
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(
-        '/api/pets/$petId',
+        '/api/pets/$encodedPetId',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -308,18 +316,28 @@ class TemplateGenerationRepository {
     required XFile photo,
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
     final rawFileName = photo.name.isNotEmpty
         ? photo.name
         : photo.path.split(Platform.pathSeparator).last;
     final fileName = _safeSourceImageFileName(rawFileName);
-    final contentType = await _detectSourceImageContentType(photo.path);
+    final declaredContentType =
+        photo.mimeType ?? _resolveImageContentType(fileName);
+    if (!_isAllowedImageContentType(declaredContentType)) {
+      throw const AppException('pets.photo_type_not_allowed');
+    }
+
+    final contentType = await _detectSourceImageContentType(
+      photo.path,
+      unavailableMessage: 'pets.photo_type_not_allowed',
+    );
     if (contentType == null) {
       throw const AppException('pets.photo_type_not_allowed');
     }
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/pets/$petId/photos',
+        '/api/pets/$encodedPetId/photos',
         data: FormData.fromMap({
           'photo': await MultipartFile.fromFile(
             photo.path,
@@ -340,9 +358,10 @@ class TemplateGenerationRepository {
     String petId, {
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
-        '/api/pets/$petId/photos',
+        '/api/pets/$encodedPetId/photos',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -359,9 +378,11 @@ class TemplateGenerationRepository {
     required String photoId,
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
+    final encodedPhotoId = _apiPathSegment(photoId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/pets/$petId/photos/$photoId/set-avatar',
+        '/api/pets/$encodedPetId/photos/$encodedPhotoId/set-avatar',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -377,9 +398,11 @@ class TemplateGenerationRepository {
     required bool isFavorite,
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
+    final encodedPhotoId = _apiPathSegment(photoId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/pets/$petId/photos/$photoId/favorite',
+        '/api/pets/$encodedPetId/photos/$encodedPhotoId/favorite',
         data: {'isFavorite': isFavorite},
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
@@ -395,9 +418,11 @@ class TemplateGenerationRepository {
     required String photoId,
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
+    final encodedPhotoId = _apiPathSegment(photoId);
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(
-        '/api/pets/$petId/photos/$photoId',
+        '/api/pets/$encodedPetId/photos/$encodedPhotoId',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -409,9 +434,10 @@ class TemplateGenerationRepository {
     String petId, {
     CancelToken? cancelToken,
   }) async {
+    final encodedPetId = _apiPathSegment(petId);
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
-        '/api/pets/$petId/generations',
+        '/api/pets/$encodedPetId/generations',
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
       ),
@@ -435,9 +461,10 @@ class TemplateGenerationRepository {
     Map<String, Object?>? metadata,
     CancelToken? cancelToken,
   }) async {
+    final encodedTemplateId = _apiPathSegment(templateId);
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
-        '/api/templates/$templateId/analytics/events',
+        '/api/templates/$encodedTemplateId/analytics/events',
         data: {
           'eventType': eventType,
           'source': source,
@@ -457,9 +484,10 @@ class TemplateGenerationRepository {
     String paymentMethod = 'credit',
     CancelToken? cancelToken,
   }) async {
+    final encodedGenerationId = _apiPathSegment(generationId);
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.post<Map<String, dynamic>>(
-        '/api/generations/$generationId/remove-watermark',
+        '/api/generations/$encodedGenerationId/remove-watermark',
         data: {'paymentMethod': paymentMethod},
         options: authenticatedRequestOptions(session.accessToken),
         cancelToken: cancelToken,
@@ -477,9 +505,10 @@ class TemplateGenerationRepository {
     Map<String, Object?> metadata = const {},
     CancelToken? cancelToken,
   }) async {
+    final encodedTemplateId = _apiPathSegment(templateId);
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
-        '/api/templates/$templateId/analytics/events',
+        '/api/templates/$encodedTemplateId/analytics/events',
         data: {
           'eventType': eventType,
           'source': 'mobile',
@@ -498,9 +527,10 @@ class TemplateGenerationRepository {
     String generationId, {
     CancelToken? cancelToken,
   }) {
+    final encodedGenerationId = _apiPathSegment(generationId);
     return _fetchMediaAccess(
       generationId,
-      '/api/generations/$generationId/download',
+      '/api/generations/$encodedGenerationId/download',
       method: 'GET',
       cancelToken: cancelToken,
     );
@@ -510,9 +540,10 @@ class TemplateGenerationRepository {
     String generationId, {
     CancelToken? cancelToken,
   }) {
+    final encodedGenerationId = _apiPathSegment(generationId);
     return _fetchMediaAccess(
       generationId,
-      '/api/generations/$generationId/share',
+      '/api/generations/$encodedGenerationId/share',
       method: 'POST',
       cancelToken: cancelToken,
     );
@@ -680,6 +711,7 @@ class TemplateGenerationRepository {
     String? status,
     int? skip,
     int? take,
+    CancelToken? cancelToken,
   }) async {
     final queryParameters = <String, Object?>{};
     if (status != null && status.isNotEmpty) {
@@ -697,6 +729,7 @@ class TemplateGenerationRepository {
         '/api/templates/generations',
         queryParameters: queryParameters,
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -717,11 +750,12 @@ class TemplateGenerationRepository {
         .toList(growable: false);
   }
 
-  Future<int> fetchUnreadGenerationCount() async {
+  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/templates/generations/unread-count',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -730,11 +764,16 @@ class TemplateGenerationRepository {
     return count;
   }
 
-  Future<void> markGenerationRead(String generationId) async {
+  Future<void> markGenerationRead(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    final encodedGenerationId = _apiPathSegment(generationId);
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
-        '/api/templates/generations/$generationId/mark-read',
+        '/api/templates/generations/$encodedGenerationId/mark-read',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
@@ -742,16 +781,77 @@ class TemplateGenerationRepository {
     await _markCachedGenerationRead(generationId);
   }
 
-  Future<void> deleteGeneration(String generationId) async {
+  Future<void> deleteGeneration(
+    String generationId, {
+    CancelToken? cancelToken,
+  }) async {
+    final encodedGenerationId = _apiPathSegment(generationId);
     await _authorizedRequest<void>(
       (session) => _dio.delete<void>(
-        '/api/templates/generations/$generationId',
+        '/api/templates/generations/$encodedGenerationId',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );
 
     await _removeCachedGeneration(generationId);
+  }
+
+  Future<void> upsertCachedGeneration(
+    TemplateGenerationResult generation,
+  ) async {
+    for (final status in _cacheStatuses) {
+      try {
+        final cacheStatus = status == _cacheAllStatusKey ? null : status;
+        final key = _cacheKeyForStatus(cacheStatus);
+        final raw = await _preferences.getString(key);
+        if (raw == null || raw.isEmpty) {
+          continue;
+        }
+
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) {
+          continue;
+        }
+
+        final updated = <Map<String, Object?>>[];
+        for (final entry in decoded.whereType<Map>()) {
+          final cachedGeneration = Map<String, Object?>.from(entry);
+          if (cachedGeneration['generationId'] != generation.generationId) {
+            updated.add(cachedGeneration);
+          }
+        }
+
+        if (_matchesCachedGenerationStatus(generation, cacheStatus)) {
+          updated.insert(0, _generationToCachedJson(generation));
+        }
+
+        updated.sort((left, right) {
+          final leftUpdated = DateTime.tryParse(
+            left['updatedAtUtc'] as String? ?? '',
+          );
+          final rightUpdated = DateTime.tryParse(
+            right['updatedAtUtc'] as String? ?? '',
+          );
+          if (leftUpdated == null && rightUpdated == null) {
+            return 0;
+          }
+          if (leftUpdated == null) {
+            return 1;
+          }
+          if (rightUpdated == null) {
+            return -1;
+          }
+          return rightUpdated.compareTo(leftUpdated);
+        });
+
+        final bounded = updated.take(50).toList(growable: false);
+        await _preferences.setString(key, jsonEncode(bounded));
+      } on Object {
+        // Persistent cache updates are best-effort; realtime remains in memory.
+      }
+    }
   }
 
   Future<void> submitGenerationFeedback({
@@ -905,6 +1005,92 @@ class TemplateGenerationRepository {
         ? _cacheAllStatusKey
         : status.trim().toLowerCase();
     return '$_generationsCachePrefix$normalized';
+  }
+
+  bool _matchesCachedGenerationStatus(
+    TemplateGenerationResult generation,
+    String? status,
+  ) {
+    if (status == null || status.isEmpty) {
+      return true;
+    }
+
+    return switch (status.toLowerCase()) {
+      'active' => !generation.isTerminal,
+      'ready' => generation.isCompleted,
+      'failed' => generation.isFailed,
+      _ => true,
+    };
+  }
+
+  Map<String, Object?> _generationToCachedJson(
+    TemplateGenerationResult generation,
+  ) {
+    return {
+      'generationId': generation.generationId,
+      'userId': generation.userId,
+      'templateId': generation.templateId,
+      'status': generation.status.name,
+      'tokenCost': generation.tokenCost,
+      'sourceImageAsset': generation.sourceImageAsset == null
+          ? null
+          : {
+              'url': generation.sourceImageAsset!.url,
+              'fileName': generation.sourceImageAsset!.fileName,
+              'contentType': generation.sourceImageAsset!.contentType,
+              'fileSizeBytes': generation.sourceImageAsset!.fileSizeBytes,
+              'durationSeconds': generation.sourceImageAsset!.durationSeconds,
+            },
+      'normalizedImageUrl': generation.normalizedImageUrl,
+      'referenceMotionUrl': generation.referenceMotionUrl,
+      'outputUrl': generation.outputUrl,
+      'attemptCount': generation.attemptCount,
+      'usedPreprocessingModel': generation.usedPreprocessingModel,
+      'usedKlingModel': generation.usedKlingModel,
+      'outputVideoDurationSeconds': generation.outputVideoDurationSeconds,
+      'failureCode': generation.failureCode,
+      'failureMessage': generation.failureMessage,
+      'createdAtUtc': generation.createdAtUtc.toUtc().toIso8601String(),
+      'updatedAtUtc': generation.updatedAtUtc.toUtc().toIso8601String(),
+      'startedAtUtc': generation.startedAtUtc?.toUtc().toIso8601String(),
+      'preprocessingCompletedAtUtc': generation.preprocessingCompletedAtUtc
+          ?.toUtc()
+          .toIso8601String(),
+      'motionGenerationCompletedAtUtc': generation
+          .motionGenerationCompletedAtUtc
+          ?.toUtc()
+          .toIso8601String(),
+      'mediaImportCompletedAtUtc': generation.mediaImportCompletedAtUtc
+          ?.toUtc()
+          .toIso8601String(),
+      'completedAtUtc': generation.completedAtUtc?.toUtc().toIso8601String(),
+      'templateTitle': generation.templateTitle,
+      'templateType': generation.templateType,
+      'stage': generation.stage,
+      'progressPercent': generation.progressPercent,
+      'estimatedDurationLabel': generation.estimatedDurationLabel,
+      'chargedAtUtc': generation.chargedAtUtc?.toUtc().toIso8601String(),
+      'refundedAtUtc': generation.refundedAtUtc?.toUtc().toIso8601String(),
+      'userMediaExpired': generation.userMediaExpired,
+      'isUnread': generation.isUnread,
+      'queuePosition': generation.queuePosition,
+      'estimatedWaitSeconds': generation.estimatedWaitSeconds,
+      'hasWatermark': generation.hasWatermark,
+      'canRemoveWatermark': generation.canRemoveWatermark,
+      'isWatermarkRemoved': generation.isWatermarkRemoved,
+      'removeWatermarkCostCredits': generation.removeWatermarkCostCredits,
+      'userPlan': generation.userPlan,
+      'watermarkMessage': generation.watermarkMessage,
+      'supportsGenerateSimilar': generation.supportsGenerateSimilar,
+      'inputSourceType': generation.inputSourceType,
+      'inputMediaAssetId': generation.inputMediaAssetId,
+      'resultMediaAssetId': generation.resultMediaAssetId,
+      'inputPreviewUrl': generation.inputPreviewUrl,
+      'resultPreviewUrl': generation.resultPreviewUrl,
+      'canCompareBeforeAfter': generation.canCompareBeforeAfter,
+      'petId': generation.petId,
+      'petPhotoId': generation.petPhotoId,
+    };
   }
 
   Future<void> _markCachedGenerationRead(String generationId) async {
@@ -1062,6 +1248,10 @@ class TemplateGenerationRepository {
     return sanitizeFileName(basename, fallback: 'petmagic_source_image.jpg');
   }
 
+  String _apiPathSegment(String value) {
+    return Uri.encodeComponent(value);
+  }
+
   bool _isAllowedImageContentType(String contentType) {
     final normalized = contentType.toLowerCase();
     return normalized == 'image/jpeg' ||
@@ -1071,8 +1261,14 @@ class TemplateGenerationRepository {
         normalized == 'image/heif';
   }
 
-  Future<String?> _detectSourceImageContentType(String path) async {
-    final header = await _sourceImageHeader(path);
+  Future<String?> _detectSourceImageContentType(
+    String path, {
+    required String unavailableMessage,
+  }) async {
+    final header = await _sourceImageHeader(
+      path,
+      unavailableMessage: unavailableMessage,
+    );
     if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
       return 'image/jpeg';
     }
@@ -1108,12 +1304,15 @@ class TemplateGenerationRepository {
     return null;
   }
 
-  Future<List<int>> _sourceImageHeader(String path) async {
+  Future<List<int>> _sourceImageHeader(
+    String path, {
+    required String unavailableMessage,
+  }) async {
     try {
       final chunks = await File(path).openRead(0, 32).toList();
       return [for (final chunk in chunks) ...chunk];
     } on FileSystemException catch (error) {
-      throw AppException('templates.source_image_unavailable', cause: error);
+      throw AppException(unavailableMessage, cause: error);
     }
   }
 
