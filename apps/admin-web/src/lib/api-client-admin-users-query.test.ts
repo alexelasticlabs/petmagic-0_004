@@ -5,6 +5,7 @@ import {
   assignRole,
   fetchAdminUser,
   fetchAdminUserDashboardMetrics,
+  fetchUsers,
   normalizeFetchUsersQuery,
   revokeRole,
   USER_SEARCH_MAX_LENGTH,
@@ -64,8 +65,8 @@ describe("admin users api client query and role guards", () => {
         skip: 10.5,
         take: 25.8,
         search: " alice@example.com ",
-        role: "Moderator",
-        status: "blocked",
+        role: " moderator ",
+        status: " BLOCKED ",
       })
     ).toEqual({
       skip: 10,
@@ -77,11 +78,47 @@ describe("admin users api client query and role guards", () => {
     });
   });
 
+  it("uses the canonical admin users list route without a trailing slash", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      Response.json({
+        items: [],
+        totalCount: 0,
+        skip: 0,
+        take: 25,
+        hasMore: false,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchUsers({ skip: 0, take: 25, search: " alice@example.com " });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "https://api.example.com/api/admin/users?skip=0&take=25&search=alice%40example.com"
+    );
+  });
+
   it("rejects non-admin-panel roles before sending role mutation requests", async () => {
     await expect(assignRole("user-1", "Premium")).rejects.toThrow("Invalid admin role.");
     await expect(revokeRole("user-1", "User")).rejects.toThrow("Invalid admin role.");
 
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("canonicalizes admin role mutations before sending requests", async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await assignRole("user-1", " moderator ");
+    await revokeRole("user-1", " ADMIN ");
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "https://api.example.com/api/admin/users/user-1/role",
+      "https://api.example.com/api/admin/users/user-1/role",
+    ]);
+    expect(fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)))).toEqual([
+      { role: "Moderator" },
+      { role: "Admin" },
+    ]);
   });
 
   it("encodes user ids before placing them in API path segments", async () => {

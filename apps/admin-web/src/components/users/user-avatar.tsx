@@ -7,6 +7,7 @@ import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
 import type { UserAvatar } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type UserAvatarProps = {
   avatar?: UserAvatar | null;
@@ -23,6 +24,16 @@ function getInitials(label: string) {
   }
 
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+function getAvatarFetchErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
 }
 
 function resolveAvatarUrl(rawUrl?: string | null): string | null {
@@ -106,7 +117,7 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
           return;
         }
 
-        clientLogger.warn("users.avatar_fetch_failed", { error });
+        clientLogger.warn("users.avatar_fetch_failed", getAvatarFetchErrorDetails(error));
         setAvatarMedia({ sourceUrl: imageUrl, objectUrl: null, failed: true });
       });
 

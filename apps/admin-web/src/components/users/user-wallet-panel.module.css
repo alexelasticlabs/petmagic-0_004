@@ -78,12 +78,19 @@
   font: inherit;
 }
 
-.input:focus,
-.select:focus,
-.textarea:focus {
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible {
   outline: none;
   border-color: var(--border-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: var(--focus-ring);
+}
+
+.input:disabled,
+.select:disabled,
+.textarea:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .textarea {
@@ -129,11 +136,11 @@
 }
 
 .positive {
-  color: var(--success);
+  color: color-mix(in srgb, var(--success) 82%, var(--text-strong));
 }
 
 .negative {
-  color: var(--danger);
+  color: color-mix(in srgb, var(--danger) 86%, var(--text-strong));
 }
 
 @media (max-width: 1360px) {

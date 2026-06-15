@@ -74,6 +74,18 @@ function getUserPetsCopy(locale: Locale) {
     restore: isRu ? "Восстановить" : "Restore",
     hidePhoto: isRu ? "Скрыть фото" : "Hide photo",
     restorePhoto: isRu ? "Восстановить фото" : "Restore photo",
+    activeStatus: isRu ? "Активен" : "Active",
+    hiddenStatus: isRu ? "Скрыт" : "Hidden",
+    hidePetLabel: isRu ? "Скрыть питомца" : "Hide pet",
+    restorePetLabel: isRu ? "Восстановить питомца" : "Restore pet",
+    hidePhotoLabel: isRu ? "Скрыть фото питомца" : "Hide pet photo",
+    restorePhotoLabel: isRu ? "Восстановить фото питомца" : "Restore pet photo",
+    statusUpdateError: isRu
+      ? "Не удалось обновить статус питомца."
+      : "Failed to update pet status.",
+    photoStatusUpdateError: isRu
+      ? "Не удалось обновить статус фото."
+      : "Failed to update photo status.",
     showDetails: isRu ? "Показать фото и генерации" : "Show photos and generations",
     hideDetails: isRu ? "Скрыть детали" : "Hide details",
     avatar: isRu ? "Аватар" : "Avatar",
@@ -118,6 +130,18 @@ function getGenerationStatusColor(status: string): string {
   return "var(--text-muted)";
 }
 
+function formatPetStatus(status: string, text: ReturnType<typeof getUserPetsCopy>) {
+  if (status === "active") {
+    return text.activeStatus;
+  }
+
+  if (status === "hidden") {
+    return text.hiddenStatus;
+  }
+
+  return sanitizeSensitiveText(status, 32);
+}
+
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const petText = useMemo(() => getUserPetsCopy(locale), [locale]);
@@ -125,6 +149,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const session = useAuthSession();
   const queryClient = useQueryClient();
   const [expandedPetIds, setExpandedPetIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [petActionError, setPetActionError] = useState<string | null>(null);
   const canViewUserProfile = session?.user.roles.includes("Admin") ?? false;
   const { analytics, hasError, isFetching, isLoading, refresh, user } = useAdminUserProfile({
     enabled: canViewUserProfile,
@@ -138,14 +163,46 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const petStatusMutation = useMutation({
     mutationFn: ({ petId, status }: { petId: string; status: "active" | "hidden" }) =>
       changeAdminUserPetStatus(userId, petId, status),
+    onMutate: () => {
+      setPetActionError(null);
+    },
     onSuccess: async () => {
       await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["admin", "users", userId, "pets"] }),
       ]);
     },
+    onError: (error) => {
+      setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));
+    },
   });
+  const isPetActionLocked = petStatusMutation.isPending || petsQuery.isFetching;
+  const visiblePetIds = useMemo(
+    () => new Set((petsQuery.data ?? []).map((pet) => pet.id)),
+    [petsQuery.data]
+  );
+
+  useEffect(() => {
+    if (!petsQuery.data || expandedPetIds.size === 0) {
+      return;
+    }
+
+    const hasStaleExpandedPet = Array.from(expandedPetIds).some(
+      (petId) => !visiblePetIds.has(petId)
+    );
+    if (!hasStaleExpandedPet) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setExpandedPetIds((current) => {
+        const next = new Set([...current].filter((petId) => visiblePetIds.has(petId)));
+        return next.size === current.size ? current : next;
+      });
+    });
+  }, [expandedPetIds, petsQuery.data, visiblePetIds]);
+
   function requestPetStatusChange(pet: AdminUserPet) {
-    if (!canViewUserProfile || petStatusMutation.isPending) {
+    if (!canViewUserProfile || isPetActionLocked) {
       return;
     }
 
@@ -153,6 +210,22 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
       petId: pet.id,
       status: pet.status === "active" ? "hidden" : "active",
     });
+  }
+
+  function requestPetsRetry() {
+    if (!canViewUserProfile || petsQuery.isFetching) {
+      return;
+    }
+
+    void petsQuery.refetch().catch(() => undefined);
+  }
+
+  function requestUserProfileRetry() {
+    if (!canViewUserProfile || isFetching) {
+      return;
+    }
+
+    void refresh().catch(() => undefined);
   }
 
   useEffect(() => {
@@ -211,13 +284,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  if (!canViewUserProfile) {
-                    return;
-                  }
-
-                  void refresh().catch(() => undefined);
-                }}
+                onClick={requestUserProfileRetry}
                 disabled={!canViewUserProfile || isFetching}
               >
                 {text.supportRetryAction}
@@ -338,6 +405,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
       />
 
       <AdminCard title={petText.title} description={petText.description}>
+        {petActionError ? <AdminStateCard tone="warning" title={petActionError} /> : null}
         {petsQuery.isError ? (
           <AdminStateCard
             tone="danger"
@@ -346,7 +414,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => void petsQuery.refetch().catch(() => undefined)}
+                onClick={requestPetsRetry}
                 disabled={!canViewUserProfile || petsQuery.isFetching}
               >
                 {text.supportRetryAction}
@@ -364,7 +432,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                   <div className={styles.dataHeader}>
                     <strong>{sanitizeSensitiveText(pet.name, 80)}</strong>
                     <AdminStatusBadge color={pet.status === "active" ? "var(--success)" : "var(--warning)"}>
-                      {sanitizeSensitiveText(pet.status, 32)}
+                      {formatPetStatus(pet.status, petText)}
                     </AdminStatusBadge>
                   </div>
                   <p>
@@ -378,7 +446,10 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                     <Button
                       variant="secondary"
                       size="sm"
-                      disabled={!canViewUserProfile || petStatusMutation.isPending}
+                      aria-label={`${
+                        pet.status === "active" ? petText.hidePetLabel : petText.restorePetLabel
+                      }: ${sanitizeSensitiveText(pet.name, 80)}`}
+                      disabled={!canViewUserProfile || isPetActionLocked}
                       onClick={() => requestPetStatusChange(pet)}
                     >
                       {pet.status === "active" ? petText.hide : petText.restore}
@@ -575,11 +646,14 @@ function AdminPetDetails({
   userId: string;
 }) {
   const queryClient = useQueryClient();
+  const [photoActionError, setPhotoActionError] = useState<string | null>(null);
   const photosQuery = useQuery<AdminUserPetPhoto[]>({
+    enabled: canManagePets,
     queryKey: ["admin", "users", userId, "pets", pet.id, "photos"],
     queryFn: ({ signal }) => fetchAdminUserPetPhotos(userId, pet.id, signal),
   });
   const generationsQuery = useQuery<AdminUserPetGeneration[]>({
+    enabled: canManagePets,
     queryKey: ["admin", "users", userId, "pets", pet.id, "generations"],
     queryFn: ({ signal }) => fetchAdminUserPetGenerations(userId, pet.id, signal),
   });
@@ -591,6 +665,9 @@ function AdminPetDetails({
       photoId: string;
       status: "active" | "hidden";
     }) => changeAdminUserPetPhotoStatus(userId, pet.id, photoId, status),
+    onMutate: () => {
+      setPhotoActionError(null);
+    },
     onSuccess: async () => {
       await Promise.allSettled([
         queryClient.invalidateQueries({
@@ -598,9 +675,13 @@ function AdminPetDetails({
         }),
       ]);
     },
+    onError: (error) => {
+      setPhotoActionError(getAdminErrorMessage(error, text.photoStatusUpdateError));
+    },
   });
+  const isPhotoActionLocked = photoStatusMutation.isPending || photosQuery.isFetching;
   function requestPhotoStatusChange(photo: AdminUserPetPhoto) {
-    if (!canManagePets || photoStatusMutation.isPending) {
+    if (!canManagePets || isPhotoActionLocked) {
       return;
     }
 
@@ -610,11 +691,35 @@ function AdminPetDetails({
     });
   }
 
+  function requestPhotosRetry() {
+    if (!canManagePets || photosQuery.isFetching) {
+      return;
+    }
+
+    void photosQuery.refetch().catch(() => undefined);
+  }
+
+  function requestGenerationsRetry() {
+    if (!canManagePets || generationsQuery.isFetching) {
+      return;
+    }
+
+    void generationsQuery.refetch().catch(() => undefined);
+  }
+
   const photos = photosQuery.data ?? [];
   const generations = generationsQuery.data ?? [];
 
   return (
-    <div className={styles.petDetails}>
+    <div
+      className={styles.petDetails}
+      aria-busy={
+        photosQuery.isFetching || generationsQuery.isFetching || photoStatusMutation.isPending
+          ? "true"
+          : undefined
+      }
+    >
+      {photoActionError ? <AdminStateCard tone="warning" title={photoActionError} /> : null}
       {photosQuery.isLoading ? (
         <span className={styles.petDetailState}>{text.loadingPhotos}</span>
       ) : photosQuery.isError ? (
@@ -625,8 +730,8 @@ function AdminPetDetails({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void photosQuery.refetch().catch(() => undefined)}
-              disabled={photosQuery.isFetching}
+              onClick={requestPhotosRetry}
+              disabled={!canManagePets || photosQuery.isFetching}
             >
               {retryLabel}
             </Button>
@@ -645,7 +750,7 @@ function AdminPetDetails({
               <span>
                 {photo.isAvatar ? `${text.avatar} • ` : ""}
                 {photo.isFavorite ? `${text.favorite} • ` : ""}
-                {sanitizeSensitiveText(photo.status, 32)}
+                {formatPetStatus(photo.status, text)}
               </span>
               <span>
                 {sanitizeSensitiveText(photo.contentType, 64)}
@@ -656,7 +761,10 @@ function AdminPetDetails({
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={!canManagePets || photoStatusMutation.isPending}
+                aria-label={`${
+                  photo.status === "active" ? text.hidePhotoLabel : text.restorePhotoLabel
+                }: ${sanitizeSensitiveText(pet.name, 80)} ${text.photoAlt}`}
+                disabled={!canManagePets || isPhotoActionLocked}
                 onClick={() => requestPhotoStatusChange(photo)}
               >
                 {photo.status === "active" ? text.hidePhoto : text.restorePhoto}
@@ -678,8 +786,8 @@ function AdminPetDetails({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => void generationsQuery.refetch().catch(() => undefined)}
-              disabled={generationsQuery.isFetching}
+              onClick={requestGenerationsRetry}
+              disabled={!canManagePets || generationsQuery.isFetching}
             >
               {retryLabel}
             </Button>

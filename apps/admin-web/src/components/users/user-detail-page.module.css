@@ -118,6 +118,7 @@
 
 .timelineHeader,
 .dataHeader {
+  min-width: 0;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -126,10 +127,13 @@
 
 .timelineHeader strong,
 .dataHeader strong {
+  min-width: 0;
   color: var(--text-strong);
+  overflow-wrap: anywhere;
 }
 
 .dataHeader span {
+  min-width: 0;
   overflow-wrap: anywhere;
   text-align: right;
 }
@@ -147,12 +151,18 @@
 }
 
 .petPhoto {
+  min-width: 0;
   display: grid;
   gap: 0.42rem;
   padding: 0.5rem;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   background: var(--surface-1);
+}
+
+.petPhoto span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .petPhoto img {

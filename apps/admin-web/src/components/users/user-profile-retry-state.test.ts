@@ -30,9 +30,12 @@ describe("admin user profile retry states", () => {
     const source = readFileSync(detailPagePath, "utf8");
 
     expect(source).toContain("title={text.userAnalyticsLoadError}");
+    expect(source).toContain("function requestUserProfileRetry()");
     expect(source).toContain(
-      "if (!canViewUserProfile) {\n                    return;\n                  }\n\n                  void refresh().catch(() => undefined);"
+      "if (!canViewUserProfile || isFetching) {\n      return;\n    }"
     );
+    expect(source).toContain("void refresh().catch(() => undefined)");
+    expect(source).toContain("onClick={requestUserProfileRetry}");
     expect(source).toContain("disabled={!canViewUserProfile || isFetching}");
     expect(source).toContain("{text.supportRetryAction}");
     expect(source).toContain("href={`/${locale}/users`}");
@@ -42,9 +45,12 @@ describe("admin user profile retry states", () => {
     const source = readFileSync(inlineAnalyticsPath, "utf8");
 
     expect(source).toContain("title={text.userAnalyticsLoadError}");
+    expect(source).toContain("function requestUserProfileRetry()");
     expect(source).toContain(
-      "if (!canViewUserProfile) {\n                return;\n              }\n\n              void refresh().catch(() => undefined);"
+      "if (!canViewUserProfile || isFetching) {\n      return;\n    }"
     );
+    expect(source).toContain("void refresh().catch(() => undefined)");
+    expect(source).toContain("onClick={requestUserProfileRetry}");
     expect(source).toContain("disabled={!canViewUserProfile || isFetching}");
     expect(source).toContain("{text.supportRetryAction}");
   });

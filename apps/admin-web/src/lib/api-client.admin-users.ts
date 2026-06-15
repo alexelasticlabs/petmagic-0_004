@@ -28,18 +28,34 @@ export type FetchUsersQuery = {
 };
 
 type AdminAssignableRole = "Admin" | "Moderator";
+type AdminUserRoleFilter = AdminAssignableRole | "User";
+type AdminUserStatusFilter = "active" | "blocked" | "unconfirmed";
 
 const USER_LIST_MAX_TAKE = 100;
 export const USER_SEARCH_MAX_LENGTH = 120;
 export const USER_WALLET_REASON_MAX_LENGTH = 240;
-const allowedUserRoles = new Set(["Admin", "Moderator", "User"]);
-const allowedUserStatuses = new Set(["active", "blocked", "unconfirmed"]);
-const allowedAssignableRoles = new Set<AdminAssignableRole>(["Admin", "Moderator"]);
+const allowedUserRoles: readonly AdminUserRoleFilter[] = ["Admin", "Moderator", "User"];
+const allowedUserStatuses: readonly AdminUserStatusFilter[] = ["active", "blocked", "unconfirmed"];
+const allowedAssignableRoles: readonly AdminAssignableRole[] = ["Admin", "Moderator"];
+
+function normalizeAllowedValue<const T extends string>(
+  value: string | undefined,
+  allowedValues: readonly T[]
+): T | undefined {
+  const normalizedValue = value?.trim();
+  if (!normalizedValue) {
+    return undefined;
+  }
+
+  return allowedValues.find(
+    (allowedValue) => allowedValue.toLowerCase() === normalizedValue.toLowerCase()
+  );
+}
 
 export function normalizeFetchUsersQuery(query: FetchUsersQuery = {}): FetchUsersQuery {
   const search = query.search?.trim().slice(0, USER_SEARCH_MAX_LENGTH) || undefined;
-  const role = query.role?.trim();
-  const status = query.status?.trim();
+  const role = normalizeAllowedValue(query.role, allowedUserRoles);
+  const status = normalizeAllowedValue(query.status, allowedUserStatuses);
 
   return {
     skip:
@@ -51,8 +67,8 @@ export function normalizeFetchUsersQuery(query: FetchUsersQuery = {}): FetchUser
         ? Math.min(Math.floor(query.take), USER_LIST_MAX_TAKE)
         : USER_LIST_MAX_TAKE,
     search,
-    role: role && allowedUserRoles.has(role) ? role : undefined,
-    status: status && allowedUserStatuses.has(status) ? status : undefined,
+    role,
+    status,
     isPremium: typeof query.isPremium === "boolean" ? query.isPremium : undefined,
   };
 }
@@ -91,13 +107,13 @@ function buildUsersPath(query: FetchUsersQuery): string {
     params.set("isPremium", String(normalizedQuery.isPremium));
   }
 
-  return `/api/admin/users/?${params.toString()}`;
+  return `/api/admin/users?${params.toString()}`;
 }
 
 function assertAssignableRole(role: string): AdminAssignableRole {
-  const normalizedRole = role.trim();
-  if (allowedAssignableRoles.has(normalizedRole as AdminAssignableRole)) {
-    return normalizedRole as AdminAssignableRole;
+  const normalizedRole = normalizeAllowedValue(role, allowedAssignableRoles);
+  if (normalizedRole) {
+    return normalizedRole;
   }
 
   throw new Error("Invalid admin role.");

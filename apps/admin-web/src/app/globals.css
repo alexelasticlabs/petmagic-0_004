@@ -4,12 +4,15 @@
   --font-heading: var(--font-admin-heading);
   --font-manrope: var(--font-body);
   --font-space-grotesk: var(--font-heading);
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
   --surface-0: #000000;
   --surface-1: #090b0e;
   --surface-2: #0e1217;
   --surface-3: #141920;
+  --surface-4: #1a2028;
+  --surface: var(--surface-1);
   --surface-raised: #10151b;
-  --surface-overlay: rgba(0, 0, 0, 0.92);
+  --surface-overlay: color-mix(in srgb, var(--surface-0) 92%, transparent);
   --text-strong: #f5f7fa;
   --text-soft: #c8d0d9;
   --text-muted: #8c99a6;
@@ -32,6 +35,7 @@
   --neutral: #9aa0a6;
   --radius: 10px;
   --radius-sm: 8px;
+  --radius-md: var(--radius);
   --radius-xs: 4px;
   --radius-lg: 14px;
   --radius-pill: 999px;
@@ -40,35 +44,43 @@
   --space-3: 1rem;
   --space-4: 1.5rem;
   --space-5: 2rem;
-  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.22);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.18);
-  --shadow-strong: 0 10px 24px rgba(0, 0, 0, 0.34);
-  --focus-ring: 0 0 0 2px rgba(138, 180, 248, 0.24);
-  --interactive-glow: 0 0 0 1px rgba(138, 180, 248, 0.08);
-  --scrollbar-track: rgba(0, 0, 0, 0.96);
-  --scrollbar-thumb: rgba(68, 76, 86, 0.92);
-  --scrollbar-thumb-hover: rgba(96, 105, 118, 0.96);
-  --bg-grid-primary: rgba(255, 255, 255, 0.012);
-  --bg-grid-secondary: rgba(255, 255, 255, 0.01);
-  --bg-glow: rgba(138, 180, 248, 0.035);
+  --shadow-soft: 0 1px 3px color-mix(in srgb, var(--surface-0) 22%, transparent);
+  --shadow-card: 0 1px 2px color-mix(in srgb, var(--surface-0) 18%, transparent);
+  --shadow-strong: 0 10px 24px color-mix(in srgb, var(--surface-0) 34%, transparent);
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+  --interactive-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+  --scrollbar-track: color-mix(in srgb, var(--surface-0) 96%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--border-strong) 92%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--text-subtle) 96%, transparent);
+  --bg-grid-primary: color-mix(in srgb, var(--text-strong) 1.2%, transparent);
+  --bg-grid-secondary: color-mix(in srgb, var(--text-strong) 1%, transparent);
+  --bg-glow: color-mix(in srgb, var(--accent) 3.5%, transparent);
   --bg-gradient-start: #000000;
   --bg-gradient-end: #020304;
   --primary-bg: #1a73e8;
   --primary-bg-hover: #226fdb;
-  --primary-border: rgba(138, 180, 248, 0.6);
-  --primary-border-hover: rgba(166, 196, 255, 0.92);
-  --ghost-bg: rgba(5, 8, 14, 0.94);
-  --secondary-bg: rgba(8, 10, 13, 0.96);
-  --surface-hover: rgba(9, 14, 22, 0.98);
-  --accent-soft-bg: rgba(18, 36, 67, 0.78);
-  --danger-soft-bg: rgba(71, 20, 24, 0.52);
+  --primary-border: color-mix(in srgb, var(--accent) 60%, transparent);
+  --primary-border-hover: color-mix(in srgb, var(--accent-strong) 72%, var(--accent-contrast));
+  --ghost-bg: color-mix(in srgb, var(--surface-1) 94%, transparent);
+  --secondary-bg: color-mix(in srgb, var(--surface-2) 96%, transparent);
+  --surface-hover: color-mix(in srgb, var(--surface-2) 98%, var(--surface-1));
+  --accent-soft-bg: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  --danger-soft-bg: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
   --danger-soft-fg: #ffd8d3;
-  --toast-success-bg: rgba(20, 54, 33, 0.96);
+  --primary-soft-bg: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+  --primary-soft-fg: #d2e3fc;
+  --info-soft-bg: color-mix(in srgb, var(--info) 18%, var(--surface-2));
+  --info-soft-fg: #d2e3fc;
+  --success-soft-bg: color-mix(in srgb, var(--success) 18%, var(--surface-2));
+  --success-soft-fg: #dff3e4;
+  --warning-soft-bg: color-mix(in srgb, var(--warning) 20%, var(--surface-2));
+  --warning-soft-fg: #ffe8a3;
+  --toast-success-bg: color-mix(in srgb, var(--success) 18%, var(--surface-2));
   --toast-success-fg: #dff3e4;
-  --toast-success-border: rgba(46, 160, 67, 0.44);
-  --toast-error-bg: rgba(71, 20, 24, 0.96);
+  --toast-success-border: color-mix(in srgb, var(--success) 44%, var(--border-soft));
+  --toast-error-bg: color-mix(in srgb, var(--danger) 18%, var(--surface-2));
   --toast-error-fg: #ffd8d3;
-  --toast-error-border: rgba(248, 81, 73, 0.44);
+  --toast-error-border: color-mix(in srgb, var(--danger) 44%, var(--border-soft));
   --template-image-aspect-ratio: 2 / 3;
   --template-video-aspect-ratio: 2 / 3;
 }
@@ -79,8 +91,9 @@
   --surface-1: #ffffff;
   --surface-2: #f7f9fc;
   --surface-3: #eef2f7;
+  --surface-4: #e2e8f0;
   --surface-raised: #ffffff;
-  --surface-overlay: rgba(255, 255, 255, 0.94);
+  --surface-overlay: color-mix(in srgb, var(--surface-1) 94%, transparent);
   --text-strong: #121a26;
   --text-soft: #334155;
   --text-muted: #5b6b7d;
@@ -101,35 +114,43 @@
   --error: #dc2626;
   --magenta: #9333ea;
   --neutral: #64748b;
-  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.08);
-  --shadow-card: 0 4px 14px rgba(15, 23, 42, 0.08);
-  --shadow-strong: 0 12px 24px rgba(15, 23, 42, 0.16);
-  --focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.24);
-  --interactive-glow: 0 0 0 1px rgba(37, 99, 235, 0.12);
-  --scrollbar-track: rgba(237, 242, 247, 0.95);
-  --scrollbar-thumb: rgba(148, 163, 184, 0.9);
-  --scrollbar-thumb-hover: rgba(100, 116, 139, 0.95);
-  --bg-grid-primary: rgba(15, 23, 42, 0.04);
-  --bg-grid-secondary: rgba(15, 23, 42, 0.03);
-  --bg-glow: rgba(37, 99, 235, 0.1);
+  --shadow-soft: 0 1px 2px color-mix(in srgb, var(--text-strong) 8%, transparent);
+  --shadow-card: 0 4px 14px color-mix(in srgb, var(--text-strong) 8%, transparent);
+  --shadow-strong: 0 12px 24px color-mix(in srgb, var(--text-strong) 16%, transparent);
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent);
+  --interactive-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+  --scrollbar-track: color-mix(in srgb, var(--surface-3) 95%, transparent);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-muted) 90%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--text-soft) 95%, transparent);
+  --bg-grid-primary: color-mix(in srgb, var(--text-strong) 4%, transparent);
+  --bg-grid-secondary: color-mix(in srgb, var(--text-strong) 3%, transparent);
+  --bg-glow: color-mix(in srgb, var(--accent) 10%, transparent);
   --bg-gradient-start: #f8fafc;
   --bg-gradient-end: #eef3f9;
   --primary-bg: #2563eb;
   --primary-bg-hover: #1d4ed8;
-  --primary-border: rgba(37, 99, 235, 0.58);
-  --primary-border-hover: rgba(29, 78, 216, 0.72);
-  --ghost-bg: rgba(247, 250, 252, 0.94);
-  --secondary-bg: rgba(255, 255, 255, 0.96);
-  --surface-hover: rgba(241, 245, 249, 0.98);
-  --accent-soft-bg: rgba(37, 99, 235, 0.12);
-  --danger-soft-bg: rgba(220, 38, 38, 0.12);
+  --primary-border: color-mix(in srgb, var(--accent) 58%, transparent);
+  --primary-border-hover: color-mix(in srgb, var(--accent-strong) 72%, transparent);
+  --ghost-bg: color-mix(in srgb, var(--surface-2) 94%, transparent);
+  --secondary-bg: color-mix(in srgb, var(--surface-1) 96%, transparent);
+  --surface-hover: color-mix(in srgb, var(--surface-3) 98%, transparent);
+  --accent-soft-bg: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  --danger-soft-bg: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
   --danger-soft-fg: #991b1b;
-  --toast-success-bg: rgba(220, 252, 231, 0.95);
+  --primary-soft-bg: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  --primary-soft-fg: #1e3a8a;
+  --info-soft-bg: color-mix(in srgb, var(--info) 12%, var(--surface-1));
+  --info-soft-fg: #1e3a8a;
+  --success-soft-bg: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  --success-soft-fg: #14532d;
+  --warning-soft-bg: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
+  --warning-soft-fg: #92400e;
+  --toast-success-bg: color-mix(in srgb, var(--success) 12%, var(--surface-1));
   --toast-success-fg: #14532d;
-  --toast-success-border: rgba(22, 163, 74, 0.34);
-  --toast-error-bg: rgba(254, 226, 226, 0.95);
+  --toast-success-border: color-mix(in srgb, var(--success) 34%, var(--border-soft));
+  --toast-error-bg: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
   --toast-error-fg: #991b1b;
-  --toast-error-border: rgba(220, 38, 38, 0.34);
+  --toast-error-border: color-mix(in srgb, var(--danger) 34%, var(--border-soft));
 }
 
 * {
@@ -153,12 +174,12 @@
 *::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: var(--radius);
-  background: rgba(72, 82, 94, 0.92);
+  background: var(--scrollbar-thumb);
   background-clip: content-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: rgba(97, 108, 122, 0.96);
+  background: var(--scrollbar-thumb-hover);
   background-clip: content-box;
 }
 
@@ -183,7 +204,7 @@ body {
   background:
     linear-gradient(90deg, var(--bg-grid-primary) 1px, transparent 1px),
     linear-gradient(180deg, var(--bg-grid-secondary) 1px, transparent 1px),
-    radial-gradient(circle at top left, var(--bg-glow), transparent 24rem),
+    linear-gradient(135deg, var(--bg-glow) 0%, transparent 32rem),
     linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
   background-size:
     32px 32px,
@@ -210,12 +231,16 @@ select {
   bottom: 1rem;
   z-index: 80;
   max-width: min(28rem, calc(100vw - 2rem));
+  max-height: min(18rem, calc(100dvh - 2rem));
+  overflow-y: auto;
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   padding: 0.8rem 0.95rem;
   box-shadow: var(--shadow-card);
   font-size: 0.9rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .ui-toast--success {
@@ -280,7 +305,7 @@ select {
 }
 
 .ui-button--danger {
-  border-color: rgba(248, 81, 73, 0.4);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border-soft));
   color: var(--danger-soft-fg);
   background: var(--danger-soft-bg);
 }

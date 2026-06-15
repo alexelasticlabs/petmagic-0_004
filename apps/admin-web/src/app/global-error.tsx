@@ -34,12 +34,16 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
     <html lang={isRu ? "ru" : "en"}>
       <body className={styles.body}>
         <main className={styles.main}>
-          <section className={styles.panel} aria-labelledby="global-error-title">
+          <section
+            className={styles.panel}
+            aria-labelledby="global-error-title"
+            aria-describedby="global-error-description"
+          >
             <p className={styles.eyebrow}>PetMagic Admin</p>
             <h1 id="global-error-title" className={styles.title}>
               {isRu ? "Не удалось открыть админ-панель" : "Unable to open the admin panel"}
             </h1>
-            <p className={styles.description}>
+            <p id="global-error-description" className={styles.description}>
               {isRu
                 ? "Произошла критическая ошибка интерфейса. Повторите попытку или вернитесь на страницу входа."
                 : "A critical interface error occurred. Try again or return to the sign-in page."}

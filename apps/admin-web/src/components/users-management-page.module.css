@@ -30,11 +30,11 @@
   padding: 0 0.58rem;
 }
 
-.searchInput:focus,
-.filterSelect:focus {
+.searchInput:focus-visible,
+.filterSelect:focus-visible {
   outline: none;
   border-color: var(--border-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 46%, transparent);
+  box-shadow: var(--focus-ring);
 }
 
 .message {
@@ -103,7 +103,7 @@
 }
 
 .actionsCell {
-  min-width: 28rem;
+  min-width: clamp(20rem, 30vw, 28rem);
 }
 
 .actions {
@@ -171,10 +171,14 @@
   position: fixed;
   z-index: 240;
   pointer-events: auto;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100dvh - 1rem);
 }
 
 .actionMenuList {
   min-width: 15.5rem;
+  max-width: min(17rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
   display: grid;
   gap: 0.14rem;
   padding: 0.34rem;
@@ -182,6 +186,7 @@
   border: 1px solid var(--border-soft);
   background: var(--surface-1);
   box-shadow: var(--shadow-strong);
+  overflow-y: auto;
   animation: actionMenuFade 130ms ease;
 }
 
@@ -218,6 +223,16 @@
   font-size: 0.76rem;
   cursor: pointer;
   text-decoration: none;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.actionMenuItem span,
+.actionMenuLink span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .actionMenuItem:hover:not(:disabled),
@@ -230,6 +245,13 @@
 .actionMenuItem:disabled {
   opacity: 0.62;
   cursor: not-allowed;
+}
+
+.actionMenuLinkDisabled,
+.actionMenuLink[aria-disabled="true"] {
+  opacity: 0.62;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .actionMenuItemDanger {
@@ -302,7 +324,7 @@
   gap: 0.6rem;
   padding: 0.76rem;
   border: 1px solid var(--border-soft);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   box-shadow: var(--shadow-strong);
 }
@@ -336,11 +358,17 @@
   padding: 0.5rem 0.56rem;
 }
 
-.walletInput:focus,
-.walletTextarea:focus {
+.walletInput:focus-visible,
+.walletTextarea:focus-visible {
   outline: none;
   border-color: var(--border-accent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 46%, transparent);
+  box-shadow: var(--focus-ring);
+}
+
+.walletInput:disabled,
+.walletTextarea:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .walletTextarea {
@@ -377,7 +405,7 @@
   display: grid;
   grid-template-rows: auto 1fr;
   border: 1px solid var(--border-soft);
-  border-radius: 1rem;
+  border-radius: var(--radius-sm);
   background: var(--surface-1);
   box-shadow: var(--shadow-strong);
 }
@@ -545,7 +573,7 @@
   }
 
   .actionsCell {
-    min-width: 25rem;
+    min-width: clamp(18rem, 34vw, 25rem);
   }
 }
 
@@ -570,5 +598,76 @@
 
   .sidePanel {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .filtersBar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .searchInput,
+  .filterSelect {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .paginationControls {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pageInfo {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .walletActions {
+    flex-direction: column;
+  }
+
+  .walletActions > * {
+    width: 100%;
+  }
+
+  .sidePanelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .closeBtn {
+    width: 100%;
+  }
+
+  .profileRow {
+    align-items: flex-start;
+  }
+
+  .profileTitle,
+  .profileSub {
+    overflow-wrap: anywhere;
+  }
+
+  .actionsCell {
+    min-width: min(18rem, calc(100vw - 2rem));
+  }
+
+  .actions {
+    align-items: stretch;
+  }
+
+  .quickActionBtn {
+    flex: 1 1 8rem;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .actionMenuPortal {
+    max-width: calc(100vw - 1rem);
+  }
+
+  .actionMenuList {
+    min-width: min(15.5rem, calc(100vw - 1rem));
   }
 }

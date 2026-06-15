@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 import {
   AdminCard,
@@ -38,6 +38,16 @@ type PendingWalletAdjustment = {
   reason: string;
 };
 
+function getWalletActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function UserWalletPanel({
   locale,
   userId,
@@ -56,15 +66,17 @@ export function UserWalletPanel({
   );
   const parsedAmount = Number(amount);
   const normalizedReason = reason.trim().slice(0, USER_WALLET_REASON_MAX_LENGTH);
+  const isWalletConfirmationOpen = pendingAdjustment !== null;
+  const isWalletFormLocked = isSubmitting || isWalletConfirmationOpen;
   const canSubmit =
     canAdjustWallet &&
     Number.isInteger(parsedAmount) &&
     parsedAmount > 0 &&
     normalizedReason.length > 0 &&
-    !isSubmitting;
+    !isWalletFormLocked;
 
   function handleSubmit() {
-    if (!canAdjustWallet || isSubmitting) {
+    if (!canAdjustWallet || isWalletFormLocked) {
       return;
     }
 
@@ -78,6 +90,11 @@ export function UserWalletPanel({
       amount: parsedAmount,
       reason: normalizedReason,
     });
+  }
+
+  function handleFormSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    handleSubmit();
   }
 
   async function confirmWalletAdjustment() {
@@ -101,10 +118,10 @@ export function UserWalletPanel({
       await onUpdated?.();
     } catch (error) {
       clientLogger.error("users.wallet_adjust_failed", {
-        userId,
+        userId: sanitizeSensitiveText(userId, 80),
         operation: pendingAdjustment.operation,
         amount: pendingAdjustment.amount,
-        error,
+        ...getWalletActionErrorDetails(error),
       });
       setFeedback({
         tone: "danger",
@@ -174,7 +191,7 @@ export function UserWalletPanel({
 
       <div className={styles.grid}>
         {canAdjustWallet ? (
-          <section className={styles.controls}>
+          <form className={styles.controls} onSubmit={handleFormSubmit}>
             <div className={styles.sectionHeader}>
               <h4>{text.walletAdjustmentTitle}</h4>
               <p>{text.walletAdjustmentHint}</p>
@@ -187,7 +204,7 @@ export function UserWalletPanel({
                   value={operation}
                   onChange={(event) => setOperation(event.target.value as "credit" | "debit")}
                   className={styles.select}
-                  disabled={isSubmitting}
+                  disabled={isWalletFormLocked}
                 >
                   <option value="credit">{text.walletOperationCredit}</option>
                   <option value="debit">{text.walletOperationDebit}</option>
@@ -204,7 +221,7 @@ export function UserWalletPanel({
                   inputMode="numeric"
                   maxLength={8}
                   className={styles.input}
-                  disabled={isSubmitting}
+                  disabled={isWalletFormLocked}
                 />
               </label>
             </div>
@@ -220,12 +237,12 @@ export function UserWalletPanel({
                 maxLength={USER_WALLET_REASON_MAX_LENGTH}
                 className={styles.textarea}
                 placeholder={text.walletReasonPlaceholder}
-                disabled={isSubmitting}
+                disabled={isWalletFormLocked}
               />
             </label>
 
             <div className={styles.actions}>
-              <Button type="button" onClick={() => void handleSubmit()} disabled={!canSubmit}>
+              <Button type="submit" disabled={!canSubmit}>
                 <span>{isSubmitting ? text.walletSaving : text.walletApplyAction}</span>
               </Button>
             </div>
@@ -237,7 +254,7 @@ export function UserWalletPanel({
                 className={styles.feedback}
               />
             ) : null}
-          </section>
+          </form>
         ) : null}
 
         <section className={styles.ledger}>
@@ -273,7 +290,7 @@ export function UserWalletPanel({
         </section>
       </div>
       <ConfirmationDialog
-        open={canAdjustWallet && pendingAdjustment !== null}
+        open={canAdjustWallet && isWalletConfirmationOpen}
         title={text.walletConfirmTitle}
         description={pendingDescription}
         confirmLabel={isSubmitting ? text.walletSaving : text.walletApplyAction}

@@ -1,18 +1,27 @@
 .body {
-  --global-error-surface-0: #f5f7fb;
-  --global-error-surface-1: #ffffff;
-  --global-error-surface-2: #eef2f7;
-  --global-error-text-strong: #121a26;
-  --global-error-text-soft: #334155;
-  --global-error-text-muted: #5b6b7d;
-  --global-error-border: #d7dee8;
-  --global-error-accent: #2563eb;
-  --global-error-accent-hover: #1d4ed8;
-  --global-error-accent-contrast: #f8fbff;
-  --global-error-focus-ring: 0 0 0 2px rgba(37, 99, 235, 0.24);
-  --global-error-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  --global-error-surface-0: var(--surface-0, Canvas);
+  --global-error-surface-1: var(--surface-1, Canvas);
+  --global-error-surface-2: var(--surface-2, color-mix(in srgb, CanvasText 5%, Canvas));
+  --global-error-text-strong: var(--text-strong, CanvasText);
+  --global-error-text-soft: var(--text-soft, color-mix(in srgb, CanvasText 82%, Canvas));
+  --global-error-text-muted: var(--text-muted, color-mix(in srgb, CanvasText 62%, Canvas));
+  --global-error-border: var(--border-soft, color-mix(in srgb, CanvasText 18%, Canvas));
+  --global-error-accent: var(--accent, LinkText);
+  --global-error-accent-hover: var(--accent-strong, var(--accent, LinkText));
+  --global-error-accent-contrast: var(--accent-contrast, Canvas);
+  --global-error-grid-primary: var(--bg-grid-primary, color-mix(in srgb, CanvasText 4%, transparent));
+  --global-error-grid-secondary: var(--bg-grid-secondary, color-mix(in srgb, CanvasText 3%, transparent));
+  --global-error-glow: var(--bg-glow, color-mix(in srgb, var(--global-error-accent) 10%, transparent));
+  --global-error-focus-ring: var(
+    --focus-ring,
+    0 0 0 2px color-mix(in srgb, var(--global-error-accent) 24%, transparent)
+  );
+  --global-error-shadow: var(
+    --shadow-strong,
+    0 12px 24px color-mix(in srgb, CanvasText 14%, transparent)
+  );
 
-  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   color: var(--global-error-text-soft);
   font-family:
@@ -25,9 +34,9 @@
     "Segoe UI",
     sans-serif;
   background:
-    linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px),
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 24rem),
+    linear-gradient(90deg, var(--global-error-grid-primary) 1px, transparent 1px),
+    linear-gradient(180deg, var(--global-error-grid-secondary) 1px, transparent 1px),
+    linear-gradient(135deg, var(--global-error-glow) 0%, transparent 34rem),
     linear-gradient(
       180deg,
       var(--global-error-surface-0) 0%,
@@ -41,7 +50,7 @@
 }
 
 .main {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 2rem;
@@ -61,14 +70,14 @@
   color: var(--global-error-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
 .title {
   margin: 0;
   color: var(--global-error-text-strong);
-  font-size: clamp(1.6rem, 4vw, 2.25rem);
+  font-size: 2rem;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0;
@@ -81,6 +90,7 @@
   line-height: 1.55;
 }
 
+.actionRow,
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -133,23 +143,38 @@
 
 @media (prefers-color-scheme: dark) {
   .body {
-    --global-error-surface-0: #000000;
-    --global-error-surface-1: #090b0e;
-    --global-error-surface-2: #141920;
-    --global-error-text-strong: #f5f7fa;
-    --global-error-text-soft: #c8d0d9;
-    --global-error-text-muted: #8c99a6;
-    --global-error-border: #20262d;
-    --global-error-accent: #1a73e8;
-    --global-error-accent-hover: #226fdb;
-    --global-error-accent-contrast: #f6f8fa;
-    --global-error-focus-ring: 0 0 0 2px rgba(138, 180, 248, 0.24);
-    --global-error-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+    --global-error-surface-0: var(--surface-0, Canvas);
+    --global-error-surface-1: var(--surface-1, color-mix(in srgb, Canvas 96%, CanvasText 4%));
+    --global-error-surface-2: var(--surface-2, color-mix(in srgb, Canvas 88%, CanvasText 12%));
+    --global-error-text-strong: var(--text-strong, CanvasText);
+    --global-error-text-soft: var(--text-soft, color-mix(in srgb, CanvasText 78%, Canvas));
+    --global-error-text-muted: var(--text-muted, color-mix(in srgb, CanvasText 58%, Canvas));
+    --global-error-border: var(--border-soft, color-mix(in srgb, CanvasText 14%, Canvas));
+    --global-error-accent: var(--accent, LinkText);
+    --global-error-accent-hover: var(--accent-strong, var(--accent, LinkText));
+    --global-error-accent-contrast: var(--accent-contrast, Canvas);
+    --global-error-grid-primary: var(
+      --bg-grid-primary,
+      color-mix(in srgb, CanvasText 2%, transparent)
+    );
+    --global-error-grid-secondary: var(
+      --bg-grid-secondary,
+      color-mix(in srgb, CanvasText 1%, transparent)
+    );
+    --global-error-glow: var(--bg-glow, color-mix(in srgb, var(--global-error-accent) 4%, transparent));
+    --global-error-focus-ring: var(
+      --focus-ring,
+      0 0 0 2px color-mix(in srgb, var(--global-error-accent) 24%, transparent)
+    );
+    --global-error-shadow: var(
+      --shadow-strong,
+      0 10px 24px color-mix(in srgb, CanvasText 34%, transparent)
+    );
 
     background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.012) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
-      radial-gradient(circle at top left, rgba(138, 180, 248, 0.035), transparent 24rem),
+      linear-gradient(90deg, var(--global-error-grid-primary) 1px, transparent 1px),
+      linear-gradient(180deg, var(--global-error-grid-secondary) 1px, transparent 1px),
+      linear-gradient(135deg, var(--global-error-glow) 0%, transparent 34rem),
       linear-gradient(
         180deg,
         var(--global-error-surface-0) 0%,
@@ -172,6 +197,11 @@
     padding: 1.25rem;
   }
 
+  .title {
+    font-size: 1.6rem;
+  }
+
+  .actionRow,
   .actions {
     align-items: stretch;
   }

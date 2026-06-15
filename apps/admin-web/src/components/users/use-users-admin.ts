@@ -11,6 +11,7 @@ import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchUsers, useAuthSession, type FetchUsersQuery, type UserListPage } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type UsersToastState = {
   type: "success" | "error";
@@ -21,6 +22,20 @@ type RunActionOptions = {
   successMessage?: string;
   errorMessage?: string;
 };
+
+function formatUsersLogText(value: string | null | undefined, maxLength = 80) {
+  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
+}
+
+function getUsersActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
 
 export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery) {
   const text = getDictionary(locale);
@@ -85,16 +100,16 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
       const refreshedUsers = await usersQuery.refetch();
       if (refreshedUsers.isError) {
         clientLogger.warn("users.action_refresh_failed", {
-          userId,
-          error: refreshedUsers.error,
+          userId: formatUsersLogText(userId),
+          ...getUsersActionErrorDetails(refreshedUsers.error),
         });
       }
 
       return refreshedUsers;
     } catch (error) {
       clientLogger.warn("users.action_refresh_failed", {
-        userId,
-        error,
+        userId: formatUsersLogText(userId),
+        ...getUsersActionErrorDetails(error),
       });
     }
   }
@@ -135,8 +150,8 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
       return true;
     } catch (error) {
       clientLogger.error("users.run_action_failed", {
-        userId,
-        error,
+        userId: formatUsersLogText(userId),
+        ...getUsersActionErrorDetails(error),
       });
       const message = getAdminErrorMessage(error, options?.errorMessage ?? text.errorLoadingUsers);
       setActionError(message);

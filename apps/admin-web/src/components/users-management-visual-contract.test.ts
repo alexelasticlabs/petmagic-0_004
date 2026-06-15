@@ -7,10 +7,12 @@ const usersStylesPath = fileURLToPath(
   new URL("./users-management-page.module.css", import.meta.url)
 );
 const userDetailPath = fileURLToPath(new URL("./users/user-detail-page.tsx", import.meta.url));
+const userDetailStylesPath = fileURLToPath(
+  new URL("./users/user-detail-page.module.css", import.meta.url)
+);
 const userInlineAnalyticsStylesPath = fileURLToPath(
   new URL("./users/user-inline-analytics.module.css", import.meta.url)
 );
-const usersTableStylesPath = fileURLToPath(new URL("./users-table.module.css", import.meta.url));
 
 describe("users management visual contract", () => {
   it("keeps user badges on semantic theme tokens", () => {
@@ -82,15 +84,106 @@ describe("users management visual contract", () => {
     expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
   });
 
-  it("keeps users table action menu shadows on theme tokens", () => {
-    const stylesSource = readFileSync(usersTableStylesPath, "utf8");
-    const actionMenuLayer = stylesSource.slice(
-      stylesSource.indexOf(".actionMenuList {"),
-      stylesSource.indexOf(".actionMenuListPortal {")
+  it("keeps inline analytics readable on phone screens", () => {
+    const stylesSource = readFileSync(userInlineAnalyticsStylesPath, "utf8");
+
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".header,\n  .identity");
+    expect(stylesSource).toContain(".identity h3,\n  .identity p");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
+    expect(stylesSource).toContain(".profileLink {\n    width: 100%;");
+    expect(stylesSource).toContain("justify-content: center;");
+    expect(stylesSource).toContain(".timelineHeader {\n    display: grid;");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
+  });
+
+  it("keeps user detail cards and actions usable on phone screens", () => {
+    const stylesSource = readFileSync(userDetailStylesPath, "utf8");
+
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain(".backLink,\n  .errorActions > *");
+    expect(stylesSource).toContain("flex-direction: column;");
+    expect(stylesSource).toContain(".profileTitle,\n  .profileEmail");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
+    expect(stylesSource).toContain(".timelineHeader,\n  .dataHeader");
+    expect(stylesSource).toContain("grid-template-columns: minmax(0, 1fr);");
+    expect(stylesSource).toContain(".petMediaGrid");
+  });
+
+  it("keeps users management filters and panels usable on phone screens", () => {
+    const stylesSource = readFileSync(usersStylesPath, "utf8");
+
+    expect(stylesSource).toContain("@media (max-width: 640px)");
+    expect(stylesSource).toContain("min-width: clamp(20rem, 30vw, 28rem);");
+    expect(stylesSource).toContain("min-width: clamp(18rem, 34vw, 25rem);");
+    expect(stylesSource).toContain(".filtersBar {\n    grid-template-columns: minmax(0, 1fr);");
+    expect(stylesSource).toContain(".searchInput,\n  .filterSelect");
+    expect(stylesSource).toContain(".searchInput:focus-visible,\n.filterSelect:focus-visible");
+    expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
+    expect(stylesSource).toContain("width: 100%;\n    min-width: 0;");
+    expect(stylesSource).toContain(".paginationControls {\n    width: 100%;");
+    expect(stylesSource).toContain("justify-content: space-between;");
+    expect(stylesSource).toContain(".walletActions {\n    flex-direction: column;");
+    expect(stylesSource).toContain(".sidePanelHeader {\n    display: grid;");
+    expect(stylesSource).toContain(".closeBtn {\n    width: 100%;");
+    expect(stylesSource).toContain(".actionsCell {\n    min-width: min(18rem, calc(100vw - 2rem));");
+    expect(stylesSource).toContain(".quickActionBtn {\n    flex: 1 1 8rem;");
+    expect(stylesSource).toContain("white-space: normal;");
+    expect(stylesSource).toContain(".actionMenuPortal {\n    max-width: calc(100vw - 1rem);");
+    expect(stylesSource).toContain(".actionMenuList {\n    min-width: min(15.5rem, calc(100vw - 1rem));");
+    expect(stylesSource).not.toContain(".searchInput:focus,\n.filterSelect:focus");
+  });
+
+  it("keeps users panels and wallet form controls on compact admin radii", () => {
+    const usersStylesSource = readFileSync(usersStylesPath, "utf8");
+    const walletStylesSource = readFileSync(
+      fileURLToPath(new URL("./users/user-wallet-panel.module.css", import.meta.url)),
+      "utf8"
     );
 
+    expect(usersStylesSource).toContain(".walletDialog {");
+    expect(usersStylesSource).toContain(".sidePanel {");
+    expect(usersStylesSource).toContain(".walletInput:focus-visible,\n.walletTextarea:focus-visible");
+    expect(usersStylesSource).toContain(".walletInput:disabled,\n.walletTextarea:disabled");
+    expect(walletStylesSource).toContain(".input,\n.select,\n.textarea");
+    expect(walletStylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible");
+    expect(walletStylesSource).toContain("box-shadow: var(--focus-ring);");
+    expect(walletStylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
+    expect(usersStylesSource).toContain("border-radius: var(--radius-sm);");
+    expect(walletStylesSource).toContain("border-radius: var(--radius-sm);");
+    expect(usersStylesSource).not.toContain(".walletInput:focus,\n.walletTextarea:focus");
+    expect(walletStylesSource).not.toContain(".input:focus,\n.select:focus,\n.textarea:focus");
+    expect(`${usersStylesSource}\n${walletStylesSource}`).not.toMatch(
+      /border-radius:\s*(?:0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/
+    );
+  });
+
+  it("keeps users management action menu viewport-safe and theme-tokenized", () => {
+    const stylesSource = readFileSync(usersStylesPath, "utf8");
+    const actionMenuPortalLayer = stylesSource.slice(
+      stylesSource.indexOf(".actionMenuPortal {"),
+      stylesSource.indexOf(".actionMenuList {")
+    );
+    const actionMenuLayer = stylesSource.slice(
+      stylesSource.indexOf(".actionMenuList {"),
+      stylesSource.indexOf(".actionMenuListUpward {")
+    );
+    const actionMenuItemLayer = stylesSource.slice(
+      stylesSource.indexOf(".actionMenuItem,\n.actionMenuLink"),
+      stylesSource.indexOf(".actionMenuItem:hover")
+    );
+
+    expect(actionMenuPortalLayer).toContain("max-width: calc(100vw - 1rem);");
+    expect(actionMenuPortalLayer).toContain("max-height: calc(100dvh - 1rem);");
     expect(actionMenuLayer).toContain("box-shadow: var(--shadow-strong);");
+    expect(actionMenuLayer).toContain("max-width: min(17rem, calc(100vw - 1rem));");
+    expect(actionMenuLayer).toContain("max-height: calc(100dvh - 1rem);");
+    expect(actionMenuLayer).toContain("overflow-y: auto;");
+    expect(actionMenuItemLayer).toContain("min-width: 0;");
+    expect(actionMenuItemLayer).toContain("white-space: normal;");
+    expect(actionMenuItemLayer).toContain("overflow-wrap: anywhere;");
     expect(actionMenuLayer).not.toContain("rgba(");
     expect(actionMenuLayer).not.toContain("0 14px 28px");
+    expect(`${actionMenuPortalLayer}\n${actionMenuLayer}`).not.toContain("100vh");
   });
 });

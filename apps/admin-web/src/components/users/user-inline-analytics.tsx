@@ -33,6 +33,14 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
     userId,
   });
 
+  function requestUserProfileRetry() {
+    if (!canViewUserProfile || isFetching) {
+      return;
+    }
+
+    void refresh().catch(() => undefined);
+  }
+
   if (!userId) {
     return (
       <AdminStateCard
@@ -62,13 +70,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => {
-              if (!canViewUserProfile) {
-                return;
-              }
-
-              void refresh().catch(() => undefined);
-            }}
+            onClick={requestUserProfileRetry}
             disabled={!canViewUserProfile || isFetching}
           >
             {text.supportRetryAction}

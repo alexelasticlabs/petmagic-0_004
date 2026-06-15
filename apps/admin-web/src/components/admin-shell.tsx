@@ -131,6 +131,8 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isSidebarDrawerMode, setIsSidebarDrawerMode] = useState(false);
+  const previousPathnameRef = useRef(pathname);
 
   useEffect(() => {
     if (!needsSessionRestore || isRestoringSessionRef.current) {
@@ -212,7 +214,39 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [sidebarOpen]);
 
+  useEffect(() => {
+    if (previousPathnameRef.current === pathname) {
+      return;
+    }
+
+    previousPathnameRef.current = pathname;
+    setSidebarOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const media = window.matchMedia("(max-width: 860px)");
+    const syncSidebarMode = () => {
+      const isDrawerMode = media.matches;
+      setIsSidebarDrawerMode(isDrawerMode);
+      if (!isDrawerMode) {
+        setSidebarOpen(false);
+      }
+    };
+
+    syncSidebarMode();
+    media.addEventListener("change", syncSidebarMode);
+    return () => media.removeEventListener("change", syncSidebarMode);
+  }, []);
+
   function handleLogoutRequest() {
+    if (isLoggingOut) {
+      return;
+    }
+
     setSidebarOpen(false);
     setLogoutDialogOpen(true);
   }
@@ -295,14 +329,20 @@ export function AdminShell({ locale, children }: AdminShellProps) {
         locale={locale}
         currentPath={currentPath}
         isOpen={sidebarOpen}
+        isDrawerMode={isSidebarDrawerMode}
         onNavigate={() => setSidebarOpen(false)}
         onLogout={handleLogoutRequest}
+        logoutDisabled={isLoggingOut}
         logoutLabel={text.navLogout}
         supportUnreadCount={supportUnreadCount}
         roles={sessionRoles}
       />
 
-      <div className={styles.main}>
+      <div
+        className={styles.main}
+        aria-hidden={isSidebarDrawerMode && sidebarOpen ? "true" : undefined}
+        inert={isSidebarDrawerMode && sidebarOpen}
+      >
         <AdminTopbar
           locale={locale}
           pageTitle={pageMeta.title}

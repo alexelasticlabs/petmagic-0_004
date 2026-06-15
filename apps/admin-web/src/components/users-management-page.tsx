@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -53,6 +53,7 @@ import {
   type AdminUserDashboardMetrics,
   type UserListItem,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import {
@@ -126,6 +127,16 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
+}
+
+function getUsersPageErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
 }
 
 async function fetchUserRowEnrichment<TValue>(
@@ -220,7 +231,7 @@ function getNewUsersCountForRange(
 }
 
 export function UsersManagementPage({ locale }: UsersManagementPageProps) {
-  const text = getDictionary(locale);
+  const text = useMemo(() => getDictionary(locale), [locale]);
   const ui = useMemo(
     () =>
       locale === "ru"
@@ -397,6 +408,8 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [walletDialog, setWalletDialog] = useState<WalletDialogState | null>(null);
   const [walletDialogSubmitting, setWalletDialogSubmitting] = useState(false);
+  const walletDialogTitleId = useId();
+  const walletDialogErrorId = useId();
   const [confirmationDialog, setConfirmationDialog] = useState<ConfirmationDialogState | null>(
     null
   );
@@ -435,6 +448,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     error,
     hasSession,
     isFetching: isUsersFetching,
+    isRefreshing: isUsersRefreshing,
     isLoading,
     refreshUsers,
     runAction,
@@ -459,6 +473,19 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     setActionsMenuPosition(null);
   }, []);
 
+  const resetUsersSelection = useCallback(
+    (nextPage = 1) => {
+      setSelectedUserId(null);
+      closeActionsMenu();
+      if (!isUserActionLocked) {
+        setWalletDialog(null);
+        setConfirmationDialog(null);
+      }
+      setPage(nextPage);
+    },
+    [closeActionsMenu, isUserActionLocked]
+  );
+
   const supportInboxQuery = useQuery({
     queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
     queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
@@ -466,6 +493,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   });
 
   const selectedUserProfile = useAdminUserProfile({ enabled: hasSession, userId: selectedUserId });
+
+  function requestSelectedUserProfileRetry() {
+    if (!selectedUserId || selectedUserProfile.isFetching) {
+      return;
+    }
+
+    void selectedUserProfile.refresh().catch(() => undefined);
+  }
 
   const selectedSubscriptionQuery = useQuery({
     queryKey: selectedUserId
@@ -502,6 +537,23 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     setWalletDialog(null);
   }, [walletDialogSubmitting]);
 
+  const refreshSelectedUserProfileAfterAction = useCallback(
+    async (userId: string) => {
+      if (selectedUserId !== userId) {
+        return;
+      }
+
+      const [refreshResult] = await Promise.allSettled([selectedUserProfile.refresh()]);
+      if (refreshResult.status === "rejected") {
+        clientLogger.warn("users.selected_profile_action_refresh_failed", {
+          userId: sanitizeSensitiveText(userId, 80),
+          ...getUsersPageErrorDetails(refreshResult.reason),
+        });
+      }
+    },
+    [selectedUserId, selectedUserProfile]
+  );
+
   const runUserAction = useCallback(
     async (
       userId: string,
@@ -509,12 +561,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       options?: { successMessage?: string; errorMessage?: string }
     ) => {
       const succeeded = await runAction(userId, action, options);
-      if (succeeded && selectedUserId === userId) {
-        await selectedUserProfile.refresh();
+      if (succeeded) {
+        await refreshSelectedUserProfileAfterAction(userId);
       }
       return succeeded;
     },
-    [runAction, selectedUserId, selectedUserProfile]
+    [refreshSelectedUserProfileAfterAction, runAction]
   );
 
   const closeConfirmationDialog = useCallback(() => {
@@ -758,6 +810,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
   const pageUsers = users;
   const pageUserIds = useMemo(() => pageUsers.map((user) => user.userId), [pageUsers]);
+  const pageUserIdSet = useMemo(() => new Set(pageUserIds), [pageUserIds]);
 
   const rowAnalyticsQuery = useQuery({
     queryKey: adminQueryKeys.userRowAnalytics(pageUserIds),
@@ -952,6 +1005,57 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     };
   }, [selectedUserId]);
 
+  useEffect(() => {
+    if (isUsersRefreshing || isUserActionLocked) {
+      return;
+    }
+
+    const shouldCloseActionsMenu =
+      openActionsUserId !== null && !pageUserIdSet.has(openActionsUserId);
+    const shouldCloseSelectedUserPanel =
+      selectedUserId !== null && !pageUserIdSet.has(selectedUserId);
+    const shouldCloseWalletDialog =
+      walletDialog !== null && !pageUserIdSet.has(walletDialog.userId);
+    const shouldCloseConfirmationDialog =
+      confirmationDialog !== null && !pageUserIdSet.has(confirmationDialog.userId);
+
+    if (
+      !shouldCloseActionsMenu &&
+      !shouldCloseSelectedUserPanel &&
+      !shouldCloseWalletDialog &&
+      !shouldCloseConfirmationDialog
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (shouldCloseActionsMenu) {
+        closeActionsMenu();
+      }
+
+      if (shouldCloseSelectedUserPanel) {
+        setSelectedUserId(null);
+      }
+
+      if (shouldCloseWalletDialog) {
+        setWalletDialog(null);
+      }
+
+      if (shouldCloseConfirmationDialog) {
+        setConfirmationDialog(null);
+      }
+    });
+  }, [
+    closeActionsMenu,
+    confirmationDialog,
+    isUserActionLocked,
+    isUsersRefreshing,
+    openActionsUserId,
+    pageUserIdSet,
+    selectedUserId,
+    walletDialog,
+  ]);
+
   const hero = (
     <AdminPageHero
       eyebrow={text.usersHeroEyebrow}
@@ -959,6 +1063,19 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       description={text.usersHeroDescription}
     />
   );
+
+  if (!canManageRoles) {
+    return (
+      <AdminPage className={styles.page}>
+        {hero}
+        <AdminStateCard
+          tone="info"
+          title={text.usersTitle}
+          description={text.usersLoadingDescription}
+        />
+      </AdminPage>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -1009,7 +1126,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={search}
             onChange={(event) => {
               setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));
-              setPage(1);
+              resetUsersSelection();
             }}
             maxLength={USER_SEARCH_MAX_LENGTH}
           />
@@ -1019,7 +1136,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={roleFilter}
             onChange={(event) => {
               setRoleFilter(event.target.value as RoleFilter);
-              setPage(1);
+              resetUsersSelection();
             }}
             aria-label={ui.filterRole}
           >
@@ -1036,7 +1153,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={premiumFilter}
             onChange={(event) => {
               setPremiumFilter(event.target.value as PremiumFilter);
-              setPage(1);
+              resetUsersSelection();
             }}
             aria-label={ui.filterPremium}
           >
@@ -1052,7 +1169,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={activityFilter}
             onChange={(event) => {
               setActivityFilter(event.target.value as ActivityFilter);
-              setPage(1);
+              resetUsersSelection();
             }}
             aria-label={ui.filterActivity}
           >
@@ -1068,7 +1185,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={statusFilter}
             onChange={(event) => {
               setStatusFilter(event.target.value as StatusFilter);
-              setPage(1);
+              resetUsersSelection();
             }}
             aria-label={ui.filterStatus}
           >
@@ -1085,7 +1202,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
             value={String(rangeDays)}
             onChange={(event) => {
               setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);
-              setPage(1);
+              resetUsersSelection();
             }}
             aria-label={ui.periodLabel}
           >
@@ -1103,7 +1220,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
               setPremiumFilter("all");
               setActivityFilter("all");
               setStatusFilter("all");
-              setPage(1);
+              resetUsersSelection();
             }}
           >
             {ui.resetFilters}
@@ -1128,7 +1245,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           />
         ) : null}
 
-        {!pageUsers.length ? (
+        {isUsersRefreshing ? (
+          <AdminStateCard tone="info" className={styles.emptyState} title={text.loading} />
+        ) : null}
+
+        {!isUsersRefreshing && !pageUsers.length ? (
           <AdminStateCard
             tone="info"
             className={styles.emptyState}
@@ -1137,7 +1258,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
           />
         ) : null}
 
-        {!!pageUsers.length && (
+        {!isUsersRefreshing && !!pageUsers.length && (
           <>
             <div
               className={`${adminTableStyles.tableWrap} ${styles.tableWrap}`}
@@ -1322,7 +1443,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  onClick={() => resetUsersSelection(Math.max(1, currentPage - 1))}
                   disabled={currentPage <= 1 || isUsersFetching}
                   aria-label={ui.previousPageLabel}
                   title={ui.previousPageLabel}
@@ -1335,7 +1456,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  onClick={() => resetUsersSelection(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage >= totalPages || isUsersFetching}
                   aria-label={ui.nextPageLabel}
                   title={ui.nextPageLabel}
@@ -1451,8 +1572,23 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 )}
                 <Link
                   href={`/${locale}/users/${encodeURIComponent(openActionsUser.userId)}`}
-                  className={styles.actionMenuLink}
-                  onClick={closeActionsMenu}
+                  className={`${styles.actionMenuLink}${
+                    isUserActionLocked || busyUserId === openActionsUser.userId
+                      ? ` ${styles.actionMenuLinkDisabled}`
+                      : ""
+                  }`}
+                  aria-disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
+                  tabIndex={
+                    isUserActionLocked || busyUserId === openActionsUser.userId ? -1 : undefined
+                  }
+                  onClick={(event) => {
+                    if (isUserActionLocked || busyUserId === openActionsUser.userId) {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    closeActionsMenu();
+                  }}
                 >
                   <span>{ui.openCard}</span>
                 </Link>
@@ -1483,14 +1619,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                 className={styles.walletDialog}
                 role="dialog"
                 aria-modal="true"
-                aria-label={
-                  walletDialog.operation === "credit"
-                    ? ui.walletDialogTitleCredit
-                    : ui.walletDialogTitleDebit
-                }
+                aria-labelledby={walletDialogTitleId}
+                aria-describedby={walletDialog.error ? walletDialogErrorId : undefined}
                 onClick={(event) => event.stopPropagation()}
               >
-                <h3 className={styles.walletDialogTitle}>
+                <h3 id={walletDialogTitleId} className={styles.walletDialogTitle}>
                   {walletDialog.operation === "credit"
                     ? ui.walletDialogTitleCredit
                     : ui.walletDialogTitleDebit}
@@ -1539,7 +1672,9 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                   />
                 </label>
                 {walletDialog.error ? (
-                  <p className={styles.walletError}>{walletDialog.error}</p>
+                  <p id={walletDialogErrorId} className={styles.walletError} role="alert">
+                    {walletDialog.error}
+                  </p>
                 ) : null}
                 <div className={styles.walletActions}>
                   <Button
@@ -1604,7 +1739,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                         variant="secondary"
                         size="sm"
                         disabled={selectedUserProfile.isFetching}
-                        onClick={() => void selectedUserProfile.refresh().catch(() => undefined)}
+                        onClick={requestSelectedUserProfileRetry}
                       >
                         {text.supportRetryAction}
                       </Button>
@@ -1626,9 +1761,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
                             variant="secondary"
                             size="sm"
                             disabled={selectedUserProfile.isFetching}
-                            onClick={() =>
-                              void selectedUserProfile.refresh().catch(() => undefined)
-                            }
+                            onClick={requestSelectedUserProfileRetry}
                           >
                             {text.supportRetryAction}
                           </Button>

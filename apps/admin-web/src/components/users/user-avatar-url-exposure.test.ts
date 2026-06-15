@@ -14,6 +14,11 @@ describe("user avatar URL exposure", () => {
     expect(source).toContain("URL.createObjectURL(blob)");
     expect(source).toContain("fetchWithTimeout(imageUrl");
     expect(source).toContain("users.avatar_fetch_failed");
+    expect(source).toContain("import { sanitizeSensitiveText }");
+    expect(source).toContain("function getAvatarFetchErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("getAvatarFetchErrorDetails(error)");
+    expect(source).not.toContain('clientLogger.warn("users.avatar_fetch_failed", { error })');
   });
 
   it("keeps avatar fallback styling theme-token based", () => {
