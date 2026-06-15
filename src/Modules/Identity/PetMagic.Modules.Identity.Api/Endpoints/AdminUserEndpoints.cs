@@ -23,7 +23,7 @@ public static class AdminUserEndpoints
             .RequireRateLimiting("admin")
             .RequireAuthorization("ModeratorOrAdmin");
 
-        group.MapGet("/", ListUsersAsync);
+        group.MapGet("", ListUsersAsync);
         group.MapGet("/dashboard/metrics", GetDashboardMetricsAsync);
         group.MapGet("/{userId:guid}", GetUserAsync);
         group.MapGet("/{userId:guid}/analytics", GetUserAnalyticsAsync);
@@ -149,14 +149,14 @@ public static class AdminUserEndpoints
         [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var command = new AssignRoleCommand(userId, request.Role);
+        var command = new AssignRoleCommand(userId, NormalizeSystemRole(request.Role));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
             return TypedResults.ValidationProblem(validation.ToDictionary());
         }
 
-        if (request.Role is SystemRoles.Admin or SystemRoles.Moderator)
+        if (command.Role is SystemRoles.Admin or SystemRoles.Moderator)
         {
             var isAdmin = httpContext.User.IsInRole(SystemRoles.Admin);
             if (!isAdmin)
@@ -171,7 +171,10 @@ public static class AdminUserEndpoints
         var result = await service.AssignRoleAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
         }
 
         return TypedResults.NoContent();
@@ -194,7 +197,10 @@ public static class AdminUserEndpoints
         var result = await service.SetPremiumStatusAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
         }
 
         return TypedResults.NoContent();
@@ -207,7 +213,7 @@ public static class AdminUserEndpoints
         [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var command = new RevokeRoleCommand(userId, request.Role);
+        var command = new RevokeRoleCommand(userId, NormalizeSystemRole(request.Role));
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {
@@ -217,7 +223,10 @@ public static class AdminUserEndpoints
         var result = await service.RevokeRoleAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
         }
 
         return TypedResults.NoContent();
@@ -240,7 +249,10 @@ public static class AdminUserEndpoints
         var result = await service.SetUserActiveStatusAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
         }
 
         return TypedResults.NoContent();
@@ -262,13 +274,10 @@ public static class AdminUserEndpoints
         var result = await service.DeleteAdminUserAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "users.not_found" => StatusCodes.Status404NotFound,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return TypedResults.Problem(
+                title: result.Error.Code,
+                detail: result.Error.Message,
+                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
         }
 
         return TypedResults.NoContent();
@@ -296,9 +305,38 @@ public static class AdminUserEndpoints
         return TypedResults.Accepted((string?)null);
     }
 
-    public sealed record AssignRoleRequest(string Role);
+    private static int ResolveAdminUserMutationFailureStatusCode(string errorCode)
+    {
+        return errorCode switch
+        {
+            "users.not_found" => StatusCodes.Status404NotFound,
+            "users.cannot_remove_last_admin" => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest,
+        };
+    }
 
-    public sealed record RevokeRoleRequest(string Role);
+    private static string NormalizeSystemRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedRole))
+        {
+            return string.Empty;
+        }
+
+        foreach (var supportedRole in SystemRoles.All)
+        {
+            if (string.Equals(supportedRole, normalizedRole, StringComparison.OrdinalIgnoreCase))
+            {
+                return supportedRole;
+            }
+        }
+
+        return normalizedRole;
+    }
+
+    public sealed record AssignRoleRequest(string? Role);
+
+    public sealed record RevokeRoleRequest(string? Role);
 
     public sealed record SetPremiumStatusRequest(bool IsPremium);
 

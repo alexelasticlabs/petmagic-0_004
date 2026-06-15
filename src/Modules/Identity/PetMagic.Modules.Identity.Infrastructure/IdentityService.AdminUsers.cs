@@ -38,7 +38,7 @@ public sealed partial class IdentityService
                 || (user.DisplayName != null && user.DisplayName.ToLower().Contains(loweredSearch)));
         }
 
-        var normalizedRole = role?.Trim();
+        var normalizedRole = NormalizeSystemRole(role);
         if (!string.IsNullOrWhiteSpace(normalizedRole) && !string.Equals(normalizedRole, "all", StringComparison.OrdinalIgnoreCase))
         {
             if (!SystemRoles.All.Contains(normalizedRole))
@@ -148,30 +148,34 @@ public sealed partial class IdentityService
         var previousWeekStart = currentWeekStart.AddDays(-7);
 
         var users = userManager.Users.AsNoTracking();
-        var totalUsers = await users.CountAsync(cancellationToken);
-        var premiumUsers = await users.CountAsync(user => user.IsPremium, cancellationToken);
-        var activeUsers = await users.CountAsync(user => user.IsActive, cancellationToken);
-        var blockedUsers = await users.CountAsync(user => !user.IsActive, cancellationToken);
-        var usersThisWeek = await users.CountAsync(user => user.CreatedAtUtc >= currentWeekStart, cancellationToken);
-        var usersPreviousWeek = await users.CountAsync(
-            user => user.CreatedAtUtc >= previousWeekStart && user.CreatedAtUtc < currentWeekStart,
-            cancellationToken);
-        var newUsersLast30Days = await users.CountAsync(user => user.CreatedAtUtc >= now.AddDays(-30), cancellationToken);
-        var newUsersLast90Days = await users.CountAsync(user => user.CreatedAtUtc >= now.AddDays(-90), cancellationToken);
+        var userCounters = await users
+            .GroupBy(_ => 1)
+            .Select(group => new DashboardUserCounters(
+                group.Count(),
+                group.Count(user => user.IsPremium),
+                group.Count(user => user.IsActive),
+                group.Count(user => !user.IsActive),
+                group.Count(user => user.CreatedAtUtc >= currentWeekStart),
+                group.Count(user => user.CreatedAtUtc >= previousWeekStart && user.CreatedAtUtc < currentWeekStart),
+                group.Count(user => user.CreatedAtUtc >= now.AddDays(-30)),
+                group.Count(user => user.CreatedAtUtc >= now.AddDays(-90))))
+            .SingleOrDefaultAsync(cancellationToken)
+            ?? new DashboardUserCounters(0, 0, 0, 0, 0, 0, 0, 0);
+
         var roleCounts = await GetDashboardRoleCountsAsync(cancellationToken);
         return Result.Success(new AdminUserDashboardMetricsResponse(
-            totalUsers,
-            premiumUsers,
-            activeUsers,
-            blockedUsers,
+            userCounters.TotalUsers,
+            userCounters.PremiumUsers,
+            userCounters.ActiveUsers,
+            userCounters.BlockedUsers,
             roleCounts.AdminUsers,
             roleCounts.ModeratorUsers,
             roleCounts.RegularUsers,
-            usersThisWeek,
-            usersPreviousWeek,
-            usersThisWeek,
-            newUsersLast30Days,
-            newUsersLast90Days));
+            userCounters.UsersThisWeek,
+            userCounters.UsersPreviousWeek,
+            userCounters.UsersThisWeek,
+            userCounters.NewUsersLast30Days,
+            userCounters.NewUsersLast90Days));
     }
 
     public async Task<Result<AdminUserDetailResponse>> GetAdminUserAsync(Guid userId, CancellationToken cancellationToken)
@@ -201,7 +205,7 @@ public sealed partial class IdentityService
 
     private async Task<DashboardRoleCounts> GetDashboardRoleCountsAsync(CancellationToken cancellationToken)
     {
-        var roleRows = await dbContext.UserRoles
+        var roleCounts = await dbContext.UserRoles
             .AsNoTracking()
             .Join(
                 dbContext.Roles.AsNoTracking(),
@@ -216,18 +220,34 @@ public sealed partial class IdentityService
                 row.RoleName == SystemRoles.Admin ||
                 row.RoleName == SystemRoles.Moderator ||
                 row.RoleName == SystemRoles.User)
-            .ToListAsync(cancellationToken);
+            .GroupBy(row => row.RoleName)
+            .Select(group => new
+            {
+                RoleName = group.Key,
+                Count = group.Select(row => row.UserId).Distinct().Count()
+            })
+            .ToDictionaryAsync(row => row.RoleName, row => row.Count, StringComparer.Ordinal, cancellationToken);
 
         return new DashboardRoleCounts(
-            roleRows.Count(row => row.RoleName == SystemRoles.Admin),
-            roleRows.Count(row => row.RoleName == SystemRoles.Moderator),
-            roleRows.Count(row => row.RoleName == SystemRoles.User));
+            roleCounts.GetValueOrDefault(SystemRoles.Admin),
+            roleCounts.GetValueOrDefault(SystemRoles.Moderator),
+            roleCounts.GetValueOrDefault(SystemRoles.User));
     }
 
     private static DateTime StartOfUtcDay(DateTime value)
     {
         return new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Utc);
     }
+
+    private sealed record DashboardUserCounters(
+        int TotalUsers,
+        int PremiumUsers,
+        int ActiveUsers,
+        int BlockedUsers,
+        int UsersThisWeek,
+        int UsersPreviousWeek,
+        int NewUsersLast30Days,
+        int NewUsersLast90Days);
 
     private sealed record DashboardRoleCounts(
         int AdminUsers,
@@ -332,6 +352,7 @@ public sealed partial class IdentityService
 
     public async Task<Result> AssignRoleAsync(AssignRoleCommand command, CancellationToken cancellationToken)
     {
+        var normalizedRole = NormalizeSystemRole(command.Role);
         var user = await userManager.FindByIdAsync(command.UserId.ToString());
         if (user is null)
         {
@@ -339,17 +360,17 @@ public sealed partial class IdentityService
         }
 
         var currentRoles = await userManager.GetRolesAsync(user);
-        if (currentRoles.Contains(command.Role, StringComparer.Ordinal))
+        if (currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
         {
             return Result.Success();
         }
 
-        if (!await roleManager.RoleExistsAsync(command.Role))
+        if (!await roleManager.RoleExistsAsync(normalizedRole))
         {
             return Result.Failure(IdentityErrors.OperationFailed);
         }
 
-        var addResult = await userManager.AddToRoleAsync(user, command.Role);
+        var addResult = await userManager.AddToRoleAsync(user, normalizedRole);
         if (!addResult.Succeeded)
         {
             return Result.Failure(IdentityErrors.OperationFailed);
@@ -358,41 +379,42 @@ public sealed partial class IdentityService
         await WriteAuditAsync(
             user.Id,
             "user.role.assigned",
-            $"Assigned role '{command.Role}'.",
+            $"Assigned role '{normalizedRole}'.",
             cancellationToken,
             targetType: "user",
             targetId: user.Id.ToString("D"),
             oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
-            newValue: string.Join(",", currentRoles.Append(command.Role).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
+            newValue: string.Join(",", currentRoles.Append(normalizedRole).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
         return Result.Success();
     }
 
     public async Task<Result> RevokeRoleAsync(RevokeRoleCommand command, CancellationToken cancellationToken)
     {
+        var normalizedRole = NormalizeSystemRole(command.Role);
         var user = await userManager.FindByIdAsync(command.UserId.ToString());
         if (user is null)
         {
             return Result.Failure(IdentityErrors.UserNotFound);
         }
 
-        if (string.Equals(command.Role, SystemRoles.User, StringComparison.Ordinal))
+        if (string.Equals(normalizedRole, SystemRoles.User, StringComparison.Ordinal))
         {
             return Result.Failure(IdentityErrors.CannotRevokeBaseRole);
         }
 
         var currentRoles = await userManager.GetRolesAsync(user);
-        if (!currentRoles.Contains(command.Role, StringComparer.Ordinal))
+        if (!currentRoles.Contains(normalizedRole, StringComparer.Ordinal))
         {
             return Result.Success();
         }
 
-        if (string.Equals(command.Role, SystemRoles.Admin, StringComparison.Ordinal)
+        if (string.Equals(normalizedRole, SystemRoles.Admin, StringComparison.Ordinal)
             && await IsLastAdminAsync(user.Id, cancellationToken))
         {
             return Result.Failure(IdentityErrors.CannotRemoveLastAdmin);
         }
 
-        var removeResult = await userManager.RemoveFromRoleAsync(user, command.Role);
+        var removeResult = await userManager.RemoveFromRoleAsync(user, normalizedRole);
         if (!removeResult.Succeeded)
         {
             return Result.Failure(IdentityErrors.OperationFailed);
@@ -401,13 +423,32 @@ public sealed partial class IdentityService
         await WriteAuditAsync(
             user.Id,
             "user.role.revoked",
-            $"Revoked role '{command.Role}'.",
+            $"Revoked role '{normalizedRole}'.",
             cancellationToken,
             targetType: "user",
             targetId: user.Id.ToString("D"),
             oldValue: string.Join(",", currentRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase)),
-            newValue: string.Join(",", currentRoles.Where(role => !string.Equals(role, command.Role, StringComparison.Ordinal)).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
+            newValue: string.Join(",", currentRoles.Where(role => !string.Equals(role, normalizedRole, StringComparison.Ordinal)).OrderBy(role => role, StringComparer.OrdinalIgnoreCase)));
         return Result.Success();
+    }
+
+    private static string NormalizeSystemRole(string? role)
+    {
+        var normalizedRole = role?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedRole))
+        {
+            return string.Empty;
+        }
+
+        foreach (var supportedRole in SystemRoles.All)
+        {
+            if (string.Equals(supportedRole, normalizedRole, StringComparison.OrdinalIgnoreCase))
+            {
+                return supportedRole;
+            }
+        }
+
+        return normalizedRole;
     }
 
     public async Task<Result> SetPremiumStatusAsync(SetPremiumStatusCommand command, CancellationToken cancellationToken)

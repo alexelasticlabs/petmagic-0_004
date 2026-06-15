@@ -97,8 +97,8 @@ public sealed partial class IdentityServiceProfileTests
             skip: 0,
             take: 20,
             search: "searched",
-            role: SystemRoles.Moderator,
-            status: "active",
+            role: " moderator ",
+            status: " ACTIVE ",
             isPremium: true,
             CancellationToken.None);
 
@@ -106,6 +106,40 @@ public sealed partial class IdentityServiceProfileTests
         var item = Assert.Single(result.Value.Items);
         Assert.Equal(matching.Id, item.UserId);
         Assert.Contains(SystemRoles.Moderator, item.Roles);
+    }
+
+    [Fact]
+    public async Task RoleMutations_ShouldNormalizeSupportedRoleCasing()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var user = CreateListUser("role-normalized@petmagic.app", DateTime.UtcNow);
+
+        identityDb.Users.Add(user);
+        await identityDb.SaveChangesAsync();
+        await AddUserRoleAsync(identityDb, user.Id, SystemRoles.User);
+
+        var assignResult = await service.AssignRoleAsync(
+            new AssignRoleCommand(user.Id, " moderator "),
+            CancellationToken.None);
+
+        Assert.True(assignResult.IsSuccess);
+        Assert.Contains(
+            identityDb.UserRoles,
+            userRole => userRole.UserId == user.Id
+                && userRole.RoleId == identityDb.Roles.Single(role => role.Name == SystemRoles.Moderator).Id);
+
+        var revokeResult = await service.RevokeRoleAsync(
+            new RevokeRoleCommand(user.Id, " MODERATOR "),
+            CancellationToken.None);
+
+        Assert.True(revokeResult.IsSuccess);
+        Assert.DoesNotContain(
+            identityDb.UserRoles,
+            userRole => userRole.UserId == user.Id
+                && userRole.RoleId == identityDb.Roles.Single(role => role.Name == SystemRoles.Moderator).Id);
     }
 
     [Fact]
