@@ -45,6 +45,16 @@ type ToastState = {
 
 type EditorVisibilityStatus = Extract<TemplateStatus, "Draft" | "Active">;
 
+function getTemplateEditorErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function useTemplateEditorController({
   initialTemplateId,
   locale,
@@ -70,6 +80,8 @@ export function useTemplateEditorController({
     createInitialTemplateForm(templateType)
   );
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
+  const [initializationRetryKey, setInitializationRetryKey] = useState(0);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [uploadingKind, setUploadingKind] = useState<TemplateAssetKind | null>(null);
@@ -178,6 +190,7 @@ export function useTemplateEditorController({
 
     async function initialize() {
       setIsInitializing(true);
+      setInitializationError(null);
       try {
         if (!ensureAdminSession(locale, router, { requiredRole: "Admin" })) {
           return;
@@ -203,12 +216,16 @@ export function useTemplateEditorController({
         }
 
         clientLogger.error("templates.editor_initialize_failed", {
-          initialTemplateId,
+          initialTemplateId: initialTemplateId
+            ? sanitizeSensitiveText(initialTemplateId, 80)
+            : undefined,
           templateType,
-          error,
+          ...getTemplateEditorErrorDetails(error),
         });
         if (!isCancelled) {
-          setToast({ type: "error", message: text.errorLoadingTemplates });
+          const message = getAdminErrorMessage(error, text.errorLoadingTemplates);
+          setInitializationError(message);
+          setToast({ type: "error", message });
         }
       } finally {
         if (!isCancelled) {
@@ -226,6 +243,7 @@ export function useTemplateEditorController({
   }, [
     canManageTemplates,
     initialTemplateId,
+    initializationRetryKey,
     locale,
     router,
     templateType,
@@ -233,11 +251,20 @@ export function useTemplateEditorController({
   ]);
 
   function resetForm() {
-    setSelectedTemplate(null);
-    setForm(createInitialTemplateForm(templateType));
-    setEditorStatus("Draft");
+    if (selectedTemplate) {
+      setForm(createFormFromTemplate(selectedTemplate));
+      setEditorStatus(resolveEditorVisibilityStatus(selectedTemplate.status));
+    } else {
+      setForm(createInitialTemplateForm(templateType));
+      setEditorStatus("Draft");
+    }
+
     setPreviewFile(null);
     setReferenceFile(null);
+  }
+
+  function retryInitialization() {
+    setInitializationRetryKey((current) => current + 1);
   }
 
   function assertCanManageTemplateEditor(): boolean {
@@ -317,8 +344,8 @@ export function useTemplateEditorController({
       clientLogger.warn("templates.media_upload_failed", {
         assetKind,
         fileName: sanitizeSensitiveText(file.name, 120),
-        contentType: file.type,
-        error,
+        contentType: sanitizeSensitiveText(file.type, 80),
+        ...getTemplateEditorErrorDetails(error),
       });
     } finally {
       setUploadingKind(null);
@@ -359,6 +386,7 @@ export function useTemplateEditorController({
     handleSave,
     handleSubmit,
     handleUpload,
+    initializationError,
     isEditMode,
     isLoading,
     isSaving,
@@ -368,6 +396,7 @@ export function useTemplateEditorController({
     previewTags,
     referenceFile,
     resetForm,
+    retryInitialization,
     router,
     selectedTemplate,
     setEditorStatus,

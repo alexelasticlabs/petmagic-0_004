@@ -459,6 +459,12 @@
   color: var(--text-strong);
 }
 
+.footerStatusButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+}
+
 .footerStatusButtonActive {
   background: var(--accent-soft-bg);
   color: var(--text-strong);
@@ -1230,25 +1236,6 @@
   }
 }
 
-@media (max-width: 1120px) {
-  .editorGrid,
-  .loadingGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .editorRail {
-    position: static;
-  }
-
-  .previewCardWrap {
-    max-width: min(100%, 20rem);
-  }
-
-  .layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 1440px) {
   .templateEditorPage {
     max-width: var(--admin-page-max-wide);
@@ -1266,6 +1253,25 @@
 
   .mediaGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1120px) {
+  .editorGrid,
+  .loadingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorRail {
+    position: static;
+  }
+
+  .previewCardWrap {
+    max-width: min(100%, 20rem);
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
   }
 }
 

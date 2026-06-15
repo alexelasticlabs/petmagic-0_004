@@ -204,6 +204,7 @@ export function TemplateEditorFooter({
               editorStatus === "Draft" ? styles.footerStatusButtonActive : null
             )}
             aria-pressed={editorStatus === "Draft"}
+            disabled={isSaving}
             onClick={() => onSetEditorStatus("Draft")}
           >
             {text.editorDraft}
@@ -216,6 +217,7 @@ export function TemplateEditorFooter({
               editorStatus === "Active" ? styles.footerStatusButtonLive : null
             )}
             aria-pressed={editorStatus === "Active"}
+            disabled={isSaving}
             onClick={() => onSetEditorStatus("Active")}
           >
             {text.editorActive}

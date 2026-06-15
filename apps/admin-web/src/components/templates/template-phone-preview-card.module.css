@@ -510,3 +510,69 @@
   height: 100%;
 }
 
+@media (max-width: 420px) {
+  .phoneMedia {
+    border-radius: 1rem;
+  }
+
+  .phoneTopRow {
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    gap: 0.45rem;
+  }
+
+  .phoneHeroBadge,
+  .phoneMediaKindBadge,
+  .phoneMetricBadge,
+  .phoneAccessTag {
+    max-width: 100%;
+  }
+
+  .phoneHeroBadge,
+  .phoneMediaKindBadge {
+    min-height: 1.28rem;
+    padding-block: 0.08rem;
+    font-size: 0.58rem;
+  }
+
+  .phoneBottomContent {
+    gap: 0.28rem;
+    padding: 0.3rem 0.58rem 0.58rem;
+    border-radius: 0 0 1rem 1rem;
+  }
+
+  .phoneTitle,
+  .phoneDescription,
+  .phoneMusicDescription,
+  .phoneTagRow {
+    max-width: 100%;
+  }
+
+  .phoneTitle {
+    font-size: 0.98rem;
+    line-height: 1.08;
+  }
+
+  .phoneDescription,
+  .phoneMusicDescription,
+  .phoneMetaRow {
+    font-size: 0.64rem;
+  }
+
+  .phoneTag {
+    min-height: 1.16rem;
+    font-size: 0.58rem;
+  }
+
+  .phoneMetricRow,
+  .phoneMetaRow {
+    gap: 0.28rem;
+  }
+
+  .phoneAccessTag {
+    min-height: 1.34rem;
+    padding-inline: 0.36rem;
+  }
+}
+

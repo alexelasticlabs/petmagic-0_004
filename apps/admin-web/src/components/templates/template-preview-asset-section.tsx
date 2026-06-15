@@ -5,13 +5,12 @@ import { inferTemplateMediaKind } from "@/components/templates/template-media-ut
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
-import type { Dictionary, Locale } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 32 * 1024 * 1024;
 
 type TemplatePreviewAssetSectionProps = {
-  locale: Locale;
   text: Dictionary;
   form: TemplateFormState;
   setForm: SetTemplateFormState;
@@ -22,7 +21,6 @@ type TemplatePreviewAssetSectionProps = {
 };
 
 export function TemplatePreviewAssetSection({
-  locale,
   text,
   form,
   setForm,
@@ -68,12 +66,12 @@ export function TemplatePreviewAssetSection({
     }
 
     if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      setSelectionError(getPreviewSelectionError(locale, "type"));
+      setSelectionError(getPreviewSelectionError(text, "type"));
       return;
     }
 
     if (file.size > TEMPLATE_PREVIEW_ASSET_MAX_BYTES) {
-      setSelectionError(getPreviewSelectionError(locale, "size"));
+      setSelectionError(getPreviewSelectionError(text, "size"));
       return;
     }
 
@@ -134,7 +132,7 @@ export function TemplatePreviewAssetSection({
       >
         <div className={styles.assetPreviewOverlay}>
           <span className={styles.assetPreviewBadge}>
-            {previewKind === "video" ? "Video preview" : "Cover asset"}
+            {previewKind === "video" ? text.previewAssetVideoBadge : text.previewAssetCoverBadge}
           </span>
           <span
             className={`${styles.assetPreviewState} ${hasPreview ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
@@ -243,14 +241,10 @@ export function TemplatePreviewAssetSection({
   );
 }
 
-function getPreviewSelectionError(locale: Locale, reason: "size" | "type"): string {
+function getPreviewSelectionError(text: Dictionary, reason: "size" | "type"): string {
   if (reason === "size") {
-    return locale === "ru"
-      ? "Файл слишком большой. Максимальный размер preview - 32 MB."
-      : "File is too large. The maximum preview size is 32 MB.";
+    return text.previewAssetFileTooLarge;
   }
 
-  return locale === "ru"
-    ? "Можно загрузить только image/* или video/* файл."
-    : "Only image/* or video/* files are supported.";
+  return text.previewAssetFileTypeError;
 }

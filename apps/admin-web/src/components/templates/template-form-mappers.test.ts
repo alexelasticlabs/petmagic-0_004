@@ -27,6 +27,9 @@ const basicFieldsPath = fileURLToPath(new URL("./template-basic-fields.tsx", imp
 const editorSectionsPath = fileURLToPath(
   new URL("./template-editor-sections.tsx", import.meta.url)
 );
+const editorControllerPath = fileURLToPath(
+  new URL("./use-template-editor-controller.ts", import.meta.url)
+);
 const formMappersPath = fileURLToPath(new URL("./template-form-mappers.ts", import.meta.url));
 
 describe("template form numeric hardening", () => {
@@ -132,6 +135,58 @@ describe("template form numeric hardening", () => {
     expect(editorSectionsSource).not.toContain("preprocessingPrompt: event.target.value");
     expect(editorSectionsSource).not.toContain("klingPrompt: event.target.value");
     expect(editorSectionsSource).not.toContain("imagePrompt: event.target.value");
+  });
+
+  it("keeps generation result editor controls localized", () => {
+    const basicFieldsSource = readFileSync(basicFieldsPath, "utf8");
+
+    expect(basicFieldsSource).toContain("text.editorGenerationResultInputTitle");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultSupported");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultUnsupported");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultInputHint");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultRecommended");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultNotRecommended");
+    expect(basicFieldsSource).toContain("text.editorGenerationResultRecommendedHint");
+    expect(basicFieldsSource).toContain("text.editorRequiredInputMediaTypeLabel");
+    expect(basicFieldsSource).toContain("text.editorInputMediaTypeImageLabel");
+    expect(basicFieldsSource).toContain("text.editorInputMediaTypeImageHint");
+    expect(basicFieldsSource).toContain("text.editorInputMediaTypeVideoLabel");
+    expect(basicFieldsSource).toContain("text.editorInputMediaTypeVideoHint");
+    expect(basicFieldsSource).toContain('role="group"');
+    expect(basicFieldsSource).toContain("aria-label={text.accessLabel}");
+    expect(basicFieldsSource).toContain("aria-label={text.editorGenerationResultInputTitle}");
+    expect(basicFieldsSource).toContain("aria-pressed={!form.isPremium}");
+    expect(basicFieldsSource).toContain("aria-pressed={form.isPremium}");
+    expect(basicFieldsSource).toContain("aria-pressed={form.supportsGenerationResultInput}");
+    expect(basicFieldsSource).toContain("aria-pressed={form.recommendedAfterImageGeneration}");
+    expect(basicFieldsSource).not.toContain(">Generation result input<");
+    expect(basicFieldsSource).not.toContain(">Supported<");
+    expect(basicFieldsSource).not.toContain(">Not supported<");
+    expect(basicFieldsSource).not.toContain("Allows completed generation results to start this template.");
+    expect(basicFieldsSource).not.toContain(">Recommended<");
+    expect(basicFieldsSource).not.toContain(">Not recommended<");
+    expect(basicFieldsSource).not.toContain("Prioritizes this template after image generation.");
+    expect(basicFieldsSource).not.toContain(">Required input media type<");
+    expect(basicFieldsSource).not.toContain('ariaLabel="Required input media type"');
+    expect(basicFieldsSource).not.toContain('label: "Image"');
+    expect(basicFieldsSource).not.toContain('label: "Video"');
+    expect(basicFieldsSource).not.toContain('description: "Completed image result"');
+    expect(basicFieldsSource).not.toContain('description: "Reserved for future video-result input"');
+  });
+
+  it("keeps template editor action logs sanitized", () => {
+    const controllerSource = readFileSync(editorControllerPath, "utf8");
+
+    expect(controllerSource).toContain("function getTemplateEditorErrorDetails(error: unknown)");
+    expect(controllerSource).toContain(
+      'errorName: error instanceof Error ? error.name : "UnknownError"'
+    );
+    expect(controllerSource).toContain("sanitizeSensitiveText(initialTemplateId, 80)");
+    expect(controllerSource).toContain("fileName: sanitizeSensitiveText(file.name, 120)");
+    expect(controllerSource).toContain("contentType: sanitizeSensitiveText(file.type, 80)");
+    expect(controllerSource).toContain("...getTemplateEditorErrorDetails(error)");
+    expect(controllerSource).not.toContain("initialTemplateId,\n          templateType,\n          error");
+    expect(controllerSource).not.toContain("contentType: file.type,\n        error");
   });
 });
 

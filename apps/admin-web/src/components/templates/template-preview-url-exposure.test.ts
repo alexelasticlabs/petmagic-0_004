@@ -53,6 +53,9 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).toContain("candidate.origin !== globalThis.location.origin");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
+    expect(secureMediaSource).toContain("function getMediaFetchErrorName(error: unknown)");
+    expect(secureMediaSource).toContain("errorName: getMediaFetchErrorName(error)");
+    expect(secureMediaSource).not.toContain("error,\n        });");
   });
 
   it("sanitizes visible template media file names before rendering them", () => {

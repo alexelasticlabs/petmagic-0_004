@@ -92,14 +92,14 @@ export function TemplateBasicFields({
   const inputMediaTypeOptions: SelectOption[] = [
     {
       value: "Image",
-      label: "Image",
-      description: "Completed image result",
+      label: text.editorInputMediaTypeImageLabel,
+      description: text.editorInputMediaTypeImageHint,
       tone: "recommended",
     },
     {
       value: "Video",
-      label: "Video",
-      description: "Reserved for future video-result input",
+      label: text.editorInputMediaTypeVideoLabel,
+      description: text.editorInputMediaTypeVideoHint,
       tone: "neutral",
     },
   ];
@@ -216,7 +216,7 @@ export function TemplateBasicFields({
         />
       </label>
 
-      <div className={styles.accessGroup}>
+      <div className={styles.accessGroup} role="group" aria-label={text.accessLabel}>
         <span className={styles.accessLabel}>{text.accessLabel}</span>
         <div className={styles.accessOptions}>
           <button
@@ -227,6 +227,7 @@ export function TemplateBasicFields({
               !form.isPremium ? styles.accessOptionActive : null,
               !form.isPremium ? styles.accessOptionActiveFree : null
             )}
+            aria-pressed={!form.isPremium}
             onClick={() => setForm((current) => ({ ...current, isPremium: false }))}
           >
             <span className={styles.accessOptionTitle}>{text.freeLabel}</span>
@@ -241,6 +242,7 @@ export function TemplateBasicFields({
               form.isPremium ? styles.accessOptionActive : null,
               form.isPremium ? styles.accessOptionActivePremium : null
             )}
+            aria-pressed={form.isPremium}
             onClick={() => setForm((current) => ({ ...current, isPremium: true }))}
           >
             <span className={styles.accessOptionTitle}>{text.premiumLabel}</span>
@@ -299,8 +301,12 @@ export function TemplateBasicFields({
         ) : null}
       </div>
 
-      <div className={styles.accessGroup}>
-        <span className={styles.accessLabel}>Generation result input</span>
+      <div
+        className={styles.accessGroup}
+        role="group"
+        aria-label={text.editorGenerationResultInputTitle}
+      >
+        <span className={styles.accessLabel}>{text.editorGenerationResultInputTitle}</span>
         <div className={styles.accessOptions}>
           <button
             type="button"
@@ -308,6 +314,7 @@ export function TemplateBasicFields({
               styles.accessOption,
               form.supportsGenerationResultInput ? styles.accessOptionActive : null
             )}
+            aria-pressed={form.supportsGenerationResultInput}
             onClick={() =>
               setForm((current) => ({
                 ...current,
@@ -316,10 +323,12 @@ export function TemplateBasicFields({
             }
           >
             <span className={styles.accessOptionTitle}>
-              {form.supportsGenerationResultInput ? "Supported" : "Not supported"}
+              {form.supportsGenerationResultInput
+                ? text.editorGenerationResultSupported
+                : text.editorGenerationResultUnsupported}
             </span>
             <span className={styles.accessOptionHint}>
-              Allows completed generation results to start this template.
+              {text.editorGenerationResultInputHint}
             </span>
           </button>
 
@@ -329,6 +338,7 @@ export function TemplateBasicFields({
               styles.accessOption,
               form.recommendedAfterImageGeneration ? styles.accessOptionActive : null
             )}
+            aria-pressed={form.recommendedAfterImageGeneration}
             onClick={() =>
               setForm((current) => ({
                 ...current,
@@ -337,10 +347,12 @@ export function TemplateBasicFields({
             }
           >
             <span className={styles.accessOptionTitle}>
-              {form.recommendedAfterImageGeneration ? "Recommended" : "Not recommended"}
+              {form.recommendedAfterImageGeneration
+                ? text.editorGenerationResultRecommended
+                : text.editorGenerationResultNotRecommended}
             </span>
             <span className={styles.accessOptionHint}>
-              Prioritizes this template after image generation.
+              {text.editorGenerationResultRecommendedHint}
             </span>
           </button>
         </div>
@@ -348,12 +360,12 @@ export function TemplateBasicFields({
 
       <label className={styles.fieldBlock}>
         <span className={styles.fieldHeader}>
-          <span>Required input media type</span>
+          <span>{text.editorRequiredInputMediaTypeLabel}</span>
         </span>
         <Select
           value={form.requiredInputMediaType}
           options={inputMediaTypeOptions}
-          ariaLabel="Required input media type"
+          ariaLabel={text.editorRequiredInputMediaTypeLabel}
           onChange={(value) =>
             setForm((current) => ({
               ...current,

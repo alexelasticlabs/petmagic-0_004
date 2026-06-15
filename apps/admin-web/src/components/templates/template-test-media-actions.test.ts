@@ -38,6 +38,17 @@ describe("template test media actions", () => {
     expect(source).toContain("fetchWithTimeout(previewUrl");
     expect(source).toContain("<TemplateSecureMedia");
     expect(source).toContain("templates.media_preview_fetch_failed");
+    expect(source).toContain("function getTemplateTestErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("templateId: sanitizeSensitiveText(templateId, 80)");
+    expect(source).toContain("generationId: sanitizeSensitiveText(activeRun.generationId, 80)");
+    expect(source).toContain("...getTemplateTestErrorDetails(error)");
+    expect(source).toContain("function downloadPreviewBlobUrl(objectUrl: string): void");
+    expect(source).toContain("anchor.download = downloadName ?? (videoUrl ? \"template-test.mp4\" : \"template-test.png\");");
+    expect(source).not.toContain("templateId,\n            error");
+    expect(source).not.toContain("templateId,\n          error");
+    expect(source).not.toContain("generationId: activeRun.generationId,\n          error");
+    expect(source).not.toContain("mediaType,\n        error");
   });
 
   it("aborts pending generated media actions and ignores abort failures", () => {
@@ -52,6 +63,16 @@ describe("template test media actions", () => {
     expect(source).toContain("fetchPreviewBlob(\"open\", controller.signal)");
     expect(source).toContain("if (signal.aborted)");
     expect(source).toContain("disabled={!canManageTemplates || pendingMediaAction !== null}");
+  });
+
+  it("falls back to a generated media download when opening a preview is blocked", () => {
+    const source = readFileSync(templateTestPagePath, "utf8");
+
+    expect(source).toContain('const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");');
+    expect(source).toContain("if (!opened) {");
+    expect(source).toContain("downloadPreviewBlobUrl(objectUrl);");
+    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).not.toContain("if (!opened) {\n        URL.revokeObjectURL(objectUrl);\n        return;\n      }");
   });
 
   it("guards template test generation against invalid and repeated submits", () => {
@@ -69,6 +90,8 @@ describe("template test media actions", () => {
     expect(source).toContain("startTestInFlightRef.current = true;");
     expect(source).toContain("startTestInFlightRef.current = false;");
     expect(source).toContain("const templateTestInFlightMessage =");
+    expect(source).toContain("const templateTestActionsAdminOnly = text.templateTestActionsAdminOnly;");
+    expect(source).toContain("const templateTestInFlightMessage = text.templateTestInFlightMessage;");
     expect(source).toContain(
       "if (startTestInFlightRef.current || isSubmitting || isTemplateTestRunInFlight(run)) {\n      setRunError(templateTestInFlightMessage);\n      return;\n    }"
     );
@@ -79,8 +102,11 @@ describe("template test media actions", () => {
       source.indexOf("clearSelectedFilePreviewUrl();\n    setSelectedFile(null);")
     );
     expect(source).toContain("if (!selectedFile) {");
+    expect(source).toContain("setRunError(text.templateTestChoosePhotoFirst);");
     expect(source.match(/if \(!file\.type\.startsWith\("image\/"\)\)/g) ?? []).toHaveLength(1);
+    expect(source).toContain("setRunError(text.templateTestImageFileTypeError);");
     expect(source).toContain("if (file.size > MAX_TEMPLATE_TEST_IMAGE_BYTES) {");
+    expect(source).toContain("setRunError(text.templateTestImageFileTooLarge);");
     expect(source.indexOf('if (!file.type.startsWith("image/"))')).toBeLessThan(
       source.indexOf("if (file.size > MAX_TEMPLATE_TEST_IMAGE_BYTES)")
     );
@@ -92,11 +118,13 @@ describe("template test media actions", () => {
     expect(source).toContain("const [loadRetryNonce, setLoadRetryNonce] = useState(0);");
     expect(source).toContain("function handleRetryLoad()");
     expect(source).toContain("setLoadRetryNonce((current) => current + 1);");
-    expect(source).toContain("}, [canManageTemplates, isRu, loadRetryNonce, locale, router, templateId]);");
+    expect(source).toContain(
+      "}, [canManageTemplates, loadRetryNonce, locale, pageText.loadTemplateError, router, templateId]);"
+    );
     expect(source).toContain("<Button variant=\"secondary\" onClick={handleRetryLoad}>");
     expect(source).toContain("const [pollRetryNonce, setPollRetryNonce] = useState(0);");
     expect(source).toContain("setPollRetryNonce((current) => current + 1);");
-    expect(source).toContain("}, [isRu, pollRetryNonce, run, templateId]);");
+    expect(source).toContain("}, [pageText.refreshStatusError, pollRetryNonce, run, templateId]);");
     expect(source).toContain("setRunError(null);");
     expect(source).not.toContain(
       'if (!run || (run.status !== "Queued" && run.status !== "Processing"))'
@@ -109,8 +137,19 @@ describe("template test media actions", () => {
     );
     expect(source).toContain("disabled={isDisabled}");
     expect(source).toContain("aria-disabled={isDisabled}");
-    expect(source).toContain('"Running..."');
+    expect(source).toContain('running: isRu ? "В работе..." : "Running..."');
     expect(source).toContain("Supports image/* up to 8 MB and drag-and-drop.");
+    expect(source).toContain("{text.templateTestHistoryEmpty}");
+    expect(source).toContain("return text.templateTestStartFailed;");
+    expect(source).toContain("return text.templateTestInvalidStatus;");
+    expect(source).toContain("return text.templateTestImageModelRequired;");
+    expect(source).toContain("return text.templateTestReferenceMotionRequired;");
+    expect(source).toContain("return text.templateTestPreprocessingModelRequired;");
+    expect(source).toContain("return text.templateTestKlingModelRequired;");
+    expect(source).toContain("return text.templateTestCharacterOrientationRequired;");
+    expect(source).not.toContain("Choose a test pet photo first.");
+    expect(source).not.toContain("Only image/* files are supported.");
+    expect(source).not.toContain("File is too large. The maximum test photo size is 8 MB.");
   });
 
   it("keeps template test generation admin-only at the handler and UI layer", () => {
@@ -156,7 +195,7 @@ describe("template test media actions", () => {
     expect(source).toContain("const safeGenerationId = sanitizeSensitiveText(generationId, 64)");
     expect(source).toContain("description: formatTemplateTestDisplayText(\n        run.failureCode");
     expect(source).toContain(
-      "formatTemplateTestDisplayText(selectedFile.name, isRu ? \"Файл\" : \"File\", 120)"
+      "formatTemplateTestDisplayText(selectedFile.name, pageText.fileFallback, 120)"
     );
     expect(source).toContain(
       "formatTemplateTestDisplayText(activeRun.sourceImageAsset.fileName, \"-\", 120)"
@@ -182,12 +221,50 @@ describe("template test media actions", () => {
   it("localizes template test stage placeholder labels", () => {
     const source = readFileSync(templateTestPagePath, "utf8");
 
-    expect(source).toContain('const stageOneLabel = isRu ? "Этап 01" : "Stage 01";');
-    expect(source).toContain('const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";');
+    expect(source).toContain('stageOne: isRu ? "Этап 01" : "Stage 01"');
+    expect(source).toContain('stageTwo: isRu ? "Этап 02" : "Stage 02"');
+    expect(source).toContain("const stageOneLabel = pageText.stageOne;");
+    expect(source).toContain("const stageTwoLabel = pageText.stageTwo;");
     expect(source).toContain("placeholderEyebrow: stageOneLabel");
     expect(source).toContain("? stageTwoLabel");
+    expect(source).toContain("openLabel: pageText.open");
+    expect(source).toContain("downloadLabel: pageText.download");
     expect(source).not.toContain('placeholderEyebrow: isRu ? "Stage 01" : "Stage 01"');
+    expect(source).not.toContain('const stageOneLabel = isRu ? "Этап 01" : "Stage 01";');
+    expect(source).not.toContain('const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";');
     expect(source).not.toContain('? "Stage 02"\n        : "Stage 02"');
+  });
+
+  it("keeps selected history media previews bound to the active run", () => {
+    const source = readFileSync(templateTestPagePath, "utf8");
+
+    expect(source).toContain(
+      "const historyGenerationIds = useMemo(\n    () => new Set(history.map((item) => item.generationId)),"
+    );
+    expect(source).toContain(
+      "if (!selectedHistoryGenerationId || historyGenerationIds.has(selectedHistoryGenerationId))"
+    );
+    expect(source).toContain("queueMicrotask(() => setSelectedHistoryGenerationId(null));");
+    expect(source).toContain("}, [historyGenerationIds, selectedHistoryGenerationId]);");
+    expect(source).toContain(
+      "return history.find((item) => item.generationId === selectedHistoryGenerationId) ?? run;"
+    );
+    expect(source).toContain(
+      "const sourceImageUrl = selectedFilePreviewUrl ?? activeRun?.sourceImageAsset?.url ?? undefined;"
+    );
+    expect(source).toContain("imageUrl: activeRun?.normalizedImageUrl ?? undefined");
+    expect(source).toContain("selectedFile || activeRun?.sourceImageAsset");
+    expect(source).toContain(
+      "imageUrl: isVideoTemplate ? undefined : (activeRun?.outputUrl ?? undefined)"
+    );
+    expect(source).toContain(
+      "videoUrl: isVideoTemplate ? (activeRun?.outputUrl ?? undefined) : undefined"
+    );
+    expect(source).toContain('activeRun?.status === "Processing"');
+    expect(source).not.toContain("imageUrl: run?.normalizedImageUrl ?? undefined");
+    expect(source).not.toContain("imageUrl: isVideoTemplate ? undefined : (run?.outputUrl");
+    expect(source).not.toContain("videoUrl: isVideoTemplate ? (run?.outputUrl");
+    expect(source).not.toContain('run?.status === "Processing"\n        ? isVideoTemplate');
   });
 
   it("keeps template test page visuals on semantic tokens without decorative tracking", () => {
@@ -200,6 +277,10 @@ describe("template test media actions", () => {
     expect(stylesSource).not.toContain("rgba(");
     expect(stylesSource).not.toContain("radial-gradient");
     expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(stylesSource).toContain(".historyItemHeader {");
+    expect(stylesSource).toContain("flex-wrap: wrap;");
+    expect(stylesSource).toContain(".historyItemHeader {\n    flex-direction: column;");
+    expect(stylesSource).toContain("align-items: stretch;");
     expect(nonZeroLetterSpacingRules).toEqual([]);
   });
 
@@ -228,24 +309,79 @@ describe("template test media actions", () => {
     );
   });
 
+  it("keeps failed edit-template initialization recoverable without showing a blank create form", () => {
+    const controllerSource = readFileSync(templateEditorControllerPath, "utf8");
+    const editorSource = readFileSync(templateEditorPath, "utf8");
+
+    expect(controllerSource).toContain("const [initializationError, setInitializationError]");
+    expect(controllerSource).toContain("const [initializationRetryKey, setInitializationRetryKey]");
+    expect(controllerSource).toContain("setInitializationError(null);");
+    expect(controllerSource).toContain(
+      "const message = getAdminErrorMessage(error, text.errorLoadingTemplates);"
+    );
+    expect(controllerSource).toContain("setInitializationError(message);");
+    expect(controllerSource).toContain("function retryInitialization()");
+    expect(controllerSource).toContain("setInitializationRetryKey((current) => current + 1);");
+    expect(controllerSource).toContain("initializationError,");
+    expect(controllerSource).toContain("retryInitialization,");
+    expect(editorSource).toContain("if (initializationError) {");
+    expect(editorSource).toContain("title={initializationError}");
+    expect(editorSource).toContain("onClick={retryInitialization}");
+    expect(editorSource).toContain('{locale === "ru" ? "Повторить" : "Retry"}');
+    expect(editorSource.indexOf("if (initializationError)")).toBeLessThan(
+      editorSource.indexOf("<form className={styles.editorForm}")
+    );
+  });
+
+  it("resets edit-template forms back to the loaded template instead of create mode", () => {
+    const controllerSource = readFileSync(templateEditorControllerPath, "utf8");
+
+    expect(controllerSource).toContain("function resetForm()");
+    expect(controllerSource).toContain("if (selectedTemplate) {");
+    expect(controllerSource).toContain("setForm(createFormFromTemplate(selectedTemplate));");
+    expect(controllerSource).toContain(
+      "setEditorStatus(resolveEditorVisibilityStatus(selectedTemplate.status));"
+    );
+    expect(controllerSource).toContain("} else {\n      setForm(createInitialTemplateForm(templateType));");
+    expect(controllerSource).toContain("setPreviewFile(null);");
+    expect(controllerSource).toContain("setReferenceFile(null);");
+    expect(controllerSource).not.toContain(
+      "function resetForm() {\n    setSelectedTemplate(null);"
+    );
+  });
+
   it("shows template editor media selection errors before upload", () => {
     const editorSource = readFileSync(templateEditorPath, "utf8");
     const previewSource = readFileSync(templatePreviewAssetSectionPath, "utf8");
     const sectionsSource = readFileSync(templateEditorSectionsPath, "utf8");
     const stylesSource = readFileSync(templateEditorStylesPath, "utf8");
 
-    expect(editorSource).toContain("<TemplatePreviewAssetSection\n                  locale={locale}");
-    expect(editorSource).toContain("<TemplateReferenceAssetSection\n                    locale={locale}");
+    expect(editorSource).toContain("<TemplatePreviewAssetSection\n                  text={text}");
+    expect(editorSource).toContain("<TemplateReferenceAssetSection\n                    text={text}");
     expect(previewSource).toContain("const TEMPLATE_PREVIEW_ASSET_MAX_BYTES = 32 * 1024 * 1024;");
     expect(sectionsSource).toContain(
       "const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;"
     );
     expect(previewSource).toContain("const [selectionError, setSelectionError]");
     expect(sectionsSource).toContain("const [selectionError, setSelectionError]");
-    expect(previewSource).toContain("setSelectionError(getPreviewSelectionError(locale, \"type\"));");
-    expect(previewSource).toContain("setSelectionError(getPreviewSelectionError(locale, \"size\"));");
-    expect(sectionsSource).toContain("setSelectionError(getReferenceSelectionError(locale, \"type\"));");
-    expect(sectionsSource).toContain("setSelectionError(getReferenceSelectionError(locale, \"size\"));");
+    expect(previewSource).toContain("setSelectionError(getPreviewSelectionError(text, \"type\"));");
+    expect(previewSource).toContain("setSelectionError(getPreviewSelectionError(text, \"size\"));");
+    expect(sectionsSource).toContain("setSelectionError(getReferenceSelectionError(text, \"type\"));");
+    expect(sectionsSource).toContain("setSelectionError(getReferenceSelectionError(text, \"size\"));");
+    expect(previewSource).toContain("text.previewAssetVideoBadge");
+    expect(previewSource).toContain("text.previewAssetCoverBadge");
+    expect(previewSource).toContain("return text.previewAssetFileTooLarge;");
+    expect(previewSource).toContain("return text.previewAssetFileTypeError;");
+    expect(sectionsSource).toContain("{text.referenceMotionSourceBadge}");
+    expect(sectionsSource).toContain("return text.referenceMotionFileTooLarge;");
+    expect(sectionsSource).toContain("return text.referenceMotionFileTypeError;");
+    expect(previewSource).not.toContain(">Video preview<");
+    expect(previewSource).not.toContain(">Cover asset<");
+    expect(previewSource).not.toContain("File is too large. The maximum preview size is 32 MB.");
+    expect(previewSource).not.toContain("Only image/* or video/* files are supported.");
+    expect(sectionsSource).not.toContain(">Motion source<");
+    expect(sectionsSource).not.toContain("File is too large. The maximum reference motion size is 128 MB.");
+    expect(sectionsSource).not.toContain("Only MP4 video files are supported.");
     expect(previewSource.indexOf("file.size > TEMPLATE_PREVIEW_ASSET_MAX_BYTES")).toBeLessThan(
       previewSource.indexOf("setPreviewFile(file)")
     );

@@ -6,7 +6,7 @@ import { TemplateSecureMedia } from "@/components/templates/template-secure-medi
 import type { SetTemplateFormState, TemplateFormState } from "@/components/templates/types";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
-import type { Dictionary, Locale } from "@/lib/i18n";
+import type { Dictionary } from "@/lib/i18n";
 import { formatPrice, getImageModelPrice, getMotionModelPrice } from "@/lib/model-pricing";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -15,7 +15,6 @@ const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;
 const promptMaxLength = 2000;
 
 type TemplateReferenceAssetSectionProps = {
-  locale: Locale;
   text: Dictionary;
   form: TemplateFormState;
   setForm: SetTemplateFormState;
@@ -41,7 +40,6 @@ type TemplateImageModelSectionProps = {
 };
 
 export function TemplateReferenceAssetSection({
-  locale,
   text,
   form,
   setForm,
@@ -81,13 +79,13 @@ export function TemplateReferenceAssetSection({
   function handleReferenceFileSelection(file: File | null) {
     if (!file || !isSupportedReferenceMotionFile(file)) {
       if (file) {
-        setSelectionError(getReferenceSelectionError(locale, "type"));
+        setSelectionError(getReferenceSelectionError(text, "type"));
       }
       return;
     }
 
     if (file.size > TEMPLATE_REFERENCE_MOTION_MAX_BYTES) {
-      setSelectionError(getReferenceSelectionError(locale, "size"));
+      setSelectionError(getReferenceSelectionError(text, "size"));
       return;
     }
 
@@ -147,7 +145,7 @@ export function TemplateReferenceAssetSection({
         onDrop={handleReferenceDrop}
       >
         <div className={styles.assetPreviewOverlay}>
-          <span className={styles.assetPreviewBadge}>Motion source</span>
+          <span className={styles.assetPreviewBadge}>{text.referenceMotionSourceBadge}</span>
           <span
             className={`${styles.assetPreviewState} ${hasReference ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
           >
@@ -240,16 +238,12 @@ export function TemplateReferenceAssetSection({
   );
 }
 
-function getReferenceSelectionError(locale: Locale, reason: "size" | "type"): string {
+function getReferenceSelectionError(text: Dictionary, reason: "size" | "type"): string {
   if (reason === "size") {
-    return locale === "ru"
-      ? "Файл слишком большой. Максимальный размер reference motion - 128 MB."
-      : "File is too large. The maximum reference motion size is 128 MB.";
+    return text.referenceMotionFileTooLarge;
   }
 
-  return locale === "ru"
-    ? "Можно загрузить только MP4 video файл."
-    : "Only MP4 video files are supported.";
+  return text.referenceMotionFileTypeError;
 }
 
 function isSupportedReferenceMotionFile(file: File): boolean {

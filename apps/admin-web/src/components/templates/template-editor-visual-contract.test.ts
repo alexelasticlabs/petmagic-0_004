@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const editorStylesPath = fileURLToPath(new URL("./template-editor.module.css", import.meta.url));
+const editorLayoutPath = fileURLToPath(new URL("./template-editor-layout.tsx", import.meta.url));
 
 describe("template editor visual contract", () => {
   it("keeps editor typography and upload surfaces theme-token based", () => {
@@ -24,5 +25,25 @@ describe("template editor visual contract", () => {
     expect(styles).toContain("background: linear-gradient(");
     expect(styles).toContain("color-mix(in srgb, var(--surface-1) 96%, var(--surface-2))");
     expect(styles).toContain("box-shadow:\n    inset 0 1px 0 color-mix");
+  });
+
+  it("keeps the medium-screen editor rail below the form after wider breakpoints", () => {
+    const styles = readFileSync(editorStylesPath, "utf8");
+    const wideBreakpointIndex = styles.indexOf("@media (max-width: 1440px)");
+    const mediumBreakpointIndex = styles.indexOf("@media (max-width: 1120px)");
+
+    expect(wideBreakpointIndex).toBeGreaterThanOrEqual(0);
+    expect(mediumBreakpointIndex).toBeGreaterThan(wideBreakpointIndex);
+    expect(styles).toContain(".editorGrid,\n  .loadingGrid {\n    grid-template-columns: 1fr;");
+    expect(styles).toContain(".editorRail {\n    position: static;");
+  });
+
+  it("locks the visibility switch while the template save is in flight", () => {
+    const layoutSource = readFileSync(editorLayoutPath, "utf8");
+    const styles = readFileSync(editorStylesPath, "utf8");
+
+    expect(layoutSource.match(/disabled=\{isSaving\}/g)).toHaveLength(5);
+    expect(styles).toContain(".footerStatusButton:disabled");
+    expect(styles).toContain("cursor: not-allowed;");
   });
 });

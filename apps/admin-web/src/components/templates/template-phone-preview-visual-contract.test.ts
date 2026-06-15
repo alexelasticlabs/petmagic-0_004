@@ -42,4 +42,16 @@ describe("template phone preview visual contract", () => {
     expect(cssSource).not.toMatch(/letter-spacing:\s*-/);
     expect(nonZeroLetterSpacingRules).toEqual([]);
   });
+
+  it("keeps phone preview controls constrained on narrow editor columns", () => {
+    const cssSource = readFileSync(phonePreviewCssPath, "utf8");
+
+    expect(cssSource).toContain("@media (max-width: 420px)");
+    expect(cssSource).toContain(".phoneTopRow");
+    expect(cssSource).toContain(".phoneBottomContent");
+    expect(cssSource).toContain(".phoneTitle,\n  .phoneDescription,\n  .phoneMusicDescription,\n  .phoneTagRow");
+    expect(cssSource).toContain("max-width: 100%;");
+    expect(cssSource).toContain(".phoneAccessTag");
+    expect(cssSource).toContain("padding-inline: 0.36rem;");
+  });
 });

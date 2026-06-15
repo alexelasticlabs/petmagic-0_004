@@ -46,6 +46,10 @@ function shouldUseDirectMediaUrl(url: string) {
   }
 }
 
+function getMediaFetchErrorName(error: unknown) {
+  return error instanceof Error ? error.name : "UnknownError";
+}
+
 export function TemplateSecureMedia({
   url,
   kind,
@@ -128,7 +132,7 @@ export function TemplateSecureMedia({
           contentType: logContext?.contentType,
           surface: logContext?.surface,
           kind,
-          error,
+          errorName: getMediaFetchErrorName(error),
         });
         setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
         onLoadFailedRef.current?.();

@@ -40,7 +40,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { getDictionary, type Locale } from "@/lib/i18n";
+import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateTestPageProps = {
@@ -80,6 +80,16 @@ function formatTemplateTestDisplayText(
   return sanitizeSensitiveText(trimmed || fallback, maxLength);
 }
 
+function getTemplateTestErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 function isTemplateTestRunInFlight(run: AdminTemplateTestRun | null | undefined): boolean {
   return run?.status === "Queued" || run?.status === "Processing" || run?.status === "Retrying";
 }
@@ -87,15 +97,86 @@ function isTemplateTestRunInFlight(run: AdminTemplateTestRun | null | undefined)
 export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) {
   const isRu = locale === "ru";
   const text = useMemo(() => getDictionary(locale), [locale]);
+  const pageText = useMemo(
+    () => ({
+      fileFallback: isRu ? "Файл" : "File",
+      noPhotoSelected: isRu ? "Фото не выбрано" : "No photo selected",
+      chooseImageFile: isRu ? "Выберите image/* файл" : "Choose an image/* file",
+      petMagicBilling: isRu ? "Стоимость PetMagic" : "PetMagic billing",
+      falMotionCost: isRu ? "Стоимость Fal" : "Fal motion cost",
+      falImageCost: isRu ? "Стоимость Fal" : "Fal image cost",
+      falInference: isRu ? "Fal inference" : "Fal inference time",
+      falImageInference: isRu ? "Fal inference" : "Fal image inference",
+      waitingToStart: isRu ? "Ожидает запуска" : "Waiting to start",
+      templateFallback: isRu ? "Шаблон" : "Template",
+      stageOne: isRu ? "Этап 01" : "Stage 01",
+      stageTwo: isRu ? "Этап 02" : "Stage 02",
+      preprocessing: isRu ? "Препроцессинг" : "Preprocessing",
+      normalizedPhoto: isRu ? "Нормализованное фото" : "Normalized photo",
+      preprocessingPending: isRu
+        ? "Карточка заполнится сразу после завершения препроцессинга."
+        : "This frame will fill in as soon as preprocessing finishes.",
+      preprocessingEmpty: isRu
+        ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения."
+        : "Upload a pet photo to prepare the frame for motion generation.",
+      finalVideo: isRu ? "Финальное видео" : "Final video",
+      finalImage: isRu ? "Финальное изображение" : "Final image",
+      result: "Result",
+      readyVideo: isRu ? "Готовый ролик" : "Ready video",
+      readyImage: isRu ? "Готовое изображение" : "Ready image",
+      videoProcessing: isRu
+        ? "Видео собирается. После завершения здесь появятся просмотр и скачивание."
+        : "The video is being assembled. Preview and download will appear here after completion.",
+      imageProcessing: isRu
+        ? "Изображение генерируется. После завершения здесь появятся просмотр и скачивание."
+        : "The image is being generated. Preview and download will appear here after completion.",
+      videoReadyEmpty: isRu
+        ? "После генерации здесь всегда будут доступны просмотр и скачивание финального видео."
+        : "After generation, preview and download for the final video will always appear here.",
+      imageReadyEmpty: isRu
+        ? "После генерации здесь будут доступны просмотр и скачивание итогового изображения."
+        : "After generation, preview and download for the final image will appear here.",
+      open: isRu ? "Открыть" : "Open",
+      download: isRu ? "Скачать" : "Download",
+      loadingWorkspace: isRu ? "Загрузка тестового стенда..." : "Loading test workspace...",
+      templateNotFound: isRu ? "Шаблон не найден." : "Template was not found.",
+      retry: isRu ? "Повторить" : "Retry",
+      videoTemplates: isRu ? "Видео шаблоны" : "Video templates",
+      imageTemplates: isRu ? "Шаблоны изображений" : "Image templates",
+      templateTest: isRu ? "Тест шаблона" : "Template test",
+      backToCatalog: isRu ? "К каталогу" : "Back to catalog",
+      openEditor: isRu ? "Открыть редактор" : "Open editor",
+      generationResult: isRu ? "Результат генерации" : "Generation result",
+      launching: isRu ? "Запуск..." : "Launching...",
+      running: isRu ? "В работе..." : "Running...",
+      generateTest: isRu ? "Сгенерировать тест" : "Generate test",
+      generationTime: isRu ? "Время генерации" : "Generation time",
+      lastUpdate: isRu ? "Последнее обновление" : "Last update",
+      generationEvents: isRu ? "События генерации" : "Generation events",
+      done: isRu ? "Готово" : "Done",
+      runningShort: isRu ? "В работе" : "Running",
+      timelineEmpty: isRu
+        ? "После запуска здесь появятся этапы тестовой генерации."
+        : "Pipeline milestones appear here after the test starts.",
+      runSummary: isRu ? "Сводка запуска" : "Run summary",
+      testHistory: isRu ? "История тестов" : "Test history",
+      attempt: isRu ? "Попытка" : "Attempt",
+      started: isRu ? "Старт" : "Started",
+      completed: isRu ? "Завершён" : "Completed",
+      loadTemplateError: isRu
+        ? "Не удалось загрузить шаблон для теста."
+        : "Failed to load the template for testing.",
+      refreshStatusError: isRu
+        ? "Не удалось обновить статус теста."
+        : "Failed to refresh test status.",
+    }),
+    [isRu]
+  );
   const router = useRouter();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
-  const templateTestActionsAdminOnly = isRu
-    ? "Тестовые генерации шаблонов доступны только Admin."
-    : "Template test generations are available to Admin only.";
-  const templateTestInFlightMessage = isRu
-    ? "Дождитесь завершения текущей тестовой генерации перед заменой фото."
-    : "Wait for the current template test generation to finish before replacing the photo.";
+  const templateTestActionsAdminOnly = text.templateTestActionsAdminOnly;
+  const templateTestInFlightMessage = text.templateTestInFlightMessage;
   const [template, setTemplate] = useState<AdminTemplate | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -149,8 +230,8 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           }
 
           clientLogger.warn("templates.test_history_load_failed", {
-            templateId,
-            error,
+            templateId: sanitizeSensitiveText(templateId, 80),
+            ...getTemplateTestErrorDetails(error),
           });
           if (!isCancelled) {
             setHistory([]);
@@ -162,15 +243,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         }
 
         clientLogger.error("templates.test_template_load_failed", {
-          templateId,
-          error,
+          templateId: sanitizeSensitiveText(templateId, 80),
+          ...getTemplateTestErrorDetails(error),
         });
         if (!isCancelled) {
-          setLoadError(
-            isRu
-              ? "Не удалось загрузить шаблон для теста."
-              : "Failed to load the template for testing."
-          );
+          setLoadError(pageText.loadTemplateError);
         }
       } finally {
         if (!isCancelled) {
@@ -185,7 +262,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       isCancelled = true;
       controller.abort();
     };
-  }, [canManageTemplates, isRu, loadRetryNonce, locale, router, templateId]);
+  }, [canManageTemplates, loadRetryNonce, locale, pageText.loadTemplateError, router, templateId]);
 
   useEffect(() => {
     if (!run || !isTemplateTestRunInFlight(run)) {
@@ -215,11 +292,11 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         }
 
         clientLogger.warn("templates.test_polling_failed", {
-          templateId,
-          generationId: activeRun.generationId,
-          error,
+          templateId: sanitizeSensitiveText(templateId, 80),
+          generationId: sanitizeSensitiveText(activeRun.generationId, 80),
+          ...getTemplateTestErrorDetails(error),
         });
-        setRunError(isRu ? "Не удалось обновить статус теста." : "Failed to refresh test status.");
+        setRunError(pageText.refreshStatusError);
         setPollRetryNonce((current) => current + 1);
       }
     }, 2500);
@@ -228,7 +305,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [isRu, pollRetryNonce, run, templateId]);
+  }, [pageText.refreshStatusError, pollRetryNonce, run, templateId]);
 
   useEffect(
     () => () => {
@@ -238,6 +315,19 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     },
     []
   );
+
+  const historyGenerationIds = useMemo(
+    () => new Set(history.map((item) => item.generationId)),
+    [history]
+  );
+
+  useEffect(() => {
+    if (!selectedHistoryGenerationId || historyGenerationIds.has(selectedHistoryGenerationId)) {
+      return;
+    }
+
+    queueMicrotask(() => setSelectedHistoryGenerationId(null));
+  }, [historyGenerationIds, selectedHistoryGenerationId]);
 
   async function handleStartTest() {
     if (!canManageTemplates) {
@@ -250,9 +340,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     }
 
     if (!selectedFile) {
-      setRunError(
-        isRu ? "Сначала выберите тестовое фото питомца." : "Choose a test pet photo first."
-      );
+      setRunError(text.templateTestChoosePhotoFirst);
       return;
     }
 
@@ -271,7 +359,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         )
       );
     } catch (error) {
-      setRunError(getStartTestErrorMessage(error, isRu, template?.templateType === "Video"));
+      setRunError(getStartTestErrorMessage(error, text, template?.templateType === "Video"));
     } finally {
       startTestInFlightRef.current = false;
       setIsSubmitting(false);
@@ -294,18 +382,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     }
 
     if (!file.type.startsWith("image/")) {
-      setRunError(
-        isRu ? "Можно загрузить только image/* файл." : "Only image/* files are supported."
-      );
+      setRunError(text.templateTestImageFileTypeError);
       return;
     }
 
     if (file.size > MAX_TEMPLATE_TEST_IMAGE_BYTES) {
-      setRunError(
-        isRu
-          ? "Файл слишком большой. Максимальный размер тестового фото - 8 MB."
-          : "File is too large. The maximum test photo size is 8 MB."
-      );
+      setRunError(text.templateTestImageFileTooLarge);
       return;
     }
 
@@ -364,12 +446,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const sourceImageUrl = selectedFilePreviewUrl ?? activeRun?.sourceImageAsset?.url ?? undefined;
   const selectedFileName =
     selectedFile
-      ? formatTemplateTestDisplayText(selectedFile.name, isRu ? "Файл" : "File", 120)
+      ? formatTemplateTestDisplayText(selectedFile.name, pageText.fileFallback, 120)
       : activeRun?.sourceImageAsset?.fileName
         ? formatTemplateTestDisplayText(activeRun.sourceImageAsset.fileName, "-", 120)
-        : isRu
-          ? "Фото не выбрано"
-          : "No photo selected";
+        : pageText.noPhotoSelected;
   const selectedFileMeta = selectedFile
     ? `${formatBytes(selectedFile.size)} • ${formatTemplateTestDisplayText(
         selectedFile.type || "image/*",
@@ -382,36 +462,24 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           "image/*",
           64
         )}`
-      : isRu
-        ? "Выберите image/* файл"
-        : "Choose an image/* file";
+      : pageText.chooseImageFile;
   const generationDuration = formatGenerationDuration(activeRun, isRu);
-  const petMagicBillingLabel = isRu ? "Стоимость PetMagic" : "PetMagic billing";
-  const falProviderCostLabel = isRu
-    ? "Стоимость Fal"
-    : isVideoTemplate
-      ? "Fal motion cost"
-      : "Fal image cost";
-  const falInferenceLabel = isRu
-    ? "Fal inference"
-    : isVideoTemplate
-      ? "Fal inference time"
-      : "Fal image inference";
+  const petMagicBillingLabel = pageText.petMagicBilling;
+  const falProviderCostLabel = isVideoTemplate ? pageText.falMotionCost : pageText.falImageCost;
+  const falInferenceLabel = isVideoTemplate ? pageText.falInference : pageText.falImageInference;
   const internalTokenCost = activeRun?.tokenCost ?? template?.tokenCost ?? 0;
   const internalBillingText = formatTokenCost(internalTokenCost);
   const providerCostText = formatProviderCost(activeRun, locale);
   const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
   const statusText = formatTemplateTestDisplayText(
     activeRun?.status,
-    isRu ? "Ожидает запуска" : "Waiting to start",
+    pageText.waitingToStart,
     64
   );
   const lastUpdateText = activeRun ? formatDateTime(activeRun.updatedAtUtc, locale, true) : "-";
   const templateTitle = template
-    ? formatTemplateTestDisplayText(template.title, isRu ? "Шаблон" : "Template", 120)
-    : isRu
-      ? "Шаблон"
-      : "Template";
+    ? formatTemplateTestDisplayText(template.title, pageText.templateFallback, 120)
+    : pageText.templateFallback;
   const finalDownloadName =
     activeRun && template
       ? buildGeneratedDownloadName(
@@ -432,77 +500,49 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
     providerCostText,
   });
   const hasSourceImage = Boolean(sourceImageUrl);
-  const stageOneLabel = isRu ? "Этап 01" : "Stage 01";
-  const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";
+  const stageOneLabel = pageText.stageOne;
+  const stageTwoLabel = pageText.stageTwo;
   const middleArtifact: ArtifactItem | null = isVideoTemplate
     ? {
         key: "normalized",
-        title: isRu ? "Препроцессинг" : "Preprocessing",
+        title: pageText.preprocessing,
         accent: "preprocess",
-        imageUrl: run?.normalizedImageUrl ?? undefined,
+        imageUrl: activeRun?.normalizedImageUrl ?? undefined,
         placeholderEyebrow: stageOneLabel,
-        placeholderTitle: isRu ? "Нормализованное фото" : "Normalized photo",
+        placeholderTitle: pageText.normalizedPhoto,
         placeholderText:
-          selectedFile || run?.sourceImageAsset
-            ? isRu
-              ? "Карточка заполнится сразу после завершения препроцессинга."
-              : "This frame will fill in as soon as preprocessing finishes."
-            : isRu
-              ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения."
-              : "Upload a pet photo to prepare the frame for motion generation.",
+          selectedFile || activeRun?.sourceImageAsset
+            ? pageText.preprocessingPending
+            : pageText.preprocessingEmpty,
+        openLabel: pageText.open,
+        downloadLabel: pageText.download,
       }
     : null;
   const resultArtifact: ArtifactItem = {
     key: "output",
-    title: isVideoTemplate
-      ? isRu
-        ? "Финальное видео"
-        : "Final video"
-      : isRu
-        ? "Финальное изображение"
-        : "Final image",
+    title: isVideoTemplate ? pageText.finalVideo : pageText.finalImage,
     accent: "result",
-    imageUrl: isVideoTemplate ? undefined : (run?.outputUrl ?? undefined),
-    videoUrl: isVideoTemplate ? (run?.outputUrl ?? undefined) : undefined,
-    placeholderEyebrow: isVideoTemplate
-      ? stageTwoLabel
-      : isRu
-        ? "Result"
-        : "Result",
-    placeholderTitle: isVideoTemplate
-      ? isRu
-        ? "Готовый ролик"
-        : "Ready video"
-      : isRu
-        ? "Готовое изображение"
-        : "Ready image",
+    imageUrl: isVideoTemplate ? undefined : (activeRun?.outputUrl ?? undefined),
+    videoUrl: isVideoTemplate ? (activeRun?.outputUrl ?? undefined) : undefined,
+    placeholderEyebrow: isVideoTemplate ? stageTwoLabel : pageText.result,
+    placeholderTitle: isVideoTemplate ? pageText.readyVideo : pageText.readyImage,
     placeholderText:
-      run?.status === "Processing"
+      activeRun?.status === "Processing"
         ? isVideoTemplate
-          ? isRu
-            ? "Видео собирается. После завершения здесь появятся просмотр и скачивание."
-            : "The video is being assembled. Preview and download will appear here after completion."
-          : isRu
-            ? "Изображение генерируется. После завершения здесь появятся просмотр и скачивание."
-            : "The image is being generated. Preview and download will appear here after completion."
+          ? pageText.videoProcessing
+          : pageText.imageProcessing
         : isVideoTemplate
-          ? isRu
-            ? "После генерации здесь всегда будут доступны просмотр и скачивание финального видео."
-            : "After generation, preview and download for the final video will always appear here."
-          : isRu
-            ? "После генерации здесь будут доступны просмотр и скачивание итогового изображения."
-            : "After generation, preview and download for the final image will appear here.",
-    openLabel: isRu ? "Открыть" : "Open",
-    downloadLabel: isRu ? "Скачать" : "Download",
+          ? pageText.videoReadyEmpty
+          : pageText.imageReadyEmpty,
+    openLabel: pageText.open,
+    downloadLabel: pageText.download,
     downloadName: finalDownloadName,
   };
 
   if (isLoading) {
     return (
       <section className={styles.page}>
-        <p className={styles.infoText}>
-          {isRu ? "Загрузка тестового стенда..." : "Loading test workspace..."}
-        </p>
+        <p className={styles.infoText}>{pageText.loadingWorkspace}</p>
       </section>
     );
   }
@@ -510,12 +550,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   if (loadError || !template) {
     return (
       <section className={styles.page}>
-        <p className={styles.errorText}>
-          {loadError ?? (isRu ? "Шаблон не найден." : "Template was not found.")}
-        </p>
+        <p className={styles.errorText}>{loadError ?? pageText.templateNotFound}</p>
         <Button variant="secondary" onClick={handleRetryLoad}>
           <RefreshIcon className={styles.inlineIcon} />
-          {isRu ? "Повторить" : "Retry"}
+          {pageText.retry}
         </Button>
       </section>
     );
@@ -526,13 +564,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
       <div className={styles.pageHeader}>
         <div className={styles.breadcrumbs}>
           <Link href={catalogPath}>
-            {isVideoTemplate
-              ? isRu
-                ? "Видео шаблоны"
-                : "Video templates"
-              : isRu
-                ? "Шаблоны изображений"
-                : "Image templates"}
+            {isVideoTemplate ? pageText.videoTemplates : pageText.imageTemplates}
           </Link>
           <span aria-hidden="true">/</span>
           {canManageTemplates ? (
@@ -541,7 +573,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
             <span>{templateTitle}</span>
           )}
           <span aria-hidden="true">/</span>
-          <span>{isRu ? "Тест шаблона" : "Template test"}</span>
+          <span>{pageText.templateTest}</span>
         </div>
 
         <div className={styles.headerGrid}>
@@ -577,12 +609,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           <div className={styles.headerActions}>
             <Link href={catalogPath} className={styles.secondaryLink}>
               <TableIcon className={styles.inlineIcon} />
-              <span>{isRu ? "К каталогу" : "Back to catalog"}</span>
+              <span>{pageText.backToCatalog}</span>
             </Link>
             {canManageTemplates ? (
               <Link href={editorPath} className={styles.primaryLink}>
                 <ChartIcon className={styles.inlineIcon} />
-                <span>{isRu ? "Открыть редактор" : "Open editor"}</span>
+                <span>{pageText.openEditor}</span>
               </Link>
             ) : null}
           </div>
@@ -593,7 +625,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         <div className={styles.resultsColumn}>
           <section className={styles.card}>
             <div className={styles.sectionHeaderRow}>
-              <StepHeader number="1" title={isRu ? "Результат генерации" : "Generation result"} />
+              <StepHeader number="1" title={pageText.generationResult} />
               <div className={styles.resultHeaderActions}>
                 <StatusPill
                   tone={
@@ -617,16 +649,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 >
                   <PlayCircleIcon className={styles.inlineIcon} />
                   {isSubmitting
-                    ? isRu
-                      ? "Запуск..."
-                      : "Launching..."
+                    ? pageText.launching
                     : isCurrentRunInFlight
-                      ? isRu
-                        ? "В работе..."
-                        : "Running..."
-                    : isRu
-                      ? "Сгенерировать тест"
-                      : "Generate test"}
+                      ? pageText.running
+                      : pageText.generateTest}
                 </Button>
               </div>
             </div>
@@ -688,18 +714,18 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <MetricTile label={falProviderCostLabel} value={providerCostText} />
               <MetricTile label={falInferenceLabel} value={providerInferenceText} />
               <MetricTile
-                label={isRu ? "Время генерации" : "Generation time"}
+                label={pageText.generationTime}
                 value={generationDuration}
               />
               <MetricTile
-                label={isRu ? "Последнее обновление" : "Last update"}
+                label={pageText.lastUpdate}
                 value={lastUpdateText}
               />
             </div>
           </section>
 
           <section className={styles.card}>
-            <StepHeader number="2" title={isRu ? "События генерации" : "Generation events"} />
+            <StepHeader number="2" title={pageText.generationEvents} />
             <div className={styles.timeline}>
               {timeline.length ? (
                 timeline.map((event) => (
@@ -716,22 +742,18 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                     </div>
                     <time>{event.at}</time>
                     <StatusPill tone={event.done ? "success" : "info"}>
-                      {event.done ? (isRu ? "Готово" : "Done") : isRu ? "В работе" : "Running"}
+                      {event.done ? pageText.done : pageText.runningShort}
                     </StatusPill>
                   </div>
                 ))
               ) : (
-                <p className={styles.infoText}>
-                  {isRu
-                    ? "После запуска здесь появятся этапы тестовой генерации."
-                    : "Pipeline milestones appear here after the test starts."}
-                </p>
+                <p className={styles.infoText}>{pageText.timelineEmpty}</p>
               )}
             </div>
           </section>
 
           <section className={styles.card}>
-            <StepHeader number="3" title={isRu ? "Сводка запуска" : "Run summary"} />
+            <StepHeader number="3" title={pageText.runSummary} />
             <div className={styles.detailGrid}>
               {runDetails.map((item) => (
                 <DetailRow
@@ -747,7 +769,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           <section className={styles.card}>
             <StepHeader
               number="4"
-              title={isRu ? "История тестов" : "Test history"}
+              title={pageText.testHistory}
               badge={history.length ? String(history.length) : undefined}
             />
             {history.length ? (
@@ -755,8 +777,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 {history.map((item) => {
                   const isCurrent = activeRun?.generationId === item.generationId;
                   const sourceLabel = sanitizeSensitiveText(
-                    item.sourceImageAsset?.fileName ??
-                      (isRu ? "Фото не выбрано" : "No photo selected"),
+                    item.sourceImageAsset?.fileName ?? pageText.noPhotoSelected,
                     120
                   );
 
@@ -791,17 +812,17 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                       </div>
                       <div className={styles.historyItemMeta}>
                         <span>
-                          {isRu ? "Попытка" : "Attempt"}: {item.attemptCount}
+                          {pageText.attempt}: {item.attemptCount}
                         </span>
                         <span>
                           {isRu ? "PawSpark" : "PawSpark"}: {item.tokenCost}
                         </span>
                         <span>
-                          {isRu ? "Старт" : "Started"}:{" "}
+                          {pageText.started}:{" "}
                           {formatDateTime(item.startedAtUtc, locale, true)}
                         </span>
                         <span>
-                          {isRu ? "Завершён" : "Completed"}:{" "}
+                          {pageText.completed}:{" "}
                           {formatDateTime(item.completedAtUtc, locale, true)}
                         </span>
                       </div>
@@ -810,11 +831,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                 })}
               </div>
             ) : (
-              <p className={styles.infoText}>
-                {isRu
-                  ? "История тестовых запусков появится после первого запуска."
-                  : "Test run history will appear after the first run starts."}
-              </p>
+              <p className={styles.infoText}>{text.templateTestHistoryEmpty}</p>
             )}
           </section>
         </div>
@@ -831,64 +848,48 @@ type ApiLikeError = {
   validationErrors?: string[];
 };
 
-function getStartTestErrorMessage(error: unknown, isRu: boolean, isVideoTemplate: boolean): string {
+function getStartTestErrorMessage(
+  error: unknown,
+  text: Dictionary,
+  isVideoTemplate: boolean
+): string {
   const apiError = error as ApiLikeError | null;
   if (!apiError) {
-    return isRu
-      ? "Не удалось запустить тестовую генерацию."
-      : "Failed to start the test generation.";
+    return text.templateTestStartFailed;
   }
 
   if (Array.isArray(apiError.validationErrors) && apiError.validationErrors.length > 0) {
-    return getAdminErrorMessage(
-      { validationErrors: apiError.validationErrors },
-      isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation."
-    );
+    return getAdminErrorMessage({ validationErrors: apiError.validationErrors }, text.templateTestStartFailed);
   }
 
   if (apiError.code === "templates.invalid_status") {
-    return isRu
-      ? "Тест недоступен: проверьте статус и обязательные поля шаблона в редакторе."
-      : "Test is unavailable. Check template status and required fields in the editor.";
+    return text.templateTestInvalidStatus;
   }
 
   if (
     apiError.code === "templates.image_model_required" ||
     apiError.code === "templates.invalid_image_model"
   ) {
-    return isRu
-      ? "Для image-теста нужно выбрать корректную image model в редакторе шаблона."
-      : "Image test requires a valid image model in the template editor.";
+    return text.templateTestImageModelRequired;
   }
 
   if (isVideoTemplate && apiError.code === "templates.reference_motion_required") {
-    return isRu
-      ? "Для видео-теста нужно загрузить reference motion в редакторе шаблона."
-      : "Video test requires a reference motion asset in the template editor.";
+    return text.templateTestReferenceMotionRequired;
   }
 
   if (isVideoTemplate && apiError.code === "templates.invalid_preprocessing_model") {
-    return isRu
-      ? "Для видео-теста нужно выбрать preprocessing model в редакторе шаблона."
-      : "Video test requires a preprocessing model in the template editor.";
+    return text.templateTestPreprocessingModelRequired;
   }
 
   if (isVideoTemplate && apiError.code === "templates.invalid_kling_model") {
-    return isRu
-      ? "Для видео-теста нужно выбрать Kling model в редакторе шаблона."
-      : "Video test requires a Kling model in the template editor.";
+    return text.templateTestKlingModelRequired;
   }
 
   if (isVideoTemplate && apiError.code === "templates.character_orientation_required") {
-    return isRu
-      ? "Для видео-теста нужно указать длительность референса, чтобы вычислилась ориентация персонажа."
-      : "Video test requires reference duration so character orientation can be resolved.";
+    return text.templateTestCharacterOrientationRequired;
   }
 
-  return getAdminErrorMessage(
-    error,
-    isRu ? "Не удалось запустить тестовую генерацию." : "Failed to start the test generation."
-  );
+  return getAdminErrorMessage(error, text.templateTestStartFailed);
 }
 
 type DetailItem = {
@@ -1148,10 +1149,20 @@ function MediaPreviewCard({
       clientLogger.warn("templates.media_preview_fetch_failed", {
         action,
         mediaType,
-        error,
+        ...getTemplateTestErrorDetails(error),
       });
       return null;
     }
+  }
+
+  function downloadPreviewBlobUrl(objectUrl: string): void {
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
+    anchor.rel = "noreferrer";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   async function handleDownload() {
@@ -1170,13 +1181,7 @@ function MediaPreviewCard({
       }
 
       const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = downloadName ?? (videoUrl ? "template-test.mp4" : "template-test.png");
-      anchor.rel = "noreferrer";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
+      downloadPreviewBlobUrl(objectUrl);
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } finally {
       if (mediaActionAbortControllerRef.current === controller) {
@@ -1204,7 +1209,8 @@ function MediaPreviewCard({
       const objectUrl = URL.createObjectURL(blob);
       const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
       if (!opened) {
-        URL.revokeObjectURL(objectUrl);
+        downloadPreviewBlobUrl(objectUrl);
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
         return;
       }
 
