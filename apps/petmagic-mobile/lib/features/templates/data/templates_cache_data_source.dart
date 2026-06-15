@@ -89,25 +89,28 @@ class TemplatesCacheDataSource {
       for (final item in existing) item.templateId: item,
     };
 
-    final removedPreviewUrls = <String>[];
+    final staleMediaCandidates = <String>{};
     for (final deletedId in changes.deletedIds) {
       final removed = byId.remove(deletedId);
-      final previewUrl = removed?.previewAsset?.url.trim();
-      if (previewUrl != null && previewUrl.isNotEmpty) {
-        removedPreviewUrls.add(previewUrl);
-      }
+      staleMediaCandidates.addAll(_templateMediaUrls(removed));
     }
 
     for (final upsert in changes.upserts) {
+      staleMediaCandidates.addAll(_templateMediaUrls(byId[upsert.templateId]));
       byId[upsert.templateId] = upsert;
     }
+
+    final retainedMediaUrls = byId.values.expand(_templateMediaUrls).toSet();
+    final staleMediaUrls = staleMediaCandidates
+        .where((url) => !retainedMediaUrls.contains(url))
+        .toList(growable: false);
 
     await writeCatalogItems(
       _sortByUpdatedAt(byId.values.toList(growable: false)),
     );
     await writeCatalogVersion(changes.toVersion);
 
-    return removedPreviewUrls;
+    return staleMediaUrls;
   }
 
   Future<TemplatesFeedDto?> readPage(TemplatesQuery query) async {
@@ -180,10 +183,27 @@ class TemplatesCacheDataSource {
         return byDate;
       }
 
+      final byVersion = b.version.compareTo(a.version);
+      if (byVersion != 0) {
+        return byVersion;
+      }
+
       return b.templateId.compareTo(a.templateId);
     });
 
     return sorted;
+  }
+
+  Iterable<String> _templateMediaUrls(TemplateItemDto? item) sync* {
+    final thumbnailUrl = item?.thumbnailUrl?.trim();
+    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+      yield thumbnailUrl;
+    }
+
+    final previewUrl = item?.previewAsset?.url.trim();
+    if (previewUrl != null && previewUrl.isNotEmpty) {
+      yield previewUrl;
+    }
   }
 
   List<TemplateItemDto> _filterItems(
@@ -207,12 +227,7 @@ class TemplatesCacheDataSource {
           }
 
           if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
-            final title = item.title.toLowerCase();
-            final category = item.category.toLowerCase();
-            final tags = item.tags.join(' ').toLowerCase();
-            if (!title.contains(normalizedSearch) &&
-                !category.contains(normalizedSearch) &&
-                !tags.contains(normalizedSearch)) {
+            if (!_matchesSearch(item, normalizedSearch)) {
               return false;
             }
           }
@@ -220,5 +235,19 @@ class TemplatesCacheDataSource {
           return true;
         })
         .toList(growable: false);
+  }
+
+  bool _matchesSearch(TemplateItemDto item, String normalizedSearch) {
+    final haystacks = <String>[
+      item.title,
+      item.shortDescription,
+      item.category,
+      ...item.tags,
+      ...item.petPhotoRequirements,
+    ];
+
+    return haystacks.any(
+      (value) => value.toLowerCase().contains(normalizedSearch),
+    );
   }
 }

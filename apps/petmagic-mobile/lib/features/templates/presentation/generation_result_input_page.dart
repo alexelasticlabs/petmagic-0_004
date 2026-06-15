@@ -24,7 +24,7 @@ class GenerationResultInputPage extends ConsumerStatefulWidget {
 
   static const routePrefix = '/generation-results';
   static String routeFor(String generationId) =>
-      '$routePrefix/$generationId/use-input';
+      '$routePrefix/${Uri.encodeComponent(generationId)}/use-input';
 
   final String generationId;
 
@@ -35,6 +35,9 @@ class GenerationResultInputPage extends ConsumerStatefulWidget {
 
 enum _ResultTemplateFilter { all, image, video }
 
+const int _parentPreviewCacheWidth = 900;
+const int _compatibleTemplateThumbnailCacheWidth = 240;
+
 class _GenerationResultInputPageState
     extends ConsumerState<GenerationResultInputPage> {
   TemplateGenerationResult? _parent;
@@ -44,6 +47,7 @@ class _GenerationResultInputPageState
   bool _isStarting = false;
   String? _error;
   CancelToken? _cancelToken;
+  CancelToken? _startCancelToken;
 
   @override
   void initState() {
@@ -54,6 +58,7 @@ class _GenerationResultInputPageState
   @override
   void dispose() {
     _cancelToken?.cancel('generation_result_input_disposed');
+    _startCancelToken?.cancel('generation_result_input_start_disposed');
     super.dispose();
   }
 
@@ -238,36 +243,63 @@ class _GenerationResultInputPageState
       return;
     }
 
+    _startCancelToken?.cancel('generation_result_input_start_replaced');
+    final startCancelToken = CancelToken();
+    _startCancelToken = startCancelToken;
     setState(() => _isStarting = true);
     try {
-      await _recordEvent(template, 'template_selected');
-      final generation = await ref
-          .read(templateGenerationRepositoryProvider)
-          .startGenerationFromResult(
-            parentGenerationResultId: widget.generationId,
-            templateId: template.id,
-          );
-      await ref
-          .read(templateGenerationRepositoryProvider)
-          .rememberActiveGeneration(generationId: generation.generationId);
+      final repository = ref.read(templateGenerationRepositoryProvider);
+      await _recordEvent(
+        template,
+        'template_selected',
+        cancelToken: startCancelToken,
+      );
+      if (!mounted || startCancelToken.isCancelled) {
+        return;
+      }
+      final generation = await repository.startGenerationFromResult(
+        parentGenerationResultId: widget.generationId,
+        templateId: template.id,
+        cancelToken: startCancelToken,
+      );
+      if (!mounted || startCancelToken.isCancelled) {
+        return;
+      }
+      await repository.rememberActiveGeneration(
+        generationId: generation.generationId,
+      );
+      if (!mounted || startCancelToken.isCancelled) {
+        return;
+      }
       await _recordEvent(
         template,
         'generation_started',
-        generation.generationId,
+        generationId: generation.generationId,
+        cancelToken: startCancelToken,
       );
-      if (!mounted) {
+      if (!mounted || startCancelToken.isCancelled) {
         return;
       }
-      context.go(
-        '${GenerationStatusPage.routePrefix}/${generation.generationId}',
-      );
-    } on Object {
+      context.go(GenerationStatusPage.routeFor(generation.generationId));
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error) || startCancelToken.isCancelled) {
+        return;
+      }
       if (!mounted) {
         return;
       }
       _showInfo(copy.error);
+    } on Object {
+      if (!mounted || startCancelToken.isCancelled) {
+        return;
+      }
+      _showInfo(copy.error);
     } finally {
-      if (mounted) {
+      final isCurrentStart = identical(_startCancelToken, startCancelToken);
+      if (isCurrentStart) {
+        _startCancelToken = null;
+      }
+      if (mounted && isCurrentStart) {
         setState(() => _isStarting = false);
       }
     }
@@ -275,9 +307,10 @@ class _GenerationResultInputPageState
 
   Future<void> _recordEvent(
     CompatibleGenerationTemplate template,
-    String eventType, [
+    String eventType, {
     String? generationId,
-  ]) async {
+    CancelToken? cancelToken,
+  }) async {
     try {
       await ref
           .read(templateGenerationRepositoryProvider)
@@ -285,6 +318,7 @@ class _GenerationResultInputPageState
             templateId: template.id,
             eventType: eventType,
             generationId: generationId ?? widget.generationId,
+            cancelToken: cancelToken,
           );
     } on Object {
       // Best-effort analytics must not block generation.
@@ -332,7 +366,9 @@ class _ParentPreviewCard extends StatelessWidget {
                     : CachedNetworkImage(
                         imageUrl: mediaUrl.toString(),
                         fit: BoxFit.cover,
-                        memCacheWidth: 900,
+                        memCacheWidth: _parentPreviewCacheWidth,
+                        maxWidthDiskCache: _parentPreviewCacheWidth,
+                        filterQuality: FilterQuality.medium,
                       ),
               ),
             ),
@@ -436,7 +472,10 @@ class _CompatibleTemplateTile extends StatelessWidget {
                       : CachedNetworkImage(
                           imageUrl: safeThumb.toString(),
                           fit: BoxFit.cover,
-                          memCacheWidth: 240,
+                          memCacheWidth: _compatibleTemplateThumbnailCacheWidth,
+                          maxWidthDiskCache:
+                              _compatibleTemplateThumbnailCacheWidth,
+                          filterQuality: FilterQuality.medium,
                         ),
                 ),
               ),

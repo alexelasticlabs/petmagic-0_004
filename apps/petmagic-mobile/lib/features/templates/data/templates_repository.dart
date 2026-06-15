@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_cache_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
@@ -13,10 +14,26 @@ final templatesRepositoryProvider = Provider<TemplatesRepository>((ref) {
   );
 });
 
+typedef TemplateMediaCleanup = Future<void> Function(String url);
+
 abstract interface class TemplatesRepository {
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query);
 
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query);
+
+  void cancelPendingFeedRequest();
+
+  void cancelPendingRandomTemplateRequest();
+
+  void cancelPendingMetadataRequests();
+
+  Future<TemplateItem> fetchTemplate(String templateId);
+
+  Future<TemplateItem?> fetchRandomTemplate({
+    required TemplateRandomMode mode,
+    required String? category,
+    required bool includePremium,
+  });
 
   Future<List<TemplateItem>> readSyncedCatalogItems();
 
@@ -42,16 +59,26 @@ abstract interface class TemplatesRepository {
 }
 
 class DefaultTemplatesRepository implements TemplatesRepository {
-  const DefaultTemplatesRepository({
+  DefaultTemplatesRepository({
     required TemplatesRemoteDataSource remoteDataSource,
     required TemplatesCacheDataSource cacheDataSource,
+    TemplateMediaCleanup? mediaCleanup,
   }) : _remoteDataSource = remoteDataSource,
-       _cacheDataSource = cacheDataSource;
+       _cacheDataSource = cacheDataSource,
+       _mediaCleanup = mediaCleanup ?? _removeTemplateMediaFromCache;
 
   final TemplatesRemoteDataSource _remoteDataSource;
   final TemplatesCacheDataSource _cacheDataSource;
+  final TemplateMediaCleanup _mediaCleanup;
+  final Map<String, _CachedTemplateDetail> _templateDetailsById =
+      <String, _CachedTemplateDetail>{};
+  final Map<String, Future<TemplateItem>> _templateDetailFetchesById =
+      <String, Future<TemplateItem>>{};
+  int _templateDetailCacheGeneration = 0;
 
   static const int _fullResyncPageSize = 100;
+  static const int _templateDetailCacheLimit = 64;
+  static const Duration _templateDetailCacheTtl = Duration(minutes: 10);
 
   @override
   Future<TemplatesFeedPage?> readCachedFirstPage(TemplatesQuery query) async {
@@ -61,26 +88,92 @@ class DefaultTemplatesRepository implements TemplatesRepository {
 
   @override
   Future<TemplatesFeedPage> fetchFeed(TemplatesQuery query) async {
-    final dto = await _cacheDataSource.readPage(query);
-    if (dto != null) {
-      return dto.toDomain();
+    final dto = await _remoteDataSource.fetchFeed(query);
+    final page = dto.toDomain();
+    return TemplatesFeedPage(
+      items: page.items,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+      page: query.page <= 0 ? 1 : query.page,
+    );
+  }
+
+  @override
+  void cancelPendingFeedRequest() {
+    _remoteDataSource.cancelPendingFeedRequest();
+  }
+
+  @override
+  void cancelPendingRandomTemplateRequest() {
+    _remoteDataSource.cancelPendingRandomTemplateRequest();
+  }
+
+  @override
+  void cancelPendingMetadataRequests() {
+    _remoteDataSource.cancelPendingMetadataRequests();
+  }
+
+  @override
+  Future<TemplateItem> fetchTemplate(String templateId) async {
+    final normalizedId = templateId.trim();
+    final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
+    final now = DateTime.now().toUtc();
+    final cached = _templateDetailsById[cacheKey];
+    if (cached != null && cached.expiresAtUtc.isAfter(now)) {
+      _rememberTemplateDetail(cacheKey, cached.template, now);
+      return cached.template;
     }
 
-    if (query.page > 1) {
-      return TemplatesFeedPage(
-        items: const [],
-        hasMore: false,
-        page: query.page,
+    if (cached != null) {
+      _templateDetailsById.remove(cacheKey);
+    }
+
+    final inFlight = _templateDetailFetchesById[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final cacheGeneration = _templateDetailCacheGeneration;
+    late final Future<TemplateItem> fetch;
+    fetch = _remoteDataSource
+        .fetchTemplate(cacheKey)
+        .then((dto) {
+          final template = dto.toDomain();
+          if (cacheGeneration == _templateDetailCacheGeneration) {
+            _rememberTemplateDetail(cacheKey, template, DateTime.now().toUtc());
+          }
+          return template;
+        })
+        .whenComplete(() {
+          if (identical(_templateDetailFetchesById[cacheKey], fetch)) {
+            _templateDetailFetchesById.remove(cacheKey);
+          }
+        });
+    _templateDetailFetchesById[cacheKey] = fetch;
+    return fetch;
+  }
+
+  @override
+  Future<TemplateItem?> fetchRandomTemplate({
+    required TemplateRandomMode mode,
+    required String? category,
+    required bool includePremium,
+  }) async {
+    final cacheGeneration = _templateDetailCacheGeneration;
+    final dto = await _remoteDataSource.fetchRandomTemplate(
+      mode: mode,
+      category: category,
+      includePremium: includePremium,
+    );
+    final template = dto.toDomain();
+    if (template != null && cacheGeneration == _templateDetailCacheGeneration) {
+      _rememberTemplateDetail(
+        template.templateId,
+        template,
+        DateTime.now().toUtc(),
       );
     }
-
-    await syncCatalog();
-    final refreshedDto = await _cacheDataSource.readPage(query);
-    if (refreshedDto != null) {
-      return refreshedDto.toDomain();
-    }
-
-    return const TemplatesFeedPage(items: [], hasMore: false, page: 1);
+    return template;
   }
 
   @override
@@ -119,12 +212,17 @@ class DefaultTemplatesRepository implements TemplatesRepository {
 
   @override
   Future<List<String>> fetchCategories() async {
-    final localCategories = await _cacheDataSource.readCategories();
-    if (localCategories.isNotEmpty) {
-      return localCategories;
+    try {
+      return await _remoteDataSource.fetchCategories();
+    } on RequestCancelledException {
+      rethrow;
+    } on AppException {
+      final localCategories = await _cacheDataSource.readCategories();
+      if (localCategories.isNotEmpty) {
+        return localCategories;
+      }
+      rethrow;
     }
-
-    return _remoteDataSource.fetchCategories();
   }
 
   @override
@@ -163,10 +261,14 @@ class DefaultTemplatesRepository implements TemplatesRepository {
       return _performFullResync(knownRemoteVersion: remoteVersion);
     }
 
-    final deletedPreviewUrls = await _cacheDataSource.applyCatalogChanges(
+    final staleMediaUrls = await _cacheDataSource.applyCatalogChanges(
       changesDto,
     );
-    await _cleanupDeletedPreviewUrls(deletedPreviewUrls);
+    _forgetTemplateDetails([
+      ...changesDto.deletedIds,
+      ...changesDto.upserts.map((item) => item.templateId),
+    ]);
+    await _cleanupDeletedMediaUrls(staleMediaUrls);
     return _cacheDataSource.readCatalogVersion();
   }
 
@@ -174,45 +276,118 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     final targetVersion = knownRemoteVersion ?? await fetchCatalogVersion();
     final previousItems = await _cacheDataSource.readCatalogItems();
     final allItems = <TemplateItemDto>[];
-    String? cursor;
+    var page = 1;
 
     while (true) {
-      final response = await _remoteDataSource.fetchFeed(
-        TemplatesQuery(cursor: cursor, pageSize: _fullResyncPageSize),
+      final response = await _remoteDataSource.fetchCatalogPage(
+        page: page,
+        pageSize: _fullResyncPageSize,
       );
       allItems.addAll(response.items);
-      if (!response.hasMore) {
+      if (!response.hasMore || response.items.isEmpty) {
         break;
       }
 
-      final nextCursor = response.nextCursor;
-      if (nextCursor == null || nextCursor.trim().isEmpty) {
-        break;
-      }
-
-      cursor = nextCursor;
+      page = response.page + 1;
     }
 
-    final incomingIds = allItems.map((item) => item.templateId).toSet();
-    final removedPreviewUrls = previousItems
-        .where((item) => !incomingIds.contains(item.templateId))
-        .map((item) => item.previewAsset?.url.trim())
-        .whereType<String>()
-        .where((url) => url.isNotEmpty)
+    final incomingMediaUrls = allItems.expand(_templateMediaUrls).toSet();
+    final staleMediaUrls = previousItems
+        .expand(_templateMediaUrls)
+        .where((url) => !incomingMediaUrls.contains(url))
+        .toSet()
         .toList(growable: false);
 
     await _cacheDataSource.replaceCatalog(allItems, version: targetVersion);
-    await _cleanupDeletedPreviewUrls(removedPreviewUrls);
+    _clearTemplateDetails(forceGeneration: true);
+    await _cleanupDeletedMediaUrls(staleMediaUrls);
     return targetVersion;
   }
 
-  Future<void> _cleanupDeletedPreviewUrls(List<String> urls) async {
-    for (final url in urls) {
+  void _rememberTemplateDetail(
+    String templateId,
+    TemplateItem template,
+    DateTime nowUtc,
+  ) {
+    final normalizedId = templateId.trim();
+    final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
+    _templateDetailsById.remove(cacheKey);
+    _templateDetailsById[cacheKey] = _CachedTemplateDetail(
+      template,
+      nowUtc.add(_templateDetailCacheTtl),
+    );
+
+    while (_templateDetailsById.length > _templateDetailCacheLimit) {
+      _templateDetailsById.remove(_templateDetailsById.keys.first);
+    }
+  }
+
+  void _forgetTemplateDetails(Iterable<String> templateIds) {
+    var changedAnyTemplate = false;
+    for (final templateId in templateIds) {
+      final normalizedId = templateId.trim();
+      final cacheKey = normalizedId.isEmpty ? templateId : normalizedId;
+      changedAnyTemplate = true;
+      _templateDetailsById.remove(cacheKey);
+      _templateDetailFetchesById.remove(cacheKey);
+    }
+
+    if (changedAnyTemplate) {
+      _templateDetailCacheGeneration++;
+    }
+  }
+
+  void _clearTemplateDetails({bool forceGeneration = false}) {
+    final hadCachedDetails =
+        _templateDetailsById.isNotEmpty ||
+        _templateDetailFetchesById.isNotEmpty;
+    _templateDetailsById.clear();
+    _templateDetailFetchesById.clear();
+    if (forceGeneration || hadCachedDetails) {
+      _templateDetailCacheGeneration++;
+    }
+  }
+
+  Future<void> _cleanupDeletedMediaUrls(List<String> urls) async {
+    for (final url in urls.toSet()) {
       try {
-        await TemplateMediaCache.removePreviewFile(url);
+        await _mediaCleanup(url);
       } catch (_) {
         // Best-effort cleanup only.
       }
     }
   }
+
+  static Future<void> _removeTemplateMediaFromCache(String url) async {
+    try {
+      await TemplateMediaCache.removeThumbnailFile(url);
+    } catch (_) {
+      // Best-effort cleanup only.
+    }
+
+    try {
+      await TemplateMediaCache.removePreviewFile(url);
+    } catch (_) {
+      // Best-effort cleanup only.
+    }
+  }
+
+  static Iterable<String> _templateMediaUrls(TemplateItemDto item) sync* {
+    final thumbnailUrl = item.thumbnailUrl?.trim();
+    if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+      yield thumbnailUrl;
+    }
+
+    final previewUrl = item.previewAsset?.url.trim();
+    if (previewUrl != null && previewUrl.isNotEmpty) {
+      yield previewUrl;
+    }
+  }
+}
+
+class _CachedTemplateDetail {
+  const _CachedTemplateDetail(this.template, this.expiresAtUtc);
+
+  final TemplateItem template;
+  final DateTime expiresAtUtc;
 }

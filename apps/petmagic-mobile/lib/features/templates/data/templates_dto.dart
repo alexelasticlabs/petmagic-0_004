@@ -58,6 +58,11 @@ class TemplateItemDto {
     required this.previewAsset,
     required this.musicDescription,
     required this.referenceVideoDurationSeconds,
+    required this.supportsGenerationResultInput,
+    required this.requiredInputMediaType,
+    required this.recommendedAfterImageGeneration,
+    required this.supportsGenerateSimilar,
+    required this.defaultVariationStrength,
     required this.version,
     required this.updatedAtUtc,
   });
@@ -76,6 +81,11 @@ class TemplateItemDto {
   final TemplateAssetDto? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
+  final bool supportsGenerationResultInput;
+  final String? requiredInputMediaType;
+  final bool recommendedAfterImageGeneration;
+  final bool supportsGenerateSimilar;
+  final String defaultVariationStrength;
   final int version;
   final DateTime? updatedAtUtc;
 
@@ -134,6 +144,16 @@ class TemplateItemDto {
       musicDescription: json['musicDescription'] as String?,
       referenceVideoDurationSeconds:
           (json['referenceVideoDurationSeconds'] as num?)?.toDouble(),
+      supportsGenerationResultInput:
+          json['supportsGenerationResultInput'] as bool? ?? false,
+      requiredInputMediaType: (json['requiredInputMediaType'] as String?)
+          ?.trim(),
+      recommendedAfterImageGeneration:
+          json['recommendedAfterImageGeneration'] as bool? ?? false,
+      supportsGenerateSimilar: json['supportsGenerateSimilar'] as bool? ?? true,
+      defaultVariationStrength: _normalizeVariationStrength(
+        json['defaultVariationStrength'] as String?,
+      ),
       version: (json['version'] as num?)?.toInt() ?? 0,
       updatedAtUtc: _parseDateTime(
         json['updatedAtUtc'] as String? ?? json['updatedAt'] as String?,
@@ -201,6 +221,20 @@ class TemplateItemDto {
     return 'application/octet-stream';
   }
 
+  static String _normalizeVariationStrength(String? raw) {
+    final normalized = raw?.trim();
+    return normalized == null || normalized.isEmpty ? 'medium' : normalized;
+  }
+
+  static TemplateType? _parseRequiredInputMediaType(String? raw) {
+    final normalized = raw?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    return templateTypeFromApi(normalized);
+  }
+
   Map<String, Object?> toJson() => {
     'templateId': templateId,
     'templateType': templateType,
@@ -216,6 +250,11 @@ class TemplateItemDto {
     'previewAsset': previewAsset?.toJson(),
     'musicDescription': musicDescription,
     'referenceVideoDurationSeconds': referenceVideoDurationSeconds,
+    'supportsGenerationResultInput': supportsGenerationResultInput,
+    'requiredInputMediaType': requiredInputMediaType,
+    'recommendedAfterImageGeneration': recommendedAfterImageGeneration,
+    'supportsGenerateSimilar': supportsGenerateSimilar,
+    'defaultVariationStrength': defaultVariationStrength,
     'version': version,
     'updatedAtUtc': updatedAtUtc?.toIso8601String(),
   };
@@ -235,6 +274,13 @@ class TemplateItemDto {
     previewAsset: previewAsset?.toDomain(),
     musicDescription: musicDescription,
     referenceVideoDurationSeconds: referenceVideoDurationSeconds,
+    supportsGenerationResultInput: supportsGenerationResultInput,
+    requiredInputMediaType: _parseRequiredInputMediaType(
+      requiredInputMediaType,
+    ),
+    recommendedAfterImageGeneration: recommendedAfterImageGeneration,
+    supportsGenerateSimilar: supportsGenerateSimilar,
+    defaultVariationStrength: defaultVariationStrength,
     version: version,
     updatedAtUtc: updatedAtUtc,
   );
@@ -357,6 +403,23 @@ class PublicTemplateOfTheDayDto {
   }
 
   TemplateOfTheDayItem? toDomain() => template?.toDomain();
+}
+
+class PublicRandomTemplateDto {
+  const PublicRandomTemplateDto({required this.template});
+
+  final TemplateItemDto? template;
+
+  factory PublicRandomTemplateDto.fromJson(Map<String, Object?> json) {
+    final rawTemplate = json['template'];
+    return PublicRandomTemplateDto(
+      template: rawTemplate is Map
+          ? TemplateItemDto.fromJson(Map<String, Object?>.from(rawTemplate))
+          : null,
+    );
+  }
+
+  TemplateItem? toDomain() => template?.toDomain();
 }
 
 class TemplateOfTheDayItemDto {

@@ -6,12 +6,17 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 
 final templatesRemoteDataSourceProvider = Provider<TemplatesRemoteDataSource>((
   ref,
 ) {
   final dataSource = TemplatesRemoteDataSource(ref.watch(dioProvider));
-  ref.onDispose(dataSource.cancelPendingFeedRequest);
+  ref.onDispose(() {
+    dataSource.cancelPendingFeedRequest();
+    dataSource.cancelPendingRandomTemplateRequest();
+    dataSource.cancelPendingMetadataRequests();
+  });
   return dataSource;
 });
 
@@ -20,6 +25,9 @@ class TemplatesRemoteDataSource {
 
   final Dio _dio;
   CancelToken? _feedCancelToken;
+  CancelToken? _randomCancelToken;
+  CancelToken? _categoriesCancelToken;
+  CancelToken? _templateOfTheDayCancelToken;
 
   Future<TemplatesFeedDto> fetchFeed(TemplatesQuery query) async {
     cancelPendingFeedRequest();
@@ -33,9 +41,38 @@ class TemplatesRemoteDataSource {
         cancelToken: cancelToken,
       );
 
+      final data = response.data;
+      if (data == null) {
+        throw const AppException('templates.catalog_page_response_empty');
+      }
+
+      return TemplatesFeedDto.fromJson(data);
+    } on DioException catch (error) {
+      if (_isCancelledRequest(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    } finally {
       if (identical(_feedCancelToken, cancelToken)) {
         _feedCancelToken = null;
       }
+    }
+  }
+
+  Future<TemplatesFeedDto> fetchCatalogPage({
+    required int page,
+    required int pageSize,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates',
+        queryParameters: <String, Object?>{'page': page, 'pageSize': pageSize},
+      );
 
       final data = response.data;
       if (data == null) {
@@ -44,7 +81,7 @@ class TemplatesRemoteDataSource {
 
       return TemplatesFeedDto.fromJson(data);
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -56,10 +93,85 @@ class TemplatesRemoteDataSource {
     }
   }
 
+  Future<TemplateItemDto> fetchTemplate(String templateId) async {
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates/${_encodePathSegment(templateId)}',
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const AppException('templates.template_response_empty');
+      }
+
+      return TemplateItemDto.fromJson(data);
+    } on DioException catch (error) {
+      if (_isCancelledRequest(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    }
+  }
+
+  Future<PublicRandomTemplateDto> fetchRandomTemplate({
+    required TemplateRandomMode mode,
+    required String? category,
+    required bool includePremium,
+  }) async {
+    cancelPendingRandomTemplateRequest();
+    final cancelToken = CancelToken();
+    _randomCancelToken = cancelToken;
+
+    try {
+      final response = await _dio.get<Map<String, Object?>>(
+        '/api/templates/random',
+        queryParameters: <String, Object?>{
+          if (mode != TemplateRandomMode.any)
+            'type': mode == TemplateRandomMode.video
+                ? TemplateType.video.apiValue
+                : TemplateType.image.apiValue,
+          if (category != null && category.trim().isNotEmpty)
+            'category': category.trim(),
+          'includePremium': includePremium,
+        },
+        cancelToken: cancelToken,
+      );
+      final data = response.data;
+      if (data == null) {
+        throw const AppException('templates.random_response_empty');
+      }
+
+      return PublicRandomTemplateDto.fromJson(data);
+    } on DioException catch (error) {
+      if (_isCancelledRequest(error)) {
+        throw const RequestCancelledException();
+      }
+
+      throw AppException(
+        _mapMessage(error),
+        statusCode: error.response?.statusCode,
+        cause: error,
+      );
+    } finally {
+      if (identical(_randomCancelToken, cancelToken)) {
+        _randomCancelToken = null;
+      }
+    }
+  }
+
   Future<List<String>> fetchCategories() async {
+    cancelPendingCategoriesRequest();
+    final cancelToken = CancelToken();
+    _categoriesCancelToken = cancelToken;
+
     try {
       final response = await _dio.get<List<dynamic>>(
         '/api/templates/categories',
+        cancelToken: cancelToken,
       );
       final data = response.data;
       if (data == null) {
@@ -79,7 +191,7 @@ class TemplatesRemoteDataSource {
 
       return categories;
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -88,13 +200,22 @@ class TemplatesRemoteDataSource {
         statusCode: error.response?.statusCode,
         cause: error,
       );
+    } finally {
+      if (identical(_categoriesCancelToken, cancelToken)) {
+        _categoriesCancelToken = null;
+      }
     }
   }
 
   Future<PublicTemplateOfTheDayDto> fetchTemplateOfTheDay() async {
+    cancelPendingTemplateOfTheDayRequest();
+    final cancelToken = CancelToken();
+    _templateOfTheDayCancelToken = cancelToken;
+
     try {
       final response = await _dio.get<Map<String, Object?>>(
         '/api/templates/template-of-the-day',
+        cancelToken: cancelToken,
       );
       final data = response.data;
       if (data == null) {
@@ -105,7 +226,7 @@ class TemplatesRemoteDataSource {
 
       return PublicTemplateOfTheDayDto.fromJson(data);
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -114,6 +235,10 @@ class TemplatesRemoteDataSource {
         statusCode: error.response?.statusCode,
         cause: error,
       );
+    } finally {
+      if (identical(_templateOfTheDayCancelToken, cancelToken)) {
+        _templateOfTheDayCancelToken = null;
+      }
     }
   }
 
@@ -126,7 +251,7 @@ class TemplatesRemoteDataSource {
   }) async {
     try {
       await _dio.post<void>(
-        '/api/templates/$templateId/analytics/events',
+        '/api/templates/${_encodePathSegment(templateId)}/analytics/events',
         data: <String, Object?>{
           'eventType': eventType,
           if (source != null && source.trim().isNotEmpty)
@@ -137,7 +262,7 @@ class TemplatesRemoteDataSource {
         },
       );
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -161,7 +286,7 @@ class TemplatesRemoteDataSource {
 
       return TemplatesCatalogVersionDto.fromJson(data);
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -188,7 +313,7 @@ class TemplatesRemoteDataSource {
 
       return TemplatesCatalogChangesDto.fromJson(data);
     } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) {
+      if (_isCancelledRequest(error)) {
         throw const RequestCancelledException();
       }
 
@@ -208,6 +333,65 @@ class TemplatesRemoteDataSource {
 
     cancelToken.cancel('Superseded by a newer templates feed request.');
     _feedCancelToken = null;
+  }
+
+  void cancelPendingRandomTemplateRequest() {
+    final cancelToken = _randomCancelToken;
+    if (cancelToken == null || cancelToken.isCancelled) {
+      return;
+    }
+
+    cancelToken.cancel('Superseded by a newer random template request.');
+    _randomCancelToken = null;
+  }
+
+  void cancelPendingMetadataRequests() {
+    cancelPendingCategoriesRequest();
+    cancelPendingTemplateOfTheDayRequest();
+  }
+
+  void cancelPendingCategoriesRequest() {
+    final cancelToken = _categoriesCancelToken;
+    if (cancelToken == null || cancelToken.isCancelled) {
+      return;
+    }
+
+    cancelToken.cancel('Superseded by hidden templates metadata lifecycle.');
+    _categoriesCancelToken = null;
+  }
+
+  void cancelPendingTemplateOfTheDayRequest() {
+    final cancelToken = _templateOfTheDayCancelToken;
+    if (cancelToken == null || cancelToken.isCancelled) {
+      return;
+    }
+
+    cancelToken.cancel('Superseded by hidden templates metadata lifecycle.');
+    _templateOfTheDayCancelToken = null;
+  }
+
+  String _encodePathSegment(String value) {
+    return Uri.encodeComponent(value);
+  }
+
+  bool _isCancelledRequest(DioException error) {
+    final innerError = error.error;
+    if (innerError is RequestCancelledException) {
+      return true;
+    }
+
+    if (innerError is DioException && _isCancelledRequest(innerError)) {
+      return true;
+    }
+
+    final message = [
+      error.message,
+      innerError?.toString(),
+      error.toString(),
+    ].whereType<String>().join('\n');
+    return CancelToken.isCancel(error) ||
+        error.type == DioExceptionType.cancel ||
+        message.contains('Request cancelled');
   }
 
   String _mapMessage(DioException error) {

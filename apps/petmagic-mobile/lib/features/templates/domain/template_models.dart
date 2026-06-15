@@ -52,6 +52,7 @@ class TemplateOfTheDayItem {
               fileName: previewUrl.split('/').last,
               contentType: isVideo ? 'video/mp4' : 'image/jpeg',
             ),
+      supportsGenerateSimilar: false,
     );
   }
 }
@@ -98,6 +99,11 @@ class TemplateItem {
     this.previewAsset,
     this.musicDescription,
     this.referenceVideoDurationSeconds,
+    this.supportsGenerationResultInput = false,
+    this.requiredInputMediaType,
+    this.recommendedAfterImageGeneration = false,
+    this.supportsGenerateSimilar = true,
+    this.defaultVariationStrength = 'medium',
     this.version = 0,
     this.updatedAtUtc,
   });
@@ -116,6 +122,11 @@ class TemplateItem {
   final TemplateAsset? previewAsset;
   final String? musicDescription;
   final double? referenceVideoDurationSeconds;
+  final bool supportsGenerationResultInput;
+  final TemplateType? requiredInputMediaType;
+  final bool recommendedAfterImageGeneration;
+  final bool supportsGenerateSimilar;
+  final String defaultVariationStrength;
   final int version;
   final DateTime? updatedAtUtc;
 
