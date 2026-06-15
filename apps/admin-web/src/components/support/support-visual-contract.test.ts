@@ -172,6 +172,14 @@ describe("support visual contract", () => {
     );
   });
 
+  it("keeps support inbox rows on compact admin radii", () => {
+    const source = readSupportStyles();
+    const conversationRowLayer = sliceBetween(source, ".conversationRow {", ".conversationRowButton");
+
+    expect(conversationRowLayer).toContain("border-radius: var(--radius-sm);");
+    expect(conversationRowLayer).not.toContain("border-radius: 0.9rem;");
+  });
+
   it("keeps attachment previews and side panel actions theme-aware", () => {
     const source = readSupportStyles();
     const attachmentAndSidePanelLayer = sliceBetween(
@@ -288,6 +296,31 @@ describe("support visual contract", () => {
     expect(sidePanelContentLayer).toContain("background: var(--surface-2);");
     expect(sidePanelContentLayer).toContain("color: var(--danger-soft-fg);");
     expect(sidePanelContentLayer).toContain("color: var(--danger);");
+  });
+
+  it("keeps support form fields accessible in keyboard and disabled states", () => {
+    const source = readSupportStyles();
+    const inboxFieldLayer = sliceBetween(source, ".searchInput,", ".inboxQueueGrid");
+    const queueToolLayer = sliceBetween(source, ".queueToolField select", ".list");
+    const infoPanelFieldLayer = sliceBetween(source, ".infoPanelSelect", ".infoPanelTagsWrap");
+
+    expect(inboxFieldLayer).toContain(".searchInput:focus-visible,\n.input:focus-visible,\n.textarea:focus-visible");
+    expect(inboxFieldLayer).toContain("box-shadow: var(--focus-ring);");
+    expect(inboxFieldLayer).toContain(".searchInput:disabled,\n.input:disabled,\n.textarea:disabled");
+    expect(inboxFieldLayer).toContain("cursor: not-allowed;");
+    expect(inboxFieldLayer).not.toMatch(/\.(?:searchInput|input|textarea):focus(?!-visible)/);
+
+    expect(queueToolLayer).toContain(".queueToolField select:focus-visible");
+    expect(queueToolLayer).toContain("box-shadow: var(--focus-ring);");
+    expect(queueToolLayer).not.toMatch(/\.queueToolField select:focus(?!-visible)/);
+
+    expect(infoPanelFieldLayer).toContain(".infoPanelSelect:focus-visible");
+    expect(infoPanelFieldLayer).toContain(".infoPanelTagInput:focus-visible");
+    expect(infoPanelFieldLayer).toContain(".infoPanelSelect:disabled");
+    expect(infoPanelFieldLayer).toContain(".infoPanelTagInput:disabled");
+    expect(infoPanelFieldLayer).toContain("box-shadow: var(--focus-ring);");
+    expect(infoPanelFieldLayer).toContain("opacity: 0.62;");
+    expect(infoPanelFieldLayer).not.toMatch(/\.(?:infoPanelSelect|infoPanelTagInput):focus(?!-visible)/);
   });
 
   it("keeps support media viewer, keyboard focus, and local scrollbars theme-aware", () => {
@@ -541,9 +574,8 @@ describe("support visual contract", () => {
     expect(queueRefreshLayer).toContain(
       "border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));"
     );
-    expect(queueRefreshLayer).toContain(
-      "outline: 1px solid color-mix(in srgb, var(--success) 45%, transparent);"
-    );
+    expect(queueRefreshLayer).toContain(".queueToolField select:focus-visible");
+    expect(queueRefreshLayer).toContain("box-shadow: var(--focus-ring);");
     expect(queueRefreshLayer).toContain(
       "color-mix(in srgb, var(--surface-2) 78%, var(--surface-1) 22%)"
     );
@@ -570,9 +602,9 @@ describe("support visual contract", () => {
     expect(ticketPanelLayer).toContain(
       "color-mix(in srgb, var(--surface-2) 82%, var(--surface-1) 18%)"
     );
-    expect(ticketPanelLayer).toContain(
-      "outline: 1px solid color-mix(in srgb, var(--success) 48%, transparent);"
-    );
+    expect(ticketPanelLayer).toContain(".infoPanelSelect:focus-visible");
+    expect(ticketPanelLayer).toContain(".infoPanelTagInput:focus-visible");
+    expect(ticketPanelLayer).toContain("box-shadow: var(--focus-ring);");
     expect(ticketPanelLayer).toContain(
       "border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));"
     );
@@ -666,6 +698,16 @@ describe("support visual contract", () => {
     expect(queueStatusLayer).toContain(
       "border-color: color-mix(in srgb, var(--text-muted) 32%, var(--border-soft));"
     );
+  });
+
+  it("uses dynamic viewport heights for support workspace and media viewer panels", () => {
+    const source = readSupportStyles();
+
+    expect(source).toContain("height: clamp(38rem, calc(100dvh - 10rem), 66rem);");
+    expect(source).toContain("max-height: calc(100dvh - 2.4rem);");
+    expect(source).toContain("max-height: calc(100dvh - 14rem);");
+    expect(source).toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
+    expect(source).not.toContain("100vh");
   });
 
   it("keeps late support workspace dark overrides below final polish styles", () => {

@@ -376,11 +376,18 @@
     box-shadow 140ms ease;
 }
 
-.searchInput:focus,
-.input:focus,
-.textarea:focus {
-  border-color: color-mix(in srgb, var(--success) 55%, var(--border-soft));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--success) 24%, transparent);
+.searchInput:focus-visible,
+.input:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.searchInput:disabled,
+.input:disabled,
+.textarea:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .inboxQueueGrid {
@@ -399,7 +406,7 @@
   display: grid;
   gap: 6px;
   padding: 8px 9px;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
   background: var(--surface-2);
   color: var(--text-strong);
@@ -419,7 +426,15 @@
   cursor: pointer;
 }
 
-.conversationRow:hover {
+.conversationRowButton:disabled,
+.conversationRow[data-disabled="true"] {
+  opacity: 0.62;
+  cursor: progress;
+  pointer-events: none;
+}
+
+.conversationRow:hover:not([data-disabled="true"]),
+.conversationRowButton:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--success) 46%, var(--border-soft));
   transform: translateY(-1px);
   background: var(--surface-hover);
@@ -662,8 +677,8 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 14px;
-  height: clamp(38rem, calc(100vh - 10rem), 66rem);
-  max-height: clamp(38rem, calc(100vh - 10rem), 66rem);
+  height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
   min-width: 0;
   overflow: hidden;
   position: relative;
@@ -2555,8 +2570,8 @@
   }
 
   .chatShell {
-    height: clamp(40rem, calc(100vh - 9rem), 68rem);
-    max-height: clamp(40rem, calc(100vh - 9rem), 68rem);
+    height: clamp(40rem, calc(100dvh - 9rem), 68rem);
+    max-height: clamp(40rem, calc(100dvh - 9rem), 68rem);
   }
 }
 
@@ -2573,7 +2588,7 @@
 
 .imageViewerPanel {
   width: min(100%, 72rem);
-  max-height: calc(100vh - 2.4rem);
+  max-height: calc(100dvh - 2.4rem);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
@@ -2602,7 +2617,7 @@
 .imageViewerImage {
   width: auto;
   max-width: 100%;
-  max-height: calc(100vh - 14rem);
+  max-height: calc(100dvh - 14rem);
   height: auto;
   object-fit: contain;
   border-radius: 0.9rem;
@@ -2612,7 +2627,7 @@
 .imageViewerVideo {
   width: min(100%, 70rem);
   max-width: 100%;
-  max-height: calc(100vh - 14rem);
+  max-height: calc(100dvh - 14rem);
   height: auto;
   border-radius: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, var(--border-soft));
@@ -2846,8 +2861,8 @@
   gap: 12px;
   min-width: 0;
   overflow-y: auto;
-  height: clamp(38rem, calc(100vh - 10rem), 66rem);
-  max-height: clamp(38rem, calc(100vh - 10rem), 66rem);
+  height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
 }
 
 .infoPanelFlat {
@@ -2857,8 +2872,8 @@
   border-radius: 0;
   background: var(--surface-1);
   min-width: 0;
-  height: clamp(38rem, calc(100vh - 10rem), 66rem);
-  max-height: clamp(38rem, calc(100vh - 10rem), 66rem);
+  height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2870,8 +2885,8 @@
   border-radius: 0;
   background: var(--surface-1);
   min-width: 0;
-  height: clamp(38rem, calc(100vh - 10rem), 66rem);
-  max-height: clamp(38rem, calc(100vh - 10rem), 66rem);
+  height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4164,9 +4179,10 @@
   padding: 0.2rem 0.38rem;
 }
 
-.queueToolField select:focus {
-  outline: 1px solid color-mix(in srgb, var(--success) 45%, transparent);
-  border-color: color-mix(in srgb, var(--success) 45%, var(--border-soft));
+.queueToolField select:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
 }
 
 .list {
@@ -4474,9 +4490,15 @@
   padding: 0.3rem 0.5rem;
 }
 
-.infoPanelSelect:focus {
-  outline: 1px solid color-mix(in srgb, var(--success) 48%, transparent);
-  border-color: color-mix(in srgb, var(--success) 48%, var(--border-soft));
+.infoPanelSelect:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.infoPanelSelect:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .infoPanelTagInputRow {
@@ -4496,9 +4518,15 @@
   padding: 0.35rem 0.55rem;
 }
 
-.infoPanelTagInput:focus {
-  outline: 1px solid color-mix(in srgb, var(--success) 48%, transparent);
-  border-color: color-mix(in srgb, var(--success) 48%, var(--border-soft));
+.infoPanelTagInput:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.infoPanelTagInput:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .infoPanelTagsWrap {
@@ -4884,7 +4912,7 @@
   grid-template-rows: auto auto auto 1fr auto;
   gap: 0.8rem;
   padding: 1rem;
-  min-height: clamp(42rem, calc(100vh - 9rem), 52rem);
+  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
 }
 
 .queuePaneHeader {
@@ -5146,7 +5174,7 @@
 .chatShell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: clamp(42rem, calc(100vh - 9rem), 52rem);
+  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
   padding: 0 !important;
   border-radius: 26px;
   overflow: hidden;
@@ -5777,8 +5805,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.72rem;
-  min-height: clamp(42rem, calc(100vh - 9rem), 52rem);
-  height: clamp(42rem, calc(100vh - 9rem), 52rem);
+  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
+  height: clamp(42rem, calc(100dvh - 9rem), 52rem);
   padding: 0.92rem;
 }
 

@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatFileSize,
   formatRelativeTime,
+  formatSafeSupportDownloadName,
   formatSafeSupportDisplay,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
@@ -20,6 +21,7 @@ import { type SupportConversationStatus } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { type Locale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type SupportInfoPanelProps = {
   locale: Locale;
@@ -27,6 +29,29 @@ type SupportInfoPanelProps = {
 };
 
 type SupportInfoAttachment = ReturnType<typeof getMessageAttachments>[number];
+
+function downloadSupportInfoBlobUrl(objectUrl: string, fileName: string): void {
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+function formatSupportInfoLogText(value: string | null | undefined, maxLength = 80) {
+  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
+}
+
+function getSupportInfoErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
 
 export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) {
   const [pendingStatusConfirm, setPendingStatusConfirm] =
@@ -36,6 +61,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   const [pendingAttachmentOpenKey, setPendingAttachmentOpenKey] = useState<string | null>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const attachmentOpenAbortControllerRef = useRef<AbortController | null>(null);
+  const previousConversationIdRef = useRef<string | null>(null);
 
   const {
     activeSidePanelTab,
@@ -65,6 +91,45 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     userQuery,
   } = controller;
 
+  const isRu = locale === "ru";
+  const panelText = useMemo(
+    () => ({
+      panelTabsLabel: isRu ? "Разделы панели" : "Panel tabs",
+      ticketInformation: isRu ? "Информация о тикете" : "Ticket information",
+      updated: isRu ? "Обновлён" : "Updated",
+      attachmentsTitle: (count: number) =>
+        isRu ? `Вложения (${count})` : `Attachments (${count})`,
+      viewAll: isRu ? "Смотреть все" : "View all",
+      noAttachments: isRu ? "Вложений пока нет" : "No attachments yet",
+      fileFallback: isRu ? "Файл" : "File",
+      operatorTags: isRu ? "Теги оператора" : "Operator tags",
+      addTag: isRu ? "Добавить тег" : "Add tag",
+      removeTag: isRu ? "Удалить тег" : "Remove tag",
+      tagFallback: isRu ? "Тег" : "Tag",
+      add: isRu ? "Добавить" : "Add",
+      tagHint: isRu
+        ? "Теги используются для быстрого поиска в очереди."
+        : "Tags are used for fast queue search.",
+      user: isRu ? "Пользователь" : "User",
+      purchases: isRu ? "Покупки" : "Purchases",
+      noData: isRu ? "Нет данных" : "No data",
+      ticketActions: isRu ? "Действия по тикету" : "Ticket actions",
+      closeConversationPrompt: isRu ? "Закрыть обращение?" : "Close conversation?",
+      close: isRu ? "Закрыть" : "Close",
+      cancel: isRu ? "Отмена" : "Cancel",
+      allAttachments: isRu ? "Все вложения" : "All attachments",
+      open: isRu ? "Открыть" : "Open",
+      activity: isRu ? "Активность" : "Activity",
+      failures: isRu ? "Ошибки" : "Failures",
+      occurrences: (count: number) => (isRu ? `Повторений: ${count}` : `Occurrences: ${count}`),
+      recentEvents: isRu ? "Последние события" : "Recent events",
+      noActivityData: isRu ? "Нет данных активности" : "No activity data",
+      conversationHistory: isRu ? "История диалога" : "Conversation history",
+      timeline: isRu ? "Таймлайн" : "Timeline",
+      timelineEmpty: isRu ? "История пуста" : "Timeline is empty",
+    }),
+    [isRu]
+  );
   const isUserPremium = canViewSubjectUserContext ? (userQuery.data?.isPremium ?? false) : false;
 
   useEffect(
@@ -98,6 +163,23 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
       return true;
     });
   }, [conversation?.messages]);
+
+  useEffect(() => {
+    const previousConversationId = previousConversationIdRef.current;
+    previousConversationIdRef.current = conversation?.conversationId ?? null;
+
+    if (!pendingStatusConfirm || statusMutation.isPending) {
+      return;
+    }
+
+    if (
+      !conversation ||
+      conversation.status === pendingStatusConfirm ||
+      (previousConversationId !== null && previousConversationId !== conversation.conversationId)
+    ) {
+      queueMicrotask(() => setPendingStatusConfirm(null));
+    }
+  }, [conversation, pendingStatusConfirm, statusMutation.isPending]);
 
   if (!conversation) {
     return null;
@@ -155,9 +237,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
       });
       if (!response.ok) {
         clientLogger.warn("support.attachment_open_failed", {
-          messageId,
+          messageId: formatSupportInfoLogText(messageId),
           status: response.status,
-          mimeType: attachment.mimeType,
+          mimeType: formatSupportInfoLogText(attachment.mimeType),
         });
         return;
       }
@@ -166,7 +248,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
       const objectUrl = URL.createObjectURL(blob);
       const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");
       if (!opened) {
-        URL.revokeObjectURL(objectUrl);
+        downloadSupportInfoBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
         return;
       }
 
@@ -177,9 +260,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
       }
 
       clientLogger.warn("support.attachment_open_failed", {
-        messageId,
-        mimeType: attachment.mimeType,
-        error,
+        messageId: formatSupportInfoLogText(messageId),
+        mimeType: formatSupportInfoLogText(attachment.mimeType),
+        ...getSupportInfoErrorDetails(error),
       });
     } finally {
       if (attachmentOpenAbortControllerRef.current === controller) {
@@ -226,7 +309,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
           <div
             className={styles.sidePanelTabs}
             role="tablist"
-            aria-label={locale === "ru" ? "Разделы панели" : "Panel tabs"}
+            aria-label={panelText.panelTabsLabel}
           >
             {sidePanelTabs
               .filter((tab) => tab.value !== "activity" && tab.value !== "dialog")
@@ -250,7 +333,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             <div className={styles.infoPanelSection}>
               <div className={styles.infoPanelSectionHeader}>
                 <span className={styles.infoPanelSectionTitle}>
-                  {locale === "ru" ? "Информация о тикете" : "Ticket information"}
+                  {panelText.ticketInformation}
                 </span>
               </div>
               <div className={styles.infoPanelKvRow}>
@@ -279,7 +362,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   <span className={styles.infoPanelKvIcon} aria-hidden="true">
                     ↻
                   </span>
-                  <span>{locale === "ru" ? "Обновлён" : "Updated"}</span>
+                  <span>{panelText.updated}</span>
                 </span>
                 <strong>{formatDateTime(conversation.updatedAtUtc, locale)}</strong>
               </div>
@@ -288,9 +371,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             <div className={styles.infoPanelSection}>
               <div className={styles.infoPanelSectionHeader}>
                 <span className={styles.infoPanelSectionTitle}>
-                  {locale === "ru"
-                    ? `Вложения (${recentAttachments.length})`
-                    : `Attachments (${recentAttachments.length})`}
+                  {panelText.attachmentsTitle(recentAttachments.length)}
                 </span>
                 {remainingAttachmentCount > 0 ? (
                   <button
@@ -298,14 +379,12 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     className={styles.infoPanelSectionLinkButton}
                     onClick={() => setActiveSidePanelTab("attachments")}
                   >
-                    {locale === "ru" ? "Смотреть все" : "View all"}
+                    {panelText.viewAll}
                   </button>
                 ) : null}
               </div>
               {recentAttachments.length === 0 ? (
-                <span className={styles.subtle}>
-                  {locale === "ru" ? "Вложений пока нет" : "No attachments yet"}
-                </span>
+                <span className={styles.subtle}>{panelText.noAttachments}</span>
               ) : (
                 <div className={styles.infoPanelAttachmentPreviewStrip}>
                   {attachmentPreviewEntries.map((entry, index) => {
@@ -313,7 +392,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     const isImage = attachment.mimeType.toLowerCase().startsWith("image/");
                     const safeName = formatSafeSupportDisplay(
                       attachment.fileName,
-                      locale === "ru" ? "Файл" : "File",
+                      panelText.fileFallback,
                       120
                     );
 
@@ -372,7 +451,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             <div className={styles.infoPanelSection}>
               <div className={styles.infoPanelSectionHeader}>
                 <span className={styles.infoPanelSectionTitle}>
-                  {locale === "ru" ? "Теги оператора" : "Operator tags"}
+                  {panelText.operatorTags}
                 </span>
                 <button
                   type="button"
@@ -385,8 +464,8 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     window.setTimeout(() => tagInputRef.current?.focus(), 0);
                   }}
                   disabled={!canManageSupportWorkspace}
-                  aria-label={locale === "ru" ? "Добавить тег" : "Add tag"}
-                  title={locale === "ru" ? "Добавить тег" : "Add tag"}
+                  aria-label={panelText.addTag}
+                  title={panelText.addTag}
                 >
                   +
                 </button>
@@ -400,9 +479,9 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       className={styles.infoPanelTagChip}
                       onClick={() => removeOperatorTag(tag)}
                       disabled={!canManageSupportWorkspace}
-                      title={locale === "ru" ? "Удалить тег" : "Remove tag"}
+                      title={panelText.removeTag}
                     >
-                      {formatSafeSupportDisplay(tag, locale === "ru" ? "Тег" : "Tag", 40)}{" "}
+                      {formatSafeSupportDisplay(tag, panelText.tagFallback, 40)}{" "}
                       <span aria-hidden="true">×</span>
                     </button>
                   ))}
@@ -432,21 +511,17 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     onClick={handleAddTag}
                     disabled={!canManageSupportWorkspace || !tagInput.trim()}
                   >
-                    {locale === "ru" ? "Добавить" : "Add"}
+                    {panelText.add}
                   </Button>
                 </div>
               ) : null}
-              <span className={styles.subtle}>
-                {locale === "ru"
-                  ? "Теги используются для быстрого поиска в очереди."
-                  : "Tags are used for fast queue search."}
-              </span>
+              <span className={styles.subtle}>{panelText.tagHint}</span>
             </div>
 
             <div className={styles.infoPanelSection}>
               <div className={styles.infoPanelSectionHeader}>
                 <span className={styles.infoPanelSectionTitle}>
-                  {locale === "ru" ? "Пользователь" : "User"}
+                  {panelText.user}
                 </span>
               </div>
               {canViewSubjectUserContext ? (
@@ -472,7 +547,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     className={`${styles.infoPanelStatTileFull} ${styles.infoPanelStatTileButton}`}
                     onClick={() => setActiveSidePanelTab("activity")}
                   >
-                    <span>{locale === "ru" ? "Покупки" : "Purchases"}</span>
+                    <span>{panelText.purchases}</span>
                     <strong>{String(totalPurchases)}</strong>
                   </button>
                 ) : null}
@@ -485,9 +560,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   <strong>
                     {lastActivityAtUtc
                       ? formatDateTime(lastActivityAtUtc, locale)
-                      : locale === "ru"
-                        ? "Нет данных"
-                        : "No data"}
+                      : panelText.noData}
                   </strong>
                 </button>
               </div>
@@ -496,7 +569,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
             <div className={styles.infoPanelSection}>
               <div className={styles.infoPanelSectionHeader}>
                 <span className={styles.infoPanelSectionTitle}>
-                  {locale === "ru" ? "Действия по тикету" : "Ticket actions"}
+                  {panelText.ticketActions}
                 </span>
               </div>
 
@@ -504,7 +577,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                 {pendingStatusConfirm ? (
                   <div className={styles.spConfirmBox}>
                     <span className={styles.spConfirmText}>
-                      {locale === "ru" ? "Закрыть обращение?" : "Close conversation?"}
+                      {panelText.closeConversationPrompt}
                     </span>
                     <div className={styles.spConfirmActions}>
                       <Button
@@ -513,14 +586,15 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                         onClick={() => void confirmPendingStatusChange()}
                         disabled={!canManageSupportWorkspace || statusMutation.isPending}
                       >
-                        {locale === "ru" ? "Закрыть" : "Close"}
+                        {panelText.close}
                       </Button>
                       <Button
                         variant="secondary"
                         size="sm"
                         onClick={() => setPendingStatusConfirm(null)}
+                        disabled={statusMutation.isPending}
                       >
-                        {locale === "ru" ? "Отмена" : "Cancel"}
+                        {panelText.cancel}
                       </Button>
                     </div>
                   </div>
@@ -577,20 +651,18 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
           <div className={styles.infoPanelSection}>
             <div className={styles.infoPanelSectionHeader}>
               <span className={styles.infoPanelSectionTitle}>
-                {locale === "ru" ? "Все вложения" : "All attachments"}
+                {panelText.allAttachments}
               </span>
             </div>
             {recentAttachments.length === 0 ? (
-              <span className={styles.subtle}>
-                {locale === "ru" ? "Вложений пока нет" : "No attachments yet"}
-              </span>
+              <span className={styles.subtle}>{panelText.noAttachments}</span>
             ) : (
               <div className={styles.attachmentList}>
                 {recentAttachments.map((entry, index) => {
                   const { attachment } = entry;
                   const safeName = formatSafeSupportDisplay(
                     attachment.fileName,
-                    locale === "ru" ? "Файл" : "File",
+                    panelText.fileFallback,
                     120
                   );
                   const isImage = attachment.mimeType.toLowerCase().startsWith("image/");
@@ -670,7 +742,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                           }
                           className="ui-button ui-button--secondary ui-button--sm"
                         >
-                          {locale === "ru" ? "Открыть" : "Open"}
+                          {panelText.open}
                         </button>
                       </div>
                     </div>
@@ -685,14 +757,14 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
           <div className={styles.infoPanelSection}>
             <div className={styles.infoPanelSectionHeader}>
               <span className={styles.infoPanelSectionTitle}>
-                {locale === "ru" ? "Активность" : "Activity"}
+                {panelText.activity}
               </span>
             </div>
             <div className={styles.sidePanelContent}>
               {canViewSubjectUserContext && recentUserPurchases.length > 0 ? (
                 <div className={styles.sectionBlock}>
                   <div className={styles.sectionHeaderCompact}>
-                    <strong>{locale === "ru" ? "Покупки" : "Purchases"}</strong>
+                    <strong>{panelText.purchases}</strong>
                   </div>
                   <div className={styles.timelineList}>
                     {recentUserPurchases.slice(0, 4).map((purchase) => (
@@ -724,7 +796,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
               {recentFailures.length > 0 ? (
                 <div className={styles.sectionBlock}>
                   <div className={styles.sectionHeaderCompact}>
-                    <strong>{locale === "ru" ? "Ошибки" : "Failures"}</strong>
+                    <strong>{panelText.failures}</strong>
                   </div>
                   <div className={styles.timelineList}>
                     {recentFailures.map((item) => (
@@ -733,11 +805,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                           <strong>{formatSafeSupportDisplay(item.failureCode, "—", 120)}</strong>
                           <span>{formatRelativeTime(item.lastOccurredAtUtc, locale)}</span>
                         </div>
-                        <p className={styles.timelineCardBody}>
-                          {locale === "ru"
-                            ? `Повторений: ${item.count}`
-                            : `Occurrences: ${item.count}`}
-                        </p>
+                        <p className={styles.timelineCardBody}>{panelText.occurrences(item.count)}</p>
                       </article>
                     ))}
                   </div>
@@ -746,7 +814,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
 
               <div className={styles.sectionBlock}>
                 <div className={styles.sectionHeaderCompact}>
-                  <strong>{locale === "ru" ? "Последние события" : "Recent events"}</strong>
+                  <strong>{panelText.recentEvents}</strong>
                 </div>
                 <div className={styles.timelineList}>
                   {activityTimeline.length > 0 ? (
@@ -760,9 +828,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       </article>
                     ))
                   ) : (
-                    <span className={styles.subtle}>
-                      {locale === "ru" ? "Нет данных активности" : "No activity data"}
-                    </span>
+                    <span className={styles.subtle}>{panelText.noActivityData}</span>
                   )}
                 </div>
               </div>
@@ -774,13 +840,13 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
           <div className={styles.infoPanelSection}>
             <div className={styles.infoPanelSectionHeader}>
               <span className={styles.infoPanelSectionTitle}>
-                {locale === "ru" ? "История диалога" : "Conversation history"}
+                {panelText.conversationHistory}
               </span>
             </div>
             <div className={styles.sidePanelContent}>
               <div className={styles.sectionBlock}>
                 <div className={styles.sectionHeaderCompact}>
-                  <strong>{locale === "ru" ? "Таймлайн" : "Timeline"}</strong>
+                  <strong>{panelText.timeline}</strong>
                 </div>
                 <div className={styles.timelineList}>
                   {conversationTimeline.length > 0 ? (
@@ -794,9 +860,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                       </article>
                     ))
                   ) : (
-                    <span className={styles.subtle}>
-                      {locale === "ru" ? "История пуста" : "Timeline is empty"}
-                    </span>
+                    <span className={styles.subtle}>{panelText.timelineEmpty}</span>
                   )}
                 </div>
               </div>

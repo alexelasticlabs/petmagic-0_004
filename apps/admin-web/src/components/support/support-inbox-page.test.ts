@@ -16,17 +16,29 @@ describe("support inbox page", () => {
     );
     expect(source).toContain("ensureAdminSession(locale, router);");
     expect(source).toContain("enabled: canManageSupportWorkspace");
+    expect(source).toContain("function requestInboxRetry()");
     expect(source).toContain(
-      "if (!canManageSupportWorkspace) {\n                  return;\n                }\n\n                void inboxQuery.refetch().catch(() => undefined);"
+      "if (!canManageSupportWorkspace || inboxQuery.isFetching) {\n      return;\n    }"
     );
     expect(source).toContain("inboxQuery.refetch().catch(() => undefined)");
+    expect(source).toContain("onClick={requestInboxRetry}");
     expect(source).toContain("disabled={!canManageSupportWorkspace || inboxQuery.isFetching}");
+    expect(source).toContain("title={text.supportEmpty}");
+    expect(source).toContain("{text.supportRefresh}");
     expect(source).toContain("!canManageSupportWorkspace ||\n    inboxQuery.isLoading");
     expect(source).toContain("{text.adminRetryAction}");
     expect(source).toContain("useQuery<AdminSupportInboxPage>");
     expect(source).toContain("sortSupportQueueItems(inboxQuery.data?.items ?? [])");
+    expect(source).toContain("const sortedConversationIdSignature = sortedConversations");
+    expect(source).toContain(".map((conversation) => conversation.conversationId)");
+    expect(source).toContain("sortedConversationIdSignature.split(\"|\").includes(selectedConversationId)");
+    expect(source).toContain("queueMicrotask(() => setSelectedConversationId(null));");
+    expect(source).toContain(
+      "selectedConversationId &&\n      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)"
+    );
     expect(source).not.toContain("enabled: Boolean(session)");
     expect(source).not.toContain("disabled={!session || inboxQuery.isFetching}");
     expect(source).not.toContain("sortSupportQueueItems(inboxQuery.data ?? [])");
+    expect(source).not.toContain("onClick={() => {\n                if (!canManageSupportWorkspace)");
   });
 });

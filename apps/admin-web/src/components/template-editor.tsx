@@ -1,6 +1,10 @@
 "use client";
 
-import { AdminMetricStrip, AdminSectionHeader } from "@/components/admin/admin-primitives";
+import {
+  AdminMetricStrip,
+  AdminSectionHeader,
+  AdminStateCard,
+} from "@/components/admin/admin-primitives";
 import { TemplateBasicFields } from "@/components/templates/template-basic-fields";
 import {
   TemplateEditorFooter,
@@ -22,6 +26,7 @@ import {
 } from "@/components/templates/template-form-mappers";
 import { TemplatePreviewAssetSection } from "@/components/templates/template-preview-asset-section";
 import { useTemplateEditorController } from "@/components/templates/use-template-editor-controller";
+import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
 import { type TemplateType } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
@@ -44,6 +49,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     form,
     handleSubmit,
     handleUpload,
+    initializationError,
     isEditMode,
     isLoading,
     isSaving,
@@ -53,6 +59,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
     previewTags,
     referenceFile,
     resetForm,
+    retryInitialization,
     router,
     setEditorStatus,
     setForm,
@@ -64,6 +71,28 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
   if (isLoading) {
     return <TemplateEditorLoadingState />;
+  }
+
+  if (initializationError) {
+    return (
+      <section className={styles.templateEditorPage}>
+        <TemplateEditorHeader
+          catalogLabel={catalogLabel}
+          currentLabel={text.updateTemplate}
+          onNavigateCatalog={() => router.push(catalogPath)}
+        />
+        <AdminStateCard
+          tone="danger"
+          title={initializationError}
+          action={
+            <Button type="button" variant="secondary" onClick={retryInitialization}>
+              {locale === "ru" ? "Повторить" : "Retry"}
+            </Button>
+          }
+        />
+        {activeToast ? <Toast message={activeToast.message} type={activeToast.type} /> : null}
+      </section>
+    );
   }
 
   return (
@@ -120,7 +149,6 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
               <div className={styles.mediaGrid}>
                 <TemplatePreviewAssetSection
-                  locale={locale}
                   text={text}
                   form={form}
                   setForm={setForm}
@@ -132,7 +160,6 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
 
                 {isVideo ? (
                   <TemplateReferenceAssetSection
-                    locale={locale}
                     text={text}
                     form={form}
                     setForm={setForm}

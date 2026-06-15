@@ -9,6 +9,7 @@ const supportHelpersPath = fileURLToPath(
 );
 const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
 const supportPagePath = fileURLToPath(new URL("./support-conversation-page.tsx", import.meta.url));
+const supportSecureMediaPath = fileURLToPath(new URL("./support-secure-media.tsx", import.meta.url));
 
 describe("support sensitive display", () => {
   it("sanitizes activity timeline values before rendering them in support panels", () => {
@@ -56,12 +57,16 @@ describe("support sensitive display", () => {
   it("sanitizes operator tags and keeps tag input bounded", () => {
     const source = readFileSync(supportInfoPanelPath, "utf8");
 
-    expect(source).toContain(
-      'formatSafeSupportDisplay(tag, locale === "ru" ? "Тег" : "Tag", 40)'
-    );
+    expect(source).toContain("tagFallback: isRu ? \"Тег\" : \"Tag\"");
+    expect(source).toContain("formatSafeSupportDisplay(tag, panelText.tagFallback, 40)");
+    expect(source).toContain("aria-label={panelText.addTag}");
+    expect(source).toContain("title={panelText.removeTag}");
     expect(source).toContain("setTagInput(event.target.value.slice(0, 40))");
     expect(source).toContain("maxLength={40}");
     expect(source).toContain("disabled={!canManageSupportWorkspace || !tagInput.trim()}");
+    expect(source).not.toContain(
+      'formatSafeSupportDisplay(tag, locale === "ru" ? "Тег" : "Tag", 40)'
+    );
     expect(source).not.toContain("{tag} <span aria-hidden=\"true\">×</span>");
     expect(source).not.toContain("onChange={(event) => setTagInput(event.target.value)}");
   });
@@ -101,22 +106,38 @@ describe("support sensitive display", () => {
     expect(helperSource).toContain("const safeValue = formatSafeSupportDisplay(value, \"—\", 32)");
     expect(helperSource).not.toContain("return value.length > 8");
     expect(supportPageSource).toContain(
-      "const safeFileName = formatSafeSupportDownloadName(fullscreenImage.fileName, defaultFileName)"
+      "const safeFileName = formatSafeSupportDownloadName(\n        currentFullscreenImage.fileName,\n        defaultFileName\n      )"
     );
     expect(supportPageSource).toContain(
-      "title: formatSafeSupportDisplay(fullscreenImage.fileName, \"Support attachment\", 120)"
+      "title: formatSafeSupportDisplay(\n          currentFullscreenImage.fileName,\n          \"Support attachment\",\n          120\n        )"
     );
     expect(supportPageSource).toMatch(/formatSafeSupportDisplay\(\s*message\.replyToPreview/);
     expect(supportPageSource).toContain(
       "formatSafeSupportDisplay(message.body, \"\", 2000)"
     );
-    expect(supportPageSource).toContain(
-      "if (!canManageSupportWorkspace) {\n                          return;\n                        }\n\n                        void inboxQuery.refetch().catch(() => undefined);"
-    );
+    expect(supportPageSource).toContain("const requestInboxRetry = () => {");
+    expect(supportPageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
+    expect(supportPageSource).toContain("void inboxQuery.refetch().catch(() => undefined);");
+    expect(supportPageSource).toContain("onClick={requestInboxRetry}");
     expect(supportPageSource).toContain("disabled={!canManageSupportWorkspace || inboxQuery.isFetching}");
     expect(supportPageSource).not.toContain("<div className={styles.messageBody}>{message.body}</div>");
     expect(supportPageSource).not.toContain(
       "const file = new File([blob], fullscreenImage.fileName?.trim() || defaultFileName"
     );
+  });
+
+  it("keeps support secure media telemetry sanitized", () => {
+    const secureMediaSource = readFileSync(supportSecureMediaPath, "utf8");
+
+    expect(secureMediaSource).toContain("import { sanitizeSensitiveText }");
+    expect(secureMediaSource).toContain("function formatSupportMediaLogText(");
+    expect(secureMediaSource).toContain("function getSupportMediaErrorDetails(error: unknown)");
+    expect(secureMediaSource).toContain(
+      'errorName: error instanceof Error ? error.name : "UnknownError"'
+    );
+    expect(secureMediaSource).toContain("messageId: formatSupportMediaLogText(logContext?.messageId)");
+    expect(secureMediaSource).toContain("mimeType: formatSupportMediaLogText(logContext?.mimeType)");
+    expect(secureMediaSource).toContain("...getSupportMediaErrorDetails(error)");
+    expect(secureMediaSource).not.toContain("mimeType: logContext?.mimeType,\n          kind,\n          error");
   });
 });

@@ -46,18 +46,44 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     () => sortSupportQueueItems(inboxQuery.data?.items ?? []),
     [inboxQuery.data]
   );
+  const sortedConversationIdSignature = sortedConversations
+    .map((conversation) => conversation.conversationId)
+    .join("|");
+
+  useEffect(() => {
+    if (
+      !selectedConversationId ||
+      inboxQuery.isFetching ||
+      sortedConversationIdSignature.split("|").includes(selectedConversationId)
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => setSelectedConversationId(null));
+  }, [inboxQuery.isFetching, selectedConversationId, sortedConversationIdSignature]);
 
   const activeConversationId = useMemo(() => {
     if (sortedConversations.length === 0) {
       return null;
     }
 
-    if (selectedConversationId) {
+    if (
+      selectedConversationId &&
+      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)
+    ) {
       return selectedConversationId;
     }
 
     return sortedConversations[0]?.conversationId ?? null;
   }, [selectedConversationId, sortedConversations]);
+
+  function requestInboxRetry() {
+    if (!canManageSupportWorkspace || inboxQuery.isFetching) {
+      return;
+    }
+
+    void inboxQuery.refetch().catch(() => undefined);
+  }
 
   if (
     !canManageSupportWorkspace ||
@@ -85,13 +111,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
           action={
             <Button
               variant="secondary"
-              onClick={() => {
-                if (!canManageSupportWorkspace) {
-                  return;
-                }
-
-                void inboxQuery.refetch().catch(() => undefined);
-              }}
+              onClick={requestInboxRetry}
               disabled={!canManageSupportWorkspace || inboxQuery.isFetching}
             >
               {text.adminRetryAction}
@@ -109,6 +129,15 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
           tone="info"
           title={text.supportEmpty}
           description={text.supportDescription}
+          action={
+            <Button
+              variant="secondary"
+              onClick={requestInboxRetry}
+              disabled={!canManageSupportWorkspace || inboxQuery.isFetching}
+            >
+              {text.supportRefresh}
+            </Button>
+          }
         />
       </AdminPage>
     );

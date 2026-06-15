@@ -22,8 +22,15 @@ describe("support conversation controller errors", () => {
     expect(source).toContain("const pushSupportError = useCallback(");
     expect(source).toContain("getAdminErrorMessage(error, text.supportLoadError)");
     expect(source).toContain("pushSupportError(error)");
+    expect(source).toContain("function getSupportControllerErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("function formatSupportControllerLogText(");
+    expect(source).toContain("conversationId: formatSupportControllerLogText(conversationId)");
+    expect(source).toContain("...getSupportControllerErrorDetails(error)");
     expect(source).not.toContain('setToast({ type: "error", message: text.supportLoadError });');
     expect(source).not.toContain('pushSupportNotification("error", text.supportLoadError);');
+    expect(source).not.toContain("conversationId,\n            error");
+    expect(source).not.toContain("conversationId,\n          error");
   });
 
   it("keeps support workspace fetches and actions role-guarded at the controller layer", () => {
@@ -106,18 +113,30 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).not.toContain("(inboxQuery.data?.length ?? 0) >= SUPPORT_INBOX_PAGE_SIZE");
     expect(pageSource).toContain("setQueuePage((currentPage) => Math.max(1, currentPage - 1))");
     expect(pageSource).toContain("setQueuePage((currentPage) => currentPage + 1)");
-    expect(pageSource).toContain("disabled={!canGoToNextQueuePage || inboxQuery.isFetching}");
-    expect(pageSource).toContain(
+    expect(pageSource).toContain("disabled={!canGoToNextQueuePage || isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n                              return;\n                            }");
+    expect(pageSource).toContain('data-disabled={isQueueControlsLocked ? "true" : undefined}');
+    expect(pageSource).toContain("tabIndex={isQueueControlsLocked ? -1 : undefined}");
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n                            event.preventDefault();\n                          }");
+    expect(pageSource).toContain('previousPage: locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"');
+    expect(pageSource).toContain('nextPage: locale === "ru" ? "Следующая страница очереди" : "Next queue page"');
+    expect(pageSource).toContain("aria-label={queueLabels.previousPage}");
+    expect(pageSource).toContain("aria-label={queueLabels.nextPage}");
+    expect(pageSource).toContain("title={queueLabels.previousPage}");
+    expect(pageSource).toContain("title={queueLabels.nextPage}");
+    expect(pageSource).toContain("{queueLabels.title}");
+    expect(pageSource).toContain("{queueLabels.all} {queueCount}");
+    expect(pageSource).toContain("{queueLabels.unassigned} {unassignedCount}");
+    expect(pageSource).toContain("{queueLabels.archive} {archiveCount}");
+    expect(pageSource).toContain("{ value: \"all\", label: queueLabels.all }");
+    expect(pageSource).toContain("title={queueLabels.newMessagesTitle(incomingMessagesCount)}");
+    expect(pageSource).toContain("queueLabels.pageCount(");
+    expect(pageSource).not.toContain(
       'aria-label={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}'
     );
-    expect(pageSource).toContain(
+    expect(pageSource).not.toContain(
       'aria-label={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}'
-    );
-    expect(pageSource).toContain(
-      'title={locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"}'
-    );
-    expect(pageSource).toContain(
-      'title={locale === "ru" ? "Следующая страница очереди" : "Next queue page"}'
     );
     expect(pageSource).toContain(
       '<CaretDownIcon\n                        className={`${styles.queuePagerIcon} ${styles.queuePagerIconPrevious}`}'
@@ -127,7 +146,9 @@ describe("support conversation controller errors", () => {
     );
     expect(pageSource).not.toContain('{locale === "ru" ? "Назад" : "Previous"}');
     expect(pageSource).not.toContain('{locale === "ru" ? "Вперёд" : "Next"}');
-    expect(inboxPageSource).toContain("if (selectedConversationId) {");
+    expect(inboxPageSource).toContain(
+      "selectedConversationId &&\n      sortedConversations.some((conversation) => conversation.conversationId === selectedConversationId)"
+    );
   });
 
   it("bounds support queue search and reply composer values before storing them", () => {
@@ -163,14 +184,19 @@ describe("support conversation controller errors", () => {
     const stylesSource = readFileSync(supportStylesPath, "utf8");
 
     expect(pageSource).toContain("conversationQuery.isError || !conversation");
+    expect(pageSource).toContain("const requestConversationRetry = () => {");
     expect(pageSource).toContain(
-      "if (!canManageSupportWorkspace) {\n                    return;\n                  }\n\n                  void conversationQuery.refetch().catch(() => undefined);"
+      "if (!canManageSupportWorkspace || conversationQuery.isFetching) {\n      return;\n    }"
     );
     expect(pageSource).toContain("void conversationQuery.refetch().catch(() => undefined)");
+    expect(pageSource).toContain("onClick={requestConversationRetry}");
     expect(pageSource).toContain("disabled={!canManageSupportWorkspace || conversationQuery.isFetching}");
     expect(pageSource).toContain("{text.supportRetryAction}");
     expect(pageSource).toContain("{text.supportBackToInbox}");
     expect(pageSource).toContain("className={styles.errorActions}");
+    expect(pageSource).not.toContain(
+      "onClick={() => {\n                  if (!canManageSupportWorkspace)"
+    );
     expect(pageSource).not.toContain('style={{ display: "flex"');
     expect(stylesSource).toContain(".errorActions");
     expect(stylesSource).toContain("@media (max-width: 520px)");
@@ -182,8 +208,12 @@ describe("support conversation controller errors", () => {
 
     expect(pageSource).toContain("queueStatusFilter,");
     expect(pageSource).toContain(
+      "const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;"
+    );
+    expect(pageSource).toContain(
       'const setExactQueueStatusFilter = (value: "all" | SupportConversationStatus) => {'
     );
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
     expect(pageSource).toContain('setSubFilter("all");');
     expect(pageSource).toContain('setQueueFilter("all");');
     expect(pageSource).toContain("setQueueStatusFilter(value);");
@@ -191,6 +221,7 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain(
       'setExactQueueStatusFilter(value as "all" | SupportConversationStatus);'
     );
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
     expect(controllerSource).toContain('queueStatusFilter?: "all" | SupportConversationStatus;');
     expect(controllerSource).toContain(
       'const effectiveQueueStatus =\n    queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;'
@@ -210,17 +241,57 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain(
       'const setQueueSubFilter = (value: "all" | "unassigned" | "archive") => {'
     );
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n      return;\n    }");
     expect(pageSource).toContain('setQueueStatusFilter("all");');
     expect(pageSource).toContain('setQueueFilter("Closed");');
     expect(pageSource).toContain('setQueueFilter("unassigned");');
     expect(pageSource).toContain('setQueueFilter("all");');
     expect(pageSource).toContain('onClick={() => setQueueSubFilter("archive")}');
     expect(pageSource).toContain('onClick={() => setQueueSubFilter("unassigned")}');
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
     expect(pageSource).toContain("const displayedInboxItems = filteredInboxItems;");
     expect(pageSource).not.toContain('onClick={() => setSubFilter("archive")}');
     expect(pageSource).not.toContain('onClick={() => setSubFilter("unassigned")}');
     expect(pageSource).not.toContain('const isArchived = item.status === "Closed";');
     expect(pageSource).not.toContain("return !item.assignedAdminId;");
+  });
+
+  it("locks support queue controls while inbox data is refreshing", () => {
+    const pageSource = readFileSync(supportPagePath, "utf8");
+
+    expect(pageSource).toContain(
+      "const isQueueControlsLocked = !canManageSupportWorkspace || inboxQuery.isFetching;"
+    );
+    expect(pageSource).toContain("const requestPreviousQueuePage = () => {");
+    expect(pageSource).toContain(
+      "if (isQueueControlsLocked || !canGoToPreviousQueuePage) {\n      return;\n    }"
+    );
+    expect(pageSource).toContain("const requestNextQueuePage = () => {");
+    expect(pageSource).toContain(
+      "if (isQueueControlsLocked || !canGoToNextQueuePage) {\n      return;\n    }"
+    );
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={!canGoToPreviousQueuePage || isQueueControlsLocked}");
+    expect(pageSource).toContain("disabled={!canGoToNextQueuePage || isQueueControlsLocked}");
+    expect(pageSource).toContain("onClick={requestPreviousQueuePage}");
+    expect(pageSource).toContain("onClick={requestNextQueuePage}");
+    expect(pageSource).toContain("data-disabled={isQueueControlsLocked ? \"true\" : undefined}");
+    expect(pageSource).toContain("tabIndex={isQueueControlsLocked ? -1 : undefined}");
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n                              return;");
+    expect(pageSource).toContain("if (isQueueControlsLocked) {\n                            event.preventDefault();");
+    expect(pageSource).not.toContain("disabled={inboxQuery.isFetching}");
+    expect(pageSource).not.toContain("data-disabled={inboxQuery.isFetching ? \"true\" : undefined}");
+    expect(pageSource).not.toContain("tabIndex={inboxQuery.isFetching ? -1 : undefined}");
+    expect(pageSource).not.toContain(
+      "onClick={() => setQueuePage((currentPage) => Math.max(1, currentPage - 1))}"
+    );
+    expect(pageSource).not.toContain(
+      "onClick={() => setQueuePage((currentPage) => currentPage + 1)}"
+    );
   });
 
   it("sources support queue counters from backend aggregate metrics", () => {
@@ -259,11 +330,16 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("const inboxPageSize = inboxQuery.data?.pageSize ?? displayedInboxItems.length;");
     expect(pageSource).toContain("const inboxCurrentPage = inboxQuery.data?.page ?? queuePage;");
     expect(pageSource).toContain(
-      "? `Страница ${inboxCurrentPage}: показано ${queueShownStart}-${queueShownEnd} из ${inboxTotalCount}`"
+      "pageCount: (page: number, start: number, end: number, total: number) =>"
     );
     expect(pageSource).toContain(
-      ": `Page ${inboxCurrentPage}: showing ${queueShownStart}-${queueShownEnd} of ${inboxTotalCount}`"
+      "? `Страница ${page}: показано ${start}-${end} из ${total}`"
     );
+    expect(pageSource).toContain(
+      ": `Page ${page}: showing ${start}-${end} of ${total}`"
+    );
+    expect(pageSource).toContain("queueLabels.pageCount(");
+    expect(pageSource).toContain("inboxCurrentPage,\n                      queueShownStart,");
     expect(pageSource).not.toContain(
       "`Page ${queuePage}: showing ${displayedInboxItems.length} of ${filteredInboxItems.length}`"
     );
@@ -358,6 +434,7 @@ describe("support conversation controller errors", () => {
     expect(infoPanelSource).toContain(
       "if (!canManageSupportWorkspace || !pendingStatusConfirm || statusMutation.isPending)"
     );
+    expect(infoPanelSource).toContain("disabled={statusMutation.isPending}");
     expect(infoPanelSource).toContain("const requestStatusChange = (status: SupportConversationStatus) =>");
     expect(infoPanelSource).toContain(
       "!canManageSupportWorkspace ||\n      statusMutation.isPending ||\n      conversation.status === status"
@@ -372,6 +449,20 @@ describe("support conversation controller errors", () => {
     );
     expect(infoPanelSource).not.toContain("statusMutation.mutate(primaryStatusAction.status);");
     expect(infoPanelSource).not.toContain("statusMutation.mutate(action.status);");
+  });
+
+  it("clears stale close-conversation confirmations after ticket changes or status refreshes", () => {
+    const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
+
+    expect(infoPanelSource).toContain("const previousConversationIdRef = useRef<string | null>(null);");
+    expect(infoPanelSource).toContain(
+      "const previousConversationId = previousConversationIdRef.current;\n    previousConversationIdRef.current = conversation?.conversationId ?? null;"
+    );
+    expect(infoPanelSource).toContain("if (!pendingStatusConfirm || statusMutation.isPending)");
+    expect(infoPanelSource).toContain(
+      "!conversation ||\n      conversation.status === pendingStatusConfirm ||\n      (previousConversationId !== null && previousConversationId !== conversation.conversationId)"
+    );
+    expect(infoPanelSource).toContain("queueMicrotask(() => setPendingStatusConfirm(null));");
   });
 
   it("guards support reopen status actions in handlers, not only disabled UI", () => {
@@ -400,8 +491,39 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain("(!reply.trim() && !hasComposerAttachment)");
     expect(pageSource).toContain("disabled={isComposerDisabled}");
     expect(pageSource).toContain(
+      "selectReplyToMessage(null);\n    setReply(\"\");\n    resetSelectedAttachment();"
+    );
+    expect(pageSource).toContain("setFullscreenImage(null);");
+    expect(pageSource).toContain("setPendingFullscreenAction(null);");
+    expect(pageSource).toContain("setPendingAttachmentActionKey(null);");
+    expect(pageSource).toContain("setHighlightedMessageId(null);");
+    expect(pageSource).toContain("setIsDragging(false);");
+    expect(pageSource).toContain(
+      "[conversationId, resetSelectedAttachment, selectReplyToMessage, setReply]"
+    );
+    expect(pageSource).toContain(
       "className={styles.composerReplyClose}\n                              onClick={() => selectReplyToMessage(null)}\n                              disabled={isComposerDisabled}"
     );
+    expect(pageSource).toContain("const messageLabels = {");
+    expect(pageSource).toContain('openPhoto: locale === "ru" ? "Открыть фото" : "Open photo"');
+    expect(pageSource).toContain('openVideo: locale === "ru" ? "Открыть видео" : "Open video"');
+    expect(pageSource).toContain('reply: locale === "ru" ? "Ответить" : "Reply"');
+    expect(pageSource).toContain('replyTo: locale === "ru" ? "Ответ на" : "Reply to"');
+    expect(pageSource).toContain('cancelReply: locale === "ru" ? "Отменить ответ" : "Cancel reply"');
+    expect(pageSource).toContain('attachFile: locale === "ru" ? "Прикрепить файл" : "Attach file"');
+    expect(pageSource).toContain("aria-label={messageLabels.openPhoto}");
+    expect(pageSource).toContain("aria-label={messageLabels.openVideo}");
+    expect(pageSource).toContain("title={messageLabels.reply}");
+    expect(pageSource).toContain("aria-label={messageLabels.reply}");
+    expect(pageSource).toContain("{messageLabels.replyTo}");
+    expect(pageSource).toContain("aria-label={message.isRead ? messageLabels.read : messageLabels.sent}");
+    expect(pageSource).toContain("title={message.isRead ? messageLabels.read : messageLabels.sent}");
+    expect(pageSource).toContain("{messageLabels.jump}");
+    expect(pageSource).toContain("aria-label={messageLabels.cancelReply}");
+    expect(pageSource).toContain("aria-label={messageLabels.attachFile}");
+    expect(pageSource).not.toContain('aria-label={locale === "ru" ? "Открыть фото" : "Open photo"}');
+    expect(pageSource).not.toContain('title={locale === "ru" ? "Ответить" : "Reply"}');
+    expect(pageSource).not.toContain('aria-label={locale === "ru" ? "Прикрепить файл" : "Attach file"}');
     expect(pageSource).toContain("requestSendReply();");
     expect(pageSource).not.toContain("sendMutation.mutate();");
     expect(pageSource).not.toContain(
@@ -425,9 +547,11 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("}, [attachmentPreviewUrl]);");
     expect(controllerSource).toContain("const loadOlderMessages = useCallback(async () => {");
     expect(controllerSource).toContain("if (!canManageSupportWorkspace) {\n      return;\n    }");
+    expect(pageSource).toContain("const requestOlderMessagesLoad = () => {");
     expect(pageSource).toContain(
-      "if (!canManageSupportWorkspace) {\n                                return;\n                              }\n\n                              void loadOlderMessages();"
+      "if (!canManageSupportWorkspace || conversationQuery.isFetching) {\n      return;\n    }"
     );
+    expect(pageSource).toContain("onClick={requestOlderMessagesLoad}");
     expect(pageSource).toContain(
       "disabled={!canManageSupportWorkspace || conversationQuery.isFetching}"
     );

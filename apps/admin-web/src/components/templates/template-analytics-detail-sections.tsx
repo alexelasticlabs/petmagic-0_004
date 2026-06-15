@@ -126,6 +126,7 @@ export function TemplateAnalyticsRecentRunsSection({
               type="button"
               className={mode === "latest" ? styles.chartTabActive : styles.chartTab}
               onClick={() => onModeChange("latest")}
+              disabled={mode === "latest" || isLoading || !canLoadRecentRuns}
             >
               <span>{text.recentRunsLatest}</span>
             </button>
@@ -133,7 +134,7 @@ export function TemplateAnalyticsRecentRunsSection({
               type="button"
               className={mode === "all" ? styles.chartTabActive : styles.chartTab}
               onClick={() => onModeChange("all")}
-              disabled={isLoading || !canLoadRecentRuns}
+              disabled={mode === "all" || isLoading || !canLoadRecentRuns}
             >
               <span>{isLoading ? text.recentRunsLoading : text.recentRunsAll}</span>
             </button>
@@ -142,7 +143,7 @@ export function TemplateAnalyticsRecentRunsSection({
                 type="button"
                 className={mode === "failed" ? styles.chartTabActive : styles.chartTab}
                 onClick={() => onModeChange("failed")}
-                disabled={isLoading || !canLoadRecentRuns}
+                disabled={mode === "failed" || isLoading || !canLoadRecentRuns}
               >
                 <span>{text.recentRunsFailed}</span>
               </button>

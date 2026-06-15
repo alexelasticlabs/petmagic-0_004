@@ -51,7 +51,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import { maskEmail } from "@/lib/sensitive-display";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 import { useSupportRealtime } from "@/lib/support-realtime";
 
 type UseSupportConversationControllerParams = {
@@ -123,6 +123,20 @@ function isUserSupportMessageEvent(event: {
     (event.adminUnreadCount ?? 0) > 0 &&
     (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType)
   );
+}
+
+function formatSupportControllerLogText(value: string | null | undefined, maxLength = 80) {
+  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
+}
+
+function getSupportControllerErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
 }
 
 function isNotFoundError(error: unknown): boolean {
@@ -428,8 +442,8 @@ export function useSupportConversationController({
         })
         .catch((error) => {
           clientLogger.warn("support.realtime_fetch_conversation_failed", {
-            conversationId,
-            error,
+            conversationId: formatSupportControllerLogText(conversationId),
+            ...getSupportControllerErrorDetails(error),
           });
           void queryClient.invalidateQueries({
             queryKey: adminQueryKeys.supportConversation(conversationId),
@@ -474,8 +488,8 @@ export function useSupportConversationController({
       .then(refreshConversationData)
       .catch((error) => {
         clientLogger.warn("support.mark_read_failed", {
-          conversationId,
-          error,
+          conversationId: formatSupportControllerLogText(conversationId),
+          ...getSupportControllerErrorDetails(error),
         });
       })
       .finally(() => {

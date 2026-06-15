@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type SupportSecureMediaProps = {
   url: string;
@@ -26,6 +27,20 @@ type SupportSecureMediaProps = {
 
 function isLocalObjectUrl(url: string) {
   return url.startsWith("blob:") || url.startsWith("data:");
+}
+
+function formatSupportMediaLogText(value: string | null | undefined, maxLength = 80) {
+  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
+}
+
+function getSupportMediaErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
 }
 
 export function SupportSecureMedia({
@@ -70,8 +85,8 @@ export function SupportSecureMedia({
 
         if (!response.ok) {
           clientLogger.warn("support.secure_media_fetch_failed", {
-            messageId: logContext?.messageId,
-            mimeType: logContext?.mimeType,
+            messageId: formatSupportMediaLogText(logContext?.messageId),
+            mimeType: formatSupportMediaLogText(logContext?.mimeType),
             kind,
             status: response.status,
           });
@@ -93,10 +108,10 @@ export function SupportSecureMedia({
         }
 
         clientLogger.warn("support.secure_media_fetch_failed", {
-          messageId: logContext?.messageId,
-          mimeType: logContext?.mimeType,
+          messageId: formatSupportMediaLogText(logContext?.messageId),
+          mimeType: formatSupportMediaLogText(logContext?.mimeType),
           kind,
-          error,
+          ...getSupportMediaErrorDetails(error),
         });
         setRemoteMedia({ sourceUrl: url, objectUrl: null, failed: true });
       });

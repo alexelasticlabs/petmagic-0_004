@@ -16,6 +16,16 @@ describe("support info attachment links", () => {
     expect(source).toContain("URL.createObjectURL(blob)");
     expect(source).toContain("fetchWithTimeout(attachment.fileUrl");
     expect(source).toContain("support.attachment_open_failed");
+    expect(source).toContain("function getSupportInfoErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("function formatSupportInfoLogText(");
+    expect(source).toContain("messageId: formatSupportInfoLogText(messageId)");
+    expect(source).toContain("mimeType: formatSupportInfoLogText(attachment.mimeType)");
+    expect(source).toContain("...getSupportInfoErrorDetails(error)");
+    expect(source).toContain("formatSafeSupportDownloadName");
+    expect(source).toContain("function downloadSupportInfoBlobUrl(objectUrl: string, fileName: string): void");
+    expect(source).toContain("link.download = fileName;");
+    expect(source).not.toContain("mimeType: attachment.mimeType,\n        error");
   });
 
   it("aborts pending attachment opens on unmount and ignores abort errors", () => {
@@ -36,5 +46,17 @@ describe("support info attachment links", () => {
     expect(source.match(/pendingAttachmentOpenKey !== null/g) ?? []).toHaveLength(4);
     expect(source).not.toContain("pendingAttachmentOpenKey ===\n                          getAttachmentOpenKey");
     expect(source).not.toContain("pendingAttachmentOpenKey ===\n                            getAttachmentOpenKey");
+  });
+
+  it("falls back to safe blob downloads when attachment popups are blocked", () => {
+    const source = readFileSync(supportInfoPanelPath, "utf8");
+
+    expect(source).toContain('const opened = window.open(objectUrl, "_blank", "noopener,noreferrer");');
+    expect(source).toContain("if (!opened) {");
+    expect(source).toContain(
+      "downloadSupportInfoBlobUrl(objectUrl, formatSafeSupportDownloadName(attachment.fileName));"
+    );
+    expect(source).toContain("window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);");
+    expect(source).not.toContain("if (!opened) {\n        URL.revokeObjectURL(objectUrl);\n        return;\n      }");
   });
 });
