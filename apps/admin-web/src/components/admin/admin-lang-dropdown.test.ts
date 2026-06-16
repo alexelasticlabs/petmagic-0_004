@@ -25,6 +25,7 @@ describe("admin language dropdown", () => {
     );
     expect(source).toContain("aria-controls={open ? menuId : undefined}");
     expect(source).toContain("aria-label={triggerLabel}");
+    expect(source).toContain("title={triggerLabel}");
     expect(source).toContain(
       '<ul id={menuId} className={styles.localeMenu} role="listbox" aria-label={languageLabel}>'
     );
@@ -39,5 +40,11 @@ describe("admin language dropdown", () => {
     expect(stylesSource).toContain("display: inline-flex;");
     expect(stylesSource).toContain("color: var(--admin-accent);");
     expect(stylesSource).toContain(".localeCheck svg {");
+    expect(stylesSource).toContain("max-width: min(14rem, calc(100vw - 1rem));");
+    expect(stylesSource).toContain("max-height: calc(100dvh - 5rem);");
+    expect(stylesSource).toContain("overflow-y: auto;");
+    expect(stylesSource).toContain(".localeOption {\n  display: flex;");
+    expect(stylesSource).toContain("min-width: 0;");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
   });
 });

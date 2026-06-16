@@ -11,6 +11,21 @@ describe("login card logging", () => {
 
     expect(source).not.toContain("email: normalizedEmail");
     expect(source).toContain("maskedEmail: maskEmail(normalizedEmail)");
+    expect(source).toContain('import { maskEmail, sanitizeSensitiveText }');
+    expect(source).toContain("function getLoginClientErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain('"digest" in error');
+    expect(source).toContain(
+      'sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)'
+    );
+    expect(source).toContain("...getLoginClientErrorDetails(error)");
+    expect(source).not.toContain("sanitizeSensitiveText(error.message, 160)");
+    expect(source).not.toContain(
+      'clientLogger.warn("auth.legal_acceptance_with_session_versions_failed", {\n        locale,\n        error,'
+    );
+    expect(source).not.toContain(
+      'clientLogger.warn("auth.login_failed", {\n        locale,\n        maskedEmail: maskEmail(normalizedEmail),\n        error,'
+    );
   });
 
   it("keeps credential failures generic but surfaces safe network and server login errors", () => {

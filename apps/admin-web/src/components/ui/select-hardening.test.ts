@@ -37,11 +37,13 @@ describe("shared admin select hardening", () => {
     expect(source).toContain('const effectiveAriaLabel = ariaLabel ?? selectedOption?.label ?? "Select";');
     expect(source).toContain("aria-controls={isMenuOpen ? listboxId : undefined}");
     expect(source).toContain("aria-label={effectiveAriaLabel}");
+    expect(source).toContain("title={effectiveAriaLabel}");
     expect(source).toContain(
       '<div id={listboxId} className={styles.menu} role="listbox" aria-label={effectiveAriaLabel}>'
     );
     expect(source).not.toContain("aria-controls={listboxId}");
     expect(source).not.toContain("aria-label={ariaLabel}");
+    expect(source).not.toContain("title={ariaLabel}");
     expect(source).not.toContain('role="listbox" aria-label={ariaLabel}');
   });
 

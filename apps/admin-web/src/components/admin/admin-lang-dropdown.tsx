@@ -57,6 +57,7 @@ export function AdminLangDropdown({ locale, ruPath, enPath }: AdminLangDropdownP
         aria-haspopup="listbox"
         aria-controls={open ? menuId : undefined}
         aria-label={triggerLabel}
+        title={triggerLabel}
       >
         <GlobeIcon className={styles.localeIcon} />
         <span>{locale === "ru" ? "Русский" : "English"}</span>

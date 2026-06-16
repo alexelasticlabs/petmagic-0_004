@@ -1,4 +1,5 @@
 import { clientLogger } from "@/lib/client-logger";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type AdminTheme = "dark" | "light";
 
@@ -20,6 +21,16 @@ export function nextAdminTheme(current: AdminTheme): AdminTheme {
   return current === "dark" ? "light" : "dark";
 }
 
+function getThemeStorageErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function readStoredAdminTheme(): AdminTheme | null {
   if (typeof window === "undefined") {
     return null;
@@ -29,7 +40,7 @@ export function readStoredAdminTheme(): AdminTheme | null {
     const raw = window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY);
     return isAdminTheme(raw) ? raw : null;
   } catch (error) {
-    clientLogger.warn("theme.storage_read_failed", { error });
+    clientLogger.warn("theme.storage_read_failed", getThemeStorageErrorDetails(error));
     return null;
   }
 }
@@ -42,7 +53,7 @@ export function storeAdminTheme(theme: AdminTheme): void {
   try {
     window.localStorage.setItem(ADMIN_THEME_STORAGE_KEY, theme);
   } catch (error) {
-    clientLogger.warn("theme.storage_write_failed", { error });
+    clientLogger.warn("theme.storage_write_failed", getThemeStorageErrorDetails(error));
   }
 }
 

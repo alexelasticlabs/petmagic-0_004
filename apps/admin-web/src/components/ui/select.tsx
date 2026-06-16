@@ -159,6 +159,7 @@ export function Select({
         aria-expanded={isMenuOpen}
         aria-controls={isMenuOpen ? listboxId : undefined}
         aria-label={effectiveAriaLabel}
+        title={effectiveAriaLabel}
         disabled={isSelectDisabled}
         onClick={() => {
           if (isSelectDisabled) {

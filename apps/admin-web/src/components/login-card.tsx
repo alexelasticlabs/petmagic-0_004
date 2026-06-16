@@ -20,7 +20,7 @@ import {
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { type Locale, getDictionary } from "@/lib/i18n";
-import { maskEmail } from "@/lib/sensitive-display";
+import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 /* ── Component ────────────────────────────────────────────────────── */
 type LoginCardProps = { locale: Locale };
@@ -40,6 +40,16 @@ function resolveLoginErrorMessage(error: unknown, fallback: string): string {
   return getAdminErrorMessage(error, fallback);
 }
 
+function getLoginClientErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 async function ensureLegalAcceptance(locale: Locale, session: AuthSession): Promise<void> {
   const legalAcceptance = session.user.legalAcceptance;
   if (!legalAcceptance?.requiresAcceptance) {
@@ -56,7 +66,7 @@ async function ensureLegalAcceptance(locale: Locale, session: AuthSession): Prom
     } catch (error) {
       clientLogger.warn("auth.legal_acceptance_with_session_versions_failed", {
         locale,
-        error,
+        ...getLoginClientErrorDetails(error),
       });
     }
   }
@@ -197,7 +207,7 @@ export function LoginCard({ locale }: LoginCardProps) {
       clientLogger.warn("auth.login_failed", {
         locale,
         maskedEmail: maskEmail(normalizedEmail),
-        error,
+        ...getLoginClientErrorDetails(error),
       });
       setError(resolveLoginErrorMessage(error, text.loginFailed));
     } finally {

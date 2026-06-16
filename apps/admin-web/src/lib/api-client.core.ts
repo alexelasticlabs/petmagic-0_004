@@ -111,6 +111,19 @@ export const cachedAdminTemplateEventAnalytics = new Map<
 >();
 export const inflightGetRequests = new Map<string, Promise<unknown>>();
 
+function getAuthStorageErrorDetails(error: unknown): {
+  errorName: string;
+  errorDigest?: string;
+} {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function clearAdminListCaches(): void {
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
@@ -292,7 +305,10 @@ export function getSession(): AuthSession | null {
           }
           window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(parsed)));
         } catch (storageError) {
-          clientLogger.warn("auth.session_token_migration_failed", { error: storageError });
+          clientLogger.warn(
+            "auth.session_token_migration_failed",
+            getAuthStorageErrorDetails(storageError)
+          );
         }
       });
     }
@@ -300,7 +316,7 @@ export function getSession(): AuthSession | null {
     cachedAuthSession = parsed;
     return cachedAuthSession;
   } catch (error) {
-    clientLogger.warn("auth.session_parse_failed", { error });
+    clientLogger.warn("auth.session_parse_failed", getAuthStorageErrorDetails(error));
     cachedAuthRaw = null;
     cachedAuthSession = null;
     volatileAccessToken = null;
@@ -309,7 +325,10 @@ export function getSession(): AuthSession | null {
     try {
       window.sessionStorage.removeItem(AUTH_KEY);
     } catch (storageError) {
-      clientLogger.warn("auth.session_parse_cleanup_failed", { error: storageError });
+      clientLogger.warn(
+        "auth.session_parse_cleanup_failed",
+        getAuthStorageErrorDetails(storageError)
+      );
     }
     return null;
   }
@@ -429,6 +448,26 @@ function sanitizeApiErrorText(value: string): string {
   return sanitizeSensitiveText(value, 240);
 }
 
+function getApiClientErrorDetails(error: unknown): {
+  errorName: string;
+  errorDigest?: string;
+} {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
+function getApiPayloadParseErrorDetails(error: unknown): {
+  errorName: string;
+  errorDigest?: string;
+} {
+  return getApiClientErrorDetails(error);
+}
+
 function isJsonResponse(response: Response): boolean {
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
   return contentType.includes("application/json") || contentType.includes("+json");
@@ -536,7 +575,7 @@ export async function apiRequest<TResponse>(
       path,
       method: init.method ?? "GET",
       correlationId: headers.get("X-Correlation-ID"),
-      error,
+      ...getApiClientErrorDetails(error),
     });
 
     const networkError = new Error("Network error. Check connection and try again.") as ApiError;
@@ -625,7 +664,7 @@ export async function apiRequest<TResponse>(
           method: init.method ?? "GET",
           status: response.status,
           correlationId: headers.get("X-Correlation-ID"),
-          error: parseError,
+          ...getApiPayloadParseErrorDetails(parseError),
         });
       }
     }
@@ -650,7 +689,7 @@ export async function apiRequest<TResponse>(
       method: init.method ?? "GET",
       status: response.status,
       correlationId: headers.get("X-Correlation-ID"),
-      error,
+      ...getApiPayloadParseErrorDetails(error),
     });
     throw createApiError(
       "Unexpected server response. Try again.",
@@ -687,7 +726,7 @@ async function refreshSessionInternal(): Promise<boolean> {
   } catch (error) {
     clientLogger.warn("auth.refresh_failed", {
       hasRefreshToken: Boolean(refreshToken),
-      error,
+      ...getApiClientErrorDetails(error),
     });
     clearSession();
     return false;
@@ -789,7 +828,7 @@ export async function logout(): Promise<void> {
     })
       .catch((error: unknown) => {
         if (!logoutAbortController.signal.aborted) {
-          clientLogger.warn("auth.logout_failed", { error });
+          clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));
         }
       })
       .finally(() => {

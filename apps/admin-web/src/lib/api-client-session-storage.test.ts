@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,6 +12,7 @@ import {
 } from "@/lib/api-client.core";
 
 const AUTH_KEY = "petmagic_admin_auth";
+const apiClientCorePath = fileURLToPath(new URL("./api-client.core.ts", import.meta.url));
 
 type StoredSession = {
   accessToken?: string;
@@ -192,6 +195,34 @@ describe("api-client session storage", () => {
     expect(serializedLogs).toContain("auth.session_parse_failed");
     expect(serializedLogs).not.toContain("legacy-access-secret");
     expect(serializedLogs).not.toContain("legacy-refresh-secret");
+  });
+
+  it("logs auth storage failures without retaining raw Error objects", () => {
+    const source = readFileSync(apiClientCorePath, "utf8");
+
+    expect(source).toContain("function getAuthStorageErrorDetails(error: unknown)");
+    expect(source).toContain("function getApiClientErrorDetails(error: unknown)");
+    expect(source).toContain("function getApiPayloadParseErrorDetails(error: unknown)");
+    expect(source).toContain("return getApiClientErrorDetails(error);");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain(
+      'clientLogger.warn("auth.session_parse_failed", getAuthStorageErrorDetails(error));'
+    );
+    expect(source).toContain(
+      'clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));'
+    );
+    expect(source).not.toContain(
+      'clientLogger.warn("auth.session_token_migration_failed", { error: storageError });'
+    );
+    expect(source).not.toContain('clientLogger.warn("auth.session_parse_failed", { error });');
+    expect(source).not.toContain(
+      'clientLogger.warn("auth.session_parse_cleanup_failed", { error: storageError });'
+    );
+    expect(source).not.toContain('clientLogger.warn("auth.logout_failed", { error });');
+    expect(source).not.toContain("error: parseError");
+    expect(source).not.toContain("error,\n    });\n\n    const networkError");
+    expect(source).not.toContain("correlationId: headers.get(\"X-Correlation-ID\"),\n      error,");
+    expect(source).not.toContain("hasRefreshToken: Boolean(refreshToken),\n      error,");
   });
 
   it("rejects malformed login sessions without storing partial auth state", async () => {

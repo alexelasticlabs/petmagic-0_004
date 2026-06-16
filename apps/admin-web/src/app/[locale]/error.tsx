@@ -10,6 +10,7 @@ import { getDefaultAdminPath } from "@/lib/admin-rbac";
 import { useAuthSession } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, isLocale } from "@/lib/i18n";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 import styles from "./admin-route-fallback.module.css";
 
@@ -34,7 +35,7 @@ export default function Error({ error, reset }: ErrorPageProps) {
   useEffect(() => {
     clientLogger.error("admin.error_boundary_triggered", {
       name: error.name,
-      digest: error.digest,
+      digest: error.digest ? sanitizeSensitiveText(error.digest, 80) : undefined,
       scope: "locale",
     });
   }, [error]);

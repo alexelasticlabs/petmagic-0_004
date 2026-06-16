@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 import styles from "./global-error.module.css";
 
@@ -25,7 +26,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
   useEffect(() => {
     clientLogger.error("admin.global_error_boundary_triggered", {
       name: error.name,
-      digest: error.digest,
+      digest: error.digest ? sanitizeSensitiveText(error.digest, 80) : undefined,
       scope: "root",
     });
   }, [error]);

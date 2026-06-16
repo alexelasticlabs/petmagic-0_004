@@ -109,6 +109,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function getAdminNotificationStorageErrorDetails(error: unknown): {
+  errorName: string;
+  errorDigest?: string;
+} {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 function sanitizeNotificationHref(href: unknown): string | undefined {
   if (typeof href !== "string") {
     return undefined;
@@ -247,7 +260,10 @@ function readInitialAdminNotifications(): AdminNotificationItem[] {
       )
       .slice(0, MAX_ADMIN_NOTIFICATIONS);
   } catch (error) {
-    clientLogger.warn("admin.notifications_hydrate_failed", { error });
+    clientLogger.warn(
+      "admin.notifications_hydrate_failed",
+      getAdminNotificationStorageErrorDetails(error)
+    );
     window.localStorage.removeItem(ADMIN_NOTIFICATIONS_STORAGE_KEY);
     return [];
   }
@@ -267,7 +283,10 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
     try {
       window.localStorage.setItem(ADMIN_NOTIFICATIONS_STORAGE_KEY, JSON.stringify(items));
     } catch (error) {
-      clientLogger.warn("admin.notifications_persist_failed", { error });
+      clientLogger.warn(
+        "admin.notifications_persist_failed",
+        getAdminNotificationStorageErrorDetails(error)
+      );
     }
   }, [items]);
 

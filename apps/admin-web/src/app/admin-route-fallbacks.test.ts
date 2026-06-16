@@ -32,8 +32,13 @@ describe("admin route fallbacks", () => {
     expect(errorSource).toContain("title={text.adminErrorTitle}");
     expect(errorSource).toContain("description={text.adminErrorDescription}");
     expect(errorSource).toContain('scope: "locale"');
+    expect(errorSource).toContain('import { sanitizeSensitiveText } from "@/lib/sensitive-display";');
+    expect(errorSource).toContain(
+      "digest: error.digest ? sanitizeSensitiveText(error.digest, 80) : undefined"
+    );
     expect(errorSource).not.toContain("description={error.message}");
     expect(errorSource).not.toContain("message: error.message");
+    expect(errorSource).not.toContain("digest: error.digest,");
     expect(errorSource).not.toContain("\n      error,");
     expect(errorSource).not.toContain("stack: error.stack");
     expect(errorSource).not.toContain("description={text.navDashboard}");
@@ -48,6 +53,12 @@ describe("admin route fallbacks", () => {
     expect(errorStyles).toContain("@media (max-width: 520px)");
 
     expect(globalErrorSource).toContain('clientLogger.error("admin.global_error_boundary_triggered"');
+    expect(globalErrorSource).toContain(
+      'import { sanitizeSensitiveText } from "@/lib/sensitive-display";'
+    );
+    expect(globalErrorSource).toContain(
+      "digest: error.digest ? sanitizeSensitiveText(error.digest, 80) : undefined"
+    );
     expect(globalErrorSource).toContain("<html lang={isRu ? \"ru\" : \"en\"}>");
     expect(globalErrorSource).toContain('import styles from "./global-error.module.css"');
     expect(globalErrorSource).toContain("className={styles.body}");
@@ -60,6 +71,7 @@ describe("admin route fallbacks", () => {
     expect(globalErrorSource).toContain('href={isRu ? "/ru" : "/en"}');
     expect(globalErrorSource).not.toContain("{error.message}");
     expect(globalErrorSource).not.toContain("message: error.message");
+    expect(globalErrorSource).not.toContain("digest: error.digest,");
     expect(globalErrorSource).not.toContain("error.stack");
     expect(globalErrorSource).not.toContain("JSON.stringify(error");
     expect(globalErrorSource).not.toContain("CSSProperties");

@@ -13,6 +13,7 @@ export type AdminTone =
 
 type AdminCardProps = {
   title?: ReactNode;
+  titleId?: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
@@ -286,6 +287,7 @@ export function AdminSelectField({
 
 export function AdminCard({
   title,
+  titleId,
   description,
   action,
   children,
@@ -300,7 +302,11 @@ export function AdminCard({
       {hasHeader ? (
         <div className={styles.cardHeader}>
           <div className={styles.cardTitleGroup}>
-            {title ? <h2 className={styles.cardTitle}>{title}</h2> : null}
+            {title ? (
+              <h2 id={titleId} className={styles.cardTitle}>
+                {title}
+              </h2>
+            ) : null}
             {description ? <p className={styles.cardDescription}>{description}</p> : null}
           </div>
           {action ? <div className={styles.cardAction}>{action}</div> : null}

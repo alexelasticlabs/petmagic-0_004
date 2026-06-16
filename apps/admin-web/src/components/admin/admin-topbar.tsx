@@ -66,6 +66,7 @@ export function AdminTopbar({
   const notificationRootRef = useRef<HTMLDivElement | null>(null);
   const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
+  const previousNotificationPathnameRef = useRef(pathname);
   const notificationPanelId = useId();
   const notificationPanelTitleId = useId();
   const themeLabel =
@@ -164,6 +165,15 @@ export function AdminTopbar({
       window.requestAnimationFrame(() => notificationTriggerRef.current?.focus());
     }
   }, []);
+
+  useEffect(() => {
+    if (previousNotificationPathnameRef.current === pathname) {
+      return;
+    }
+
+    previousNotificationPathnameRef.current = pathname;
+    setNotificationPanelPathname(null);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isNotificationsOpen) {

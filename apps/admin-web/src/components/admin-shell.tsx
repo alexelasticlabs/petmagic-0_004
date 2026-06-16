@@ -215,6 +215,19 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   }, [sidebarOpen]);
 
   useEffect(() => {
+    if (!sidebarOpen || !isSidebarDrawerMode || typeof document === "undefined") {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isSidebarDrawerMode, sidebarOpen]);
+
+  useEffect(() => {
     if (previousPathnameRef.current === pathname) {
       return;
     }

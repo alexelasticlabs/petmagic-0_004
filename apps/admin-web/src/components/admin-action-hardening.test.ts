@@ -89,7 +89,11 @@ describe("admin action hardening", () => {
     expect(source).toContain("function getRoleActionErrorDetails(error: unknown, targetUserId: string)");
     expect(source).toContain("targetUserId: shortIdentifier(targetUserId)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("sanitizeSensitiveText(error.message, 160)");
+    expect(source).toContain('"digest" in error');
+    expect(source).toContain(
+      'sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)'
+    );
+    expect(source).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(source).toContain('clientLogger.warn(\n        "roles.action_failed",');
     expect(source).not.toContain('clientLogger.warn("roles.action_failed", { error');
     expect(source).toContain("USER_SEARCH_MAX_LENGTH,");
@@ -411,6 +415,13 @@ describe("admin action hardening", () => {
     expect(source).toContain("if (!isDrawerMode) {\n        setSidebarOpen(false);\n      }");
     expect(source).toContain("media.addEventListener(\"change\", syncSidebarMode);");
     expect(source).toContain("media.removeEventListener(\"change\", syncSidebarMode);");
+    expect(source).toContain(
+      "if (!sidebarOpen || !isSidebarDrawerMode || typeof document === \"undefined\")"
+    );
+    expect(source).toContain("const previousOverflow = document.body.style.overflow;");
+    expect(source).toContain('document.body.style.overflow = "hidden";');
+    expect(source).toContain("document.body.style.overflow = previousOverflow;");
+    expect(source).toContain("}, [isSidebarDrawerMode, sidebarOpen]);");
     expect(source).toContain("if (isLoggingOut) {\n      return;");
     expect(source).toContain("logoutDisabled={isLoggingOut}");
     expect(source).toContain("isDrawerMode={isSidebarDrawerMode}");

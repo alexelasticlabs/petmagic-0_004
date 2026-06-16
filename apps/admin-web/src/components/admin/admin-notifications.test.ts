@@ -126,6 +126,25 @@ describe("admin notification sanitization", () => {
     );
   });
 
+  it("logs notification storage failures without retaining raw Error objects", () => {
+    const source = readFileSync(adminNotificationsPath, "utf8");
+
+    expect(source).toContain("function getAdminNotificationStorageErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain(
+      'clientLogger.warn(\n      "admin.notifications_hydrate_failed",\n      getAdminNotificationStorageErrorDetails(error)\n    );'
+    );
+    expect(source).toContain(
+      'clientLogger.warn(\n        "admin.notifications_persist_failed",\n        getAdminNotificationStorageErrorDetails(error)\n      );'
+    );
+    expect(source).not.toContain(
+      'clientLogger.warn("admin.notifications_hydrate_failed", { error });'
+    );
+    expect(source).not.toContain(
+      'clientLogger.warn("admin.notifications_persist_failed", { error });'
+    );
+  });
+
   it("sanitizes notification text again at the topbar render boundary", () => {
     const source = readFileSync(adminTopbarPath, "utf8");
 
@@ -149,9 +168,14 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("useCallback, useEffect, useId, useMemo, useRef, useState");
     expect(source).toContain("const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);");
     expect(source).toContain("const notificationPanelRef = useRef<HTMLDivElement | null>(null);");
+    expect(source).toContain("const previousNotificationPathnameRef = useRef(pathname);");
     expect(source).toContain("const notificationPanelId = useId();");
     expect(source).toContain("const notificationPanelTitleId = useId();");
     expect(source).toContain("const closeNotificationPanel = useCallback(");
+    expect(source).toContain("if (previousNotificationPathnameRef.current === pathname)");
+    expect(source).toContain("previousNotificationPathnameRef.current = pathname;");
+    expect(source).toContain("setNotificationPanelPathname(null);");
+    expect(source).toContain("}, [pathname]);");
     expect(source).toContain("notificationPanelRef.current?.focus();");
     expect(source).toContain("closeNotificationPanel({ restoreFocus: true });");
     expect(source).toContain("ref={notificationTriggerRef}");

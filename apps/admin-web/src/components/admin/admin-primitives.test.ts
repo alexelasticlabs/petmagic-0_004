@@ -27,6 +27,15 @@ describe("admin primitives responsive layout", () => {
     expect(source).not.toContain("var(--status-color, #");
   });
 
+  it("lets composed dialogs bind shared card headings to aria-labelledby", () => {
+    const source = readFileSync(primitivesSourcePath, "utf8");
+
+    expect(source).toContain("titleId?: string;");
+    expect(source).toContain("titleId,");
+    expect(source).toContain("<h2 id={titleId} className={styles.cardTitle}>");
+    expect(source).not.toContain("{title ? <h2 className={styles.cardTitle}>{title}</h2> : null}");
+  });
+
   it("keeps shared primitive typography and surfaces on theme tokens", () => {
     const source = readFileSync(primitivesCssPath, "utf8");
     const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
