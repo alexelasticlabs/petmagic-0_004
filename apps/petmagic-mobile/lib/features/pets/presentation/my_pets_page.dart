@@ -222,7 +222,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
     }
   }
 
-  void _addPhoto(String petId) {
+  void _addPhoto(String petId, {String? currentAvatarUrl}) {
     if (_isAddingPhoto) {
       return;
     }
@@ -236,6 +236,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
           context,
           ref,
           petId,
+          currentAvatarUrl: currentAvatarUrl,
           cancelToken: cancelToken,
         );
       } on Object catch (error) {
@@ -359,7 +360,8 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                         onEdit: () => _showPetForm(context, ref, pet: pet),
                         onGenerate: () =>
                             context.go(_templatesWithPetLocation(pet.id)),
-                        onAddPhoto: () => _addPhoto(pet.id),
+                        onAddPhoto: () =>
+                            _addPhoto(pet.id, currentAvatarUrl: pet.avatarUrl),
                         isAddingPhoto: _isAddingPhoto,
                       ),
                     ),
@@ -380,7 +382,11 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                       ),
                     ],
                     data: (items) => <Widget>[
-                      _PhotoGrid(petId: pet.id, photos: items),
+                      _PhotoGrid(
+                        petId: pet.id,
+                        currentAvatarUrl: pet.avatarUrl,
+                        photos: items,
+                      ),
                     ],
                   ),
                   _SectionTitleSliver(
@@ -602,9 +608,14 @@ class _PhotoGridSkeletonSliver extends StatelessWidget {
 }
 
 class _PhotoGrid extends ConsumerStatefulWidget {
-  const _PhotoGrid({required this.petId, required this.photos});
+  const _PhotoGrid({
+    required this.petId,
+    required this.currentAvatarUrl,
+    required this.photos,
+  });
 
   final String petId;
+  final String? currentAvatarUrl;
   final List<PetPhoto> photos;
 
   @override
@@ -705,7 +716,8 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
               (cancelToken) => _setAvatar(
                 ref,
                 widget.petId,
-                photo.id,
+                photo,
+                currentAvatarUrl: widget.currentAvatarUrl,
                 cancelToken: cancelToken,
               ),
             ),
@@ -731,7 +743,8 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
               (cancelToken) => _deletePhoto(
                 ref,
                 widget.petId,
-                photo.id,
+                photo,
+                currentAvatarUrl: widget.currentAvatarUrl,
                 cancelToken: cancelToken,
               ),
             ),
@@ -785,6 +798,7 @@ class _PetPhotoCard extends StatelessWidget {
                         imageUrl: imageUrl,
                         fit: BoxFit.cover,
                         memCacheWidth: _petPhotoThumbnailMemCacheWidth,
+                        maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
                         placeholder: (_, _) => const _PetPhotoImageSkeleton(),
                         errorWidget: (_, _, _) =>
                             const _PetPhotoImageFallback(),
@@ -1029,7 +1043,12 @@ class _PetGenerationHistoryTile extends StatelessWidget {
             ),
             IconButton(
               tooltip: 'Use as input',
-              onPressed: () => context.go(TemplatesPage.routePath),
+              onPressed: () => context.go(
+                _templatesWithPetLocation(
+                  generation.petId ?? '',
+                  petPhotoId: generation.petPhotoId,
+                ),
+              ),
               icon: const Icon(Icons.auto_fix_high_outlined),
             ),
           ],
@@ -1063,6 +1082,7 @@ class _PetAvatar extends StatelessWidget {
         height: size,
         fit: BoxFit.cover,
         memCacheWidth: _petAvatarMemCacheWidth,
+        maxWidthDiskCache: _petAvatarMemCacheWidth,
         placeholder: (_, _) => CircleAvatar(
           radius: size / 2,
           child: const SizedBox.square(
@@ -1333,6 +1353,7 @@ Future<void> _pickAndUploadPhoto(
   BuildContext context,
   WidgetRef ref,
   String petId, {
+  String? currentAvatarUrl,
   required CancelToken cancelToken,
 }) async {
   final picked = await ImagePicker().pickImage(
@@ -1344,9 +1365,14 @@ Future<void> _pickAndUploadPhoto(
     return;
   }
 
-  await ref
+  final uploadedPhoto = await ref
       .read(templateGenerationRepositoryProvider)
       .uploadPetPhoto(petId: petId, photo: picked, cancelToken: cancelToken);
+  if (cancelToken.isCancelled) {
+    return;
+  }
+  await _evictPetMediaUrl(currentAvatarUrl);
+  await _evictPetPhotoMedia(uploadedPhoto);
   if (cancelToken.isCancelled) {
     return;
   }
@@ -1357,16 +1383,23 @@ Future<void> _pickAndUploadPhoto(
 Future<void> _setAvatar(
   WidgetRef ref,
   String petId,
-  String photoId, {
+  PetPhoto photo, {
+  String? currentAvatarUrl,
   required CancelToken cancelToken,
 }) async {
-  await ref
+  final updatedPhoto = await ref
       .read(templateGenerationRepositoryProvider)
       .setPetPhotoAsAvatar(
         petId: petId,
-        photoId: photoId,
+        photoId: photo.id,
         cancelToken: cancelToken,
       );
+  if (cancelToken.isCancelled) {
+    return;
+  }
+  await _evictPetMediaUrl(currentAvatarUrl);
+  await _evictPetPhotoMedia(photo);
+  await _evictPetPhotoMedia(updatedPhoto);
   if (cancelToken.isCancelled) {
     return;
   }
@@ -1397,12 +1430,22 @@ Future<void> _setFavorite(
 Future<void> _deletePhoto(
   WidgetRef ref,
   String petId,
-  String photoId, {
+  PetPhoto photo, {
+  String? currentAvatarUrl,
   required CancelToken cancelToken,
 }) async {
   await ref
       .read(templateGenerationRepositoryProvider)
-      .deletePetPhoto(petId: petId, photoId: photoId, cancelToken: cancelToken);
+      .deletePetPhoto(
+        petId: petId,
+        photoId: photo.id,
+        cancelToken: cancelToken,
+      );
+  if (cancelToken.isCancelled) {
+    return;
+  }
+  await _evictPetMediaUrl(currentAvatarUrl);
+  await _evictPetPhotoMedia(photo);
   if (cancelToken.isCancelled) {
     return;
   }
@@ -1473,10 +1516,15 @@ Future<void> _ignoreRefreshFailure<T>(Future<T> future) async {
 }
 
 String _templatesWithPetLocation(String petId, {String? petPhotoId}) {
+  final normalizedPetId = petId.trim();
+  if (normalizedPetId.isEmpty) {
+    return TemplatesPage.routePath;
+  }
+
   return Uri(
     path: TemplatesPage.routePath,
     queryParameters: {
-      'petId': petId,
+      'petId': normalizedPetId,
       if (petPhotoId != null && petPhotoId.isNotEmpty) 'petPhotoId': petPhotoId,
     },
   ).toString();
@@ -1484,6 +1532,26 @@ String _templatesWithPetLocation(String petId, {String? petPhotoId}) {
 
 String? _petPhotoDisplayUrl(PetPhoto photo) {
   return _normalizePetMediaUrl(photo.thumbnailUrl);
+}
+
+Future<void> _evictPetPhotoMedia(PetPhoto photo) async {
+  await Future.wait([
+    _evictPetMediaUrl(photo.thumbnailUrl),
+    _evictPetMediaUrl(photo.url),
+  ]);
+}
+
+Future<void> _evictPetMediaUrl(String? rawUrl) async {
+  final imageUrl = _normalizePetMediaUrl(rawUrl);
+  if (imageUrl == null) {
+    return;
+  }
+
+  try {
+    await CachedNetworkImage.evictFromCache(imageUrl);
+  } on Object {
+    // Provider invalidation still refreshes metadata; image-cache eviction is best-effort.
+  }
 }
 
 String? _normalizePetMediaUrl(String? rawUrl) {

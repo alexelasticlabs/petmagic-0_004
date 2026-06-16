@@ -179,9 +179,11 @@ void main() {
     expect(historyController.markReadCalls, ['generation-pet-1']);
     expect(find.text('status:generation-pet-1'), findsOneWidget);
 
-    router.go(GenerationsGalleryPage.routePath);
+    expect(router.canPop(), isTrue);
+    router.pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(GenerationsGalleryPage), findsOneWidget);
     expect(find.text('Pet portrait'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
@@ -193,6 +195,7 @@ void main() {
     expect(mediaActions.saveCalls, [
       'https://cdn.petmagic.app/generated-bella.jpg',
     ]);
+    expect(mediaActions.saveLocalPaths, [null]);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -203,6 +206,7 @@ void main() {
     expect(mediaActions.shareCalls, [
       'https://cdn.petmagic.app/generated-bella.jpg',
     ]);
+    expect(mediaActions.shareLocalPaths, [null]);
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pump();
@@ -245,6 +249,8 @@ class _RecordingGenerationStatusMediaActions
     extends GenerationStatusMediaActions {
   final saveCalls = <String>[];
   final shareCalls = <String>[];
+  final saveLocalPaths = <String?>[];
+  final shareLocalPaths = <String?>[];
 
   @override
   Future<bool> saveToGallery({
@@ -253,8 +259,10 @@ class _RecordingGenerationStatusMediaActions
     required bool isVideo,
     required String albumName,
     required CancelToken cancelToken,
+    String? localPath,
   }) async {
     saveCalls.add(mediaUrl);
+    saveLocalPaths.add(localPath);
     return true;
   }
 
@@ -264,8 +272,10 @@ class _RecordingGenerationStatusMediaActions
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? localPath,
   }) async {
     shareCalls.add(mediaUrl);
+    shareLocalPaths.add(localPath);
   }
 }
 

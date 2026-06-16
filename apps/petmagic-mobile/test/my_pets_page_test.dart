@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -17,6 +18,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
@@ -29,6 +31,42 @@ void main() {
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+  });
+
+  test('Pet photo mutations evict cached image URLs before refresh', () {
+    final source = File(
+      'lib/features/pets/presentation/my_pets_page.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('Future<void> _evictPetPhotoMedia'));
+    expect(source, contains('CachedNetworkImage.evictFromCache(imageUrl)'));
+    expect(source, contains('currentAvatarUrl: pet.avatarUrl'));
+    expect(source, contains('currentAvatarUrl: widget.currentAvatarUrl'));
+    expect(
+      source,
+      contains(
+        'await _evictPetMediaUrl(currentAvatarUrl);\n'
+        '  await _evictPetPhotoMedia(uploadedPhoto);\n'
+        '  if (cancelToken.isCancelled)',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        'await _evictPetMediaUrl(currentAvatarUrl);\n'
+        '  await _evictPetPhotoMedia(photo);\n'
+        '  await _evictPetPhotoMedia(updatedPhoto);\n'
+        '  if (cancelToken.isCancelled)',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        'await _evictPetMediaUrl(currentAvatarUrl);\n'
+        '  await _evictPetPhotoMedia(photo);\n'
+        '  if (cancelToken.isCancelled)',
+      ),
+    );
   });
 
   for (final config in <_PetUiVariant>[
@@ -65,6 +103,7 @@ void main() {
                 name: 'Bella',
                 type: 'dog',
                 breed: 'Corgi',
+                avatarUrl: 'https://cdn.petmagic.app/avatar.jpg',
                 photosCount: 3,
                 generationsCount: 7,
                 createdAtUtc: DateTime.utc(2026),
@@ -79,6 +118,12 @@ void main() {
         expect(find.text('Bella'), findsOneWidget);
         expect(find.textContaining('3 photos'), findsOneWidget);
         expect(find.text('Create with Bella'), findsOneWidget);
+        final avatar = tester.widget<CachedNetworkImage>(
+          find.byType(CachedNetworkImage).first,
+        );
+        expect(avatar.imageUrl, 'https://cdn.petmagic.app/avatar.jpg');
+        expect(avatar.memCacheWidth, 192);
+        expect(avatar.maxWidthDiskCache, 192);
         expect(tester.takeException(), isNull);
       } finally {
         debugDefaultTargetPlatformOverride = null;
@@ -305,6 +350,8 @@ void main() {
       find.byType(CachedNetworkImage).first,
     );
     expect(thumbnail.imageUrl, 'https://cdn.petmagic.app/thumb.jpg');
+    expect(thumbnail.memCacheWidth, 512);
+    expect(thumbnail.maxWidthDiskCache, 512);
     expect(find.byTooltip('Set as avatar'), findsOneWidget);
     expect(find.byTooltip('Mark favorite'), findsOneWidget);
     expect(find.byTooltip('Use for generation'), findsOneWidget);
@@ -520,6 +567,155 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Pet generation history use-as-input preserves pet context', (
+    tester,
+  ) async {
+    const petId = 'pet/history #1?x=2&kind=dog';
+    const petPhotoId = 'photo/history #7?pose=1&tag=a';
+    final repository = _FakePetRepository(
+      pets: [
+        PetProfile(
+          id: petId,
+          name: 'Bella',
+          type: 'dog',
+          photosCount: 0,
+          generationsCount: 1,
+          createdAtUtc: DateTime.utc(2026),
+          updatedAtUtc: DateTime.utc(2026),
+        ),
+      ],
+      generations: [
+        TemplateGenerationResult(
+          generationId: 'generation-history',
+          userId: 'user-1',
+          templateId: 'template-1',
+          status: TemplateGenerationStatus.completed,
+          tokenCost: 6,
+          attemptCount: 1,
+          createdAtUtc: DateTime.utc(2026),
+          updatedAtUtc: DateTime.utc(2026),
+          userMediaExpired: false,
+          outputUrl: 'https://cdn.petmagic.app/output.jpg',
+          templateTitle: 'Generated portrait',
+          templateType: 'image',
+          petId: petId,
+          petPhotoId: petPhotoId,
+        ),
+      ],
+    );
+    final router = _petDetailsRouter(
+      initialPetId: petId,
+      templatesBuilder: (context, state) => Scaffold(
+        body: Center(
+          child: Text(
+            'decoded:${state.uri.queryParameters['petId']}|'
+            '${state.uri.queryParameters['petPhotoId']}',
+          ),
+        ),
+      ),
+    );
+    addTearDown(router.dispose);
+
+    await _pumpPetDetailsWithRouter(
+      tester,
+      repository: repository,
+      router: router,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Generated portrait'),
+      120,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pump();
+
+    final historyTile = find.ancestor(
+      of: find.text('Generated portrait'),
+      matching: find.byType(ListTile),
+    );
+    final useInputButton = find.descendant(
+      of: historyTile,
+      matching: find.byTooltip('Use as input'),
+    );
+    await tester.tap(useInputButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('decoded:$petId|$petPhotoId'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Pet generation history use-as-input drops orphan photo context',
+    (tester) async {
+      final repository = _FakePetRepository(
+        pets: [
+          PetProfile(
+            id: 'pet-1',
+            name: 'Bella',
+            type: 'dog',
+            photosCount: 0,
+            generationsCount: 1,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        generations: [
+          TemplateGenerationResult(
+            generationId: 'generation-orphan-photo',
+            userId: 'user-1',
+            templateId: 'template-1',
+            status: TemplateGenerationStatus.completed,
+            tokenCost: 6,
+            attemptCount: 1,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+            userMediaExpired: false,
+            outputUrl: 'https://cdn.petmagic.app/output.jpg',
+            templateTitle: 'Generated orphan photo',
+            templateType: 'image',
+            petPhotoId: 'photo-orphan',
+          ),
+        ],
+      );
+      final router = _petDetailsRouter(
+        templatesBuilder: (context, state) => Scaffold(
+          body: Center(
+            child: Text(
+              'decoded:${state.uri.queryParameters['petId'] ?? '<none>'}|'
+              '${state.uri.queryParameters['petPhotoId'] ?? '<none>'}',
+            ),
+          ),
+        ),
+      );
+      addTearDown(router.dispose);
+
+      await _pumpPetDetailsWithRouter(
+        tester,
+        repository: repository,
+        router: router,
+      );
+      await tester.scrollUntilVisible(
+        find.text('Generated orphan photo'),
+        120,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pump();
+
+      final historyTile = find.ancestor(
+        of: find.text('Generated orphan photo'),
+        matching: find.byType(ListTile),
+      );
+      final useInputButton = find.descendant(
+        of: historyTile,
+        matching: find.byTooltip('Use as input'),
+      );
+      await tester.tap(useInputButton);
+      await tester.pumpAndSettle();
+
+      expect(find.text('decoded:<none>|<none>'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Pet details shows auth gate for guests without fetching data', (
     tester,
   ) async {
@@ -555,6 +751,40 @@ void main() {
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
     expect(find.byTooltip('Delete pet'), findsNothing);
+    expect(repository.petsFetchCount, 0);
+    expect(repository.petPhotoFetchCount, 0);
+    expect(repository.petGenerationFetchCount, 0);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Pet details auth gate preserves reserved pet ID redirect', (
+    tester,
+  ) async {
+    const petId = 'pet/auth #1?x=2&kind=cat';
+    final repository = _FakePetRepository(pets: const []);
+    final router = _petDetailsRouter(initialPetId: petId);
+    addTearDown(router.dispose);
+
+    await _pumpPetDetailsWithRouter(
+      tester,
+      repository: repository,
+      router: router,
+      authenticated: false,
+    );
+    final text = AppLocalizations.of(
+      tester.element(find.byType(PetDetailsPage)),
+    );
+
+    await tester.tap(find.text(text.profileSignInAction).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.profileSignInAction).last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('auth-route'), findsOneWidget);
+    expect(
+      find.text('auth-redirect:${PetDetailsPage.location(petId)}'),
+      findsOneWidget,
+    );
     expect(repository.petsFetchCount, 0);
     expect(repository.petPhotoFetchCount, 0);
     expect(repository.petGenerationFetchCount, 0);
@@ -1681,6 +1911,129 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Pet favorite action cancellation does not refresh after dispose',
+    (tester) async {
+      final favoriteCompleter = Completer<void>();
+      final repository = _FakePetRepository(
+        pets: [
+          PetProfile(
+            id: 'pet-1',
+            name: 'Bella',
+            type: 'dog',
+            photosCount: 1,
+            generationsCount: 0,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        photos: [
+          PetPhoto(
+            id: 'photo-1',
+            petId: 'pet-1',
+            mediaAssetId: 'media-1',
+            url: '',
+            fileName: 'bella.jpg',
+            contentType: 'image/jpeg',
+            isFavorite: false,
+            isAvatar: false,
+            sortOrder: 1,
+            createdAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        favoriteCompleter: favoriteCompleter,
+      );
+
+      await _pumpPetDetails(tester, repository: repository);
+      await tester.scrollUntilVisible(
+        find.byTooltip('Mark favorite'),
+        120,
+        scrollable: find.byType(Scrollable),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Mark favorite'));
+      await tester.pump();
+
+      expect(repository.favoriteUpdates, ['photo-1:true']);
+      expect(repository.favoriteCancelToken?.isCancelled, isFalse);
+      expect(repository.petPhotoFetchCount, 1);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+
+      expect(repository.favoriteCancelToken?.isCancelled, isTrue);
+      expect(repository.petPhotoFetchCount, 1);
+
+      favoriteCompleter.complete();
+      await tester.pump();
+
+      expect(repository.petPhotoFetchCount, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Pet delete action cancellation does not refresh after dispose', (
+    tester,
+  ) async {
+    final deleteCompleter = Completer<void>();
+    final repository = _FakePetRepository(
+      pets: [
+        PetProfile(
+          id: 'pet-1',
+          name: 'Bella',
+          type: 'dog',
+          photosCount: 1,
+          generationsCount: 0,
+          createdAtUtc: DateTime.utc(2026),
+          updatedAtUtc: DateTime.utc(2026),
+        ),
+      ],
+      photos: [
+        PetPhoto(
+          id: 'photo-1',
+          petId: 'pet-1',
+          mediaAssetId: 'media-1',
+          url: '',
+          fileName: 'bella.jpg',
+          contentType: 'image/jpeg',
+          isFavorite: false,
+          isAvatar: false,
+          sortOrder: 1,
+          createdAtUtc: DateTime.utc(2026),
+        ),
+      ],
+      deletePhotoCompleter: deleteCompleter,
+    );
+
+    await _pumpPetDetails(tester, repository: repository);
+    await tester.scrollUntilVisible(
+      find.byTooltip('Delete photo'),
+      120,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Delete photo'));
+    await tester.pump();
+
+    expect(repository.deletedPhotoIds, ['photo-1']);
+    expect(repository.deletePhotoCancelToken?.isCancelled, isFalse);
+    expect(repository.petPhotoFetchCount, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    expect(repository.deletePhotoCancelToken?.isCancelled, isTrue);
+    expect(repository.petPhotoFetchCount, 1);
+
+    deleteCompleter.complete();
+    await tester.pump();
+
+    expect(repository.petPhotoFetchCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Late photo action failure after dispose is ignored', (
     tester,
   ) async {
@@ -2214,6 +2567,23 @@ GoRouter _petDetailsRouter({
             (context, state) =>
                 const Scaffold(body: Center(child: Text('templates-route'))),
       ),
+      GoRoute(
+        path: AuthEntryPage.routePath,
+        builder: (context, state) {
+          final redirect = state.uri.queryParameters['redirect'] ?? '';
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('auth-route'),
+                  Text('auth-redirect:$redirect'),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     ],
   );
 }
@@ -2284,6 +2654,8 @@ class _FakePetRepository extends TemplateGenerationRepository {
     this.uploadCompleter,
     this.uploadCompleters = const [],
     this.petPhotosCompleter,
+    this.favoriteCompleter,
+    this.deletePhotoCompleter,
     List<Object> petPhotosErrors = const [],
     this.avatarError,
     this.uploadError,
@@ -2302,6 +2674,8 @@ class _FakePetRepository extends TemplateGenerationRepository {
   final Completer<void>? uploadCompleter;
   final List<Completer<void>> uploadCompleters;
   final Completer<void>? petPhotosCompleter;
+  final Completer<void>? favoriteCompleter;
+  final Completer<void>? deletePhotoCompleter;
   final List<Object> petPhotosErrors;
   final Object? avatarError;
   final Object? uploadError;
@@ -2461,6 +2835,7 @@ class _FakePetRepository extends TemplateGenerationRepository {
   }) async {
     favoriteCancelToken = cancelToken;
     favoriteUpdates.add('$photoId:$isFavorite');
+    await favoriteCompleter?.future;
     return photos.firstWhere((photo) => photo.id == photoId);
   }
 
@@ -2472,6 +2847,7 @@ class _FakePetRepository extends TemplateGenerationRepository {
   }) async {
     deletePhotoCancelToken = cancelToken;
     deletedPhotoIds.add(photoId);
+    await deletePhotoCompleter?.future;
   }
 
   @override

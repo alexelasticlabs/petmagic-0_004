@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
+import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 
 void main() {
   group('downloadFileBytes', () {
@@ -158,6 +160,58 @@ void main() {
 
       await expectation;
     });
+  });
+
+  group('cacheRemoteMediaFile', () {
+    test('writes supported media payloads to a temp file', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          return ResponseBody.fromBytes(const [0xFF, 0xD8, 0xFF, 0xD9], 200);
+        });
+
+      final file = await cacheRemoteMediaFile(
+        mediaUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
+        fileName: 'remote-valid.jpg',
+        client: dio,
+      );
+      addTearDown(() async {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      });
+
+      expect(await file.exists(), isTrue);
+      expect(await file.readAsBytes(), const [0xFF, 0xD8, 0xFF, 0xD9]);
+    });
+
+    test(
+      'rejects unsupported remote payloads before writing temp files',
+      () async {
+        final dio = Dio()
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            return ResponseBody.fromBytes('not-media'.codeUnits, 200);
+          });
+        final target = File(
+          '${Directory.systemTemp.path}${Platform.pathSeparator}'
+          'petmagic_remote-invalid.jpg',
+        );
+        addTearDown(() async {
+          if (await target.exists()) {
+            await target.delete();
+          }
+        });
+
+        await expectLater(
+          cacheRemoteMediaFile(
+            mediaUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
+            fileName: 'remote-invalid.jpg',
+            client: dio,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(target.existsSync(), isFalse);
+      },
+    );
   });
 
   group('sanitizeFileName', () {
