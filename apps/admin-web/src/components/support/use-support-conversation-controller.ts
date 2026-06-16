@@ -272,12 +272,17 @@ export function useSupportConversationController({
   );
 
   const pushSupportError = useCallback(
-    (error: unknown) => {
+    (error: unknown, action = "support_action") => {
       const message = getAdminErrorMessage(error, text.supportLoadError);
+      clientLogger.warn("support.action_failed", {
+        conversationId: formatSupportControllerLogText(conversationId),
+        action: formatSupportControllerLogText(action, 40),
+        ...getSupportControllerErrorDetails(error),
+      });
       setToast({ type: "error", message });
       pushSupportNotification("error", message);
     },
-    [pushSupportNotification, text.supportLoadError]
+    [conversationId, pushSupportNotification, text.supportLoadError]
   );
 
   const assertCanManageSupportWorkspace = useCallback(() => {
@@ -758,7 +763,7 @@ export function useSupportConversationController({
         );
       }
 
-      pushSupportError(error);
+      pushSupportError(error, "send_reply");
     },
     onSettled: () => {
       sendReplyInFlightRef.current = false;
@@ -798,7 +803,7 @@ export function useSupportConversationController({
       await refreshConversationData();
     },
     onError: (error) => {
-      pushSupportError(error);
+      pushSupportError(error, "update_status");
     },
   });
 
@@ -816,7 +821,7 @@ export function useSupportConversationController({
       await refreshConversationData();
     },
     onError: (error) => {
-      pushSupportError(error);
+      pushSupportError(error, "assign_conversation");
     },
   });
 
@@ -834,7 +839,7 @@ export function useSupportConversationController({
       await refreshConversationData();
     },
     onError: (error) => {
-      pushSupportError(error);
+      pushSupportError(error, "update_metadata");
     },
   });
 

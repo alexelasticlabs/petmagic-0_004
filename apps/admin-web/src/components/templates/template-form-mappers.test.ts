@@ -182,10 +182,11 @@ describe("template form numeric hardening", () => {
       'errorName: error instanceof Error ? error.name : "UnknownError"'
     );
     expect(controllerSource).toContain("sanitizeSensitiveText(initialTemplateId, 80)");
-    expect(controllerSource).toContain("fileName: sanitizeSensitiveText(file.name, 120)");
+    expect(controllerSource).toContain("fileSizeBytes: file.size");
     expect(controllerSource).toContain("contentType: sanitizeSensitiveText(file.type, 80)");
     expect(controllerSource).toContain("...getTemplateEditorErrorDetails(error)");
     expect(controllerSource).not.toContain("initialTemplateId,\n          templateType,\n          error");
+    expect(controllerSource).not.toContain("fileName:");
     expect(controllerSource).not.toContain("contentType: file.type,\n        error");
   });
 });

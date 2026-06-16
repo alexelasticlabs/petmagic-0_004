@@ -47,7 +47,6 @@ import { clientLogger } from "@/lib/client-logger";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-
 type TemplatesDailyFeaturedPageProps = {
   locale: Locale;
 };
@@ -205,6 +204,18 @@ function safeErrorDetails(error: unknown) {
       error && typeof error === "object" && "digest" in error
         ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
         : undefined,
+  };
+}
+
+function safeActionContext(input: {
+  assignmentId?: string | null;
+  templateId?: string | null;
+  templateTitle?: string | null;
+}) {
+  return {
+    assignmentId: input.assignmentId ? sanitizeSensitiveText(input.assignmentId, 80) : undefined,
+    templateId: input.templateId ? sanitizeSensitiveText(input.templateId, 80) : undefined,
+    templateTitle: input.templateTitle ? sanitizeSensitiveText(input.templateTitle, 96) : undefined,
   };
 }
 
@@ -603,6 +614,14 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       setForm(emptyForm(form.startDate));
       await loadScheduleData();
     } catch (saveError) {
+      clientLogger.warn("templates.daily_featured_save_failed", {
+        ...safeActionContext({
+          assignmentId: form.id,
+          templateId: form.templateId,
+          templateTitle: selectedTemplateSnapshot?.title,
+        }),
+        ...safeErrorDetails(saveError),
+      });
       setError(getAdminErrorMessage(saveError, text.saveError));
     } finally {
       setIsSubmitting(false);
@@ -625,6 +644,14 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       await loadScheduleData();
       return true;
     } catch (deleteError) {
+      clientLogger.warn("templates.daily_featured_delete_failed", {
+        ...safeActionContext({
+          assignmentId: assignment.id,
+          templateId: assignment.templateId,
+          templateTitle: assignment.templateTitle,
+        }),
+        ...safeErrorDetails(deleteError),
+      });
       setError(getAdminErrorMessage(deleteError, text.saveError));
       return false;
     } finally {
@@ -645,6 +672,12 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       });
       await loadScheduleData();
     } catch (autoPickError) {
+      clientLogger.warn("templates.daily_featured_auto_pick_failed", {
+        autoPickDate: sanitizeSensitiveText(autoPick.date, 20),
+        allowedTypes: autoPick.allowedTypes,
+        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
+        ...safeErrorDetails(autoPickError),
+      });
       setError(getAdminErrorMessage(autoPickError, text.saveError));
     } finally {
       setIsSubmitting(false);
@@ -670,6 +703,12 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         excludeRecentDays: String(saved.excludeRecentDays),
       }));
     } catch (settingsError) {
+      clientLogger.warn("templates.daily_featured_settings_save_failed", {
+        autoModeEnabled: autoPick.autoModeEnabled,
+        allowedTypes: autoPick.allowedTypes,
+        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
+        ...safeErrorDetails(settingsError),
+      });
       setError(getAdminErrorMessage(settingsError, text.saveError));
     } finally {
       setIsSubmitting(false);

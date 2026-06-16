@@ -84,6 +84,9 @@ describe("template analytics error states", () => {
       'errorName: overviewQuery.error instanceof Error ? overviewQuery.error.name : "UnknownError"'
     );
     expect(hubSource).toContain('"digest" in overviewQuery.error');
+    expect(hubSource).toContain(
+      'sanitizeSensitiveText(String((overviewQuery.error as { digest?: unknown }).digest ?? ""), 80)'
+    );
     expect(hubSource).not.toContain("error: overviewQuery.error");
     expect(hubSource).not.toContain("message: overviewQuery.error");
     expect(hubSource).toContain("if (hasBlockingError || !overview)");

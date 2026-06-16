@@ -129,6 +129,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain('import { sanitizeSensitiveText }');
     expect(pageSource).toContain("function safeDisplayText");
     expect(pageSource).toContain("function safeErrorDetails");
+    expect(pageSource).toContain("function safeActionContext");
     expect(pageSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(pageSource).toContain(
       'clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadFailure));'
@@ -136,12 +137,23 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain(
       'clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadError));'
     );
+    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_save_failed", {');
+    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_delete_failed", {');
+    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_auto_pick_failed", {');
+    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_settings_save_failed", {');
+    expect(pageSource).toContain("assignmentId: input.assignmentId ? sanitizeSensitiveText(input.assignmentId, 80) : undefined");
+    expect(pageSource).toContain("templateId: input.templateId ? sanitizeSensitiveText(input.templateId, 80) : undefined");
+    expect(pageSource).toContain("templateTitle: input.templateTitle ? sanitizeSensitiveText(input.templateTitle, 96) : undefined");
     expect(pageSource).toContain("safeDisplayText(template.title, 120)");
     expect(pageSource).toContain("safeDisplayText(template.category, 72)");
     expect(pageSource).toContain("safeDisplayText(assignment.templateTitle, 120)");
     expect(pageSource).toContain("safeDisplayText(assignment.subtitleOverride, 220)");
     expect(pageSource).not.toContain("{ error: loadError }");
     expect(pageSource).not.toContain("{ error: loadFailure }");
+    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_save_failed", { error: saveError });');
+    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_delete_failed", { error: deleteError });');
+    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_auto_pick_failed", { error: autoPickError });');
+    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_settings_save_failed", { error: settingsError });');
   });
 
   it("warns on occupied manual dates and sends manual assignment payloads", () => {

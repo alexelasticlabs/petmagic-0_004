@@ -5,6 +5,7 @@ import { useEffect, useEffectEvent } from "react";
 
 import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
 import { clientLogger } from "@/lib/client-logger";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export type SupportConversationUpdatedEvent = {
   conversationId: string;
@@ -23,6 +24,16 @@ let supportRealtimeBlockedUntil = 0;
 let supportRealtimeAccessToken: string | undefined;
 let supportRealtimeConnection: HubConnection | null = null;
 const supportRealtimeListeners = new Set<(event: SupportConversationUpdatedEvent) => void>();
+
+function getSupportRealtimeErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
 
 export function useSupportRealtime(
   accessToken: string | undefined,
@@ -80,7 +91,7 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
     clientLogger.warn("support.realtime_closed", {
       expectedFailure,
       blockedUntil: supportRealtimeBlockedUntil,
-      error,
+      ...getSupportRealtimeErrorDetails(error),
     });
 
     supportRealtimeConnection = null;
@@ -116,7 +127,7 @@ function ensureSupportRealtimeConnection(accessToken: string): void {
       clientLogger.warn("support.realtime_start_failed", {
         expectedFailure,
         blockedUntil: supportRealtimeBlockedUntil,
-        error,
+        ...getSupportRealtimeErrorDetails(error),
       });
 
       supportRealtimeConnection = null;

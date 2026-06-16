@@ -25,4 +25,17 @@ describe("support realtime connection policy", () => {
     expect(source).toContain(".configureLogging(LogLevel.None)");
     expect(source).not.toContain("let isDisposed = false;");
   });
+
+  it("logs realtime failures with sanitized diagnostics", () => {
+    const source = readFileSync(supportRealtimePath, "utf8");
+
+    expect(source).toContain('import { sanitizeSensitiveText } from "@/lib/sensitive-display";');
+    expect(source).toContain("function getSupportRealtimeErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("...getSupportRealtimeErrorDetails(error)");
+    expect(source).toContain('clientLogger.warn("support.realtime_closed", {');
+    expect(source).toContain('clientLogger.warn("support.realtime_start_failed", {');
+    expect(source).not.toContain("blockedUntil: supportRealtimeBlockedUntil,\n      error,");
+    expect(source).not.toContain("blockedUntil: supportRealtimeBlockedUntil,\n        error,");
+  });
 });

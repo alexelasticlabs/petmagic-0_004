@@ -147,6 +147,12 @@ describe("template test media actions", () => {
     expect(source).toContain("return text.templateTestPreprocessingModelRequired;");
     expect(source).toContain("return text.templateTestKlingModelRequired;");
     expect(source).toContain("return text.templateTestCharacterOrientationRequired;");
+    expect(source).toContain('clientLogger.warn("templates.test_start_failed", {');
+    expect(source).toContain("fileContentType: sanitizeSensitiveText(selectedFile.type || \"image/*\", 64)");
+    expect(source).toContain("fileSizeBytes: selectedFile.size");
+    expect(source).toContain("...getTemplateTestErrorDetails(error)");
+    expect(source).not.toContain("fileName: selectedFile.name");
+    expect(source).not.toContain('clientLogger.warn("templates.test_start_failed", { error });');
     expect(source).not.toContain("Choose a test pet photo first.");
     expect(source).not.toContain("Only image/* files are supported.");
     expect(source).not.toContain("File is too large. The maximum test photo size is 8 MB.");
@@ -288,7 +294,8 @@ describe("template test media actions", () => {
     const source = readFileSync(templateEditorControllerPath, "utf8");
 
     expect(source).toContain("import { sanitizeSensitiveText }");
-    expect(source).toContain("fileName: sanitizeSensitiveText(file.name, 120)");
+    expect(source).toContain("fileSizeBytes: file.size");
+    expect(source).not.toContain("fileName:");
     expect(source).not.toContain("fileName: file.name");
   });
 

@@ -156,7 +156,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
         overviewQuery.error &&
         typeof overviewQuery.error === "object" &&
         "digest" in overviewQuery.error
-          ? String((overviewQuery.error as { digest?: unknown }).digest ?? "")
+          ? sanitizeSensitiveText(String((overviewQuery.error as { digest?: unknown }).digest ?? ""), 80)
           : undefined,
     });
   }, [overviewQuery.error, query]);

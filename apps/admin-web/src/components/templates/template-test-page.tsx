@@ -359,6 +359,12 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
         )
       );
     } catch (error) {
+      clientLogger.warn("templates.test_start_failed", {
+        templateId: sanitizeSensitiveText(templateId, 80),
+        fileContentType: sanitizeSensitiveText(selectedFile.type || "image/*", 64),
+        fileSizeBytes: selectedFile.size,
+        ...getTemplateTestErrorDetails(error),
+      });
       setRunError(getStartTestErrorMessage(error, text, template?.templateType === "Video"));
     } finally {
       startTestInFlightRef.current = false;

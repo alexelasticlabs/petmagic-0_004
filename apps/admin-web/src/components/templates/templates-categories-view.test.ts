@@ -122,6 +122,28 @@ describe("template categories view actions", () => {
     );
   });
 
+  it("logs category CRUD failures with sanitized diagnostics", () => {
+    const source = readFileSync(categoriesViewPath, "utf8");
+
+    expect(source).toContain('import { clientLogger } from "@/lib/client-logger";');
+    expect(source).toContain("function getCategoryActionErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("function getCategoryActionContext(category?: AdminTemplateCategory | null)");
+    expect(source).toContain("categoryId: category?.categoryId ? sanitizeSensitiveText(category.categoryId, 80) : undefined");
+    expect(source).toContain("categoryName: category?.name ? sanitizeSensitiveText(category.name, 96) : undefined");
+    expect(source).toContain('clientLogger.warn("templates.categories_create_failed", {');
+    expect(source).toContain('clientLogger.warn("templates.categories_update_failed", {');
+    expect(source).toContain('clientLogger.warn("templates.categories_archive_toggle_failed", {');
+    expect(source).toContain('clientLogger.warn("templates.categories_delete_failed", {');
+    expect(source).toContain("categoryName: sanitizeSensitiveText(name, 96)");
+    expect(source).toContain("categoryId: sanitizeSensitiveText(categoryId, 80)");
+    expect(source).toContain("...getCategoryActionErrorDetails(actionError)");
+    expect(source).not.toContain("clientLogger.warn(\"templates.categories_create_failed\", { error");
+    expect(source).not.toContain("clientLogger.warn(\"templates.categories_update_failed\", { error");
+    expect(source).not.toContain("clientLogger.warn(\"templates.categories_archive_toggle_failed\", { error");
+    expect(source).not.toContain("clientLogger.warn(\"templates.categories_delete_failed\", { error");
+  });
+
   it("keeps category page copy centralized while preserving sanitized confirmation names", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
+import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 type TemplateSecureMediaProps = {
   url: string;
@@ -48,6 +49,10 @@ function shouldUseDirectMediaUrl(url: string) {
 
 function getMediaFetchErrorName(error: unknown) {
   return error instanceof Error ? error.name : "UnknownError";
+}
+
+function formatTemplateMediaLogText(value: string | null | undefined, maxLength = 80) {
+  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
 }
 
 export function TemplateSecureMedia({
@@ -103,9 +108,9 @@ export function TemplateSecureMedia({
 
         if (!response.ok) {
           clientLogger.warn("templates.secure_media_fetch_failed", {
-            templateId: logContext?.templateId,
-            contentType: logContext?.contentType,
-            surface: logContext?.surface,
+            templateId: formatTemplateMediaLogText(logContext?.templateId),
+            contentType: formatTemplateMediaLogText(logContext?.contentType),
+            surface: formatTemplateMediaLogText(logContext?.surface, 48),
             kind,
             status: response.status,
           });
@@ -128,9 +133,9 @@ export function TemplateSecureMedia({
         }
 
         clientLogger.warn("templates.secure_media_fetch_failed", {
-          templateId: logContext?.templateId,
-          contentType: logContext?.contentType,
-          surface: logContext?.surface,
+          templateId: formatTemplateMediaLogText(logContext?.templateId),
+          contentType: formatTemplateMediaLogText(logContext?.contentType),
+          surface: formatTemplateMediaLogText(logContext?.surface, 48),
           kind,
           errorName: getMediaFetchErrorName(error),
         });

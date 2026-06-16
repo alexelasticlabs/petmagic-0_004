@@ -54,7 +54,14 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
     expect(secureMediaSource).toContain("function getMediaFetchErrorName(error: unknown)");
+    expect(secureMediaSource).toContain("function formatTemplateMediaLogText(");
+    expect(secureMediaSource).toContain("templateId: formatTemplateMediaLogText(logContext?.templateId)");
+    expect(secureMediaSource).toContain("contentType: formatTemplateMediaLogText(logContext?.contentType)");
+    expect(secureMediaSource).toContain("surface: formatTemplateMediaLogText(logContext?.surface, 48)");
     expect(secureMediaSource).toContain("errorName: getMediaFetchErrorName(error)");
+    expect(secureMediaSource).not.toContain("templateId: logContext?.templateId");
+    expect(secureMediaSource).not.toContain("contentType: logContext?.contentType");
+    expect(secureMediaSource).not.toContain("surface: logContext?.surface");
     expect(secureMediaSource).not.toContain("error,\n        });");
   });
 

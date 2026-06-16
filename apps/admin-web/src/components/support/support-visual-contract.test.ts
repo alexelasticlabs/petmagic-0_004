@@ -472,6 +472,28 @@ describe("support visual contract", () => {
     );
   });
 
+  it("keeps late support workspace height rules viewport-safe on tablet and mobile", () => {
+    const source = readSupportStyles();
+    const finalChatReadabilityLayer = sliceBetween(
+      source,
+      "/* Final chat readability and alignment fixes */",
+      "/* Late dark-theme support workspace overrides must stay below final polish rules. */"
+    );
+
+    expect(source).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(source).toContain("height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(finalChatReadabilityLayer).toContain("@media (max-width: 1180px) {");
+    expect(finalChatReadabilityLayer).toContain(
+      ".inboxPaneFlat,\n  .chatShell,\n  .infoPanelFlat {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }"
+    );
+    expect(finalChatReadabilityLayer).toContain("@media (max-width: 780px) {");
+    expect(finalChatReadabilityLayer).toContain("border-radius: 1rem;");
+    expect(finalChatReadabilityLayer).not.toContain(
+      "height: clamp(42rem, calc(100dvh - 9rem), 52rem);"
+    );
+    expect(source).not.toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
+  });
+
   it("keeps late light-theme support status overrides tokenized", () => {
     const source = readSupportStyles();
     const lateLightStatusLayer = sliceBetween(
@@ -706,7 +728,8 @@ describe("support visual contract", () => {
     expect(source).toContain("height: clamp(38rem, calc(100dvh - 10rem), 66rem);");
     expect(source).toContain("max-height: calc(100dvh - 2.4rem);");
     expect(source).toContain("max-height: calc(100dvh - 14rem);");
-    expect(source).toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
+    expect(source).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(source).not.toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
     expect(source).not.toContain("100vh");
   });
 

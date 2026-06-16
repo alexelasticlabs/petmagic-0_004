@@ -343,7 +343,7 @@ export function useTemplateEditorController({
       setToast({ type: "error", message });
       clientLogger.warn("templates.media_upload_failed", {
         assetKind,
-        fileName: sanitizeSensitiveText(file.name, 120),
+        fileSizeBytes: file.size,
         contentType: sanitizeSensitiveText(file.type, 80),
         ...getTemplateEditorErrorDetails(error),
       });

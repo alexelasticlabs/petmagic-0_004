@@ -4912,7 +4912,7 @@
   grid-template-rows: auto auto auto 1fr auto;
   gap: 0.8rem;
   padding: 1rem;
-  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
+  min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);
 }
 
 .queuePaneHeader {
@@ -5174,7 +5174,7 @@
 .chatShell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
+  min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);
   padding: 0 !important;
   border-radius: 26px;
   overflow: hidden;
@@ -5805,8 +5805,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.72rem;
-  min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);
-  height: clamp(42rem, calc(100dvh - 9rem), 52rem);
+  min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);
+  height: clamp(34rem, calc(100dvh - 9rem), 52rem);
   padding: 0.92rem;
 }
 
@@ -6317,6 +6317,28 @@
 .messages {
   overflow-x: hidden;
   gap: 12px;
+}
+
+@media (max-width: 1180px) {
+  .workspaceFullView {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .inboxPaneFlat,
+  .chatShell,
+  .infoPanelFlat {
+    min-height: auto;
+    height: auto;
+    max-height: none;
+  }
+}
+
+@media (max-width: 780px) {
+  .inboxPaneFlat,
+  .chatShell,
+  .infoPanelFlat {
+    border-radius: 1rem;
+  }
 }
 
 .messageItem {

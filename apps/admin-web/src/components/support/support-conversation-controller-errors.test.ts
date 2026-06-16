@@ -21,7 +21,12 @@ describe("support conversation controller errors", () => {
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("const pushSupportError = useCallback(");
     expect(source).toContain("getAdminErrorMessage(error, text.supportLoadError)");
-    expect(source).toContain("pushSupportError(error)");
+    expect(source).toContain('clientLogger.warn("support.action_failed", {');
+    expect(source).toContain("action: formatSupportControllerLogText(action, 40)");
+    expect(source).toContain('pushSupportError(error, "send_reply")');
+    expect(source).toContain('pushSupportError(error, "update_status")');
+    expect(source).toContain('pushSupportError(error, "assign_conversation")');
+    expect(source).toContain('pushSupportError(error, "update_metadata")');
     expect(source).toContain("function getSupportControllerErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain("function formatSupportControllerLogText(");
@@ -29,6 +34,7 @@ describe("support conversation controller errors", () => {
     expect(source).toContain("...getSupportControllerErrorDetails(error)");
     expect(source).not.toContain('setToast({ type: "error", message: text.supportLoadError });');
     expect(source).not.toContain('pushSupportNotification("error", text.supportLoadError);');
+    expect(source).not.toContain('clientLogger.warn("support.action_failed", { error');
     expect(source).not.toContain("conversationId,\n            error");
     expect(source).not.toContain("conversationId,\n          error");
   });

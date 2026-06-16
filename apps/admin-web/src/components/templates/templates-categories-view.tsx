@@ -31,6 +31,7 @@ import {
   useAuthSession,
   type AdminTemplateCategory,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -42,6 +43,23 @@ type ArchiveFilter = "active" | "archived";
 
 function formatCategoryActionName(category: AdminTemplateCategory | null): string {
   return sanitizeSensitiveText(category?.name, 96);
+}
+
+function getCategoryActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
+function getCategoryActionContext(category?: AdminTemplateCategory | null) {
+  return {
+    categoryId: category?.categoryId ? sanitizeSensitiveText(category.categoryId, 80) : undefined,
+    categoryName: category?.name ? sanitizeSensitiveText(category.name, 96) : undefined,
+  };
 }
 
 type ToastState = {
@@ -314,6 +332,10 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       }
       setToast({ type: "success", message: categoryText.createSuccess });
     } catch (actionError) {
+      clientLogger.warn("templates.categories_create_failed", {
+        categoryName: sanitizeSensitiveText(name, 96),
+        ...getCategoryActionErrorDetails(actionError),
+      });
       const message = getActionErrorMessage(actionError, categoryText.createError);
       setActionError(message);
       setToast({ type: "error", message });
@@ -349,6 +371,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       }
       setToast({ type: "success", message: categoryText.updateSuccess });
     } catch (actionError) {
+      clientLogger.warn("templates.categories_update_failed", {
+        categoryId: sanitizeSensitiveText(categoryId, 80),
+        categoryName: sanitizeSensitiveText(name, 96),
+        ...getCategoryActionErrorDetails(actionError),
+      });
       const message = getActionErrorMessage(actionError, categoryText.updateError);
       setActionError(message);
       setToast({ type: "error", message });
@@ -385,6 +412,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       });
       return true;
     } catch (actionError) {
+      clientLogger.warn("templates.categories_archive_toggle_failed", {
+        ...getCategoryActionContext(category),
+        nextArchivedState: !category.isArchived,
+        ...getCategoryActionErrorDetails(actionError),
+      });
       const message = getActionErrorMessage(actionError, categoryText.archiveError);
       setActionError(message);
       setToast({ type: "error", message });
@@ -419,6 +451,11 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       setToast({ type: "success", message: categoryText.deleteSuccess });
       return true;
     } catch (actionError) {
+      clientLogger.warn("templates.categories_delete_failed", {
+        ...getCategoryActionContext(category),
+        totalTemplates: category.totalTemplates,
+        ...getCategoryActionErrorDetails(actionError),
+      });
       const message = getActionErrorMessage(actionError, categoryText.deleteError);
       setActionError(message);
       setToast({ type: "error", message });
