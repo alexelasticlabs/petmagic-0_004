@@ -141,6 +141,15 @@ describe("moderation page sensitive display", () => {
   it("guards moderation decisions against stale rows and repeated submit", () => {
     const source = readFileSync(moderationPagePath, "utf8");
 
+    expect(source).toContain('import { clientLogger } from "@/lib/client-logger";');
+    expect(source).toContain("function getModerationDecisionErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(source).toContain("function getModerationDecisionContext(decision: DecisionState | null)");
+    expect(source).toContain("eventId: decision?.item.eventId ? sanitizeSensitiveText(decision.item.eventId, 80) : undefined");
+    expect(source).toContain("templateId: decision?.item.templateId");
+    expect(source).toContain('clientLogger.warn("moderation.decision_failed", {');
+    expect(source).toContain("...getModerationDecisionContext(decision)");
+    expect(source).toContain("...getModerationDecisionErrorDetails(error)");
     expect(source).toContain("MODERATION_SEARCH_MAX_LENGTH,");
     expect(source).toContain("MODERATION_DECISION_REASON_MAX_LENGTH,");
     expect(source).toContain(
@@ -232,6 +241,8 @@ describe("moderation page sensitive display", () => {
     expect(source).not.toContain("setSearch(event.target.value);");
     expect(source).not.toContain("setReason(event.target.value);");
     expect(source).not.toContain('throw new Error("Missing decision")');
+    expect(source).not.toContain('clientLogger.warn("moderation.decision_failed", { error');
+    expect(source).not.toContain("eventId: decision.item.eventId,\n        error");
   });
 
   it("uses the shared admin session guard before loading the moderation API", () => {

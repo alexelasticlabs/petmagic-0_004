@@ -24,14 +24,18 @@ export function usePromoActionsMenu() {
   const getActionsMenuPosition = useCallback((trigger: HTMLElement): ActionsMenuPosition => {
     const rect = trigger.getBoundingClientRect();
     const openUpward = window.innerHeight - rect.bottom < ACTIONS_MENU_HEIGHT_ESTIMATE_PX;
+    const menuWidth = Math.min(
+      ACTIONS_MENU_WIDTH_PX,
+      Math.max(0, window.innerWidth - ACTIONS_MENU_GAP_PX * 2)
+    );
     const maxLeft = Math.max(
       ACTIONS_MENU_GAP_PX,
-      window.innerWidth - ACTIONS_MENU_WIDTH_PX - ACTIONS_MENU_GAP_PX
+      window.innerWidth - menuWidth - ACTIONS_MENU_GAP_PX
     );
 
     return {
       top: openUpward ? rect.top - ACTIONS_MENU_GAP_PX : rect.bottom + ACTIONS_MENU_GAP_PX,
-      left: Math.min(Math.max(ACTIONS_MENU_GAP_PX, rect.right - ACTIONS_MENU_WIDTH_PX), maxLeft),
+      left: Math.min(Math.max(ACTIONS_MENU_GAP_PX, rect.right - menuWidth), maxLeft),
       openUpward,
     };
   }, []);

@@ -127,7 +127,9 @@ function getEconomyActionErrorDetails(error: unknown) {
   return {
     errorName: error instanceof Error ? error.name : "UnknownError",
     errorDigest:
-      error instanceof Error ? sanitizeSensitiveText(error.message, 160) : "unknown_error",
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
   };
 }
 

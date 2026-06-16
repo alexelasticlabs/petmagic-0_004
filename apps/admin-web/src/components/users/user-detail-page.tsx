@@ -35,6 +35,7 @@ import {
   type AdminUserPetPhoto,
   useAuthSession,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { getAdminUserDisplayName, maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -142,6 +143,16 @@ function formatPetStatus(status: string, text: ReturnType<typeof getUserPetsCopy
   return sanitizeSensitiveText(status, 32);
 }
 
+function getUserPetActionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
   const petText = useMemo(() => getUserPetsCopy(locale), [locale]);
@@ -171,7 +182,13 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
         queryClient.invalidateQueries({ queryKey: ["admin", "users", userId, "pets"] }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      clientLogger.warn("users.pet_status_update_failed", {
+        userId: sanitizeSensitiveText(userId, 80),
+        petId: sanitizeSensitiveText(variables.petId, 80),
+        status: variables.status,
+        ...getUserPetActionErrorDetails(error),
+      });
       setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));
     },
   });
@@ -675,7 +692,14 @@ function AdminPetDetails({
         }),
       ]);
     },
-    onError: (error) => {
+    onError: (error, variables) => {
+      clientLogger.warn("users.pet_photo_status_update_failed", {
+        userId: sanitizeSensitiveText(userId, 80),
+        petId: sanitizeSensitiveText(pet.id, 80),
+        photoId: sanitizeSensitiveText(variables.photoId, 80),
+        status: variables.status,
+        ...getUserPetActionErrorDetails(error),
+      });
       setPhotoActionError(getAdminErrorMessage(error, text.photoStatusUpdateError));
     },
   });

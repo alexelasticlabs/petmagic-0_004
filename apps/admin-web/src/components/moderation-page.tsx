@@ -29,6 +29,7 @@ import {
   type AdminModerationQueueItem,
   type AdminModerationStatus,
 } from "@/lib/api-client";
+import { clientLogger } from "@/lib/client-logger";
 import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
@@ -150,6 +151,26 @@ function formatTemplateType(templateType: string, text: ReturnType<typeof getCop
   return sanitizeSensitiveText(templateType, 48);
 }
 
+function getModerationDecisionErrorDetails(error: unknown) {
+  return {
+    errorName: error instanceof Error ? error.name : "UnknownError",
+    errorDigest:
+      error && typeof error === "object" && "digest" in error
+        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
+        : undefined,
+  };
+}
+
+function getModerationDecisionContext(decision: DecisionState | null) {
+  return {
+    eventId: decision?.item.eventId ? sanitizeSensitiveText(decision.item.eventId, 80) : undefined,
+    templateId: decision?.item.templateId
+      ? sanitizeSensitiveText(decision.item.templateId, 80)
+      : undefined,
+    action: decision?.action,
+  };
+}
+
 export function ModerationPage({ locale }: ModerationPageProps) {
   const text = getCopy(locale);
   const router = useRouter();
@@ -218,8 +239,13 @@ export function ModerationPage({ locale }: ModerationPageProps) {
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.dashboard(locale) }),
       ]);
     },
-    onError: (error) =>
-      setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) }),
+    onError: (error) => {
+      clientLogger.warn("moderation.decision_failed", {
+        ...getModerationDecisionContext(decision),
+        ...getModerationDecisionErrorDetails(error),
+      });
+      setToast({ type: "error", message: getAdminErrorMessage(error, text.failed) });
+    },
     onSettled: () => {
       decisionInFlightRef.current = false;
       setIsDecisionInFlight(false);

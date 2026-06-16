@@ -541,6 +541,8 @@
   position: fixed;
   z-index: 90;
   pointer-events: auto;
+  max-width: calc(100vw - 1rem);
+  max-height: calc(100dvh - 1rem);
 }
 
 .actionsMenuListPortal {
@@ -548,13 +550,18 @@
   top: auto;
   right: auto;
   min-width: 100%;
+  max-width: inherit;
+  max-height: inherit;
   z-index: auto;
+  overflow-y: auto;
   animation: menuFadeUp 140ms ease;
   transform-origin: top right;
 }
 
 .actionsMenuItem {
   appearance: none;
+  width: 100%;
+  min-width: 0;
   border: 0;
   border-radius: 0.66rem;
   background: transparent;
@@ -563,6 +570,8 @@
   padding: 0.52rem 0.62rem;
   font-size: 0.82rem;
   line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 

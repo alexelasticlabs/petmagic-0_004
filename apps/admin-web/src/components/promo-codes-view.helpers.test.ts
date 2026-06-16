@@ -26,6 +26,9 @@ const promoCodesListCardPath = fileURLToPath(
 const promoCodesActionsMenuPortalPath = fileURLToPath(
   new URL("./promo-codes-actions-menu-portal.tsx", import.meta.url)
 );
+const promoCodesActionsMenuHookPath = fileURLToPath(
+  new URL("./use-promo-actions-menu.ts", import.meta.url)
+);
 const promoCodeActivationsCardPath = fileURLToPath(
   new URL("./promo-code-activations-card.tsx", import.meta.url)
 );
@@ -306,10 +309,14 @@ describe("promo code dangerous action hardening", () => {
     expect(helpersSource).toContain("} finally {\n    input.remove();");
     expect(viewSource).toContain("function getPromoClientErrorDetails(error: unknown)");
     expect(viewSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(viewSource).toContain("sanitizeSensitiveText(error.message, 160)");
+    expect(viewSource).toContain('"digest" in error');
+    expect(viewSource).toContain(
+      'sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)'
+    );
     expect(viewSource).toContain(
       'clientLogger.warn("promo.copy_failed", getPromoClientErrorDetails(error));'
     );
+    expect(viewSource).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(viewSource).not.toContain('clientLogger.warn("promo.copy_failed", { error });');
     expect(viewSource).toContain('setFeedback({ tone: "danger", message: text.promoCodesUpdateError });');
     expect(viewSource).toContain(
@@ -667,6 +674,8 @@ describe("promo code sensitive display", () => {
     const helperSource = readFileSync(promoCodesHelpersPath, "utf8");
     const listSource = readFileSync(promoCodesListCardPath, "utf8");
     const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
+    const actionsMenuSource = readFileSync(promoCodesActionsMenuPortalPath, "utf8");
+    const actionsMenuHookSource = readFileSync(promoCodesActionsMenuHookPath, "utf8");
     const stylesSource = readFileSync(promoCodesStylesPath, "utf8");
     const nonZeroLetterSpacingRules = [...stylesSource.matchAll(/letter-spacing:\s*([^;]+);/g)]
       .map((match) => match[1]?.trim())
@@ -690,7 +699,24 @@ describe("promo code sensitive display", () => {
     expect(stylesSource).toContain("outline: 2px solid var(--border-accent);");
     expect(stylesSource).toContain(".actionsMenuItem:focus-visible");
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
+    expect(stylesSource).toContain("max-width: calc(100vw - 1rem);");
+    expect(stylesSource).toContain("max-height: calc(100dvh - 1rem);");
+    expect(stylesSource).toContain(".actionsMenuListPortal {\n  position: static;");
+    expect(stylesSource).toContain("max-width: inherit;");
+    expect(stylesSource).toContain("max-height: inherit;");
+    expect(stylesSource).toContain("overflow-y: auto;");
+    expect(stylesSource).toContain(".actionsMenuItem {\n  appearance: none;\n  width: 100%;\n  min-width: 0;");
+    expect(stylesSource).toContain("white-space: normal;");
+    expect(stylesSource).toContain("overflow-wrap: anywhere;");
     expect(stylesSource).not.toContain("rgba(");
+    expect(actionsMenuSource).toContain('minWidth: `min(${minWidthPx}px, calc(100vw - 1rem))`');
+    expect(actionsMenuSource).not.toContain("minWidth: minWidthPx");
+    expect(actionsMenuHookSource).toContain("const menuWidth = Math.min(");
+    expect(actionsMenuHookSource).toContain(
+      "Math.max(0, window.innerWidth - ACTIONS_MENU_GAP_PX * 2)"
+    );
+    expect(actionsMenuHookSource).toContain("rect.right - menuWidth");
+    expect(actionsMenuHookSource).not.toContain("rect.right - ACTIONS_MENU_WIDTH_PX");
     expect(stylesSource).not.toContain("outline: 1px solid color-mix(in srgb, var(--success) 42%, transparent);");
     expect(stylesSource).not.toContain("radial-gradient");
     expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);

@@ -6,6 +6,9 @@ const usersAdminHookPath = fileURLToPath(new URL("./use-users-admin.ts", import.
 const usersManagementPagePath = fileURLToPath(
   new URL("../users-management-page.tsx", import.meta.url)
 );
+const usersManagementStylesPath = fileURLToPath(
+  new URL("../users-management-page.module.css", import.meta.url)
+);
 
 describe("users admin action hardening", () => {
   it("keeps successful user actions independent from best-effort list refresh failures", () => {
@@ -106,5 +109,17 @@ describe("users admin action hardening", () => {
     expect(pageSource).toContain("setWalletDialog(null);");
     expect(pageSource).toContain("setConfirmationDialog(null);");
     expect(pageSource).toContain("selectedUserId,");
+  });
+
+  it("keeps the wallet adjustment dialog usable on narrow and short screens", () => {
+    const source = readFileSync(usersManagementStylesPath, "utf8");
+
+    expect(source).toContain(".walletDialog {");
+    expect(source).toContain("max-height: min(32rem, calc(100dvh - 1.6rem));");
+    expect(source).toContain("overflow-y: auto;");
+    expect(source).toContain(".walletActions {\n  display: flex;\n  flex-wrap: wrap;");
+    expect(source).toContain("@media (max-width: 420px)");
+    expect(source).toContain(".walletActions :global(.ui-button) {\n    flex: 1 1 9rem;");
+    expect(source).not.toContain("max-height: calc(100vh");
   });
 });

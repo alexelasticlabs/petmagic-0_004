@@ -159,6 +159,7 @@ describe("users management visual contract", () => {
   });
 
   it("keeps users management action menu viewport-safe and theme-tokenized", () => {
+    const pageSource = readFileSync(usersPagePath, "utf8");
     const stylesSource = readFileSync(usersStylesPath, "utf8");
     const actionMenuPortalLayer = stylesSource.slice(
       stylesSource.indexOf(".actionMenuPortal {"),
@@ -175,6 +176,17 @@ describe("users management visual contract", () => {
 
     expect(actionMenuPortalLayer).toContain("max-width: calc(100vw - 1rem);");
     expect(actionMenuPortalLayer).toContain("max-height: calc(100dvh - 1rem);");
+    expect(pageSource).toContain("const ACTIONS_MENU_TARGET_WIDTH_PX = 250;");
+    expect(pageSource).toContain("const ACTIONS_MENU_VIEWPORT_PADDING_PX = 8;");
+    expect(pageSource).toContain(
+      "const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);"
+    );
+    expect(pageSource).toContain("window.innerWidth - viewportPadding * 2");
+    expect(pageSource).toContain(
+      "const minWidth = Math.min(ACTIONS_MENU_TARGET_WIDTH_PX, availableWidth);"
+    );
+    expect(pageSource).not.toContain("ACTIONS_MENU_MIN_WIDTH_PX");
+    expect(pageSource).not.toContain("const minWidth = 250;");
     expect(actionMenuLayer).toContain("box-shadow: var(--shadow-strong);");
     expect(actionMenuLayer).toContain("max-width: min(17rem, calc(100vw - 1rem));");
     expect(actionMenuLayer).toContain("max-height: calc(100dvh - 1rem);");

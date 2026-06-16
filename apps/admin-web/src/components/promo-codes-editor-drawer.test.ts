@@ -21,6 +21,11 @@ describe("promo codes editor drawer production form", () => {
   it("keeps submit guarded by client validation and mutation state", () => {
     const source = readFileSync(drawerPath, "utf8");
 
+    expect(source).toContain("useId,");
+    expect(source).toContain("const panelTitleId = useId();");
+    expect(source).toContain("aria-labelledby={panelTitleId}");
+    expect(source).toContain("titleId={panelTitleId}");
+    expect(source).not.toContain("aria-label={panelTitle}");
     expect(source).toContain("onClick={isMutating ? undefined : onClose}");
     expect(source).toContain("const isFormLocked = isMutating;");
     expect(source).toContain('aria-busy={isFormLocked}');

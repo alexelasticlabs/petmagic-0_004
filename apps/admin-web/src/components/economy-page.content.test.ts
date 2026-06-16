@@ -121,11 +121,15 @@ describe("economy-page content", () => {
     expect(source).toContain('import { clientLogger } from "@/lib/client-logger";');
     expect(source).toContain("function getEconomyActionErrorDetails(error: unknown)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("sanitizeSensitiveText(error.message, 160)");
+    expect(source).toContain('"digest" in error');
+    expect(source).toContain(
+      'sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)'
+    );
     expect(source).toContain('clientLogger.error("economy.cancel_subscription_failed"');
     expect(source).toContain('clientLogger.error("economy.refund_purchase_failed"');
     expect(source).toContain("subscriptionId: formatEconomyLogText(subscription?.subscriptionId)");
     expect(source).toContain("orderId: formatEconomyLogText(purchase?.orderId)");
+    expect(source).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(source).not.toContain("error,\n      });");
   });
 

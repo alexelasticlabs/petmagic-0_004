@@ -56,7 +56,7 @@ export function PromoCodesActionsMenuPortal({
       style={{
         top: actionsMenuPosition.top,
         left: actionsMenuPosition.left,
-        minWidth: minWidthPx,
+        minWidth: `min(${minWidthPx}px, calc(100vw - 1rem))`,
         transform: actionsMenuPosition.openUpward ? "translateY(-100%)" : undefined,
       }}
       role="menu"

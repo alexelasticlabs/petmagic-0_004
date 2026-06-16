@@ -320,6 +320,8 @@
 
 .walletDialog {
   width: min(28rem, 100%);
+  max-height: min(32rem, calc(100dvh - 1.6rem));
+  overflow-y: auto;
   display: grid;
   gap: 0.6rem;
   padding: 0.76rem;
@@ -384,8 +386,23 @@
 
 .walletActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.42rem;
+}
+
+@media (max-width: 420px) {
+  .walletDialogBackdrop {
+    padding: 0.64rem;
+  }
+
+  .walletActions {
+    justify-content: stretch;
+  }
+
+  .walletActions :global(.ui-button) {
+    flex: 1 1 9rem;
+  }
 }
 
 .sidePanelBackdrop {

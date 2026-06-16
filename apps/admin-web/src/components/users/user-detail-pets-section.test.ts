@@ -82,6 +82,11 @@ describe("user detail pets section", () => {
     expect(source).toContain("enabled: canManagePets");
     expect(source).toContain("function requestPetStatusChange(pet: AdminUserPet)");
     expect(source).toContain("const [petActionError, setPetActionError]");
+    expect(source).toContain('clientLogger.warn("users.pet_status_update_failed", {');
+    expect(source).toContain("petId: sanitizeSensitiveText(variables.petId, 80)");
+    expect(source).toContain("status: variables.status");
+    expect(source).toContain("function getUserPetActionErrorDetails(error: unknown)");
+    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain("setPetActionError(getAdminErrorMessage(error, petText.statusUpdateError));");
     expect(source).toContain(
       '{petActionError ? <AdminStateCard tone="warning" title={petActionError} /> : null}'
@@ -102,6 +107,9 @@ describe("user detail pets section", () => {
     );
     expect(source).toContain("function requestPhotoStatusChange(photo: AdminUserPetPhoto)");
     expect(source).toContain("const [photoActionError, setPhotoActionError]");
+    expect(source).toContain('clientLogger.warn("users.pet_photo_status_update_failed", {');
+    expect(source).toContain("photoId: sanitizeSensitiveText(variables.photoId, 80)");
+    expect(source).toContain("...getUserPetActionErrorDetails(error)");
     expect(source).toContain(
       "setPhotoActionError(getAdminErrorMessage(error, text.photoStatusUpdateError));"
     );
@@ -123,6 +131,8 @@ describe("user detail pets section", () => {
     expect(source).not.toContain(
       "onClick={() =>\n                  photoStatusMutation.mutate({"
     );
+    expect(source).not.toContain('clientLogger.warn("users.pet_status_update_failed", { error');
+    expect(source).not.toContain('clientLogger.warn("users.pet_photo_status_update_failed", { error');
     expect(styles).toContain(".petDetailState");
   });
 

@@ -76,6 +76,9 @@ type ActionsMenuPosition = {
 
 type AccountStatus = "active" | "blocked" | "unconfirmed";
 
+const ACTIONS_MENU_TARGET_WIDTH_PX = 250;
+const ACTIONS_MENU_VIEWPORT_PADDING_PX = 8;
+
 const accountStatusColors: Record<AccountStatus, string> = {
   active: "var(--success)",
   blocked: "var(--danger)",
@@ -901,8 +904,9 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
 
       const triggerRect = trigger.getBoundingClientRect();
       const gap = 6;
-      const viewportPadding = 8;
-      const minWidth = 250;
+      const viewportPadding = ACTIONS_MENU_VIEWPORT_PADDING_PX;
+      const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
+      const minWidth = Math.min(ACTIONS_MENU_TARGET_WIDTH_PX, availableWidth);
       const estimatedHeight = canManageRoles ? 356 : 252;
       const availableBelow = window.innerHeight - triggerRect.bottom - gap;
       const availableAbove = triggerRect.top - gap;

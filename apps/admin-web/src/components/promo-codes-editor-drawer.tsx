@@ -1,6 +1,6 @@
 "use client";
 
-import { type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useId, type Dispatch, type FormEvent, type SetStateAction } from "react";
 
 import { CalendarIcon, PeopleIcon, PromoCodeIcon } from "@/components/admin/admin-icons";
 import { AdminCard } from "@/components/admin/admin-primitives";
@@ -51,6 +51,8 @@ export function PromoCodesEditorDrawer({
   onGenerateCode,
   onToggleCodeState,
 }: PromoCodesEditorDrawerProps) {
+  const panelTitleId = useId();
+
   if (!isOpen) {
     return null;
   }
@@ -81,10 +83,11 @@ export function PromoCodesEditorDrawer({
         className={styles.editorDrawer}
         role="dialog"
         aria-modal="true"
-        aria-label={panelTitle}
+        aria-labelledby={panelTitleId}
         onClick={(event) => event.stopPropagation()}
       >
         <AdminCard
+          titleId={panelTitleId}
           title={panelTitle}
           description={text.promoCodesFormCardDescription}
           className={styles.formCard}
