@@ -3,16 +3,11 @@ part of 'generations_gallery_page.dart';
 const int _generationGalleryThumbnailCacheWidth = 320;
 
 File? _localMediaFile(String? path) {
-  final normalized = path?.trim();
-  if (normalized == null || normalized.isEmpty) {
+  final usablePath = usableLocalMediaPathSync(path);
+  if (usablePath == null) {
     return null;
   }
-
-  final file = File(normalized);
-  if (!file.existsSync()) {
-    return null;
-  }
-  return file;
+  return File(usablePath);
 }
 
 class _ActiveCard extends ConsumerWidget {
@@ -411,7 +406,7 @@ class _FailedCard extends ConsumerWidget {
     }
 
     void pickAnotherPhoto() {
-      context.go(TemplatesPage.routePath);
+      context.go(_templatesLocationForGeneration(generation));
     }
 
     void openSupport() {

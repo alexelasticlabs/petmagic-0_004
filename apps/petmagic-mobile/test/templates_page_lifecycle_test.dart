@@ -1096,9 +1096,14 @@ void main() {
     addTearDown(() {
       SharedPreferencesAsyncPlatform.instance = previousPreferencesPlatform;
     });
+    const petId = 'pet/42 #x?kind=dog&name=Bella';
+    const petPhotoId = 'photo/7 #main?pose=1&tag=a';
     final generationRepository = _PetFlowGenerationRepository();
     final router = GoRouter(
-      initialLocation: '/templates?petId=pet-42&petPhotoId=photo-7',
+      initialLocation: Uri(
+        path: TemplatesPage.routePath,
+        queryParameters: {'petId': petId, 'petPhotoId': petPhotoId},
+      ).toString(),
       routes: [
         GoRoute(
           path: TemplatesPage.routePath,
@@ -1183,8 +1188,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(generationRepository.startFromPetCalls, 1);
-    expect(generationRepository.lastPetId, 'pet-42');
-    expect(generationRepository.lastPetPhotoId, 'photo-7');
+    expect(generationRepository.lastPetId, petId);
+    expect(generationRepository.lastPetPhotoId, petPhotoId);
     expect(generationRepository.lastTemplateId, 'template-pet');
     expect(generationRepository.rememberedGenerationIds, ['generation-pet-1']);
     expect(find.text('status:generation-pet-1'), findsOneWidget);

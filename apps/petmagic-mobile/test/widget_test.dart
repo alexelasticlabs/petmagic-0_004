@@ -755,6 +755,103 @@ void main() {
   });
 
   testWidgets(
+    'app router shows auth gates for guest gallery routes without fetching',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
+
+      final authStorage = _TestAuthSessionStorage();
+      final generationRepository = _RouterTemplateGenerationRepository();
+      final historyController = _TrackingGenerationHistoryController();
+      final container = ProviderContainer(
+        overrides: [
+          dioProvider.overrideWith(
+            (ref) => Dio(BaseOptions(baseUrl: 'https://petmagic.test')),
+          ),
+          authSessionStorageProvider.overrideWith((ref) => authStorage),
+          templateGenerationRepositoryProvider.overrideWithValue(
+            generationRepository,
+          ),
+          templatesRepositoryProvider.overrideWith(
+            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
+          ),
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            () => historyController,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          profileRepositoryProvider.overrideWith(
+            (ref) => _FakeProfileRepository(),
+          ),
+          externalAuthRepositoryProvider.overrideWith(
+            (ref) => _FakeExternalAuthRepository(),
+          ),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(appLaunchControllerProvider.notifier)
+          .continueAsGuest();
+      final router = container.read(appRouterProvider);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            routerConfig: router,
+          ),
+        ),
+      );
+      await _pumpFrames(tester);
+      final initialFetchPetsCalls = generationRepository.fetchPetsCalls;
+
+      final text = AppLocalizations.of(
+        tester.element(find.byType(Scaffold).first),
+      );
+
+      router.go(GenerationsGalleryPage.routePath);
+      await _pumpFrames(tester);
+      expect(find.byType(GenerationsGalleryPage), findsOneWidget);
+      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
+      expect(
+        find.text(text.generationStatusEmptyMessage),
+        findsAtLeastNWidgets(1),
+      );
+      expect(historyController.loadCalls, isEmpty);
+      expect(historyController.screenVisibilityCalls, contains(false));
+
+      router.go(MyPetsPage.routePath);
+      await _pumpFrames(tester);
+      expect(find.byType(MyPetsPage), findsOneWidget);
+      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
+      expect(find.text(text.authRequiredMessage), findsAtLeastNWidgets(1));
+      expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
+
+      router.go(PetDetailsPage.location('pet-router'));
+      await _pumpFrames(tester);
+      expect(find.byType(PetDetailsPage), findsOneWidget);
+      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
+      expect(find.text(text.authRequiredMessage), findsAtLeastNWidgets(1));
+      expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
+      expect(generationRepository.fetchPetPhotosCalls, 0);
+      expect(generationRepository.fetchPetGenerationsCalls, 0);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 500));
+    },
+  );
+
+  testWidgets(
     'app router registers pet details creations and generation status routes',
     (tester) async {
       SharedPreferences.setMockInitialValues({

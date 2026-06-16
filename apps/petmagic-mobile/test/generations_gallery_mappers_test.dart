@@ -137,6 +137,27 @@ void main() {
         );
         expect(previewUrl(image), 'https://cdn.petmagic.app/result.jpg');
 
+        final imageWithResultPreview = _generation(
+          templateType: 'Image',
+          resultPreviewUrl: ' https://cdn.petmagic.app/result-thumb.jpg ',
+          outputUrl: 'https://cdn.petmagic.app/result-original.jpg',
+        );
+        expect(
+          previewUrl(imageWithResultPreview),
+          'https://cdn.petmagic.app/result-thumb.jpg',
+        );
+
+        final videoWithResultPreview = _generation(
+          templateType: 'Video',
+          resultPreviewUrl: 'https://cdn.petmagic.app/video-thumb.jpg',
+          sourceImageAsset: _asset('https://cdn.petmagic.app/source.jpg'),
+          outputUrl: 'https://cdn.petmagic.app/result.mp4',
+        );
+        expect(
+          previewUrl(videoWithResultPreview),
+          'https://cdn.petmagic.app/video-thumb.jpg',
+        );
+
         final videoWithSource = _generation(
           templateType: 'Video',
           sourceImageAsset: _asset('https://cdn.petmagic.app/source.jpg'),
@@ -163,6 +184,12 @@ void main() {
           outputUrl: 'https://cdn.petmagic.app/result.mp4',
         );
         expect(previewUrl(videoOnly), isNull);
+
+        final opaqueVideoOutput = _generation(
+          templateType: 'Video',
+          outputUrl: 'https://cdn.petmagic.app/result',
+        );
+        expect(previewUrl(opaqueVideoOutput), isNull);
 
         final videoPosterOnly = _generation(
           templateType: 'Video',
@@ -258,6 +285,7 @@ TemplateGenerationResult _generation({
   String? estimatedDurationLabel,
   TemplateAsset? sourceImageAsset,
   String? normalizedImageUrl,
+  String? resultPreviewUrl,
   String? outputUrl,
   double? outputVideoDurationSeconds,
   String? failureCode,
@@ -280,6 +308,7 @@ TemplateGenerationResult _generation({
     estimatedDurationLabel: estimatedDurationLabel,
     sourceImageAsset: sourceImageAsset,
     normalizedImageUrl: normalizedImageUrl,
+    resultPreviewUrl: resultPreviewUrl,
     outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,
     failureCode: failureCode,

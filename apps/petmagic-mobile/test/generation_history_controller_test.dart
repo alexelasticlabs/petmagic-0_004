@@ -118,6 +118,33 @@ void main() {
     },
   );
 
+  test('loads remote history when unread count refresh fails', () async {
+    final ready = _generation(
+      generationId: 'generation-ready',
+      status: TemplateGenerationStatus.completed,
+    );
+    final repository = _FakeTemplateGenerationRepository(
+      remoteByStatus: {
+        null: [ready],
+      },
+      unreadCountError: const AppException('templates.unread_count_failed'),
+    );
+    final harness = _ControllerHarness(repository: repository);
+    addTearDown(harness.dispose);
+
+    await harness.controller.load();
+
+    expect(repository.fetchCalls, [(status: null, take: 50)]);
+    expect(repository.fetchUnreadCountCalls, 1);
+    expect(harness.state.items.map((item) => item.generationId), [
+      'generation-ready',
+    ]);
+    expect(harness.state.isLoading, isFalse);
+    expect(harness.state.syncFailed, isFalse);
+    expect(harness.state.errorMessage, isNull);
+    expect(harness.state.unreadCount, 0);
+  });
+
   test(
     'clears queued filter load when screen hides during in-flight history load',
     () async {
@@ -226,6 +253,50 @@ void main() {
       'generation-ready',
     ]);
   });
+
+  test(
+    'cancels post-load unread count before applying fetched history',
+    () async {
+      final unreadCompleter = Completer<void>();
+      final ready = _generation(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+      );
+      final repository = _FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          null: [ready],
+        },
+        unreadCount: 1,
+        unreadCountCompleter: unreadCompleter,
+      );
+      final harness = _ControllerHarness(repository: repository);
+      addTearDown(harness.dispose);
+
+      final controller = harness.controller;
+      controller.setScreenVisible(true);
+      final loadFuture = controller.load();
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(repository.fetchCalls, [(status: null, take: 50)]);
+      expect(repository.fetchUnreadCountCalls, 1);
+      expect(repository.fetchUnreadCancelTokens.single?.isCancelled, isFalse);
+      expect(harness.state.isLoading, isTrue);
+
+      controller.setScreenVisible(false);
+
+      expect(repository.fetchUnreadCancelTokens.single?.isCancelled, isTrue);
+      expect(harness.state.isLoading, isFalse);
+
+      unreadCompleter.complete();
+      await loadFuture;
+
+      expect(harness.state.items, isEmpty);
+      expect(harness.state.unreadCount, 0);
+      expect(harness.state.syncFailed, isFalse);
+      expect(harness.state.errorMessage, isNull);
+    },
+  );
 
   test('screen visibility schedules local artifact cleanup once', () async {
     final repository = _FakeTemplateGenerationRepository();
@@ -434,6 +505,9 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
 
     final updated = harness.state.items.single;
     expect(updated.generationId, 'generation-active');
@@ -462,6 +536,246 @@ void main() {
     ]);
     expect(harness.state.unreadCount, 0);
     expect(realtimeClient.connectCalls, 1);
+  });
+
+  test(
+    'mergeFetchedGeneration updates history state from status refresh',
+    () async {
+      final ready = _generation(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+        outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      );
+      final repository = _FakeTemplateGenerationRepository();
+      final store = _FakeGenerationGalleryStore();
+      final harness = _ControllerHarness(repository: repository, store: store);
+      addTearDown(harness.dispose);
+
+      await harness.controller.mergeFetchedGeneration(ready);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.state.items.map((item) => item.generationId), [
+        'generation-ready',
+      ]);
+      expect(harness.state.items.single.isCompleted, isTrue);
+      expect(repository.cachedUpserts.map((item) => item.generationId), [
+        'generation-ready',
+      ]);
+      expect(store.materializedGenerationIds, isEmpty);
+    },
+  );
+
+  test(
+    'mergeFetchedGeneration decorates status refresh with local media record',
+    () async {
+      final ready = _generation(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+        outputUrl: 'https://cdn.petmagic.app/result.jpg',
+      );
+      final localRecord = GenerationGalleryMediaRecord(
+        generationId: 'generation-ready',
+        accountScope: 'user-1',
+        userId: 'user-1',
+        status: TemplateGenerationStatus.completed.name,
+        updatedAtUtc: ready.updatedAtUtc,
+        lastSyncedAtUtc: DateTime.utc(2026, 6, 14, 12, 4),
+        version: 1,
+        previewRemoteUrl: ready.outputUrl,
+        outputRemoteUrl: ready.outputUrl,
+        previewLocalPath: '/local/generation-ready-preview.jpg',
+        outputLocalPath: '/local/generation-ready-output.jpg',
+        isDownloadComplete: true,
+      );
+      final repository = _FakeTemplateGenerationRepository();
+      final store = _FakeGenerationGalleryStore(
+        localReadyRecords: [localRecord],
+      );
+      final harness = _ControllerHarness(repository: repository, store: store);
+      addTearDown(harness.dispose);
+
+      await harness.controller.mergeFetchedGeneration(ready);
+      await Future<void>.delayed(Duration.zero);
+
+      final item = harness.state.items.single;
+      expect(item.localPreviewPath, '/local/generation-ready-preview.jpg');
+      expect(item.localOutputPath, '/local/generation-ready-output.jpg');
+      expect(item.isLocalMediaReady, isTrue);
+      expect(
+        repository.cachedUpserts.single.localOutputPath,
+        item.localOutputPath,
+      );
+    },
+  );
+
+  test(
+    'mergeFetchedGeneration ignores stale local media records for changed URLs',
+    () async {
+      final ready = _generation(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+        outputUrl: 'https://cdn.petmagic.app/new-result.jpg',
+      );
+      final localRecord = GenerationGalleryMediaRecord(
+        generationId: 'generation-ready',
+        accountScope: 'user-1',
+        userId: 'user-1',
+        status: TemplateGenerationStatus.completed.name,
+        updatedAtUtc: ready.updatedAtUtc,
+        lastSyncedAtUtc: DateTime.utc(2026, 6, 14, 12, 4),
+        version: 1,
+        previewRemoteUrl: 'https://cdn.petmagic.app/old-result.jpg',
+        outputRemoteUrl: 'https://cdn.petmagic.app/old-result.jpg',
+        previewLocalPath: '/local/old-preview.jpg',
+        outputLocalPath: '/local/old-output.jpg',
+        isDownloadComplete: true,
+      );
+      final repository = _FakeTemplateGenerationRepository();
+      final store = _FakeGenerationGalleryStore(
+        localReadyRecords: [localRecord],
+      );
+      final harness = _ControllerHarness(repository: repository, store: store);
+      addTearDown(harness.dispose);
+
+      await harness.controller.mergeFetchedGeneration(ready);
+      await Future<void>.delayed(Duration.zero);
+
+      final item = harness.state.items.single;
+      expect(item.localPreviewPath, isNull);
+      expect(item.localOutputPath, isNull);
+      expect(item.isLocalMediaReady, isFalse);
+      expect(repository.cachedUpserts.single.localOutputPath, isNull);
+      expect(store.materializedGenerationIds, isEmpty);
+    },
+  );
+
+  test(
+    'mergeFetchedGeneration clears existing local media when URLs change',
+    () async {
+      final oldReady = _generation(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+        outputUrl: 'https://cdn.petmagic.app/old-result.jpg',
+      );
+      final newReady = oldReady.copyWith(
+        outputUrl: 'https://cdn.petmagic.app/new-result.jpg',
+        updatedAtUtc: oldReady.updatedAtUtc.add(const Duration(minutes: 1)),
+      );
+      final localRecord = GenerationGalleryMediaRecord(
+        generationId: 'generation-ready',
+        accountScope: 'user-1',
+        userId: 'user-1',
+        status: TemplateGenerationStatus.completed.name,
+        updatedAtUtc: oldReady.updatedAtUtc,
+        lastSyncedAtUtc: DateTime.utc(2026, 6, 14, 12, 4),
+        version: 1,
+        previewRemoteUrl: oldReady.outputUrl,
+        outputRemoteUrl: oldReady.outputUrl,
+        previewLocalPath: '/local/old-preview.jpg',
+        outputLocalPath: '/local/old-output.jpg',
+        isDownloadComplete: true,
+      );
+      final repository = _FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          null: [oldReady],
+        },
+      );
+      final store = _FakeGenerationGalleryStore(
+        localReadyRecords: [localRecord],
+      );
+      final harness = _ControllerHarness(repository: repository, store: store);
+      addTearDown(harness.dispose);
+
+      await harness.controller.load();
+      expect(
+        harness.state.items.single.localPreviewPath,
+        '/local/old-preview.jpg',
+      );
+      expect(
+        harness.state.items.single.localOutputPath,
+        '/local/old-output.jpg',
+      );
+
+      await harness.controller.mergeFetchedGeneration(newReady);
+      await Future<void>.delayed(Duration.zero);
+
+      final item = harness.state.items.single;
+      expect(item.outputUrl, newReady.outputUrl);
+      expect(item.localPreviewPath, isNull);
+      expect(item.localOutputPath, isNull);
+      expect(item.isLocalMediaReady, isFalse);
+      expect(repository.cachedUpserts.last.localOutputPath, isNull);
+      expect(store.materializedGenerationIds, isEmpty);
+    },
+  );
+
+  test(
+    'mergeFetchedGeneration keeps completed status refresh out of active filter',
+    () async {
+      final active = _generation(
+        generationId: 'generation-active',
+        status: TemplateGenerationStatus.generating,
+        stage: 'generating',
+        progressPercent: 45,
+      );
+      final completed = active.copyWith(
+        status: TemplateGenerationStatus.completed,
+        stage: 'completed',
+        progressPercent: 100,
+        outputUrl: 'https://cdn.petmagic.app/result.jpg',
+        completedAtUtc: DateTime.utc(2026, 6, 14, 12, 5),
+        updatedAtUtc: DateTime.utc(2026, 6, 14, 12, 5),
+      );
+      final repository = _FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          'active': [active],
+          'ready': const <TemplateGenerationResult>[],
+        },
+      );
+      final store = _FakeGenerationGalleryStore();
+      final harness = _ControllerHarness(repository: repository, store: store);
+      addTearDown(harness.dispose);
+
+      await harness.controller.load(filter: GenerationHistoryFilter.active);
+
+      expect(harness.state.filter, GenerationHistoryFilter.active);
+      expect(harness.state.items.map((item) => item.generationId), [
+        'generation-active',
+      ]);
+
+      await harness.controller.mergeFetchedGeneration(completed);
+
+      expect(harness.state.filter, GenerationHistoryFilter.active);
+      expect(harness.state.items, isEmpty);
+      expect(
+        harness.state.cachedItemsByFilter[GenerationHistoryFilter.active],
+        isEmpty,
+      );
+      expect(
+        harness.state.cachedItemsByFilter.containsKey(
+          GenerationHistoryFilter.ready,
+        ),
+        isFalse,
+      );
+    },
+  );
+
+  test('mergeFetchedGeneration does not resurrect tombstoned items', () async {
+    final ready = _generation(
+      generationId: 'generation-ready',
+      status: TemplateGenerationStatus.completed,
+    );
+    final repository = _FakeTemplateGenerationRepository();
+    final store = _FakeGenerationGalleryStore()
+      ..deletedGenerationIds.add('generation-ready');
+    final harness = _ControllerHarness(repository: repository, store: store);
+    addTearDown(harness.dispose);
+
+    await harness.controller.mergeFetchedGeneration(ready);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(harness.state.items, isEmpty);
+    expect(repository.cachedUpserts, isEmpty);
   });
 
   test(
@@ -562,12 +876,63 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
     await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
 
     expect(harness.state.items, isEmpty);
     expect(store.materializedGenerationIds, isEmpty);
     expect(repository.deleteGenerationCalls, ['generation-active']);
     expect(store.clearPendingServerDeleteCalls, ['generation-active']);
   });
+
+  test(
+    'realtime checks persisted tombstones before the first history load',
+    () async {
+      final active = _generation(
+        generationId: 'generation-active',
+        status: TemplateGenerationStatus.generating,
+        stage: 'generating',
+        progressPercent: 70,
+      );
+      final repository = _FakeTemplateGenerationRepository();
+      final realtimeClient = _FakeRealtimeClient();
+      final store = _FakeGenerationGalleryStore()
+        ..deletedGenerationIds.add('generation-active');
+      final harness = _ControllerHarness(
+        repository: repository,
+        store: store,
+        realtimeClient: realtimeClient,
+      );
+      addTearDown(harness.dispose);
+
+      final controller = harness.controller;
+      controller.setScreenVisible(true);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      realtimeClient.emit(
+        RealtimeEvent(
+          topic: RealtimeTopics.templatesGenerationStatusChanged,
+          payload: _generationPayload(
+            active.copyWith(
+              status: TemplateGenerationStatus.completed,
+              stage: 'finalizing',
+              progressPercent: 100,
+              outputUrl: 'https://cdn.petmagic.app/result.jpg',
+              completedAtUtc: DateTime.utc(2026, 6, 14, 12, 3),
+            ),
+          ),
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.state.items, isEmpty);
+      expect(repository.cachedUpserts, isEmpty);
+      expect(store.materializedGenerationIds, isEmpty);
+      expect(realtimeClient.connectCalls, 1);
+    },
+  );
 
   test(
     'realtime disconnects if screen hides before connect completes',
@@ -788,6 +1153,8 @@ void main() {
           ),
         ),
       );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
@@ -1351,6 +1718,7 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
     this.markReadError,
     this.markReadCompleter,
     this.unreadCountCompleter,
+    this.unreadCountError,
     this.unreadCount = 0,
   }) : remoteByStatus = Map<String?, List<TemplateGenerationResult>>.from(
          remoteByStatus,
@@ -1382,6 +1750,7 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   Object? markReadError;
   Completer<void>? markReadCompleter;
   Completer<void>? unreadCountCompleter;
+  Object? unreadCountError;
   int unreadCount;
 
   @override
@@ -1435,6 +1804,10 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
         ),
         type: DioExceptionType.cancel,
       );
+    }
+    final error = unreadCountError;
+    if (error != null) {
+      throw error;
     }
     return unreadCount;
   }
@@ -1493,7 +1866,11 @@ class _FakeGenerationGalleryStore extends GenerationGalleryStore {
   _FakeGenerationGalleryStore({
     this.materializeCompleter,
     this.markDeletedCompleter,
-  }) : super(
+    List<GenerationGalleryMediaRecord> localReadyRecords = const [],
+  }) : localReadyRecords = List<GenerationGalleryMediaRecord>.from(
+         localReadyRecords,
+       ),
+       super(
          dio: Dio(),
          preferences: SharedPreferencesAsync(),
          sessionStorage: AuthSessionStorage(),
@@ -1502,6 +1879,7 @@ class _FakeGenerationGalleryStore extends GenerationGalleryStore {
 
   final Completer<GenerationGalleryMediaRecord?>? materializeCompleter;
   final Completer<void>? markDeletedCompleter;
+  final List<GenerationGalleryMediaRecord> localReadyRecords;
   final List<String> materializedGenerationIds = [];
   final List<({String generationId, String? userId})> markDeletedCalls = [];
   final List<String> clearPendingServerDeleteCalls = [];
@@ -1519,7 +1897,7 @@ class _FakeGenerationGalleryStore extends GenerationGalleryStore {
 
   @override
   Future<List<GenerationGalleryMediaRecord>> loadLocalReadyItems() async =>
-      const [];
+      localReadyRecords;
 
   @override
   Future<void> clearPendingServerDelete(String generationId) async {
@@ -1561,12 +1939,16 @@ class _FakeGenerationGalleryStore extends GenerationGalleryStore {
     }
 
     final nowUtc = DateTime.now().toUtc();
+    final outputRemoteUrl = generation.outputUrl;
+    final previewRemoteUrl = generation.resultPreviewUrl ?? outputRemoteUrl;
     return GenerationGalleryMediaRecord(
       generationId: generation.generationId,
       accountScope: generation.userId,
       userId: generation.userId,
       status: generation.status.name,
       updatedAtUtc: generation.updatedAtUtc,
+      previewRemoteUrl: previewRemoteUrl,
+      outputRemoteUrl: outputRemoteUrl,
       previewLocalPath: '/local/${generation.generationId}-preview.jpg',
       outputLocalPath: '/local/${generation.generationId}-output.jpg',
       isDownloadComplete: true,

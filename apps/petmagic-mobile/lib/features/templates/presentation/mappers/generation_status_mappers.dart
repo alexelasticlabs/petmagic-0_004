@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 
 String typeLabel(AppLocalizations text, TemplateGenerationResult generation) {
@@ -134,6 +135,5 @@ Color generationStatusColor(
 }
 
 bool isVideoGeneration(TemplateGenerationResult generation) {
-  return generation.templateType?.toLowerCase() == 'video' ||
-      (generation.outputUrl ?? '').toLowerCase().endsWith('.mp4');
+  return isVideoGenerationResult(generation);
 }

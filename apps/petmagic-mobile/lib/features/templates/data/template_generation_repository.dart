@@ -67,13 +67,15 @@ class TemplateGenerationRepository {
     String? correlationId,
     CancelToken? cancelToken,
   }) async {
+    final encodedTemplateId = _apiPathSegment(templateId);
     final rawFileName = sourceImage.name.isNotEmpty
         ? sourceImage.name
         : sourceImage.path.split(Platform.pathSeparator).last;
     final fileName = _safeSourceImageFileName(rawFileName);
     final declaredContentType =
         sourceImage.mimeType ?? _resolveImageContentType(fileName);
-    if (!_isAllowedImageContentType(declaredContentType)) {
+    if (!_isAllowedImageContentType(declaredContentType) &&
+        !_isGenericBinaryContentType(declaredContentType)) {
       throw const AppException('templates.source_image_type_not_allowed');
     }
 
@@ -95,7 +97,7 @@ class TemplateGenerationRepository {
 
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/templates/$templateId/generations',
+        '/api/templates/$encodedTemplateId/generations',
         data: FormData.fromMap({
           'sourceImage': await MultipartFile.fromFile(
             sourceImage.path,
@@ -323,7 +325,8 @@ class TemplateGenerationRepository {
     final fileName = _safeSourceImageFileName(rawFileName);
     final declaredContentType =
         photo.mimeType ?? _resolveImageContentType(fileName);
-    if (!_isAllowedImageContentType(declaredContentType)) {
+    if (!_isAllowedImageContentType(declaredContentType) &&
+        !_isGenericBinaryContentType(declaredContentType)) {
       throw const AppException('pets.photo_type_not_allowed');
     }
 
@@ -1095,42 +1098,46 @@ class TemplateGenerationRepository {
 
   Future<void> _markCachedGenerationRead(String generationId) async {
     for (final status in _cacheStatuses) {
-      final key = _cacheKeyForStatus(
-        status == _cacheAllStatusKey ? null : status,
-      );
-      final raw = await _preferences.getString(key);
-      if (raw == null || raw.isEmpty) {
-        continue;
-      }
+      try {
+        final key = _cacheKeyForStatus(
+          status == _cacheAllStatusKey ? null : status,
+        );
+        final raw = await _preferences.getString(key);
+        if (raw == null || raw.isEmpty) {
+          continue;
+        }
 
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) {
-        continue;
-      }
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) {
+          continue;
+        }
 
-      var changed = false;
-      final updated = decoded
-          .map((entry) {
-            if (entry is! Map) {
-              return entry;
-            }
+        var changed = false;
+        final updated = decoded
+            .map((entry) {
+              if (entry is! Map) {
+                return entry;
+              }
 
-            final generation = Map<String, Object?>.from(entry);
-            if (generation['generationId'] != generationId) {
-              return generation;
-            }
+              final generation = Map<String, Object?>.from(entry);
+              if (generation['generationId'] != generationId) {
+                return generation;
+              }
 
-            if (generation['isUnread'] == false) {
-              return generation;
-            }
+              if (generation['isUnread'] == false) {
+                return generation;
+              }
 
-            changed = true;
-            return {...generation, 'isUnread': false};
-          })
-          .toList(growable: false);
+              changed = true;
+              return {...generation, 'isUnread': false};
+            })
+            .toList(growable: false);
 
-      if (changed) {
-        await _preferences.setString(key, jsonEncode(updated));
+        if (changed) {
+          await _preferences.setString(key, jsonEncode(updated));
+        }
+      } on Object {
+        // Keep mark-read cache mutation best-effort per bucket.
       }
     }
 
@@ -1144,35 +1151,39 @@ class TemplateGenerationRepository {
     var removedUnread = false;
 
     for (final status in _cacheStatuses) {
-      final key = _cacheKeyForStatus(
-        status == _cacheAllStatusKey ? null : status,
-      );
-      final raw = await _preferences.getString(key);
-      if (raw == null || raw.isEmpty) {
-        continue;
-      }
-
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) {
-        continue;
-      }
-
-      var changed = false;
-      final updated = <Map<String, Object?>>[];
-      for (final entry in decoded.whereType<Map>()) {
-        final generation = Map<String, Object?>.from(entry);
-        if (generation['generationId'] == generationId) {
-          changed = true;
-          if (generation['isUnread'] == true) {
-            removedUnread = true;
-          }
+      try {
+        final key = _cacheKeyForStatus(
+          status == _cacheAllStatusKey ? null : status,
+        );
+        final raw = await _preferences.getString(key);
+        if (raw == null || raw.isEmpty) {
           continue;
         }
-        updated.add(generation);
-      }
 
-      if (changed) {
-        await _preferences.setString(key, jsonEncode(updated));
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) {
+          continue;
+        }
+
+        var changed = false;
+        final updated = <Map<String, Object?>>[];
+        for (final entry in decoded.whereType<Map>()) {
+          final generation = Map<String, Object?>.from(entry);
+          if (generation['generationId'] == generationId) {
+            changed = true;
+            if (generation['isUnread'] == true) {
+              removedUnread = true;
+            }
+            continue;
+          }
+          updated.add(generation);
+        }
+
+        if (changed) {
+          await _preferences.setString(key, jsonEncode(updated));
+        }
+      } on Object {
+        // Keep delete cache mutation best-effort per bucket.
       }
     }
 
@@ -1253,13 +1264,23 @@ class TemplateGenerationRepository {
   }
 
   bool _isAllowedImageContentType(String contentType) {
-    final normalized = contentType.toLowerCase();
+    final normalized = _normalizedContentType(contentType);
     return normalized == 'image/jpeg' ||
         normalized == 'image/png' ||
         normalized == 'image/webp' ||
         normalized == 'image/heic' ||
         normalized == 'image/heif';
   }
+
+  bool _isGenericBinaryContentType(String contentType) {
+    final normalized = _normalizedContentType(contentType);
+    return normalized == 'application/octet-stream' ||
+        normalized == 'binary/octet-stream' ||
+        normalized == 'application/x-binary';
+  }
+
+  String _normalizedContentType(String contentType) =>
+      contentType.split(';').first.trim().toLowerCase();
 
   Future<String?> _detectSourceImageContentType(
     String path, {

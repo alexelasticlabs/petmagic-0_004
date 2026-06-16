@@ -50,13 +50,25 @@ class GenerationStatusMediaActions {
     required bool isVideo,
     required String albumName,
     required CancelToken cancelToken,
-  }) {
+    String? localPath,
+  }) async {
+    final usableLocalPath = await usableLocalMediaPath(localPath);
+    if (usableLocalPath != null) {
+      return await saveLocalMediaToGallery(
+        filePath: usableLocalPath,
+        fileName: fileName,
+        isVideo: isVideo,
+        albumName: albumName,
+        cancelToken: cancelToken,
+      );
+    }
+
     final safeUri = parseSafeGenerationMediaUri(mediaUrl);
     if (safeUri == null) {
       throw const AppException('generation.media_url_untrusted');
     }
 
-    return saveRemoteMediaToGallery(
+    return await saveRemoteMediaToGallery(
       mediaUrl: safeUri.toString(),
       fileName: fileName,
       isVideo: isVideo,
@@ -70,13 +82,25 @@ class GenerationStatusMediaActions {
     required String fileName,
     required String title,
     required CancelToken cancelToken,
-  }) {
+    String? localPath,
+  }) async {
+    final usableLocalPath = await usableLocalMediaPath(localPath);
+    if (usableLocalPath != null) {
+      await shareLocalMediaFile(
+        filePath: usableLocalPath,
+        fileName: fileName,
+        title: title,
+        cancelToken: cancelToken,
+      );
+      return;
+    }
+
     final safeUri = parseSafeGenerationMediaUri(mediaUrl);
     if (safeUri == null) {
       throw const AppException('generation.media_url_untrusted');
     }
 
-    return shareRemoteMediaFile(
+    await shareRemoteMediaFile(
       mediaUrl: safeUri.toString(),
       fileName: fileName,
       title: title,
@@ -272,7 +296,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                   subtitle: generation == null
                       ? null
                       : '${typeLabel(text, generation)} • ${generation.tokenCost} PawSpark',
-                  onBack: () => context.go('/creations'),
+                  onBack: _handleBackNavigation,
                   onMenu: generation == null
                       ? null
                       : () => _openActionsSheet(generation),
@@ -393,9 +417,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                     _FailureCard(generation: generation),
                     const SizedBox(height: 14),
                     _FailedActions(
-                      onPickAnotherPhoto: () =>
-                          context.go(TemplatesPage.routePath),
-                      onRetry: _retrySoon,
+                      onPickAnotherPhoto: () => context.go(
+                        _templatesLocationForGeneration(generation),
+                      ),
+                      onRetry: () => _retrySoon(generation),
                       onSupport: () => context.push(SupportChatPage.routePath),
                     ),
                     const SizedBox(height: 14),
@@ -440,7 +465,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                     _BackgroundHintCard(generation: generation),
                     const SizedBox(height: 14),
                     _ActiveActions(
-                      onContinue: () => context.go('/templates'),
+                      onContinue: () => context.go(
+                        _templatesLocationForGeneration(generation),
+                      ),
                       onCancel: _cancelSoon,
                     ),
                     const SizedBox(height: 14),
@@ -474,6 +501,16 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         ),
       ),
     );
+  }
+
+  void _handleBackNavigation() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    context.go('/creations');
   }
 
   Future<void> _openActionsSheet(TemplateGenerationResult generation) async {
@@ -608,7 +645,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                             label: text.generationStatusPickAnotherPhotoAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              context.go(TemplatesPage.routePath);
+                              context.go(
+                                _templatesLocationForGeneration(generation),
+                              );
                             },
                           ),
                           _StatusSheetActionTile(
@@ -616,7 +655,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                             label: text.generationStatusRetryAction,
                             onTap: () {
                               Navigator.of(sheetContext).pop();
-                              _retrySoon();
+                              _retrySoon(generation);
                             },
                           ),
                           _StatusSheetActionTile(
@@ -667,34 +706,53 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final text = AppLocalizations.of(context);
 
     try {
-      final access = await ref
-          .read(templateGenerationRepositoryProvider)
-          .fetchDownloadUrl(
-            generation.generationId,
-            cancelToken: mediaActionCancelToken,
-          );
-      final outputUrl = access.mediaUrl;
-      if (outputUrl.isEmpty) {
-        _showInfo(text.generationStatusResultUnavailableForSave);
+      final localOutputPath = await usableLocalMediaPath(
+        generation.localOutputPath,
+      );
+      if (!mounted) {
         return;
       }
-      final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
-      if (safeOutputUri == null) {
-        _showInfo(text.generationStatusResultUnavailableForSave);
-        return;
+      String safeOutputUrl = '';
+      String fileName;
+      if (localOutputPath == null) {
+        final access = await ref
+            .read(templateGenerationRepositoryProvider)
+            .fetchDownloadUrl(
+              generation.generationId,
+              cancelToken: mediaActionCancelToken,
+            );
+        final outputUrl = access.mediaUrl;
+        if (outputUrl.isEmpty) {
+          _showInfo(text.generationStatusResultUnavailableForSave);
+          return;
+        }
+        final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+        if (safeOutputUri == null) {
+          _showInfo(text.generationStatusResultUnavailableForSave);
+          return;
+        }
+        safeOutputUrl = safeOutputUri.toString();
+        fileName = access.fileName.isEmpty
+            ? _buildOutputFileName(generation, safeOutputUrl)
+            : access.fileName;
+      } else {
+        final safeOutputUri = parseSafeGenerationMediaUri(generation.outputUrl);
+        safeOutputUrl = safeOutputUri?.toString() ?? '';
+        fileName = _buildOutputFileName(
+          generation,
+          safeOutputUrl.isEmpty ? localOutputPath : safeOutputUrl,
+        );
       }
-      final safeOutputUrl = safeOutputUri.toString();
 
       final wasSaved = await ref
           .read(generationStatusMediaActionsProvider)
           .saveToGallery(
             mediaUrl: safeOutputUrl,
-            fileName: access.fileName.isEmpty
-                ? _buildOutputFileName(generation, safeOutputUrl)
-                : access.fileName,
+            fileName: fileName,
             isVideo: isVideoGeneration(generation),
             albumName: 'PetMagic',
             cancelToken: mediaActionCancelToken,
+            localPath: localOutputPath,
           );
 
       if (!mounted) {
@@ -760,9 +818,26 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     _showInfo(AppLocalizations.of(context).generationStatusCancelSoonMessage);
   }
 
-  void _retrySoon() {
+  void _retrySoon(TemplateGenerationResult generation) {
     _showInfo(AppLocalizations.of(context).generationStatusRetrySoonMessage);
-    context.go(TemplatesPage.routePath);
+    context.go(_templatesLocationForGeneration(generation));
+  }
+
+  String _templatesLocationForGeneration(TemplateGenerationResult generation) {
+    final petId = generation.petId?.trim();
+    if (petId == null || petId.isEmpty) {
+      return TemplatesPage.routePath;
+    }
+
+    final petPhotoId = generation.petPhotoId?.trim();
+    return Uri(
+      path: TemplatesPage.routePath,
+      queryParameters: {
+        'petId': petId,
+        if (petPhotoId != null && petPhotoId.isNotEmpty)
+          'petPhotoId': petPhotoId,
+      },
+    ).toString();
   }
 
   bool _canGenerateSimilar(TemplateGenerationResult generation) {
@@ -949,33 +1024,52 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
     final text = AppLocalizations.of(context);
 
     try {
-      final access = await ref
-          .read(templateGenerationRepositoryProvider)
-          .fetchShareUrl(
-            generation.generationId,
-            cancelToken: mediaActionCancelToken,
-          );
-      final outputUrl = access.mediaUrl;
-      if (outputUrl.isEmpty) {
-        _showInfo(text.generationStatusResultUnavailableForShare);
+      final localOutputPath = await usableLocalMediaPath(
+        generation.localOutputPath,
+      );
+      if (!mounted) {
         return;
       }
-      final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
-      if (safeOutputUri == null) {
-        _showInfo(text.generationStatusResultUnavailableForShare);
-        return;
+      String safeOutputUrl = '';
+      String fileName;
+      if (localOutputPath == null) {
+        final access = await ref
+            .read(templateGenerationRepositoryProvider)
+            .fetchShareUrl(
+              generation.generationId,
+              cancelToken: mediaActionCancelToken,
+            );
+        final outputUrl = access.mediaUrl;
+        if (outputUrl.isEmpty) {
+          _showInfo(text.generationStatusResultUnavailableForShare);
+          return;
+        }
+        final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
+        if (safeOutputUri == null) {
+          _showInfo(text.generationStatusResultUnavailableForShare);
+          return;
+        }
+        safeOutputUrl = safeOutputUri.toString();
+        fileName = access.fileName.isEmpty
+            ? _buildOutputFileName(generation, safeOutputUrl)
+            : access.fileName;
+      } else {
+        final safeOutputUri = parseSafeGenerationMediaUri(generation.outputUrl);
+        safeOutputUrl = safeOutputUri?.toString() ?? '';
+        fileName = _buildOutputFileName(
+          generation,
+          safeOutputUrl.isEmpty ? localOutputPath : safeOutputUrl,
+        );
       }
-      final safeOutputUrl = safeOutputUri.toString();
 
       await ref
           .read(generationStatusMediaActionsProvider)
           .share(
             mediaUrl: safeOutputUrl,
-            fileName: access.fileName.isEmpty
-                ? _buildOutputFileName(generation, safeOutputUrl)
-                : access.fileName,
+            fileName: fileName,
             title: generation.templateTitle ?? text.generationStatusResultTitle,
             cancelToken: mediaActionCancelToken,
+            localPath: localOutputPath,
           );
     } on DioException catch (error) {
       if (!mounted || CancelToken.isCancel(error)) {
@@ -1500,6 +1594,12 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         return;
       }
 
+      unawaited(
+        ref
+            .read(generationHistoryControllerProvider.notifier)
+            .mergeFetchedGeneration(generation),
+      );
+
       setState(() {
         _generation = generation;
         _isLoading = false;
@@ -1625,13 +1725,19 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
       return;
     }
 
+    final localizedGeneration = current.copyWith(
+      localPreviewPath: localRecord.previewLocalPath,
+      localOutputPath: localRecord.outputLocalPath,
+      isLocalMediaReady: localRecord.isDownloadComplete,
+    );
     setState(() {
-      _generation = current.copyWith(
-        localPreviewPath: localRecord.previewLocalPath,
-        localOutputPath: localRecord.outputLocalPath,
-        isLocalMediaReady: localRecord.isDownloadComplete,
-      );
+      _generation = localizedGeneration;
     });
+    unawaited(
+      ref
+          .read(generationHistoryControllerProvider.notifier)
+          .mergeFetchedGeneration(localizedGeneration),
+    );
   }
 
   Future<void> _handleRatingSelected(int rating) async {

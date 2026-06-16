@@ -109,6 +109,25 @@ class _IdleGenerationHistoryController extends GenerationHistoryController {
   Future<void> markRead(String generationId) async {}
 }
 
+class _TrackingGenerationHistoryController
+    extends _IdleGenerationHistoryController {
+  final List<bool> screenVisibilityCalls = [];
+  final List<({GenerationHistoryFilter? filter, bool refresh})> loadCalls = [];
+
+  @override
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {
+    screenVisibilityCalls.add(visible);
+  }
+
+  @override
+  Future<void> load({
+    GenerationHistoryFilter? filter,
+    bool refresh = false,
+  }) async {
+    loadCalls.add((filter: filter, refresh: refresh));
+  }
+}
+
 class _ThrowingGuestLaunchController extends AppLaunchController {
   @override
   AppLaunchState build() {
@@ -342,9 +361,13 @@ class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
 
   final List<String> fetchGenerationCalls = [];
   final List<String> fetchCompatibleTemplateCalls = [];
+  int fetchPetsCalls = 0;
+  int fetchPetPhotosCalls = 0;
+  int fetchPetGenerationsCalls = 0;
 
   @override
   Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
+    fetchPetsCalls++;
     return [
       PetProfile(
         id: 'pet-router',
@@ -365,6 +388,7 @@ class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
     String petId, {
     CancelToken? cancelToken,
   }) async {
+    fetchPetPhotosCalls++;
     return const [];
   }
 
@@ -373,6 +397,7 @@ class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
     String petId, {
     CancelToken? cancelToken,
   }) async {
+    fetchPetGenerationsCalls++;
     return const [];
   }
 

@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
@@ -157,6 +158,17 @@ class GenerationGalleryStore {
 
     final entries = await _readEntriesForScope(accountScope);
     final existing = _findEntry(entries, generation.generationId);
+    final previewRemoteUrl = _previewUrl(generation);
+    final outputRemoteUrl = _safeMediaUrl(generation.outputUrl);
+    final hasRemoteMedia = previewRemoteUrl != null || outputRemoteUrl != null;
+    final canReuseLocalMedia =
+        hasRemoteMedia &&
+        existing != null &&
+        _safeNullableMediaUriEquals(
+          existing.previewRemoteUrl,
+          previewRemoteUrl,
+        ) &&
+        _safeNullableMediaUriEquals(existing.outputRemoteUrl, outputRemoteUrl);
     final next = GenerationGalleryMediaRecord(
       generationId: generation.generationId,
       accountScope: accountScope,
@@ -165,12 +177,14 @@ class GenerationGalleryStore {
       templateTitle: generation.templateTitle,
       templateType: generation.templateType,
       updatedAtUtc: generation.updatedAtUtc.toUtc(),
-      previewRemoteUrl: _previewUrl(generation),
-      outputRemoteUrl: _cleanUrl(generation.outputUrl),
-      previewLocalPath: existing?.previewLocalPath,
-      outputLocalPath: existing?.outputLocalPath,
+      previewRemoteUrl: previewRemoteUrl,
+      outputRemoteUrl: outputRemoteUrl,
+      previewLocalPath: canReuseLocalMedia ? existing.previewLocalPath : null,
+      outputLocalPath: canReuseLocalMedia ? existing.outputLocalPath : null,
       isDeletedLocally: existing?.isDeletedLocally ?? false,
-      isDownloadComplete: existing?.isDownloadComplete ?? false,
+      isDownloadComplete: canReuseLocalMedia
+          ? existing.isDownloadComplete
+          : false,
       lastSyncedAtUtc: DateTime.now().toUtc(),
       version: (existing?.version ?? 0) + 1,
       pendingServerDelete: existing?.pendingServerDelete ?? false,
@@ -246,10 +260,11 @@ class GenerationGalleryStore {
     final accountScope =
         _resolveAccountScope(generation.userId) ??
         await readCurrentAccountScope();
-    final downloadKey = _downloadKey(
-      accountScope ?? '',
-      generation.generationId,
-    );
+    if (accountScope == null) {
+      return null;
+    }
+
+    final downloadKey = _downloadKey(accountScope, generation.generationId);
     final existing = _inFlightDownloads[downloadKey];
     if (existing != null) {
       return existing;
@@ -322,6 +337,12 @@ class GenerationGalleryStore {
       generation.generationId,
     );
     await _cleanupGenerationArtifacts(generationDirectory);
+    if (baseEntry.previewLocalPath == null) {
+      await _deleteFilesForPrefix(generationDirectory, 'preview');
+    }
+    if (baseEntry.outputLocalPath == null) {
+      await _deleteFilesForPrefix(generationDirectory, 'result');
+    }
 
     final cancelToken = CancelToken();
     _downloadCancelTokens[downloadKey] = cancelToken;
@@ -332,35 +353,66 @@ class GenerationGalleryStore {
 
     try {
       final previewUrl = baseEntry.previewRemoteUrl;
-      if (previewUrl != null) {
-        final previewFile = await _materializeRemoteFile(
-          remoteUrl: previewUrl,
-          targetDirectory: generationDirectory,
-          prefix: 'preview',
-          fallbackExtension: 'jpg',
-          cancelToken: cancelToken,
-        );
-        previewLocalPath = previewFile?.path;
-        if (previewFile == null) {
-          isDownloadComplete = false;
-        }
-      }
-
       final outputUrl = baseEntry.outputRemoteUrl;
-      if (outputUrl != null) {
+      final canReuseOutputAsPreview =
+          previewUrl != null &&
+          outputUrl != null &&
+          !isVideoGenerationResult(generation) &&
+          _safeMediaUriEquals(previewUrl, outputUrl);
+
+      if (canReuseOutputAsPreview) {
         final outputFile = await _materializeRemoteFile(
           remoteUrl: outputUrl,
           targetDirectory: generationDirectory,
           prefix: 'result',
-          fallbackExtension: _isLikelyVideoUrl(outputUrl) ? 'mp4' : 'jpg',
+          fallbackExtension: 'jpg',
           cancelToken: cancelToken,
         );
         outputLocalPath = outputFile?.path;
+        previewLocalPath = outputFile?.path;
         if (outputFile == null) {
           isDownloadComplete = false;
+        } else {
+          await _deleteStaleFilesForPrefix(
+            generationDirectory,
+            'preview',
+            outputFile,
+          );
         }
       } else {
-        isDownloadComplete = false;
+        if (previewUrl != null) {
+          final previewFile = await _materializeRemoteFile(
+            remoteUrl: previewUrl,
+            targetDirectory: generationDirectory,
+            prefix: 'preview',
+            fallbackExtension: 'jpg',
+            cancelToken: cancelToken,
+          );
+          previewLocalPath = previewFile?.path;
+          if (previewFile == null) {
+            isDownloadComplete = false;
+          }
+        }
+
+        if (outputUrl != null) {
+          final outputFile = await _materializeRemoteFile(
+            remoteUrl: outputUrl,
+            targetDirectory: generationDirectory,
+            prefix: 'result',
+            fallbackExtension:
+                isVideoGenerationResult(generation) ||
+                    isLikelyGenerationVideoUrl(outputUrl)
+                ? 'mp4'
+                : 'jpg',
+            cancelToken: cancelToken,
+          );
+          outputLocalPath = outputFile?.path;
+          if (outputFile == null) {
+            isDownloadComplete = false;
+          }
+        } else {
+          isDownloadComplete = false;
+        }
       }
     } on DioException catch (error) {
       if (!CancelToken.isCancel(error)) {
@@ -475,6 +527,30 @@ class GenerationGalleryStore {
     }
   }
 
+  Future<void> _deleteFilesForPrefix(
+    Directory targetDirectory,
+    String prefix,
+  ) async {
+    if (!await targetDirectory.exists()) {
+      return;
+    }
+
+    await for (final entity in targetDirectory.list()) {
+      if (entity is! File) {
+        continue;
+      }
+
+      final fileName = _basename(entity.path);
+      final isLegacyFile = fileName.startsWith('$prefix.');
+      final isStampedFile = fileName.startsWith('${prefix}_');
+      if (!isLegacyFile && !isStampedFile) {
+        continue;
+      }
+
+      await entity.delete();
+    }
+  }
+
   Future<bool> _hasUsableFile(File file) async {
     try {
       if (!await file.exists()) {
@@ -513,6 +589,24 @@ class GenerationGalleryStore {
     } on Object {
       return false;
     }
+  }
+
+  bool _safeMediaUriEquals(String left, String right) {
+    final leftUri = parseSafeGenerationMediaUri(left);
+    final rightUri = parseSafeGenerationMediaUri(right);
+    return leftUri != null &&
+        rightUri != null &&
+        leftUri.toString() == rightUri.toString();
+  }
+
+  bool _safeNullableMediaUriEquals(String? left, String? right) {
+    if (left == null && right == null) {
+      return true;
+    }
+    if (left == null || right == null) {
+      return false;
+    }
+    return _safeMediaUriEquals(left, right);
   }
 
   bool _hasSupportedMediaSignature(List<int> header) {
@@ -1009,10 +1103,15 @@ class GenerationGalleryMediaRecord {
 }
 
 String? _previewUrl(TemplateGenerationResult generation) {
-  final output = _cleanUrl(generation.outputUrl);
-  final source = _cleanUrl(generation.sourceImageAsset?.url);
-  final normalized = _cleanUrl(generation.normalizedImageUrl);
-  final generationIsVideo = _isVideoGeneration(generation);
+  final resultPreview = _safeMediaUrl(generation.resultPreviewUrl);
+  final output = _safeMediaUrl(generation.outputUrl);
+  final source = _safeMediaUrl(generation.sourceImageAsset?.url);
+  final normalized = _safeMediaUrl(generation.normalizedImageUrl);
+  final generationIsVideo = isVideoGenerationResult(generation);
+
+  if (resultPreview != null && !isLikelyGenerationVideoUrl(resultPreview)) {
+    return resultPreview;
+  }
 
   if (generationIsVideo) {
     if (source != null) {
@@ -1021,10 +1120,10 @@ String? _previewUrl(TemplateGenerationResult generation) {
     if (normalized != null) {
       return normalized;
     }
-    return output != null && !_isLikelyVideoUrl(output) ? output : null;
+    return output != null && isLikelyGenerationImageUrl(output) ? output : null;
   }
 
-  if (output != null && !_isLikelyVideoUrl(output)) {
+  if (output != null && !isLikelyGenerationVideoUrl(output)) {
     return output;
   }
   if (source != null) {
@@ -1036,43 +1135,8 @@ String? _previewUrl(TemplateGenerationResult generation) {
   return null;
 }
 
-bool _isVideoGeneration(TemplateGenerationResult generation) {
-  final type = generation.templateType?.toLowerCase() ?? '';
-  return type.contains('video') ||
-      generation.outputVideoDurationSeconds != null ||
-      _isLikelyVideoUrl(generation.outputUrl);
-}
-
-String? _cleanUrl(String? raw) {
-  final value = raw?.trim();
-  if (value == null || value.isEmpty) {
-    return null;
-  }
-  return value;
-}
-
-bool _isLikelyVideoUrl(String? rawUrl) {
-  final url = _cleanUrl(rawUrl);
-  if (url == null) {
-    return false;
-  }
-
-  final normalized = url.toLowerCase();
-  final uri = Uri.tryParse(normalized);
-  final path = (uri?.path ?? normalized).toLowerCase();
-  final query = (uri?.query ?? '').toLowerCase();
-
-  return path.endsWith('.mp4') ||
-      path.endsWith('.webm') ||
-      path.endsWith('.mov') ||
-      path.endsWith('.m4v') ||
-      normalized.contains('.mp4?') ||
-      normalized.contains('.webm?') ||
-      normalized.contains('.mov?') ||
-      normalized.contains('.m4v?') ||
-      query.contains('format=mp4') ||
-      query.contains('ext=mp4') ||
-      query.contains('contenttype=video');
+String? _safeMediaUrl(String? raw) {
+  return parseSafeGenerationMediaUri(raw)?.toString();
 }
 
 String _stableUrlStamp(String value) {
@@ -1088,7 +1152,7 @@ String _safePathSegment(String value, {required String fallback}) {
   final trimmed = value.trim();
   final sanitized = sanitizeFileName(trimmed, fallback: fallback);
   final isSpecialDirectory = sanitized == '.' || sanitized == '..';
-  if (!isSpecialDirectory && sanitized == trimmed) {
+  if (!isSpecialDirectory && sanitized == trimmed && sanitized.length <= 80) {
     return sanitized;
   }
 

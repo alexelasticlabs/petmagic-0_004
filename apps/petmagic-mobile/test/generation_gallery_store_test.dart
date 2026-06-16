@@ -83,16 +83,199 @@ void main() {
       expect(first!.isDownloadComplete, isTrue);
       expect(first.previewLocalPath, isNotNull);
       expect(first.outputLocalPath, isNotNull);
+      expect(first.previewLocalPath, first.outputLocalPath);
       expect(await File(first.previewLocalPath!).length(), greaterThan(0));
       expect(await File(first.outputLocalPath!).length(), greaterThan(0));
       final requestCountAfterFirstMaterialize = requestCount;
-      expect(requestCountAfterFirstMaterialize, greaterThanOrEqualTo(2));
+      expect(requestCountAfterFirstMaterialize, 1);
 
       final second = await store.materializeGenerationMedia(generation);
 
       expect(second, isNotNull);
       expect(second!.isDownloadComplete, isTrue);
       expect(requestCount, requestCountAfterFirstMaterialize);
+    },
+  );
+
+  test(
+    'materializeGenerationMedia skips completed media without account scope',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestCount++;
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(_tinyJpegOne);
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = GenerationGalleryStore(
+        dio: Dio(),
+        preferences: SharedPreferencesAsync(),
+        sessionStorage: _InMemoryAuthSessionStorage(null),
+        rootDirectoryResolver: () async => tempDir,
+      );
+      final outputUrl =
+          'http://${server.address.address}:${server.port}/result.jpg';
+
+      final record = await store.materializeGenerationMedia(
+        _completedGeneration(userId: '', outputUrl: outputUrl),
+      );
+
+      expect(record, isNull);
+      expect(requestCount, 0);
+      expect(await store.loadLocalReadyItems(), isEmpty);
+      expect(await tempDir.list(recursive: true).toList(), isEmpty);
+    },
+  );
+
+  test(
+    'materializeGenerationMedia uses result preview thumbnail separately from output',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final requestCountsByPath = <String, int>{};
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestCountsByPath.update(
+          request.uri.path,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(
+          request.uri.path == '/thumb.jpg' ? _tinyJpegOne : _tinyJpegTwo,
+        );
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir);
+      final baseUrl = 'http://${server.address.address}:${server.port}';
+      final generation = _completedGeneration(
+        outputUrl: '$baseUrl/result.jpg',
+        resultPreviewUrl: '$baseUrl/thumb.jpg',
+      );
+
+      final record = await store.materializeGenerationMedia(generation);
+
+      expect(record, isNotNull);
+      expect(record!.isDownloadComplete, isTrue);
+      expect(record.previewLocalPath, isNotNull);
+      expect(record.outputLocalPath, isNotNull);
+      expect(record.previewLocalPath, isNot(record.outputLocalPath));
+      expect(await File(record.previewLocalPath!).readAsBytes(), _tinyJpegOne);
+      expect(await File(record.outputLocalPath!).readAsBytes(), _tinyJpegTwo);
+      expect(requestCountsByPath, {'/thumb.jpg': 1, '/result.jpg': 1});
+    },
+  );
+
+  test(
+    'materializeGenerationMedia ignores unsafe result preview when output is safe',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestCount++;
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(_tinyJpegOne);
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir);
+      final outputUrl =
+          'http://${server.address.address}:${server.port}/result.jpg';
+      final generation = _completedGeneration(
+        outputUrl: outputUrl,
+        resultPreviewUrl: 'javascript:alert(1)',
+      );
+
+      final record = await store.materializeGenerationMedia(generation);
+
+      expect(record, isNotNull);
+      expect(record!.previewRemoteUrl, outputUrl);
+      expect(record.outputRemoteUrl, outputUrl);
+      expect(record.isDownloadComplete, isTrue);
+      expect(record.previewLocalPath, record.outputLocalPath);
+      expect(await File(record.outputLocalPath!).readAsBytes(), _tinyJpegOne);
+      expect(requestCount, 1);
+    },
+  );
+
+  test(
+    'materializeGenerationMedia stores opaque video outputs as mp4 without preview',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        requestCount++;
+        request.response.headers.contentType = ContentType('video', 'mp4');
+        request.response.add(_tinyMp4);
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir);
+      final outputUrl =
+          'http://${server.address.address}:${server.port}/result';
+      final generation = _completedGeneration(
+        templateType: 'Video',
+        outputUrl: outputUrl,
+      );
+
+      final record = await store.materializeGenerationMedia(generation);
+
+      expect(record, isNotNull);
+      expect(record!.isDownloadComplete, isTrue);
+      expect(record.previewLocalPath, isNull);
+      expect(record.outputLocalPath, isNotNull);
+      expect(record.outputLocalPath, endsWith('.mp4'));
+      expect(await File(record.outputLocalPath!).readAsBytes(), _tinyMp4);
+      expect(requestCount, 1);
     },
   );
 
@@ -179,6 +362,58 @@ void main() {
   );
 
   test(
+    'materializeGenerationMedia bounds long safe generation id path segments',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        request.response.add(_tinyJpegOne);
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      const longGenerationId =
+          'generation-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      final store = _store(tempDir);
+      final outputUrl =
+          'http://${server.address.address}:${server.port}/result.jpg';
+
+      final record = await store.materializeGenerationMedia(
+        _completedGeneration(
+          generationId: longGenerationId,
+          outputUrl: outputUrl,
+        ),
+      );
+
+      expect(record, isNotNull);
+      expect(record!.generationId, longGenerationId);
+      expect(record.outputLocalPath, isNotNull);
+      final generationSegment = File(
+        record.outputLocalPath!,
+      ).parent.path.split(Platform.pathSeparator).last;
+      expect(generationSegment, isNot(longGenerationId));
+      expect(generationSegment.length, lessThanOrEqualTo(89));
+      expect(
+        generationSegment,
+        matches(RegExp(r'^[a-zA-Z0-9._-]+_[0-9a-f]{8}$')),
+      );
+      expect(await File(record.outputLocalPath!).exists(), isTrue);
+    },
+  );
+
+  test(
     'concurrent materializeGenerationMedia is isolated by account scope',
     () async {
       final tempDir = await Directory.systemTemp.createTemp(
@@ -243,11 +478,13 @@ void main() {
       expect(userTwoRecord.accountScope, 'user-2');
       expect(userOneRecord.outputLocalPath, contains('/user-1/'));
       expect(userTwoRecord.outputLocalPath, contains('/user-2/'));
+      expect(userOneRecord.previewLocalPath, userOneRecord.outputLocalPath);
+      expect(userTwoRecord.previewLocalPath, userTwoRecord.outputLocalPath);
       expect(
         userOneRecord.outputLocalPath,
         isNot(userTwoRecord.outputLocalPath),
       );
-      expect(requestCount, greaterThanOrEqualTo(4));
+      expect(requestCount, greaterThanOrEqualTo(2));
 
       final userTwoStore = _store(
         tempDir,
@@ -299,10 +536,11 @@ void main() {
       expect(first!.isDownloadComplete, isTrue);
       final firstPreviewPath = first.previewLocalPath!;
       final firstOutputPath = first.outputLocalPath!;
+      expect(firstPreviewPath, firstOutputPath);
       expect(await File(firstPreviewPath).readAsBytes(), _tinyJpegOne);
       expect(await File(firstOutputPath).readAsBytes(), _tinyJpegOne);
       final firstRequestCount = requestCount;
-      expect(firstRequestCount, greaterThanOrEqualTo(2));
+      expect(firstRequestCount, 1);
 
       await File(firstPreviewPath).writeAsString('corrupted preview');
       await File(firstOutputPath).writeAsString('corrupted output');
@@ -314,6 +552,7 @@ void main() {
       expect(second!.isDownloadComplete, isTrue);
       expect(second.previewLocalPath, firstPreviewPath);
       expect(second.outputLocalPath, firstOutputPath);
+      expect(second.previewLocalPath, second.outputLocalPath);
       expect(await File(firstPreviewPath).readAsBytes(), _tinyJpegTwo);
       expect(await File(firstOutputPath).readAsBytes(), _tinyJpegTwo);
       expect(requestCount, greaterThan(firstRequestCount));
@@ -374,11 +613,67 @@ void main() {
       expect(second!.isDownloadComplete, isTrue);
       expect(second.previewLocalPath, isNot(firstPreviewPath));
       expect(second.outputLocalPath, isNot(firstOutputPath));
+      expect(second.previewLocalPath, second.outputLocalPath);
       expect(await File(second.outputLocalPath!).readAsBytes(), _tinyJpegTwo);
       expect(await File(firstPreviewPath).exists(), isFalse);
       expect(await File(firstOutputPath).exists(), isFalse);
-      expect(requestCountsByPath['/first.jpg'], 2);
-      expect(requestCountsByPath['/second.jpg'], 2);
+      expect(requestCountsByPath['/first.jpg'], 1);
+      expect(requestCountsByPath['/second.jpg'], 1);
+    },
+  );
+
+  test(
+    'materializeGenerationMedia clears local paths when changed URL fails',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'petmagic-generation-gallery-store-test-',
+      );
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      late final StreamSubscription<HttpRequest> subscription;
+      subscription = server.listen((request) async {
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        if (request.uri.path == '/first.jpg') {
+          request.response.add(_tinyJpegOne);
+        }
+        await request.response.close();
+      });
+
+      addTearDown(() async {
+        await subscription.cancel();
+        await server.close(force: true);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final store = _store(tempDir);
+      final firstUrl =
+          'http://${server.address.address}:${server.port}/first.jpg';
+      final secondUrl =
+          'http://${server.address.address}:${server.port}/second.jpg';
+
+      final first = await store.materializeGenerationMedia(
+        _completedGeneration(outputUrl: firstUrl),
+      );
+      final firstPreviewPath = first!.previewLocalPath!;
+      final firstOutputPath = first.outputLocalPath!;
+      expect(await File(firstOutputPath).readAsBytes(), _tinyJpegOne);
+
+      final second = await store.materializeGenerationMedia(
+        _completedGeneration(
+          outputUrl: secondUrl,
+          updatedAtUtc: DateTime.utc(2035, 1, 1, 0, 1),
+        ),
+      );
+
+      expect(second, isNotNull);
+      expect(second!.previewRemoteUrl, secondUrl);
+      expect(second.outputRemoteUrl, secondUrl);
+      expect(second.previewLocalPath, isNull);
+      expect(second.outputLocalPath, isNull);
+      expect(second.isDownloadComplete, isFalse);
+      expect(await File(firstPreviewPath).exists(), isFalse);
+      expect(await File(firstOutputPath).exists(), isFalse);
     },
   );
 
@@ -456,7 +751,7 @@ void main() {
     expect(record!.isDownloadComplete, isFalse);
     expect(record.previewLocalPath, isNull);
     expect(record.outputLocalPath, isNull);
-    expect(requestCount, greaterThanOrEqualTo(2));
+    expect(requestCount, 1);
 
     final persisted = await store.readLocalRecord(generation.generationId);
     expect(persisted, isNotNull);
@@ -502,7 +797,7 @@ void main() {
     expect(record!.isDownloadComplete, isFalse);
     expect(record.previewLocalPath, isNull);
     expect(record.outputLocalPath, isNull);
-    expect(requestCount, greaterThanOrEqualTo(2));
+    expect(requestCount, 1);
 
     final persisted = await store.readLocalRecord(generation.generationId);
     expect(persisted, isNotNull);
@@ -816,6 +1111,25 @@ const _tinyJpegTwo = [
   0xD9,
 ];
 
+const _tinyMp4 = [
+  0x00,
+  0x00,
+  0x00,
+  0x18,
+  0x66,
+  0x74,
+  0x79,
+  0x70,
+  0x69,
+  0x73,
+  0x6F,
+  0x6D,
+  0x00,
+  0x00,
+  0x00,
+  0x00,
+];
+
 GenerationGalleryStore _store(
   Directory rootDirectory, {
   Dio? dio,
@@ -846,6 +1160,8 @@ TemplateGenerationResult _completedGeneration({
   String generationId = 'generation-1',
   String userId = 'user-1',
   DateTime? updatedAtUtc,
+  String? templateType,
+  String? resultPreviewUrl,
   String? outputUrl,
 }) {
   final timestamp = updatedAtUtc ?? DateTime.utc(2035);
@@ -860,7 +1176,8 @@ TemplateGenerationResult _completedGeneration({
     updatedAtUtc: timestamp,
     userMediaExpired: false,
     templateTitle: 'Magic portrait',
-    templateType: 'image',
+    templateType: templateType ?? 'image',
+    resultPreviewUrl: resultPreviewUrl,
     outputUrl: outputUrl ?? 'https://cdn.petmagic.example/$generationId.jpg',
   );
 }

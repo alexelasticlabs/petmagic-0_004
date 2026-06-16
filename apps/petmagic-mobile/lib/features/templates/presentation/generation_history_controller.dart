@@ -6,7 +6,9 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final generationHistoryControllerProvider =
     NotifierProvider<GenerationHistoryController, GenerationHistoryState>(
@@ -298,8 +300,8 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           deletedGenerationIds,
           localReadyRecords,
         );
-        final unreadCount = await _repository.fetchUnreadGenerationCount(
-          cancelToken: loadCancelToken,
+        final unreadCount = await _fetchUnreadGenerationCountBestEffort(
+          loadCancelToken,
         );
         _reconcileLocallyReadIds(remoteItems);
         _locallyDeletedUnreadGenerationIds =
@@ -310,7 +312,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         if (!ref.mounted) {
           return;
         }
-        final visibleUnreadCount = _visibleUnreadCount(unreadCount);
+        final visibleUnreadCount = unreadCount == null
+            ? state.unreadCount
+            : _visibleUnreadCount(unreadCount);
         if (!ref.mounted) {
           return;
         }
@@ -557,7 +561,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
   }
 
   Future<void> refreshUnreadCount() async {
-    if (!ref.mounted || !_isScreenVisible) {
+    if (!ref.mounted || !_isScreenVisible || _isLoadInFlight) {
       return;
     }
 
@@ -580,6 +584,21 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       if (identical(_activeUnreadRefreshCancelToken, cancelToken)) {
         _activeUnreadRefreshCancelToken = null;
       }
+    }
+  }
+
+  Future<int?> _fetchUnreadGenerationCountBestEffort(
+    CancelToken cancelToken,
+  ) async {
+    try {
+      return await _repository.fetchUnreadGenerationCount(
+        cancelToken: cancelToken,
+      );
+    } on Object catch (error) {
+      if (_isCancelledRequest(error) || cancelToken.isCancelled) {
+        rethrow;
+      }
+      return null;
     }
   }
 
@@ -687,6 +706,54 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     );
   }
 
+  Future<void> mergeFetchedGeneration(
+    TemplateGenerationResult generation,
+  ) async {
+    await _mergeExternalGeneration(
+      generation,
+      refreshUnreadBadge: false,
+      requireScreenVisible: false,
+    );
+  }
+
+  Future<void> _mergeExternalGeneration(
+    TemplateGenerationResult generation, {
+    required bool refreshUnreadBadge,
+    required bool requireScreenVisible,
+  }) async {
+    final deletedGenerationIds = await _galleryStore.loadDeletedGenerationIds();
+    _locallyDeletedGenerationIds = Set<String>.from(deletedGenerationIds);
+    if (!ref.mounted ||
+        (requireScreenVisible && !_isScreenVisible) ||
+        deletedGenerationIds.contains(generation.generationId)) {
+      return;
+    }
+
+    final localReadyRecords = await _galleryStore.loadLocalReadyItems();
+    if (!ref.mounted || (requireScreenVisible && !_isScreenVisible)) {
+      return;
+    }
+
+    final decoratedItems = _decorateWithLocalMedia(
+      [generation],
+      deletedGenerationIds,
+      localReadyRecords,
+    );
+    if (decoratedItems.isEmpty) {
+      return;
+    }
+
+    final decoratedGeneration = decoratedItems.single;
+    _upsertGeneration(decoratedGeneration);
+    unawaited(_repository.upsertCachedGeneration(decoratedGeneration));
+    if (decoratedGeneration.isCompleted) {
+      unawaited(_syncCompletedMedia([decoratedGeneration]));
+    }
+    if (refreshUnreadBadge) {
+      unawaited(refreshUnreadCount());
+    }
+  }
+
   void _handleRealtimeEvent(RealtimeEvent event) {
     if (!ref.mounted || !_isScreenVisible) {
       return;
@@ -701,17 +768,13 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       final generation = TemplateGenerationDto.fromJson(
         Map<String, dynamic>.from(event.payload),
       ).toDomain();
-      if (_locallyDeletedGenerationIds.contains(generation.generationId)) {
-        return;
-      }
-      _upsertGeneration(generation);
       unawaited(
-        _repository.upsertCachedGeneration(_applyLocalReadState(generation)),
+        _mergeExternalGeneration(
+          generation,
+          refreshUnreadBadge: true,
+          requireScreenVisible: true,
+        ),
       );
-      if (generation.isCompleted) {
-        unawaited(_syncCompletedMedia([generation]));
-      }
-      unawaited(refreshUnreadCount());
     } catch (_) {}
   }
 
@@ -811,19 +874,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     TemplateGenerationResult generation,
     GenerationHistoryFilter filter,
   ) {
-    final previous = source.where(
-      (item) => item.generationId == generation.generationId,
-    );
-    final existing = previous.isEmpty ? null : previous.first;
-    final localizedGeneration = _applyLocalReadState(
-      existing == null
-          ? generation
-          : generation.copyWith(
-              localPreviewPath: existing.localPreviewPath,
-              localOutputPath: existing.localOutputPath,
-              isLocalMediaReady: existing.isLocalMediaReady,
-            ),
-    );
+    final localizedGeneration = _applyLocalReadState(generation);
     final next = [
       for (final item in source)
         if (item.generationId != generation.generationId) item,
@@ -1017,7 +1068,9 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
         .where((item) => !deletedGenerationIds.contains(item.generationId))
         .map((item) {
           final localRecord = localById[item.generationId];
-          if (localRecord == null || localRecord.isDeletedLocally) {
+          if (localRecord == null ||
+              localRecord.isDeletedLocally ||
+              !_localRecordMatchesGeneration(localRecord, item)) {
             return _applyLocalReadState(
               item.copyWith(
                 clearLocalPreviewPath: true,
@@ -1102,11 +1155,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     final updatedItems = [
       for (final item in state.items)
         if (item.generationId == record.generationId)
-          item.copyWith(
-            localPreviewPath: record.previewLocalPath,
-            localOutputPath: record.outputLocalPath,
-            isLocalMediaReady: record.isDownloadComplete,
-          )
+          _applyLocalRecordToGeneration(item, record)
         else
           item,
     ];
@@ -1116,11 +1165,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
             entry.key: [
               for (final item in entry.value)
                 if (item.generationId == record.generationId)
-                  item.copyWith(
-                    localPreviewPath: record.previewLocalPath,
-                    localOutputPath: record.outputLocalPath,
-                    isLocalMediaReady: record.isDownloadComplete,
-                  )
+                  _applyLocalRecordToGeneration(item, record)
                 else
                   item,
             ],
@@ -1142,6 +1187,25 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       GenerationHistoryFilter.ready => generation.isCompleted,
       GenerationHistoryFilter.failed => generation.isFailed,
     };
+  }
+
+  TemplateGenerationResult _applyLocalRecordToGeneration(
+    TemplateGenerationResult generation,
+    GenerationGalleryMediaRecord record,
+  ) {
+    if (!_localRecordMatchesGeneration(record, generation)) {
+      return generation.copyWith(
+        clearLocalPreviewPath: true,
+        clearLocalOutputPath: true,
+        isLocalMediaReady: false,
+      );
+    }
+
+    return generation.copyWith(
+      localPreviewPath: record.previewLocalPath,
+      localOutputPath: record.outputLocalPath,
+      isLocalMediaReady: record.isDownloadComplete,
+    );
   }
 }
 
@@ -1187,4 +1251,69 @@ bool _isSafeHistoryErrorKey(String value) {
 
 bool _isCancelledRequest(Object error) {
   return error is DioException && CancelToken.isCancel(error);
+}
+
+bool _localRecordMatchesGeneration(
+  GenerationGalleryMediaRecord record,
+  TemplateGenerationResult generation,
+) {
+  final previewUrl = _historyPreviewUrl(generation);
+  final outputUrl = _safeGenerationMediaUrl(generation.outputUrl);
+  if (previewUrl == null && outputUrl == null) {
+    return false;
+  }
+
+  return _safeNullableMediaUrlEquals(record.previewRemoteUrl, previewUrl) &&
+      _safeNullableMediaUrlEquals(record.outputRemoteUrl, outputUrl);
+}
+
+String? _historyPreviewUrl(TemplateGenerationResult generation) {
+  final resultPreview = _safeGenerationMediaUrl(generation.resultPreviewUrl);
+  final output = _safeGenerationMediaUrl(generation.outputUrl);
+  final source = _safeGenerationMediaUrl(generation.sourceImageAsset?.url);
+  final normalized = _safeGenerationMediaUrl(generation.normalizedImageUrl);
+  final generationIsVideo = isVideoGenerationResult(generation);
+
+  if (resultPreview != null && !isLikelyGenerationVideoUrl(resultPreview)) {
+    return resultPreview;
+  }
+
+  if (generationIsVideo) {
+    if (source != null) {
+      return source;
+    }
+    if (normalized != null) {
+      return normalized;
+    }
+    return output != null && isLikelyGenerationImageUrl(output) ? output : null;
+  }
+
+  if (output != null && !isLikelyGenerationVideoUrl(output)) {
+    return output;
+  }
+  if (source != null) {
+    return source;
+  }
+  if (normalized != null) {
+    return normalized;
+  }
+  return null;
+}
+
+String? _safeGenerationMediaUrl(String? raw) {
+  return parseSafeGenerationMediaUri(raw)?.toString();
+}
+
+bool _safeNullableMediaUrlEquals(String? left, String? right) {
+  if (left == null && right == null) {
+    return true;
+  }
+  if (left == null || right == null) {
+    return false;
+  }
+  final leftUri = parseSafeGenerationMediaUri(left);
+  final rightUri = parseSafeGenerationMediaUri(right);
+  return leftUri != null &&
+      rightUri != null &&
+      leftUri.toString() == rightUri.toString();
 }

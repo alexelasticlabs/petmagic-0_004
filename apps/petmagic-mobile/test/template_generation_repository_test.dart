@@ -59,6 +59,119 @@ void main() {
     expect(updatePetBody, contains("'breed': ?breed"));
   });
 
+  test(
+    'startGenerationFromPet sends raw pet and photo IDs in request body',
+    () async {
+      const petId = 'pet/space #1?x=1&kind=dog';
+      const petPhotoId = 'photo/primary #7?pose=1&tag=a';
+      const templateId = 'template/pet portrait #1';
+      final requests = <RequestOptions>[];
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          requests.add(options);
+          expect(options.method, 'POST');
+          expect(options.path, '/api/generations/from-pet');
+          expect(
+            options.headers[HttpHeaders.authorizationHeader],
+            'Bearer access-token',
+          );
+          expect(options.headers['X-Correlation-Id'], 'corr-1');
+          expect(options.headers['Idempotency-Key'], isNotNull);
+          expect(options.data, {
+            'petId': petId,
+            'petPhotoId': petPhotoId,
+            'templateId': templateId,
+          });
+          return _jsonResponse({
+            ..._generationJson(
+              generationId: 'generation-from-pet',
+              status: 'queued',
+              updatedAtUtc: '2026-06-14T12:01:00Z',
+            ),
+            'templateId': templateId,
+            'petId': petId,
+            'petPhotoId': petPhotoId,
+          });
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: _SessionStorage(_session()),
+        preferences: SharedPreferencesAsync(),
+      );
+
+      final generation = await repository.startGenerationFromPet(
+        petId: petId,
+        petPhotoId: petPhotoId,
+        templateId: templateId,
+        correlationId: 'corr-1',
+      );
+
+      expect(requests, hasLength(1));
+      expect(generation.generationId, 'generation-from-pet');
+      expect(generation.petId, petId);
+      expect(generation.petPhotoId, petPhotoId);
+      expect(generation.templateId, templateId);
+    },
+  );
+
+  test('startGeneration encodes template ID path segment', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-generation-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final file = await _writeTinyJpeg(tempDir, 'source.jpg');
+    const templateId = 'template/space #1?x=1&kind=pet';
+    final encodedTemplateId = Uri.encodeComponent(templateId);
+    final requests = <RequestOptions>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        requests.add(options);
+        expect(options.method, 'POST');
+        expect(options.path, '/api/templates/$encodedTemplateId/generations');
+        expect(
+          options.headers[HttpHeaders.authorizationHeader],
+          'Bearer access-token',
+        );
+        expect(options.headers['X-Correlation-Id'], 'corr-1');
+        expect(options.data, isA<FormData>());
+
+        final formData = options.data as FormData;
+        expect(formData.files.single.key, 'sourceImage');
+        expect(formData.files.single.value.filename, 'source.jpg');
+        expect(
+          formData.files.single.value.contentType.toString(),
+          'image/jpeg',
+        );
+        return _jsonResponse({
+          ..._generationJson(
+            generationId: 'generation-template-route',
+            status: 'queued',
+            updatedAtUtc: '2026-06-14T12:01:00Z',
+          ),
+          'templateId': templateId,
+        });
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+      preferences: SharedPreferencesAsync(),
+    );
+
+    final generation = await repository.startGeneration(
+      templateId: templateId,
+      sourceImage: XFile(file.path, name: 'source.jpg'),
+      correlationId: 'corr-1',
+    );
+
+    expect(requests, hasLength(1));
+    expect(generation.generationId, 'generation-template-route');
+    expect(generation.templateId, templateId);
+  });
+
   test('maps canonical mediaUrl generation field to outputUrl', () {
     final dto = TemplateGenerationDto.fromJson({
       'generationId': 'generation-1',
@@ -311,6 +424,53 @@ void main() {
     expect(didAttemptUpload, isFalse);
   });
 
+  test('sniffs pet photos with generic binary picker content type', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-pet-photo-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final file = await _writeTinyJpeg(tempDir, 'pet.jpg');
+
+    var requestCount = 0;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        requestCount++;
+        expect(options.method, 'POST');
+        expect(options.path, '/api/pets/pet-1/photos');
+        expect(options.data, isA<FormData>());
+
+        final formData = options.data as FormData;
+        expect(formData.files, hasLength(1));
+        final entry = formData.files.single;
+        expect(entry.key, 'photo');
+        expect(entry.value.filename, 'pet.jpg');
+        expect(entry.value.contentType.toString(), 'image/jpeg');
+
+        return _jsonResponse(_petPhotoJson());
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+      preferences: SharedPreferencesAsync(),
+    );
+
+    final photo = await repository.uploadPetPhoto(
+      petId: 'pet-1',
+      photo: XFile(
+        file.path,
+        name: 'pet.jpg',
+        mimeType: 'application/octet-stream',
+      ),
+    );
+
+    expect(requestCount, 1);
+    expect(photo.contentType, 'image/jpeg');
+  });
+
   test('uploads pet photos as multipart with detected content type', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'petmagic-pet-photo-test-',
@@ -358,6 +518,49 @@ void main() {
     expect(photo.id, 'photo-1');
     expect(photo.thumbnailUrl, 'https://cdn.petmagic.test/photo-1-thumb.jpg');
     expect(photo.contentType, 'image/jpeg');
+  });
+
+  test('uploads HEIC and HEIF pet photos with detected content type', () async {
+    final tempDir = await Directory.systemTemp.createTemp(
+      'petmagic-pet-photo-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final heicFile = await _writeFtypImage(tempDir, 'pet.heic', 'heic');
+    final heifFile = await _writeFtypImage(tempDir, 'pet.heif', 'mif1');
+
+    final detectedContentTypes = <String>[];
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        expect(options.method, 'POST');
+        expect(options.path, '/api/pets/pet-1/photos');
+        expect(options.data, isA<FormData>());
+
+        final formData = options.data as FormData;
+        detectedContentTypes.add(
+          formData.files.single.value.contentType.toString(),
+        );
+        return _jsonResponse(_petPhotoJson());
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+      preferences: SharedPreferencesAsync(),
+    );
+
+    await repository.uploadPetPhoto(
+      petId: 'pet-1',
+      photo: XFile(heicFile.path, name: 'pet.heic'),
+    );
+    await repository.uploadPetPhoto(
+      petId: 'pet-1',
+      photo: XFile(heifFile.path, name: 'pet.heif'),
+    );
+
+    expect(detectedContentTypes, ['image/heic', 'image/heif']);
   });
 
   test('keeps pet photo CRUD request contracts stable', () async {
@@ -665,6 +868,83 @@ void main() {
   });
 
   test(
+    'mark read skips corrupted cache buckets and updates readable buckets',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString('templates_generations_v1:all', '{broken');
+      await preferences.setString(
+        'templates_generations_v1:ready',
+        jsonEncode([
+          _generationJson(
+            generationId: 'generation-1',
+            status: 'completed',
+            updatedAtUtc: '2026-06-14T12:00:00Z',
+            isUnread: true,
+          ),
+        ]),
+      );
+      await preferences.setInt('templates_generations_unread_v1', 2);
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          expect(options.method, 'POST');
+          expect(
+            options.path,
+            '/api/templates/generations/generation-1/mark-read',
+          );
+          return ResponseBody.fromString('', 204);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: _SessionStorage(_session()),
+        preferences: preferences,
+      );
+
+      await repository.markGenerationRead('generation-1');
+
+      final ready = await repository.readCachedGenerations(status: 'ready');
+      expect(ready?.single.isUnread, isFalse);
+      expect(await repository.readCachedUnreadGenerationCount(), 1);
+    },
+  );
+
+  test(
+    'delete skips corrupted cache buckets and removes readable cached items',
+    () async {
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString('templates_generations_v1:all', '{broken');
+      await preferences.setString(
+        'templates_generations_v1:ready',
+        jsonEncode([
+          _generationJson(
+            generationId: 'generation-1',
+            status: 'completed',
+            updatedAtUtc: '2026-06-14T12:00:00Z',
+            isUnread: true,
+          ),
+        ]),
+      );
+      await preferences.setInt('templates_generations_unread_v1', 2);
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          expect(options.method, 'DELETE');
+          expect(options.path, '/api/templates/generations/generation-1');
+          return ResponseBody.fromString('', 204);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: _SessionStorage(_session()),
+        preferences: preferences,
+      );
+
+      await repository.deleteGeneration('generation-1');
+
+      final ready = await repository.readCachedGenerations(status: 'ready');
+      expect(ready, isEmpty);
+      expect(await repository.readCachedUnreadGenerationCount(), 1);
+    },
+  );
+
+  test(
     'realtime cache upsert keeps persistent filter buckets consistent',
     () async {
       final activeJson = _generationJson(
@@ -793,6 +1073,35 @@ Future<File> _writeTinyJpeg(Directory directory, String name) async {
   return file;
 }
 
+Future<File> _writeFtypImage(
+  Directory directory,
+  String name,
+  String brand,
+) async {
+  assert(brand.length == 4);
+  final file = File('${directory.path}/$name');
+  final brandBytes = brand.codeUnits;
+  await file.writeAsBytes([
+    0x00,
+    0x00,
+    0x00,
+    0x18,
+    0x66,
+    0x74,
+    0x79,
+    0x70,
+    brandBytes[0],
+    brandBytes[1],
+    brandBytes[2],
+    brandBytes[3],
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+  ], flush: true);
+  return file;
+}
+
 ResponseBody _jsonResponse(Object body) {
   return ResponseBody.fromString(
     jsonEncode(body),
@@ -836,6 +1145,7 @@ Map<String, dynamic> _generationJson({
   required String generationId,
   required String status,
   required String updatedAtUtc,
+  bool isUnread = true,
 }) {
   return {
     'generationId': generationId,
@@ -849,7 +1159,7 @@ Map<String, dynamic> _generationJson({
     'userMediaExpired': false,
     'templateTitle': 'Realtime Active',
     'templateType': 'image',
-    'isUnread': true,
+    'isUnread': isUnread,
   };
 }
 

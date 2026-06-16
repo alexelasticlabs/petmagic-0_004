@@ -22,6 +22,7 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_page.d
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
+import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
@@ -43,6 +44,22 @@ class GenerationsGalleryPage extends ConsumerStatefulWidget {
   @override
   ConsumerState<GenerationsGalleryPage> createState() =>
       _GenerationsGalleryPageState();
+}
+
+String _templatesLocationForGeneration(TemplateGenerationResult generation) {
+  final petId = generation.petId?.trim();
+  if (petId == null || petId.isEmpty) {
+    return TemplatesPage.routePath;
+  }
+
+  final petPhotoId = generation.petPhotoId?.trim();
+  return Uri(
+    path: TemplatesPage.routePath,
+    queryParameters: {
+      'petId': petId,
+      if (petPhotoId != null && petPhotoId.isNotEmpty) 'petPhotoId': petPhotoId,
+    },
+  ).toString();
 }
 
 class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>

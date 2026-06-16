@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generations_gall
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -102,6 +104,8 @@ void main() {
     expect(find.text(text.authSignInRequired), findsOneWidget);
     expect(find.text(text.generationStatusEmptyMessage), findsOneWidget);
     expect(find.text(text.profileSignInAction), findsOneWidget);
+    expect(harness.controller.screenVisibilityCalls, [false]);
+    expect(harness.controller.loadCalls, isEmpty);
   });
 
   testWidgets('gallery renders loading error and empty states', (tester) async {
@@ -132,9 +136,26 @@ void main() {
     await tester.pumpWidget(errorHarness.app());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    final text = _text(tester);
+    var text = _text(tester);
     expect(find.text('Network is unavailable'), findsOneWidget);
     expect(find.text(text.retryAction), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+
+    final keyedErrorHarness = _GalleryHarness(
+      initialState: const GenerationHistoryState(
+        errorMessage: 'templates.connection_timeout',
+      ),
+    );
+    addTearDown(keyedErrorHarness.router.dispose);
+
+    await tester.pumpWidget(keyedErrorHarness.app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    text = _text(tester);
+    expect(find.text(text.templatesConnectionTimeoutError), findsOneWidget);
+    expect(find.text('templates.connection_timeout'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -467,7 +488,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text(text.generationStatusSaveAction));
-    await tester.pump();
+    await _pumpUntil(tester, () => mediaActions.saveCalls > 0);
 
     expect(mediaActions.saveCalls, 1);
     expect(mediaActions.savedUrls, ['https://cdn.petmagic.test/ready-1.jpg']);
@@ -522,9 +543,206 @@ void main() {
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text(text.supportChatShareAction));
-    await tester.pump();
+    await _pumpUntil(tester, () => mediaActions.shareCalls > 0);
 
     expect(mediaActions.sharedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card media actions prefer cached local output file', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final tempDir = Directory.systemTemp.createTempSync(
+      'petmagic-gallery-local-output-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final localOutput = File(
+      '${tempDir.path}${Platform.pathSeparator}ready-local.jpg',
+    );
+    localOutput.writeAsBytesSync(const [0xFF, 0xD8, 0xFF, 0xD9]);
+    expect(await usableLocalMediaPath(localOutput.path), localOutput.path);
+
+    final mediaActions = _DelayedGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final generation = _generation(
+      generationId: 'g-ready-local',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Local Ready',
+      templateType: 'image',
+      tokenCost: 6,
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      localOutputPath: localOutput.path,
+    );
+    final harness = _GalleryHarness(
+      items: [generation],
+      mediaActions: mediaActions,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await _pumpUntil(tester, () => mediaActions.saveCalls > 0);
+
+    expect(mediaActions.savedUrls, ['']);
+    expect(mediaActions.savedLocalPaths, [localOutput.path]);
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await _pumpUntil(tester, () => mediaActions.shareCalls > 0);
+
+    expect(mediaActions.sharedUrls, ['']);
+    expect(mediaActions.sharedLocalPaths, [localOutput.path]);
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card media actions ignore corrupted local output file', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final tempDir = Directory.systemTemp.createTempSync(
+      'petmagic-gallery-corrupt-local-output-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final localOutput = File(
+      '${tempDir.path}${Platform.pathSeparator}ready-corrupt.jpg',
+    );
+    localOutput.writeAsBytesSync('not-media'.codeUnits);
+
+    final mediaActions = _DelayedGenerationStatusMediaActions(
+      delayShare: false,
+    );
+    final generation = _generation(
+      generationId: 'g-ready-corrupt',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Corrupt Local Ready',
+      templateType: 'image',
+      tokenCost: 6,
+      outputUrl: 'https://cdn.petmagic.test/ready-fallback.jpg',
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      localOutputPath: localOutput.path,
+    );
+    final harness = _GalleryHarness(
+      items: [generation],
+      mediaActions: mediaActions,
+    );
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusSaveAction));
+    await tester.pump();
+
+    expect(mediaActions.savedUrls, [
+      'https://cdn.petmagic.test/ready-fallback.jpg',
+    ]);
+    expect(mediaActions.savedLocalPaths, [null]);
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.supportChatShareAction));
+    await tester.pump();
+
+    expect(mediaActions.sharedUrls, [
+      'https://cdn.petmagic.test/ready-fallback.jpg',
+    ]);
+    expect(mediaActions.sharedLocalPaths, [null]);
+    await tester.pump(const Duration(seconds: 3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ready card ignores corrupted local preview file', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final tempDir = Directory.systemTemp.createTempSync(
+      'petmagic-gallery-corrupt-local-preview-test-',
+    );
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+    final localPreview = File(
+      '${tempDir.path}${Platform.pathSeparator}ready-preview-corrupt.jpg',
+    );
+    localPreview.writeAsBytesSync('not-media'.codeUnits);
+
+    final generation = _generation(
+      generationId: 'g-ready-preview-corrupt',
+      status: TemplateGenerationStatus.completed,
+      templateTitle: 'Corrupt Preview Ready',
+      templateType: 'image',
+      tokenCost: 6,
+      outputUrl: 'https://cdn.petmagic.test/ready-preview-fallback.jpg',
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      localPreviewPath: localPreview.path,
+    );
+    final harness = _GalleryHarness(items: [generation]);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final readyChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterReady,
+    );
+    await tester.ensureVisible(readyChip);
+    await tester.tap(readyChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Image && widget.image is FileImage,
+      ),
+      findsNothing,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -779,6 +997,44 @@ void main() {
     expect(mediaActions.shareCancelToken?.isCancelled, isTrue);
   });
 
+  test(
+    'ready card media actions stop after local-media lookup if unmounted',
+    () {
+      final source = File(
+        'lib/features/templates/presentation/'
+        'generations_gallery_page_states_and_actions.dart',
+      ).readAsStringSync();
+      final saveBody = source.substring(
+        source.indexOf('Future<void> _saveGenerationToGallery'),
+        source.indexOf('Future<void> _shareGenerationFile'),
+      );
+      final shareBody = source.substring(
+        source.indexOf('Future<void> _shareGenerationFile'),
+        source.indexOf('Future<void> _copyGenerationLink'),
+      );
+
+      void expectMountedGuardAfterLocalLookup(String body) {
+        final localLookupIndex = body.indexOf('await usableLocalMediaPath');
+        final mountedGuardIndex = body.indexOf('if (!context.mounted)');
+        final safeUriIndex = body.indexOf('parseSafeGenerationMediaUri');
+        expect(localLookupIndex, isNonNegative);
+        expect(mountedGuardIndex, isNonNegative);
+        expect(safeUriIndex, isNonNegative);
+        expect(localLookupIndex, lessThan(mountedGuardIndex));
+        expect(mountedGuardIndex, lessThan(safeUriIndex));
+        expect(
+          body,
+          contains(
+            'galleryState._completeMediaAction(mediaActionCancelToken);',
+          ),
+        );
+      }
+
+      expectMountedGuardAfterLocalLookup(saveBody);
+      expectMountedGuardAfterLocalLookup(shareBody);
+    },
+  );
+
   testWidgets('ready card media actions reject unsafe output URLs', (
     tester,
   ) async {
@@ -867,7 +1123,7 @@ void main() {
     expect(find.text('status:g-active-1'), findsOneWidget);
   });
 
-  testWidgets('failed card buttons navigate to templates and support', (
+  testWidgets('failed card buttons preserve pet context and open support', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -893,6 +1149,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('templates-route'), findsOneWidget);
+    expect(find.text('templates-pet:pet/route'), findsOneWidget);
+    expect(find.text('templates-photo:photo route'), findsOneWidget);
 
     harness.router.go(GenerationsGalleryPage.routePath);
     await tester.pumpAndSettle();
@@ -909,6 +1167,92 @@ void main() {
     expect(find.text('support-generation:g-failed-1'), findsOneWidget);
   });
 
+  testWidgets('failed card action sheet marks unread generation read', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final failed = _generation(
+      generationId: 'g-failed-unread',
+      status: TemplateGenerationStatus.failed,
+      templateTitle: 'Failed Unread',
+      templateType: 'image',
+      tokenCost: 6,
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      isUnread: true,
+    );
+    final harness = _GalleryHarness(items: [failed]);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final failedChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterFailed,
+    );
+    await tester.ensureVisible(failedChip);
+    await tester.tap(failedChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(ListTile, text.generationStatusOpenStatusAction),
+    );
+    await tester.pumpAndSettle();
+
+    expect(harness.controller.markReadCalls, ['g-failed-unread']);
+    expect(find.text('status:g-failed-unread'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('failed card action sheet preserves pet context for templates', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final failed = _generation(
+      generationId: 'g-failed-pet',
+      status: TemplateGenerationStatus.failed,
+      templateTitle: 'Failed Pet Photo',
+      templateType: 'image',
+      tokenCost: 6,
+      updatedAtUtc: DateTime.utc(2026, 5, 25, 14, 30),
+      petId: 'pet/sheet',
+      petPhotoId: 'photo sheet',
+    );
+    final harness = _GalleryHarness(items: [failed]);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pumpAndSettle();
+    final text = _text(tester);
+
+    final failedChip = find.widgetWithText(
+      ChoiceChip,
+      text.generationStatusFilterFailed,
+    );
+    await tester.ensureVisible(failedChip);
+    await tester.tap(failedChip, warnIfMissed: false);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text(text.generationStatusPickAnotherPhotoAction).last,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('templates-route'), findsOneWidget);
+    expect(find.text('templates-pet:pet/sheet'), findsOneWidget);
+    expect(find.text('templates-photo:photo sheet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('gallery does not force refresh when tab is hidden and shown', (
     tester,
   ) async {
@@ -923,6 +1267,7 @@ void main() {
 
     expect(harness.controller.refreshCalls, isEmpty);
     expect(harness.controller.loadCalls, [GenerationHistoryFilter.all]);
+    expect(harness.controller.screenVisibilityCalls, [true]);
 
     final hostState = tester.state<_GalleryTickerModeHostState>(
       find.byType(_GalleryTickerModeHost),
@@ -931,6 +1276,7 @@ void main() {
     hostState.setEnabled(false);
     await tester.pump();
     await tester.pump();
+    expect(harness.controller.screenVisibilityCalls, [true, false]);
 
     hostState.setEnabled(true);
     await tester.pump();
@@ -938,6 +1284,7 @@ void main() {
 
     expect(harness.controller.refreshCalls, isEmpty);
     expect(harness.controller.loadCalls, [GenerationHistoryFilter.all]);
+    expect(harness.controller.screenVisibilityCalls, [true, false, true]);
   });
 
   testWidgets('gallery premium upsell fits narrow widths', (tester) async {
@@ -959,6 +1306,16 @@ void main() {
 AppLocalizations _text(WidgetTester tester) {
   final context = tester.element(find.byType(GenerationsGalleryPage).first);
   return AppLocalizations.of(context);
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() isDone, {
+  int maxPumps = 10,
+}) async {
+  for (var attempt = 0; attempt < maxPumps && !isDone(); attempt++) {
+    await tester.pump(const Duration(milliseconds: 50));
+  }
 }
 
 class _GalleryHarness {
@@ -996,9 +1353,23 @@ class _GalleryHarness {
            ),
            GoRoute(
              path: TemplatesPage.routePath,
-             pageBuilder: (context, state) => const NoTransitionPage(
-               child: Scaffold(body: Center(child: Text('templates-route'))),
-             ),
+             pageBuilder: (context, state) {
+               final query = state.uri.queryParameters;
+               return NoTransitionPage(
+                 child: Scaffold(
+                   body: Center(
+                     child: Column(
+                       mainAxisSize: MainAxisSize.min,
+                       children: [
+                         const Text('templates-route'),
+                         Text('templates-pet:${query['petId'] ?? ''}'),
+                         Text('templates-photo:${query['petPhotoId'] ?? ''}'),
+                       ],
+                     ),
+                   ),
+                 ),
+               );
+             },
            ),
            GoRoute(
              path: SupportChatPage.routePath,
@@ -1142,6 +1513,7 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
   final List<GenerationHistoryFilter> refreshCalls = [];
   final List<String> markReadCalls = [];
   final List<String> deleteGenerationCalls = [];
+  final List<bool> screenVisibilityCalls = [];
 
   @override
   GenerationHistoryState build() {
@@ -1154,7 +1526,9 @@ class _FakeGenerationHistoryController extends GenerationHistoryController {
   }
 
   @override
-  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {}
+  void setScreenVisible(bool visible, {bool clearLoadingState = true}) {
+    screenVisibilityCalls.add(visible);
+  }
 
   @override
   Future<void> load({
@@ -1281,6 +1655,8 @@ class _DelayedGenerationStatusMediaActions
   int shareCalls = 0;
   final savedUrls = <String>[];
   final sharedUrls = <String>[];
+  final savedLocalPaths = <String?>[];
+  final sharedLocalPaths = <String?>[];
   final savedFileNames = <String>[];
   final sharedFileNames = <String>[];
 
@@ -1291,9 +1667,11 @@ class _DelayedGenerationStatusMediaActions
     required bool isVideo,
     required String albumName,
     required CancelToken cancelToken,
+    String? localPath,
   }) {
     saveCalls++;
     savedUrls.add(mediaUrl);
+    savedLocalPaths.add(localPath);
     savedFileNames.add(fileName);
     saveCancelToken = cancelToken;
     if (!saveStarted.isCompleted) {
@@ -1311,9 +1689,11 @@ class _DelayedGenerationStatusMediaActions
     required String fileName,
     required String title,
     required CancelToken cancelToken,
+    String? localPath,
   }) {
     shareCalls++;
     sharedUrls.add(mediaUrl);
+    sharedLocalPaths.add(localPath);
     sharedFileNames.add(fileName);
     shareCancelToken = cancelToken;
     if (!shareStarted.isCompleted) {
@@ -1405,6 +1785,8 @@ List<TemplateGenerationResult> _sampleItems() {
       stage: 'finalizing',
       updatedAtUtc: now.subtract(const Duration(minutes: 7)),
       refundedAtUtc: now.subtract(const Duration(minutes: 6)),
+      petId: 'pet/route',
+      petPhotoId: 'photo route',
     ),
   ];
 }
@@ -1423,6 +1805,10 @@ TemplateGenerationResult _generation({
   double? outputVideoDurationSeconds,
   DateTime? refundedAtUtc,
   bool isUnread = false,
+  String? localPreviewPath,
+  String? localOutputPath,
+  String? petId,
+  String? petPhotoId,
 }) {
   return TemplateGenerationResult(
     generationId: generationId,
@@ -1443,6 +1829,10 @@ TemplateGenerationResult _generation({
     outputVideoDurationSeconds: outputVideoDurationSeconds,
     refundedAtUtc: refundedAtUtc,
     isUnread: isUnread,
+    localPreviewPath: localPreviewPath,
+    localOutputPath: localOutputPath,
+    petId: petId,
+    petPhotoId: petPhotoId,
   );
 }
 

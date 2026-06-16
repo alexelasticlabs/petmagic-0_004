@@ -93,6 +93,7 @@ class _ErrorState extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final displayMessage = _galleryHistoryErrorText(text, message);
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -101,7 +102,7 @@ class _ErrorState extends ConsumerWidget {
           Icon(Icons.wifi_off_rounded, size: 42, color: colors.danger),
           const SizedBox(height: 12),
           Text(
-            message,
+            displayMessage,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textSoft,
@@ -119,6 +120,15 @@ class _ErrorState extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _galleryHistoryErrorText(AppLocalizations text, String raw) {
+  return switch (raw.trim()) {
+    'templates.connection_timeout' => text.templatesConnectionTimeoutError,
+    'templates.server_timeout' => text.templatesServerTimeoutError,
+    'templates.request_failed' => text.templatesRequestFailedError,
+    _ => raw,
+  };
 }
 
 class _OfflineCacheBanner extends ConsumerWidget {
@@ -484,7 +494,7 @@ Future<void> _showFailedCardActions(
                       title: Text(text.generationStatusPickAnotherPhotoAction),
                       onTap: () {
                         Navigator.of(sheetContext).pop();
-                        context.go(TemplatesPage.routePath);
+                        context.go(_templatesLocationForGeneration(generation));
                       },
                     ),
                     ListTile(
@@ -528,15 +538,25 @@ Future<void> _saveGenerationToGallery(
   final context = galleryState.context;
 
   final outputUrl = generation.outputUrl;
+  final localOutputPath = await usableLocalMediaPath(
+    generation.localOutputPath,
+  );
+  if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
   final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
-  if (safeOutputUri == null) {
+  if (safeOutputUri == null && localOutputPath == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForSave);
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
-  final safeOutputUrl = safeOutputUri.toString();
+  final safeOutputUrl = safeOutputUri?.toString() ?? '';
 
-  final fileName = _buildGenerationFileName(generation, safeOutputUrl);
+  final fileName = _buildGenerationFileName(
+    generation,
+    safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
+  );
   try {
     final wasSaved = await ref
         .read(generationStatusMediaActionsProvider)
@@ -546,6 +566,7 @@ Future<void> _saveGenerationToGallery(
           isVideo: isVideoGeneration(generation),
           albumName: 'PetMagic',
           cancelToken: mediaActionCancelToken,
+          localPath: localOutputPath,
         );
 
     if (!context.mounted) {
@@ -588,22 +609,33 @@ Future<void> _shareGenerationFile(
   final context = galleryState.context;
 
   final outputUrl = generation.outputUrl;
+  final localOutputPath = await usableLocalMediaPath(
+    generation.localOutputPath,
+  );
+  if (!context.mounted) {
+    galleryState._completeMediaAction(mediaActionCancelToken);
+    return;
+  }
   final safeOutputUri = parseSafeGenerationMediaUri(outputUrl);
-  if (safeOutputUri == null) {
+  if (safeOutputUri == null && localOutputPath == null) {
     _notifySoon(context, text.generationStatusResultUnavailableForShare);
     galleryState._completeMediaAction(mediaActionCancelToken);
     return;
   }
-  final safeOutputUrl = safeOutputUri.toString();
+  final safeOutputUrl = safeOutputUri?.toString() ?? '';
 
   try {
     await ref
         .read(generationStatusMediaActionsProvider)
         .share(
           mediaUrl: safeOutputUrl,
-          fileName: _buildGenerationFileName(generation, safeOutputUrl),
+          fileName: _buildGenerationFileName(
+            generation,
+            safeOutputUrl.isEmpty ? localOutputPath ?? '' : safeOutputUrl,
+          ),
           title: generation.templateTitle ?? text.generationStatusResultTitle,
           cancelToken: mediaActionCancelToken,
+          localPath: localOutputPath,
         );
   } on DioException catch (error) {
     if (!context.mounted || CancelToken.isCancel(error)) {

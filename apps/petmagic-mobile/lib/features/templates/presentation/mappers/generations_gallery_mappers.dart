@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
@@ -115,10 +116,15 @@ Color statusColor(PetMagicColors colors, TemplateGenerationResult generation) {
 }
 
 String? previewUrl(TemplateGenerationResult generation) {
+  final resultPreview = _safeMediaUrl(generation.resultPreviewUrl);
   final output = _safeMediaUrl(generation.outputUrl);
   final source = _safeMediaUrl(generation.sourceImageAsset?.url);
   final normalized = _safeMediaUrl(generation.normalizedImageUrl);
   final generationIsVideo = isVideoGeneration(generation);
+
+  if (resultPreview != null && !isLikelyGenerationVideoUrl(resultPreview)) {
+    return resultPreview;
+  }
 
   if (generationIsVideo) {
     if (source != null) {
@@ -127,10 +133,10 @@ String? previewUrl(TemplateGenerationResult generation) {
     if (normalized != null) {
       return normalized;
     }
-    return output != null && !_isLikelyVideoUrl(output) ? output : null;
+    return output != null && isLikelyGenerationImageUrl(output) ? output : null;
   }
 
-  if (output != null && !_isLikelyVideoUrl(output)) {
+  if (output != null && !isLikelyGenerationVideoUrl(output)) {
     return output;
   }
   if (source != null) {
@@ -143,49 +149,14 @@ String? previewUrl(TemplateGenerationResult generation) {
 }
 
 bool isVideoGeneration(TemplateGenerationResult generation) {
-  final type = generation.templateType?.toLowerCase() ?? '';
-  return type.contains('video') ||
-      generation.outputVideoDurationSeconds != null ||
-      _isLikelyVideoUrl(generation.outputUrl);
+  return isVideoGenerationResult(generation);
 }
 
 bool canRenderImagePreview(String? url) {
   final normalized = _safeMediaUrl(url);
-  return normalized != null && !_isLikelyVideoUrl(normalized);
+  return normalized != null && !isLikelyGenerationVideoUrl(normalized);
 }
 
 String? _safeMediaUrl(String? raw) {
   return parseSafeGenerationMediaUri(raw)?.toString();
-}
-
-String? _cleanUrl(String? raw) {
-  final value = raw?.trim();
-  if (value == null || value.isEmpty) {
-    return null;
-  }
-  return value;
-}
-
-bool _isLikelyVideoUrl(String? rawUrl) {
-  final url = _cleanUrl(rawUrl);
-  if (url == null) {
-    return false;
-  }
-
-  final normalized = url.toLowerCase();
-  final uri = Uri.tryParse(normalized);
-  final path = (uri?.path ?? normalized).toLowerCase();
-  final query = (uri?.query ?? '').toLowerCase();
-
-  return path.endsWith('.mp4') ||
-      path.endsWith('.webm') ||
-      path.endsWith('.mov') ||
-      path.endsWith('.m4v') ||
-      normalized.contains('.mp4?') ||
-      normalized.contains('.webm?') ||
-      normalized.contains('.mov?') ||
-      normalized.contains('.m4v?') ||
-      query.contains('format=mp4') ||
-      query.contains('ext=mp4') ||
-      query.contains('contenttype=video');
 }
