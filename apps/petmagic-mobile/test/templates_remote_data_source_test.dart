@@ -407,6 +407,37 @@ void main() {
     },
   );
 
+  test('fetchRandomTemplate sends strict premium access filter', () async {
+    RequestOptions? capturedOptions;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        capturedOptions = options;
+        return ResponseBody.fromString(
+          jsonEncode({'template': null}),
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+    final dataSource = TemplatesRemoteDataSource(dio);
+
+    await dataSource.fetchRandomTemplate(
+      mode: TemplateRandomMode.image,
+      category: 'Portrait',
+      includePremium: false,
+      access: TemplateRandomAccess.premium,
+    );
+
+    expect(capturedOptions?.path, '/api/templates/random');
+    expect(capturedOptions?.queryParameters, {
+      'type': 'Image',
+      'category': 'Portrait',
+      'includePremium': false,
+      'access': 'premium',
+    });
+  });
+
   test(
     'cancelPendingRandomTemplateRequest cancels active random request',
     () async {

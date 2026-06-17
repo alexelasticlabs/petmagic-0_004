@@ -1565,6 +1565,7 @@ class _FakeTemplatesRepository implements TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     for (final page in pagesByKey.values) {
       if (page.items.isNotEmpty) {

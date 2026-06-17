@@ -63,6 +63,44 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not load templates. Please try again.';
 
   @override
+  String get randomTemplateSheetDescription =>
+      'Choose which templates to search for a random pick.';
+
+  @override
+  String get randomTemplateTypeLabel => 'Template type';
+
+  @override
+  String get randomTemplateCategoryLabel => 'Category';
+
+  @override
+  String get randomTemplateAccessLabel => 'Availability';
+
+  @override
+  String get randomTemplateAccessAvailable => 'All available';
+
+  @override
+  String get randomTemplateAccessFree => 'Free';
+
+  @override
+  String get randomTemplateAccessPremium => 'Premium';
+
+  @override
+  String get randomTemplateFindAction => 'Find random template';
+
+  @override
+  String get randomTemplateFinding => 'Finding a random template...';
+
+  @override
+  String get randomTemplateNoMatches => 'No templates match these settings.';
+
+  @override
+  String get randomTemplateNoMatchesHint =>
+      'Try choosing All or another category.';
+
+  @override
+  String get randomTemplateResetFilters => 'Reset settings';
+
+  @override
   String get templateOfTheDayTitle => 'Template of the Day';
 
   @override

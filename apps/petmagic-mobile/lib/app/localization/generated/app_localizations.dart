@@ -210,6 +210,78 @@ abstract class AppLocalizations {
   /// **'Could not load templates. Please try again.'**
   String get randomTemplateLoadFailed;
 
+  /// No description provided for @randomTemplateSheetDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which templates to search for a random pick.'**
+  String get randomTemplateSheetDescription;
+
+  /// No description provided for @randomTemplateTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Template type'**
+  String get randomTemplateTypeLabel;
+
+  /// No description provided for @randomTemplateCategoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get randomTemplateCategoryLabel;
+
+  /// No description provided for @randomTemplateAccessLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Availability'**
+  String get randomTemplateAccessLabel;
+
+  /// No description provided for @randomTemplateAccessAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'All available'**
+  String get randomTemplateAccessAvailable;
+
+  /// No description provided for @randomTemplateAccessFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free'**
+  String get randomTemplateAccessFree;
+
+  /// No description provided for @randomTemplateAccessPremium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get randomTemplateAccessPremium;
+
+  /// No description provided for @randomTemplateFindAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Find random template'**
+  String get randomTemplateFindAction;
+
+  /// No description provided for @randomTemplateFinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding a random template...'**
+  String get randomTemplateFinding;
+
+  /// No description provided for @randomTemplateNoMatches.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates match these settings.'**
+  String get randomTemplateNoMatches;
+
+  /// No description provided for @randomTemplateNoMatchesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Try choosing All or another category.'**
+  String get randomTemplateNoMatchesHint;
+
+  /// No description provided for @randomTemplateResetFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset settings'**
+  String get randomTemplateResetFilters;
+
   /// No description provided for @templateOfTheDayTitle.
   ///
   /// In en, this message translates to:

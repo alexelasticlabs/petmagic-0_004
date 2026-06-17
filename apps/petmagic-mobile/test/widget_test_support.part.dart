@@ -309,6 +309,7 @@ class _FakeTemplatesRepository implements TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     return items.isEmpty ? null : items.first;
   }

@@ -121,6 +121,7 @@ class TemplatesRemoteDataSource {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     cancelPendingRandomTemplateRequest();
     final cancelToken = CancelToken();
@@ -137,6 +138,10 @@ class TemplatesRemoteDataSource {
           if (category != null && category.trim().isNotEmpty)
             'category': category.trim(),
           'includePremium': includePremium,
+          if (access != TemplateRandomAccess.available)
+            'access': access == TemplateRandomAccess.premium
+                ? 'premium'
+                : 'free',
         },
         cancelToken: cancelToken,
       );

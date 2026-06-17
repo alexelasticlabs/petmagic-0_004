@@ -2,6 +2,8 @@ enum TemplateType { image, video }
 
 enum TemplateRandomMode { any, image, video }
 
+enum TemplateRandomAccess { available, free, premium }
+
 class TemplateOfTheDayItem {
   const TemplateOfTheDayItem({
     required this.templateId,

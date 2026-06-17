@@ -943,6 +943,15 @@ public sealed partial class TemplatesServiceTests
         Assert.False(freeRandom.Value.Template.IsPremium);
         Assert.Equal(freeRandom.Value.Template.PreviewAsset?.Url, freeRandom.Value.Template.ThumbnailUrl);
 
+        var premiumRandom = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(TemplateType.Image, "portrait", false, null, "premium"),
+            CancellationToken.None);
+
+        Assert.True(premiumRandom.IsSuccess);
+        Assert.NotNull(premiumRandom.Value.Template);
+        Assert.Equal(premiumTemplate.Value.TemplateId, premiumRandom.Value.Template!.TemplateId);
+        Assert.True(premiumRandom.Value.Template.IsPremium);
+
         var noVideoInPortrait = await service.GetPublicRandomTemplateAsync(
             new PublicRandomTemplateQuery(TemplateType.Video, "Portrait", true, null),
             CancellationToken.None);

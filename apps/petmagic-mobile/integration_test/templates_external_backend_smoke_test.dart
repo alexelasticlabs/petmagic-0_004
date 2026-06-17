@@ -268,12 +268,14 @@ Future<Map<String, Object?>> _fetchRandomProbe(
   required TemplateRandomMode mode,
   required String? category,
   required bool includePremium,
+  TemplateRandomAccess access = TemplateRandomAccess.available,
 }) async {
   final watch = Stopwatch()..start();
   final response = await remote.fetchRandomTemplate(
     mode: mode,
     category: category,
     includePremium: includePremium,
+    access: access,
   );
   watch.stop();
 

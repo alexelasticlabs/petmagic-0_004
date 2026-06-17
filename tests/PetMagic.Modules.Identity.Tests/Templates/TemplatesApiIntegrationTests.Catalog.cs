@@ -308,7 +308,7 @@ public sealed partial class TemplatesApiIntegrationTests
             "Random Free Magic",
             "Magic",
             ["random", "free"]);
-        await CreateActivePremiumImageTemplateAsync(
+        var premium = await CreateActivePremiumImageTemplateAsync(
             application.Client,
             "Random Premium Magic",
             "Magic",
@@ -324,6 +324,14 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(free.TemplateId, random.Template!.TemplateId);
         Assert.False(random.Template.IsPremium);
         Assert.Equal(random.Template.PreviewAsset?.Url, random.Template.ThumbnailUrl);
+
+        var premiumRandom = await GetFromJsonAsync<PublicRandomTemplateResponse>(
+            application.Client,
+            "/api/templates/random?type=all&category=magic&includePremium=false&access=premium");
+
+        Assert.NotNull(premiumRandom.Template);
+        Assert.Equal(premium.TemplateId, premiumRandom.Template!.TemplateId);
+        Assert.True(premiumRandom.Template.IsPremium);
     }
 
     [Fact]
@@ -673,6 +681,21 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("templates.invalid_type", body);
         Assert.Contains("Image, Video, or all", body);
+    }
+
+    [Fact]
+    public async Task PublicRandomTemplate_ShouldReturnProblem_WhenAccessFilterIsInvalid()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        using var response = await application.Client.GetAsync("/api/templates/random?access=vip");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("templates.invalid_access", body);
+        Assert.Contains("all, free, or premium", body);
     }
 
     [Theory]

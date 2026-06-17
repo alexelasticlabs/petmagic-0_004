@@ -668,11 +668,13 @@ class _RemoteBackedTemplatesRepository implements TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     return (await _dataSource.fetchRandomTemplate(
       mode: mode,
       category: category,
       includePremium: includePremium,
+      access: access,
     )).toDomain();
   }
 

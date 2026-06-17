@@ -1072,7 +1072,8 @@ public sealed record PublicRandomTemplateQuery(
     TemplateType? Type,
     string? Category,
     bool IncludePremium,
-    string? Locale);
+    string? Locale,
+    string? Access = null);
 
 public sealed record PublicRandomTemplateResponse(
     PublicTemplateListItemResponse? Template);

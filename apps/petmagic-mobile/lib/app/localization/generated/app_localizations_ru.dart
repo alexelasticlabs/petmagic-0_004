@@ -64,6 +64,44 @@ class AppLocalizationsRu extends AppLocalizations {
       'Не удалось загрузить шаблоны. Попробуйте ещё раз.';
 
   @override
+  String get randomTemplateSheetDescription =>
+      'Выберите, среди каких шаблонов искать случайный вариант.';
+
+  @override
+  String get randomTemplateTypeLabel => 'Тип шаблона';
+
+  @override
+  String get randomTemplateCategoryLabel => 'Категория';
+
+  @override
+  String get randomTemplateAccessLabel => 'Доступность';
+
+  @override
+  String get randomTemplateAccessAvailable => 'Все доступные';
+
+  @override
+  String get randomTemplateAccessFree => 'Бесплатные';
+
+  @override
+  String get randomTemplateAccessPremium => 'Premium';
+
+  @override
+  String get randomTemplateFindAction => 'Найти случайный шаблон';
+
+  @override
+  String get randomTemplateFinding => 'Ищем случайный шаблон...';
+
+  @override
+  String get randomTemplateNoMatches => 'Нет шаблонов по выбранным параметрам.';
+
+  @override
+  String get randomTemplateNoMatchesHint =>
+      'Попробуйте выбрать «Все» или другую категорию.';
+
+  @override
+  String get randomTemplateResetFilters => 'Сбросить параметры';
+
+  @override
   String get templateOfTheDayTitle => 'Шаблон дня';
 
   @override

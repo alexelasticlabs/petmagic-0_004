@@ -186,6 +186,19 @@ internal sealed partial class TemplatesService
         return NormalizePublicTextFilter(search, PublicSearchFilterMaxLength);
     }
 
+    private static string? NormalizePublicRandomAccess(string? access)
+    {
+        if (string.IsNullOrWhiteSpace(access))
+        {
+            return null;
+        }
+
+        var normalized = access.Trim().ToLowerInvariant();
+        return normalized is "all" or "free" or "premium"
+            ? normalized
+            : null;
+    }
+
     private static string? NormalizePublicTextFilter(string? value, int maxLength)
     {
         if (string.IsNullOrWhiteSpace(value))

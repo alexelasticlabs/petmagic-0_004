@@ -659,7 +659,7 @@ void main() {
     },
   );
 
-  testWidgets('templates page uses compact random action without mode sheet', (
+  testWidgets('templates page opens compact random settings sheet', (
     tester,
   ) async {
     final controller = _FakeTemplatesController();
@@ -707,8 +707,9 @@ void main() {
     await _tapRandomTemplateAction(tester);
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(repository.fetchRandomTemplateCalls, 1);
-    expect(repository.lastRandomMode, TemplateRandomMode.any);
+    expect(find.text(text.randomTemplateAction), findsOneWidget);
+    expect(find.text(text.randomTemplateSheetDescription), findsOneWidget);
+    expect(repository.fetchRandomTemplateCalls, 0);
     expect(find.text(text.randomTemplateAny), findsNothing);
     expect(find.text(text.randomTemplateImage), findsNothing);
     expect(find.text(text.randomTemplateVideo), findsNothing);
@@ -754,9 +755,12 @@ void main() {
     await tester.pump();
 
     expect(tester.takeException(), isNull);
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+    expect(find.text(text.randomTemplateAction), findsNothing);
   });
 
-  testWidgets('random template empty result shows localized notification', (
+  testWidgets('random template empty result shows sheet empty state', (
     tester,
   ) async {
     await PetMagicNotificationCenter.instance.clearQueue();
@@ -798,13 +802,15 @@ void main() {
 
     await _tapRandomTemplateAction(tester);
     await tester.pump();
+    await _tapFindRandomTemplateAction(tester, text);
+    await tester.pump();
 
     expect(repository.fetchRandomTemplateCalls, 1);
     expect(repository.lastRandomMode, TemplateRandomMode.any);
-    expect(
-      PetMagicNotificationCenter.instance.current?.message,
-      text.randomTemplateNoAvailableForType,
-    );
+    expect(find.text(text.randomTemplateNoMatches), findsOneWidget);
+    expect(find.text(text.randomTemplateNoMatchesHint), findsOneWidget);
+    expect(find.text(text.randomTemplateResetFilters), findsOneWidget);
+    expect(PetMagicNotificationCenter.instance.current, isNull);
 
     await PetMagicNotificationCenter.instance.clearQueue();
   });
@@ -884,13 +890,20 @@ void main() {
       await tester.pump();
       await tester.pump();
 
+      final context = tester.element(find.byType(TemplatesPage));
+      final text = AppLocalizations.of(context);
+
       await _tapRandomTemplateAction(tester);
+      await tester.pump();
+      await _tapSheetText(tester, text.randomTemplateAccessPremium);
+      await _tapFindRandomTemplateAction(tester, text);
       await tester.pumpAndSettle();
 
       expect(repository.fetchRandomTemplateCalls, 1);
       expect(repository.lastRandomMode, TemplateRandomMode.image);
       expect(repository.lastRandomCategory, 'Portrait');
       expect(repository.lastIncludePremium, false);
+      expect(repository.lastRandomAccess, TemplateRandomAccess.premium);
       expect(find.text('opened:catalog-image'), findsOneWidget);
       expect(repository.cancelPendingRandomTemplateRequestCalls, 0);
     },
@@ -964,8 +977,12 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
     await _tapRandomTemplateAction(tester);
     await tester.pump();
+    await _tapFindRandomTemplateAction(tester, text);
 
     expect(repository.fetchRandomTemplateCalls, 1);
     expect(repository.lastRandomMode, TemplateRandomMode.video);
@@ -1039,8 +1056,12 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
     await _tapRandomTemplateAction(tester);
     await tester.pump();
+    await _tapFindRandomTemplateAction(tester, text);
 
     expect(repository.fetchRandomTemplateCalls, 1);
 
@@ -1493,7 +1514,7 @@ void main() {
     expect(find.text('Open status'), findsOneWidget);
   });
 
-  testWidgets('random template load failure shows localized notification', (
+  testWidgets('random template load failure shows sheet error state', (
     tester,
   ) async {
     await PetMagicNotificationCenter.instance.clearQueue();
@@ -1537,10 +1558,12 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    expect(
-      PetMagicNotificationCenter.instance.current?.message,
-      text.randomTemplateLoadFailed,
-    );
+    await _tapFindRandomTemplateAction(tester, text);
+    await tester.pump();
+
+    expect(find.text(text.randomTemplateLoadFailed), findsOneWidget);
+    expect(find.text(text.retryAction), findsOneWidget);
+    expect(PetMagicNotificationCenter.instance.current, isNull);
 
     await PetMagicNotificationCenter.instance.clearQueue();
   });
@@ -1558,7 +1581,35 @@ Finder _randomTemplateActionFinder() {
 }
 
 Future<void> _tapRandomTemplateAction(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(390, 900));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pump();
   await tester.tap(_randomTemplateActionFinder());
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
+Future<void> _tapFindRandomTemplateAction(
+  WidgetTester tester,
+  AppLocalizations text,
+) async {
+  final button = find.widgetWithText(
+    FilledButton,
+    text.randomTemplateFindAction,
+  );
+  await tester.tap(button);
+  await tester.pump();
+}
+
+Future<void> _tapSheetText(WidgetTester tester, String label) async {
+  final finder = find.text(label);
+  await tester.scrollUntilVisible(
+    finder,
+    120,
+    scrollable: find.byType(Scrollable).last,
+  );
+  await tester.pump();
+  await tester.tap(finder);
   await tester.pump();
 }
 
@@ -1783,6 +1834,7 @@ class _RandomTemplatesRepository implements TemplatesRepository {
   TemplateRandomMode? lastRandomMode;
   String? lastRandomCategory;
   bool? lastIncludePremium;
+  TemplateRandomAccess? lastRandomAccess;
 
   @override
   Future<List<String>> fetchCategories() async => const ['Portrait'];
@@ -1833,11 +1885,13 @@ class _RandomTemplatesRepository implements TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     fetchRandomTemplateCalls++;
     lastRandomMode = mode;
     lastRandomCategory = category;
     lastIncludePremium = includePremium;
+    lastRandomAccess = access;
     if (throwOnRandom) {
       throw StateError('random template unavailable');
     }

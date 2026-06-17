@@ -33,6 +33,7 @@ abstract interface class TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   });
 
   Future<List<TemplateItem>> readSyncedCatalogItems();
@@ -158,12 +159,14 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     required TemplateRandomMode mode,
     required String? category,
     required bool includePremium,
+    TemplateRandomAccess access = TemplateRandomAccess.available,
   }) async {
     final cacheGeneration = _templateDetailCacheGeneration;
     final dto = await _remoteDataSource.fetchRandomTemplate(
       mode: mode,
       category: category,
       includePremium: includePremium,
+      access: access,
     );
     final template = dto.toDomain();
     if (template != null && cacheGeneration == _templateDetailCacheGeneration) {

@@ -464,17 +464,24 @@ internal sealed partial class TemplatesService
         CancellationToken cancellationToken)
     {
         var normalizedCategory = NormalizePublicCategoryFilter(query.Category);
+        var normalizedAccess = NormalizePublicRandomAccess(query.Access);
 
         var filteredQuery = dbContext.TemplateItems
             .AsNoTracking()
             .Where(template => template.DeletedAtUtc == null)
             .Where(template => template.Status == TemplateStatus.Active)
             .Where(template => !query.Type.HasValue || template.TemplateType == query.Type.Value)
-            .Where(template => query.IncludePremium || !template.IsPremium)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
                 && asset.Url != null
                 && asset.Url.Trim() != string.Empty));
+
+        filteredQuery = normalizedAccess switch
+        {
+            "premium" => filteredQuery.Where(template => template.IsPremium),
+            "free" => filteredQuery.Where(template => !template.IsPremium),
+            _ => filteredQuery.Where(template => query.IncludePremium || !template.IsPremium)
+        };
 
         filteredQuery = await ApplyPublicCategoryFilterAsync(filteredQuery, normalizedCategory, cancellationToken);
 

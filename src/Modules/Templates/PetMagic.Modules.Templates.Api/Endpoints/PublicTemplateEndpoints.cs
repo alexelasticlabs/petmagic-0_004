@@ -237,6 +237,7 @@ public static class PublicTemplateEndpoints
         [FromQuery] string? type,
         [FromQuery] string? category,
         [FromQuery] bool? includePremium,
+        [FromQuery] string? access,
         [FromQuery] string? locale,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
@@ -246,12 +247,21 @@ public static class PublicTemplateEndpoints
             return InvalidTemplateTypeProblem();
         }
 
+        if (!TryParseOptionalRandomAccess(access, out var normalizedAccess))
+        {
+            return TypedResults.Problem(
+                title: "templates.invalid_access",
+                detail: "Query parameter access must be all, free, or premium.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var result = await service.GetPublicRandomTemplateAsync(
             new PublicRandomTemplateQuery(
                 templateType,
                 category,
                 includePremium ?? true,
-                ResolveLocalePreference(httpContext, locale)),
+                ResolveLocalePreference(httpContext, locale),
+                normalizedAccess),
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
@@ -307,6 +317,24 @@ public static class PublicTemplateEndpoints
 
         templateType = Enum.Parse<TemplateType>(normalizedType, ignoreCase: true);
         return true;
+    }
+
+    private static bool TryParseOptionalRandomAccess(string? rawAccess, out string? access)
+    {
+        access = null;
+        if (string.IsNullOrWhiteSpace(rawAccess))
+        {
+            return true;
+        }
+
+        var normalizedAccess = rawAccess.Trim().ToLowerInvariant();
+        if (normalizedAccess is "all" or "free" or "premium")
+        {
+            access = normalizedAccess;
+            return true;
+        }
+
+        return false;
     }
 
     private static ProblemHttpResult InvalidTemplateTypeProblem()
