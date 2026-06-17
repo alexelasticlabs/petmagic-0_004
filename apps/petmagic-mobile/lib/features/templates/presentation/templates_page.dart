@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +42,7 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -241,201 +243,213 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
           colors: [colors.backgroundTop, colors.backgroundBottom],
         ),
       ),
-      child: RefreshIndicator.adaptive(
-        onRefresh: () async {
-          await PetMagicHaptics.medium();
-          await controller.refresh();
-        },
-        color: colors.accent,
-        child: CustomScrollView(
-          scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
-          controller: _scrollController,
-          physics: const BouncingScrollPhysics(
-            parent: AlwaysScrollableScrollPhysics(),
-          ),
-          slivers: [
-            SliverToBoxAdapter(
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 1),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _TopBar(
-                        isAuthenticated: isAuthenticated,
-                        tokenBalance: wallet?.balance ?? 0,
-                        onAuthPressed: () =>
-                            context.go(AuthEntryPage.routePath),
-                        onRewardsPressed: () =>
-                            context.go(RewardsPage.routePath),
-                        onTopUpPressed: () =>
-                            context.push(WalletPage.routePath),
-                        onWalletPressed: () =>
-                            context.push(WalletPage.routePath),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        text.createMagicTitle,
-                        style: titleStyle?.copyWith(
-                          color: colors.textStrong,
-                          fontSize: 17,
-                          height: 1.08,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        text.pickTemplateSubtitle,
-                        style: subtitleStyle?.copyWith(
-                          color: colors.textSoft,
-                          fontSize: 10.2,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _CreateWithPetBlock(
-                        pets: ref.watch(_templateHomePetsProvider),
-                        selectedPetId: selectedPetId,
-                        selectedPetPhotoId: selectedPetPhotoId,
-                      ),
-                      _TemplateOfTheDaySlot(
-                        template: templateOfTheDay,
-                        isLoading: state.isTemplateOfTheDayLoading,
-                        hasPremiumAccess: wallet?.isPremium ?? false,
-                        onPressed: templateOfTheDay == null
-                            ? null
-                            : () => _handleTemplateOfTheDaySelected(
-                                templateOfTheDay,
-                              ),
-                      ),
-                      const SizedBox(height: 5),
-                      _SearchField(
-                        controller: _searchController,
-                        onChanged: _handleSearchChanged,
-                      ),
-                      const SizedBox(height: 6),
-                      _RandomTemplateButton(
-                        isLoading: _isRandomTemplateLoading,
-                        isEnabled: !state.isInitialLoading,
-                        onPressed: _handleRandomTemplatePressed,
-                      ),
-                      const SizedBox(height: 6),
-                      TemplateTypeFilters(
-                        selectedType: state.query.type,
-                        categories: state.categories,
-                        selectedCategory: state.query.category,
-                        onTypeSelected: controller.setType,
-                        onCategorySelected: controller.setCategory,
-                      ),
-                    ],
-                  ),
-                ),
+      child: Stack(
+        children: [
+          RefreshIndicator.adaptive(
+            onRefresh: () async {
+              await PetMagicHaptics.medium();
+              await controller.refresh();
+            },
+            color: colors.accent,
+            child: CustomScrollView(
+              scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
+              controller: _scrollController,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
               ),
-            ),
-            if (state.isInitialLoading)
-              const SliverMagicLoadingScreen()
-            else if (state.errorMessage != null && state.items.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _StateMessage(
-                  icon: Icons.cloud_off_rounded,
-                  title: text.templatesErrorTitle,
-                  message: _mapTemplatesError(text, state.errorMessage!),
-                  actionLabel: text.retryAction,
-                  onAction: () => controller.loadInitial(forceRefresh: true),
-                ),
-              )
-            else if (state.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _StateMessage(
-                  icon: Icons.auto_awesome_motion_rounded,
-                  title: text.emptyTemplatesTitle,
-                  message: text.emptyTemplatesMessage,
-                  actionLabel: text.retryAction,
-                  onAction: () => controller.loadInitial(forceRefresh: true),
-                ),
-              )
-            else ...[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
-                sliver: SliverGrid.builder(
-                  itemCount: state.items.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 5,
-                    mainAxisSpacing: 6,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemBuilder: (context, index) {
-                    final template = state.items[index];
-                    final isTodayPick =
-                        templateOfTheDay?.templateId == template.templateId;
-                    final templateIdentity = _templateCardIdentity(
-                      template: template,
-                      renderContextKey: state.query.cacheKey,
-                    );
-                    final card = TemplateCard(
-                      key: ValueKey(templateIdentity),
-                      template: template,
-                      hasPremiumAccess: wallet?.isPremium ?? false,
-                      renderContextKey: state.query.cacheKey,
-                      highlightBadgeLabel: isTodayPick
-                          ? text.templateOfTheDayFeedBadge
-                          : null,
-                      onPressed: () => _handleTemplateSelected(template),
-                    );
-                    if (index >= 6) {
-                      return card;
-                    }
-
-                    return TweenAnimationBuilder<double>(
-                      key: ValueKey('template-item-$templateIdentity'),
-                      tween: Tween(begin: 0, end: 1),
-                      duration: Duration(milliseconds: 130 + (index % 6) * 20),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) {
-                        final clamped = value.clamp(0.0, 1.0);
-                        return Opacity(
-                          opacity: clamped,
-                          child: Transform.translate(
-                            offset: Offset(0, (1 - clamped) * 8),
-                            child: child,
+              slivers: [
+                SliverToBoxAdapter(
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 1),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _TopBar(
+                            isAuthenticated: isAuthenticated,
+                            tokenBalance: wallet?.balance ?? 0,
+                            onAuthPressed: () =>
+                                context.go(AuthEntryPage.routePath),
+                            onRewardsPressed: () =>
+                                context.go(RewardsPage.routePath),
+                            onTopUpPressed: () =>
+                                context.push(WalletPage.routePath),
+                            onWalletPressed: () =>
+                                context.push(WalletPage.routePath),
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            text.createMagicTitle,
+                            style: titleStyle?.copyWith(
+                              color: colors.textStrong,
+                              fontSize: 17,
+                              height: 1.08,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            text.pickTemplateSubtitle,
+                            style: subtitleStyle?.copyWith(
+                              color: colors.textSoft,
+                              fontSize: 10.2,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _CreateWithPetBlock(
+                            pets: ref.watch(_templateHomePetsProvider),
+                            selectedPetId: selectedPetId,
+                            selectedPetPhotoId: selectedPetPhotoId,
+                          ),
+                          _TemplateOfTheDaySlot(
+                            template: templateOfTheDay,
+                            isLoading: state.isTemplateOfTheDayLoading,
+                            hasPremiumAccess: wallet?.isPremium ?? false,
+                            onPressed: templateOfTheDay == null
+                                ? null
+                                : () => _handleTemplateOfTheDaySelected(
+                                    templateOfTheDay,
+                                  ),
+                          ),
+                          const SizedBox(height: 5),
+                          _SearchField(
+                            controller: _searchController,
+                            onChanged: _handleSearchChanged,
+                          ),
+                          const SizedBox(height: 6),
+                          TemplateTypeFilters(
+                            selectedType: state.query.type,
+                            categories: state.categories,
+                            selectedCategory: state.query.category,
+                            onTypeSelected: controller.setType,
+                            onCategorySelected: controller.setCategory,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (state.isInitialLoading)
+                  const SliverMagicLoadingScreen()
+                else if (state.errorMessage != null && state.items.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _StateMessage(
+                      icon: Icons.cloud_off_rounded,
+                      title: text.templatesErrorTitle,
+                      message: _mapTemplatesError(text, state.errorMessage!),
+                      actionLabel: text.retryAction,
+                      onAction: () =>
+                          controller.loadInitial(forceRefresh: true),
+                    ),
+                  )
+                else if (state.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _StateMessage(
+                      icon: Icons.auto_awesome_motion_rounded,
+                      title: text.emptyTemplatesTitle,
+                      message: text.emptyTemplatesMessage,
+                      actionLabel: text.retryAction,
+                      onAction: () =>
+                          controller.loadInitial(forceRefresh: true),
+                    ),
+                  )
+                else ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+                    sliver: SliverGrid.builder(
+                      itemCount: state.items.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 5,
+                            mainAxisSpacing: 6,
+                            childAspectRatio: 0.72,
+                          ),
+                      itemBuilder: (context, index) {
+                        final template = state.items[index];
+                        final isTodayPick =
+                            templateOfTheDay?.templateId == template.templateId;
+                        final templateIdentity = _templateCardIdentity(
+                          template: template,
+                          renderContextKey: state.query.cacheKey,
+                        );
+                        final card = TemplateCard(
+                          key: ValueKey(templateIdentity),
+                          template: template,
+                          hasPremiumAccess: wallet?.isPremium ?? false,
+                          renderContextKey: state.query.cacheKey,
+                          highlightBadgeLabel: isTodayPick
+                              ? text.templateOfTheDayFeedBadge
+                              : null,
+                          onPressed: () => _handleTemplateSelected(template),
+                        );
+                        if (index >= 6) {
+                          return card;
+                        }
+
+                        return TweenAnimationBuilder<double>(
+                          key: ValueKey('template-item-$templateIdentity'),
+                          tween: Tween(begin: 0, end: 1),
+                          duration: Duration(
+                            milliseconds: 130 + (index % 6) * 20,
+                          ),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, child) {
+                            final clamped = value.clamp(0.0, 1.0);
+                            return Opacity(
+                              opacity: clamped,
+                              child: Transform.translate(
+                                offset: Offset(0, (1 - clamped) * 8),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: card,
                         );
                       },
-                      child: card,
-                    );
-                  },
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: state.isLoadingMore
-                        ? Center(
-                            child: CircularProgressIndicator.adaptive(
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                colors.accent,
-                              ),
-                            ),
-                          )
-                        : state.errorMessage != null
-                        ? TextButton.icon(
-                            onPressed: controller.loadMore,
-                            icon: const Icon(Icons.refresh_rounded),
-                            label: Text(text.retryAction),
-                          )
-                        : const SizedBox(height: 28),
+                    ),
                   ),
-                ),
-              ),
-            ],
-          ],
-        ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: state.isLoadingMore
+                            ? Center(
+                                child: CircularProgressIndicator.adaptive(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    colors.accent,
+                                  ),
+                                ),
+                              )
+                            : state.errorMessage != null
+                            ? TextButton.icon(
+                                onPressed: controller.loadMore,
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(text.retryAction),
+                              )
+                            : const SizedBox(height: 28),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: petMagicBottomNavInset(context, extraSpacing: 24),
+            child: _FloatingRandomTemplateButton(
+              isLoading: _isRandomTemplateLoading,
+              isEnabled: !state.isInitialLoading,
+              onPressed: _handleRandomTemplatePressed,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -602,10 +616,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
   }
 
   Future<void> _handleRandomTemplatePressed() async {
-    final mode = await _showRandomTemplateModeSheet(context);
-    if (!mounted || !_canUseVisibleTemplatesUi || mode == null) {
+    if (!mounted || !_canUseVisibleTemplatesUi) {
       return;
     }
+
+    final activeQuery = ref.read(templatesControllerProvider).query;
+    final mode = _randomModeForTemplateType(activeQuery.type);
 
     setState(() {
       _isRandomTemplateLoading = true;
@@ -618,13 +634,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     _activeRandomTemplateRepository = randomRepository;
 
     try {
-      final activeCategory = ref
-          .read(templatesControllerProvider)
-          .query
-          .category;
       final template = await randomRepository.fetchRandomTemplate(
         mode: mode,
-        category: activeCategory,
+        category: activeQuery.category,
         includePremium: hasPremiumAccess,
       );
       if (identical(_activeRandomTemplateRepository, randomRepository)) {
@@ -638,7 +650,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       if (template == null) {
         PetMagicToast.show(
           context,
-          message: _randomTemplateEmptyMessage(text, mode),
+          message: text.randomTemplateNoAvailableForType,
           tone: PetMagicToastTone.info,
         );
         return;
@@ -1236,64 +1248,11 @@ Future<PetProfile?> _showPetPickerSheet(
   );
 }
 
-Future<TemplateRandomMode?> _showRandomTemplateModeSheet(BuildContext context) {
-  final text = AppLocalizations.of(context);
-  final colors = context.petMagicColors;
-
-  return showPetMagicModalBottomSheet<TemplateRandomMode>(
-    context: context,
-    showDragHandle: true,
-    builder: (sheetContext, bottomInset) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(18, 6, 18, bottomInset + 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                text.randomTemplateAction,
-                style: Theme.of(sheetContext).textTheme.titleMedium?.copyWith(
-                  color: colors.textStrong,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 10),
-              _RandomTemplateModeTile(
-                icon: Icons.auto_awesome_rounded,
-                title: text.randomTemplateAny,
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(TemplateRandomMode.any),
-              ),
-              _RandomTemplateModeTile(
-                icon: Icons.image_outlined,
-                title: text.randomTemplateImage,
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(TemplateRandomMode.image),
-              ),
-              _RandomTemplateModeTile(
-                icon: Icons.play_circle_outline_rounded,
-                title: text.randomTemplateVideo,
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(TemplateRandomMode.video),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
-String _randomTemplateEmptyMessage(
-  AppLocalizations text,
-  TemplateRandomMode mode,
-) {
-  return switch (mode) {
-    TemplateRandomMode.any => text.randomTemplateNoTemplates,
-    TemplateRandomMode.image => text.randomTemplateNoImageTemplates,
-    TemplateRandomMode.video => text.randomTemplateNoVideoTemplates,
+TemplateRandomMode _randomModeForTemplateType(TemplateType? type) {
+  return switch (type) {
+    null => TemplateRandomMode.any,
+    TemplateType.image => TemplateRandomMode.image,
+    TemplateType.video => TemplateRandomMode.video,
   };
 }
 
@@ -2675,8 +2634,8 @@ class _SearchField extends StatelessWidget {
   }
 }
 
-class _RandomTemplateButton extends StatelessWidget {
-  const _RandomTemplateButton({
+class _FloatingRandomTemplateButton extends StatelessWidget {
+  const _FloatingRandomTemplateButton({
     required this.isLoading,
     required this.isEnabled,
     required this.onPressed,
@@ -2690,100 +2649,88 @@ class _RandomTemplateButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
     final enabled = isEnabled && !isLoading;
 
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: OutlinedButton.icon(
-        onPressed: enabled ? onPressed : null,
-        icon: AnimatedSwitcher(
-          duration: AppTheme.motionFast,
-          child: isLoading
-              ? SizedBox(
-                  key: const ValueKey('random-template-loading'),
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator.adaptive(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
-                  ),
-                )
-              : const Icon(
-                  Icons.casino_rounded,
-                  key: ValueKey('random-template-icon'),
-                  size: 17,
-                ),
-        ),
-        label: Text(text.randomTemplateAction),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(0, 36),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          foregroundColor: colors.accent,
-          disabledForegroundColor: colors.textMuted,
-          side: BorderSide(
-            color: enabled
-                ? colors.accent.withValues(alpha: 0.42)
-                : colors.border,
-          ),
-          textStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RandomTemplateModeTile extends StatelessWidget {
-  const _RandomTemplateModeTile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: PetMagicInteractiveSurface(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceGlass,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colors.border),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Icon(icon, color: colors.accent, size: 21),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colors.textStrong,
-                      fontWeight: FontWeight.w800,
+    return RepaintBoundary(
+      child: Tooltip(
+        message: text.randomTemplateAction,
+        child: Semantics(
+          button: true,
+          enabled: enabled,
+          label: text.randomTemplateAction,
+          child: AnimatedOpacity(
+            duration: AppTheme.motionFast,
+            opacity: enabled ? 1 : 0.4,
+            child: PressableScale(
+              enabled: enabled,
+              onTap: enabled ? onPressed : null,
+              haptic: PressableScaleHaptic.selection,
+              borderRadius: BorderRadius.circular(24),
+              scaleDown: 0.96,
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.surfaceGlass.withValues(
+                        alpha: isLight ? 0.92 : 0.74,
+                      ),
+                      border: Border.all(
+                        color: colors.accent.withValues(
+                          alpha: isLight ? 0.72 : 0.64,
+                        ),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.shadow.withValues(alpha: 0.28),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: colors.accent.withValues(alpha: 0.22),
+                          blurRadius: 18,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: SizedBox(
+                      key: const ValueKey('templates-random-floating-button'),
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: AppTheme.motionFast,
+                          child: isLoading
+                              ? SizedBox(
+                                  key: const ValueKey(
+                                    'random-template-loading',
+                                  ),
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      colors.accent,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.casino_rounded,
+                                  key: const ValueKey('random-template-icon'),
+                                  size: 22,
+                                  color: isLight
+                                      ? colors.accent
+                                      : colors.textStrong,
+                                ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colors.textMuted,
-                  size: 20,
-                ),
-              ],
+              ),
             ),
           ),
         ),

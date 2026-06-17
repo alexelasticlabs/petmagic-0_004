@@ -604,10 +604,14 @@ void main() {
     },
   );
 
-  testWidgets('templates page opens random template mode sheet', (
+  testWidgets('templates page uses compact random action without mode sheet', (
     tester,
   ) async {
     final controller = _FakeTemplatesController();
+    final randomCompleter = Completer<TemplateItem?>();
+    final repository = _RandomTemplatesRepository(
+      randomTemplateCompleter: randomCompleter,
+    );
 
     await tester.pumpWidget(
       ProviderScope(
@@ -617,6 +621,7 @@ void main() {
           ),
           walletControllerProvider.overrideWith(_IdleWalletController.new),
           templatesControllerProvider.overrideWith(() => controller),
+          templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -641,15 +646,18 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    expect(find.text(text.randomTemplateAction), findsOneWidget);
+    expect(find.text(text.randomTemplateAction), findsNothing);
+    expect(_randomTemplateActionFinder(), findsOneWidget);
 
-    await tester.tap(find.text(text.randomTemplateAction));
-    await tester.pump();
+    await _tapRandomTemplateAction(tester);
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text(text.randomTemplateAny), findsOneWidget);
-    expect(find.text(text.randomTemplateImage), findsOneWidget);
-    expect(find.text(text.randomTemplateVideo), findsOneWidget);
+    expect(repository.fetchRandomTemplateCalls, 1);
+    expect(repository.lastRandomMode, TemplateRandomMode.any);
+    expect(find.text(text.randomTemplateAny), findsNothing);
+    expect(find.text(text.randomTemplateImage), findsNothing);
+    expect(find.text(text.randomTemplateVideo), findsNothing);
+    expect(PetMagicNotificationCenter.instance.current, isNull);
   });
 
   testWidgets('random template action is disabled during initial loading', (
@@ -685,16 +693,12 @@ void main() {
     );
     await tester.pump();
 
-    final context = tester.element(find.byType(TemplatesPage));
-    final text = AppLocalizations.of(context);
-    final button = tester.widget<OutlinedButton>(
-      find.ancestor(
-        of: find.text(text.randomTemplateAction),
-        matching: find.byType(OutlinedButton),
-      ),
-    );
+    expect(_randomTemplateActionFinder(), findsOneWidget);
 
-    expect(button.onPressed, isNull);
+    await _tapRandomTemplateAction(tester);
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('random template empty result shows localized notification', (
@@ -702,6 +706,7 @@ void main() {
   ) async {
     await PetMagicNotificationCenter.instance.clearQueue();
     final controller = _FakeTemplatesController();
+    final repository = _RandomTemplatesRepository(items: const []);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -711,9 +716,7 @@ void main() {
           ),
           walletControllerProvider.overrideWith(_IdleWalletController.new),
           templatesControllerProvider.overrideWith(() => controller),
-          templatesRepositoryProvider.overrideWithValue(
-            _RandomTemplatesRepository(items: []),
-          ),
+          templatesRepositoryProvider.overrideWithValue(repository),
           realtimeClientProvider.overrideWith(
             (ref) => const NoopRealtimeClient(),
           ),
@@ -738,15 +741,14 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    await tester.tap(find.text(text.randomTemplateAction));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text(text.randomTemplateImage));
+    await _tapRandomTemplateAction(tester);
     await tester.pump();
 
+    expect(repository.fetchRandomTemplateCalls, 1);
+    expect(repository.lastRandomMode, TemplateRandomMode.any);
     expect(
       PetMagicNotificationCenter.instance.current?.message,
-      text.randomTemplateNoImageTemplates,
+      text.randomTemplateNoAvailableForType,
     );
 
     await PetMagicNotificationCenter.instance.clearQueue();
@@ -790,6 +792,11 @@ void main() {
             walletControllerProvider.overrideWith(_IdleWalletController.new),
             templatesControllerProvider.overrideWith(
               () => _FakeTemplatesController(
+                query: const TemplatesQuery(
+                  type: TemplateType.image,
+                  category: 'Portrait',
+                ),
+                categories: const ['Portrait'],
                 items: [
                   _template(
                     'visible-video',
@@ -822,17 +829,13 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      final context = tester.element(find.byType(TemplatesPage));
-      final text = AppLocalizations.of(context);
-
-      await tester.tap(find.text(text.randomTemplateAction));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text(text.randomTemplateImage));
+      await _tapRandomTemplateAction(tester);
       await tester.pumpAndSettle();
 
       expect(repository.fetchRandomTemplateCalls, 1);
       expect(repository.lastRandomMode, TemplateRandomMode.image);
+      expect(repository.lastRandomCategory, 'Portrait');
+      expect(repository.lastIncludePremium, false);
       expect(find.text('opened:catalog-image'), findsOneWidget);
       expect(repository.cancelPendingRandomTemplateRequestCalls, 0);
     },
@@ -871,6 +874,7 @@ void main() {
           walletControllerProvider.overrideWith(_IdleWalletController.new),
           templatesControllerProvider.overrideWith(
             () => _FakeTemplatesController(
+              query: const TemplatesQuery(type: TemplateType.video),
               items: [
                 _template(
                   'visible-video',
@@ -905,16 +909,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    final context = tester.element(find.byType(TemplatesPage));
-    final text = AppLocalizations.of(context);
-
-    await tester.tap(find.text(text.randomTemplateAction));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text(text.randomTemplateImage));
+    await _tapRandomTemplateAction(tester);
     await tester.pump();
 
     expect(repository.fetchRandomTemplateCalls, 1);
+    expect(repository.lastRandomMode, TemplateRandomMode.video);
 
     final hostState = tester.state<_TemplatesTickerModeHostState>(
       find.byType(_TemplatesTickerModeHost),
@@ -985,13 +984,7 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    final context = tester.element(find.byType(TemplatesPage));
-    final text = AppLocalizations.of(context);
-
-    await tester.tap(find.text(text.randomTemplateAction));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text(text.randomTemplateImage));
+    await _tapRandomTemplateAction(tester);
     await tester.pump();
 
     expect(repository.fetchRandomTemplateCalls, 1);
@@ -1483,14 +1476,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    await _tapRandomTemplateAction(tester);
+    await tester.pump();
+
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
-
-    await tester.tap(find.text(text.randomTemplateAction));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.text(text.randomTemplateAny));
-    await tester.pump();
 
     expect(
       PetMagicNotificationCenter.instance.current?.message,
@@ -1506,6 +1496,15 @@ String _searchFieldText(WidgetTester tester) {
     find.byKey(const ValueKey('templates-search-field')),
   );
   return field.controller?.text ?? '';
+}
+
+Finder _randomTemplateActionFinder() {
+  return find.byKey(const ValueKey('templates-random-floating-button'));
+}
+
+Future<void> _tapRandomTemplateAction(WidgetTester tester) async {
+  await tester.tap(_randomTemplateActionFinder());
+  await tester.pump();
 }
 
 class _TemplatesTickerModeHost extends StatefulWidget {
