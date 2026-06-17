@@ -34,7 +34,9 @@ void main() {
       );
       expect(autoRefreshBody, contains('if (!ref.mounted)'));
       expect(offlineBannerBody, contains('if (!ref.mounted)'));
-      expect(unreadBody, contains('if (!ref.mounted || !_isScreenVisible)'));
+      expect(unreadBody, contains('if (!ref.mounted'));
+      expect(unreadBody, contains('!_isScreenVisible'));
+      expect(unreadBody, contains('_isLoadInFlight'));
       expect(
         markReadBody.indexOf('state = state.copyWith'),
         lessThan(markReadBody.indexOf('await _repository.markGenerationRead')),

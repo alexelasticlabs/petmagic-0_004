@@ -302,6 +302,30 @@ public sealed class ClientApiContractRouteTests
         Assert.Empty(unprotectedRoutes);
     }
 
+    [Fact]
+    public async Task ApiRoutes_ShouldDeclareExplicitAccessPolicy()
+    {
+        await using var app = await ClientApiContractTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetApiRoutesWithoutAccessPolicy());
+    }
+
+    [Fact]
+    public async Task ApiRoutes_ShouldDeclareRateLimitPolicy()
+    {
+        await using var app = await ClientApiContractTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetApiRoutesWithoutRateLimitPolicy());
+    }
+
+    [Fact]
+    public async Task AdminApiRoutes_ShouldRequireAdminOrModeratorPolicy()
+    {
+        await using var app = await ClientApiContractTestApplication.CreateAsync();
+
+        Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
+    }
+
     private sealed class ClientApiContractTestApplication : IAsyncDisposable
     {
         private readonly WebApplication app;
@@ -426,6 +450,58 @@ public sealed class ClientApiContractRouteTests
                         .GetRequiredMetadata<IHttpMethodMetadata>()
                         .HttpMethods
                         .Contains(method, StringComparer.OrdinalIgnoreCase));
+        }
+
+        public string[] GetApiRoutesWithoutAccessPolicy()
+        {
+            return ApiRouteEndpoints()
+                .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+                .Where(endpoint => endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count == 0)
+                .Select(FormatEndpoint)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetApiRoutesWithoutRateLimitPolicy()
+        {
+            return ApiRouteEndpoints()
+                .Where(endpoint => endpoint.Metadata.GetMetadata<EnableRateLimitingAttribute>() is null)
+                .Select(FormatEndpoint)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetAdminRoutesWithoutRolePolicy()
+        {
+            return ApiRouteEndpoints()
+                .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/admin/", StringComparison.Ordinal) == true)
+                .Where(endpoint => endpoint.Metadata.GetMetadata<IAllowAnonymous>() is null)
+                .Where(endpoint => !endpoint.Metadata
+                    .GetOrderedMetadata<IAuthorizeData>()
+                    .Any(metadata => metadata.Policy is "AdminOnly" or "ModeratorOrAdmin"))
+                .Select(FormatEndpoint)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private IEnumerable<RouteEndpoint> ApiRouteEndpoints()
+        {
+            return app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith("/api/", StringComparison.Ordinal) == true);
+        }
+
+        private static string FormatEndpoint(RouteEndpoint endpoint)
+        {
+            var methods = endpoint.Metadata
+                .GetMetadata<IHttpMethodMetadata>()
+                ?.HttpMethods
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray() ?? [];
+
+            return $"{string.Join(",", methods)} {endpoint.RoutePattern.RawText}";
         }
 
         private static string NormalizeRoutePattern(string? routePattern)

@@ -20,10 +20,11 @@ function createStorage() {
 
 function createSession(
   roles: string[],
-  overrides: Partial<Pick<AuthSession, "accessToken" | "expiresAtUtc">> = {}
+  overrides: Partial<Pick<AuthSession, "accessToken" | "refreshToken" | "expiresAtUtc">> = {}
 ): AuthSession {
   return {
     accessToken: "access-token",
+    refreshToken: "refresh-token",
     expiresAtUtc: "2099-01-01T00:00:00Z",
     ...overrides,
     user: {
@@ -101,5 +102,19 @@ describe("ensureAdminSession", () => {
     );
     expect(ensureAdminSession("ru", router)).toBe(false);
     expect(router.replace).toHaveBeenCalledWith("/ru");
+  });
+
+  it("migrates persisted sessions so access and refresh tokens stay volatile", async () => {
+    const router = { replace: vi.fn() };
+
+    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin"])));
+
+    expect(ensureAdminSession("en", router)).toBe(true);
+    await Promise.resolve();
+
+    const persistedSession = JSON.parse(storage.setItem.mock.calls.at(-1)?.[1] ?? "{}") as AuthSession;
+    expect(persistedSession.accessToken).toBeUndefined();
+    expect(persistedSession.refreshToken).toBeUndefined();
+    expect(persistedSession.user.userId).toBe("user-1");
   });
 });

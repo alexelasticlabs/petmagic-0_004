@@ -240,6 +240,88 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task LogoutAsync_ShouldRevokeRefreshToken_AndRejectReuse()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("logout.reuse@petmagic.app", "StrongPassword123", "Logout Reuse", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        user.EmailConfirmed = true;
+        await dbContext.SaveChangesAsync();
+
+        var loginResult = await service.LoginAsync(
+            new LoginCommand("logout.reuse@petmagic.app", "StrongPassword123"),
+            CancellationToken.None);
+
+        Assert.True(loginResult.IsSuccess);
+
+        var logoutResult = await service.LogoutAsync(
+            new LogoutCommand(user.Id, loginResult.Value.RefreshToken),
+            CancellationToken.None);
+
+        Assert.True(logoutResult.IsSuccess);
+
+        var refreshResult = await service.RefreshAsync(
+            new RefreshTokenCommand(loginResult.Value.RefreshToken),
+            CancellationToken.None);
+
+        Assert.True(refreshResult.IsFailure);
+        Assert.Equal("auth.invalid_refresh", refreshResult.Error.Code);
+
+        var persistedSession = await dbContext.RefreshTokenSessions.SingleAsync(x => x.UserId == user.Id);
+        Assert.NotNull(persistedSession.RevokedAtUtc);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_ShouldRejectRefreshTokenOwnedByAnotherUser()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var firstRegister = await service.RegisterAsync(
+            new RegisterUserCommand("logout.owner.one@petmagic.app", "StrongPassword123", "Owner One", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+        var secondRegister = await service.RegisterAsync(
+            new RegisterUserCommand("logout.owner.two@petmagic.app", "StrongPassword123", "Owner Two", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+
+        Assert.True(firstRegister.IsSuccess);
+        Assert.True(secondRegister.IsSuccess);
+
+        var users = await dbContext.Users.OrderBy(x => x.Email).ToListAsync();
+        foreach (var user in users)
+        {
+            user.EmailConfirmed = true;
+        }
+        await dbContext.SaveChangesAsync();
+
+        var owner = users.Single(x => x.Email == "logout.owner.one@petmagic.app");
+        var attacker = users.Single(x => x.Email == "logout.owner.two@petmagic.app");
+
+        var ownerLogin = await service.LoginAsync(
+            new LoginCommand(owner.Email!, "StrongPassword123"),
+            CancellationToken.None);
+
+        Assert.True(ownerLogin.IsSuccess);
+
+        var logoutResult = await service.LogoutAsync(
+            new LogoutCommand(attacker.Id, ownerLogin.Value.RefreshToken),
+            CancellationToken.None);
+
+        Assert.True(logoutResult.IsFailure);
+        Assert.Equal("auth.refresh_token_not_owned", logoutResult.Error.Code);
+
+        var ownerSession = await dbContext.RefreshTokenSessions.SingleAsync(x => x.UserId == owner.Id);
+        Assert.Null(ownerSession.RevokedAtUtc);
+    }
+
+    [Fact]
     public async Task ConfirmCurrentPasswordChangeAsync_ShouldKeepCurrentSession_And_RevokeOtherSessions()
     {
         await using var dbContext = CreateDbContext();

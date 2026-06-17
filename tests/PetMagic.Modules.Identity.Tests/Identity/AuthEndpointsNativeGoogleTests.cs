@@ -1,11 +1,16 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Api;
@@ -199,6 +204,26 @@ public sealed class AuthEndpointsNativeGoogleTests
         AssertRefreshCookieSecurity(refreshCookie, expectSecure: true);
     }
 
+    [Fact]
+    public async Task UpdateAvatar_ShouldRejectDeclaredImageWithInvalidMagicBytes()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+        using var content = new MultipartFormDataContent();
+        using var file = new ByteArrayContent("not-an-image"u8.ToArray());
+        file.Headers.ContentType = new("image/png");
+        content.Add(file, "file", "../avatar.png");
+
+        var response = await app.Client.PutAsync("/api/auth/me/avatar", content);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("Avatar content type is not allowed", body, StringComparison.Ordinal);
+        Assert.Null(service.LastUpdateAvatarCommand);
+    }
+
     private static void AssertRefreshCookieSecurity(string setCookie, bool expectSecure)
     {
         Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
@@ -244,6 +269,8 @@ public sealed class AuthEndpointsNativeGoogleTests
                 options.AddPolicy("auth", _ =>
                     RateLimitPartition.GetNoLimiter("tests"));
             });
+            builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
+                .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiModule();
             builder.Services.AddSingleton(verifier);
@@ -253,6 +280,8 @@ public sealed class AuthEndpointsNativeGoogleTests
 
             var app = builder.Build();
             app.UseRateLimiter();
+            app.UseAuthentication();
+            app.UseAuthorization();
             app.MapAuthEndpoints();
 
             await app.StartAsync();
@@ -270,6 +299,29 @@ public sealed class AuthEndpointsNativeGoogleTests
             Client.Dispose();
             await app.StopAsync();
             await app.DisposeAsync();
+        }
+    }
+
+    private sealed class TestAuthHandler(
+        IOptionsMonitor<AuthenticationSchemeOptions> options,
+        ILoggerFactory logger,
+        UrlEncoder encoder)
+        : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
+    {
+        public const string SchemeName = "Test";
+
+        protected override Task<AuthenticateResult> HandleAuthenticateAsync()
+        {
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                new Claim("sub", Guid.NewGuid().ToString()),
+            };
+            var identity = new ClaimsIdentity(claims, SchemeName);
+            var principal = new ClaimsPrincipal(identity);
+            var ticket = new AuthenticationTicket(principal, SchemeName);
+
+            return Task.FromResult(AuthenticateResult.Success(ticket));
         }
     }
 
@@ -327,6 +379,8 @@ public sealed class AuthEndpointsNativeGoogleTests
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
 
         public RefreshTokenCommand? LastRefreshCommand { get; private set; }
+
+        public UpdateUserAvatarCommand? LastUpdateAvatarCommand { get; private set; }
 
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
@@ -401,7 +455,11 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<UserProfileResponse>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> UpdateCurrentUserProfileAsync(Guid userId, UpdateCurrentUserProfileCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserProfileResponse>> AcceptLegalDocumentsAsync(Guid userId, AcceptLegalDocumentsCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
-        public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<UserProfileResponse>> UpdateUserAvatarAsync(UpdateUserAvatarCommand command, CancellationToken cancellationToken)
+        {
+            LastUpdateAvatarCommand = command;
+            return NotSupported<UserProfileResponse>();
+        }
         public Task<Result<UserProfileResponse>> RemoveUserAvatarAsync(RemoveUserAvatarCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
         public Task<Result<UserListPageResponse>> ListUsersAsync(int skip, int take, string? search, string? role, string? status, bool? isPremium, CancellationToken cancellationToken) => NotSupported<UserListPageResponse>();
         public Task<Result<AdminUserDashboardMetricsResponse>> GetAdminUserDashboardMetricsAsync(CancellationToken cancellationToken) => NotSupported<AdminUserDashboardMetricsResponse>();

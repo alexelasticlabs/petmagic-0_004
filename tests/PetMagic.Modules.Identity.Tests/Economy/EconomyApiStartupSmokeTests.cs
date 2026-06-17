@@ -35,6 +35,7 @@ public sealed class EconomyApiStartupSmokeTests
     [InlineData("POST", "/api/economy/webhooks/app-store", "webhooks")]
     [InlineData("POST", "/api/economy/webhooks/google-play", "webhooks")]
     [InlineData("POST", "/api/payments/stripe/token-purchase", "economy")]
+    [InlineData("GET", "/api/payments/stripe/diagnostics", "economy")]
     [InlineData("GET", "/api/admin/economy/ledger", "admin")]
     public async Task EconomyEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
@@ -68,6 +69,19 @@ public sealed class EconomyApiStartupSmokeTests
         await using var app = await EconomyApiStartupTestApplication.CreateAsync();
 
         Assert.Empty(app.GetAdminRoutesWithoutRolePolicy());
+    }
+
+    [Theory]
+    [InlineData("GET", "/api/economy/premium/stripe-diagnostics")]
+    [InlineData("GET", "/api/payments/stripe/diagnostics")]
+    public async Task StripeDiagnosticsEndpoints_ShouldRequireAdminOnlyPolicy(string method, string routePattern)
+    {
+        await using var app = await EconomyApiStartupTestApplication.CreateAsync();
+
+        Assert.Contains(
+            "AdminOnly",
+            app.GetAuthorizationPolicies(method, routePattern),
+            StringComparer.Ordinal);
     }
 
     [Theory]
@@ -227,6 +241,27 @@ public sealed class EconomyApiStartupSmokeTests
                     .Any(metadata => metadata.Policy is "AdminOnly" or "ModeratorOrAdmin"))
                 .Select(endpoint => endpoint.RoutePattern.RawText!)
                 .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        public string[] GetAuthorizationPolicies(string method, string routePattern)
+        {
+            var endpoint = app.Services
+                .GetRequiredService<EndpointDataSource>()
+                .Endpoints
+                .OfType<RouteEndpoint>()
+                .Single(endpoint =>
+                    string.Equals(endpoint.RoutePattern.RawText, routePattern, StringComparison.Ordinal)
+                    && endpoint.Metadata
+                        .GetRequiredMetadata<IHttpMethodMetadata>()
+                        .HttpMethods
+                        .Contains(method, StringComparer.OrdinalIgnoreCase));
+
+            return endpoint.Metadata
+                .GetOrderedMetadata<IAuthorizeData>()
+                .Select(metadata => metadata.Policy)
+                .Where(policy => !string.IsNullOrWhiteSpace(policy))
+                .Select(policy => policy!)
                 .ToArray();
         }
 

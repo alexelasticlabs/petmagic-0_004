@@ -1538,3 +1538,52 @@ The original goal is not fully closed until these are verified with authoritativ
 - Network request and byte counting against the deployed backend/CDN and physical devices, including real video-preview downloads. The Android QA runner now captures per-app qtaguid RX/TX byte deltas for new runs, but existing passing artifacts predate that counter and the deployed API host is still unresolved.
 - Cache directory size measurement after extended use.
 - FPS/frame timing on a physical device or a trusted performance environment.
+
+## Remaining Gate Command Matrix
+
+Run these commands when the missing physical devices and deployed API host are available. Replace placeholders before running; keep the resulting artifact directories attached to this QA record.
+
+```sh
+# Physical Android profile cross-gallery flow.
+RUN_ID=android-physical-gallery-cross-flow-profile-$(date -u +%Y%m%dT%H%M%SZ) \
+DEVICE_ID=<physical-android-device-id> \
+MODE=profile \
+TARGET=integration_test/gallery_cross_flow_test.dart \
+ANDROID_SAMPLE_INTERVAL_SECONDS=1 \
+FLUTTER_DRIVE_EXTRA_ARGS='--dart-define=PETMAGIC_SKIP_FIREBASE=true' \
+bash scripts/qa/run-template-feed-device-qa.sh
+
+# Physical Android profile cross-gallery flow under an external slow-network conditioner.
+# Configure the device/network first; the QA runner records app metrics but does not shape physical-device traffic.
+RUN_ID=android-physical-gallery-cross-flow-slow-$(date -u +%Y%m%dT%H%M%SZ) \
+DEVICE_ID=<physical-android-device-id> \
+MODE=profile \
+TARGET=integration_test/gallery_cross_flow_test.dart \
+ANDROID_SAMPLE_INTERVAL_SECONDS=1 \
+FLUTTER_DRIVE_EXTRA_ARGS='--dart-define=PETMAGIC_SKIP_FIREBASE=true' \
+bash scripts/qa/run-template-feed-device-qa.sh
+
+# Physical iOS profile cross-gallery flow.
+RUN_ID=ios-physical-gallery-cross-flow-profile-$(date -u +%Y%m%dT%H%M%SZ) \
+DEVICE_ID=<physical-ios-device-id> \
+MODE=profile \
+TARGET=integration_test/gallery_cross_flow_test.dart \
+FLUTTER_DRIVE_EXTRA_ARGS='--dart-define=PETMAGIC_SKIP_FIREBASE=true' \
+bash scripts/qa/run-template-feed-device-qa.sh
+
+# Deployed API template-feed smoke after DNS/API base URL is available.
+RUN_ID=android-deployed-template-feed-smoke-$(date -u +%Y%m%dT%H%M%SZ) \
+DEVICE_ID=<physical-android-or-emulator-device-id> \
+MODE=debug \
+TARGET=integration_test/templates_external_backend_smoke_test.dart \
+ANDROID_SAMPLE_INTERVAL_SECONDS=1 \
+FLUTTER_DRIVE_EXTRA_ARGS='--dart-define=PETMAGIC_EXTERNAL_TEMPLATES_API_BASE_URL=https://<deployed-api-host> --dart-define=PETMAGIC_SKIP_FIREBASE=true' \
+bash scripts/qa/run-template-feed-device-qa.sh
+```
+
+Required acceptance for those runs:
+
+- completion summary exit code `0`, `completion_marker: all_tests_passed_log`, `driver_request_result: true`, and `integration_response_data: present`.
+- `video_playback_log_failed: false` and `cache_budget_failed: false`.
+- physical-device FPS/RAM/cache/network samples attached and reviewed, not inferred from simulator-only artifacts.
+- deployed backend/CDN request counters show no duplicate media or feed requests for the exercised flow.

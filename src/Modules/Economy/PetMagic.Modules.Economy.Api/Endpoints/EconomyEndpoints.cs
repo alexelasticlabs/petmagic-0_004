@@ -94,7 +94,7 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         group.MapGet("/premium/stripe-diagnostics", GetStripeDiagnosticsAsync)
-            .RequireAuthorization();
+            .RequireAuthorization("AdminOnly");
 
         group.MapPost("/premium/checkout", CreatePremiumCheckoutAsync)
             .RequireAuthorization();
@@ -194,7 +194,7 @@ public static class EconomyEndpoints
             .RequireAuthorization();
 
         stripePaymentsGroup.MapGet("/diagnostics", GetStripeDiagnosticsAsync)
-            .RequireAuthorization();
+            .RequireAuthorization("AdminOnly");
 
         return endpoints;
     }

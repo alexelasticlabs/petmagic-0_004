@@ -91,6 +91,86 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public void StripeCheckoutSessionVerification_ShouldRequireCurrentOrderIdentityAmountAndCurrency()
+    {
+        var order = CreatePendingStripeOrder(priceAmount: 9.99m, currencyCode: "USD");
+        var validSession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = order.Id.ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            AmountTotal = 999,
+            Currency = "usd",
+        };
+
+        var wrongOrderSession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = Guid.NewGuid().ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = Guid.NewGuid().ToString("D") },
+            AmountTotal = 999,
+            Currency = "usd",
+        };
+
+        var wrongAmountSession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = order.Id.ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            AmountTotal = 100,
+            Currency = "usd",
+        };
+
+        var wrongCurrencySession = new Stripe.Checkout.Session
+        {
+            ClientReferenceId = order.Id.ToString("D"),
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            AmountTotal = 999,
+            Currency = "eur",
+        };
+
+        Assert.True(EconomyService.IsStripeCheckoutSessionForOrder(validSession, order));
+        Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongOrderSession, order));
+        Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongAmountSession, order));
+        Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongCurrencySession, order));
+    }
+
+    [Fact]
+    public void StripePaymentIntentVerification_ShouldRequireCurrentOrderIdentityAmountAndCurrency()
+    {
+        var order = CreatePendingStripeOrder(priceAmount: 4.99m, currencyCode: "USD");
+        var validPaymentIntent = new Stripe.PaymentIntent
+        {
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            Amount = 499,
+            Currency = "usd",
+        };
+
+        var wrongOrderPaymentIntent = new Stripe.PaymentIntent
+        {
+            Metadata = new Dictionary<string, string> { ["order_id"] = Guid.NewGuid().ToString("D") },
+            Amount = 499,
+            Currency = "usd",
+        };
+
+        var wrongAmountPaymentIntent = new Stripe.PaymentIntent
+        {
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            Amount = 999,
+            Currency = "usd",
+        };
+
+        var wrongCurrencyPaymentIntent = new Stripe.PaymentIntent
+        {
+            Metadata = new Dictionary<string, string> { ["order_id"] = order.Id.ToString("D") },
+            Amount = 499,
+            Currency = "eur",
+        };
+
+        Assert.True(EconomyService.IsStripePaymentIntentForOrder(validPaymentIntent, order));
+        Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongOrderPaymentIntent, order));
+        Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongAmountPaymentIntent, order));
+        Assert.False(EconomyService.IsStripePaymentIntentForOrder(wrongCurrencyPaymentIntent, order));
+    }
+
+    [Fact]
     public async Task VerifyPremiumStorePurchaseAsync_ShouldActivateAfterBackendValidation()
     {
         await using var dbContext = CreateDbContext();

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Data;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
@@ -143,6 +144,22 @@ public sealed partial class EconomyServiceTests
         });
         dbContext.SaveChanges();
         return packId;
+    }
+
+    private static PurchaseOrder CreatePendingStripeOrder(decimal priceAmount, string currencyCode)
+    {
+        return new PurchaseOrder
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            PackId = Guid.NewGuid(),
+            PaymentProvider = "stripe",
+            Status = PurchaseOrderStatus.Pending,
+            PriceAmount = priceAmount,
+            CurrencyCode = currencyCode,
+            SparkToGrant = 100,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
     }
 
     private static string BuildStripeSignature(string payload, string secret)

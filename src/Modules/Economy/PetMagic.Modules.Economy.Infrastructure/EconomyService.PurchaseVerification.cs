@@ -157,6 +157,12 @@ public sealed partial class EconomyService
                 {
                     return Result.Success(ToPurchaseOrderResponse(order));
                 }
+
+                if (!IsStripeCheckoutSessionForOrder(session, order))
+                {
+                    LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.session_ownership");
+                    return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
+                }
             }
             else if (stripeReferenceId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
             {
@@ -166,6 +172,12 @@ public sealed partial class EconomyService
                 if (!string.Equals(paymentIntent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
                 {
                     return Result.Success(ToPurchaseOrderResponse(order));
+                }
+
+                if (!IsStripePaymentIntentForOrder(paymentIntent, order))
+                {
+                    LogPaymentFailed(order, EconomyErrors.PaymentGatewayFailed, "stripe.verify.payment_intent_ownership");
+                    return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
                 }
             }
             else
@@ -217,6 +229,63 @@ public sealed partial class EconomyService
         }
 
         return Result.Success(ToPurchaseOrderResponse(refreshedOrder));
+    }
+
+    internal static bool IsStripeCheckoutSessionForOrder(Stripe.Checkout.Session session, PurchaseOrder order)
+    {
+        if (!HasStripeOrderIdentity(session.Metadata, session.ClientReferenceId, order.Id))
+        {
+            return false;
+        }
+
+        if (session.AmountTotal.HasValue && session.AmountTotal.Value != ToStripeMinorUnits(order.PriceAmount))
+        {
+            return false;
+        }
+
+        return IsStripeCurrencyMatch(session.Currency, order.CurrencyCode);
+    }
+
+    internal static bool IsStripePaymentIntentForOrder(PaymentIntent paymentIntent, PurchaseOrder order)
+    {
+        if (!HasStripeOrderIdentity(paymentIntent.Metadata, clientReferenceId: null, order.Id))
+        {
+            return false;
+        }
+
+        if (paymentIntent.Amount != ToStripeMinorUnits(order.PriceAmount))
+        {
+            return false;
+        }
+
+        return IsStripeCurrencyMatch(paymentIntent.Currency, order.CurrencyCode);
+    }
+
+    private static bool HasStripeOrderIdentity(
+        IDictionary<string, string>? metadata,
+        string? clientReferenceId,
+        Guid orderId)
+    {
+        var expectedOrderId = orderId.ToString("D");
+        if (string.Equals(clientReferenceId?.Trim(), expectedOrderId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return metadata is not null
+            && metadata.TryGetValue("order_id", out var metadataOrderId)
+            && string.Equals(metadataOrderId?.Trim(), expectedOrderId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStripeCurrencyMatch(string? stripeCurrency, string orderCurrency)
+    {
+        return string.IsNullOrWhiteSpace(stripeCurrency)
+            || string.Equals(stripeCurrency.Trim(), orderCurrency.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static long ToStripeMinorUnits(decimal amount)
+    {
+        return (long)decimal.Round(amount * 100m, 0, MidpointRounding.AwayFromZero);
     }
 
     public async Task<Result<PurchaseOrderResponse>> VerifyPackStorePurchaseAsync(
