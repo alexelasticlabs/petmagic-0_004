@@ -73,13 +73,10 @@ class _TemplateCardState extends State<TemplateCard>
     final mediaChanged =
         oldWidget.template.templateId != widget.template.templateId ||
         oldWidget.template.mediaIdentity != widget.template.mediaIdentity;
-    final renderContextChanged =
-        oldWidget.renderContextKey != widget.renderContextKey;
-
-    if (mediaChanged || renderContextChanged) {
+    if (mediaChanged) {
       _isPreviewActive = false;
       _videoLoadFailed = false;
-      _previewRetryToken = renderContextChanged ? _previewRetryToken + 1 : 0;
+      _previewRetryToken = 0;
       _disposeTimer?.cancel();
       unawaited(_disposeVideoController());
     }
@@ -136,8 +133,7 @@ class _TemplateCardState extends State<TemplateCard>
         child: VisibilityDetector(
           key: ValueKey(
             'template-card-${widget.template.templateId}'
-            '-${widget.template.mediaIdentity}'
-            '-${widget.renderContextKey}',
+            '-${widget.template.mediaIdentity}',
           ),
           onVisibilityChanged: _handleVisibility,
           child: DecoratedBox(
@@ -218,7 +214,6 @@ class _TemplateCardState extends State<TemplateCard>
                         children: [
                           _TemplateMedia(
                             template: widget.template,
-                            renderContextKey: widget.renderContextKey,
                             controller: _videoController,
                             videoLoadFailed: _videoLoadFailed,
                             previewRetryToken: _previewRetryToken,
@@ -533,7 +528,6 @@ Future<VideoPlayerController> createTemplatePreviewVideoController(
 class _TemplateMedia extends StatelessWidget {
   const _TemplateMedia({
     required this.template,
-    required this.renderContextKey,
     required this.controller,
     required this.videoLoadFailed,
     required this.previewRetryToken,
@@ -545,7 +539,6 @@ class _TemplateMedia extends StatelessWidget {
   static const int _maxTemplateCardImageCacheWidth = 1080;
 
   final TemplateItem template;
-  final String renderContextKey;
   final VideoPlayerController? controller;
   final bool videoLoadFailed;
   final int previewRetryToken;
@@ -586,7 +579,6 @@ class _TemplateMedia extends StatelessWidget {
                 key: ValueKey(
                   'template-image-${template.templateId}'
                   '-${template.mediaIdentity}'
-                  '-$renderContextKey'
                   '-$previewRetryToken',
                 ),
                 imageUrl: imageUrl,

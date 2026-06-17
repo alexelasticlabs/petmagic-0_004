@@ -670,83 +670,43 @@ void main() {
     ]);
   });
 
-  testWidgets(
-    'TemplateCard image subtree identity changes with filter context',
-    (tester) async {
-      final template = _imageTemplate();
+  testWidgets('TemplateCard keeps image subtree stable across filter context', (
+    tester,
+  ) async {
+    final template = _imageTemplate();
 
-      await tester.pumpWidget(
-        _buildHost(template, renderContextKey: 'all|all||20'),
-      );
-      await tester.pump();
+    await tester.pumpWidget(
+      _buildHost(template, renderContextKey: 'all|all||20'),
+    );
+    await tester.pump();
 
-      expect(
-        find.byKey(
-          ValueKey(
-            'template-image-${template.templateId}'
-            '-${template.mediaIdentity}'
-            '-all|all||20-0',
-          ),
+    expect(
+      find.byKey(
+        ValueKey(
+          'template-image-${template.templateId}'
+          '-${template.mediaIdentity}'
+          '-0',
         ),
-        findsOneWidget,
-      );
+      ),
+      findsOneWidget,
+    );
 
-      await tester.pumpWidget(
-        _buildHost(template, renderContextKey: 'all|portrait||20'),
-      );
-      await tester.pump();
+    await tester.pumpWidget(
+      _buildHost(template, renderContextKey: 'all|portrait||20'),
+    );
+    await tester.pump();
 
-      expect(
-        find.byKey(
-          ValueKey(
-            'template-image-${template.templateId}'
-            '-${template.mediaIdentity}'
-            '-all|portrait||20-1',
-          ),
+    expect(
+      find.byKey(
+        ValueKey(
+          'template-image-${template.templateId}'
+          '-${template.mediaIdentity}'
+          '-0',
         ),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'TemplateCard resets media subtree token when filter context changes',
-    (tester) async {
-      final template = _imageTemplate();
-
-      await tester.pumpWidget(
-        _buildHost(template, renderContextKey: 'all|all||20'),
-      );
-      await tester.pump();
-
-      expect(
-        find.byKey(
-          ValueKey(
-            'template-image-${template.templateId}'
-            '-${template.mediaIdentity}'
-            '-all|all||20-0',
-          ),
-        ),
-        findsOneWidget,
-      );
-
-      await tester.pumpWidget(
-        _buildHost(template, renderContextKey: 'all|portrait||20'),
-      );
-      await tester.pump();
-
-      expect(
-        find.byKey(
-          ValueKey(
-            'template-image-${template.templateId}'
-            '-${template.mediaIdentity}'
-            '-all|portrait||20-1',
-          ),
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+      ),
+      findsOneWidget,
+    );
+  });
 
   test('TemplateCard prefers thumbnail over original image preview', () async {
     final source = await File(

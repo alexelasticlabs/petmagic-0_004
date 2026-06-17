@@ -299,8 +299,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _CreateWithPetBlock(
-                            pets: ref.watch(_templateHomePetsProvider),
+                          _CreateWithPetBlockSlot(
                             selectedPetId: selectedPetId,
                             selectedPetPhotoId: selectedPetPhotoId,
                           ),
@@ -378,7 +377,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                             templateOfTheDay?.templateId == template.templateId;
                         final templateIdentity = _templateCardIdentity(
                           template: template,
-                          renderContextKey: state.query.cacheKey,
                         );
                         final card = TemplateCard(
                           key: ValueKey(templateIdentity),
@@ -1821,11 +1819,8 @@ String _templatesPetShortcutLocation({
   ).toString();
 }
 
-String _templateCardIdentity({
-  required TemplateItem template,
-  required String renderContextKey,
-}) {
-  return '${template.templateId}|${template.mediaIdentity}|$renderContextKey';
+String _templateCardIdentity({required TemplateItem template}) {
+  return '${template.templateId}|${template.mediaIdentity}';
 }
 
 String _mapTemplatesError(AppLocalizations text, String raw) {
@@ -2806,19 +2801,22 @@ class _TemplateOfTheDayVideoPreviewState
         return;
       }
 
-      _controller = controller;
       await controller.setVolume(0);
       await controller.setLooping(true);
-      await controller.initialize();
-      if (!_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
-        if (_controller == controller) {
-          _controller = null;
-        }
+      if (!_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
         await controller.dispose();
         _releasePreviewSlot();
         return;
       }
 
+      await controller.initialize();
+      if (!_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
+        await controller.dispose();
+        _releasePreviewSlot();
+        return;
+      }
+
+      _controller = controller;
       await _syncPlaybackState();
       if (!_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
         if (_controller == controller) {
@@ -2832,10 +2830,12 @@ class _TemplateOfTheDayVideoPreviewState
       setState(() => _failedToLoad = false);
     } catch (_) {
       await controller?.dispose();
-      if (_isCurrentVideoRequest(requestVersion, previewUrl, controller)) {
+      if (_isCurrentVideoRequestToken(requestVersion, previewUrl)) {
         _releasePreviewSlot();
         setState(() {
-          _controller = null;
+          if (_controller == controller) {
+            _controller = null;
+          }
           _failedToLoad = true;
         });
       }
@@ -3138,6 +3138,25 @@ int? _templateMediaCacheDimension(double logicalSize, double pixelRatio) {
   }
 
   return (logicalSize * pixelRatio).ceil();
+}
+
+class _CreateWithPetBlockSlot extends ConsumerWidget {
+  const _CreateWithPetBlockSlot({
+    required this.selectedPetId,
+    required this.selectedPetPhotoId,
+  });
+
+  final String? selectedPetId;
+  final String? selectedPetPhotoId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _CreateWithPetBlock(
+      pets: ref.watch(_templateHomePetsProvider),
+      selectedPetId: selectedPetId,
+      selectedPetPhotoId: selectedPetPhotoId,
+    );
+  }
 }
 
 class _CreateWithPetBlock extends StatelessWidget {
