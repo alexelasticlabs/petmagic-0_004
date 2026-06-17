@@ -409,6 +409,9 @@ void main() {
       requiredPlan: 'free',
       date: DateTime.utc(2026, 6, 14),
       source: 'manual',
+      category: 'Portrait',
+      tags: const ['daily', 'portrait'],
+      tokenCost: 5,
     );
     final controller = _FakeTemplatesController(
       items: [
@@ -452,6 +455,8 @@ void main() {
 
     expect(find.text(text.templateOfTheDayTitle), findsOneWidget);
     expect(find.text('Daily portrait'), findsWidgets);
+    expect(find.text('#daily'), findsOneWidget);
+    expect(find.text('5 PawSpark'), findsOneWidget);
     expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
     expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
   });
@@ -518,6 +523,56 @@ void main() {
     expect(visibleCardIds.length, greaterThanOrEqualTo(2));
     expect(visibleCardIds.take(2).toList(), ['template-1', 'template-2']);
     expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
+  });
+
+  testWidgets('template of the day error state stays compact and retries', (
+    tester,
+  ) async {
+    final controller = _FakeTemplatesController(
+      items: [_template('template-1', 'Template 1')],
+      templateOfTheDayError: 'templates.template_of_the_day_load_failed',
+      isTemplateOfTheDayLoading: false,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final context = tester.element(find.byType(TemplatesPage));
+    final text = AppLocalizations.of(context);
+
+    expect(find.text('Could not load Template of the Day'), findsOneWidget);
+    expect(find.text(text.retryAction), findsOneWidget);
+
+    await tester.tap(find.text(text.retryAction));
+    await tester.pump();
+
+    expect(controller.loadInitialCalls, contains(true));
   });
 
   testWidgets(
@@ -1626,6 +1681,8 @@ class _FakeTemplatesController extends TemplatesController {
   _FakeTemplatesController({
     this.items,
     this.templateOfTheDay,
+    this.templateOfTheDayError,
+    this.isTemplateOfTheDayLoading = false,
     this.query = const TemplatesQuery(),
     this.categories = const [],
     this.hasMore = false,
@@ -1634,6 +1691,8 @@ class _FakeTemplatesController extends TemplatesController {
 
   final List<TemplateItem>? items;
   final TemplateOfTheDayItem? templateOfTheDay;
+  final String? templateOfTheDayError;
+  final bool isTemplateOfTheDayLoading;
   final TemplatesQuery query;
   final List<String> categories;
   final bool hasMore;
@@ -1660,6 +1719,8 @@ class _FakeTemplatesController extends TemplatesController {
       itemsQueryKey: query.cacheKey,
       categories: categories,
       templateOfTheDay: templateOfTheDay,
+      isTemplateOfTheDayLoading: isTemplateOfTheDayLoading,
+      templateOfTheDayError: templateOfTheDayError,
       isLoading: false,
       isRefreshing: false,
       hasMore: hasMore,

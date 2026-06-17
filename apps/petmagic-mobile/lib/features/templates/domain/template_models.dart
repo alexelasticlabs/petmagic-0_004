@@ -13,8 +13,12 @@ class TemplateOfTheDayItem {
     required this.requiredPlan,
     required this.date,
     required this.source,
+    this.category = '',
+    this.tags = const [],
+    this.tokenCost = 0,
     this.thumbnailUrl,
     this.previewMediaUrl,
+    this.previewAsset,
   });
 
   final String templateId;
@@ -28,30 +32,37 @@ class TemplateOfTheDayItem {
   final String requiredPlan;
   final DateTime date;
   final String source;
+  final String category;
+  final List<String> tags;
+  final int tokenCost;
+  final TemplateAsset? previewAsset;
 
   bool get isVideo => templateType == TemplateType.video;
 
   TemplateItem toFallbackTemplateItem() {
     final previewUrl = previewMediaUrl?.trim();
+    final resolvedPreviewAsset =
+        previewAsset ??
+        (previewUrl == null || previewUrl.isEmpty
+            ? null
+            : TemplateAsset(
+                url: previewUrl,
+                fileName: previewUrl.split('/').last,
+                contentType: isVideo ? 'video/mp4' : 'image/jpeg',
+              ));
     return TemplateItem(
       templateId: templateId,
       templateType: templateType,
       title: title,
       shortDescription: subtitle,
       petPhotoRequirements: const [],
-      category: '',
-      tags: const [],
+      category: category,
+      tags: tags,
       isPremium: isPremium,
-      tokenCost: 0,
+      tokenCost: tokenCost,
       effectivePromoBadge: badgeText,
       thumbnailUrl: thumbnailUrl,
-      previewAsset: previewUrl == null || previewUrl.isEmpty
-          ? null
-          : TemplateAsset(
-              url: previewUrl,
-              fileName: previewUrl.split('/').last,
-              contentType: isVideo ? 'video/mp4' : 'image/jpeg',
-            ),
+      previewAsset: resolvedPreviewAsset,
       supportsGenerateSimilar: false,
     );
   }

@@ -433,8 +433,12 @@ class TemplateOfTheDayItemDto {
     required this.requiredPlan,
     required this.date,
     required this.source,
+    required this.category,
+    required this.tags,
+    required this.tokenCost,
     this.thumbnailUrl,
     this.previewMediaUrl,
+    this.previewAsset,
   });
 
   final String templateId;
@@ -448,8 +452,13 @@ class TemplateOfTheDayItemDto {
   final String requiredPlan;
   final DateTime date;
   final String source;
+  final String category;
+  final List<String> tags;
+  final int tokenCost;
+  final TemplateAssetDto? previewAsset;
 
   factory TemplateOfTheDayItemDto.fromJson(Map<String, Object?> json) {
+    final rawPreviewAsset = json['previewAsset'];
     return TemplateOfTheDayItemDto(
       templateId: (json['templateId'] as String? ?? '').trim(),
       title: json['title'] as String? ?? '',
@@ -462,6 +471,21 @@ class TemplateOfTheDayItemDto {
       requiredPlan: json['requiredPlan'] as String? ?? 'free',
       date: _parseDate(json['date'] as String?),
       source: json['source'] as String? ?? 'auto',
+      category: json['category'] as String? ?? '',
+      tags: (json['tags'] as List<dynamic>? ?? const [])
+          .whereType<String>()
+          .map((tag) => tag.trim())
+          .where((tag) => tag.isNotEmpty)
+          .toList(growable: false),
+      tokenCost:
+          (json['tokenCost'] as num?)?.toInt() ??
+          (json['priceTokens'] as num?)?.toInt() ??
+          0,
+      previewAsset: rawPreviewAsset is Map
+          ? TemplateAssetDto.fromJson(
+              Map<String, Object?>.from(rawPreviewAsset),
+            )
+          : null,
     );
   }
 
@@ -477,6 +501,10 @@ class TemplateOfTheDayItemDto {
     requiredPlan: requiredPlan,
     date: date,
     source: source,
+    category: category,
+    tags: tags,
+    tokenCost: tokenCost,
+    previewAsset: previewAsset?.toDomain(),
   );
 
   static DateTime _parseDate(String? raw) {

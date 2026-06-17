@@ -43,6 +43,7 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
+import 'package:petmagic_mobile/shared/widgets/shimmer_box.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -306,7 +307,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                           _TemplateOfTheDaySlot(
                             template: templateOfTheDay,
                             isLoading: state.isTemplateOfTheDayLoading,
+                            errorMessage: state.templateOfTheDayError,
                             hasPremiumAccess: wallet?.isPremium ?? false,
+                            onRetry: () => controller.refresh(),
                             onPressed: templateOfTheDay == null
                                 ? null
                                 : () => _handleTemplateOfTheDaySelected(
@@ -1609,19 +1612,24 @@ class _TemplateOfTheDaySlot extends StatelessWidget {
   const _TemplateOfTheDaySlot({
     required this.template,
     required this.isLoading,
+    required this.errorMessage,
     required this.hasPremiumAccess,
+    required this.onRetry,
     required this.onPressed,
   });
 
   final TemplateOfTheDayItem? template;
   final bool isLoading;
+  final String? errorMessage;
   final bool hasPremiumAccess;
+  final VoidCallback onRetry;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     final featured = template;
-    if (!isLoading && featured == null) {
+    final hasError = errorMessage != null;
+    if (!isLoading && featured == null && !hasError) {
       return const SizedBox.shrink();
     }
 
@@ -1629,9 +1637,14 @@ class _TemplateOfTheDaySlot extends StatelessWidget {
       padding: const EdgeInsets.only(top: 8),
       child: AnimatedSwitcher(
         duration: AppTheme.motionFast,
-        child: featured == null
+        child: isLoading && featured == null
             ? const _TemplateOfTheDaySkeleton(
                 key: ValueKey('template-of-the-day-skeleton'),
+              )
+            : featured == null
+            ? _TemplateOfTheDayError(
+                key: const ValueKey('template-of-the-day-error'),
+                onRetry: onRetry,
               )
             : _TemplateOfTheDayCard(
                 key: ValueKey('template-of-the-day-${featured.templateId}'),
@@ -1652,59 +1665,147 @@ class _TemplateOfTheDaySkeleton extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
 
-    return SizedBox(
-      height: 118,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surfaceGlass.withValues(alpha: isLight ? 0.64 : 0.34),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: colors.accent.withValues(alpha: 0.28)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Container(
-                width: 84,
-                height: double.infinity,
-                decoration: BoxDecoration(
-                  color: colors.surfaceStrong.withValues(alpha: 0.48),
-                  borderRadius: BorderRadius.circular(17),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxWidth < 340 ? 204.0 : 224.0;
+        final baseColor = colors.surfaceStrong.withValues(
+          alpha: isLight ? 0.42 : 0.34,
+        );
+        final highlightColor = colors.surfaceGlass.withValues(
+          alpha: isLight ? 0.78 : 0.5,
+        );
+        return ShimmerBox(
+          baseColor: baseColor,
+          highlightColor: highlightColor,
+          child: SizedBox(
+            height: height,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: colors.surfaceGlass.withValues(
+                  alpha: isLight ? 0.64 : 0.34,
+                ),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: colors.accent.withValues(alpha: 0.28),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 112,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.52),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
+                    Row(
+                      children: [
+                        _TemplateOfTheDaySkeletonBar(width: 128, height: 22),
+                        const SizedBox(width: 8),
+                        _TemplateOfTheDaySkeletonBar(width: 74, height: 22),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    Container(
+                    const Spacer(),
+                    _TemplateOfTheDaySkeletonBar(
                       width: double.infinity,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.62),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
+                      height: 18,
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      width: 150,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colors.surfaceStrong.withValues(alpha: 0.44),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
+                    _TemplateOfTheDaySkeletonBar(width: 210, height: 13),
+                    const SizedBox(height: 12),
+                    _TemplateOfTheDaySkeletonBar(width: 156, height: 30),
                   ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _TemplateOfTheDaySkeletonBar extends StatelessWidget {
+  const _TemplateOfTheDaySkeletonBar({
+    required this.width,
+    required this.height,
+  });
+
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.56),
+        borderRadius: BorderRadius.circular(999),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayError extends StatelessWidget {
+  const _TemplateOfTheDayError({required this.onRetry, super.key});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+
+    return SizedBox(
+      height: 96,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceGlass.withValues(alpha: isLight ? 0.78 : 0.36),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.accent.withValues(alpha: 0.22)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+          child: Row(
+            children: [
+              Icon(
+                Icons.auto_awesome_motion_rounded,
+                color: colors.accent,
+                size: 24,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  _templateOfTheDayLoadErrorLabel(context),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colors.textStrong,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.14,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(
+                  foregroundColor: colors.accent,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(0, 0),
+                ),
+                child: Text(
+                  text.retryAction,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
             ],
@@ -1736,7 +1837,7 @@ class _TemplateOfTheDayCard extends StatelessWidget {
       template.thumbnailUrl,
     );
     final previewMediaUrl = _normalizeTemplateOfTheDayMediaUrl(
-      template.previewMediaUrl,
+      template.previewMediaUrl ?? template.previewAsset?.url,
     );
     final videoPreviewUrl =
         template.isVideo &&
@@ -1747,177 +1848,299 @@ class _TemplateOfTheDayCard extends StatelessWidget {
     final imageUrl =
         thumbnailUrl ?? (!template.isVideo ? previewMediaUrl : null);
     final isPremiumLocked = template.isPremium && !hasPremiumAccess;
-    return PetMagicInteractiveSurface(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(22),
-      scaleDown: 0.985,
-      child: SizedBox(
-        height: 164,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: colors.accent.withValues(alpha: 0.5)),
-            boxShadow: [
-              BoxShadow(
-                color: colors.accent.withValues(alpha: isLight ? 0.12 : 0.18),
-                blurRadius: 22,
-                offset: const Offset(0, 12),
+    final visibleTags = template.tags.take(3).toList(growable: false);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxWidth < 340 ? 208.0 : 232.0;
+        return PetMagicInteractiveSurface(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(22),
+          scaleDown: 0.985,
+          child: SizedBox(
+            height: height,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: colors.accent.withValues(alpha: 0.5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.accent.withValues(
+                      alpha: isLight ? 0.14 : 0.2,
+                    ),
+                    blurRadius: 24,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+                color: colors.backgroundBottom,
               ),
-            ],
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                colors.surfaceGlass.withValues(alpha: isLight ? 0.8 : 0.42),
-                colors.surfaceStrong.withValues(alpha: isLight ? 0.56 : 0.2),
-              ],
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(21),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (imageUrl != null || videoPreviewUrl != null)
-                  Positioned.fill(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final cacheWidth = _templateMediaCacheDimension(
-                          constraints.maxWidth,
-                          MediaQuery.devicePixelRatioOf(context),
-                        );
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (imageUrl != null || videoPreviewUrl != null)
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, mediaConstraints) {
+                            final cacheWidth = _templateMediaCacheDimension(
+                              mediaConstraints.maxWidth,
+                              MediaQuery.devicePixelRatioOf(context),
+                            );
 
-                        if (videoPreviewUrl != null) {
-                          return _TemplateOfTheDayVideoPreview(
-                            previewUrl: videoPreviewUrl,
-                            thumbnailUrl: thumbnailUrl,
-                            cacheWidth: cacheWidth,
-                          );
-                        }
+                            if (videoPreviewUrl != null) {
+                              return _TemplateOfTheDayVideoPreview(
+                                previewUrl: videoPreviewUrl,
+                                thumbnailUrl: thumbnailUrl,
+                                cacheWidth: cacheWidth,
+                              );
+                            }
 
-                        if (imageUrl != null) {
-                          return CachedNetworkImage(
-                            imageUrl: imageUrl,
-                            cacheManager: TemplateMediaCache.thumbnailCache,
-                            memCacheWidth: cacheWidth,
-                            maxWidthDiskCache: cacheWidth,
-                            fit: BoxFit.cover,
-                            filterQuality: FilterQuality.medium,
-                            fadeInDuration: AppTheme.motionFast,
-                            placeholder: (context, url) =>
-                                const _TemplateOfTheDayMediaFallback(),
-                            errorWidget: (context, url, error) =>
-                                const _TemplateOfTheDayMediaFallback(),
-                          );
-                        }
+                            if (imageUrl != null) {
+                              return CachedNetworkImage(
+                                imageUrl: imageUrl,
+                                cacheManager: TemplateMediaCache.thumbnailCache,
+                                memCacheWidth: cacheWidth,
+                                maxWidthDiskCache: cacheWidth,
+                                fit: BoxFit.cover,
+                                filterQuality: FilterQuality.medium,
+                                fadeInDuration: AppTheme.motionFast,
+                                placeholder: (context, url) =>
+                                    const _TemplateOfTheDayMediaFallback(),
+                                errorWidget: (context, url, error) =>
+                                    const _TemplateOfTheDayMediaFallback(),
+                              );
+                            }
 
-                        return const _TemplateOfTheDayMediaFallback();
-                      },
-                    ),
-                  )
-                else
-                  const _TemplateOfTheDayMediaFallback(),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: [
-                        colors.backgroundBottom.withValues(
-                          alpha: isLight ? 0.93 : 0.9,
+                            return const _TemplateOfTheDayMediaFallback();
+                          },
                         ),
-                        colors.backgroundBottom.withValues(
-                          alpha: isLight ? 0.74 : 0.72,
-                        ),
-                        colors.backgroundBottom.withValues(alpha: 0.26),
-                      ],
-                      stops: const [0, 0.58, 1],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(13, 11, 12, 11),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 5,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
+                      )
+                    else
+                      const _TemplateOfTheDayMediaFallback(),
+                    const _TemplateOfTheDayDarkOverlay(),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 5,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _TemplateOfTheDayBadge(
+                                icon: Icons.auto_awesome_rounded,
+                                label: template.badgeText.trim().isEmpty
+                                    ? text.templateOfTheDayTitle
+                                    : template.badgeText,
+                              ),
+                              _TemplateOfTheDayBadge(
+                                icon: template.isVideo
+                                    ? Icons.play_circle_outline_rounded
+                                    : Icons.image_outlined,
+                                label: template.isVideo
+                                    ? text.videoLabel
+                                    : text.imageLabel,
+                                isSubtle: true,
+                              ),
+                              if (template.isPremium)
                                 _TemplateOfTheDayBadge(
-                                  icon: Icons.auto_awesome_rounded,
-                                  label: template.badgeText.trim().isEmpty
-                                      ? text.templateOfTheDayTitle
-                                      : template.badgeText,
+                                  icon: Icons.workspace_premium_rounded,
+                                  label: text.premiumLabel,
+                                  isPremium: true,
                                 ),
-                                _TemplateOfTheDayBadge(
-                                  icon: template.isVideo
-                                      ? Icons.play_circle_outline_rounded
-                                      : Icons.image_outlined,
-                                  label: template.isVideo
-                                      ? text.videoLabel
-                                      : text.imageLabel,
-                                  isSubtle: true,
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            template.title.trim().isEmpty
+                                ? text.templateOfTheDaySubtitle
+                                : template.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontSize: constraints.maxWidth < 340
+                                      ? 17
+                                      : 18.5,
+                                  height: 1.03,
+                                  fontWeight: FontWeight.w900,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Color.fromRGBO(0, 0, 0, 0.74),
+                                      blurRadius: 18,
+                                      offset: Offset(0, 5),
+                                    ),
+                                  ],
                                 ),
-                                if (template.isPremium)
-                                  _TemplateOfTheDayBadge(
-                                    icon: Icons.workspace_premium_rounded,
-                                    label: text.premiumLabel,
-                                    isPremium: true,
-                                  ),
-                              ],
-                            ),
-                            const Spacer(),
-                            Text(
-                              template.title.trim().isEmpty
-                                  ? text.templateOfTheDaySubtitle
-                                  : template.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(
-                                    color: colors.textStrong,
-                                    fontSize: 15,
-                                    height: 1.05,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              template.subtitle.trim().isEmpty
-                                  ? text.templateOfTheDaySubtitle
-                                  : template.subtitle,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colors.textSoft,
-                                    fontSize: 10.5,
-                                    height: 1.15,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            _TemplateOfTheDayAction(
-                              label: isPremiumLocked
-                                  ? text.templateUnlockPremiumAction
-                                  : text.templateOfTheDayTryAction,
-                              isPremium: template.isPremium,
-                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            template.subtitle.trim().isEmpty
+                                ? text.templateOfTheDaySubtitle
+                                : template.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.88),
+                                  fontSize: 11.2,
+                                  height: 1.16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          if (visibleTags.isNotEmpty) ...[
+                            const SizedBox(height: 7),
+                            _TemplateOfTheDayTags(tags: visibleTags),
                           ],
-                        ),
+                          const SizedBox(height: 9),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 7,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (template.tokenCost > 0)
+                                _TemplateOfTheDayCostChip(
+                                  cost: template.tokenCost,
+                                ),
+                              _TemplateOfTheDayAction(
+                                label: isPremiumLocked
+                                    ? text.templateUnlockPremiumAction
+                                    : text.templateOfTheDayTryAction,
+                                isPremium: template.isPremium,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 82),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+}
+
+class _TemplateOfTheDayDarkOverlay extends StatelessWidget {
+  const _TemplateOfTheDayDarkOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.2),
+              Colors.black.withValues(alpha: 0.08),
+              Colors.black.withValues(alpha: 0.58),
+              Colors.black.withValues(alpha: 0.9),
+            ],
+            stops: const [0, 0.34, 0.72, 1],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayTags extends StatelessWidget {
+  const _TemplateOfTheDayTags({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 22,
+      child: ClipRect(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Row(
+            children: [
+              for (var index = 0; index < tags.length; index++) ...[
+                if (index > 0) const SizedBox(width: 6),
+                _TemplateOfTheDayTag(label: tags[index]),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayTag extends StatelessWidget {
+  const _TemplateOfTheDayTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        child: Text(
+          '#$label',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            height: 1,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateOfTheDayCostChip extends StatelessWidget {
+  const _TemplateOfTheDayCostChip({required this.cost});
+
+  final int cost;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.44),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PawSparkIcon(size: 13),
+            const SizedBox(width: 5),
+            Text(
+              '$cost PawSpark',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10.2,
+                fontWeight: FontWeight.w900,
+                height: 1,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2331,34 +2554,45 @@ class _TemplateOfTheDayAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final textColor = isPremium ? const Color(0xFF251102) : Colors.white;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: isPremium ? const Color(0xFFEFC35C) : colors.accent,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.arrow_forward_rounded, size: 13, color: textColor),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: textColor,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
-                height: 1,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 190),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: isPremium ? const Color(0xFFEFC35C) : colors.accent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.arrow_forward_rounded, size: 13, color: textColor),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+String _templateOfTheDayLoadErrorLabel(BuildContext context) {
+  return Localizations.localeOf(context).languageCode == 'ru'
+      ? 'Не удалось загрузить шаблон дня'
+      : 'Could not load Template of the Day';
 }
 
 String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {

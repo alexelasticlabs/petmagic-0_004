@@ -584,6 +584,10 @@ internal sealed partial class TemplatesService
             assignment.Template.IsPremium,
             assignment.Template.IsPremium ? "premium" : "free",
             date,
-            assignment.IsManual ? "manual" : "auto");
+            assignment.IsManual ? "manual" : "auto",
+            assignment.Template.Category,
+            DeserializeTags(assignment.Template.Tags),
+            assignment.Template.TokenCost,
+            previewAsset);
     }
 }

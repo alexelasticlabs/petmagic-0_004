@@ -46,6 +46,73 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(today, template.Date);
         Assert.Equal("https://cdn.example.com/cozy-magic.jpg", template.ThumbnailUrl);
         Assert.Equal("https://cdn.example.com/cozy-magic.jpg", template.PreviewMediaUrl);
+        Assert.Equal("Portrait", template.Category);
+        Assert.Equal(["cozy"], template.Tags);
+        Assert.Equal(20, template.TokenCost);
+        Assert.NotNull(template.PreviewAsset);
+        Assert.Equal("https://cdn.example.com/cozy-magic.jpg", template.PreviewAsset?.Url);
+    }
+
+    [Fact]
+    public async Task GetPublicTemplateOfTheDayAsync_ShouldReturnVideoPreviewAndPremiumFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var createdVideo = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                "Daily Motion",
+                "Video pick description",
+                "Video",
+                ["daily", "motion"],
+                true,
+                60,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                "Meme soundtrack",
+                CreatePreviewAsset("https://cdn.example.com/daily-motion.mp4", "daily-motion.mp4", "video/mp4"),
+                CreateReferenceAsset(5.0),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "motion prompt",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(createdVideo.IsSuccess);
+
+        var createdAssignment = await service.CreateTemplateOfTheDayAsync(
+            new CreateTemplateOfTheDayCommand(
+                createdVideo.Value.TemplateId,
+                date,
+                date,
+                true,
+                true,
+                10,
+                null,
+                null,
+                null,
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(createdAssignment.IsSuccess);
+
+        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var template = Assert.IsType<PublicTemplateOfTheDayItemResponse>(result.Value.Template);
+        Assert.Equal(createdVideo.Value.TemplateId, template.TemplateId);
+        Assert.Equal("Video", template.Type);
+        Assert.Null(template.ThumbnailUrl);
+        Assert.Equal("https://cdn.example.com/daily-motion.mp4", template.PreviewMediaUrl);
+        Assert.True(template.IsPremium);
+        Assert.Equal("premium", template.RequiredPlan);
+        Assert.Equal("Video", template.Category);
+        Assert.Equal(["daily", "motion"], template.Tags);
+        Assert.Equal(60, template.TokenCost);
+        Assert.NotNull(template.PreviewAsset);
+        Assert.Equal("video/mp4", template.PreviewAsset?.ContentType);
     }
 
     [Fact]

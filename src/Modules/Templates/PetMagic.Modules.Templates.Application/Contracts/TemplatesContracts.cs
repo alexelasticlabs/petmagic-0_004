@@ -1126,7 +1126,11 @@ public sealed record PublicTemplateOfTheDayItemResponse(
     bool IsPremium,
     string RequiredPlan,
     DateOnly Date,
-    string Source);
+    string Source,
+    string Category,
+    IReadOnlyList<string> Tags,
+    int TokenCost,
+    TemplateAssetResponse? PreviewAsset);
 
 public sealed record TemplateGenerationResponse(
     Guid GenerationId,

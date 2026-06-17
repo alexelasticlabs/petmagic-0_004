@@ -184,6 +184,16 @@ void main() {
               'requiredPlan': 'premium',
               'date': '2026-06-14',
               'source': 'manual',
+              'category': 'Portrait',
+              'tags': ['daily', 'video'],
+              'tokenCost': 12,
+              'previewAsset': {
+                'url': 'https://cdn.petmagic.test/day.mp4',
+                'fileName': 'day.mp4',
+                'contentType': 'video/mp4',
+                'fileSizeBytes': 64000,
+                'durationSeconds': 4.5,
+              },
             },
           }),
           200,
@@ -203,6 +213,11 @@ void main() {
     expect(template?.isPremium, isTrue);
     expect(template?.source, 'manual');
     expect(template?.date, DateTime.utc(2026, 6, 14));
+    expect(template?.category, 'Portrait');
+    expect(template?.tags, ['daily', 'video']);
+    expect(template?.tokenCost, 12);
+    expect(template?.previewAsset?.url, 'https://cdn.petmagic.test/day.mp4');
+    expect(template?.previewAsset?.contentType, 'video/mp4');
   });
 
   test('fetchTemplateOfTheDay accepts missing template', () async {

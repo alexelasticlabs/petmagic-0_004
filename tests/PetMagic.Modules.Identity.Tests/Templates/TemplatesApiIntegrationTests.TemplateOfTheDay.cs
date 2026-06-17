@@ -60,6 +60,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("free", featured.RequiredPlan);
         Assert.Equal(date, featured.Date);
         Assert.Equal("manual", featured.Source);
+        Assert.Equal("Portrait", featured.Category);
+        Assert.Equal(["daily", "portrait"], featured.Tags);
+        Assert.Equal(20, featured.TokenCost);
+        Assert.NotNull(featured.PreviewAsset);
+        Assert.Equal(template.PreviewAsset?.Url, featured.PreviewAsset?.Url);
     }
 
     [Fact]
