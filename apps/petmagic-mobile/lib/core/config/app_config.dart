@@ -103,7 +103,7 @@ class AppConfig {
   }
 
   static bool get enableFrameTelemetry {
-    return kDebugMode && _enableFrameTelemetry;
+    return (kDebugMode || kProfileMode) && _enableFrameTelemetry;
   }
 
   static List<String> get apiBaseUrls {

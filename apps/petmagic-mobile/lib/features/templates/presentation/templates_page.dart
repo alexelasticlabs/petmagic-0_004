@@ -215,14 +215,20 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(templatesControllerProvider);
-    _syncSearchFieldWithQuery(state.query.search);
-    final wallet = ref.watch(
-      walletControllerProvider.select((walletState) => walletState.wallet),
+    ref.listen<String?>(
+      templatesControllerProvider.select((state) => state.query.search),
+      (previous, next) => _syncSearchFieldWithQuery(next),
     );
-    final isAuthenticated = ref.watch(
-      appLaunchControllerProvider.select(
-        (launchState) => launchState.isAuthenticated,
+    final headerState = ref.watch(
+      templatesControllerProvider.select(
+        (state) => (
+          query: state.query,
+          categories: state.categories,
+          templateOfTheDay: state.templateOfTheDay,
+          isTemplateOfTheDayLoading: state.isTemplateOfTheDayLoading,
+          templateOfTheDayError: state.templateOfTheDayError,
+          isInitialLoading: state.isInitialLoading,
+        ),
       ),
     );
     final controller = ref.read(templatesControllerProvider.notifier);
@@ -231,7 +237,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     final subtitleStyle = Theme.of(context).textTheme.bodySmall;
     final bottomInset = petMagicScrollableBottomInset(context);
-    final templateOfTheDay = state.templateOfTheDay;
+    final templateOfTheDay = headerState.templateOfTheDay;
     final selectedPetId = _routeQueryParameter(context, 'petId');
     final selectedPetPhotoId = _routeQueryParameter(context, 'petPhotoId');
     _trackTemplateOfTheDayViewed(templateOfTheDay);
@@ -267,9 +273,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _TopBar(
-                            isAuthenticated: isAuthenticated,
-                            tokenBalance: wallet?.balance ?? 0,
+                          _TemplatesTopBarSlot(
                             onAuthPressed: () =>
                                 context.go(AuthEntryPage.routePath),
                             onRewardsPressed: () =>
@@ -305,9 +309,8 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                           ),
                           _TemplateOfTheDaySlot(
                             template: templateOfTheDay,
-                            isLoading: state.isTemplateOfTheDayLoading,
-                            errorMessage: state.templateOfTheDayError,
-                            hasPremiumAccess: wallet?.isPremium ?? false,
+                            isLoading: headerState.isTemplateOfTheDayLoading,
+                            errorMessage: headerState.templateOfTheDayError,
                             onRetry: () => controller.refresh(),
                             onPressed: templateOfTheDay == null
                                 ? null
@@ -322,9 +325,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                           ),
                           const SizedBox(height: 6),
                           TemplateTypeFilters(
-                            selectedType: state.query.type,
-                            categories: state.categories,
-                            selectedCategory: state.query.category,
+                            selectedType: headerState.query.type,
+                            categories: headerState.categories,
+                            selectedCategory: headerState.query.category,
                             onTypeSelected: controller.setType,
                             onCategorySelected: controller.setCategory,
                           ),
@@ -333,111 +336,12 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                     ),
                   ),
                 ),
-                if (state.isInitialLoading)
-                  const SliverMagicLoadingScreen()
-                else if (state.errorMessage != null && state.items.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _StateMessage(
-                      icon: Icons.cloud_off_rounded,
-                      title: text.templatesErrorTitle,
-                      message: _mapTemplatesError(text, state.errorMessage!),
-                      actionLabel: text.retryAction,
-                      onAction: () =>
-                          controller.loadInitial(forceRefresh: true),
-                    ),
-                  )
-                else if (state.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _StateMessage(
-                      icon: Icons.auto_awesome_motion_rounded,
-                      title: text.emptyTemplatesTitle,
-                      message: text.emptyTemplatesMessage,
-                      actionLabel: text.retryAction,
-                      onAction: () =>
-                          controller.loadInitial(forceRefresh: true),
-                    ),
-                  )
-                else ...[
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
-                    sliver: SliverGrid.builder(
-                      itemCount: state.items.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 5,
-                            mainAxisSpacing: 6,
-                            childAspectRatio: 0.72,
-                          ),
-                      itemBuilder: (context, index) {
-                        final template = state.items[index];
-                        final isTodayPick =
-                            templateOfTheDay?.templateId == template.templateId;
-                        final templateIdentity = _templateCardIdentity(
-                          template: template,
-                        );
-                        final card = TemplateCard(
-                          key: ValueKey(templateIdentity),
-                          template: template,
-                          hasPremiumAccess: wallet?.isPremium ?? false,
-                          renderContextKey: state.query.cacheKey,
-                          highlightBadgeLabel: isTodayPick
-                              ? text.templateOfTheDayFeedBadge
-                              : null,
-                          onPressed: () => _handleTemplateSelected(template),
-                        );
-                        if (index >= 6) {
-                          return card;
-                        }
-
-                        return TweenAnimationBuilder<double>(
-                          key: ValueKey('template-item-$templateIdentity'),
-                          tween: Tween(begin: 0, end: 1),
-                          duration: Duration(
-                            milliseconds: 130 + (index % 6) * 20,
-                          ),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, child) {
-                            final clamped = value.clamp(0.0, 1.0);
-                            return Opacity(
-                              opacity: clamped,
-                              child: Transform.translate(
-                                offset: Offset(0, (1 - clamped) * 8),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: card,
-                        );
-                      },
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 180),
-                        child: state.isLoadingMore
-                            ? Center(
-                                child: CircularProgressIndicator.adaptive(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    colors.accent,
-                                  ),
-                                ),
-                              )
-                            : state.errorMessage != null
-                            ? TextButton.icon(
-                                onPressed: controller.loadMore,
-                                icon: const Icon(Icons.refresh_rounded),
-                                label: Text(text.retryAction),
-                              )
-                            : const SizedBox(height: 28),
-                      ),
-                    ),
-                  ),
-                ],
+                _TemplateFeedSlivers(
+                  bottomInset: bottomInset,
+                  templateOfTheDayId: templateOfTheDay?.templateId,
+                  onTemplateSelected: (template) =>
+                      unawaited(_handleTemplateSelected(template)),
+                ),
               ],
             ),
           ),
@@ -446,7 +350,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
             bottom: petMagicBottomNavInset(context, extraSpacing: 24),
             child: _FloatingRandomTemplateButton(
               isLoading: _isRandomTemplateLoading,
-              isEnabled: !state.isInitialLoading,
+              isEnabled: !headerState.isInitialLoading,
               onPressed: _handleRandomTemplatePressed,
             ),
           ),
@@ -1904,6 +1808,197 @@ class _TemplatesLifecycleObserver with WidgetsBindingObserver {
   }
 }
 
+class _TemplateFeedSlivers extends ConsumerWidget {
+  const _TemplateFeedSlivers({
+    required this.bottomInset,
+    required this.templateOfTheDayId,
+    required this.onTemplateSelected,
+  });
+
+  final double bottomInset;
+  final String? templateOfTheDayId;
+  final ValueChanged<TemplateItem> onTemplateSelected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(
+      templatesControllerProvider.select(
+        (state) => (
+          items: state.items,
+          isInitialLoading: state.isInitialLoading,
+          isEmpty: state.isEmpty,
+          isLoadingMore: state.isLoadingMore,
+          errorMessage: state.errorMessage,
+        ),
+      ),
+    );
+    final hasPremiumAccess = ref.watch(
+      walletControllerProvider.select(
+        (walletState) => walletState.wallet?.isPremium ?? false,
+      ),
+    );
+    final controller = ref.read(templatesControllerProvider.notifier);
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    if (state.isInitialLoading) {
+      return const SliverMagicLoadingScreen();
+    }
+
+    if (state.errorMessage != null && state.items.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _StateMessage(
+          icon: Icons.cloud_off_rounded,
+          title: text.templatesErrorTitle,
+          message: _mapTemplatesError(text, state.errorMessage!),
+          actionLabel: text.retryAction,
+          onAction: () => controller.loadInitial(forceRefresh: true),
+        ),
+      );
+    }
+
+    if (state.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: _StateMessage(
+          icon: Icons.auto_awesome_motion_rounded,
+          title: text.emptyTemplatesTitle,
+          message: text.emptyTemplatesMessage,
+          actionLabel: text.retryAction,
+          onAction: () => controller.loadInitial(forceRefresh: true),
+        ),
+      );
+    }
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(6, 8, 6, 6),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final logicalCardWidth = (constraints.crossAxisExtent - 5) / 2;
+              final imageCacheWidth =
+                  templateCardImageCacheWidthForLogicalWidth(
+                    logicalCardWidth,
+                    MediaQuery.devicePixelRatioOf(context),
+                  );
+
+              return SliverGrid.builder(
+                itemCount: state.items.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 5,
+                  mainAxisSpacing: 6,
+                  childAspectRatio: 0.72,
+                ),
+                itemBuilder: (context, index) {
+                  final template = state.items[index];
+                  final isTodayPick = templateOfTheDayId == template.templateId;
+                  final templateIdentity = _templateCardIdentity(
+                    template: template,
+                  );
+                  final card = TemplateCard(
+                    key: ValueKey(templateIdentity),
+                    template: template,
+                    hasPremiumAccess: hasPremiumAccess,
+                    imageCacheWidth: imageCacheWidth,
+                    highlightBadgeLabel: isTodayPick
+                        ? text.templateOfTheDayFeedBadge
+                        : null,
+                    onPressed: () => onTemplateSelected(template),
+                  );
+                  if (index >= 6) {
+                    return card;
+                  }
+
+                  return TweenAnimationBuilder<double>(
+                    key: ValueKey('template-item-$templateIdentity'),
+                    tween: Tween(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 130 + (index % 6) * 20),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) {
+                      final clamped = value.clamp(0.0, 1.0);
+                      return Opacity(
+                        opacity: clamped,
+                        child: Transform.translate(
+                          offset: Offset(0, (1 - clamped) * 8),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: card,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(10, 8, 10, bottomInset),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: state.isLoadingMore
+                  ? Center(
+                      child: CircularProgressIndicator.adaptive(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colors.accent,
+                        ),
+                      ),
+                    )
+                  : state.errorMessage != null
+                  ? TextButton.icon(
+                      onPressed: controller.loadMore,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(text.retryAction),
+                    )
+                  : const SizedBox(height: 28),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TemplatesTopBarSlot extends ConsumerWidget {
+  const _TemplatesTopBarSlot({
+    required this.onAuthPressed,
+    required this.onRewardsPressed,
+    required this.onTopUpPressed,
+    required this.onWalletPressed,
+  });
+
+  final VoidCallback onAuthPressed;
+  final VoidCallback onRewardsPressed;
+  final VoidCallback onTopUpPressed;
+  final VoidCallback onWalletPressed;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tokenBalance = ref.watch(
+      walletControllerProvider.select(
+        (walletState) => walletState.wallet?.balance ?? 0,
+      ),
+    );
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select(
+        (launchState) => launchState.isAuthenticated,
+      ),
+    );
+
+    return _TopBar(
+      isAuthenticated: isAuthenticated,
+      tokenBalance: tokenBalance,
+      onAuthPressed: onAuthPressed,
+      onRewardsPressed: onRewardsPressed,
+      onTopUpPressed: onTopUpPressed,
+      onWalletPressed: onWalletPressed,
+    );
+  }
+}
+
 class _TopBar extends StatelessWidget {
   const _TopBar({
     required this.isAuthenticated,
@@ -2120,12 +2215,11 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
-class _TemplateOfTheDaySlot extends StatelessWidget {
+class _TemplateOfTheDaySlot extends ConsumerWidget {
   const _TemplateOfTheDaySlot({
     required this.template,
     required this.isLoading,
     required this.errorMessage,
-    required this.hasPremiumAccess,
     required this.onRetry,
     required this.onPressed,
   });
@@ -2133,12 +2227,16 @@ class _TemplateOfTheDaySlot extends StatelessWidget {
   final TemplateOfTheDayItem? template;
   final bool isLoading;
   final String? errorMessage;
-  final bool hasPremiumAccess;
   final VoidCallback onRetry;
   final VoidCallback? onPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasPremiumAccess = ref.watch(
+      walletControllerProvider.select(
+        (walletState) => walletState.wallet?.isPremium ?? false,
+      ),
+    );
     final featured = template;
     final hasError = errorMessage != null;
     if (!isLoading && featured == null && !hasError) {

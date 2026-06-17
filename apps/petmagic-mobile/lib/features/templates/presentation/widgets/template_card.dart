@@ -18,11 +18,31 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+const int _minTemplateCardImageCacheWidth = 320;
+const int _defaultTemplateCardImageCacheWidth = 720;
+const int _maxTemplateCardImageCacheWidth = 1080;
+
+int templateCardImageCacheWidthForLogicalWidth(
+  double logicalSize,
+  double pixelRatio,
+) {
+  if (!logicalSize.isFinite ||
+      logicalSize <= 0 ||
+      !pixelRatio.isFinite ||
+      pixelRatio <= 0) {
+    return _defaultTemplateCardImageCacheWidth;
+  }
+
+  return (logicalSize * pixelRatio)
+      .clamp(_minTemplateCardImageCacheWidth, _maxTemplateCardImageCacheWidth)
+      .round();
+}
+
 class TemplateCard extends StatefulWidget {
   const TemplateCard({
     required this.template,
     required this.hasPremiumAccess,
-    required this.renderContextKey,
+    required this.imageCacheWidth,
     this.onPressed,
     this.showGuestPreview = false,
     this.highlightBadgeLabel,
@@ -32,7 +52,7 @@ class TemplateCard extends StatefulWidget {
 
   final TemplateItem template;
   final bool hasPremiumAccess;
-  final String renderContextKey;
+  final int imageCacheWidth;
   final VoidCallback? onPressed;
   final bool showGuestPreview;
   final String? highlightBadgeLabel;
@@ -214,6 +234,7 @@ class _TemplateCardState extends State<TemplateCard>
                         children: [
                           _TemplateMedia(
                             template: widget.template,
+                            imageCacheWidth: widget.imageCacheWidth,
                             controller: _videoController,
                             videoLoadFailed: _videoLoadFailed,
                             previewRetryToken: _previewRetryToken,
@@ -528,17 +549,15 @@ Future<VideoPlayerController> createTemplatePreviewVideoController(
 class _TemplateMedia extends StatelessWidget {
   const _TemplateMedia({
     required this.template,
+    required this.imageCacheWidth,
     required this.controller,
     required this.videoLoadFailed,
     required this.previewRetryToken,
     required this.onRetry,
   });
 
-  static const int _minTemplateCardImageCacheWidth = 320;
-  static const int _defaultTemplateCardImageCacheWidth = 720;
-  static const int _maxTemplateCardImageCacheWidth = 1080;
-
   final TemplateItem template;
+  final int imageCacheWidth;
   final VideoPlayerController? controller;
   final bool videoLoadFailed;
   final int previewRetryToken;
@@ -552,64 +571,44 @@ class _TemplateMedia extends StatelessWidget {
     final assetIsVideo = imagePreview.assetIsVideo;
     final canRetry = imageUrl != null || assetIsVideo;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-        final cacheWidth = _cacheDimension(constraints.maxWidth, pixelRatio);
-
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (showVideo)
-              AnimatedOpacity(
-                opacity: 1,
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOut,
-                child: FittedBox(
-                  fit: BoxFit.cover,
-                  child: SizedBox(
-                    width: controller!.value.size.width,
-                    height: controller!.value.size.height,
-                    child: VideoPlayer(controller!),
-                  ),
-                ),
-              )
-            else if (imageUrl != null)
-              _TemplateImageWithFallback(
-                key: ValueKey(
-                  'template-image-${template.templateId}'
-                  '-${template.mediaIdentity}'
-                  '-$previewRetryToken',
-                ),
-                imageUrl: imageUrl,
-                cacheWidth: cacheWidth,
-                onRetry: onRetry,
-                isVideoTemplate: assetIsVideo,
-              )
-            else if (videoLoadFailed)
-              _MediaErrorPlaceholder(
-                isVideo: template.isVideo,
-                onRetry: canRetry ? onRetry : null,
-              )
-            else
-              const _MediaSkeletonPlaceholder(),
-          ],
-        );
-      },
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (showVideo)
+          AnimatedOpacity(
+            opacity: 1,
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOut,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: controller!.value.size.width,
+                height: controller!.value.size.height,
+                child: VideoPlayer(controller!),
+              ),
+            ),
+          )
+        else if (imageUrl != null)
+          _TemplateImageWithFallback(
+            key: ValueKey(
+              'template-image-${template.templateId}'
+              '-${template.mediaIdentity}'
+              '-$previewRetryToken',
+            ),
+            imageUrl: imageUrl,
+            cacheWidth: imageCacheWidth,
+            onRetry: onRetry,
+            isVideoTemplate: assetIsVideo,
+          )
+        else if (videoLoadFailed)
+          _MediaErrorPlaceholder(
+            isVideo: template.isVideo,
+            onRetry: canRetry ? onRetry : null,
+          )
+        else
+          const _MediaSkeletonPlaceholder(),
+      ],
     );
-  }
-
-  int _cacheDimension(double logicalSize, double pixelRatio) {
-    if (!logicalSize.isFinite ||
-        logicalSize <= 0 ||
-        !pixelRatio.isFinite ||
-        pixelRatio <= 0) {
-      return _defaultTemplateCardImageCacheWidth;
-    }
-
-    return (logicalSize * pixelRatio)
-        .clamp(_minTemplateCardImageCacheWidth, _maxTemplateCardImageCacheWidth)
-        .round();
   }
 }
 

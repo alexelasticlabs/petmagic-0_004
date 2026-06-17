@@ -26,7 +26,12 @@ void main() {
         source,
         contains('return kDebugMode && _enableCheckerboardOffscreenLayers;'),
       );
-      expect(source, contains('return kDebugMode && _enableFrameTelemetry;'));
+      expect(
+        source,
+        contains(
+          'return (kDebugMode || kProfileMode) && _enableFrameTelemetry;',
+        ),
+      );
       expect(
         main,
         contains('GoogleFonts.config.allowRuntimeFetching = false;'),
@@ -38,6 +43,31 @@ void main() {
       expect(router, isNot(contains('/debug/')));
     },
   );
+
+  test('global rebuild hot paths use scoped subscriptions', () {
+    final app = File('lib/app/app.dart').readAsStringSync();
+    final shell = File(
+      'lib/shared/navigation/petmagic_shell.dart',
+    ).readAsStringSync();
+    final templatesPage = File(
+      'lib/features/templates/presentation/templates_page.dart',
+    ).readAsStringSync();
+
+    expect(app, isNot(contains('ref.watch(networkStatusControllerProvider);')));
+    expect(shell, contains('class _ActiveGenerationBannerSlot'));
+    expect(shell, contains('PerformanceGuard.isDegradedMode(context)'));
+    expect(shell, contains('AppPerformanceTrace.setRouteLabel(location);'));
+    expect(templatesPage, contains('ref.listen<String?>('));
+    expect(
+      templatesPage,
+      isNot(contains('_syncSearchFieldWithQuery(state.query.search);')),
+    );
+    expect(templatesPage, contains('SliverLayoutBuilder('));
+    expect(
+      templatesPage,
+      contains('templateCardImageCacheWidthForLogicalWidth('),
+    );
+  });
 
   test('release Android signing cannot silently fall back to debug keystore', () {
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();

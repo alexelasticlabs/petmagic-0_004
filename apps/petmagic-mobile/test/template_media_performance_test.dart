@@ -88,7 +88,7 @@ void main() {
       expect(source, contains('Image.file('));
       expect(source, isNot(contains('Image.network(')));
       expect(source, contains('TemplateMediaCache.removeThumbnailFile'));
-      expect(source, contains('cacheWidth: cacheWidth'));
+      expect(source, contains('cacheWidth: widget.cacheWidth'));
       expect(source, contains('filterQuality: FilterQuality.medium'));
     },
   );
@@ -100,11 +100,14 @@ void main() {
         'lib/features/templates/presentation/widgets/template_card.dart',
       ).readAsString();
 
-      expect(source, contains('final int cacheWidth;'));
-      expect(source, contains('int _cacheDimension('));
+      expect(source, contains('final int imageCacheWidth;'));
       expect(
         source,
-        contains('static const int _defaultTemplateCardImageCacheWidth = 720;'),
+        contains('int templateCardImageCacheWidthForLogicalWidth('),
+      );
+      expect(
+        source,
+        contains('const int _defaultTemplateCardImageCacheWidth = 720;'),
       );
       expect(source, contains('return _defaultTemplateCardImageCacheWidth;'));
       expect(
@@ -113,7 +116,7 @@ void main() {
           '.clamp(_minTemplateCardImageCacheWidth, _maxTemplateCardImageCacheWidth)',
         ),
       );
-      expect(source, contains('cacheWidth: widget.cacheWidth'));
+      expect(source, contains('cacheWidth: imageCacheWidth'));
     },
   );
 

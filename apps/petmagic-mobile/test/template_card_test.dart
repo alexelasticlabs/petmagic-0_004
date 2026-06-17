@@ -670,14 +670,12 @@ void main() {
     ]);
   });
 
-  testWidgets('TemplateCard keeps image subtree stable across filter context', (
+  testWidgets('TemplateCard keeps image subtree stable across cache sizing', (
     tester,
   ) async {
     final template = _imageTemplate();
 
-    await tester.pumpWidget(
-      _buildHost(template, renderContextKey: 'all|all||20'),
-    );
+    await tester.pumpWidget(_buildHost(template, imageCacheWidth: 720));
     await tester.pump();
 
     expect(
@@ -691,9 +689,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.pumpWidget(
-      _buildHost(template, renderContextKey: 'all|portrait||20'),
-    );
+    await tester.pumpWidget(_buildHost(template, imageCacheWidth: 840));
     await tester.pump();
 
     expect(
@@ -880,7 +876,7 @@ Widget _buildHost(
   TemplateItem template, {
   Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory,
-  String renderContextKey = 'all|all||20',
+  int imageCacheWidth = 720,
   ThemeData? theme,
   bool hasPremiumAccess = true,
   Size size = const Size(320, 240),
@@ -897,7 +893,7 @@ Widget _buildHost(
           child: TemplateCard(
             template: template,
             hasPremiumAccess: hasPremiumAccess,
-            renderContextKey: renderContextKey,
+            imageCacheWidth: imageCacheWidth,
             previewControllerFactory: previewControllerFactory,
           ),
         ),
@@ -924,7 +920,7 @@ Widget _buildGridHost(List<TemplateItem> templates) {
                 child: TemplateCard(
                   template: template,
                   hasPremiumAccess: true,
-                  renderContextKey: 'all|all||20',
+                  imageCacheWidth: 720,
                   previewControllerFactory: (previewUrl) async =>
                       VideoPlayerController.networkUrl(Uri.parse(previewUrl)),
                 ),

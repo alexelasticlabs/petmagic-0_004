@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -80,19 +82,9 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     final location = widget.location;
+    AppPerformanceTrace.setRouteLabel(location);
     final navigationShell = widget.navigationShell;
     final showBottomNav = !hasKeyboard && isCurrentRoute;
-    final activeGeneration = ref.watch(
-      generationHistoryControllerProvider.select(
-        (state) => state.activeGeneration,
-      ),
-    );
-    final showActiveBanner =
-        showBottomNav &&
-        activeGeneration != null &&
-        !activeGeneration.isTerminal &&
-        _dismissedGenerationId != activeGeneration.generationId &&
-        !location.startsWith(GenerationStatusPage.routePrefix);
     final currentIndex =
         navigationShell?.currentIndex ??
         _resolveCurrentIndexFromLocation(location);
@@ -106,13 +98,12 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
             child: navigationShell ?? widget.child!,
           ),
           if (showBottomNav) const _BottomNavBackdrop(),
-          if (showActiveBanner)
-            _ActiveGenerationBanner(
-              generation: activeGeneration,
-              onDismiss: () {
-                setState(() {
-                  _dismissedGenerationId = activeGeneration.generationId;
-                });
+          if (showBottomNav)
+            _ActiveGenerationBannerSlot(
+              location: location,
+              dismissedGenerationId: _dismissedGenerationId,
+              onDismiss: (generationId) {
+                setState(() => _dismissedGenerationId = generationId);
               },
             ),
           if (showBottomNav)
@@ -305,6 +296,7 @@ class _FloatingBottomNav extends ConsumerWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final isDegraded = PerformanceGuard.isDegradedMode(context);
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final unreadCount = ref.watch(
       generationHistoryControllerProvider.select((state) => state.unreadCount),
@@ -320,6 +312,45 @@ class _FloatingBottomNav extends ConsumerWidget {
       _NavItem(2, Icons.card_giftcard_rounded, text.navRewards),
       _NavItem(3, Icons.person_outline_rounded, text.navProfile),
     ];
+    final navSurface = DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceGlass.withValues(
+          alpha: isLight ? 0.99 : (isDegraded ? 0.84 : 0.68),
+        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: colors.border.withValues(alpha: isLight ? 0.92 : 0.22),
+          width: isLight ? 1.1 : 1,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(3, 1, 3, 1),
+        child: SizedBox(
+          height: _bottomNavHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final item in items)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2,
+                      vertical: 2,
+                    ),
+                    child: _BottomNavButton(
+                      item: item,
+                      selected: currentIndex == item.index,
+                      onTap: currentIndex == item.index
+                          ? null
+                          : () => onItemSelected(item.index),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
 
     return RepaintBoundary(
       child: Align(
@@ -340,76 +371,81 @@ class _FloatingBottomNav extends ConsumerWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colors.shadow.withValues(
-                          alpha: isLight ? 0.50 : 0.3,
-                        ),
-                        blurRadius: isLight ? 20 : 14,
-                        offset: const Offset(0, 5),
-                      ),
-                      BoxShadow(
-                        color: colors.backgroundBottom.withValues(
-                          alpha: isLight ? 0.42 : 0.18,
-                        ),
-                        blurRadius: isLight ? 30 : 18,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                    boxShadow: isDegraded
+                        ? [
+                            BoxShadow(
+                              color: colors.shadow.withValues(
+                                alpha: isLight ? 0.24 : 0.18,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : [
+                            BoxShadow(
+                              color: colors.shadow.withValues(
+                                alpha: isLight ? 0.50 : 0.3,
+                              ),
+                              blurRadius: isLight ? 20 : 14,
+                              offset: const Offset(0, 5),
+                            ),
+                            BoxShadow(
+                              color: colors.backgroundBottom.withValues(
+                                alpha: isLight ? 0.42 : 0.18,
+                              ),
+                              blurRadius: isLight ? 30 : 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                   ),
                 ),
               ),
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceGlass.withValues(
-                        alpha: isLight ? 0.99 : 0.68,
+                child: isDegraded
+                    ? navSurface
+                    : BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                        child: navSurface,
                       ),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: colors.border.withValues(
-                          alpha: isLight ? 0.92 : 0.22,
-                        ),
-                        width: isLight ? 1.1 : 1,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(3, 1, 3, 1),
-                      child: SizedBox(
-                        height: _bottomNavHeight,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            for (final item in items)
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 2,
-                                    vertical: 2,
-                                  ),
-                                  child: _BottomNavButton(
-                                    item: item,
-                                    selected: currentIndex == item.index,
-                                    onTap: currentIndex == item.index
-                                        ? null
-                                        : () => onItemSelected(item.index),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ActiveGenerationBannerSlot extends ConsumerWidget {
+  const _ActiveGenerationBannerSlot({
+    required this.location,
+    required this.dismissedGenerationId,
+    required this.onDismiss,
+  });
+
+  final String location;
+  final String? dismissedGenerationId;
+  final ValueChanged<String> onDismiss;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeGeneration = ref.watch(
+      generationHistoryControllerProvider.select(
+        (state) => state.activeGeneration,
+      ),
+    );
+
+    if (activeGeneration == null ||
+        activeGeneration.isTerminal ||
+        dismissedGenerationId == activeGeneration.generationId ||
+        location.startsWith(GenerationStatusPage.routePrefix)) {
+      return const SizedBox.shrink();
+    }
+
+    return _ActiveGenerationBanner(
+      generation: activeGeneration,
+      onDismiss: () => onDismiss(activeGeneration.generationId),
     );
   }
 }

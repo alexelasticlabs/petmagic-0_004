@@ -112,7 +112,7 @@ class PetMagicApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(sessionScopeResetProvider);
-    final networkRecoveryCoordinator = ref.watch(
+    final networkRecoveryCoordinator = ref.read(
       _networkRecoveryCoordinatorProvider,
     );
 
@@ -129,9 +129,12 @@ class PetMagicApp extends ConsumerWidget {
       unawaited(networkRecoveryCoordinator.onInternetRestored());
     });
 
-    ref.watch(networkStatusControllerProvider);
     final router = ref.watch(appRouterProvider);
-    final preferences = ref.watch(appPreferencesControllerProvider);
+    final preferences = ref.watch(
+      appPreferencesControllerProvider.select(
+        (state) => (themeMode: state.themeMode, locale: state.locale),
+      ),
+    );
 
     return MaterialApp.router(
       title: 'PetMagic',

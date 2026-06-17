@@ -64,7 +64,16 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(profileControllerProvider);
+    final state = ref.watch(
+      profileControllerProvider.select(
+        (state) => (
+          isLoading: state.isLoading,
+          isAuthenticated: state.isAuthenticated,
+          isSaving: state.isSaving,
+          profile: state.profile,
+        ),
+      ),
+    );
     final wallet = ref.watch(
       walletControllerProvider.select((walletState) => walletState.wallet),
     );

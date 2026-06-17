@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/core/performance/app_performance_monitor.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
@@ -71,6 +72,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     navigatorKey: _rootNavigatorKey,
     refreshListenable: refreshListenable,
     initialLocation: StartupLoadingPage.routePath,
+    observers: [AppPerformanceRouteObserver.instance],
     redirect: (context, state) {
       final launchState = ref.read(appLaunchControllerProvider);
       final location = state.uri.path;

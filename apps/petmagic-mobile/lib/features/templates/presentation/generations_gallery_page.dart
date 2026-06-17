@@ -62,6 +62,66 @@ String _templatesLocationForGeneration(TemplateGenerationResult generation) {
   ).toString();
 }
 
+class _GalleryPageViewState {
+  const _GalleryPageViewState({
+    required this.items,
+    required this.filter,
+    required this.unreadCount,
+    required this.isLoading,
+    required this.shouldShowOfflineBanner,
+    required this.isConnectionRecovered,
+    required this.lastSyncedAtUtc,
+    required this.errorMessage,
+  });
+
+  factory _GalleryPageViewState.from(GenerationHistoryState state) {
+    return _GalleryPageViewState(
+      items: state.items,
+      filter: state.filter,
+      unreadCount: state.unreadCount,
+      isLoading: state.isLoading,
+      shouldShowOfflineBanner: state.shouldShowOfflineBanner,
+      isConnectionRecovered: state.isConnectionRecovered,
+      lastSyncedAtUtc: state.lastSyncedAtUtc,
+      errorMessage: state.errorMessage,
+    );
+  }
+
+  final List<TemplateGenerationResult> items;
+  final GenerationHistoryFilter filter;
+  final int unreadCount;
+  final bool isLoading;
+  final bool shouldShowOfflineBanner;
+  final bool isConnectionRecovered;
+  final DateTime? lastSyncedAtUtc;
+  final String? errorMessage;
+
+  @override
+  bool operator ==(Object other) {
+    return other is _GalleryPageViewState &&
+        identical(items, other.items) &&
+        filter == other.filter &&
+        unreadCount == other.unreadCount &&
+        isLoading == other.isLoading &&
+        shouldShowOfflineBanner == other.shouldShowOfflineBanner &&
+        isConnectionRecovered == other.isConnectionRecovered &&
+        lastSyncedAtUtc == other.lastSyncedAtUtc &&
+        errorMessage == other.errorMessage;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    identityHashCode(items),
+    filter,
+    unreadCount,
+    isLoading,
+    shouldShowOfflineBanner,
+    isConnectionRecovered,
+    lastSyncedAtUtc,
+    errorMessage,
+  );
+}
+
 class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     with WidgetsBindingObserver {
   bool _readyExpanded = false;
@@ -133,7 +193,9 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
-    final state = ref.watch(generationHistoryControllerProvider);
+    final state = ref.watch(
+      generationHistoryControllerProvider.select(_GalleryPageViewState.from),
+    );
     final isAuthenticated = ref.watch(
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
     );
@@ -293,7 +355,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
   List<Widget> _buildContentSlivers(
     BuildContext context,
     AppLocalizations text,
-    GenerationHistoryState state, {
+    _GalleryPageViewState state, {
     required bool isAuthenticated,
   }) {
     if (!isAuthenticated) {

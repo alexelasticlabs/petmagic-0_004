@@ -200,7 +200,23 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(walletControllerProvider);
+    final state = ref.watch(
+      walletControllerProvider.select(
+        (state) => (
+          isInitialLoading: state.isInitialLoading,
+          wallet: state.wallet,
+          errorMessage: state.errorMessage,
+          packs: state.packs,
+          paymentMethods: state.paymentMethods,
+          storeProductPrices: state.storeProductPrices,
+          isBuying: state.isBuying,
+          isClaimingAd: state.isClaimingAd,
+          ledger: state.ledger,
+          purchases: state.purchases,
+          highlightedPurchaseOrderId: state.highlightedPurchaseOrderId,
+        ),
+      ),
+    );
     final controller = ref.read(walletControllerProvider.notifier);
     final isAuthenticated = ref.watch(
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),

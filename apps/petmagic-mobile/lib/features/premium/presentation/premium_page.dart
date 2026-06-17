@@ -517,7 +517,9 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(premiumControllerProvider);
+    final isLoading = ref.watch(
+      premiumControllerProvider.select((state) => state.isLoading),
+    );
     final controller = ref.read(premiumControllerProvider.notifier);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -590,15 +592,13 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
               duration: const Duration(milliseconds: 320),
               switchInCurve: Curves.easeOutCubic,
               switchOutCurve: Curves.easeInCubic,
-              child: state.isLoading
+              child: isLoading
                   ? Center(
                       key: const ValueKey('premium-loading'),
                       child: CircularProgressIndicator(color: accent),
                     )
-                  : _PremiumBody(
+                  : _PremiumBodySlot(
                       key: const ValueKey('premium-content'),
-                      state: state,
-                      controller: controller,
                       isDark: isDark,
                       onOpenUrl: _openExternalUrl,
                       onStartCheckout: _openPaymentMethodSheetAndCheckout,
@@ -608,6 +608,37 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PremiumBodySlot extends ConsumerWidget {
+  const _PremiumBodySlot({
+    required super.key,
+    required this.isDark,
+    required this.onOpenUrl,
+    required this.onStartCheckout,
+    required this.onClose,
+  });
+
+  final bool isDark;
+  final Future<void> Function(String url) onOpenUrl;
+  final Future<void> Function() onStartCheckout;
+  final Future<void> Function() onClose;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(premiumControllerProvider);
+    final controller = ref.read(premiumControllerProvider.notifier);
+
+    return _PremiumBody(
+      key: const ValueKey('premium-body-inner'),
+      state: state,
+      controller: controller,
+      isDark: isDark,
+      onOpenUrl: onOpenUrl,
+      onStartCheckout: onStartCheckout,
+      onClose: onClose,
     );
   }
 }

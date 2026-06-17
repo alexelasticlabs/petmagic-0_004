@@ -108,19 +108,24 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     final colors = context.petMagicColors;
     final scenarioData = buildSupportAssistantScenario(widget.scenario, text);
 
-    final generationState = ref.watch(generationHistoryControllerProvider);
-    final walletState = ref.watch(walletControllerProvider);
-    final premiumState = ref.watch(premiumControllerProvider);
-
-    final generationId = generationState.items.isEmpty
-        ? null
-        : generationState.items.first.generationId;
-    final paymentId = walletState.purchases.isEmpty
-        ? null
-        : walletState.purchases.first.orderId;
-    final subscriptionLabel = premiumState.status?.isPremium == true
-        ? premiumState.status?.status ?? 'Premium'
-        : null;
+    final generationId = ref.watch(
+      generationHistoryControllerProvider.select(
+        (state) => state.items.isEmpty ? null : state.items.first.generationId,
+      ),
+    );
+    final paymentId = ref.watch(
+      walletControllerProvider.select(
+        (state) =>
+            state.purchases.isEmpty ? null : state.purchases.first.orderId,
+      ),
+    );
+    final subscriptionLabel = ref.watch(
+      premiumControllerProvider.select(
+        (state) => state.status?.isPremium == true
+            ? state.status?.status ?? 'Premium'
+            : null,
+      ),
+    );
 
     return ProfileScreenBackground(
       child: Scaffold(
