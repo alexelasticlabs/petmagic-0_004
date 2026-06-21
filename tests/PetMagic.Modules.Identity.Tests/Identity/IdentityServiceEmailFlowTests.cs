@@ -181,6 +181,44 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task VerifyEmailCodeAsync_ShouldActivateAccount_AndIssueAuthSession()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("verify.session@petmagic.app", "StrongPassword123", "Verify Session", true, true, CurrentLegalVersion, CurrentLegalVersion, true),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        var verificationCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id && x.Purpose == EmailCodePurpose.EmailConfirmation)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstAsync();
+        verificationCode.CodeHash = HashValue("123456");
+        await dbContext.SaveChangesAsync();
+
+        var verifyResult = await service.VerifyEmailCodeAsync(
+            new VerifyEmailCodeCommand("verify.session@petmagic.app", "123456"),
+            CancellationToken.None);
+
+        Assert.True(verifyResult.IsSuccess);
+        Assert.False(string.IsNullOrWhiteSpace(verifyResult.Value.AccessToken));
+        Assert.False(string.IsNullOrWhiteSpace(verifyResult.Value.RefreshToken));
+        Assert.True(verifyResult.Value.User.EmailConfirmed);
+        Assert.Equal("Active", verifyResult.Value.User.AccountStatus);
+        Assert.True(verifyResult.Value.User.MarketingEmailsEnabled);
+
+        var persistedUser = await dbContext.Users.SingleAsync();
+        Assert.True(persistedUser.EmailConfirmed);
+        Assert.Equal(AccountStatus.Active, persistedUser.AccountStatus);
+        Assert.NotNull(verificationCode.ConsumedAtUtc);
+        Assert.Single(await dbContext.RefreshTokenSessions.Where(x => x.UserId == user.Id && x.RevokedAtUtc == null).ToListAsync());
+    }
+
+    [Fact]
     public async Task ConfirmPasswordResetAsync_ShouldUpdatePassword_And_RevokeRefreshTokens()
     {
         await using var dbContext = CreateDbContext();

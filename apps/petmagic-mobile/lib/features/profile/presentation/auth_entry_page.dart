@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
@@ -550,16 +551,41 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     }
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
-      final legalDocuments = switch (ref.read(
-        currentLegalDocumentsProvider(locale),
-      )) {
-        AsyncData(:final value) => value,
-        _ => null,
-      };
 
       if (!_acceptedTerms) {
         setState(() {
           _consentErrorMessage = 'auth.accept_terms_required';
+        });
+        return;
+      }
+
+      MobileLegalDocuments legalDocuments;
+      try {
+        legalDocuments = await ref.read(
+          currentLegalDocumentsProvider(locale).future,
+        );
+      } catch (error, stackTrace) {
+        AppLogger.warn(
+          feature: 'Profile.Auth',
+          operation: 'load_legal_documents_for_registration',
+          message: 'Legal documents could not be loaded for registration',
+          context: {'locale': locale},
+          error: error,
+          stackTrace: stackTrace,
+        );
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _consentErrorMessage = 'auth.legal_documents_unavailable';
+        });
+        return;
+      }
+
+      if (legalDocuments.termsOfUse.version.trim().isEmpty ||
+          legalDocuments.privacyPolicy.version.trim().isEmpty) {
+        setState(() {
+          _consentErrorMessage = 'auth.legal_documents_unavailable';
         });
         return;
       }
@@ -583,6 +609,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       if (_isSignUp &&
           nextState.successMessage ==
               'auth.registration_pending_verification') {
+        final email = nextState.email.trim();
+        router.go(
+          '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}&cooldown=1',
+        );
+      } else if (!_isSignUp &&
+          nextState.errorMessage == 'auth.email_not_confirmed') {
         final email = nextState.email.trim();
         router.go(
           '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',

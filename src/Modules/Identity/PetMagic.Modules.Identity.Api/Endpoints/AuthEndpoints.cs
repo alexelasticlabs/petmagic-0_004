@@ -259,7 +259,8 @@ public static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> VerifyEmailCodeAsync(
+    private static async Task<Results<Ok<TokenPairResponse>, ValidationProblem, ProblemHttpResult>> VerifyEmailCodeAsync(
+        HttpContext context,
         VerifyEmailCodeCommand command,
         IValidator<VerifyEmailCodeCommand> validator,
         IIdentityService service,
@@ -277,7 +278,8 @@ public static class AuthEndpoints
             return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
         }
 
-        return TypedResults.NoContent();
+        WriteRefreshTokenCookie(context, result.Value.RefreshToken);
+        return TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Accepted, ValidationProblem, ProblemHttpResult>> RequestPasswordResetAsync(

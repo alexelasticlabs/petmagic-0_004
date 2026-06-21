@@ -110,9 +110,49 @@ public sealed partial class IdentityService
         return Result.Success(ToUserProfileResponse(user, [SystemRoles.User]));
     }
 
-    public Task<Result> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken)
+    public async Task<Result<TokenPairResponse>> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken)
     {
-        return ConfirmEmailAsync(new ConfirmEmailCommand(command.Email, command.Code), cancellationToken);
+        var email = command.Email.Trim();
+        var user = await userManager.Users
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == email.ToUpperInvariant(), cancellationToken);
+
+        if (user is null || !user.IsActive)
+        {
+            return Result.Failure<TokenPairResponse>(IdentityErrors.EmailCodeInvalid);
+        }
+
+        var now = DateTime.UtcNow;
+        var codeEntity = await FindMatchingCodeAsync(user.Id, EmailCodePurpose.EmailConfirmation, command.Code, now, cancellationToken);
+        if (codeEntity is null)
+        {
+            await RegisterCodeFailureAsync(user.Id, EmailCodePurpose.EmailConfirmation, now, cancellationToken);
+            return Result.Failure<TokenPairResponse>(IdentityErrors.EmailCodeInvalid);
+        }
+
+        codeEntity.ConsumedAtUtc = now;
+        user.EmailConfirmed = true;
+        user.AccountStatus = AccountStatus.Active;
+        user.AccountStatusUpdatedAtUtc = now;
+
+        var updateResult = await userManager.UpdateAsync(user);
+        if (!updateResult.Succeeded)
+        {
+            return Result.Failure<TokenPairResponse>(IdentityErrors.OperationFailed);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var roles = await userManager.GetRolesAsync(user);
+        if (!roles.Contains(SystemRoles.User, StringComparer.Ordinal))
+        {
+            await userManager.AddToRoleAsync(user, SystemRoles.User);
+            roles.Add(SystemRoles.User);
+        }
+
+        var tokenPair = await IssueTokenPairAsync(user, roles, cancellationToken);
+        await WriteAuditAsync(user.Id, "user.email_confirmed", "Email address confirmed and auth session issued.", cancellationToken);
+        LogAuthInformation("email_verification", user.Id, "succeeded");
+        return Result.Success(tokenPair);
     }
 
     public Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken)

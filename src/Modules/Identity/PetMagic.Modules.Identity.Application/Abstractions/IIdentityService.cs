@@ -11,7 +11,7 @@ public interface IIdentityService
 
     Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken);
 
-    Task<Result> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken);
+    Task<Result<TokenPairResponse>> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken);
 
     Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken);
 

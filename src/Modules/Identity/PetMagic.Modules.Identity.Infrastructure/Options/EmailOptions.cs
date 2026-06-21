@@ -38,8 +38,12 @@ public sealed class EmailOptions
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Host)
-        && !string.IsNullOrWhiteSpace(Username)
-        && !string.IsNullOrWhiteSpace(Password)
         && !string.IsNullOrWhiteSpace(FromAddress);
+
+    public bool HasCredentials =>
+        !string.IsNullOrWhiteSpace(Username)
+        && !string.IsNullOrWhiteSpace(Password);
+
+    public bool IsProductionConfigured => IsConfigured && HasCredentials;
 }
 

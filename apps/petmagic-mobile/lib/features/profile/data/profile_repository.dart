@@ -197,15 +197,18 @@ class ProfileRepository {
     }
   }
 
-  Future<void> verifyEmailCode({
+  Future<AuthSession> verifyEmailCode({
     required String email,
     required String code,
   }) async {
     try {
-      await _dio.post<void>(
+      final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/verify-email-code',
         data: {'email': email.trim(), 'code': code.trim()},
       );
+      final session = AuthSession.fromJson(response.data ?? const {});
+      await _sessionStorage.save(session);
+      return session;
     } on DioException catch (error) {
       throw _mapDioException(
         error,

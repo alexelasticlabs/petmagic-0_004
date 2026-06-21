@@ -99,7 +99,15 @@ class _WalletPageState extends ConsumerState<WalletPage>
     }
 
     _scheduleNextAutoRefresh();
-    unawaited(_walletController.load(refresh: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      unawaited(
+        ref.read(walletControllerProvider.notifier).load(refresh: true),
+      );
+    });
   }
 
   @override

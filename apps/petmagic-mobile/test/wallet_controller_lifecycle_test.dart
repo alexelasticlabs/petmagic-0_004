@@ -39,6 +39,22 @@ void main() {
     expect(lifecycleBody, contains('ref.onDispose'));
   });
 
+  test('wallet page defers activate refresh until after frame', () {
+    final source = File(
+      'lib/features/wallet/presentation/wallet_page.dart',
+    ).readAsStringSync();
+    final activateBody = _methodBody(source, 'activate');
+
+    expect(
+      activateBody,
+      contains('WidgetsBinding.instance.addPostFrameCallback'),
+    );
+    expect(
+      activateBody,
+      isNot(contains('unawaited(_walletController.load(refresh: true))')),
+    );
+  });
+
   test('wallet load completes safely after provider disposal', () async {
     final repository = _DelayedWalletRepository();
     final container = ProviderContainer(

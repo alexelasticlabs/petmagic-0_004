@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 
@@ -41,19 +42,41 @@ void main() {
     repository.completeResend();
     await tester.pump();
   });
+
+  testWidgets('email verification disables resend while cooldown is active', (
+    tester,
+  ) async {
+    final repository = _DuplicateGuardProfileRepository();
+    await _pumpVerificationPage(tester, repository, startResendCooldown: true);
+
+    expect(find.text('Send code again (60s)'), findsOneWidget);
+
+    await tester.tap(find.byType(OutlinedButton));
+    await tester.pump();
+
+    expect(repository.resendCalls, 0);
+
+    await tester.pump(const Duration(seconds: 60));
+
+    expect(find.text('Send code again'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpVerificationPage(
   WidgetTester tester,
-  _DuplicateGuardProfileRepository repository,
-) async {
+  _DuplicateGuardProfileRepository repository, {
+  bool startResendCooldown = false,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [profileRepositoryProvider.overrideWithValue(repository)],
-      child: const MaterialApp(
+      child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: EmailVerificationPage(email: 'pet@example.com'),
+        home: EmailVerificationPage(
+          email: 'pet@example.com',
+          startResendCooldown: startResendCooldown,
+        ),
       ),
     ),
   );
@@ -67,11 +90,14 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
   var verifyCalls = 0;
   var resendCalls = 0;
 
-  final _verifyCompleter = Completer<void>();
+  final _verifyCompleter = Completer<AuthSession>();
   final _resendCompleter = Completer<void>();
 
   @override
-  Future<void> verifyEmailCode({required String email, required String code}) {
+  Future<AuthSession> verifyEmailCode({
+    required String email,
+    required String code,
+  }) {
     verifyCalls++;
     return _verifyCompleter.future;
   }
@@ -84,7 +110,7 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
 
   void completeVerify() {
     if (!_verifyCompleter.isCompleted) {
-      _verifyCompleter.complete();
+      _verifyCompleter.complete(_authSession());
     }
   }
 
@@ -93,4 +119,35 @@ class _DuplicateGuardProfileRepository extends ProfileRepository {
       _resendCompleter.complete();
     }
   }
+}
+
+AuthSession _authSession() {
+  return AuthSession(
+    accessToken: 'access-token',
+    refreshToken: 'refresh-token',
+    expiresAtUtc: DateTime.utc(2030),
+    user: const MobileUserProfile(
+      userId: 'user-1',
+      email: 'pet@example.com',
+      displayName: null,
+      isPremium: false,
+      emailConfirmed: true,
+      termsOfUseAccepted: true,
+      privacyPolicyAccepted: true,
+      marketingEmailsEnabled: false,
+      legalAcceptance: MobileLegalAcceptanceStatus(
+        termsOfUseAccepted: true,
+        termsOfUseAcceptedVersion: '2026-05-20',
+        termsOfUseAcceptedAtUtc: null,
+        privacyPolicyAccepted: true,
+        privacyPolicyAcceptedVersion: '2026-05-20',
+        privacyPolicyAcceptedAtUtc: null,
+        currentTermsOfUseVersion: '2026-05-20',
+        currentPrivacyPolicyVersion: '2026-05-20',
+        requiresAcceptance: false,
+      ),
+      roles: ['User'],
+      avatar: null,
+    ),
+  );
 }

@@ -178,6 +178,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           state: state,
           child: EmailVerificationPage(
             email: state.uri.queryParameters['email'] ?? '',
+            startResendCooldown: state.uri.queryParameters['cooldown'] == '1',
           ),
         ),
       ),

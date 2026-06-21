@@ -255,6 +255,108 @@ public sealed class IdentityInfrastructureConfigurationTests
         services.AddIdentityInfrastructure(configuration, environment);
     }
 
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldAllowLocalSmtpWithoutCredentials_InDevelopment()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Development
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Email:Host"] = "mailpit",
+            ["Email:Port"] = "1025",
+            ["Email:UseSsl"] = "false",
+            ["Email:FromAddress"] = "no-reply@petmagic.app",
+            ["Email:Username"] = "",
+            ["Email:Password"] = ""
+        });
+
+        services.AddIdentityInfrastructure(configuration, environment);
+
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<EmailOptions>();
+
+        Assert.True(options.IsConfigured);
+        Assert.False(options.HasCredentials);
+        Assert.False(options.IsProductionConfigured);
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldPreferEmailEnvironmentVariables()
+    {
+        SetEnvironmentVariables(new Dictionary<string, string?>
+        {
+            ["EMAIL_HOST"] = "mailpit",
+            ["EMAIL_PORT"] = "1025",
+            ["EMAIL_USE_SSL"] = "false",
+            ["EMAIL_FROM_ADDRESS"] = "no-reply@petmagic.app"
+        });
+
+        try
+        {
+            var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+            {
+                EnvironmentName = Environments.Development
+            };
+            var services = CreateServices(environment);
+            var configuration = CreateConfiguration(new Dictionary<string, string?>
+            {
+                ["Email:Host"] = "smtp.example.com",
+                ["Email:Port"] = "2525",
+                ["Email:UseSsl"] = "true",
+                ["Email:FromAddress"] = "appsettings@petmagic.app"
+            });
+
+            services.AddIdentityInfrastructure(configuration, environment);
+
+            using var provider = services.BuildServiceProvider();
+            var options = provider.GetRequiredService<EmailOptions>();
+
+            Assert.Equal("mailpit", options.Host);
+            Assert.Equal(1025, options.Port);
+            Assert.False(options.UseSsl);
+            Assert.Equal("no-reply@petmagic.app", options.FromAddress);
+        }
+        finally
+        {
+            ClearEnvironmentVariables(
+                "EMAIL_HOST",
+                "EMAIL_PORT",
+                "EMAIL_USE_SSL",
+                "EMAIL_FROM_ADDRESS");
+        }
+    }
+
+    [Fact]
+    public void AddIdentityInfrastructure_ShouldRejectSmtpWithoutCredentials_InProduction()
+    {
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+        var services = CreateServices(environment);
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["BootstrapAdmin:Email"] = "",
+            ["BootstrapAdmin:Password"] = "",
+            ["Email:Host"] = "mailpit",
+            ["Email:Port"] = "1025",
+            ["Email:UseSsl"] = "false",
+            ["Email:FromAddress"] = "no-reply@petmagic.app",
+            ["Email:Username"] = "",
+            ["Email:Password"] = ""
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => services.AddIdentityInfrastructure(configuration, environment));
+
+        Assert.Equal(
+            "Email dispatch worker is enabled but SMTP configuration is incomplete.",
+            exception.Message);
+    }
+
     private static IConfiguration CreateConfiguration(IEnumerable<KeyValuePair<string, string?>> values)
     {
         var defaults = new Dictionary<string, string?>

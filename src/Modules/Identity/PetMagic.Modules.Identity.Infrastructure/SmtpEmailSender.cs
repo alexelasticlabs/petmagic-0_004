@@ -2,13 +2,15 @@ using System.Net;
 using System.Net.Mail;
 using System.Text;
 
+using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Infrastructure;
 
-internal sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
+internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSender> logger) : IEmailSender
 {
     public async Task<Result> SendAsync(EmailDispatchJob job, CancellationToken cancellationToken)
     {
@@ -55,22 +57,42 @@ internal sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
 
         using var client = new SmtpClient(options.Host, options.Port)
         {
-            Credentials = new NetworkCredential(options.Username, options.Password),
             EnableSsl = options.UseSsl,
             DeliveryMethod = SmtpDeliveryMethod.Network
         };
+
+        if (options.HasCredentials)
+        {
+            client.Credentials = new NetworkCredential(options.Username, options.Password);
+        }
 
         try
         {
             await client.SendMailAsync(message, cancellationToken);
             return Result.Success();
         }
-        catch (SmtpException)
+        catch (SmtpException exception)
         {
+            logger.LogWarning(
+                exception,
+                "SMTP email dispatch failed. Host={EmailHost} Port={EmailPort} UseSsl={UseSsl} HasCredentials={HasCredentials} RecipientDomain={RecipientDomain}",
+                options.Host,
+                options.Port,
+                options.UseSsl,
+                options.HasCredentials,
+                GetRecipientDomain(job.RecipientEmail));
             return Result.Failure(IdentityErrors.EmailDispatchFailed);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
+            logger.LogWarning(
+                exception,
+                "SMTP email dispatch failed before send. Host={EmailHost} Port={EmailPort} UseSsl={UseSsl} HasCredentials={HasCredentials} RecipientDomain={RecipientDomain}",
+                options.Host,
+                options.Port,
+                options.UseSsl,
+                options.HasCredentials,
+                GetRecipientDomain(job.RecipientEmail));
             return Result.Failure(IdentityErrors.EmailDispatchFailed);
         }
     }
@@ -89,5 +111,16 @@ internal sealed class SmtpEmailSender(EmailOptions options) : IEmailSender
             .Replace("<br/>", "\n", StringComparison.OrdinalIgnoreCase)
             .Replace("<br />", "\n", StringComparison.OrdinalIgnoreCase)
             .Trim();
+    }
+
+    private static string GetRecipientDomain(string email)
+    {
+        var atIndex = email.LastIndexOf('@');
+        if (atIndex < 0 || atIndex == email.Length - 1)
+        {
+            return "unknown";
+        }
+
+        return email[(atIndex + 1)..];
     }
 }

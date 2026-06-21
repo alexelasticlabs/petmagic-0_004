@@ -7,6 +7,7 @@ PetMagic is a modular ASP.NET Core backend with a Next.js admin panel and a Flut
 | Service | Port | Role |
 | --- | --- | --- |
 | `postgres` | `5432` | PostgreSQL 16 data store |
+| `mailpit` | `8025` web UI, `1025` SMTP | Local email inbox for confirmation and password reset codes |
 | `backend` | `5001` on host, `5000` in Docker network | REST API, auth, economy, template queue API |
 | `generation-worker` | none | Claims and processes queued template generation jobs |
 | `admin-web` | `3000` | Admin UI |
@@ -31,6 +32,7 @@ Expected local endpoints:
 
 - Backend health: `http://localhost:5001/health`
 - Admin web: `http://localhost:3000`
+- Local email inbox: `http://localhost:8025`
 - PostgreSQL: `localhost:5432`
 
 If you change `BACKEND_HOST_PORT`, update frontend and mobile API base URLs accordingly.
@@ -46,6 +48,10 @@ POSTGRES_PASSWORD=replace_with_local_or_secret_value
 JWT_SIGNING_KEY=replace_with_64_byte_random_value
 BACKEND_HOST_PORT=5001
 ADMIN_WEB_HOST_PORT=3000
+MAILPIT_WEB_HOST_PORT=8025
+EMAIL_HOST=mailpit
+EMAIL_PORT=1025
+EMAIL_USE_SSL=false
 
 GENERATION_WORKER_MAX_CONCURRENT_JOBS=1
 GENERATION_GLOBAL_MAX_CONCURRENT=3

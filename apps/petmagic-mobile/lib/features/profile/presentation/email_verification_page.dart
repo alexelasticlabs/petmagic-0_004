@@ -1,18 +1,27 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
 class EmailVerificationPage extends ConsumerStatefulWidget {
-  const EmailVerificationPage({super.key, required this.email});
+  const EmailVerificationPage({
+    super.key,
+    required this.email,
+    this.startResendCooldown = false,
+  });
 
   static const routePath = '/verify-email';
 
   final String email;
+  final bool startResendCooldown;
 
   @override
   ConsumerState<EmailVerificationPage> createState() =>
@@ -20,13 +29,26 @@ class EmailVerificationPage extends ConsumerStatefulWidget {
 }
 
 class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
+  static const _resendCooldown = Duration(seconds: 60);
+
   final _codeController = TextEditingController();
+  Timer? _resendCooldownTimer;
   bool _isBusy = false;
+  int _resendSecondsRemaining = 0;
   String? _error;
   String? _info;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.startResendCooldown) {
+      _startResendCooldown();
+    }
+  }
+
+  @override
   void dispose() {
+    _resendCooldownTimer?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -65,8 +87,10 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
             ),
             const SizedBox(height: 8),
             OutlinedButton(
-              onPressed: _isBusy ? null : _resend,
-              child: Text(text.emailVerificationResendAction),
+              onPressed: _isBusy || _resendSecondsRemaining > 0
+                  ? null
+                  : _resend,
+              child: Text(_resendButtonLabel(text)),
             ),
             const SizedBox(height: 8),
             TextButton(
@@ -97,18 +121,22 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
 
     try {
       final repository = ref.read(profileRepositoryProvider);
-      await repository.verifyEmailCode(
+      final session = await repository.verifyEmailCode(
         email: widget.email,
         code: _codeController.text,
       );
       if (!mounted) return;
 
+      ref
+          .read(appLaunchControllerProvider.notifier)
+          .markSignedInWithLegalStatus(
+            requiresLegalAcceptance:
+                session.user.legalAcceptance.requiresAcceptance,
+          );
       setState(() {
         _info = text.emailVerificationConfirmedMessage;
       });
-      context.go(
-        '${AuthEntryPage.routePath}?email=${Uri.encodeQueryComponent(widget.email)}',
-      );
+      context.go(TemplatesPage.routePath);
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -142,6 +170,7 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       setState(() {
         _info = text.emailVerificationResentFallbackMessage;
       });
+      _startResendCooldown();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -161,5 +190,38 @@ class _EmailVerificationPageState extends ConsumerState<EmailVerificationPage> {
       return mapProfileFeedbackMessage(error.message, text);
     }
     return text.authRequestFailed;
+  }
+
+  void _startResendCooldown() {
+    _resendCooldownTimer?.cancel();
+    setState(() {
+      _resendSecondsRemaining = _resendCooldown.inSeconds;
+    });
+    _resendCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_resendSecondsRemaining <= 1) {
+        timer.cancel();
+        setState(() {
+          _resendSecondsRemaining = 0;
+        });
+        return;
+      }
+
+      setState(() {
+        _resendSecondsRemaining--;
+      });
+    });
+  }
+
+  String _resendButtonLabel(AppLocalizations text) {
+    if (_resendSecondsRemaining <= 0) {
+      return text.emailVerificationResendAction;
+    }
+
+    return '${text.emailVerificationResendAction} (${_resendSecondsRemaining}s)';
   }
 }

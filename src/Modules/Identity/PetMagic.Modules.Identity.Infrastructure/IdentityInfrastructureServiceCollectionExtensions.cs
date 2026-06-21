@@ -311,13 +311,13 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     {
         return new EmailOptions
         {
-            Host = ReadValue(section, "Host", "EMAIL_HOST") ?? string.Empty,
-            Port = ParseInt(ReadValue(section, "Port", "EMAIL_PORT"), 2525),
-            Username = ReadValue(section, "Username", "EMAIL_USERNAME") ?? string.Empty,
-            Password = ReadValue(section, "Password", "EMAIL_PASSWORD") ?? string.Empty,
-            UseSsl = ParseBool(ReadValue(section, "UseSsl", "EMAIL_USE_SSL"), true),
-            FromAddress = ReadValue(section, "FromAddress", "EMAIL_FROM_ADDRESS") ?? "no-reply@petmagic.local",
-            FromName = ReadValue(section, "FromName", "EMAIL_FROM_NAME") ?? "PetMagic",
+            Host = ReadEnvironmentOverride(section, "Host", "EMAIL_HOST") ?? string.Empty,
+            Port = ParseInt(ReadEnvironmentOverride(section, "Port", "EMAIL_PORT"), 2525),
+            Username = ReadEnvironmentOverride(section, "Username", "EMAIL_USERNAME") ?? string.Empty,
+            Password = ReadEnvironmentOverride(section, "Password", "EMAIL_PASSWORD") ?? string.Empty,
+            UseSsl = ParseBool(ReadEnvironmentOverride(section, "UseSsl", "EMAIL_USE_SSL"), true),
+            FromAddress = ReadEnvironmentOverride(section, "FromAddress", "EMAIL_FROM_ADDRESS") ?? "no-reply@petmagic.local",
+            FromName = ReadEnvironmentOverride(section, "FromName", "EMAIL_FROM_NAME") ?? "PetMagic",
             VerificationCodeLength = Math.Clamp(ParseInt(section["VerificationCodeLength"], 6), 6, 6),
             VerificationCodeTtlMinutes = ParseInt(section["VerificationCodeTtlMinutes"], 10),
             PasswordResetCodeTtlMinutes = ParseInt(section["PasswordResetCodeTtlMinutes"], 10),
@@ -349,6 +349,18 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         }
 
         return Environment.GetEnvironmentVariable(environmentVariableName);
+    }
+
+    private static string? ReadEnvironmentOverride(IConfigurationSection section, string key, string environmentVariableName)
+    {
+        var environmentValue = Environment.GetEnvironmentVariable(environmentVariableName);
+        if (!string.IsNullOrWhiteSpace(environmentValue))
+        {
+            return environmentValue;
+        }
+
+        var configured = section[key];
+        return string.IsNullOrWhiteSpace(configured) ? null : configured;
     }
 
     private static int ParseInt(string? rawValue, int fallback)
@@ -461,7 +473,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             return;
         }
 
-        if (!options.IsConfigured)
+        if (!options.IsProductionConfigured)
         {
             throw new InvalidOperationException("Email dispatch worker is enabled but SMTP configuration is incomplete.");
         }

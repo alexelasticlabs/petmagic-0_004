@@ -17,6 +17,14 @@ services:
     networks:
       - petmagic-network
 
+  mailpit:
+    image: axllent/mailpit:v1.19
+    ports:
+      - "${MAILPIT_SMTP_HOST_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_HOST_PORT:-8025}:8025"
+    networks:
+      - petmagic-network
+
   backend:
     build:
       context: .
@@ -40,11 +48,11 @@ services:
       APPLE_AUDIENCES: "${APPLE_AUDIENCES:-}"
       APPLE_AUTHORIZATION_ENDPOINT: "${APPLE_AUTHORIZATION_ENDPOINT:-}"
       APPLE_TOKEN_ENDPOINT: "${APPLE_TOKEN_ENDPOINT:-}"
-      EMAIL_HOST: "${EMAIL_HOST:-}"
-      EMAIL_PORT: "${EMAIL_PORT:-2525}"
+      EMAIL_HOST: "${EMAIL_HOST:-mailpit}"
+      EMAIL_PORT: "${EMAIL_PORT:-1025}"
       EMAIL_USERNAME: "${EMAIL_USERNAME:-}"
       EMAIL_PASSWORD: "${EMAIL_PASSWORD:-}"
-      EMAIL_USE_SSL: "${EMAIL_USE_SSL:-true}"
+      EMAIL_USE_SSL: "${EMAIL_USE_SSL:-false}"
       EMAIL_FROM_ADDRESS: "${EMAIL_FROM_ADDRESS:-no-reply@petmagic.app}"
       EMAIL_FROM_NAME: "${EMAIL_FROM_NAME:-PetMagic}"
       STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
@@ -90,6 +98,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     networks:
       - petmagic-network
 
