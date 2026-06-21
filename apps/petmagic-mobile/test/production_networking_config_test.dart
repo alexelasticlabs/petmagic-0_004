@@ -69,29 +69,32 @@ void main() {
     );
   });
 
-  test('android release keeps FCM auto init while smoke manifests disable it', () {
-    final mainManifest = File(
-      'android/app/src/main/AndroidManifest.xml',
-    ).readAsStringSync();
-    final debugManifest = File(
-      'android/app/src/debug/AndroidManifest.xml',
-    ).readAsStringSync();
-    final profileManifest = File(
-      'android/app/src/profile/AndroidManifest.xml',
-    ).readAsStringSync();
+  test(
+    'android release keeps FCM auto init while smoke manifests disable it',
+    () {
+      final mainManifest = File(
+        'android/app/src/main/AndroidManifest.xml',
+      ).readAsStringSync();
+      final debugManifest = File(
+        'android/app/src/debug/AndroidManifest.xml',
+      ).readAsStringSync();
+      final profileManifest = File(
+        'android/app/src/profile/AndroidManifest.xml',
+      ).readAsStringSync();
 
-    expect(mainManifest, contains('firebase_messaging_auto_init_enabled'));
-    expect(
-      mainManifest,
-      contains(
-        'android:name="firebase_messaging_auto_init_enabled"\n'
-        '            android:value="true"',
-      ),
-    );
-    for (final manifest in [debugManifest, profileManifest]) {
-      expect(manifest, contains('firebase_messaging_auto_init_enabled'));
-      expect(manifest, contains('android:value="false"'));
-      expect(manifest, contains('tools:replace="android:value"'));
-    }
-  });
+      expect(mainManifest, contains('firebase_messaging_auto_init_enabled'));
+      expect(
+        mainManifest,
+        contains(
+          'android:name="firebase_messaging_auto_init_enabled"\n'
+          '            android:value="true"',
+        ),
+      );
+      for (final manifest in [debugManifest, profileManifest]) {
+        expect(manifest, contains('firebase_messaging_auto_init_enabled'));
+        expect(manifest, contains('android:value="false"'));
+        expect(manifest, contains('tools:replace="android:value"'));
+      }
+    },
+  );
 }

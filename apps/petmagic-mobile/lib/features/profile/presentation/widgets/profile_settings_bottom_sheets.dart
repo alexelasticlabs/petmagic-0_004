@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 
 class ProfileLanguageSheetOption {
@@ -313,6 +314,24 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceGlass,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow,
+            blurRadius: 24,
+            offset: const Offset(0, 18),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: child,
+      ),
+    );
 
     return SafeArea(
       top: false,
@@ -320,27 +339,12 @@ class _ProfileSettingsSheetShell extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(32),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceGlass,
-                borderRadius: BorderRadius.circular(32),
-                border: Border.all(color: colors.border),
-                boxShadow: [
-                  BoxShadow(
-                    color: colors.shadow,
-                    blurRadius: 24,
-                    offset: const Offset(0, 18),
-                  ),
-                ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                child: child,
-              ),
-            ),
-          ),
+          child: PerformanceGuard.shouldAvoidBlur(context)
+              ? content
+              : BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: content,
+                ),
         ),
       ),
     );

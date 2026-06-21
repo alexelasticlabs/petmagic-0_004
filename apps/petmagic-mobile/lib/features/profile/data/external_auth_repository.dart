@@ -140,6 +140,16 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
     try {
       final serverClientId = await _resolveGoogleServerClientId();
+      AppLogger.info(
+        feature: 'Profile.ExternalAuth',
+        operation: 'google_native_auth_stage',
+        message: 'Resolved Google mobile auth config',
+        context: {
+          'stage': 'mobile_config_loaded',
+          'has_server_client_id': serverClientId != null,
+          'base_url': _dio.options.baseUrl,
+        },
+      );
 
       googleSignIn = GoogleSignIn(
         scopes: const ['email'],
@@ -150,13 +160,41 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       if (account == null) {
         throw const AppException(_cancelledCode);
       }
+      AppLogger.info(
+        feature: 'Profile.ExternalAuth',
+        operation: 'google_native_auth_stage',
+        message: 'Google account selected',
+        context: {
+          'stage': 'account_selected',
+          'email_present': account.email.isNotEmpty,
+        },
+      );
 
       final authentication = await account.authentication;
       final idToken = authentication.idToken;
       if (idToken == null || idToken.isEmpty) {
         throw const AppException(_genericFailedCode);
       }
+      AppLogger.info(
+        feature: 'Profile.ExternalAuth',
+        operation: 'google_native_auth_stage',
+        message: 'Google id token acquired',
+        context: {
+          'stage': 'id_token_acquired',
+          'id_token_length': idToken.length,
+        },
+      );
 
+      AppLogger.info(
+        feature: 'Profile.ExternalAuth',
+        operation: 'google_native_auth_stage',
+        message: 'Starting backend token exchange',
+        context: {
+          'stage': 'native_exchange_started',
+          'path': '/api/auth/external/google/native',
+          'base_url': _dio.options.baseUrl,
+        },
+      );
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/auth/external/google/native',
         data: {'idToken': idToken},
@@ -184,6 +222,11 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       final mapped = _mapDioException(
         error,
         fallbackMessage: _genericFailedCode,
+      );
+      _logExternalAuthFailure(
+        'authenticate_native_google_dio',
+        error,
+        error.stackTrace ?? StackTrace.current,
       );
       _trackSocialAuthEvent(
         'social_login_failed',
@@ -216,6 +259,11 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
 
       return serverClientId;
     } on DioException catch (error) {
+      _logExternalAuthFailure(
+        'resolve_google_mobile_config_dio',
+        error,
+        error.stackTrace ?? StackTrace.current,
+      );
       if (_canContinueGoogleWithoutMobileConfig(error)) {
         _trackSocialAuthEvent(
           'google_mobile_config_unavailable',

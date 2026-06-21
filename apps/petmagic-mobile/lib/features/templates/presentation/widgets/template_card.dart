@@ -38,6 +38,24 @@ int templateCardImageCacheWidthForLogicalWidth(
       .round();
 }
 
+class TemplateCardFeaturedData {
+  const TemplateCardFeaturedData({
+    required this.badgeLabel,
+    required this.actionLabel,
+    this.countdownTarget,
+    this.popularityCount,
+    this.isNew = false,
+    this.showPopularityTodayFallback = true,
+  });
+
+  final String badgeLabel;
+  final String actionLabel;
+  final DateTime? countdownTarget;
+  final int? popularityCount;
+  final bool isNew;
+  final bool showPopularityTodayFallback;
+}
+
 class TemplateCard extends StatefulWidget {
   const TemplateCard({
     required this.template,
@@ -46,6 +64,7 @@ class TemplateCard extends StatefulWidget {
     this.onPressed,
     this.showGuestPreview = false,
     this.highlightBadgeLabel,
+    this.featuredData,
     this.previewControllerFactory,
     super.key,
   });
@@ -56,6 +75,7 @@ class TemplateCard extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool showGuestPreview;
   final String? highlightBadgeLabel;
+  final TemplateCardFeaturedData? featuredData;
   final Future<VideoPlayerController> Function(String previewUrl)?
   previewControllerFactory;
 
@@ -71,6 +91,7 @@ class _TemplateCardState extends State<TemplateCard>
 
   VideoPlayerController? _videoController;
   Timer? _disposeTimer;
+  Timer? _featuredCountdownTimer;
   bool _isPreviewActive = false;
   bool _hasPreviewSlot = false;
   bool _isPressed = false;
@@ -84,6 +105,7 @@ class _TemplateCardState extends State<TemplateCard>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _syncFeaturedCountdownTicker();
   }
 
   @override
@@ -100,11 +122,17 @@ class _TemplateCardState extends State<TemplateCard>
       _disposeTimer?.cancel();
       unawaited(_disposeVideoController());
     }
+
+    if (oldWidget.featuredData?.countdownTarget !=
+        widget.featuredData?.countdownTarget) {
+      _syncFeaturedCountdownTicker();
+    }
   }
 
   @override
   void dispose() {
     _disposeTimer?.cancel();
+    _featuredCountdownTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _videoControllerRequestVersion++;
     _videoControllerInitInFlight = false;
@@ -136,10 +164,15 @@ class _TemplateCardState extends State<TemplateCard>
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final premiumBorder = widget.template.isPremium
+    final isFeatured = widget.featuredData != null;
+    final premiumBorder = isFeatured
+        ? const Color(0xFFF0D48A).withValues(alpha: 0.94)
+        : widget.template.isPremium
         ? const Color(0xFFE6B75D).withValues(alpha: 0.9)
         : colors.border.withValues(alpha: isLight ? 0.62 : 0.28);
-    final premiumGlow = widget.template.isPremium
+    final premiumGlow = isFeatured
+        ? const Color(0xFF1EE6A0).withValues(alpha: 0.3)
+        : widget.template.isPremium
         ? const Color(0xFFF0C875).withValues(alpha: 0.34)
         : colors.shadow;
     final cardRadius = BorderRadius.circular(24);
@@ -157,35 +190,48 @@ class _TemplateCardState extends State<TemplateCard>
           ),
           onVisibilityChanged: _handleVisibility,
           child: DecoratedBox(
-            decoration: widget.template.isPremium
+            decoration: isFeatured || widget.template.isPremium
                 ? BoxDecoration(
                     borderRadius: cardRadius,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFF6E8C0),
-                        Color(0xFFE6BB64),
-                        Color(0xFFC1851E),
-                      ],
-                      stops: [0, 0.56, 1],
-                    ),
+                    gradient: isFeatured
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF1A241C),
+                              Color(0xFF0E1814),
+                              Color(0xFF3B2A0B),
+                            ],
+                            stops: [0, 0.52, 1],
+                          )
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFF6E8C0),
+                              Color(0xFFE6BB64),
+                              Color(0xFFC1851E),
+                            ],
+                            stops: [0, 0.56, 1],
+                          ),
                     boxShadow: [
                       BoxShadow(
-                        color: premiumGlow.withValues(alpha: 0.14),
-                        blurRadius: 10,
+                        color: premiumGlow.withValues(
+                          alpha: isFeatured ? 0.22 : 0.14,
+                        ),
+                        blurRadius: isFeatured ? 18 : 10,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   )
                 : const BoxDecoration(),
             child: Padding(
-              padding: widget.template.isPremium
-                  ? const EdgeInsets.all(1.15)
+              padding: isFeatured || widget.template.isPremium
+                  ? const EdgeInsets.all(1.2)
                   : EdgeInsets.zero,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: widget.template.isPremium
+                  borderRadius: isFeatured || widget.template.isPremium
                       ? BorderRadius.circular(22.85)
                       : cardRadius,
                   border: Border.all(color: premiumBorder, width: 1.15),
@@ -193,12 +239,16 @@ class _TemplateCardState extends State<TemplateCard>
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      widget.template.isPremium
+                      isFeatured
+                          ? const Color(0x3320D490)
+                          : widget.template.isPremium
                           ? const Color(0x5A664412)
                           : colors.surfaceGlass.withValues(
                               alpha: isLight ? 0.58 : 0.28,
                             ),
-                      widget.template.isPremium
+                      isFeatured
+                          ? const Color(0x3B241707)
+                          : widget.template.isPremium
                           ? const Color(0x2E2B1A08)
                           : colors.surfaceStrong.withValues(
                               alpha: isLight ? 0.28 : 0.12,
@@ -207,16 +257,22 @@ class _TemplateCardState extends State<TemplateCard>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: widget.template.isPremium
+                      color: isFeatured
+                          ? premiumGlow.withValues(alpha: 0.24)
+                          : widget.template.isPremium
                           ? premiumGlow.withValues(alpha: 0.15)
                           : premiumGlow,
-                      blurRadius: widget.template.isPremium ? 12 : 22,
+                      blurRadius: isFeatured
+                          ? 20
+                          : widget.template.isPremium
+                          ? 12
+                          : 22,
                       offset: const Offset(0, 12),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: widget.template.isPremium
+                  borderRadius: isFeatured || widget.template.isPremium
                       ? BorderRadius.circular(22.85)
                       : cardRadius,
                   child: Material(
@@ -245,24 +301,16 @@ class _TemplateCardState extends State<TemplateCard>
                             top: 8,
                             left: 8,
                             right: 8,
-                            child: Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              runSpacing: 6,
-                              children: [
-                                if (widget.highlightBadgeLabel != null)
-                                  _HighlightBadge(
-                                    label: widget.highlightBadgeLabel!,
-                                  ),
-                                if (widget.template.effectivePromoBadge != null)
-                                  _PromoBadge(
-                                    value: widget.template.effectivePromoBadge!,
-                                  )
-                                else
-                                  const SizedBox.shrink(),
-                                _MediaTypeBadge(
-                                  type: widget.template.templateType,
-                                ),
-                              ],
+                            child: _TemplateHeaderBadges(
+                              highlightBadgeLabel:
+                                  widget.featuredData?.badgeLabel ??
+                                  widget.highlightBadgeLabel,
+                              promoBadgeValue:
+                                  widget.featuredData?.isNew == true
+                                  ? 'NEW'
+                                  : widget.template.effectivePromoBadge,
+                              type: widget.template.templateType,
+                              isFeatured: isFeatured,
                             ),
                           ),
                           Positioned(
@@ -273,6 +321,7 @@ class _TemplateCardState extends State<TemplateCard>
                               template: widget.template,
                               hasPremiumAccess: widget.hasPremiumAccess,
                               showGuestPreview: widget.showGuestPreview,
+                              featuredData: widget.featuredData,
                               onPressed: widget.onPressed,
                             ),
                           ),
@@ -287,6 +336,34 @@ class _TemplateCardState extends State<TemplateCard>
         ),
       ),
     );
+  }
+
+  void _syncFeaturedCountdownTicker() {
+    _featuredCountdownTimer?.cancel();
+    final target = widget.featuredData?.countdownTarget?.toUtc();
+    if (target == null) {
+      return;
+    }
+
+    final remaining = target.difference(DateTime.now().toUtc());
+    if (remaining <= Duration.zero) {
+      return;
+    }
+
+    final interval = remaining <= const Duration(hours: 1)
+        ? const Duration(seconds: 1)
+        : const Duration(minutes: 1);
+    _featuredCountdownTimer = Timer.periodic(interval, (_) {
+      if (!mounted) {
+        return;
+      }
+
+      final nextRemaining = target.difference(DateTime.now().toUtc());
+      if (nextRemaining <= Duration.zero) {
+        _featuredCountdownTimer?.cancel();
+      }
+      setState(() {});
+    });
   }
 
   void _handleVisibility(VisibilityInfo info) {
@@ -787,17 +864,62 @@ class _TemplateShadeOverlay extends StatelessWidget {
   }
 }
 
+class _TemplateHeaderBadges extends StatelessWidget {
+  const _TemplateHeaderBadges({
+    required this.type,
+    this.highlightBadgeLabel,
+    this.promoBadgeValue,
+    this.isFeatured = false,
+  });
+
+  final TemplateType type;
+  final String? highlightBadgeLabel;
+  final String? promoBadgeValue;
+  final bool isFeatured;
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmedPromo = promoBadgeValue?.trim();
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (highlightBadgeLabel != null &&
+                  highlightBadgeLabel!.isNotEmpty)
+                _HighlightBadge(
+                  label: highlightBadgeLabel!,
+                  isFeatured: isFeatured,
+                ),
+              if (trimmedPromo != null && trimmedPromo.isNotEmpty)
+                _PromoBadge(value: trimmedPromo),
+            ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        _MediaTypeBadge(type: type),
+      ],
+    );
+  }
+}
+
 class _TemplateDetails extends StatelessWidget {
   const _TemplateDetails({
     required this.template,
     required this.hasPremiumAccess,
     required this.showGuestPreview,
+    this.featuredData,
     required this.onPressed,
   });
 
   final TemplateItem template;
   final bool hasPremiumAccess;
   final bool showGuestPreview;
+  final TemplateCardFeaturedData? featuredData;
   final VoidCallback? onPressed;
 
   @override
@@ -812,22 +934,53 @@ class _TemplateDetails extends StatelessWidget {
         musicDescription != null &&
         musicDescription.isNotEmpty;
     final isPremiumLocked = template.isPremium && !hasPremiumAccess;
+    final isFeatured = featuredData != null;
     final actionLabel = isPremiumLocked
         ? text.templateUnlockPremiumAction
-        : text.templateTryAction;
+        : featuredData?.actionLabel ?? text.templateTryAction;
+    final featuredCountdownLabel = isFeatured
+        ? _formatFeaturedCountdown(featuredData!.countdownTarget)
+        : null;
+    final featuredPopularityLabel = isFeatured
+        ? _formatFeaturedPopularity(
+            context,
+            featuredData!.popularityCount,
+            showTodayFallback: featuredData!.showPopularityTodayFallback,
+          )
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            _TokenChip(cost: template.tokenCost),
-            if (showGuestPreview)
-              _TemplateStatusChip(label: text.templateGuestPreview),
-          ],
-        ),
+        if (isFeatured)
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              if (featuredCountdownLabel != null)
+                _TemplateFeaturedMetaChip(
+                  icon: Icons.timer_outlined,
+                  label: featuredCountdownLabel,
+                  accent: const Color(0xFF22D394),
+                ),
+              if (featuredPopularityLabel != null)
+                _TemplateFeaturedMetaChip(
+                  icon: Icons.pets_rounded,
+                  label: featuredPopularityLabel,
+                  accent: const Color(0xFFF5D679),
+                ),
+            ],
+          )
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _TokenChip(cost: template.tokenCost),
+              if (showGuestPreview)
+                _TemplateStatusChip(label: text.templateGuestPreview),
+            ],
+          ),
         const SizedBox(height: 6),
         Text(
           template.title,
@@ -909,10 +1062,60 @@ class _TemplateDetails extends StatelessWidget {
         _TemplateActionButton(
           label: actionLabel,
           isPremiumLockCta: isPremiumLocked,
-          isPremiumTemplateCta: template.isPremium,
+          isPremiumTemplateCta: template.isPremium || isFeatured,
           onPressed: onPressed,
         ),
       ],
+    );
+  }
+}
+
+class _TemplateFeaturedMetaChip extends StatelessWidget {
+  const _TemplateFeaturedMetaChip({
+    required this.icon,
+    required this.label,
+    required this.accent,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(context).textTheme.labelSmall;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color.fromRGBO(8, 12, 20, 0.52),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accent.withValues(alpha: 0.44)),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: accent),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: textStyle?.copyWith(
+                color: Colors.white,
+                fontSize: 9.6,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1186,12 +1389,15 @@ class _PromoBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    final tone = switch (value.toLowerCase()) {
+    final normalized = value.toLowerCase();
+    final tone = switch (normalized) {
       'popular' => colors.purple,
       'trending' => colors.gold,
       'funny' => const Color(0xFFEC4899),
+      'new' => const Color(0xFFFF7A1A),
       _ => colors.accent,
     };
+    final text = normalized == 'new' ? 'NEW' : value.toUpperCase();
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -1205,7 +1411,7 @@ class _PromoBadge extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         child: Text(
-          value.toUpperCase(),
+          text,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: Colors.white,
             fontSize: 9,
@@ -1218,21 +1424,33 @@ class _PromoBadge extends StatelessWidget {
 }
 
 class _HighlightBadge extends StatelessWidget {
-  const _HighlightBadge({required this.label});
+  const _HighlightBadge({required this.label, this.isFeatured = false});
 
   final String label;
+  final bool isFeatured;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF12D784).withValues(alpha: 0.92),
+        gradient: isFeatured
+            ? const LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [Color(0xFF1BE9A5), Color(0xFFF0D072)],
+              )
+            : null,
+        color: isFeatured
+            ? null
+            : const Color(0xFF12D784).withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF12D784).withValues(alpha: 0.28),
-            blurRadius: 12,
+            color:
+                (isFeatured ? const Color(0xFFF0D072) : const Color(0xFF12D784))
+                    .withValues(alpha: 0.28),
+            blurRadius: isFeatured ? 16 : 12,
             offset: const Offset(0, 6),
           ),
         ],
@@ -1501,4 +1719,58 @@ class _AccessTag extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _formatFeaturedCountdown(DateTime? target) {
+  if (target == null) {
+    return null;
+  }
+
+  final remaining = target.toUtc().difference(DateTime.now().toUtc());
+  if (remaining <= Duration.zero) {
+    return null;
+  }
+
+  if (remaining < const Duration(hours: 1)) {
+    final minutes = remaining.inMinutes
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  final totalHours = remaining.inHours;
+  final minutes = remaining.inMinutes.remainder(60).toString().padLeft(2, '0');
+  return '$totalHours:$minutes';
+}
+
+String? _formatFeaturedPopularity(
+  BuildContext context,
+  int? popularityCount, {
+  required bool showTodayFallback,
+}) {
+  if (popularityCount == null || popularityCount <= 0) {
+    if (!showTodayFallback) {
+      return null;
+    }
+
+    return Localizations.localeOf(context).languageCode.toLowerCase() == 'ru'
+        ? 'Сегодня'
+        : 'Today';
+  }
+
+  if (popularityCount < 1000) {
+    return popularityCount.toString();
+  }
+
+  if (popularityCount < 10000) {
+    final compact = popularityCount / 1000;
+    return '${compact.toStringAsFixed(1).replaceFirst('.0', '')}k';
+  }
+
+  return '${(popularityCount / 1000).round()}k';
 }

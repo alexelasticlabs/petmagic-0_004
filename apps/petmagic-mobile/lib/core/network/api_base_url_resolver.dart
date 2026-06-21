@@ -67,6 +67,10 @@ class ApiBaseUrlResolver {
       return persisted;
     }
 
+    if (kDebugMode) {
+      return _resolveWithProbe();
+    }
+
     _activeBaseUrl = AppConfig.apiBaseUrl;
     _refreshInBackground();
     return _activeBaseUrl!;
@@ -297,16 +301,16 @@ class ApiBaseUrlResolver {
       return const [];
     }
 
-    final overrideProvider = _localSubnetCandidatesProvider;
-    if (overrideProvider != null) {
-      return overrideProvider();
-    }
-
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return const [];
-    }
-
     try {
+      final overrideProvider = _localSubnetCandidatesProvider;
+      if (overrideProvider != null) {
+        return await overrideProvider();
+      }
+
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        return const [];
+      }
+
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,
         includeLoopback: false,

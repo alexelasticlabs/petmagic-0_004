@@ -230,12 +230,7 @@ class _ShellTabFadeTransitionState extends State<_ShellTabFadeTransition>
   }
 
   bool _disableAnimations(BuildContext context) {
-    final media = MediaQuery.maybeOf(context);
-    if (media == null) {
-      return false;
-    }
-
-    return media.disableAnimations || media.accessibleNavigation;
+    return PerformanceGuard.shouldReduceMotion(context);
   }
 }
 
@@ -402,7 +397,7 @@ class _FloatingBottomNav extends ConsumerWidget {
               ),
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
-                child: isDegraded
+                child: isDegraded || PerformanceGuard.shouldAvoidBlur(context)
                     ? navSurface
                     : BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),

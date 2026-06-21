@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 
 class AuthBackdrop extends StatelessWidget {
@@ -290,32 +291,36 @@ class AuthFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final content = Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compact ? 12 : 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xB8181F26) : const Color(0xB8FFFFFF),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDark ? const Color(0x40789687) : const Color(0x8CB4C8BE),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.35)
+                : const Color(0x1A1F2D3D),
+            blurRadius: compact ? 24 : 32,
+            offset: Offset(0, compact ? 8 : 12),
+          ),
+        ],
+      ),
+      child: child,
+    );
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(compact ? 12 : 16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xB8181F26) : const Color(0xB8FFFFFF),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: isDark ? const Color(0x40789687) : const Color(0x8CB4C8BE),
+      child: PerformanceGuard.shouldAvoidBlur(context)
+          ? content
+          : BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: content,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: isDark
-                    ? Colors.black.withValues(alpha: 0.35)
-                    : const Color(0x1A1F2D3D),
-                blurRadius: compact ? 24 : 32,
-                offset: Offset(0, compact ? 8 : 12),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
     );
   }
 }

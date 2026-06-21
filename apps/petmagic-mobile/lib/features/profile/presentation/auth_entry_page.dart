@@ -81,6 +81,7 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  GoRouter? _router;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptedTerms = false;
@@ -117,6 +118,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _router = GoRouter.of(context);
   }
 
   @override
@@ -544,7 +551,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
 
   Future<void> _submit() async {
     final controller = ref.read(profileControllerProvider.notifier);
-    final router = GoRouter.of(context);
+    final router = _router;
+    if (router == null) {
+      return;
+    }
     if (_isSignUp) {
       final locale = Localizations.localeOf(context).toLanguageTag();
       final legalDocuments = switch (ref.read(
@@ -614,7 +624,10 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
       },
     );
     final controller = ref.read(profileControllerProvider.notifier);
-    final router = GoRouter.of(context);
+    final router = _router;
+    if (router == null) {
+      return;
+    }
     await controller.authenticateWithProvider(provider);
 
     if (!mounted) {

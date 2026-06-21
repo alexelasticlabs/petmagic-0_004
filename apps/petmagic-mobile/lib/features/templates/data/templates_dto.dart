@@ -439,6 +439,9 @@ class TemplateOfTheDayItemDto {
     this.thumbnailUrl,
     this.previewMediaUrl,
     this.previewAsset,
+    this.isNew = false,
+    this.popularityCount,
+    this.expiresAtUtc,
   });
 
   final String templateId;
@@ -456,6 +459,9 @@ class TemplateOfTheDayItemDto {
   final List<String> tags;
   final int tokenCost;
   final TemplateAssetDto? previewAsset;
+  final bool isNew;
+  final int? popularityCount;
+  final DateTime? expiresAtUtc;
 
   factory TemplateOfTheDayItemDto.fromJson(Map<String, Object?> json) {
     final rawPreviewAsset = json['previewAsset'];
@@ -486,6 +492,9 @@ class TemplateOfTheDayItemDto {
               Map<String, Object?>.from(rawPreviewAsset),
             )
           : null,
+      isNew: TemplateItemDto._toBool(json['isNew']) ?? false,
+      popularityCount: (json['popularityCount'] as num?)?.toInt(),
+      expiresAtUtc: _parseOptionalDateTime(json['expiresAt'] as String?),
     );
   }
 
@@ -505,6 +514,9 @@ class TemplateOfTheDayItemDto {
     tags: tags,
     tokenCost: tokenCost,
     previewAsset: previewAsset?.toDomain(),
+    isNew: isNew,
+    popularityCount: popularityCount,
+    expiresAtUtc: expiresAtUtc,
   );
 
   static DateTime _parseDate(String? raw) {
@@ -517,5 +529,14 @@ class TemplateOfTheDayItemDto {
 
     final parsed = normalized == null ? null : DateTime.tryParse(normalized);
     return (parsed ?? DateTime.now()).toUtc();
+  }
+
+  static DateTime? _parseOptionalDateTime(String? raw) {
+    final normalized = raw?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+
+    return DateTime.tryParse(normalized)?.toUtc();
   }
 }

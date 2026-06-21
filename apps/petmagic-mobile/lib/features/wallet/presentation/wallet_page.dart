@@ -48,6 +48,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   bool _shouldReloadOnResume = false;
   Timer? _autoRefreshTimer;
   late final WalletController _walletController;
+  ModalRoute<dynamic>? _route;
   int _autoRefreshErrorStreak = 0;
 
   @override
@@ -80,6 +81,12 @@ class _WalletPageState extends ConsumerState<WalletPage>
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = null;
     super.deactivate();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
   }
 
   @override
@@ -154,7 +161,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
         return;
       }
 
-      final route = ModalRoute.of(context);
+      final route = _route;
       if (route != null && !route.isCurrent) {
         _scheduleNextAutoRefresh();
         return;

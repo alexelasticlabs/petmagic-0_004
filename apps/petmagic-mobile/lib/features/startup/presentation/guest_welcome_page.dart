@@ -7,6 +7,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
@@ -421,6 +422,156 @@ class _WelcomeHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final content = Container(
+      height: compact ? 150 : 186,
+      padding: EdgeInsets.fromLTRB(
+        compact ? 12 : 14,
+        compact ? 10 : 12,
+        compact ? 12 : 14,
+        compact ? 10 : 12,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(compact ? 24 : 30),
+        border: Border.all(color: colors.border),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceGlass.withValues(alpha: 0.96),
+            colors.surfaceGlass.withValues(alpha: 0.76),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: compact ? -38 : -44,
+            right: compact ? -18 : -22,
+            child: BlurOrb(
+              color: colors.blue.withValues(alpha: 0.18),
+              size: compact ? 116 : 140,
+            ),
+          ),
+          Positioned(
+            left: compact ? -14 : -20,
+            bottom: compact ? -42 : -56,
+            child: BlurOrb(
+              color: colors.accent.withValues(alpha: 0.2),
+              size: compact ? 132 : 170,
+            ),
+          ),
+          Positioned(
+            top: compact ? 4 : 6,
+            left: compact ? 8 : 10,
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              color: colors.gold.withValues(alpha: 0.72),
+              size: compact ? 14 : 16,
+            ),
+          ),
+          Positioned(
+            top: compact ? 26 : 34,
+            right: compact ? 22 : 28,
+            child: Icon(
+              Icons.close_rounded,
+              color: colors.blue.withValues(alpha: 0.55),
+              size: compact ? 12 : 14,
+            ),
+          ),
+          Align(
+            alignment: Alignment.topRight,
+            child: _HeroPill(
+              icon: Icons.auto_awesome_rounded,
+              label: 'AI',
+              compact: compact,
+            ),
+          ),
+          Align(
+            child: Container(
+              width: compact ? 132 : 152,
+              height: compact ? 84 : 98,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(compact ? 20 : 24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colors.backgroundBottom.withValues(alpha: 0.96),
+                    colors.surface.withValues(alpha: 0.9),
+                  ],
+                ),
+                border: Border.all(color: colors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: colors.accent.withValues(alpha: 0.2),
+                    blurRadius: 26,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Align(
+                    child: Icon(
+                      Icons.pets_rounded,
+                      color: colors.accent,
+                      size: compact ? 34 : 42,
+                    ),
+                  ),
+                  Positioned(
+                    right: compact ? 8 : 10,
+                    bottom: compact ? 8 : 10,
+                    child: Container(
+                      width: compact ? 26 : 30,
+                      height: compact ? 26 : 30,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: colors.accent,
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        size: compact ? 16 : 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _HeroFlowChip(
+                    icon: Icons.style_rounded,
+                    label: templatesLabel,
+                    compact: compact,
+                  ),
+                ),
+                SizedBox(width: compact ? 5 : 6),
+                Expanded(
+                  child: _HeroFlowChip(
+                    icon: Icons.add_photo_alternate_outlined,
+                    label: imageLabel,
+                    compact: compact,
+                  ),
+                ),
+                SizedBox(width: compact ? 5 : 6),
+                Expanded(
+                  child: _HeroFlowChip(
+                    icon: Icons.movie_creation_outlined,
+                    label: videoLabel,
+                    compact: compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -435,159 +586,12 @@ class _WelcomeHeroCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 24 : 30),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            height: compact ? 150 : 186,
-            padding: EdgeInsets.fromLTRB(
-              compact ? 12 : 14,
-              compact ? 10 : 12,
-              compact ? 12 : 14,
-              compact ? 10 : 12,
-            ),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(compact ? 24 : 30),
-              border: Border.all(color: colors.border),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colors.surfaceGlass.withValues(alpha: 0.96),
-                  colors.surfaceGlass.withValues(alpha: 0.76),
-                ],
+        child: PerformanceGuard.shouldAvoidBlur(context)
+            ? content
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: content,
               ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  top: compact ? -38 : -44,
-                  right: compact ? -18 : -22,
-                  child: BlurOrb(
-                    color: colors.blue.withValues(alpha: 0.18),
-                    size: compact ? 116 : 140,
-                  ),
-                ),
-                Positioned(
-                  left: compact ? -14 : -20,
-                  bottom: compact ? -42 : -56,
-                  child: BlurOrb(
-                    color: colors.accent.withValues(alpha: 0.2),
-                    size: compact ? 132 : 170,
-                  ),
-                ),
-                Positioned(
-                  top: compact ? 4 : 6,
-                  left: compact ? 8 : 10,
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    color: colors.gold.withValues(alpha: 0.72),
-                    size: compact ? 14 : 16,
-                  ),
-                ),
-                Positioned(
-                  top: compact ? 26 : 34,
-                  right: compact ? 22 : 28,
-                  child: Icon(
-                    Icons.close_rounded,
-                    color: colors.blue.withValues(alpha: 0.55),
-                    size: compact ? 12 : 14,
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.topRight,
-                  child: _HeroPill(
-                    icon: Icons.auto_awesome_rounded,
-                    label: 'AI',
-                    compact: compact,
-                  ),
-                ),
-                Align(
-                  child: Container(
-                    width: compact ? 132 : 152,
-                    height: compact ? 84 : 98,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(compact ? 20 : 24),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colors.backgroundBottom.withValues(alpha: 0.96),
-                          colors.surface.withValues(alpha: 0.9),
-                        ],
-                      ),
-                      border: Border.all(color: colors.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colors.accent.withValues(alpha: 0.2),
-                          blurRadius: 26,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Align(
-                          child: Icon(
-                            Icons.pets_rounded,
-                            color: colors.accent,
-                            size: compact ? 34 : 42,
-                          ),
-                        ),
-                        Positioned(
-                          right: compact ? 8 : 10,
-                          bottom: compact ? 8 : 10,
-                          child: Container(
-                            width: compact ? 26 : 30,
-                            height: compact ? 26 : 30,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: colors.accent,
-                            ),
-                            child: Icon(
-                              Icons.play_arrow_rounded,
-                              color: Theme.of(context).colorScheme.onPrimary,
-                              size: compact ? 16 : 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _HeroFlowChip(
-                          icon: Icons.style_rounded,
-                          label: templatesLabel,
-                          compact: compact,
-                        ),
-                      ),
-                      SizedBox(width: compact ? 5 : 6),
-                      Expanded(
-                        child: _HeroFlowChip(
-                          icon: Icons.add_photo_alternate_outlined,
-                          label: imageLabel,
-                          compact: compact,
-                        ),
-                      ),
-                      SizedBox(width: compact ? 5 : 6),
-                      Expanded(
-                        child: _HeroFlowChip(
-                          icon: Icons.movie_creation_outlined,
-                          label: videoLabel,
-                          compact: compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -704,6 +708,62 @@ class _FeatureMiniCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final content = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 12,
+        vertical: compact ? 8 : 10,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surfaceGlass.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(compact ? 18 : 22),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: compact ? 30 : 34,
+            height: compact ? 30 : 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: iconColor.withValues(alpha: 0.18),
+            ),
+            child: Icon(icon, color: iconColor, size: compact ? 16 : 18),
+          ),
+          SizedBox(width: compact ? 8 : 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: colors.textStrong,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                    fontSize: compact ? 12.4 : 13.1,
+                  ),
+                ),
+                SizedBox(height: compact ? 1 : 2),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textMuted,
+                    height: 1.22,
+                    fontSize: compact ? 10.6 : 11.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.close_rounded,
+            size: compact ? 10 : 12,
+            color: colors.blue.withValues(alpha: 0.34),
+          ),
+        ],
+      ),
+    );
 
     return Container(
       decoration: BoxDecoration(
@@ -718,65 +778,12 @@ class _FeatureMiniCard extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(compact ? 18 : 22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 10 : 12,
-              vertical: compact ? 8 : 10,
-            ),
-            decoration: BoxDecoration(
-              color: colors.surfaceGlass.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(compact ? 18 : 22),
-              border: Border.all(color: colors.border),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: compact ? 30 : 34,
-                  height: compact ? 30 : 34,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: iconColor.withValues(alpha: 0.18),
-                  ),
-                  child: Icon(icon, color: iconColor, size: compact ? 16 : 18),
-                ),
-                SizedBox(width: compact ? 8 : 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: colors.textStrong,
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
-                          fontSize: compact ? 12.4 : 13.1,
-                        ),
-                      ),
-                      SizedBox(height: compact ? 1 : 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.textMuted,
-                          height: 1.22,
-                          fontSize: compact ? 10.6 : 11.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.close_rounded,
-                  size: compact ? 10 : 12,
-                  color: colors.blue.withValues(alpha: 0.34),
-                ),
-              ],
-            ),
-          ),
-        ),
+        child: PerformanceGuard.shouldAvoidBlur(context)
+            ? content
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: content,
+              ),
       ),
     );
   }

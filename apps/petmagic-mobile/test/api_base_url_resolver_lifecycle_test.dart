@@ -25,6 +25,7 @@ void main() {
       await runZonedGuarded(() async {
         final resolver = ApiBaseUrlResolver(
           preferences: SharedPreferencesAsync(),
+          healthProbe: (_) async => false,
           localSubnetCandidatesProvider: () async {
             throw StateError('local discovery failed');
           },
@@ -37,6 +38,34 @@ void main() {
       }, (error, _) => uncaughtErrors.add(error));
 
       expect(uncaughtErrors, isEmpty);
+    },
+  );
+
+  test(
+    'first resolve eagerly probes and adopts a reachable candidate',
+    () async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() {
+        SharedPreferencesAsyncPlatform.instance = previousPreferences;
+      });
+
+      const persistedBaseUrlKey = 'petmagic_mobile_last_api_base_url';
+      final preferences = SharedPreferencesAsync();
+      final resolver = ApiBaseUrlResolver(
+        preferences: preferences,
+        healthProbe: (baseUrl) async => baseUrl == 'http://127.0.0.1:5000',
+      );
+
+      addTearDown(resolver.dispose);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      expect(resolver.activeBaseUrl, 'http://127.0.0.1:5000');
+      expect(
+        await preferences.getString(persistedBaseUrlKey),
+        'http://127.0.0.1:5000',
+      );
     },
   );
 

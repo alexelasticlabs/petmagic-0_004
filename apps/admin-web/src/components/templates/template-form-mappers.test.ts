@@ -204,16 +204,15 @@ describe("template media asset payload hardening", () => {
     expect(formFromTemplate.referenceUrlSource).toBe("persisted");
   });
 
-  it("does not include persisted signed template media URLs in save payload builders", () => {
+  it("preserves persisted template media in save payload builders", () => {
     const source = readFileSync(formMappersPath, "utf8");
 
-    expect(source).toContain("function buildUploadedAsset(");
-    expect(source).toContain('if (source !== "uploaded") {');
+    expect(source).toContain("function buildTemplateAsset(");
+    expect(source).toContain('if (source === "none") {');
     expect(source).toContain("return undefined;");
-    expect(source).toContain("previewAsset: buildUploadedAsset(");
-    expect(source).toContain("referenceMotionAsset: buildUploadedAsset(");
-    expect(source).not.toContain("previewAsset: buildAsset(");
-    expect(source).not.toContain("referenceMotionAsset: buildAsset(");
+    expect(source).toContain("previewAsset: buildTemplateAsset(");
+    expect(source).toContain("referenceMotionAsset: buildTemplateAsset(");
+    expect(source).toContain("url: url.trim()");
   });
 });
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 
 abstract final class PetMotion {
   static const Duration fast = Duration(milliseconds: 160);
@@ -11,12 +12,7 @@ abstract final class PetMotion {
   static const double pressScale = 0.965;
 
   static bool reduceMotion(BuildContext context) {
-    final media = MediaQuery.maybeOf(context);
-    if (media == null) {
-      return false;
-    }
-
-    return media.disableAnimations || media.accessibleNavigation;
+    return PerformanceGuard.shouldReduceMotion(context);
   }
 
   static Duration effectiveDuration(BuildContext context, Duration normal) {

@@ -310,7 +310,7 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
 
     final nextState = ref.read(passwordChangeControllerProvider);
     if (nextState.successMessage == 'auth.password_reset_success') {
-      FocusScope.of(context).unfocus();
+      FocusManager.instance.primaryFocus?.unfocus();
     }
   }
 

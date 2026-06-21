@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
@@ -225,14 +226,44 @@ class ProfileSettingsPage extends ConsumerWidget {
                         return;
                       }
 
-                      await ref
-                          .read(templateGenerationRepositoryProvider)
-                          .submitFeedback(
-                            type: draft.type,
-                            category: draft.category,
-                            message: draft.message,
-                            sourceScreen: 'settings',
-                          );
+                      try {
+                        await ref
+                            .read(templateGenerationRepositoryProvider)
+                            .submitFeedback(
+                              type: draft.type,
+                              category: draft.category,
+                              message: draft.message,
+                              sourceScreen: 'settings',
+                            );
+                      } on AppException catch (error) {
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        PetMagicToast.show(
+                          context,
+                          message: mapProfileFeedbackMessage(
+                            error.message,
+                            text,
+                          ),
+                          tone: PetMagicToastTone.warning,
+                        );
+                        return;
+                      } catch (_) {
+                        if (!context.mounted) {
+                          return;
+                        }
+
+                        PetMagicToast.show(
+                          context,
+                          message: mapProfileFeedbackMessage(
+                            'profile.action_failed',
+                            text,
+                          ),
+                          tone: PetMagicToastTone.warning,
+                        );
+                        return;
+                      }
 
                       if (!context.mounted) {
                         return;
@@ -478,8 +509,8 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
 ) {
   final copy = _settingsFeedbackCopy(context);
   final colors = context.petMagicColors;
-  final controller = TextEditingController();
   var selected = copy.options.first;
+  var message = '';
 
   return showModalBottomSheet<_SettingsFeedbackDraft>(
     context: context,
@@ -489,10 +520,11 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
     builder: (sheetContext) {
       return StatefulBuilder(
         builder: (context, setState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.viewInsetsOf(context).bottom,
-            ),
+          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.only(bottom: bottomInset),
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: colors.backgroundBottom,
@@ -503,7 +535,7 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
               ),
               child: SafeArea(
                 top: false,
-                child: Padding(
+                child: SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -532,10 +564,10 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
                         ],
                       ),
                       const SizedBox(height: 14),
-                      TextField(
-                        controller: controller,
+                      TextFormField(
                         minLines: 3,
                         maxLines: 5,
+                        onChanged: (value) => message = value,
                         decoration: InputDecoration(
                           labelText: copy.messageLabel,
                           hintText: copy.messageHint,
@@ -544,13 +576,14 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
                       const SizedBox(height: 14),
                       FilledButton(
                         onPressed: () {
-                          Navigator.of(context).pop(
+                          final trimmedMessage = message.trim();
+                          Navigator.of(sheetContext).pop(
                             _SettingsFeedbackDraft(
                               type: selected.$1,
                               category: selected.$2,
-                              message: controller.text.trim().isEmpty
+                              message: trimmedMessage.isEmpty
                                   ? null
-                                  : controller.text.trim(),
+                                  : trimmedMessage,
                             ),
                           );
                         },
@@ -565,5 +598,5 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
         },
       );
     },
-  ).whenComplete(controller.dispose);
+  );
 }

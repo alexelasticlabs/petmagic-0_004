@@ -25,6 +25,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  GoRouter? _router;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -51,6 +52,12 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _router = GoRouter.of(context);
   }
 
   @override
@@ -330,7 +337,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     final query = email.isEmpty
         ? ''
         : '?email=${Uri.encodeQueryComponent(email)}';
-    context.go('${AuthEntryPage.routePath}$query');
+    _router?.go('${AuthEntryPage.routePath}$query');
   }
 
   void _syncControllers(PasswordResetState state) {

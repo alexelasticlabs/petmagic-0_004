@@ -9,6 +9,7 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/mappers/rewards_error_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';

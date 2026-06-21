@@ -89,7 +89,9 @@ bool isAllowedExternalUri(
       return true;
     }
 
-    return normalizedAllowedHosts.contains(host);
+    return normalizedAllowedHosts.any(
+      (allowedHost) => host == allowedHost || host.endsWith('.$allowedHost'),
+    );
   }
 
   if (scheme != 'http' || !allowLocalHttp) {
@@ -139,6 +141,7 @@ Set<String> generationMediaAllowedHosts() {
     'api.petmagic.app',
     'cdn.petmagic.app',
     'cdn.petmagic.ai',
+    'r2.dev',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
@@ -154,6 +157,7 @@ Set<String> profileAvatarAllowedHosts() {
     'api.petmagic.app',
     'cdn.petmagic.app',
     'cdn.petmagic.ai',
+    'r2.dev',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);

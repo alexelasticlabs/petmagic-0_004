@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 class ProfileScreenBackground extends StatelessWidget {
@@ -83,7 +84,21 @@ class ProfileGlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final avoidBlur = PerformanceGuard.shouldAvoidBlur(context);
     final borderRadius = BorderRadius.circular(24);
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceGlass.withValues(alpha: isLight ? 0.98 : 1),
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: colors.border.withValues(alpha: isLight ? 0.98 : 1),
+        ),
+      ),
+      child: Padding(
+        padding: padding ?? const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
 
     return RepaintBoundary(
       child: DecoratedBox(
@@ -99,24 +114,12 @@ class ProfileGlassCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: borderRadius,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceGlass.withValues(
-                  alpha: isLight ? 0.98 : 1,
+          child: avoidBlur
+              ? content
+              : BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                  child: content,
                 ),
-                borderRadius: borderRadius,
-                border: Border.all(
-                  color: colors.border.withValues(alpha: isLight ? 0.98 : 1),
-                ),
-              ),
-              child: Padding(
-                padding: padding ?? const EdgeInsets.all(16),
-                child: child,
-              ),
-            ),
-          ),
         ),
       ),
     );

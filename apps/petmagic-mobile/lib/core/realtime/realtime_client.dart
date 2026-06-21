@@ -189,6 +189,10 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       await _consumeResponse(response);
       return true;
     } catch (error, stackTrace) {
+      if (_isStopping) {
+        return false;
+      }
+
       _logRealtimeFailure(
         'connect',
         error,

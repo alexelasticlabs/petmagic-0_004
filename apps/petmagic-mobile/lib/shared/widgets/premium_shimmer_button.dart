@@ -20,13 +20,34 @@ class PremiumShimmerButton extends StatefulWidget {
 
 class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2000),
-  )..repeat();
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void deactivate() {
+    _controller.stop();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }

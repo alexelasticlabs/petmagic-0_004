@@ -1366,17 +1366,13 @@ class _AdaptiveTemplateMediaFrame extends StatelessWidget {
             useSharedPreviewCache: true,
           );
         } else if (imageUrl != null) {
-          media = CachedNetworkImage(
+          media = TemplatePreviewImage(
             imageUrl: imageUrl,
-            cacheManager: TemplateMediaCache.thumbnailCache,
             fit: BoxFit.cover,
             alignment: Alignment.center,
-            memCacheWidth: cacheWidth,
-            maxWidthDiskCache: cacheWidth,
-            filterQuality: FilterQuality.medium,
-            placeholder: (context, url) =>
-                _EmptyMediaBox(label: text.templateFlowLoadingPreview),
-            errorWidget: (context, url, error) => _TemplatePreviewPlaceholder(
+            cacheWidth: cacheWidth,
+            placeholder: _EmptyMediaBox(label: text.templateFlowLoadingPreview),
+            errorBuilder: (_) => _TemplatePreviewPlaceholder(
               isVideo: template.isVideo,
               title: _templatePreviewMissingTitle(locale),
               subtitle: _templatePreviewMissingSubtitle(

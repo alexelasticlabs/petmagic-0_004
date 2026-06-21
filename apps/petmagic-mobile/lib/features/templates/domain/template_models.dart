@@ -21,6 +21,9 @@ class TemplateOfTheDayItem {
     this.thumbnailUrl,
     this.previewMediaUrl,
     this.previewAsset,
+    this.isNew = false,
+    this.popularityCount,
+    this.expiresAtUtc,
   });
 
   final String templateId;
@@ -38,6 +41,9 @@ class TemplateOfTheDayItem {
   final List<String> tags;
   final int tokenCost;
   final TemplateAsset? previewAsset;
+  final bool isNew;
+  final int? popularityCount;
+  final DateTime? expiresAtUtc;
 
   bool get isVideo => templateType == TemplateType.video;
 

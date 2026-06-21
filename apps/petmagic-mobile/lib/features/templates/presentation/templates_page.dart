@@ -1,9 +1,10 @@
+// ignore_for_file: unused_element, unused_element_parameter, use_null_aware_elements
+
 import 'dart:async';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -14,7 +15,7 @@ import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
-import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -30,6 +31,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_generat
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_card.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_flow_sheets.dart';
+import 'package:petmagic_mobile/features/templates/presentation/widgets/template_preview_image.dart';
 import 'package:petmagic_mobile/features/templates/presentation/widgets/template_type_filters.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
@@ -43,7 +45,6 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
-import 'package:petmagic_mobile/shared/widgets/shimmer_box.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
@@ -259,7 +260,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
             },
             color: colors.accent,
             child: CustomScrollView(
-              scrollCacheExtent: ScrollCacheExtent.pixels(_gridCacheExtent),
+              cacheExtent: _gridCacheExtent,
               controller: _scrollController,
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
@@ -307,17 +308,6 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                             selectedPetId: selectedPetId,
                             selectedPetPhotoId: selectedPetPhotoId,
                           ),
-                          _TemplateOfTheDaySlot(
-                            template: templateOfTheDay,
-                            isLoading: headerState.isTemplateOfTheDayLoading,
-                            errorMessage: headerState.templateOfTheDayError,
-                            onRetry: () => controller.refresh(),
-                            onPressed: templateOfTheDay == null
-                                ? null
-                                : () => _handleTemplateOfTheDaySelected(
-                                    templateOfTheDay,
-                                  ),
-                          ),
                           const SizedBox(height: 5),
                           _SearchField(
                             controller: _searchController,
@@ -338,9 +328,14 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                 ),
                 _TemplateFeedSlivers(
                   bottomInset: bottomInset,
-                  templateOfTheDayId: templateOfTheDay?.templateId,
+                  templateOfTheDay: templateOfTheDay,
+                  selectedType: headerState.query.type,
+                  selectedCategory: headerState.query.category,
+                  searchQuery: headerState.query.search,
                   onTemplateSelected: (template) =>
                       unawaited(_handleTemplateSelected(template)),
+                  onTemplateOfTheDaySelected: (featured) =>
+                      unawaited(_handleTemplateOfTheDaySelected(featured)),
                 ),
               ],
             ),
@@ -1723,8 +1718,127 @@ String _templatesPetShortcutLocation({
   ).toString();
 }
 
-String _templateCardIdentity({required TemplateItem template}) {
-  return '${template.templateId}|${template.mediaIdentity}';
+class _TemplateGridEntry {
+  const _TemplateGridEntry({required this.template, this.templateOfTheDay});
+
+  final TemplateItem template;
+  final TemplateOfTheDayItem? templateOfTheDay;
+}
+
+_TemplateGridEntry? _buildFeaturedTemplateGridEntry({
+  required TemplateOfTheDayItem? templateOfTheDay,
+  required List<TemplateItem> visibleTemplates,
+  required TemplateType? selectedType,
+  required String? selectedCategory,
+  required String? searchQuery,
+}) {
+  final featured = templateOfTheDay;
+  if (featured == null ||
+      !_matchesTemplateOfTheDayFilters(
+        featured,
+        selectedType: selectedType,
+        selectedCategory: selectedCategory,
+        searchQuery: searchQuery,
+      )) {
+    return null;
+  }
+
+  return _TemplateGridEntry(
+    template: _mergeFeaturedTemplateWithVisibleItem(
+      featured: featured,
+      visibleTemplate: _findTemplateById(visibleTemplates, featured.templateId),
+    ),
+    templateOfTheDay: featured,
+  );
+}
+
+TemplateItem _mergeFeaturedTemplateWithVisibleItem({
+  required TemplateOfTheDayItem featured,
+  required TemplateItem? visibleTemplate,
+}) {
+  final fallbackTemplate = featured.toFallbackTemplateItem();
+  final template = visibleTemplate;
+  if (template == null) {
+    return fallbackTemplate;
+  }
+
+  return TemplateItem(
+    templateId: template.templateId,
+    templateType: template.templateType,
+    title: featured.title.trim().isEmpty ? template.title : featured.title,
+    shortDescription: featured.subtitle.trim().isEmpty
+        ? template.shortDescription
+        : featured.subtitle,
+    petPhotoRequirements: template.petPhotoRequirements,
+    category: featured.category.trim().isEmpty
+        ? template.category
+        : featured.category,
+    tags: featured.tags.isNotEmpty ? featured.tags : template.tags,
+    isPremium: featured.isPremium || template.isPremium,
+    tokenCost: template.tokenCost,
+    effectivePromoBadge: template.effectivePromoBadge,
+    thumbnailUrl: template.thumbnailUrl ?? fallbackTemplate.thumbnailUrl,
+    previewAsset: template.previewAsset ?? fallbackTemplate.previewAsset,
+    musicDescription: template.musicDescription,
+    referenceVideoDurationSeconds: template.referenceVideoDurationSeconds,
+    supportsGenerationResultInput: template.supportsGenerationResultInput,
+    requiredInputMediaType: template.requiredInputMediaType,
+    recommendedAfterImageGeneration: template.recommendedAfterImageGeneration,
+    supportsGenerateSimilar: template.supportsGenerateSimilar,
+    defaultVariationStrength: template.defaultVariationStrength,
+    version: template.version,
+    updatedAtUtc: template.updatedAtUtc,
+  );
+}
+
+bool _matchesTemplateOfTheDayFilters(
+  TemplateOfTheDayItem template, {
+  required TemplateType? selectedType,
+  required String? selectedCategory,
+  required String? searchQuery,
+}) {
+  if (selectedType != null && template.templateType != selectedType) {
+    return false;
+  }
+
+  final normalizedCategory = selectedCategory?.trim().toLowerCase();
+  if (normalizedCategory != null &&
+      normalizedCategory.isNotEmpty &&
+      template.category.trim().toLowerCase() != normalizedCategory) {
+    return false;
+  }
+
+  final normalizedSearch = searchQuery?.trim().toLowerCase();
+  if (normalizedSearch == null || normalizedSearch.isEmpty) {
+    return true;
+  }
+
+  return [
+        template.title,
+        template.subtitle,
+        template.category,
+        ...template.tags,
+      ]
+      .map((value) => value.trim().toLowerCase())
+      .any((value) => value.contains(normalizedSearch));
+}
+
+DateTime _templateOfTheDayCountdownTarget(TemplateOfTheDayItem featured) {
+  return featured.expiresAtUtc?.toUtc() ??
+      DateTime.utc(
+        featured.date.year,
+        featured.date.month,
+        featured.date.day + 1,
+      );
+}
+
+String _templateCardIdentity({
+  required TemplateItem template,
+  TemplateOfTheDayItem? featured,
+}) {
+  return featured == null
+      ? '${template.templateId}|${template.mediaIdentity}'
+      : '${template.templateId}|featured|${template.mediaIdentity}|${_templateOfTheDayDateValue(featured)}';
 }
 
 String _mapTemplatesError(AppLocalizations text, String raw) {
@@ -1811,13 +1925,21 @@ class _TemplatesLifecycleObserver with WidgetsBindingObserver {
 class _TemplateFeedSlivers extends ConsumerWidget {
   const _TemplateFeedSlivers({
     required this.bottomInset,
-    required this.templateOfTheDayId,
+    required this.templateOfTheDay,
+    required this.selectedType,
+    required this.selectedCategory,
+    required this.searchQuery,
     required this.onTemplateSelected,
+    required this.onTemplateOfTheDaySelected,
   });
 
   final double bottomInset;
-  final String? templateOfTheDayId;
+  final TemplateOfTheDayItem? templateOfTheDay;
+  final TemplateType? selectedType;
+  final String? selectedCategory;
+  final String? searchQuery;
   final ValueChanged<TemplateItem> onTemplateSelected;
+  final ValueChanged<TemplateOfTheDayItem> onTemplateOfTheDaySelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1871,6 +1993,20 @@ class _TemplateFeedSlivers extends ConsumerWidget {
       );
     }
 
+    final featuredEntry = _buildFeaturedTemplateGridEntry(
+      templateOfTheDay: templateOfTheDay,
+      visibleTemplates: state.items,
+      selectedType: selectedType,
+      selectedCategory: selectedCategory,
+      searchQuery: searchQuery,
+    );
+    final visibleEntries = <_TemplateGridEntry>[
+      if (featuredEntry != null) featuredEntry,
+      for (final template in state.items)
+        if (template.templateId != templateOfTheDay?.templateId)
+          _TemplateGridEntry(template: template),
+    ];
+
     return SliverMainAxisGroup(
       slivers: [
         SliverPadding(
@@ -1885,7 +2021,7 @@ class _TemplateFeedSlivers extends ConsumerWidget {
                   );
 
               return SliverGrid.builder(
-                itemCount: state.items.length,
+                itemCount: visibleEntries.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 5,
@@ -1893,20 +2029,35 @@ class _TemplateFeedSlivers extends ConsumerWidget {
                   childAspectRatio: 0.72,
                 ),
                 itemBuilder: (context, index) {
-                  final template = state.items[index];
-                  final isTodayPick = templateOfTheDayId == template.templateId;
+                  final entry = visibleEntries[index];
+                  final template = entry.template;
+                  final featured = entry.templateOfTheDay;
                   final templateIdentity = _templateCardIdentity(
                     template: template,
+                    featured: featured,
                   );
                   final card = TemplateCard(
                     key: ValueKey(templateIdentity),
                     template: template,
                     hasPremiumAccess: hasPremiumAccess,
                     imageCacheWidth: imageCacheWidth,
-                    highlightBadgeLabel: isTodayPick
+                    highlightBadgeLabel: featured != null
                         ? text.templateOfTheDayFeedBadge
                         : null,
-                    onPressed: () => onTemplateSelected(template),
+                    featuredData: featured == null
+                        ? null
+                        : TemplateCardFeaturedData(
+                            badgeLabel: text.templateOfTheDayFeedBadge,
+                            actionLabel: text.templateOfTheDayTryAction,
+                            countdownTarget: _templateOfTheDayCountdownTarget(
+                              featured,
+                            ),
+                            popularityCount: featured.popularityCount,
+                            isNew: featured.isNew,
+                          ),
+                    onPressed: () => featured != null
+                        ? onTemplateOfTheDaySelected(featured)
+                        : onTemplateSelected(template),
                   );
                   if (index >= 6) {
                     return card;
@@ -2215,217 +2366,6 @@ class _HeaderButton extends StatelessWidget {
   }
 }
 
-class _TemplateOfTheDaySlot extends ConsumerWidget {
-  const _TemplateOfTheDaySlot({
-    required this.template,
-    required this.isLoading,
-    required this.errorMessage,
-    required this.onRetry,
-    required this.onPressed,
-  });
-
-  final TemplateOfTheDayItem? template;
-  final bool isLoading;
-  final String? errorMessage;
-  final VoidCallback onRetry;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final hasPremiumAccess = ref.watch(
-      walletControllerProvider.select(
-        (walletState) => walletState.wallet?.isPremium ?? false,
-      ),
-    );
-    final featured = template;
-    final hasError = errorMessage != null;
-    if (!isLoading && featured == null && !hasError) {
-      return const SizedBox.shrink();
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: AnimatedSwitcher(
-        duration: AppTheme.motionFast,
-        child: isLoading && featured == null
-            ? const _TemplateOfTheDaySkeleton(
-                key: ValueKey('template-of-the-day-skeleton'),
-              )
-            : featured == null
-            ? _TemplateOfTheDayError(
-                key: const ValueKey('template-of-the-day-error'),
-                onRetry: onRetry,
-              )
-            : _TemplateOfTheDayCard(
-                key: ValueKey('template-of-the-day-${featured.templateId}'),
-                template: featured,
-                hasPremiumAccess: hasPremiumAccess,
-                onPressed: onPressed,
-              ),
-      ),
-    );
-  }
-}
-
-class _TemplateOfTheDaySkeleton extends StatelessWidget {
-  const _TemplateOfTheDaySkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final height = constraints.maxWidth < 340 ? 204.0 : 224.0;
-        final baseColor = colors.surfaceStrong.withValues(
-          alpha: isLight ? 0.42 : 0.34,
-        );
-        final highlightColor = colors.surfaceGlass.withValues(
-          alpha: isLight ? 0.78 : 0.5,
-        );
-        return ShimmerBox(
-          baseColor: baseColor,
-          highlightColor: highlightColor,
-          child: SizedBox(
-            height: height,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceGlass.withValues(
-                  alpha: isLight ? 0.64 : 0.34,
-                ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: colors.accent.withValues(alpha: 0.28),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _TemplateOfTheDaySkeletonBar(width: 128, height: 22),
-                        const SizedBox(width: 8),
-                        _TemplateOfTheDaySkeletonBar(width: 74, height: 22),
-                      ],
-                    ),
-                    const Spacer(),
-                    _TemplateOfTheDaySkeletonBar(
-                      width: double.infinity,
-                      height: 18,
-                    ),
-                    const SizedBox(height: 8),
-                    _TemplateOfTheDaySkeletonBar(width: 210, height: 13),
-                    const SizedBox(height: 12),
-                    _TemplateOfTheDaySkeletonBar(width: 156, height: 30),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _TemplateOfTheDaySkeletonBar extends StatelessWidget {
-  const _TemplateOfTheDaySkeletonBar({
-    required this.width,
-    required this.height,
-  });
-
-  final double width;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.56),
-        borderRadius: BorderRadius.circular(999),
-      ),
-    );
-  }
-}
-
-class _TemplateOfTheDayError extends StatelessWidget {
-  const _TemplateOfTheDayError({required this.onRetry, super.key});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    final isLight = Theme.of(context).brightness == Brightness.light;
-
-    return SizedBox(
-      height: 96,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colors.surfaceGlass.withValues(alpha: isLight ? 0.78 : 0.36),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: colors.accent.withValues(alpha: 0.22)),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.auto_awesome_motion_rounded,
-                color: colors.accent,
-                size: 24,
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  _templateOfTheDayLoadErrorLabel(context),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colors.textStrong,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    height: 1.14,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              TextButton(
-                onPressed: onRetry,
-                style: TextButton.styleFrom(
-                  foregroundColor: colors.accent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  minimumSize: const Size(0, 0),
-                ),
-                child: Text(
-                  text.retryAction,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _TemplateOfTheDayCard extends StatelessWidget {
   const _TemplateOfTheDayCard({
     required this.template,
@@ -2506,17 +2446,13 @@ class _TemplateOfTheDayCard extends StatelessWidget {
                             }
 
                             if (imageUrl != null) {
-                              return CachedNetworkImage(
+                              return TemplatePreviewImage(
                                 imageUrl: imageUrl,
-                                cacheManager: TemplateMediaCache.thumbnailCache,
-                                memCacheWidth: cacheWidth,
-                                maxWidthDiskCache: cacheWidth,
+                                cacheWidth: cacheWidth,
                                 fit: BoxFit.cover,
-                                filterQuality: FilterQuality.medium,
-                                fadeInDuration: AppTheme.motionFast,
-                                placeholder: (context, url) =>
+                                placeholder:
                                     const _TemplateOfTheDayMediaFallback(),
-                                errorWidget: (context, url, error) =>
+                                errorBuilder: (_) =>
                                     const _TemplateOfTheDayMediaFallback(),
                               );
                             }
@@ -3056,17 +2992,12 @@ class _TemplateOfTheDayVideoFallback extends StatelessWidget {
       return const _TemplateOfTheDayMediaFallback();
     }
 
-    return CachedNetworkImage(
+    return TemplatePreviewImage(
       imageUrl: url,
-      cacheManager: TemplateMediaCache.thumbnailCache,
-      memCacheWidth: cacheWidth,
-      maxWidthDiskCache: cacheWidth,
+      cacheWidth: cacheWidth,
       fit: BoxFit.cover,
-      filterQuality: FilterQuality.medium,
-      fadeInDuration: AppTheme.motionFast,
-      placeholder: (context, url) => const _TemplateOfTheDayMediaFallback(),
-      errorWidget: (context, url, error) =>
-          const _TemplateOfTheDayMediaFallback(),
+      placeholder: const _TemplateOfTheDayMediaFallback(),
+      errorBuilder: (_) => const _TemplateOfTheDayMediaFallback(),
     );
   }
 }
@@ -3218,13 +3149,23 @@ String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {
 
   final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
   final parsed = Uri.tryParse(sanitized);
-  final candidate = parsed?.hasScheme == true
-      ? parsed.toString()
-      : Uri.tryParse(AppConfig.apiBaseUrl)
-            ?.resolve(sanitized.startsWith('/') ? sanitized : '/$sanitized')
-            .toString();
-  if (candidate == null) {
-    return null;
+  final String candidate;
+  if (parsed?.hasScheme == true) {
+    candidate = parsed.toString();
+  } else if (sanitized.startsWith('//')) {
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    final scheme = (baseUri?.scheme.isNotEmpty ?? false)
+        ? baseUri!.scheme
+        : 'http';
+    candidate = '$scheme:$sanitized';
+  } else {
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    if (baseUri == null) {
+      return null;
+    }
+
+    final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
+    candidate = baseUri.resolve(relativePath).toString();
   }
 
   return parseSafeGenerationMediaUri(candidate)?.toString();
@@ -3518,6 +3459,7 @@ class _FloatingRandomTemplateButton extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final avoidBlur = PerformanceGuard.shouldAvoidBlur(context);
     final enabled = isEnabled && !isLoading;
 
     return RepaintBoundary(
@@ -3537,72 +3479,92 @@ class _FloatingRandomTemplateButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               scaleDown: 0.96,
               child: ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.surfaceGlass.withValues(
-                        alpha: isLight ? 0.92 : 0.74,
-                      ),
-                      border: Border.all(
-                        color: colors.accent.withValues(
-                          alpha: isLight ? 0.72 : 0.64,
-                        ),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: colors.shadow.withValues(alpha: 0.28),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                        BoxShadow(
-                          color: colors.accent.withValues(alpha: 0.22),
-                          blurRadius: 18,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
-                    child: SizedBox(
-                      key: const ValueKey('templates-random-floating-button'),
-                      width: 48,
-                      height: 48,
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: AppTheme.motionFast,
-                          child: isLoading
-                              ? SizedBox(
-                                  key: const ValueKey(
-                                    'random-template-loading',
-                                  ),
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator.adaptive(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colors.accent,
-                                    ),
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.casino_rounded,
-                                  key: const ValueKey('random-template-icon'),
-                                  size: 22,
-                                  color: isLight
-                                      ? colors.accent
-                                      : colors.textStrong,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
+                child: _FloatingRandomTemplateSurface(
+                  isLight: isLight,
+                  colors: colors,
+                  avoidBlur: avoidBlur,
+                  isLoading: isLoading,
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FloatingRandomTemplateSurface extends StatelessWidget {
+  const _FloatingRandomTemplateSurface({
+    required this.isLight,
+    required this.colors,
+    required this.avoidBlur,
+    required this.isLoading,
+  });
+
+  final bool isLight;
+  final PetMagicColors colors;
+  final bool avoidBlur;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: colors.surfaceGlass.withValues(alpha: isLight ? 0.92 : 0.74),
+        border: Border.all(
+          color: colors.accent.withValues(alpha: isLight ? 0.72 : 0.64),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.28),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: colors.accent.withValues(alpha: 0.22),
+            blurRadius: 18,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: SizedBox(
+        key: const ValueKey('templates-random-floating-button'),
+        width: 48,
+        height: 48,
+        child: Center(
+          child: AnimatedSwitcher(
+            duration: AppTheme.motionFast,
+            child: isLoading
+                ? SizedBox(
+                    key: const ValueKey('random-template-loading'),
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator.adaptive(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+                    ),
+                  )
+                : Icon(
+                    Icons.casino_rounded,
+                    key: const ValueKey('random-template-icon'),
+                    size: 22,
+                    color: isLight ? colors.accent : colors.textStrong,
+                  ),
+          ),
+        ),
+      ),
+    );
+
+    if (avoidBlur) {
+      return content;
+    }
+
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+      child: content,
     );
   }
 }

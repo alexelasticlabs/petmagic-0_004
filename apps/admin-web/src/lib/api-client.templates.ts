@@ -1,6 +1,5 @@
 import {
   apiRequest,
-  cachedAdminTemplateDetails,
   cachedAdminTemplateEventAnalytics,
   cachedAdminTemplateFailureBreakdowns,
   cachedAdminTemplateRecentGenerations,
@@ -344,16 +343,10 @@ export async function fetchAdminTemplate(
   signal?: AbortSignal
 ): Promise<AdminTemplate> {
   const encodedTemplateId = encodePathSegment(templateId);
-  return cachedGet(
-    `admin-template:${templateId}`,
-    cachedAdminTemplateDetails,
-    () =>
-      apiRequest<AdminTemplate>(`/api/admin/templates/${encodedTemplateId}`, {
-        method: "GET",
-        signal,
-      }),
-    signal
-  );
+  return apiRequest<AdminTemplate>(`/api/admin/templates/${encodedTemplateId}`, {
+    method: "GET",
+    signal,
+  });
 }
 
 export async function fetchAdminTemplateStatistics(

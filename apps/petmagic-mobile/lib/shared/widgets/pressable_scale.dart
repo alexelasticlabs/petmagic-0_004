@@ -30,10 +30,12 @@ class _PressableScaleState extends State<PressableScale> {
   @override
   Widget build(BuildContext context) {
     final isEnabled = widget.enabled && widget.onTap != null;
+    final reduceMotion = PetMotion.reduceMotion(context);
     final duration = PetMotion.effectiveDuration(context, PetMotion.fast);
+    final pressScale = reduceMotion ? 1.0 : widget.scaleDown;
 
     return AnimatedScale(
-      scale: _pressed && isEnabled ? widget.scaleDown : 1,
+      scale: _pressed && isEnabled ? pressScale : 1,
       duration: duration,
       curve: PetMotion.emphasized,
       child: Material(

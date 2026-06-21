@@ -54,23 +54,20 @@ void main() {
     },
   );
 
-  test(
-    'persists auth session only in secure storage',
-    () async {
-      final secureStorage = _FakeSecureStorage(<String, String>{});
-      final storage = AuthSessionStorage(secureStorage: secureStorage);
+  test('persists auth session only in secure storage', () async {
+    final secureStorage = _FakeSecureStorage(<String, String>{});
+    final storage = AuthSessionStorage(secureStorage: secureStorage);
 
-      await storage.save(_session);
-      final preferences = await SharedPreferences.getInstance();
+    await storage.save(_session);
+    final preferences = await SharedPreferences.getInstance();
 
-      expect(preferences.containsKey(AuthSessionStorage.sessionKey), isFalse);
-      expect(secureStorage.values, contains(AuthSessionStorage.sessionKey));
-      expect(
-        secureStorage.values[AuthSessionStorage.sessionKey],
-        contains('"refreshToken":"refresh-token"'),
-      );
-    },
-  );
+    expect(preferences.containsKey(AuthSessionStorage.sessionKey), isFalse);
+    expect(secureStorage.values, contains(AuthSessionStorage.sessionKey));
+    expect(
+      secureStorage.values[AuthSessionStorage.sessionKey],
+      contains('"refreshToken":"refresh-token"'),
+    );
+  });
 
   test(
     'clear removes auth session from secure storage and legacy shared preferences',

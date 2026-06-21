@@ -386,6 +386,23 @@ class _RewardsGlassPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final borderRadius = BorderRadius.circular(_radius);
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: borderRadius,
+        gradient:
+            gradient ??
+            LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                colors.surfaceGlass,
+                colors.surfaceStrong.withValues(alpha: 0.94),
+              ],
+            ),
+        border: Border.all(color: borderColor ?? colors.border, width: 1.1),
+      ),
+      child: Padding(padding: padding, child: child),
+    );
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -400,29 +417,12 @@ class _RewardsGlassPanel extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              borderRadius: borderRadius,
-              gradient:
-                  gradient ??
-                  LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      colors.surfaceGlass,
-                      colors.surfaceStrong.withValues(alpha: 0.94),
-                    ],
-                  ),
-              border: Border.all(
-                color: borderColor ?? colors.border,
-                width: 1.1,
+        child: PerformanceGuard.shouldAvoidBlur(context)
+            ? content
+            : BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                child: content,
               ),
-            ),
-            child: Padding(padding: padding, child: child),
-          ),
-        ),
       ),
     );
   }

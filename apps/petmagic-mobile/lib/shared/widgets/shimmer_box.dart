@@ -21,22 +21,65 @@ class ShimmerBox extends StatefulWidget {
 
 class _ShimmerBoxState extends State<ShimmerBox>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  )..repeat();
+  late final AnimationController _controller;
+  Color? _resolvedBaseColor;
+  Color? _resolvedHighlightColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncResolvedColors();
+    _syncAnimationState();
+  }
+
+  @override
+  void didUpdateWidget(covariant ShimmerBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.baseColor != widget.baseColor ||
+        oldWidget.highlightColor != widget.highlightColor ||
+        oldWidget.enabled != widget.enabled) {
+      _syncResolvedColors();
+      _syncAnimationState();
+    }
+  }
+
+  @override
+  void deactivate() {
+    _controller.stop();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _syncAnimationState();
+  }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled || PetMotion.reduceMotion(context)) {
+    final reduceMotion = PetMotion.reduceMotion(context);
+    if (!widget.enabled || reduceMotion) {
       return widget.child;
     }
+
+    final base = _resolvedBaseColor ?? const Color(0xA6D0D5DD);
+    final highlight = _resolvedHighlightColor ?? const Color(0x52F5F5F5);
 
     return RepaintBoundary(
       child: AnimatedBuilder(
@@ -48,12 +91,6 @@ class _ShimmerBoxState extends State<ShimmerBox>
             shaderCallback: (bounds) {
               final width = bounds.width;
               final offset = (width * 2.2) * _controller.value - width;
-              final base =
-                  widget.baseColor ??
-                  Theme.of(context).dividerColor.withValues(alpha: 0.65);
-              final highlight =
-                  widget.highlightColor ??
-                  Theme.of(context).colorScheme.surface.withValues(alpha: 0.32);
 
               return LinearGradient(
                 begin: Alignment.centerLeft,
@@ -67,6 +104,28 @@ class _ShimmerBoxState extends State<ShimmerBox>
         },
       ),
     );
+  }
+
+  void _syncResolvedColors() {
+    final theme = Theme.of(context);
+    _resolvedBaseColor =
+        widget.baseColor ?? theme.dividerColor.withValues(alpha: 0.65);
+    _resolvedHighlightColor =
+        widget.highlightColor ??
+        theme.colorScheme.surface.withValues(alpha: 0.32);
+  }
+
+  void _syncAnimationState() {
+    if (!widget.enabled || PetMotion.reduceMotion(context)) {
+      if (_controller.isAnimating) {
+        _controller.stop();
+      }
+      return;
+    }
+
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 }
 

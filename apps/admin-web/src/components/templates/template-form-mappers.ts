@@ -151,7 +151,7 @@ export async function saveImageTemplateFromForm(
     tags: normalizeTags(form.tags),
     isPremium: form.isPremium,
     tokenCost: parseNumber(form.tokenCost),
-    previewAsset: buildUploadedAsset(
+    previewAsset: buildTemplateAsset(
       form.previewUrlSource,
       form.previewUrl,
       form.previewFileName,
@@ -191,7 +191,7 @@ export async function saveVideoTemplateFromForm(
       form.musicDescription,
       TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH
     ),
-    previewAsset: buildUploadedAsset(
+    previewAsset: buildTemplateAsset(
       form.previewUrlSource,
       form.previewUrl,
       form.previewFileName,
@@ -199,7 +199,7 @@ export async function saveVideoTemplateFromForm(
       form.previewFileSizeBytes,
       form.previewDurationSeconds
     ),
-    referenceMotionAsset: buildUploadedAsset(
+    referenceMotionAsset: buildTemplateAsset(
       form.referenceUrlSource,
       form.referenceUrl,
       form.referenceFileName,
@@ -242,7 +242,7 @@ export function parseOptionalDecimal(raw?: string): number | undefined {
     : undefined;
 }
 
-function buildUploadedAsset(
+function buildTemplateAsset(
   source: TemplateFormState["previewUrlSource"] | TemplateFormState["referenceUrlSource"],
   url: string,
   fileName: string,
@@ -250,7 +250,7 @@ function buildUploadedAsset(
   fileSizeBytes: string,
   durationSeconds?: string
 ): TemplateAssetInput | undefined {
-  if (source !== "uploaded") {
+  if (source === "none") {
     return undefined;
   }
 

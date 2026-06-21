@@ -396,7 +396,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('templates page shows template of the day hero and feed badge', (
+  testWidgets('templates page shows template of the day as first grid card', (
     tester,
   ) async {
     final featured = TemplateOfTheDayItem(
@@ -453,79 +453,87 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    expect(find.text(text.templateOfTheDayTitle), findsOneWidget);
-    expect(find.text('Daily portrait'), findsWidgets);
-    expect(find.text('#daily'), findsOneWidget);
-    expect(find.text('5 PawSpark'), findsOneWidget);
+    final visibleCards = tester
+        .widgetList<TemplateCard>(find.byType(TemplateCard))
+        .toList();
+
+    expect(visibleCards, isNotEmpty);
+    expect(visibleCards.first.template.templateId, 'template-2');
+    expect(visibleCards.first.featuredData, isNotNull);
+    expect(find.text(text.templateOfTheDayTitle), findsNothing);
+    expect(find.text('Daily portrait'), findsOneWidget);
+    expect(find.textContaining('#daily'), findsOneWidget);
     expect(find.text(text.templateOfTheDayTryAction), findsOneWidget);
     expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
   });
 
-  testWidgets('template feed preserves backend order with daily badge', (
-    tester,
-  ) async {
-    final featured = TemplateOfTheDayItem(
-      templateId: 'template-2',
-      title: 'Daily portrait',
-      subtitle: 'Today magic idea',
-      badgeText: 'Template of the Day',
-      templateType: TemplateType.image,
-      isPremium: false,
-      requiredPlan: 'free',
-      date: DateTime.utc(2026, 6, 14),
-      source: 'manual',
-    );
-    final controller = _FakeTemplatesController(
-      items: [
-        _template('template-1', 'Template 1'),
-        _template('template-2', 'Daily portrait'),
-        _template('template-3', 'Template 3'),
-      ],
-      templateOfTheDay: featured,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          appLaunchControllerProvider.overrideWith(
-            _AuthenticatedAppLaunchController.new,
-          ),
-          walletControllerProvider.overrideWith(_IdleWalletController.new),
-          templatesControllerProvider.overrideWith(() => controller),
-          realtimeClientProvider.overrideWith(
-            (ref) => const NoopRealtimeClient(),
-          ),
+  testWidgets(
+    'template feed promotes template of the day and removes duplicate',
+    (tester) async {
+      final featured = TemplateOfTheDayItem(
+        templateId: 'template-2',
+        title: 'Daily portrait',
+        subtitle: 'Today magic idea',
+        badgeText: 'Template of the Day',
+        templateType: TemplateType.image,
+        isPremium: false,
+        requiredPlan: 'free',
+        date: DateTime.utc(2026, 6, 14),
+        source: 'manual',
+      );
+      final controller = _FakeTemplatesController(
+        items: [
+          _template('template-1', 'Template 1'),
+          _template('template-2', 'Daily portrait'),
+          _template('template-3', 'Template 3'),
         ],
-        child: MaterialApp(
-          theme: AppTheme.light(),
-          locale: const Locale('en'),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
+        templateOfTheDay: featured,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(_IdleWalletController.new),
+            templatesControllerProvider.overrideWith(() => controller),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
           ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: TemplatesPage()),
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
-    await tester.pump();
+      );
+      await tester.pump();
+      await tester.pump();
 
-    final context = tester.element(find.byType(TemplatesPage));
-    final text = AppLocalizations.of(context);
-    final visibleCardIds = tester
-        .widgetList<TemplateCard>(find.byType(TemplateCard))
-        .map((card) => card.template.templateId)
-        .toList();
+      final context = tester.element(find.byType(TemplatesPage));
+      final text = AppLocalizations.of(context);
+      final visibleCardIds = tester
+          .widgetList<TemplateCard>(find.byType(TemplateCard))
+          .map((card) => card.template.templateId)
+          .toList();
 
-    expect(visibleCardIds.length, greaterThanOrEqualTo(2));
-    expect(visibleCardIds.take(2).toList(), ['template-1', 'template-2']);
-    expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
-  });
+      expect(visibleCardIds.length, greaterThanOrEqualTo(2));
+      expect(visibleCardIds.take(2).toList(), ['template-2', 'template-1']);
+      expect(visibleCardIds.where((id) => id == 'template-2'), hasLength(1));
+      expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
+    },
+  );
 
-  testWidgets('template of the day error state stays compact and retries', (
+  testWidgets('template of the day load failure keeps regular grid visible', (
     tester,
   ) async {
     final controller = _FakeTemplatesController(
@@ -566,17 +574,14 @@ void main() {
     final context = tester.element(find.byType(TemplatesPage));
     final text = AppLocalizations.of(context);
 
-    expect(find.text('Could not load Template of the Day'), findsOneWidget);
-    expect(find.text(text.retryAction), findsOneWidget);
-
-    await tester.tap(find.text(text.retryAction));
-    await tester.pump();
-
-    expect(controller.loadInitialCalls, contains(true));
+    expect(find.text('Could not load Template of the Day'), findsNothing);
+    expect(find.text('Template 1'), findsOneWidget);
+    expect(find.text(text.retryAction), findsNothing);
+    expect(controller.loadInitialCalls, isNot(contains(true)));
   });
 
   testWidgets(
-    'template of the day hero renders on narrow dark premium video layout',
+    'template of the day featured card renders on narrow dark premium video layout',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(320, 640));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -636,11 +641,15 @@ void main() {
 
       final context = tester.element(find.byType(TemplatesPage));
       final text = AppLocalizations.of(context);
+      final firstCard = tester.widget<TemplateCard>(
+        find.byType(TemplateCard).first,
+      );
 
       expect(tester.takeException(), isNull);
-      expect(find.text(text.templateOfTheDayTitle), findsOneWidget);
-      expect(find.text(text.videoLabel), findsWidgets);
-      expect(find.text(text.premiumLabel), findsWidgets);
+      expect(firstCard.template.templateId, 'template-premium-video');
+      expect(firstCard.featuredData, isNotNull);
+      expect(firstCard.template.isPremium, isTrue);
+      expect(find.text(text.templateOfTheDayTitle), findsNothing);
       expect(find.text(text.templateUnlockPremiumAction), findsOneWidget);
       expect(find.text(text.templateOfTheDayFeedBadge), findsOneWidget);
     },

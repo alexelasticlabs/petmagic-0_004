@@ -126,31 +126,25 @@ void main() {
     ).readAsString();
 
     expect(source, contains('SliverGrid.builder('));
-    expect(source, contains('itemCount: state.items.length'));
+    expect(source, contains('itemCount: visibleEntries.length'));
     expect(source, contains('itemBuilder: (context, index)'));
-    expect(source, isNot(contains('visibleItems')));
+    expect(source, contains('_buildFeaturedTemplateGridEntry('));
     expect(source, contains('_templatesController.loadMore()'));
     expect(source, isNot(contains('GridView.count(')));
     expect(source, isNot(contains('children: state.items.map')));
   });
 
-  test(
-    'template of the day hero thumbnail is cached at bounded size',
-    () async {
-      final source = await File(
-        'lib/features/templates/presentation/templates_page.dart',
-      ).readAsString();
+  test('template cards cache thumbnails at bounded size', () async {
+    final source = await File(
+      'lib/features/templates/presentation/widgets/template_card.dart',
+    ).readAsString();
 
-      expect(source, contains('TemplateMediaCache.thumbnailCache'));
-      expect(source, contains('_templateMediaCacheDimension('));
-      expect(source, contains('memCacheWidth: cacheWidth'));
-      expect(source, contains('maxWidthDiskCache: cacheWidth'));
-      expect(source, contains('placeholder: (context, url) =>'));
-      expect(source, contains('const _TemplateOfTheDayMediaFallback()'));
-      expect(source, contains('errorWidget: (context, url, error)'));
-      expect(source, contains('filterQuality: FilterQuality.medium'));
-    },
-  );
+    expect(source, contains('TemplateMediaCache.fetchThumbnailFile'));
+    expect(source, contains('templateCardImageCacheWidthForLogicalWidth('));
+    expect(source, contains('cacheWidth: widget.cacheWidth'));
+    expect(source, contains('Image.file('));
+    expect(source, contains('filterQuality: FilterQuality.medium'));
+  });
 
   test('template page pet shortcut avatar is cached at bounded size', () async {
     final source = await File(
@@ -163,63 +157,53 @@ void main() {
     expect(source, contains('filterQuality: FilterQuality.medium'));
   });
 
-  test(
-    'template of the day video preview is visibility gated and cached',
-    () async {
-      final source = await File(
-        'lib/features/templates/presentation/templates_page.dart',
-      ).readAsString();
+  test('template card video preview is visibility gated and cached', () async {
+    final source = await File(
+      'lib/features/templates/presentation/widgets/template_card.dart',
+    ).readAsString();
 
-      expect(
-        source,
-        contains(
-          "import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';",
-        ),
-      );
-      expect(
-        source,
-        contains(
-          "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
-        ),
-      );
-      expect(
-        source,
-        contains("import 'package:video_player/video_player.dart';"),
-      );
-      expect(
-        source,
-        contains(
-          "import 'package:visibility_detector/visibility_detector.dart';",
-        ),
-      );
-      expect(source, contains('final videoPreviewUrl ='));
-      expect(source, contains('isVideoUrl(previewMediaUrl)'));
-      expect(source, contains('_TemplateOfTheDayVideoPreview('));
-      expect(source, contains('thumbnailUrl: thumbnailUrl'));
-      expect(source, contains('VisibilityDetector('));
-      expect(source, contains('_loadVisibilityFraction'));
-      expect(source, contains('_playVisibilityFraction'));
-      expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
-      expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
-      expect(source, contains('state == AppLifecycleState.paused'));
-      expect(source, contains('state == AppLifecycleState.hidden'));
-      expect(source, contains('_disposeVideoController()'));
-      expect(source, contains('bool _hasPreviewSlot = false;'));
-      expect(
-        source,
-        contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
-      );
-      expect(
-        source,
-        contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'),
-      );
-      expect(source, contains('createCachedTemplatePreviewVideoController('));
-      expect(source, contains('fallbackUri: safeUri'));
-      expect(source, contains('await controller.setVolume(0);'));
-      expect(source, contains('await controller.setLooping(true);'));
-      expect(source, contains('TemplateMediaCache.thumbnailCache'));
-    },
-  );
+    expect(
+      source,
+      contains(
+        "import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';",
+      ),
+    );
+    expect(
+      source,
+      contains(
+        "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
+      ),
+    );
+    expect(
+      source,
+      contains("import 'package:video_player/video_player.dart';"),
+    );
+    expect(
+      source,
+      contains(
+        "import 'package:visibility_detector/visibility_detector.dart';",
+      ),
+    );
+    expect(source, contains('_ensureVideoController()'));
+    expect(source, contains('widget.template.previewAsset'));
+    expect(source, contains('VisibilityDetector('));
+    expect(source, contains('_prewarmVisibilityFraction'));
+    expect(source, contains('_playVisibilityFraction'));
+    expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
+    expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
+    expect(source, contains('AppLifecycleState.resumed'));
+    expect(source, contains('_disposeVideoController()'));
+    expect(source, contains('bool _hasPreviewSlot = false;'));
+    expect(
+      source,
+      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+    );
+    expect(source, contains('MediaLifecyclePolicy.releaseVideoPreviewSlot()'));
+    expect(source, contains('createCachedTemplatePreviewVideoController('));
+    expect(source, contains('await controller.setVolume(0);'));
+    expect(source, contains('await controller.setLooping(true);'));
+    expect(source, contains('TemplateMediaCache.fetchThumbnailFile'));
+  });
 
   test('template media caches use bounded object counts and app TTL', () async {
     final source = await File(
@@ -878,9 +862,6 @@ void main() {
       );
       expect(contentSource, contains('memCacheWidth: resultCacheWidth'));
       expect(contentSource, contains('maxWidthDiskCache: resultCacheWidth'));
-      expect(contentSource, contains('TemplateMediaCache.thumbnailCache'));
-      expect(contentSource, contains('memCacheWidth: cacheWidth'));
-      expect(contentSource, contains('maxWidthDiskCache: cacheWidth'));
       expect(contentSource, isNot(contains('imageUrl: asset.url')));
       expect(
         contentSource,
@@ -925,12 +906,6 @@ void main() {
       sheetSource,
       contains(
         "import 'package:visibility_detector/visibility_detector.dart';",
-      ),
-    );
-    expect(
-      sheetSource,
-      contains(
-        "import 'package:petmagic_mobile/core/performance/template_media_cache.dart';",
       ),
     );
     expect(
