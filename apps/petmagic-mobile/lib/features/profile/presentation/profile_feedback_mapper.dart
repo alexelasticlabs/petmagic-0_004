@@ -4,6 +4,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
   switch (raw) {
     case 'auth.password_mismatch':
       return text.authPasswordMismatch;
+    case 'auth.password_policy_invalid':
+      return text.authPasswordPolicyInvalid;
     case 'auth.password_too_short':
       return text.authPasswordTooShort;
     case 'auth.accept_terms_required':

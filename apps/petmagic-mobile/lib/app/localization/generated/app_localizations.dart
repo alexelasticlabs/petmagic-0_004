@@ -4479,14 +4479,20 @@ abstract class AppLocalizations {
   /// No description provided for @authPasswordRulesHint.
   ///
   /// In en, this message translates to:
-  /// **'Use at least 6 characters.'**
+  /// **'Use at least 8 characters with uppercase, lowercase and a number.'**
   String get authPasswordRulesHint;
 
   /// No description provided for @authPasswordTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 6 characters long.'**
+  /// **'Password must be at least 8 characters long.'**
   String get authPasswordTooShort;
+
+  /// No description provided for @authPasswordPolicyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 8 characters and include uppercase, lowercase and a number.'**
+  String get authPasswordPolicyInvalid;
 
   /// No description provided for @authForgotPasswordAction.
   ///

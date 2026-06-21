@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
 
 final passwordChangeControllerProvider =
     NotifierProvider<PasswordChangeController, PasswordChangeState>(
@@ -155,9 +156,9 @@ class PasswordChangeController extends Notifier<PasswordChangeState> {
       return false;
     }
 
-    if (state.newPassword.length < 8) {
+    if (!AuthPasswordPolicy.isValid(state.newPassword)) {
       state = state.copyWith(
-        errorMessage: 'auth.password_too_short',
+        errorMessage: AuthPasswordPolicy.errorMessage,
         clearSuccess: true,
       );
       return false;

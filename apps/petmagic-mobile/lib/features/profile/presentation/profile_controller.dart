@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final profileControllerProvider =
@@ -335,16 +336,16 @@ class ProfileController extends Notifier<ProfileState> {
   Future<void> register({
     required bool termsOfUseAccepted,
     required bool privacyPolicyAccepted,
-    required MobileLegalDocuments legalDocuments,
+    required MobileLegalDocuments? legalDocuments,
     required bool marketingEmailsEnabled,
   }) async {
     if (state.isSaving) {
       return;
     }
 
-    if (state.password.length < 6) {
+    if (!AuthPasswordPolicy.isValid(state.password)) {
       state = state.copyWith(
-        errorMessage: 'auth.password_too_short',
+        errorMessage: AuthPasswordPolicy.errorMessage,
         clearSuccess: true,
       );
       return;
@@ -372,8 +373,8 @@ class ProfileController extends Notifier<ProfileState> {
         displayName: state.displayName,
         termsOfUseAccepted: termsOfUseAccepted,
         privacyPolicyAccepted: privacyPolicyAccepted,
-        termsOfUseVersion: legalDocuments.termsOfUse.version,
-        privacyPolicyVersion: legalDocuments.privacyPolicy.version,
+        termsOfUseVersion: legalDocuments?.termsOfUse.version ?? '',
+        privacyPolicyVersion: legalDocuments?.privacyPolicy.version ?? '',
         marketingEmailsEnabled: marketingEmailsEnabled,
       );
       _updateStateIfMounted(

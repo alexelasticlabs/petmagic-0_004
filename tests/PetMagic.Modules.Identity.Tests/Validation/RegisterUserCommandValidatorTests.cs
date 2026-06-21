@@ -17,6 +17,38 @@ public sealed class RegisterUserCommandValidatorTests
         var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(RegisterUserCommand.Password)
+            && error.ErrorMessage == "auth.password_policy_invalid");
+    }
+
+    [Theory]
+    [InlineData("pet12345")]
+    [InlineData("PET12345")]
+    [InlineData("PetMagic")]
+    [InlineData("Pet1234")]
+    public void Should_Fail_With_Machine_Readable_Key_When_Password_Policy_Is_Not_Met(string password)
+    {
+        var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
+        var command = new RegisterUserCommand("demo@petmagic.app", password, "Demo", true, true, CurrentLegalVersion, CurrentLegalVersion, false);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(RegisterUserCommand.Password)
+            && error.ErrorMessage == "auth.password_policy_invalid");
+    }
+
+    [Fact]
+    public void Should_Fail_With_Machine_Readable_Key_When_Email_Is_Invalid()
+    {
+        var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
+        var command = new RegisterUserCommand("not-an-email", "Pet12345", "Demo", true, true, CurrentLegalVersion, CurrentLegalVersion, false);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(RegisterUserCommand.Email)
+            && error.ErrorMessage == "auth.email_invalid");
     }
 
     [Fact]
@@ -28,6 +60,8 @@ public sealed class RegisterUserCommandValidatorTests
         var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(RegisterUserCommand.TermsOfUseAccepted)
+            && error.ErrorMessage == "auth.terms_required");
     }
 
     [Fact]
@@ -39,6 +73,29 @@ public sealed class RegisterUserCommandValidatorTests
         var result = validator.Validate(command);
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Should_Pass_When_Document_Versions_Are_Omitted_But_Both_Documents_Are_Accepted()
+    {
+        var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
+        var command = new RegisterUserCommand("demo@petmagic.app", "Pet12345", "Demo", true, true, "", "", true);
+
+        var result = validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Should_Fail_With_Machine_Readable_Key_When_Document_Versions_Are_Stale()
+    {
+        var validator = new RegisterUserCommandValidator(new FakeLegalDocumentsCatalog());
+        var command = new RegisterUserCommand("demo@petmagic.app", "Pet12345", "Demo", true, true, "old", "old", true);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.ErrorMessage == "auth.legal_versions_invalid");
     }
 
     private sealed class FakeLegalDocumentsCatalog : ILegalDocumentsCatalog

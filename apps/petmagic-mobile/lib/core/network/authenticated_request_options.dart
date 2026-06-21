@@ -4,6 +4,32 @@ import 'package:dio/dio.dart';
 
 const defaultMultipartSendTimeout = Duration(seconds: 60);
 const defaultMultipartReceiveTimeout = Duration(seconds: 60);
+const anonymousRequestExtraKey = 'petmagic_anonymous_request';
+
+Options anonymousRequestOptions({
+  Map<String, String>? extraHeaders,
+  String? correlationId,
+}) {
+  final trimmedCorrelationId = correlationId?.trim();
+  return Options(
+    headers: {
+      if (trimmedCorrelationId != null && trimmedCorrelationId.isNotEmpty)
+        'X-Correlation-ID': trimmedCorrelationId,
+      ...?extraHeaders,
+    },
+    extra: const {anonymousRequestExtraKey: true},
+  );
+}
+
+void removeAuthorizationHeaderForAnonymousRequest(RequestOptions options) {
+  if (options.extra[anonymousRequestExtraKey] != true) {
+    return;
+  }
+
+  options.headers.removeWhere(
+    (key, _) => key.toLowerCase() == HttpHeaders.authorizationHeader,
+  );
+}
 
 Options authenticatedRequestOptions(
   String accessToken, {

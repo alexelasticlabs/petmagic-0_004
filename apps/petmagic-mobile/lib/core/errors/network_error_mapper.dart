@@ -3,11 +3,17 @@ import 'package:dio/dio.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 
 class ApiErrorPayload {
-  const ApiErrorPayload({this.flattened, this.detail, this.title});
+  const ApiErrorPayload({
+    this.flattened,
+    this.detail,
+    this.title,
+    this.validationMessageKey,
+  });
 
   final String? flattened;
   final String? detail;
   final String? title;
+  final String? validationMessageKey;
 }
 
 class NetworkErrorMapper {
@@ -41,15 +47,27 @@ class NetworkErrorMapper {
       return const ApiErrorPayload();
     }
 
-    final flattened = _flattenValidationErrors(data['errors']);
+    final rawErrors = data['errors'];
+    final flattened = _flattenValidationErrors(rawErrors);
+    final validationMessageKey = _firstSafeValidationMessage(rawErrors);
     final detail = _clean(data['detail'] as String?);
     final title = _clean(data['title'] as String?);
 
-    return ApiErrorPayload(flattened: flattened, detail: detail, title: title);
+    return ApiErrorPayload(
+      flattened: flattened,
+      detail: detail,
+      title: title,
+      validationMessageKey: validationMessageKey,
+    );
   }
 
   static String? safePayloadMessage(ApiErrorPayload payload) {
-    for (final value in [payload.title, payload.detail, payload.flattened]) {
+    for (final value in [
+      payload.validationMessageKey,
+      payload.title,
+      payload.detail,
+      payload.flattened,
+    ]) {
       if (value != null && isSafeMessageKey(value)) {
         return value;
       }
@@ -96,6 +114,27 @@ class NetworkErrorMapper {
         .join(' ');
 
     return _clean(flattened);
+  }
+
+  static String? _firstSafeValidationMessage(Object? rawErrors) {
+    if (rawErrors is! Map) {
+      return null;
+    }
+
+    for (final value in rawErrors.values) {
+      if (value is! List) {
+        continue;
+      }
+
+      for (final message in value.whereType<String>()) {
+        final cleaned = _clean(message);
+        if (cleaned != null && isSafeMessageKey(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+
+    return null;
   }
 
   static String? _clean(String? value) {

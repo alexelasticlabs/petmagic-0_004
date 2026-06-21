@@ -74,10 +74,10 @@ describe("template form numeric hardening", () => {
     expect(TEMPLATE_TITLE_MAX_LENGTH).toBe(60);
     expect(TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH).toBe(120);
     expect(TEMPLATE_CATEGORY_MAX_LENGTH).toBe(64);
-    expect(TEMPLATE_TAG_MAX_LENGTH).toBe(48);
+    expect(TEMPLATE_TAG_MAX_LENGTH).toBe(32);
     expect(TEMPLATE_TAG_MAX_COUNT).toBe(12);
-    expect(TEMPLATE_MODEL_MAX_LENGTH).toBe(160);
-    expect(TEMPLATE_PROMPT_MAX_LENGTH).toBe(4000);
+    expect(TEMPLATE_MODEL_MAX_LENGTH).toBe(128);
+    expect(TEMPLATE_PROMPT_MAX_LENGTH).toBe(1000);
     expect(source).toContain("title: normalizeTemplateText(form.title, TEMPLATE_TITLE_MAX_LENGTH)");
     expect(source).toContain("TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH");
     expect(source).toContain("category: normalizeTemplateText(form.category, TEMPLATE_CATEGORY_MAX_LENGTH)");
@@ -88,6 +88,9 @@ describe("template form numeric hardening", () => {
     expect(source).toContain("normalizeTemplateText(tag, TEMPLATE_TAG_MAX_LENGTH)");
     expect(source).toContain(".slice(0, TEMPLATE_TAG_MAX_COUNT)");
     expect(source).toContain("normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH)");
+    expect(source).toContain("normalizeTemplateText(contentType, TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH)");
+    expect(source).toContain("normalizeTemplateText(inferFileName(url), TEMPLATE_ASSET_METADATA_MAX_LENGTH)");
+    expect(source).toContain("value > 0 ? value : undefined");
     expect(source).not.toContain("title: form.title");
     expect(source).not.toContain("imagePrompt: form.imagePrompt");
     expect(source).not.toContain(".map((tag) => tag.trim())");
@@ -97,7 +100,7 @@ describe("template form numeric hardening", () => {
     const basicFieldsSource = readFileSync(basicFieldsPath, "utf8");
     const editorSectionsSource = readFileSync(editorSectionsPath, "utf8");
 
-    expect(TEMPLATE_REQUIREMENT_MAX_LENGTH).toBe(180);
+    expect(TEMPLATE_REQUIREMENT_MAX_LENGTH).toBe(160);
     expect(TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH).toBe(240);
     expect(basicFieldsSource).toContain("maxLength={TEMPLATE_TITLE_MAX_LENGTH}");
     expect(basicFieldsSource).toContain("maxLength={TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH}");
@@ -144,9 +147,6 @@ describe("template form numeric hardening", () => {
     expect(basicFieldsSource).toContain("text.editorGenerationResultSupported");
     expect(basicFieldsSource).toContain("text.editorGenerationResultUnsupported");
     expect(basicFieldsSource).toContain("text.editorGenerationResultInputHint");
-    expect(basicFieldsSource).toContain("text.editorGenerationResultRecommended");
-    expect(basicFieldsSource).toContain("text.editorGenerationResultNotRecommended");
-    expect(basicFieldsSource).toContain("text.editorGenerationResultRecommendedHint");
     expect(basicFieldsSource).toContain("text.editorRequiredInputMediaTypeLabel");
     expect(basicFieldsSource).toContain("text.editorInputMediaTypeImageLabel");
     expect(basicFieldsSource).toContain("text.editorInputMediaTypeImageHint");
@@ -158,7 +158,10 @@ describe("template form numeric hardening", () => {
     expect(basicFieldsSource).toContain("aria-pressed={!form.isPremium}");
     expect(basicFieldsSource).toContain("aria-pressed={form.isPremium}");
     expect(basicFieldsSource).toContain("aria-pressed={form.supportsGenerationResultInput}");
-    expect(basicFieldsSource).toContain("aria-pressed={form.recommendedAfterImageGeneration}");
+    expect(basicFieldsSource).not.toContain("aria-pressed={form.recommendedAfterImageGeneration}");
+    expect(basicFieldsSource).not.toContain("text.editorGenerationResultRecommended");
+    expect(basicFieldsSource).not.toContain("text.editorGenerationResultNotRecommended");
+    expect(basicFieldsSource).not.toContain("text.editorGenerationResultRecommendedHint");
     expect(basicFieldsSource).not.toContain(">Generation result input<");
     expect(basicFieldsSource).not.toContain(">Supported<");
     expect(basicFieldsSource).not.toContain(">Not supported<");

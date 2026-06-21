@@ -11,6 +11,7 @@ internal static class TemplatesErrors
     public static readonly Error CategoryArchived = new("templates.category_archived", "Template category is archived and cannot be assigned to new templates.");
     public static readonly Error CategoryHasTemplates = new("templates.category_has_templates", "Template category cannot be deleted while templates still reference it.");
     public static readonly Error TypeMismatch = new("templates.type_mismatch", "Template type does not match the requested operation.");
+    public static readonly Error UpdateConflict = new("templates.update_conflict", "Template was changed while saving. Please reload and try again.");
     public static readonly Error InvalidStatus = new("templates.invalid_status", "Template status is invalid.");
     public static readonly Error MissingPreview = new("templates.preview_required", "Preview asset is required before activation.");
     public static readonly Error MissingImageModel = new("templates.image_model_required", "Image model is required before activation.");

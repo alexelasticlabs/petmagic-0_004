@@ -460,6 +460,8 @@ class _FakeProfileRepository extends ProfileRepository {
   String? passwordResetConfirmedFor;
   bool? lastTermsOfUseAccepted;
   bool? lastMarketingEmailsEnabled;
+  String? lastTermsOfUseVersion;
+  String? lastPrivacyPolicyVersion;
 
   MobileUserProfile get _profile => const MobileUserProfile(
     userId: 'user-1',
@@ -518,6 +520,8 @@ class _FakeProfileRepository extends ProfileRepository {
   }) async {
     lastTermsOfUseAccepted = termsOfUseAccepted;
     lastMarketingEmailsEnabled = marketingEmailsEnabled;
+    lastTermsOfUseVersion = termsOfUseVersion;
+    lastPrivacyPolicyVersion = privacyPolicyVersion;
 
     final session = AuthSession(
       accessToken: 'access-token',

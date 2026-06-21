@@ -471,6 +471,7 @@ internal sealed partial class TemplatesService
             .Where(template => template.DeletedAtUtc == null)
             .Where(template => template.Status == TemplateStatus.Active)
             .Where(template => !query.Type.HasValue || template.TemplateType == query.Type.Value)
+            .Where(template => !query.ExcludeTemplateId.HasValue || template.Id != query.ExcludeTemplateId.Value)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
                 && asset.Url != null

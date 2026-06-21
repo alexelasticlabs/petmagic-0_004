@@ -653,6 +653,9 @@ export async function createImageTemplate(payload: ImageTemplatePayload): Promis
   const template = await apiRequest<AdminTemplate>("/api/admin/templates/image", {
     method: "POST",
     body: JSON.stringify(payload),
+  },
+  {
+    timeoutMs: 60_000,
   });
   cachedTemplateLists.clear();
   return template;
@@ -678,6 +681,9 @@ export async function createVideoTemplate(payload: VideoTemplatePayload): Promis
   const template = await apiRequest<AdminTemplate>("/api/admin/templates/video", {
     method: "POST",
     body: JSON.stringify(payload),
+  },
+  {
+    timeoutMs: 60_000,
   });
   cachedTemplateLists.clear();
   return template;
@@ -744,6 +750,9 @@ export async function uploadTemplateMedia(
   return apiRequest<TemplateAsset>("/api/admin/templates/media/upload", {
     method: "POST",
     body: formData,
+  },
+  {
+    timeoutMs: 120_000,
   });
 }
 

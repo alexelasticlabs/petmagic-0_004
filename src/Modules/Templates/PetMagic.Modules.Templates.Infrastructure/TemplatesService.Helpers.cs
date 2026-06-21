@@ -11,6 +11,12 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplatesService
 {
+    private const int TemplateTagMaxLength = 32;
+    private const int TemplateRequirementMaxLength = 160;
+    private const int TemplatePromptMaxLength = 1000;
+    private const int TemplateAssetFileNameMaxLength = 256;
+    private const int TemplateAssetContentTypeMaxLength = 128;
+
     private Result ValidateVideoModels(string preprocessingModel, string klingModel)
     {
         if (!options.AllowedPreprocessingModels.Contains(preprocessingModel.Trim(), StringComparer.OrdinalIgnoreCase))
@@ -339,6 +345,7 @@ internal sealed partial class TemplatesService
             .SelectMany(tag => tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(tag => tag.Trim())
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
+            .Select(tag => tag.Length <= TemplateTagMaxLength ? tag : tag[..TemplateTagMaxLength])
             .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
@@ -378,6 +385,7 @@ internal sealed partial class TemplatesService
         return [.. requirements
             .Select(requirement => requirement.Trim())
             .Where(requirement => !string.IsNullOrWhiteSpace(requirement))
+            .Select(requirement => requirement.Length <= TemplateRequirementMaxLength ? requirement : requirement[..TemplateRequirementMaxLength])
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(6)];
     }
@@ -394,7 +402,19 @@ internal sealed partial class TemplatesService
 
     private static string ResolvePrompt(string prompt, string fallback)
     {
-        return string.IsNullOrWhiteSpace(prompt) ? fallback : prompt.Trim();
+        var resolved = string.IsNullOrWhiteSpace(prompt) ? fallback : prompt.Trim();
+        return resolved.Length <= TemplatePromptMaxLength ? resolved : resolved[..TemplatePromptMaxLength];
+    }
+
+    private static string NormalizeAssetText(string value, int maxLength, string fallback)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
+    }
+
+    private static long? NormalizeFileSizeBytes(long? value)
+    {
+        return value is > 0 ? value : null;
     }
 
     private static string NormalizeVariationStrength(string? raw)
@@ -485,9 +505,9 @@ internal sealed partial class TemplatesService
                 : null;
 
         existing.Url = asset.Url;
-        existing.FileName = asset.FileName;
-        existing.ContentType = asset.ContentType;
-        existing.FileSizeBytes = asset.FileSizeBytes;
+        existing.FileName = NormalizeAssetText(asset.FileName, TemplateAssetFileNameMaxLength, "asset");
+        existing.ContentType = NormalizeAssetText(asset.ContentType, TemplateAssetContentTypeMaxLength, "application/octet-stream");
+        existing.FileSizeBytes = NormalizeFileSizeBytes(asset.FileSizeBytes);
         existing.DurationSeconds = asset.DurationSeconds;
 
         return obsoleteUrl;

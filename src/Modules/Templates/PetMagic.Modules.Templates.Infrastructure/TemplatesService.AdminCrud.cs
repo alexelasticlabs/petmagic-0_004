@@ -55,17 +55,7 @@ internal sealed partial class TemplatesService
             UpdatedAtUtc = now
         };
 
-        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-            template.Title,
-            template.ShortDescription,
-            DeserializeRequirements(template.PetPhotoRequirements),
-            template.ImagePrompt,
-            template.PreprocessingPrompt,
-            template.KlingPrompt,
-            options.SupportedLocalizationLocales,
-            options.SourceLocalizationLocale,
-            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-            cancellationToken);
+        template.LocalizedTextsJson = null;
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
 
@@ -87,7 +77,15 @@ internal sealed partial class TemplatesService
         return Result.Success(MapAdminResponse(template));
     }
 
-    public async Task<Result<AdminTemplateResponse>> UpdateImageAsync(UpdateImageTemplateCommand command, CancellationToken cancellationToken)
+    public Task<Result<AdminTemplateResponse>> UpdateImageAsync(UpdateImageTemplateCommand command, CancellationToken cancellationToken)
+    {
+        return UpdateImageAsync(command, cancellationToken, retryOnConcurrency: true);
+    }
+
+    private async Task<Result<AdminTemplateResponse>> UpdateImageAsync(
+        UpdateImageTemplateCommand command,
+        CancellationToken cancellationToken,
+        bool retryOnConcurrency)
     {
         var template = await FindTemplateAsync(command.TemplateId, cancellationToken);
         if (template is null)
@@ -149,63 +147,33 @@ internal sealed partial class TemplatesService
             }
         }
 
-        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
         await StampCatalogUpsertAsync(template, now, cancellationToken);
 
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException) when (retryOnConcurrency)
+        {
+            dbContext.ChangeTracker.Clear();
+            return await UpdateImageAsync(command, cancellationToken, retryOnConcurrency: false);
+        }
         catch (DbUpdateConcurrencyException)
         {
-            // Reload the entity from the database and reapply changes
-            await dbContext.Entry(template).ReloadAsync(cancellationToken);
-            template.Title = command.Title.Trim();
-            template.ShortDescription = command.ShortDescription.Trim();
-            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
-            template.Category = categoryResult.Value.Name;
-            template.Tags = SerializeTags(command.Tags);
-            template.IsPremium = command.IsPremium;
-            template.TokenCost = command.TokenCost;
-            template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
-            template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
-            template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
-            template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
-            template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
-            template.Status = statusResult.Value;
-            template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
-            template.ImageModel = command.ImageModel.Trim();
-            template.ImagePrompt = ResolvePrompt(command.ImagePrompt, options.DefaultImagePrompt);
-            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-                template.Title,
-                template.ShortDescription,
-                DeserializeRequirements(template.PetPhotoRequirements),
-                template.ImagePrompt,
-                template.PreprocessingPrompt,
-                template.KlingPrompt,
-                options.SupportedLocalizationLocales,
-                options.SourceLocalizationLocale,
-                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-                cancellationToken);
-
-            var staleChanges = dbContext.ChangeTracker
-                .Entries<TemplateCatalogChange>()
-                .Where(entry => entry.State == EntityState.Added)
-                .ToArray();
-            foreach (var staleChange in staleChanges)
-            {
-                staleChange.State = EntityState.Detached;
-            }
-
-            await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
-
-            // Try to save again
-            await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.ChangeTracker.Clear();
+            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, command.PreviewAsset, cancellationToken);
+            return recovered is null
+                ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.UpdateConflict)
+                : Result.Success(recovered);
         }
 
+        await ClaimTemplateAssetsAfterUpdateAsync(
+            template.Id,
+            cancellationToken,
+            (command.PreviewAsset, TemplateMediaRole.PreviewAsset));
         await PublishFeedInvalidatedAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
-        return Result.Success(MapAdminResponse(template));
+        return Result.Success(await MapUpdatedTemplateResponseAsync(command.TemplateId, template, cancellationToken));
     }
 
     public async Task<Result<AdminTemplateResponse>> CreateVideoAsync(CreateVideoTemplateCommand command, CancellationToken cancellationToken)
@@ -260,17 +228,7 @@ internal sealed partial class TemplatesService
             UpdatedAtUtc = now
         };
 
-        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-            template.Title,
-            template.ShortDescription,
-            DeserializeRequirements(template.PetPhotoRequirements),
-            template.ImagePrompt,
-            template.PreprocessingPrompt,
-            template.KlingPrompt,
-            options.SupportedLocalizationLocales,
-            options.SourceLocalizationLocale,
-            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-            cancellationToken);
+        template.LocalizedTextsJson = null;
 
         SetAsset(template, TemplateAssetKind.Preview, command.PreviewAsset);
         SetAsset(template, TemplateAssetKind.ReferenceMotion, command.ReferenceMotionAsset);
@@ -294,7 +252,15 @@ internal sealed partial class TemplatesService
         return Result.Success(MapAdminResponse(template));
     }
 
-    public async Task<Result<AdminTemplateResponse>> UpdateVideoAsync(UpdateVideoTemplateCommand command, CancellationToken cancellationToken)
+    public Task<Result<AdminTemplateResponse>> UpdateVideoAsync(UpdateVideoTemplateCommand command, CancellationToken cancellationToken)
+    {
+        return UpdateVideoAsync(command, cancellationToken, retryOnConcurrency: true);
+    }
+
+    private async Task<Result<AdminTemplateResponse>> UpdateVideoAsync(
+        UpdateVideoTemplateCommand command,
+        CancellationToken cancellationToken,
+        bool retryOnConcurrency)
     {
         var template = await FindTemplateAsync(command.TemplateId, cancellationToken);
         if (template is null)
@@ -349,17 +315,7 @@ internal sealed partial class TemplatesService
         template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
         template.KeepOriginalSound = command.KeepOriginalSound;
         template.Status = statusResult.Value;
-        template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-            template.Title,
-            template.ShortDescription,
-            DeserializeRequirements(template.PetPhotoRequirements),
-            template.ImagePrompt,
-            template.PreprocessingPrompt,
-            template.KlingPrompt,
-            options.SupportedLocalizationLocales,
-            options.SourceLocalizationLocale,
-            httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-            cancellationToken);
+        template.LocalizedTextsJson = null;
         var now = DateTime.UtcNow;
 
         var obsoleteAssetUrls = CollectObsoleteAssetUrls([
@@ -376,70 +332,34 @@ internal sealed partial class TemplatesService
             }
         }
 
-        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.PreviewAsset, TemplateMediaRole.PreviewAsset, cancellationToken);
-        await mediaLifecycleService.ClaimTemplateAssetAsync(template.Id, command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset, cancellationToken);
         await StampCatalogUpsertAsync(template, now, cancellationToken);
 
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        catch (DbUpdateConcurrencyException) when (retryOnConcurrency)
+        {
+            dbContext.ChangeTracker.Clear();
+            return await UpdateVideoAsync(command, cancellationToken, retryOnConcurrency: false);
+        }
         catch (DbUpdateConcurrencyException)
         {
-            // Reload the entity from the database and reapply changes
-            await dbContext.Entry(template).ReloadAsync(cancellationToken);
-            template.Title = command.Title.Trim();
-            template.ShortDescription = command.ShortDescription.Trim();
-            template.PetPhotoRequirements = SerializeRequirements(command.PetPhotoRequirements);
-            template.Category = categoryResult.Value.Name;
-            template.Tags = SerializeTags(command.Tags);
-            template.IsPremium = command.IsPremium;
-            template.TokenCost = command.TokenCost;
-            template.SupportsGenerationResultInput = command.SupportsGenerationResultInput;
-            template.RequiredInputMediaType = ParseInputMediaType(command.RequiredInputMediaType);
-            template.RecommendedAfterImageGeneration = command.RecommendedAfterImageGeneration;
-            template.SupportsGenerateSimilar = command.SupportsGenerateSimilar;
-            template.DefaultVariationStrength = NormalizeVariationStrength(command.DefaultVariationStrength);
-            template.PromoBadgeMode = ParsePromoBadgeMode(command.PromoBadgeMode);
-            template.MusicDescription = string.IsNullOrWhiteSpace(command.MusicDescription) ? null : command.MusicDescription.Trim();
-            template.ReferenceVideoDurationSeconds = duration;
-            template.CharacterOrientation = orientation;
-            template.PreprocessingModel = command.PreprocessingModel.Trim();
-            template.PreprocessingPrompt = ResolvePrompt(command.PreprocessingPrompt, options.DefaultPreprocessingPrompt);
-            template.KlingModel = command.KlingModel.Trim();
-            template.KlingPrompt = ResolvePrompt(command.KlingPrompt, options.DefaultKlingPrompt);
-            template.KeepOriginalSound = command.KeepOriginalSound;
-            template.Status = statusResult.Value;
-            template.LocalizedTextsJson = await TemplateLocalizationTranslator.GenerateAsync(
-                template.Title,
-                template.ShortDescription,
-                DeserializeRequirements(template.PetPhotoRequirements),
-                template.ImagePrompt,
-                template.PreprocessingPrompt,
-                template.KlingPrompt,
-                options.SupportedLocalizationLocales,
-                options.SourceLocalizationLocale,
-                httpClientFactory.CreateClient(TemplateLocalizationTranslator.HttpClientName),
-                cancellationToken);
-
-            var staleChanges = dbContext.ChangeTracker
-                .Entries<TemplateCatalogChange>()
-                .Where(entry => entry.State == EntityState.Added)
-                .ToArray();
-            foreach (var staleChange in staleChanges)
-            {
-                staleChange.State = EntityState.Detached;
-            }
-
-            await StampCatalogUpsertAsync(template, DateTime.UtcNow, cancellationToken);
-
-            // Try to save again
-            await dbContext.SaveChangesAsync(cancellationToken);
+            dbContext.ChangeTracker.Clear();
+            var recovered = await TryRecoverUpdatedTemplateAsync(command.TemplateId, command.PreviewAsset, cancellationToken);
+            return recovered is null
+                ? Result.Failure<AdminTemplateResponse>(TemplatesErrors.UpdateConflict)
+                : Result.Success(recovered);
         }
 
+        await ClaimTemplateAssetsAfterUpdateAsync(
+            template.Id,
+            cancellationToken,
+            (command.PreviewAsset, TemplateMediaRole.PreviewAsset),
+            (command.ReferenceMotionAsset, TemplateMediaRole.ReferenceMotionAsset));
         await PublishFeedInvalidatedAsync(cancellationToken);
         await CleanupObsoleteMediaAsync(obsoleteAssetUrls, cancellationToken);
-        return Result.Success(MapAdminResponse(template));
+        return Result.Success(await MapUpdatedTemplateResponseAsync(command.TemplateId, template, cancellationToken));
     }
 
     public async Task<Result<AdminTemplateResponse>> ChangeStatusAsync(ChangeTemplateStatusCommand command, CancellationToken cancellationToken)
@@ -512,6 +432,82 @@ internal sealed partial class TemplatesService
         await PublishFeedInvalidatedAsync(cancellationToken);
 
         return Result.Success();
+    }
+
+    private async Task ClaimTemplateAssetsAfterUpdateAsync(
+        Guid templateId,
+        CancellationToken cancellationToken,
+        params (TemplateAssetCommand? Asset, TemplateMediaRole Role)[] assets)
+    {
+        var claimableAssets = assets
+            .Where(asset => asset.Asset is not null)
+            .ToArray();
+        if (claimableAssets.Length == 0)
+        {
+            return;
+        }
+
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                foreach (var (asset, role) in claimableAssets)
+                {
+                    await mediaLifecycleService.ClaimTemplateAssetAsync(templateId, asset, role, cancellationToken);
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            catch (DbUpdateConcurrencyException) when (attempt < maxAttempts)
+            {
+                dbContext.ChangeTracker.Clear();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                dbContext.ChangeTracker.Clear();
+                return;
+            }
+        }
+    }
+
+    private async Task<AdminTemplateResponse> MapUpdatedTemplateResponseAsync(
+        Guid templateId,
+        TemplateItem updatedTemplate,
+        CancellationToken cancellationToken)
+    {
+        if (dbContext.Entry(updatedTemplate).State != EntityState.Detached)
+        {
+            return MapAdminResponse(updatedTemplate);
+        }
+
+        var reloaded = await FindTemplateAsync(templateId, cancellationToken);
+        return reloaded is null ? MapAdminResponse(updatedTemplate) : MapAdminResponse(reloaded);
+    }
+
+    private async Task<AdminTemplateResponse?> TryRecoverUpdatedTemplateAsync(
+        Guid templateId,
+        TemplateAssetCommand? expectedPreviewAsset,
+        CancellationToken cancellationToken)
+    {
+        var template = await FindTemplateAsync(templateId, cancellationToken);
+        if (template is null || template.DeletedAtUtc is not null)
+        {
+            return null;
+        }
+
+        var preview = GetAsset(template, TemplateAssetKind.Preview);
+        var expectedPreviewUrl = expectedPreviewAsset?.Url.Trim();
+        if (expectedPreviewUrl is null)
+        {
+            return preview is null ? MapAdminResponse(template) : null;
+        }
+
+        return preview is not null
+            && string.Equals(preview.Url, expectedPreviewUrl, StringComparison.OrdinalIgnoreCase)
+                ? MapAdminResponse(template)
+                : null;
     }
 
     private async Task WriteTemplateAuditAsync(

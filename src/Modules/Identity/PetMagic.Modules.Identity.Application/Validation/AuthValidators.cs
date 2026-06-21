@@ -10,26 +10,25 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
 {
     public RegisterUserCommandValidator(ILegalDocumentsCatalog legalDocumentsCatalog)
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
-        RuleFor(x => x.Password)
+        RuleFor(x => x.Email)
             .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters long.")
-            .Matches("[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter.")
-            .Matches("[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter.")
-            .Matches("[0-9]")
-            .WithMessage("Password must contain at least one digit.");
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
+        RuleFor(x => x.Password).ApplyPasswordPolicy();
         RuleFor(x => x.TermsOfUseAccepted)
             .Equal(true)
-            .WithMessage("Terms of Use must be accepted.");
+            .WithMessage(AuthValidationMessages.TermsRequired);
         RuleFor(x => x.PrivacyPolicyAccepted)
             .Equal(true)
-            .WithMessage("Privacy Policy must be accepted.");
+            .WithMessage(AuthValidationMessages.PrivacyRequired);
         RuleFor(x => x)
-            .Must(command => legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))
-            .WithMessage("Current Terms of Use and Privacy Policy versions must be accepted.");
+            .Must(command => legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion)
+                || (command.TermsOfUseAccepted
+                    && command.PrivacyPolicyAccepted
+                    && string.IsNullOrWhiteSpace(command.TermsOfUseVersion)
+                    && string.IsNullOrWhiteSpace(command.PrivacyPolicyVersion)))
+            .WithMessage(AuthValidationMessages.LegalVersionsInvalid);
     }
 }
 
@@ -37,11 +36,15 @@ public sealed class AcceptLegalDocumentsCommandValidator : AbstractValidator<Acc
 {
     public AcceptLegalDocumentsCommandValidator(ILegalDocumentsCatalog legalDocumentsCatalog)
     {
-        RuleFor(x => x.TermsOfUseVersion).NotEmpty();
-        RuleFor(x => x.PrivacyPolicyVersion).NotEmpty();
+        RuleFor(x => x.TermsOfUseVersion)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.LegalVersionsInvalid);
+        RuleFor(x => x.PrivacyPolicyVersion)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.LegalVersionsInvalid);
         RuleFor(x => x)
             .Must(command => legalDocumentsCatalog.MatchesCurrentVersions(command.TermsOfUseVersion, command.PrivacyPolicyVersion))
-            .WithMessage("Current Terms of Use and Privacy Policy versions must be accepted.");
+            .WithMessage(AuthValidationMessages.LegalVersionsInvalid);
     }
 }
 
@@ -49,7 +52,11 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
 {
     public LoginCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Password).NotEmpty();
     }
 }
@@ -68,7 +75,11 @@ public sealed class ResendEmailVerificationCodeCommandValidator : AbstractValida
 {
     public ResendEmailVerificationCodeCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
     }
 }
 
@@ -76,7 +87,11 @@ public sealed class VerifyEmailCodeCommandValidator : AbstractValidator<VerifyEm
 {
     public VerifyEmailCodeCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Code)
             .NotEmpty()
             .Length(6)
@@ -88,7 +103,11 @@ public sealed class RequestEmailConfirmationCommandValidator : AbstractValidator
 {
     public RequestEmailConfirmationCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
     }
 }
 
@@ -96,7 +115,11 @@ public sealed class ConfirmEmailCommandValidator : AbstractValidator<ConfirmEmai
 {
     public ConfirmEmailCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Code)
             .NotEmpty()
             .Length(6)
@@ -108,7 +131,11 @@ public sealed class RequestPasswordResetCommandValidator : AbstractValidator<Req
 {
     public RequestPasswordResetCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
     }
 }
 
@@ -116,7 +143,11 @@ public sealed class VerifyPasswordResetCodeCommandValidator : AbstractValidator<
 {
     public VerifyPasswordResetCodeCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Code)
             .NotEmpty()
             .Length(6)
@@ -128,21 +159,16 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
 {
     public ResetPasswordCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Code)
             .NotEmpty()
             .Length(6)
             .Matches("^[0-9]{6}$");
-        RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters long.")
-            .Matches("[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter.")
-            .Matches("[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter.")
-            .Matches("[0-9]")
-            .WithMessage("Password must contain at least one digit.");
+        RuleFor(x => x.NewPassword).ApplyPasswordPolicy();
     }
 }
 
@@ -150,21 +176,16 @@ public sealed class ConfirmPasswordResetCommandValidator : AbstractValidator<Con
 {
     public ConfirmPasswordResetCommandValidator()
     {
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Email)
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.EmailInvalid)
+            .EmailAddress()
+            .WithMessage(AuthValidationMessages.EmailInvalid);
         RuleFor(x => x.Code)
             .NotEmpty()
             .Length(6)
             .Matches("^[0-9]{6}$");
-        RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters long.")
-            .Matches("[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter.")
-            .Matches("[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter.")
-            .Matches("[0-9]")
-            .WithMessage("Password must contain at least one digit.");
+        RuleFor(x => x.NewPassword).ApplyPasswordPolicy();
     }
 }
 
@@ -176,16 +197,7 @@ public sealed class ConfirmCurrentPasswordChangeCommandValidator : AbstractValid
             .NotEmpty()
             .Length(6)
             .Matches("^[0-9]{6}$");
-        RuleFor(x => x.NewPassword)
-            .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters long.")
-            .Matches("[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter.")
-            .Matches("[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter.")
-            .Matches("[0-9]")
-            .WithMessage("Password must contain at least one digit.");
+        RuleFor(x => x.NewPassword).ApplyPasswordPolicy();
         RuleFor(x => x.RefreshToken).NotEmpty();
     }
 }
@@ -213,6 +225,34 @@ public sealed class ExternalLoginCallbackCommandValidator : AbstractValidator<Ex
     {
         RuleFor(x => x.Provider).NotEmpty();
         RuleFor(x => x.ProviderSubject).NotEmpty();
+    }
+}
+
+internal static class AuthValidationMessages
+{
+    public const string EmailInvalid = "auth.email_invalid";
+    public const string PasswordPolicyInvalid = "auth.password_policy_invalid";
+    public const string TermsRequired = "auth.terms_required";
+    public const string PrivacyRequired = "auth.privacy_required";
+    public const string LegalVersionsInvalid = "auth.legal_versions_invalid";
+}
+
+internal static class AuthPasswordValidationRules
+{
+    public static IRuleBuilderOptions<T, string> ApplyPasswordPolicy<T>(
+        this IRuleBuilder<T, string> ruleBuilder)
+    {
+        return ruleBuilder
+            .NotEmpty()
+            .WithMessage(AuthValidationMessages.PasswordPolicyInvalid)
+            .MinimumLength(8)
+            .WithMessage(AuthValidationMessages.PasswordPolicyInvalid)
+            .Matches("[A-Z]")
+            .WithMessage(AuthValidationMessages.PasswordPolicyInvalid)
+            .Matches("[a-z]")
+            .WithMessage(AuthValidationMessages.PasswordPolicyInvalid)
+            .Matches("[0-9]")
+            .WithMessage(AuthValidationMessages.PasswordPolicyInvalid);
     }
 }
 

@@ -8,14 +8,13 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/email_verification_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_reset_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
@@ -140,7 +139,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final legalDocumentsAsync = ref.watch(
       currentLegalDocumentsProvider(locale),
     );
-    final legalDocumentsAvailable = legalDocumentsAsync.value != null;
     final compactLayout = _isSignUp || isCompactViewport;
 
     final title = _isSignUp ? text.authRegisterTitle : text.authEntryTitle;
@@ -169,7 +167,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final showInlineTermsError =
         _consentErrorMessage == 'auth.accept_terms_required';
     final showInlineLegalError =
-        legalDocumentsAsync.hasError ||
         _consentErrorMessage == 'auth.legal_documents_unavailable';
     final socialProviders = authSocialProvidersForPlatform(
       isIOS: !kIsWeb && Platform.isIOS,
@@ -386,15 +383,11 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
                       value: _acceptedTerms,
                       label: text.authAcceptTermsLabel,
                       locale: Localizations.localeOf(context),
-                      enabled: legalDocumentsAvailable && !state.isSaving,
-                      onOpenTerms: () => _openLegalDocument(
-                        legalDocuments: legalDocumentsAsync.value,
-                        documentSelector: (docs) => docs.termsOfUse,
-                      ),
-                      onOpenPrivacy: () => _openLegalDocument(
-                        legalDocuments: legalDocumentsAsync.value,
-                        documentSelector: (docs) => docs.privacyPolicy,
-                      ),
+                      enabled: !state.isSaving,
+                      onOpenTerms: () =>
+                          _openLegalDocument(ProfileSettingsDetailKind.terms),
+                      onOpenPrivacy: () =>
+                          _openLegalDocument(ProfileSettingsDetailKind.privacy),
                       showError:
                           _consentErrorMessage == 'auth.accept_terms_required',
                       onChanged: (value) {
@@ -564,13 +557,6 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         _ => null,
       };
 
-      if (legalDocuments == null) {
-        setState(() {
-          _consentErrorMessage = 'auth.legal_documents_unavailable';
-        });
-        return;
-      }
-
       if (!_acceptedTerms) {
         setState(() {
           _consentErrorMessage = 'auth.accept_terms_required';
@@ -688,23 +674,8 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     }
   }
 
-  Future<void> _openLegalDocument({
-    required MobileLegalDocuments? legalDocuments,
-    required MobileLegalDocument Function(MobileLegalDocuments docs)
-    documentSelector,
-  }) async {
-    if (legalDocuments == null) {
-      return;
-    }
-
-    final document = documentSelector(legalDocuments);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      useRootNavigator: false,
-      builder: (context) => _LegalDocumentSheet(document: document),
-    );
+  void _openLegalDocument(ProfileSettingsDetailKind kind) {
+    context.push(ProfileSettingsDetailPage.location(kind));
   }
 
   bool _isInlineConsentMessage(String raw) {
@@ -735,51 +706,6 @@ class _SocialProviderButton extends StatelessWidget {
       label: isApple ? text.authContinueWithApple : text.authContinueWithGoogle,
       compact: compact,
       onPressed: isSaving ? null : () => onPressed(provider),
-    );
-  }
-}
-
-class _LegalDocumentSheet extends StatelessWidget {
-  const _LegalDocumentSheet({required this.document});
-
-  final MobileLegalDocument document;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return FractionallySizedBox(
-      heightFactor: 0.9,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    document.title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: LegalDocumentListView(
-              documents: [document],
-              includeDocumentTitles: false,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -834,71 +760,69 @@ class _TermsConsentOption extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        onTap: enabled ? () => onChanged(!value) : null,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: value
-                ? colors.accent.withValues(alpha: isDark ? 0.09 : 0.11)
-                : colors.surfaceGlass.withValues(alpha: isDark ? 0.54 : 0.8),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: showError
-                  ? colors.danger.withValues(alpha: 0.48)
-                  : value
-                  ? colors.accent.withValues(alpha: 0.52)
-                  : colors.border.withValues(alpha: isDark ? 0.58 : 0.62),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: value
+              ? colors.accent.withValues(alpha: isDark ? 0.09 : 0.11)
+              : colors.surfaceGlass.withValues(alpha: isDark ? 0.54 : 0.8),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: showError
+                ? colors.danger.withValues(alpha: 0.48)
+                : value
+                ? colors.accent.withValues(alpha: 0.52)
+                : colors.border.withValues(alpha: isDark ? 0.58 : 0.62),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(4, 5, 10, 5),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Checkbox(
+              value: value,
+              onChanged: enabled ? onChanged : null,
+              activeColor: colors.accent,
+              checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: BorderSide(
+                color: showError
+                    ? colors.danger.withValues(alpha: 0.72)
+                    : colors.border.withValues(alpha: 0.86),
+                width: 1.2,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
-          ),
-          padding: const EdgeInsets.fromLTRB(4, 5, 10, 5),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Checkbox(
-                value: value,
-                onChanged: enabled ? onChanged : null,
-                activeColor: colors.accent,
-                checkColor: isDark ? const Color(0xFF03130C) : Colors.white,
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                side: BorderSide(
-                  color: showError
-                      ? colors.danger.withValues(alpha: 0.72)
-                      : colors.border.withValues(alpha: 0.86),
-                  width: 1.2,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: split == null
+                    ? Text(label, style: textStyle)
+                    : Wrap(
+                        children: [
+                          Text(split.prefix, style: textStyle),
+                          _InlineLegalLink(
+                            key: const ValueKey('auth_terms_link'),
+                            text: split.terms,
+                            style: linkStyle,
+                            onTap: onOpenTerms,
+                          ),
+                          Text(split.between, style: textStyle),
+                          _InlineLegalLink(
+                            key: const ValueKey('auth_privacy_link'),
+                            text: split.privacy,
+                            style: linkStyle,
+                            onTap: onOpenPrivacy,
+                          ),
+                          Text(split.suffix, style: textStyle),
+                        ],
+                      ),
               ),
-              const SizedBox(width: 2),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 8),
-                  child: split == null
-                      ? Text(label, style: textStyle)
-                      : Wrap(
-                          children: [
-                            Text(split.prefix, style: textStyle),
-                            _InlineLegalLink(
-                              text: split.terms,
-                              style: linkStyle,
-                              onTap: enabled ? onOpenTerms : null,
-                            ),
-                            Text(split.between, style: textStyle),
-                            _InlineLegalLink(
-                              text: split.privacy,
-                              style: linkStyle,
-                              onTap: enabled ? onOpenPrivacy : null,
-                            ),
-                            Text(split.suffix, style: textStyle),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1028,6 +952,7 @@ class _LegalStateLine extends StatelessWidget {
 
 class _InlineLegalLink extends StatelessWidget {
   const _InlineLegalLink({
+    super.key,
     required this.text,
     required this.style,
     required this.onTap,
@@ -1039,13 +964,16 @@ class _InlineLegalLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 1),
-        child: Text(text, style: style),
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 1),
+        visualDensity: VisualDensity.compact,
+        textStyle: style,
       ),
+      child: Text(text, style: style),
     );
   }
 }

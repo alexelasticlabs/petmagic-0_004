@@ -83,11 +83,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isPasswordResetRoute = location == PasswordResetPage.routePath;
       final isVerifyEmailRoute = location == EmailVerificationPage.routePath;
       final isLegalGateRoute = location == LegalAcceptanceGatePage.routePath;
-      final isPublicAuthRoute =
+      final isLegalDocumentRoute =
+          location ==
+              ProfileSettingsDetailPage.location(
+                ProfileSettingsDetailKind.terms,
+              ) ||
+          location ==
+              ProfileSettingsDetailPage.location(
+                ProfileSettingsDetailKind.privacy,
+              );
+      final isAuthFlowRoute =
           isAuthRoute ||
           isRegisterRoute ||
           isPasswordResetRoute ||
           isVerifyEmailRoute;
+      final isPublicAuthRoute = isAuthFlowRoute || isLegalDocumentRoute;
 
       if (launchState.isLoading) {
         return isStartupRoute ? null : StartupLoadingPage.routePath;
@@ -95,12 +105,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (launchState.isAuthenticated) {
         if (launchState.requiresLegalAcceptance) {
-          return isLegalGateRoute ? null : LegalAcceptanceGatePage.routePath;
+          return isLegalGateRoute || isLegalDocumentRoute
+              ? null
+              : LegalAcceptanceGatePage.routePath;
         }
 
         if (isStartupRoute ||
             isWelcomeRoute ||
-            isPublicAuthRoute ||
+            isAuthFlowRoute ||
             isLegalGateRoute) {
           return TemplatesPage.routePath;
         }

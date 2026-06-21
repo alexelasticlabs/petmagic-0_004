@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/features/profile/presentation/profile_surface_wi
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
@@ -754,6 +755,18 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
                   ),
                 ],
                 AsyncData(:final value) => [
+                  ProfileSectionLabel(label: text.profileLegalDocumentSection),
+                  ProfileGlassCard(
+                    padding: EdgeInsets.zero,
+                    child: LegalDocumentListView(
+                      documents: [_documentFromValue(kind, value)],
+                      includeDocumentTitles: false,
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
                   ProfileGlassCard(
                     child: profile != null && requiresAcceptance
                         ? SizedBox(

@@ -2511,11 +2511,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Confirmez le mot de passe';
 
   @override
-  String get authPasswordRulesHint => 'Utilisez au moins 6 caractères.';
+  String get authPasswordRulesHint =>
+      'Utilisez au moins 8 caractères avec une majuscule, une minuscule et un chiffre.';
 
   @override
   String get authPasswordTooShort =>
-      'Le mot de passe doit comporter au moins 6 caractères.';
+      'Le mot de passe doit comporter au moins 8 caractères.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'Le mot de passe doit comporter au moins 8 caractères et inclure une majuscule, une minuscule et un chiffre.';
 
   @override
   String get authForgotPasswordAction => 'Mot de passe oublié ?';

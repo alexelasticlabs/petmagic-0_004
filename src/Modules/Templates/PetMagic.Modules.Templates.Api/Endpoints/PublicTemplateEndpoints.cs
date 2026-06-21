@@ -238,6 +238,7 @@ public static class PublicTemplateEndpoints
         [FromQuery] string? category,
         [FromQuery] bool? includePremium,
         [FromQuery] string? access,
+        [FromQuery] Guid? excludeTemplateId,
         [FromQuery] string? locale,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
@@ -261,7 +262,8 @@ public static class PublicTemplateEndpoints
                 category,
                 includePremium ?? true,
                 ResolveLocalePreference(httpContext, locale),
-                normalizedAccess),
+                normalizedAccess,
+                excludeTemplateId),
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);

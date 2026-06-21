@@ -28,7 +28,7 @@ class ApiBaseUrlResolver {
 
   static const _persistedBaseUrlKey = 'petmagic_mobile_last_api_base_url';
   static const _healthPath = '/health';
-  static const _defaultApiPort = 5000;
+  static const _defaultApiPort = 5001;
   static const _probeConnectTimeout = Duration(milliseconds: 350);
   static const _probeReadTimeout = Duration(milliseconds: 650);
   static const _probeWorkers = 24;

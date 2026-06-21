@@ -15,6 +15,12 @@ public sealed partial class IdentityService
     {
         var email = command.Email.Trim();
         var normalizedEmail = email.ToUpperInvariant();
+        var termsOfUseVersion = string.IsNullOrWhiteSpace(command.TermsOfUseVersion)
+            ? legalDocumentsCatalog.CurrentTermsOfUseVersion
+            : command.TermsOfUseVersion;
+        var privacyPolicyVersion = string.IsNullOrWhiteSpace(command.PrivacyPolicyVersion)
+            ? legalDocumentsCatalog.CurrentPrivacyPolicyVersion
+            : command.PrivacyPolicyVersion;
         if (await IsDeletedEmailBlockedAsync(email, cancellationToken))
         {
             return Result.Failure<UserProfileResponse>(IdentityErrors.AccountDeleted);
@@ -35,10 +41,10 @@ public sealed partial class IdentityService
             existing.DisplayName = command.DisplayName;
             existing.TermsOfUseAccepted = command.TermsOfUseAccepted;
             existing.TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null;
-            existing.TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? command.TermsOfUseVersion : null;
+            existing.TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? termsOfUseVersion : null;
             existing.PrivacyPolicyAccepted = command.PrivacyPolicyAccepted;
             existing.PrivacyPolicyAcceptedAtUtc = command.PrivacyPolicyAccepted ? now : null;
-            existing.PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? command.PrivacyPolicyVersion : null;
+            existing.PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? privacyPolicyVersion : null;
             existing.MarketingEmailsEnabled = command.MarketingEmailsEnabled;
             existing.MarketingEmailsUpdatedAtUtc = now;
             existing.IsActive = true;
@@ -71,10 +77,10 @@ public sealed partial class IdentityService
             DisplayName = command.DisplayName,
             TermsOfUseAccepted = command.TermsOfUseAccepted,
             TermsOfUseAcceptedAtUtc = command.TermsOfUseAccepted ? now : null,
-            TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? command.TermsOfUseVersion : null,
+            TermsOfUseAcceptedVersion = command.TermsOfUseAccepted ? termsOfUseVersion : null,
             PrivacyPolicyAccepted = command.PrivacyPolicyAccepted,
             PrivacyPolicyAcceptedAtUtc = command.PrivacyPolicyAccepted ? now : null,
-            PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? command.PrivacyPolicyVersion : null,
+            PrivacyPolicyAcceptedVersion = command.PrivacyPolicyAccepted ? privacyPolicyVersion : null,
             MarketingEmailsEnabled = command.MarketingEmailsEnabled,
             MarketingEmailsUpdatedAtUtc = now,
             IsPremium = false,

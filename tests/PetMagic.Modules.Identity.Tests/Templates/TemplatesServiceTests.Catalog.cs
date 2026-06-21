@@ -961,6 +961,37 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetPublicRandomTemplateAsync_ShouldExcludeCurrentTemplate()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var excludedTemplateId = await CreateActiveVideoTemplateAsync(
+            service,
+            "Current Video",
+            "Recommendations",
+            ["random", "current"]);
+        var expectedTemplateId = await CreateActiveVideoTemplateAsync(
+            service,
+            "Next Video",
+            "Recommendations",
+            ["random", "next"]);
+
+        var random = await service.GetPublicRandomTemplateAsync(
+            new PublicRandomTemplateQuery(
+                TemplateType.Video,
+                "Recommendations",
+                true,
+                null,
+                ExcludeTemplateId: excludedTemplateId),
+            CancellationToken.None);
+
+        Assert.True(random.IsSuccess);
+        Assert.NotNull(random.Value.Template);
+        Assert.Equal(expectedTemplateId, random.Value.Template!.TemplateId);
+    }
+
+    [Fact]
     public async Task GetPublicRandomTemplateAsync_ShouldBoundCategoryFilter()
     {
         await using var dbContext = CreateDbContext();
@@ -1051,6 +1082,101 @@ public sealed partial class TemplatesServiceTests
         Assert.Null(oldRecord.TemplateId);
         Assert.Equal(TemplateMediaLifecycleState.AttachedToTemplate, newRecord.LifecycleState);
         Assert.Equal(created.Value.TemplateId, newRecord.TemplateId);
+    }
+
+    [Fact]
+    public async Task UpdateImageAsync_ShouldRetryPreviewChange_WhenFirstSaveHitsConcurrency()
+    {
+        var concurrency = new OneShotConcurrencyInterceptor();
+        await using var dbContext = CreateDbContext(concurrency);
+        var storage = new RecordingMediaStorage();
+        var service = CreateService(dbContext, storage);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/old-preview.jpg", "old-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        concurrency.Enabled = true;
+
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/new-preview.jpg", "new-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(1, concurrency.ThrowCount);
+        Assert.Equal("http://localhost:5000/templates-media/2026/05/new-preview.jpg", updated.Value.PreviewAsset?.Url);
+        Assert.Single(storage.DeletedUrls);
+        Assert.Equal("http://localhost:5000/templates-media/2026/05/old-preview.jpg", storage.DeletedUrls[0]);
+    }
+
+    [Fact]
+    public async Task UpdateImageAsync_ShouldNormalizeLegacyLongFields_WhenPreviewChanges()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                ["cozy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/old-preview.jpg", "old-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet."),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var longPrompt = new string('p', 1500);
+        var longRequirement = new string('r', 180);
+        var longTag = new string('t', 48);
+        var updated = await service.UpdateImageAsync(
+            new UpdateImageTemplateCommand(
+                created.Value.TemplateId,
+                "Portrait",
+                "Cozy portrait",
+                "Portrait",
+                [longTag],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/new-preview.jpg", "new-preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                longPrompt,
+                TemplateStatus.Draft.ToString(),
+                [longRequirement]),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(1000, (await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId)).ImagePrompt!.Length);
+        Assert.Equal(160, updated.Value.PetPhotoRequirements!.Single().Length);
+        Assert.Equal(32, updated.Value.Tags.Single().Length);
     }
 
     [Fact]

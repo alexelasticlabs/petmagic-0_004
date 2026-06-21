@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_failover_interceptor.dart';
 import 'package:petmagic_mobile/core/network/api_logging_interceptor.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
@@ -43,6 +44,7 @@ final dioProvider = Provider<Dio>((ref) {
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) {
+        removeAuthorizationHeaderForAnonymousRequest(options);
         options.headers['Accept-Language'] = _resolvePreferredLocaleTag(ref);
         handler.next(options);
       },

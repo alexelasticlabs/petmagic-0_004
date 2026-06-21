@@ -46,14 +46,15 @@ export const KLING_MODELS = [
 export const TEMPLATE_TOKEN_COST_MAX_LENGTH = 6;
 export const TEMPLATE_TITLE_MAX_LENGTH = 60;
 export const TEMPLATE_SHORT_DESCRIPTION_MAX_LENGTH = 120;
-export const TEMPLATE_REQUIREMENT_MAX_LENGTH = 180;
+export const TEMPLATE_REQUIREMENT_MAX_LENGTH = 160;
 export const TEMPLATE_CATEGORY_MAX_LENGTH = 64;
-export const TEMPLATE_TAG_MAX_LENGTH = 48;
+export const TEMPLATE_TAG_MAX_LENGTH = 32;
 export const TEMPLATE_TAG_MAX_COUNT = 12;
-export const TEMPLATE_MODEL_MAX_LENGTH = 160;
-export const TEMPLATE_PROMPT_MAX_LENGTH = 4000;
+export const TEMPLATE_MODEL_MAX_LENGTH = 128;
+export const TEMPLATE_PROMPT_MAX_LENGTH = 1000;
 export const TEMPLATE_MUSIC_DESCRIPTION_MAX_LENGTH = 240;
 export const TEMPLATE_ASSET_METADATA_MAX_LENGTH = 240;
+const TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH = 128;
 const TEMPLATE_ASSET_DURATION_MAX_SECONDS = 60 * 60;
 
 export function createInitialTemplateForm(templateType: TemplateType): TemplateFormState {
@@ -107,7 +108,7 @@ export function createFormFromTemplate(template: AdminTemplate): TemplateFormSta
     tokenCost: template.tokenCost.toString(),
     supportsGenerationResultInput: template.supportsGenerationResultInput ?? false,
     requiredInputMediaType: template.requiredInputMediaType ?? "Image",
-    recommendedAfterImageGeneration: template.recommendedAfterImageGeneration ?? false,
+    recommendedAfterImageGeneration: false,
     previewUrl: template.previewAsset?.url ?? "",
     previewUrlSource: template.previewAsset?.url ? "persisted" : "none",
     previewFileName: template.previewAsset?.fileName ?? "",
@@ -163,7 +164,7 @@ export async function saveImageTemplateFromForm(
     imagePrompt: normalizeTemplateText(form.imagePrompt, TEMPLATE_PROMPT_MAX_LENGTH),
     supportsGenerationResultInput: form.supportsGenerationResultInput,
     requiredInputMediaType: form.requiredInputMediaType,
-    recommendedAfterImageGeneration: form.recommendedAfterImageGeneration,
+    recommendedAfterImageGeneration: false,
   };
 
   return templateId ? updateImageTemplate(templateId, payload) : createImageTemplate(payload);
@@ -214,7 +215,7 @@ export async function saveVideoTemplateFromForm(
     keepOriginalSound: form.keepOriginalSound,
     supportsGenerationResultInput: form.supportsGenerationResultInput,
     requiredInputMediaType: form.requiredInputMediaType,
-    recommendedAfterImageGeneration: form.recommendedAfterImageGeneration,
+    recommendedAfterImageGeneration: false,
   };
 
   return templateId ? updateVideoTemplate(templateId, payload) : createVideoTemplate(payload);
@@ -264,10 +265,11 @@ function buildTemplateAsset(
   return {
     url: url.trim(),
     fileName:
-      normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH) || inferFileName(url),
+      normalizeTemplateText(fileName, TEMPLATE_ASSET_METADATA_MAX_LENGTH) ||
+      normalizeTemplateText(inferFileName(url), TEMPLATE_ASSET_METADATA_MAX_LENGTH),
     contentType:
-      normalizeTemplateText(contentType, TEMPLATE_ASSET_METADATA_MAX_LENGTH) ||
-      inferContentType(url),
+      normalizeTemplateText(contentType, TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH) ||
+      normalizeTemplateText(inferContentType(url), TEMPLATE_ASSET_CONTENT_TYPE_MAX_LENGTH),
     fileSizeBytes: size,
     durationSeconds: duration,
   };
@@ -296,7 +298,7 @@ export function normalizeTemplateText(raw: string, maxLength: number): string {
 function parseOptionalNumber(raw: string): number | undefined {
   const normalized = normalizeIntegerString(raw);
   const value = Number.parseInt(normalized, 10);
-  return normalized && Number.isSafeInteger(value) ? value : undefined;
+  return normalized && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
 export function normalizeTemplateIntegerInput(raw: string): string {

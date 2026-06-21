@@ -198,6 +198,34 @@ void main() {
     );
   });
 
+  testWidgets('registration legal links open their documents', (tester) async {
+    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextButton, 'Sign Up'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('auth_terms_link')));
+    await _pumpFrames(tester, count: 16);
+    expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
+    expect(find.text('Terms paragraph'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await _pumpFrames(tester);
+
+    await tester.tap(find.byKey(const ValueKey('auth_privacy_link')));
+    await _pumpFrames(tester);
+    expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
+    expect(find.text('Privacy paragraph'), findsOneWidget);
+  });
+
   testWidgets('compact sign in keeps submit button visible without overflow', (
     tester,
   ) async {
@@ -260,13 +288,15 @@ void main() {
     );
   });
 
-  testWidgets('sign up legal error stays inline and keeps submit visible', (
+  testWidgets('sign up can continue when legal documents are unavailable', (
     tester,
   ) async {
+    final profileRepository = _UnavailableLegalDocumentsProfileRepository();
+
     await _pumpApp(
       tester,
       sharedPrefs: const {_onboardingSeenKey: true},
-      profileRepository: _UnavailableLegalDocumentsProfileRepository(),
+      profileRepository: profileRepository,
       surfaceSize: const Size(393, 852),
     );
 
@@ -281,9 +311,24 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
     await tester.pumpAndSettle();
 
+    final text = AppLocalizations.of(
+      tester.element(find.byType(Scaffold).last),
+    );
+    expect(find.text(text.authLegalUnavailable), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('auth_terms_link')));
+    await _pumpFrames(tester, count: 16);
+    expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
+    expect(find.text(text.profileLegalLoading), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await _pumpFrames(tester);
+
     await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
     await tester.enterText(find.byType(TextField).at(2), 'Password123');
     await tester.enterText(find.byType(TextField).at(3), 'Password123');
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
 
     await tester.scrollUntilVisible(
       find.widgetWithText(FilledButton, 'Sign Up'),
@@ -294,16 +339,11 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    final text = AppLocalizations.of(
-      tester.element(find.byType(Scaffold).last),
-    );
-
-    expect(find.text(text.authLegalUnavailable), findsOneWidget);
+    expect(profileRepository.lastTermsOfUseAccepted, isTrue);
+    expect(profileRepository.lastTermsOfUseVersion, '');
+    expect(profileRepository.lastPrivacyPolicyVersion, '');
+    expect(find.text('Verify email'), findsOneWidget);
     expect(tester.takeException(), isNull);
-    _expectFullyVisible(
-      tester,
-      find.widgetWithText(FilledButton, text.authRegisterAction),
-    );
   });
 
   testWidgets('guest can open password reset and request a code', (
@@ -355,8 +395,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(1), '123456');
-    await tester.enterText(find.byType(TextField).at(2), 'pet123');
-    await tester.enterText(find.byType(TextField).at(3), 'pet123');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password123');
     await tester.tap(find.widgetWithText(FilledButton, 'Save new password'));
     await tester.pump();
     await tester.pumpAndSettle();
@@ -433,8 +473,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
-    await tester.enterText(find.byType(TextField).at(2), 'pet123');
-    await tester.enterText(find.byType(TextField).at(3), 'pet123');
+    await tester.enterText(find.byType(TextField).at(2), 'Password123');
+    await tester.enterText(find.byType(TextField).at(3), 'Password123');
     await tester.tap(find.byType(Checkbox).first);
     await tester.pump();
     await tester.tap(find.byType(Checkbox).at(1));
@@ -450,6 +490,47 @@ void main() {
 
     expect(profileRepository.lastTermsOfUseAccepted, isTrue);
     expect(profileRepository.lastMarketingEmailsEnabled, isTrue);
+  });
+
+  testWidgets('registration blocks weak password before api call', (
+    tester,
+  ) async {
+    final profileRepository = _FakeProfileRepository();
+
+    await _pumpApp(
+      tester,
+      sharedPrefs: const {_onboardingSeenKey: true},
+      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      profileRepository: profileRepository,
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextButton, 'Sign Up'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(TextButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
+    await tester.enterText(find.byType(TextField).at(2), 'pet123');
+    await tester.enterText(find.byType(TextField).at(3), 'pet123');
+    await tester.tap(find.byType(Checkbox).first);
+    await tester.pump();
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'Sign Up'),
+      160,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign Up'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3));
+
+    expect(profileRepository.lastTermsOfUseAccepted, isNull);
   });
 
   testWidgets('shows validation error when passwords do not match', (

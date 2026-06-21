@@ -198,11 +198,11 @@ internal sealed class TemplateGenerationService(
             .Include(x => x.Assets)
             .Where(x => x.DeletedAtUtc == null
                 && x.Status == TemplateStatus.Active
+                && x.TemplateType == TemplateType.Video
                 && x.SupportsGenerationResultInput
                 && x.RequiredInputMediaType == inputMediaType.Value)
-            .OrderByDescending(x => x.TemplateType == TemplateType.Video)
-            .ThenByDescending(x => x.RecommendedAfterImageGeneration)
-            .ThenBy(x => x.Title)
+            .OrderBy(x => x.Title)
+            .ThenBy(x => x.Id)
             .Select(x => new CompatibleGenerationTemplateResponse(
                 x.Id,
                 x.Title,
@@ -212,7 +212,7 @@ internal sealed class TemplateGenerationService(
                     .Select(asset => asset.Url)
                     .FirstOrDefault(),
                 x.IsPremium,
-                x.RecommendedAfterImageGeneration,
+                false,
                 x.TokenCost))
             .ToArrayAsync(cancellationToken);
 

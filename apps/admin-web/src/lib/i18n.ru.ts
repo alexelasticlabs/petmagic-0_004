@@ -436,10 +436,6 @@ export const ruDictionary: Dictionary = {
   editorGenerationResultUnsupported: "Не поддерживается",
   editorGenerationResultInputHint:
     "Позволяет запускать этот шаблон из уже готового результата генерации.",
-  editorGenerationResultRecommended: "Рекомендован",
-  editorGenerationResultNotRecommended: "Не рекомендован",
-  editorGenerationResultRecommendedHint:
-    "Повышает приоритет этого шаблона после генерации изображения.",
   editorRequiredInputMediaTypeLabel: "Требуемый тип входного медиа",
   editorInputMediaTypeImageLabel: "Изображение",
   editorInputMediaTypeImageHint: "Готовый результат генерации изображения",

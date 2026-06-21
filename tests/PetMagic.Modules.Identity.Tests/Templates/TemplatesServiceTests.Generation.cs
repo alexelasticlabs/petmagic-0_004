@@ -135,6 +135,25 @@ public sealed partial class TemplatesServiceTests
             supportsGenerationResultInput: false,
             requiredInputMediaType: TemplateType.Image.ToString(),
             recommendedAfterImageGeneration: true);
+        var imageCompatible = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Image To Image",
+                "Image result compatible but not a continuation video",
+                "Image",
+                ["from-result"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/image-to-image.jpg", "preview.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "keep pet",
+                TemplateStatus.Active.ToString(),
+                null,
+                SupportsGenerationResultInput: true,
+                RequiredInputMediaType: TemplateType.Image.ToString(),
+                RecommendedAfterImageGeneration: true),
+            CancellationToken.None);
+        Assert.True(imageCompatible.IsSuccess);
 
         var compatible = await generationService.GetCompatibleTemplatesAsync(
             userId,
@@ -147,7 +166,7 @@ public sealed partial class TemplatesServiceTests
         var template = Assert.Single(compatible.Value.Templates);
         Assert.Equal(compatibleVideo, template.Id);
         Assert.Equal("Video", template.Type);
-        Assert.True(template.IsRecommended);
+        Assert.False(template.IsRecommended);
     }
 
     [Fact]

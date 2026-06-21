@@ -1,6 +1,7 @@
 using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -34,7 +35,6 @@ public sealed partial class TemplatesServiceTests
             mediaStorage ?? new RecordingMediaStorage(),
             lifecycleService,
             realtimeService ?? new RecordingTemplateFeedRealtimeService(),
-            new TestHttpClientFactory(new HttpClient(new UnavailableTranslationHandler())),
             adminAuditLog);
     }
 
@@ -88,6 +88,33 @@ public sealed partial class TemplatesServiceTests
         return created.Value.TemplateId;
     }
 
+    private static async Task<Guid> CreateActiveVideoTemplateAsync(ITemplatesService service, string title, string category, string[] tags)
+    {
+        var slug = title.ToLowerInvariant().Replace(' ', '-');
+        var created = await service.CreateVideoAsync(
+            new CreateVideoTemplateCommand(
+                title,
+                $"{title} description",
+                category,
+                tags,
+                false,
+                30,
+                TemplatePromoBadgeMode.New.ToString(),
+                string.Empty,
+                CreatePreviewAsset($"https://cdn.example.com/{slug}.mp4", $"{slug}.mp4", "video/mp4"),
+                CreateReferenceAsset(8.0),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                "fal-ai/kling-video/v3/pro/motion-control",
+                "Smooth cinematic motion.",
+                true,
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+        return created.Value.TemplateId;
+    }
+
     private static TemplateItem CreatePublicFeedTemplate(Guid templateId, string title, DateTime updatedAtUtc, long version)
     {
         var slug = title.ToLowerInvariant().Replace(' ', '-');
@@ -122,23 +149,6 @@ public sealed partial class TemplatesServiceTests
                 }
             ]
         };
-    }
-
-    private sealed class TestHttpClientFactory(HttpClient httpClient) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name)
-        {
-            Assert.Equal(TemplateLocalizationTranslator.HttpClientName, name);
-            return httpClient;
-        }
-    }
-
-    private sealed class UnavailableTranslationHandler : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable));
-        }
     }
 
     private static async Task SetUpdatedAtUtcAsync(TemplatesDbContext dbContext, Guid templateId, DateTime updatedAtUtc)
@@ -185,13 +195,16 @@ public sealed partial class TemplatesServiceTests
         };
     }
 
-    private static TemplatesDbContext CreateDbContext()
+    private static TemplatesDbContext CreateDbContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<TemplatesDbContext>()
-            .UseInMemoryDatabase($"templates-tests-{Guid.NewGuid():N}")
-            .Options;
+        var builder = new DbContextOptionsBuilder<TemplatesDbContext>()
+            .UseInMemoryDatabase($"templates-tests-{Guid.NewGuid():N}");
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
 
-        return new TemplatesDbContext(options);
+        return new TemplatesDbContext(builder.Options);
     }
 
     private sealed class RecordingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
@@ -224,6 +237,27 @@ public sealed partial class TemplatesServiceTests
         {
             Entries.Add(entry);
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class OneShotConcurrencyInterceptor : SaveChangesInterceptor
+    {
+        public bool Enabled { get; set; }
+
+        public int ThrowCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData,
+            InterceptionResult<int> result,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Enabled || ThrowCount > 0)
+            {
+                return base.SavingChangesAsync(eventData, result, cancellationToken);
+            }
+
+            ThrowCount++;
+            throw new DbUpdateConcurrencyException("Simulated template update concurrency conflict.");
         }
     }
 

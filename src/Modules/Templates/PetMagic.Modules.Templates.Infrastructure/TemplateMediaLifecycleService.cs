@@ -13,6 +13,9 @@ internal sealed class TemplateMediaLifecycleService(
     TemplatesDbContext dbContext,
     TemplatesOptions options) : ITemplateMediaLifecycleService
 {
+    private const int FileNameMaxLength = 256;
+    private const int ContentTypeMaxLength = 128;
+
     public async Task RegisterTemporaryUploadAsync(TemplateAssetCommand asset, TemplateMediaRole role, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -139,14 +142,20 @@ internal sealed class TemplateMediaLifecycleService(
     {
         record.Url = asset.Url;
         record.StoragePath = ResolveManagedStoragePath(asset.Url) ?? asset.Url;
-        record.FileName = asset.FileName;
-        record.ContentType = asset.ContentType;
-        record.FileSizeBytes = asset.FileSizeBytes;
+        record.FileName = NormalizeAssetText(asset.FileName, FileNameMaxLength, "asset");
+        record.ContentType = NormalizeAssetText(asset.ContentType, ContentTypeMaxLength, "application/octet-stream");
+        record.FileSizeBytes = asset.FileSizeBytes is > 0 ? asset.FileSizeBytes : null;
         record.Role = role;
-        record.MediaType = asset.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "video" : "image";
+        record.MediaType = record.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "video" : "image";
         record.SourceType = role is TemplateMediaRole.GenerationOutputImage or TemplateMediaRole.GenerationOutputVideo
             ? "generation_result"
             : "user_upload";
+    }
+
+    private static string NormalizeAssetText(string value, int maxLength, string fallback)
+    {
+        var normalized = string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        return normalized.Length <= maxLength ? normalized : normalized[..maxLength];
     }
 
     private string? ResolveManagedStoragePath(string assetUrl)

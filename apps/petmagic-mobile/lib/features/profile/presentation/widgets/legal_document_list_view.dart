@@ -8,17 +8,23 @@ class LegalDocumentListView extends StatelessWidget {
     this.includeDocumentTitles = true,
     this.padding,
     this.documentSpacing = 16,
+    this.shrinkWrap = false,
+    this.physics,
   });
 
   final List<MobileLegalDocument> documents;
   final bool includeDocumentTitles;
   final EdgeInsetsGeometry? padding;
   final double documentSpacing;
+  final bool shrinkWrap;
+  final ScrollPhysics? physics;
 
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: padding,
+      shrinkWrap: shrinkWrap,
+      physics: physics,
       itemCount: _itemCount,
       itemBuilder: _buildItem,
     );

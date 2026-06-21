@@ -12,7 +12,7 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const referenceMotionAccept = ".mp4,video/mp4,application/mp4";
 const TEMPLATE_REFERENCE_MOTION_MAX_BYTES = 128 * 1024 * 1024;
-const promptMaxLength = 2000;
+const promptMaxLength = 1000;
 
 type TemplateReferenceAssetSectionProps = {
   text: Dictionary;

@@ -3,6 +3,7 @@ import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 type AdminDisplayError = {
   status?: number;
   message?: string;
+  detail?: string;
   validationErrors?: string[];
 };
 
@@ -25,6 +26,11 @@ export function getAdminErrorMessage(error: unknown, fallback: string): string {
     }
 
     return statusMessage ?? fallback;
+  }
+
+  const rawDetail = typeof candidate.detail === "string" ? normalizeErrorText(candidate.detail) : "";
+  if (rawDetail && !isTechnicalMessage(rawDetail)) {
+    return sanitizeDisplayErrorText(rawDetail);
   }
 
   const rawMessage = typeof candidate.message === "string" ? normalizeErrorText(candidate.message) : "";

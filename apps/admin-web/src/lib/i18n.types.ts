@@ -402,9 +402,6 @@ export type Dictionary = {
   editorGenerationResultSupported: string;
   editorGenerationResultUnsupported: string;
   editorGenerationResultInputHint: string;
-  editorGenerationResultRecommended: string;
-  editorGenerationResultNotRecommended: string;
-  editorGenerationResultRecommendedHint: string;
   editorRequiredInputMediaTypeLabel: string;
   editorInputMediaTypeImageLabel: string;
   editorInputMediaTypeImageHint: string;

@@ -1073,7 +1073,8 @@ public sealed record PublicRandomTemplateQuery(
     string? Category,
     bool IncludePremium,
     string? Locale,
-    string? Access = null);
+    string? Access = null,
+    Guid? ExcludeTemplateId = null);
 
 public sealed record PublicRandomTemplateResponse(
     PublicTemplateListItemResponse? Template);

@@ -507,10 +507,11 @@ function saveSession(session: AuthSession): void {
 export async function apiRequest<TResponse>(
   path: string,
   init: RequestInit,
-  options: { requireAuth?: boolean; allowRefresh?: boolean } = {}
+  options: { requireAuth?: boolean; allowRefresh?: boolean; timeoutMs?: number } = {}
 ): Promise<TResponse> {
   const requireAuth = options.requireAuth ?? true;
   const allowRefresh = options.allowRefresh ?? true;
+  const timeoutMs = options.timeoutMs ?? API_REQUEST_TIMEOUT_MS;
   const session = getSession();
 
   const headers = new Headers(init.headers);
@@ -554,7 +555,7 @@ export async function apiRequest<TResponse>(
   const timeoutId = globalThis.setTimeout(() => {
     isTimedOut = true;
     abortController.abort();
-  }, API_REQUEST_TIMEOUT_MS);
+  }, timeoutMs);
 
   let response: Response;
 

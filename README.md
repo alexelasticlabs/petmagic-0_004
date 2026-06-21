@@ -7,7 +7,7 @@ PetMagic is a modular ASP.NET Core backend with a Next.js admin panel and a Flut
 | Service | Port | Role |
 | --- | --- | --- |
 | `postgres` | `5432` | PostgreSQL 16 data store |
-| `backend` | `5000` by default | REST API, auth, economy, template queue API |
+| `backend` | `5001` on host, `5000` in Docker network | REST API, auth, economy, template queue API |
 | `generation-worker` | none | Claims and processes queued template generation jobs |
 | `admin-web` | `3000` | Admin UI |
 
@@ -29,7 +29,7 @@ docker compose up --build --scale generation-worker=3
 
 Expected local endpoints:
 
-- Backend health: `http://localhost:5000/health`
+- Backend health: `http://localhost:5001/health`
 - Admin web: `http://localhost:3000`
 - PostgreSQL: `localhost:5432`
 
@@ -44,7 +44,7 @@ Important variables:
 ```env
 POSTGRES_PASSWORD=replace_with_local_or_secret_value
 JWT_SIGNING_KEY=replace_with_64_byte_random_value
-BACKEND_HOST_PORT=5000
+BACKEND_HOST_PORT=5001
 ADMIN_WEB_HOST_PORT=3000
 
 GENERATION_WORKER_MAX_CONCURRENT_JOBS=1
@@ -86,6 +86,9 @@ Run the backend without Docker after PostgreSQL is available:
 dotnet run --project src/Host/PetMagic.Host.Api/PetMagic.Host.Api.csproj
 ```
 
+The non-Docker launch profile listens on `http://localhost:5001` to avoid the
+macOS AirPlay Receiver service that commonly owns port `5000`.
+
 Run the admin web:
 
 ```bash
@@ -100,7 +103,7 @@ Run the mobile app:
 cd apps/petmagic-mobile
 flutter pub get
 flutter gen-l10n
-flutter run --dart-define=API_BASE_URL=http://localhost:5000
+flutter run --dart-define=API_BASE_URL=http://localhost:5001
 ```
 
 Format mobile Dart code:
@@ -126,7 +129,7 @@ The queue supports:
 The k6 script is in `scripts/k6/template-generation-load-test.js`. Runtime outputs are written under ignored `artifacts/load/`.
 
 ```bash
-k6 run -e BASE_URL=http://localhost:5000 \
+k6 run -e BASE_URL=http://localhost:5001 \
   -e MODE=admin-test \
   -e TEMPLATE_ID=<template-id> \
   -e PROFILE=generation \

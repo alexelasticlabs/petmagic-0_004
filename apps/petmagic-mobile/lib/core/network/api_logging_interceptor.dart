@@ -1,8 +1,10 @@
 import 'dart:math';
 
 import 'package:dio/dio.dart';
+import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
+import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 class ApiLoggingInterceptor extends Interceptor {
@@ -41,6 +43,7 @@ class ApiLoggingInterceptor extends Interceptor {
     final correlationId = _correlationId(err.requestOptions);
     final elapsedMs = _elapsedMs(err.requestOptions);
     final traceId = _resolveTraceId(err.response?.headers);
+    final response = err.response;
 
     AppLogger.error(
       feature: 'Network',
@@ -54,9 +57,25 @@ class ApiLoggingInterceptor extends Interceptor {
       context: {
         'method': err.requestOptions.method,
         'path': _requestPath(err.requestOptions),
-        'status': err.response?.statusCode ?? 0,
+        'origin': _requestOrigin(err.requestOptions),
+        'status': response?.statusCode ?? 0,
         'duration_ms': elapsedMs,
         'error_type': err.type.name,
+        'anonymous_request':
+            err.requestOptions.extra[anonymousRequestExtraKey] == true,
+        'authorization_present': _hasAuthorizationHeader(err.requestOptions),
+        'response_content_type': _headerValue(
+          response?.headers,
+          Headers.contentTypeHeader,
+        ),
+        'response_server': _headerValue(response?.headers, 'server'),
+        'response_via': _headerValue(response?.headers, 'via'),
+        'response_cf_ray': _headerValue(response?.headers, 'cf-ray'),
+        'response_ngrok': _headerValue(response?.headers, 'ngrok-trace-id'),
+        'problem_title': _problemString(response?.data, 'title'),
+        'problem_detail': _problemString(response?.data, 'detail'),
+        'validation_fields': _validationFields(response?.data),
+        'validation_keys': _validationKeys(response?.data),
       },
     );
 
@@ -130,6 +149,95 @@ class ApiLoggingInterceptor extends Interceptor {
     }
 
     return value.substring(0, queryIndex);
+  }
+
+  String _requestOrigin(RequestOptions options) {
+    final uri = options.uri;
+    if (uri.hasScheme && uri.hasAuthority) {
+      return uri.origin;
+    }
+
+    final baseUrl = options.baseUrl.trim();
+    if (baseUrl.isEmpty) {
+      return 'unknown';
+    }
+
+    final parsed = Uri.tryParse(baseUrl);
+    if (parsed != null && parsed.hasScheme && parsed.hasAuthority) {
+      return parsed.origin;
+    }
+
+    return baseUrl;
+  }
+
+  bool _hasAuthorizationHeader(RequestOptions options) {
+    return options.headers.keys.any(
+      (key) => key.toLowerCase() == 'authorization',
+    );
+  }
+
+  String? _headerValue(Headers? headers, String name) {
+    final value = headers?.value(name)?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  String? _problemString(Object? data, String key) {
+    if (data is! Map) {
+      return null;
+    }
+
+    final value = data[key];
+    if (value is! String) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  String? _validationFields(Object? data) {
+    final errors = _validationErrors(data);
+    if (errors == null || errors.isEmpty) {
+      return null;
+    }
+
+    return errors.keys
+        .map((key) => key.toString().trim())
+        .where((key) => key.isNotEmpty)
+        .take(12)
+        .join(',');
+  }
+
+  String? _validationKeys(Object? data) {
+    final errors = _validationErrors(data);
+    if (errors == null || errors.isEmpty) {
+      return null;
+    }
+
+    final keys = <String>{};
+    for (final value in errors.values) {
+      if (value is! List) {
+        continue;
+      }
+
+      for (final message in value.whereType<String>()) {
+        final trimmed = message.trim();
+        if (NetworkErrorMapper.isSafeMessageKey(trimmed)) {
+          keys.add(trimmed);
+        }
+      }
+    }
+
+    return keys.isEmpty ? null : keys.take(12).join(',');
+  }
+
+  Map? _validationErrors(Object? data) {
+    if (data is! Map) {
+      return null;
+    }
+
+    final errors = data['errors'];
+    return errors is Map ? errors : null;
   }
 
   String? _resolveTraceId(Headers? headers) {

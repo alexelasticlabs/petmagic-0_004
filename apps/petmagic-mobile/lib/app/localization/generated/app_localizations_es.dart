@@ -2499,11 +2499,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Confirmar Contraseña';
 
   @override
-  String get authPasswordRulesHint => 'Utilice al menos 6 caracteres.';
+  String get authPasswordRulesHint =>
+      'Use al menos 8 caracteres con mayúsculas, minúsculas y un número.';
 
   @override
   String get authPasswordTooShort =>
-      'La contraseña debe tener al menos 6 caracteres.';
+      'La contraseña debe tener al menos 8 caracteres.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'La contraseña debe tener al menos 8 caracteres e incluir mayúsculas, minúsculas y un número.';
 
   @override
   String get authForgotPasswordAction => '¿Has olvidado tu contraseña?';

@@ -331,30 +331,6 @@ export function TemplateBasicFields({
               {text.editorGenerationResultInputHint}
             </span>
           </button>
-
-          <button
-            type="button"
-            className={joinClassNames(
-              styles.accessOption,
-              form.recommendedAfterImageGeneration ? styles.accessOptionActive : null
-            )}
-            aria-pressed={form.recommendedAfterImageGeneration}
-            onClick={() =>
-              setForm((current) => ({
-                ...current,
-                recommendedAfterImageGeneration: !current.recommendedAfterImageGeneration,
-              }))
-            }
-          >
-            <span className={styles.accessOptionTitle}>
-              {form.recommendedAfterImageGeneration
-                ? text.editorGenerationResultRecommended
-                : text.editorGenerationResultNotRecommended}
-            </span>
-            <span className={styles.accessOptionHint}>
-              {text.editorGenerationResultRecommendedHint}
-            </span>
-          </button>
         </div>
       </div>
 

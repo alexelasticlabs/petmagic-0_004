@@ -12,7 +12,6 @@ internal sealed partial class TemplatesService(
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService,
     ITemplateFeedRealtimeService templateFeedRealtimeService,
-    IHttpClientFactory httpClientFactory,
     IAdminAuditLog? adminAuditLog = null,
     TemplateWatermarkSettingsStore? watermarkSettings = null) : ITemplatesService
 {

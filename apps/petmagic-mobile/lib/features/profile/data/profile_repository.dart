@@ -75,6 +75,7 @@ class ProfileRepository {
               ? null
               : displayName!.trim(),
         },
+        options: anonymousRequestOptions(),
       );
 
       return;

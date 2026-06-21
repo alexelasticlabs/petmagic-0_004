@@ -2478,11 +2478,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Подтвердите пароль';
 
   @override
-  String get authPasswordRulesHint => 'Используйте минимум 6 символов.';
+  String get authPasswordRulesHint =>
+      'Используйте минимум 8 символов, заглавную и строчную буквы и цифру.';
 
   @override
   String get authPasswordTooShort =>
-      'Пароль должен содержать минимум 6 символов.';
+      'Пароль должен содержать минимум 8 символов.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'Пароль должен содержать минимум 8 символов, заглавную и строчную буквы и цифру.';
 
   @override
   String get authForgotPasswordAction => 'Забыли пароль?';

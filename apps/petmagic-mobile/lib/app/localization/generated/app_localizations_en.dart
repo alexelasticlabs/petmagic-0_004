@@ -2468,11 +2468,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Confirm password';
 
   @override
-  String get authPasswordRulesHint => 'Use at least 6 characters.';
+  String get authPasswordRulesHint =>
+      'Use at least 8 characters with uppercase, lowercase and a number.';
 
   @override
   String get authPasswordTooShort =>
-      'Password must be at least 6 characters long.';
+      'Password must be at least 8 characters long.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'Password must be at least 8 characters and include uppercase, lowercase and a number.';
 
   @override
   String get authForgotPasswordAction => 'Forgot password?';

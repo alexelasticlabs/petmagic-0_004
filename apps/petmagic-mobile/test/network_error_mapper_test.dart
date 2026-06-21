@@ -62,6 +62,30 @@ void main() {
     );
   });
 
+  test('safePayloadMessage prefers validation error localization keys', () {
+    final error = DioException(
+      requestOptions: RequestOptions(path: '/api/auth/register'),
+      response: Response<Map<String, Object?>>(
+        requestOptions: RequestOptions(path: '/api/auth/register'),
+        statusCode: 400,
+        data: const {
+          'title': 'One or more validation errors occurred.',
+          'errors': {
+            'Password': ['auth.password_policy_invalid'],
+          },
+        },
+      ),
+    );
+
+    final payload = NetworkErrorMapper.parseApiPayload(error);
+
+    expect(payload.validationMessageKey, 'auth.password_policy_invalid');
+    expect(
+      NetworkErrorMapper.safePayloadMessage(payload),
+      'auth.password_policy_invalid',
+    );
+  });
+
   test('fallback keeps status code and can skip cause', () {
     final error = DioException.badResponse(
       statusCode: 503,

@@ -24,6 +24,7 @@ import {
   uploadTemplateMedia,
   useAuthSession,
   type AdminTemplate,
+  type TemplateAsset,
   type TemplateAssetKind,
   type TemplateStatus,
   type TemplateType,
@@ -107,17 +108,21 @@ export function useTemplateEditorController({
     href: getTemplateCatalogPath(locale, templateType),
   });
 
-  const saveTemplateMutation = useMutation<AdminTemplate, unknown, EditorVisibilityStatus>({
-    mutationFn: (targetStatus) =>
+  const saveTemplateMutation = useMutation<
+    AdminTemplate,
+    unknown,
+    { targetStatus: EditorVisibilityStatus; form: TemplateFormState }
+  >({
+    mutationFn: ({ targetStatus, form: templateForm }) =>
       templateType === "Video"
-        ? saveVideoTemplateFromForm(selectedTemplate?.templateId, form, targetStatus)
-        : saveImageTemplateFromForm(selectedTemplate?.templateId, form, targetStatus),
-    onSuccess: async (savedTemplate) => {
+        ? saveVideoTemplateFromForm(selectedTemplate?.templateId, templateForm, targetStatus)
+        : saveImageTemplateFromForm(selectedTemplate?.templateId, templateForm, targetStatus),
+    onSuccess: (savedTemplate) => {
       setSelectedTemplate(savedTemplate);
       setForm(createFormFromTemplate(savedTemplate));
       setEditorStatus(resolveEditorVisibilityStatus(savedTemplate.status));
 
-      await Promise.allSettled([
+      void Promise.allSettled([
         refreshTemplateOptions(),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCatalogRoot }),
         queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateCategories(false) }),
@@ -137,27 +142,7 @@ export function useTemplateEditorController({
       durationSeconds?: number;
     }) => uploadTemplateMedia(file, assetKind, { durationSeconds }),
     onSuccess: (asset, { assetKind }) => {
-      setForm((current) =>
-        assetKind === "Preview"
-          ? {
-              ...current,
-              previewUrl: asset.url,
-              previewUrlSource: "uploaded",
-              previewFileName: asset.fileName,
-              previewContentType: asset.contentType,
-              previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
-              previewDurationSeconds: asset.durationSeconds?.toString() ?? "",
-            }
-          : {
-              ...current,
-              referenceUrl: asset.url,
-              referenceUrlSource: "uploaded",
-              referenceFileName: asset.fileName,
-              referenceContentType: asset.contentType,
-              referenceFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
-              referenceDurationSeconds: asset.durationSeconds?.toString() ?? "",
-            }
-      );
+      setForm((current) => applyUploadedAssetToForm(current, assetKind, asset));
 
       if (assetKind === "Preview") {
         setPreviewFile(null);
@@ -281,16 +266,25 @@ export function useTemplateEditorController({
       return;
     }
 
-    if (saveTemplateMutation.isPending) {
+    if (saveTemplateMutation.isPending || uploadTemplateMediaMutation.isPending || uploadingKind !== null) {
       return;
     }
 
     const catalogPath = getTemplateCatalogPath(locale, templateType);
 
     try {
+      let formToSave = form;
+      if (previewFile) {
+        formToSave = await uploadSelectedMediaForSave("Preview", previewFile, formToSave);
+      }
+
+      if (isVideo && referenceFile) {
+        formToSave = await uploadSelectedMediaForSave("ReferenceMotion", referenceFile, formToSave);
+      }
+
       const activationReadinessError = getActivationReadinessError(
         templateType,
-        form,
+        formToSave,
         text,
         targetStatus
       );
@@ -299,7 +293,7 @@ export function useTemplateEditorController({
         return;
       }
 
-      await saveTemplateMutation.mutateAsync(targetStatus);
+      await saveTemplateMutation.mutateAsync({ targetStatus, form: formToSave });
       setToast({
         type: "success",
         message: targetStatus === "Active" ? text.templateActivated : text.templateSavedAsDraft,
@@ -309,6 +303,41 @@ export function useTemplateEditorController({
     } catch (error) {
       const message = getTemplateSaveErrorMessage(error, text, targetStatus);
       setToast({ type: "error", message });
+    }
+  }
+
+  async function uploadSelectedMediaForSave(
+    assetKind: TemplateAssetKind,
+    file: File,
+    currentForm: TemplateFormState
+  ): Promise<TemplateFormState> {
+    setUploadingKind(assetKind);
+    try {
+      const durationSeconds =
+        assetKind === "Preview" && file.type.startsWith("video/")
+          ? await readVideoDurationSeconds(file)
+          : undefined;
+      const asset = await uploadTemplateMedia(file, assetKind, { durationSeconds });
+      const nextForm = applyUploadedAssetToForm(currentForm, assetKind, asset);
+      setForm(nextForm);
+
+      if (assetKind === "Preview") {
+        setPreviewFile(null);
+      } else {
+        setReferenceFile(null);
+      }
+
+      return nextForm;
+    } catch (error) {
+      clientLogger.warn("templates.media_upload_failed", {
+        assetKind,
+        fileSizeBytes: file.size,
+        contentType: sanitizeSensitiveText(file.type, 80),
+        ...getTemplateEditorErrorDetails(error),
+      });
+      throw error;
+    } finally {
+      setUploadingKind(null);
     }
   }
 
@@ -410,6 +439,32 @@ export function useTemplateEditorController({
 
 function resolveUploadErrorMessage(error: unknown, fallback: string): string {
   return getAdminErrorMessage(error, fallback);
+}
+
+function applyUploadedAssetToForm(
+  form: TemplateFormState,
+  assetKind: TemplateAssetKind,
+  asset: TemplateAsset
+): TemplateFormState {
+  return assetKind === "Preview"
+    ? {
+        ...form,
+        previewUrl: asset.url,
+        previewUrlSource: "uploaded",
+        previewFileName: asset.fileName,
+        previewContentType: asset.contentType,
+        previewFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
+        previewDurationSeconds: asset.durationSeconds?.toString() ?? "",
+      }
+    : {
+        ...form,
+        referenceUrl: asset.url,
+        referenceUrlSource: "uploaded",
+        referenceFileName: asset.fileName,
+        referenceContentType: asset.contentType,
+        referenceFileSizeBytes: asset.fileSizeBytes?.toString() ?? "",
+        referenceDurationSeconds: asset.durationSeconds?.toString() ?? "",
+      };
 }
 
 async function readVideoDurationSeconds(file: File): Promise<number | undefined> {

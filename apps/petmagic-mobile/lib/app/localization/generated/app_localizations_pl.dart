@@ -2490,10 +2490,15 @@ class AppLocalizationsPl extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Potwierdź hasło';
 
   @override
-  String get authPasswordRulesHint => 'Użyj co najmniej 6 znaków.';
+  String get authPasswordRulesHint =>
+      'Użyj co najmniej 8 znaków, wielkiej litery, małej litery i cyfry.';
 
   @override
-  String get authPasswordTooShort => 'Hasło musi mieć co najmniej 6 znaków.';
+  String get authPasswordTooShort => 'Hasło musi mieć co najmniej 8 znaków.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'Hasło musi mieć co najmniej 8 znaków i zawierać wielką literę, małą literę oraz cyfrę.';
 
   @override
   String get authForgotPasswordAction => 'Zapomniałeś hasła?';

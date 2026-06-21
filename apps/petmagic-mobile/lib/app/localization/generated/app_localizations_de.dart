@@ -2500,11 +2500,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get authConfirmPasswordLabel => 'Passwort bestätigen';
 
   @override
-  String get authPasswordRulesHint => 'Verwenden Sie mindestens 6 Zeichen.';
+  String get authPasswordRulesHint =>
+      'Verwenden Sie mindestens 8 Zeichen mit Großbuchstaben, Kleinbuchstaben und einer Zahl.';
 
   @override
   String get authPasswordTooShort =>
-      'Das Passwort muss mindestens 6 Zeichen lang sein.';
+      'Das Passwort muss mindestens 8 Zeichen lang sein.';
+
+  @override
+  String get authPasswordPolicyInvalid =>
+      'Das Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben und eine Zahl enthalten.';
 
   @override
   String get authForgotPasswordAction => 'Passwort vergessen?';
