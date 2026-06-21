@@ -1,61 +1,53 @@
 using System;
 
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 #nullable disable
 
 namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations;
 
+[DbContext(typeof(TemplatesDbContext))]
+[Migration("20260614174500_AddPetAnalyticsEvents")]
 public partial class AddPetAnalyticsEvents : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.CreateTable(
-            name: "templates_pet_analytics_events",
-            columns: table => new
-            {
-                Id = table.Column<Guid>(type: "uuid", nullable: false),
-                UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                PetId = table.Column<Guid>(type: "uuid", nullable: false),
-                PetPhotoId = table.Column<Guid>(type: "uuid", nullable: true),
-                TemplateId = table.Column<Guid>(type: "uuid", nullable: true),
-                GenerationId = table.Column<Guid>(type: "uuid", nullable: true),
-                EventType = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                PetType = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                PhotosCount = table.Column<int>(type: "integer", nullable: false),
-                UserPlan = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
-                SourceScreen = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                CreatedAtUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-            },
-            constraints: table =>
-            {
-                table.PrimaryKey("PK_templates_pet_analytics_events", x => x.Id);
-            });
+        migrationBuilder.Sql(
+            """
+            CREATE TABLE IF NOT EXISTS templates_pet_analytics_events (
+                "Id" uuid NOT NULL,
+                "UserId" uuid NOT NULL,
+                "PetId" uuid NOT NULL,
+                "PetPhotoId" uuid,
+                "TemplateId" uuid,
+                "GenerationId" uuid,
+                "EventType" character varying(64) NOT NULL,
+                "PetType" character varying(16) NOT NULL,
+                "PhotosCount" integer NOT NULL,
+                "UserPlan" character varying(32) NOT NULL,
+                "SourceScreen" character varying(64) NOT NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_templates_pet_analytics_events" PRIMARY KEY ("Id")
+            );
 
-        migrationBuilder.CreateIndex(
-            name: "IX_tpae_EventType_CreatedAtUtc",
-            table: "templates_pet_analytics_events",
-            columns: new[] { "EventType", "CreatedAtUtc" });
+            CREATE INDEX IF NOT EXISTS "IX_tpae_EventType_CreatedAtUtc"
+                ON templates_pet_analytics_events ("EventType", "CreatedAtUtc");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_tpae_PetId_CreatedAtUtc",
-            table: "templates_pet_analytics_events",
-            columns: new[] { "PetId", "CreatedAtUtc" });
+            CREATE INDEX IF NOT EXISTS "IX_tpae_PetId_CreatedAtUtc"
+                ON templates_pet_analytics_events ("PetId", "CreatedAtUtc");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_tpae_UserId_CreatedAtUtc",
-            table: "templates_pet_analytics_events",
-            columns: new[] { "UserId", "CreatedAtUtc" });
+            CREATE INDEX IF NOT EXISTS "IX_tpae_UserId_CreatedAtUtc"
+                ON templates_pet_analytics_events ("UserId", "CreatedAtUtc");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_templates_pet_analytics_events_GenerationId",
-            table: "templates_pet_analytics_events",
-            column: "GenerationId");
+            CREATE INDEX IF NOT EXISTS "IX_templates_pet_analytics_events_GenerationId"
+                ON templates_pet_analytics_events ("GenerationId");
 
-        migrationBuilder.CreateIndex(
-            name: "IX_templates_pet_analytics_events_TemplateId",
-            table: "templates_pet_analytics_events",
-            column: "TemplateId");
+            CREATE INDEX IF NOT EXISTS "IX_templates_pet_analytics_events_TemplateId"
+                ON templates_pet_analytics_events ("TemplateId");
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

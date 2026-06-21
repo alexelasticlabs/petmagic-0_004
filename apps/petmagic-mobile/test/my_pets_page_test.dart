@@ -267,6 +267,30 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('My Pets shows auth gate after pet list unauthorized error', (
+    tester,
+  ) async {
+    final repository = _FakePetRepository(
+      pets: const [],
+      fetchPetsError: const AppException(
+        'auth.sign_in_required',
+        statusCode: 401,
+      ),
+    );
+
+    await _pumpMyPets(
+      tester,
+      repository: repository,
+      brightness: Brightness.light,
+    );
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text('Could not load pets'), findsNothing);
+    expect(find.widgetWithText(FloatingActionButton, 'Add pet'), findsNothing);
+    expect(repository.petsFetchCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('My Pets create action preserves reserved pet ID for templates', (
     tester,
   ) async {
@@ -756,6 +780,29 @@ void main() {
     expect(repository.petGenerationFetchCount, 0);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Pet details stops child fetches after pet list unauthorized error',
+    (tester) async {
+      final repository = _FakePetRepository(
+        pets: const [],
+        fetchPetsError: const AppException(
+          'auth.session_expired',
+          statusCode: 401,
+        ),
+      );
+
+      await _pumpPetDetails(tester, repository: repository);
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(find.byTooltip('Delete pet'), findsNothing);
+      expect(find.text('Could not load pet'), findsNothing);
+      expect(repository.petsFetchCount, 1);
+      expect(repository.petPhotoFetchCount, 0);
+      expect(repository.petGenerationFetchCount, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Pet details auth gate preserves reserved pet ID redirect', (
     tester,
@@ -2657,6 +2704,7 @@ class _FakePetRepository extends TemplateGenerationRepository {
     this.favoriteCompleter,
     this.deletePhotoCompleter,
     List<Object> petPhotosErrors = const [],
+    this.fetchPetsError,
     this.avatarError,
     this.uploadError,
   }) : petPhotosErrors = List<Object>.from(petPhotosErrors),
@@ -2677,6 +2725,7 @@ class _FakePetRepository extends TemplateGenerationRepository {
   final Completer<void>? favoriteCompleter;
   final Completer<void>? deletePhotoCompleter;
   final List<Object> petPhotosErrors;
+  final Object? fetchPetsError;
   final Object? avatarError;
   final Object? uploadError;
   final List<String> avatarPhotoIds = [];
@@ -2705,6 +2754,10 @@ class _FakePetRepository extends TemplateGenerationRepository {
     petsFetchCancelToken = cancelToken;
     petsFetchCount++;
     await petsFetchCompleter?.future;
+    final error = fetchPetsError;
+    if (error != null) {
+      throw error;
+    }
     return pets;
   }
 

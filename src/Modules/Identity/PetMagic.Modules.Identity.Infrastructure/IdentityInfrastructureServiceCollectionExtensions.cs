@@ -24,11 +24,16 @@ public static class IdentityInfrastructureServiceCollectionExtensions
     public static IServiceCollection AddIdentityInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
-        services.Configure<BootstrapAdminOptions>(configuration.GetSection(BootstrapAdminOptions.SectionName));
+        var bootstrapAdminOptions = BuildBootstrapAdminOptions(configuration.GetSection(BootstrapAdminOptions.SectionName));
+        services.Configure<BootstrapAdminOptions>(options =>
+        {
+            options.Email = bootstrapAdminOptions.Email;
+            options.Password = bootstrapAdminOptions.Password;
+            options.DisplayName = bootstrapAdminOptions.DisplayName;
+        });
 
         var externalAuth = BuildExternalAuthOptions(configuration.GetSection(ExternalAuthOptions.SectionName));
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-        var bootstrapAdminOptions = configuration.GetSection(BootstrapAdminOptions.SectionName).Get<BootstrapAdminOptions>() ?? new BootstrapAdminOptions();
         var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
         var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
 
@@ -270,6 +275,16 @@ public static class IdentityInfrastructureServiceCollectionExtensions
                 TokenEndpoint = ReadValue(section.GetSection("Apple"), "TokenEndpoint", "APPLE_TOKEN_ENDPOINT") ?? string.Empty,
                 Audiences = ReadCsvValues(section.GetSection("Apple"), "Audiences", "APPLE_AUDIENCES")
             }
+        };
+    }
+
+    private static BootstrapAdminOptions BuildBootstrapAdminOptions(IConfigurationSection section)
+    {
+        return new BootstrapAdminOptions
+        {
+            Email = ReadValue(section, "Email", "BOOTSTRAP_ADMIN_EMAIL") ?? string.Empty,
+            Password = ReadValue(section, "Password", "BOOTSTRAP_ADMIN_PASSWORD") ?? string.Empty,
+            DisplayName = ReadValue(section, "DisplayName", "BOOTSTRAP_ADMIN_DISPLAY_NAME") ?? "System Admin"
         };
     }
 

@@ -19,10 +19,12 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 92,
-      maxWidth: 1800,
+    final picked = await _runExternalMediaPicker(
+      () => _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+        maxWidth: 1800,
+      ),
     );
     if (picked == null || !mounted) {
       return;
@@ -70,9 +72,11 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final picked = await _imagePicker.pickVideo(
-      source: ImageSource.camera,
-      maxDuration: _supportAttachmentVideoMaxDuration,
+    final picked = await _runExternalMediaPicker(
+      () => _imagePicker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: _supportAttachmentVideoMaxDuration,
+      ),
     );
     if (picked == null || !mounted) {
       return;
@@ -164,12 +168,14 @@ extension _SupportChatPageActions on _SupportChatPageState {
 
     final remainingSlots =
         _supportAttachmentMaxCount - _pendingAttachments.length;
-    final pickedFiles = remainingSlots == 1
-        ? [?(await _imagePicker.pickMedia(imageQuality: 92))]
-        : await _imagePicker.pickMultipleMedia(
-            imageQuality: 92,
-            limit: remainingSlots,
-          );
+    final pickedFiles = await _runExternalMediaPicker(
+      () async => remainingSlots == 1
+          ? [?(await _imagePicker.pickMedia(imageQuality: 92))]
+          : await _imagePicker.pickMultipleMedia(
+              imageQuality: 92,
+              limit: remainingSlots,
+            ),
+    );
     if (pickedFiles.isEmpty || !mounted) {
       return;
     }
@@ -538,7 +544,9 @@ extension _SupportChatPageActions on _SupportChatPageState {
       return;
     }
 
-    final pickedFile = await _imagePicker.pickMedia(imageQuality: 92);
+    final pickedFile = await _runExternalMediaPicker(
+      () => _imagePicker.pickMedia(imageQuality: 92),
+    );
     if (pickedFile == null || !mounted) {
       return;
     }
@@ -1163,7 +1171,7 @@ class _SupportAttachmentPickerSheetState
                 opacity: animation,
                 child: SizeTransition(
                   sizeFactor: animation,
-                  axisAlignment: -1,
+                  alignment: Alignment.topCenter,
                   child: child,
                 ),
               );

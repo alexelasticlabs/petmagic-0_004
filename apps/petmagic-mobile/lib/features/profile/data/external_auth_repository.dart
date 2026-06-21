@@ -226,7 +226,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       _logExternalAuthFailure(
         'authenticate_native_google_dio',
         error,
-        error.stackTrace ?? StackTrace.current,
+        error.stackTrace,
       );
       _trackSocialAuthEvent(
         'social_login_failed',
@@ -262,7 +262,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       _logExternalAuthFailure(
         'resolve_google_mobile_config_dio',
         error,
-        error.stackTrace ?? StackTrace.current,
+        error.stackTrace,
       );
       if (_canContinueGoogleWithoutMobileConfig(error)) {
         _trackSocialAuthEvent(

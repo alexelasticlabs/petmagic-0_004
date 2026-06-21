@@ -103,6 +103,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
+  int _externalMediaPickerDepth = 0;
   List<_PendingSupportAttachment> _pendingAttachments = const [];
   SupportChatMessage? _replyToMessage;
   String? _highlightedMessageId;
@@ -119,6 +120,8 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   bool get _hasPendingAttachment => _pendingAttachments.isNotEmpty;
 
   bool get _composerCanSend => _composerHasText || _hasPendingAttachment;
+
+  bool get _isExternalMediaPickerOpen => _externalMediaPickerDepth > 0;
 
   bool _isWaitingForInitialConversation(SupportChatState state) {
     return state.isLoading && state.conversation == null;
@@ -203,6 +206,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       return;
     }
 
+    if (_isExternalMediaPickerOpen) {
+      return;
+    }
+
     _controller.setScreenVisible(false);
     _clearLoadingFallback();
     _controller.stop();
@@ -282,6 +289,20 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     }
 
     setState(action);
+  }
+
+  Future<T> _runExternalMediaPicker<T>(Future<T> Function() action) async {
+    _externalMediaPickerDepth += 1;
+    try {
+      return await action();
+    } finally {
+      _externalMediaPickerDepth = math.max(0, _externalMediaPickerDepth - 1);
+      if (mounted && !_isExternalMediaPickerOpen) {
+        _controller.setScreenVisible(true);
+        _scheduleLoadingFallbackIfNeeded();
+        unawaited(_controller.start());
+      }
+    }
   }
 
   Future<void> _showAttachmentOptions() {

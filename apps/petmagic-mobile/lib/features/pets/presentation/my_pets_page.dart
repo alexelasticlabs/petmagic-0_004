@@ -130,6 +130,7 @@ class MyPetsPage extends ConsumerWidget {
     }
 
     final pets = ref.watch(petsProvider);
+    final petsLoadRequiresSignIn = _isUnauthorizedError(pets.asError?.error);
 
     return Scaffold(
       appBar: AppBar(title: const Text('My pets')),
@@ -144,11 +145,30 @@ class MyPetsPage extends ConsumerWidget {
         child: pets.when(
           loading: () =>
               const Center(child: CircularProgressIndicator.adaptive()),
-          error: (error, _) => _StateView(
-            title: 'Could not load pets',
-            actionLabel: 'Retry',
-            onAction: () => ref.invalidate(petsProvider),
-          ),
+          error: (error, _) {
+            if (_isUnauthorizedError(error)) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: bottomInset),
+                child: ProtectedAuthGate(
+                  subtitle: text.authRequiredMessage,
+                  onSignIn: () {
+                    unawaited(
+                      showAuthRequiredSheet(
+                        context,
+                        redirectPath: MyPetsPage.routePath,
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+
+            return _StateView(
+              title: 'Could not load pets',
+              actionLabel: 'Retry',
+              onAction: () => ref.invalidate(petsProvider),
+            );
+          },
           data: (items) {
             if (items.isEmpty) {
               return _StateView(
@@ -178,11 +198,13 @@ class MyPetsPage extends ConsumerWidget {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showPetForm(context, ref),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add pet'),
-      ),
+      floatingActionButton: petsLoadRequiresSignIn
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _showPetForm(context, ref),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add pet'),
+            ),
     );
   }
 }
@@ -309,8 +331,36 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
     }
 
     final pets = ref.watch(petsProvider);
-    final photos = ref.watch(petPhotosProvider(widget.petId));
-    final generations = ref.watch(petGenerationsProvider(widget.petId));
+    final petsLoadRequiresSignIn = _isUnauthorizedError(pets.asError?.error);
+
+    if (petsLoadRequiresSignIn) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pet details')),
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [colors.backgroundTop, colors.backgroundBottom],
+            ),
+          ),
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () {
+                unawaited(
+                  showAuthRequiredSheet(
+                    context,
+                    redirectPath: PetDetailsPage.location(widget.petId),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -344,6 +394,9 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
             if (pet == null) {
               return const _StateView(title: 'Pet not found');
             }
+
+            final photos = ref.watch(petPhotosProvider(widget.petId));
+            final generations = ref.watch(petGenerationsProvider(widget.petId));
 
             return RefreshIndicator.adaptive(
               onRefresh: () => _refreshPetDetails(ref, widget.petId),
@@ -1456,6 +1509,10 @@ Future<void> _deletePhoto(
 bool _isPetPhotoRequestCancelled(Object error, CancelToken cancelToken) {
   return cancelToken.isCancelled ||
       (error is DioException && CancelToken.isCancel(error));
+}
+
+bool _isUnauthorizedError(Object? error) {
+  return error is AppException && error.statusCode == 401;
 }
 
 String _petPhotoUploadErrorMessage(Object error) {

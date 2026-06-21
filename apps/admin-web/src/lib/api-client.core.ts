@@ -525,6 +525,18 @@ export async function apiRequest<TResponse>(
     headers.set("Authorization", `Bearer ${session.accessToken}`);
   }
 
+  if (
+    requireAuth &&
+    allowRefresh &&
+    !session?.accessToken &&
+    typeof window !== "undefined"
+  ) {
+    const restored = await refreshSession();
+    if (restored) {
+      return apiRequest<TResponse>(path, init, { requireAuth, allowRefresh: false });
+    }
+  }
+
   const abortController = new AbortController();
   let isTimedOut = false;
   const abortHandler = () => {
