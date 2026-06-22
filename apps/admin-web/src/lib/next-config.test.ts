@@ -31,4 +31,10 @@ describe("apiImageRemotePatterns", () => {
       "Admin production API base URL must use HTTPS."
     );
   });
+
+  it("rejects placeholder API origins in production", () => {
+    expect(() => apiImageRemotePatterns("https://api.example.com", "production", true)).toThrow(
+      "Admin production API base URL cannot use example.com placeholder hosts."
+    );
+  });
 });

@@ -1,91 +1,32 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
-import 'package:petmagic_mobile/app/theme/app_theme.dart';
-import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/features/pets/presentation/pet_media_url_normalizer.dart';
+import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
-import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
+import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:share_plus/share_plus.dart';
 
-const _petGalleryProviderCacheTtl = Duration(minutes: 1);
+export 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
+
 const int _petPhotoThumbnailMemCacheWidth = 512;
 const int _petAvatarMemCacheWidth = 192;
-
-Duration? _noPetGalleryProviderRetry(int retryCount, Object error) => null;
-
-final petsProvider = FutureProvider.autoDispose<List<PetProfile>>((ref) {
-  final cacheLink = ref.keepAlive();
-  final cancelToken = CancelToken();
-  Timer? cacheTimer;
-  ref.onCancel(() {
-    cacheTimer = Timer(_petGalleryProviderCacheTtl, cacheLink.close);
-  });
-  ref.onResume(() => cacheTimer?.cancel());
-  ref.onDispose(() {
-    cacheTimer?.cancel();
-    if (!cancelToken.isCancelled) {
-      cancelToken.cancel('pets_provider_disposed');
-    }
-  });
-  return ref
-      .watch(templateGenerationRepositoryProvider)
-      .fetchPets(cancelToken: cancelToken);
-}, retry: _noPetGalleryProviderRetry);
-
-final petPhotosProvider = FutureProvider.autoDispose
-    .family<List<PetPhoto>, String>((ref, petId) {
-      final cacheLink = ref.keepAlive();
-      final cancelToken = CancelToken();
-      Timer? cacheTimer;
-      ref.onCancel(() {
-        cacheTimer = Timer(_petGalleryProviderCacheTtl, cacheLink.close);
-      });
-      ref.onResume(() => cacheTimer?.cancel());
-      ref.onDispose(() {
-        cacheTimer?.cancel();
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('pet_photos_provider_disposed');
-        }
-      });
-      return ref
-          .watch(templateGenerationRepositoryProvider)
-          .fetchPetPhotos(petId, cancelToken: cancelToken);
-    }, retry: _noPetGalleryProviderRetry);
-
-final petGenerationsProvider = FutureProvider.autoDispose
-    .family<List<TemplateGenerationResult>, String>((ref, petId) {
-      final cacheLink = ref.keepAlive();
-      final cancelToken = CancelToken();
-      Timer? cacheTimer;
-      ref.onCancel(() {
-        cacheTimer = Timer(_petGalleryProviderCacheTtl, cacheLink.close);
-      });
-      ref.onResume(() => cacheTimer?.cancel());
-      ref.onDispose(() {
-        cacheTimer?.cancel();
-        if (!cancelToken.isCancelled) {
-          cancelToken.cancel('pet_generations_provider_disposed');
-        }
-      });
-      return ref
-          .watch(templateGenerationRepositoryProvider)
-          .fetchPetGenerations(petId, cancelToken: cancelToken);
-    }, retry: _noPetGalleryProviderRetry);
 
 class MyPetsPage extends ConsumerWidget {
   const MyPetsPage({super.key});
@@ -492,116 +433,66 @@ class _PetCard extends StatelessWidget {
             color: colors.surface.withValues(alpha: 0.92),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: colors.accent.withValues(alpha: 0.62),
-              width: 1.15,
+              color: colors.border.withValues(alpha: 0.72),
+              width: 1.05,
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.shadow.withValues(alpha: 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: colors.shadow.withValues(alpha: 0.10),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    _PetAvatar(url: pet.avatarUrl, name: pet.name, size: 64),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            pet.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: colors.textStrong,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 17,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: colors.textSoft),
-                          ),
-                          const SizedBox(height: 6),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 5,
-                            children: [
-                              _PetMetricChip(
-                                label: text.petsStatsPhotos(pet.photosCount),
-                              ),
-                              _PetMetricChip(
-                                label: text.petsStatsGenerations(
-                                  pet.generationsCount,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                _PetAvatar(url: pet.avatarUrl, name: pet.name, size: 68),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pet.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textStrong,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: colors.textSoft,
-                      size: 24,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 40,
-                  child: FilledButton.icon(
-                    onPressed: pet.photosCount > 0 ? onGenerate : null,
-                    icon: const Icon(Icons.auto_awesome_rounded, size: 17),
-                    label: Text(
-                      text.petsCreateWithName(pet.name),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: colors.textSoft, fontSize: 13),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${text.petsStatsPhotos(pet.photosCount)} • ${text.petsStatsGenerations(pet.generationsCount)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: colors.textMuted,
+                  size: 22,
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PetMetricChip extends StatelessWidget {
-  const _PetMetricChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.border.withValues(alpha: 0.48)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: colors.textSoft,
-            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -848,8 +739,10 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
   Widget build(BuildContext context) {
     if (widget.photos.isEmpty) {
       return SliverPadding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-        sliver: SliverToBoxAdapter(child: Text(widget.text.petsNoPhotosTitle)),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: _PetSectionEmpty(label: widget.text.petsNoPhotosTitle),
+        ),
       );
     }
 
@@ -939,6 +832,7 @@ class _PetPhotoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final imageUrl = _petPhotoDisplayUrl(photo);
+    final fallbackImageUrl = _petPhotoOriginalDisplayUrl(photo);
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -950,14 +844,11 @@ class _PetPhotoCard extends StatelessWidget {
               Expanded(
                 child: imageUrl == null
                     ? const _PetPhotoImageFallback()
-                    : CachedNetworkImage(
+                    : _PetPhotoNetworkImage(
                         imageUrl: imageUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: _petPhotoThumbnailMemCacheWidth,
-                        maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
-                        placeholder: (_, _) => const _PetPhotoImageSkeleton(),
-                        errorWidget: (_, _, _) =>
-                            const _PetPhotoImageFallback(),
+                        fallbackImageUrl: fallbackImageUrl == imageUrl
+                            ? null
+                            : fallbackImageUrl,
                       ),
               ),
               SizedBox(
@@ -1026,6 +917,39 @@ class _PetPhotoCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _PetPhotoNetworkImage extends StatelessWidget {
+  const _PetPhotoNetworkImage({required this.imageUrl, this.fallbackImageUrl});
+
+  final String imageUrl;
+  final String? fallbackImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      memCacheWidth: _petPhotoThumbnailMemCacheWidth,
+      maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
+      placeholder: (_, _) => const _PetPhotoImageSkeleton(),
+      errorWidget: (_, _, _) {
+        final fallback = fallbackImageUrl;
+        if (fallback == null || fallback.isEmpty) {
+          return const _PetPhotoImageFallback();
+        }
+
+        return CachedNetworkImage(
+          imageUrl: fallback,
+          fit: BoxFit.cover,
+          memCacheWidth: _petPhotoThumbnailMemCacheWidth,
+          maxWidthDiskCache: _petPhotoThumbnailMemCacheWidth,
+          placeholder: (_, _) => const _PetPhotoImageSkeleton(),
+          errorWidget: (_, _, _) => const _PetPhotoImageFallback(),
+        );
+      },
     );
   }
 }
@@ -1135,8 +1059,14 @@ class _PetPhotoImageFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return ColoredBox(
-      color: colors.surfaceStrong,
-      child: Icon(Icons.broken_image_outlined, color: colors.textMuted),
+      color: colors.surfaceStrong.withValues(alpha: 0.88),
+      child: Center(
+        child: Icon(
+          Icons.pets_rounded,
+          color: colors.textMuted.withValues(alpha: 0.35),
+          size: 32,
+        ),
+      ),
     );
   }
 }
@@ -1150,7 +1080,7 @@ class _GenerationList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (generations.isEmpty) {
-      return Text(text.petsNoGenerationsTitle);
+      return _PetSectionEmpty(label: text.petsNoGenerationsTitle);
     }
 
     return Column(
@@ -1228,7 +1158,7 @@ class _PetAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = _normalizePetMediaUrl(url);
+    final imageUrl = normalizePetMediaUrl(url);
     if (imageUrl == null) {
       return CircleAvatar(
         radius: size / 2,
@@ -1275,25 +1205,87 @@ class _StateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.pets_rounded, size: 48),
-            const SizedBox(height: 12),
-            Text(title, textAlign: TextAlign.center),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colors.accent.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: colors.accent.withValues(alpha: 0.26),
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(
+                Icons.pets_rounded,
+                size: 32,
+                color: colors.accent.withValues(alpha: 0.72),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             if (subtitle != null) ...[
-              const SizedBox(height: 6),
-              Text(subtitle!, textAlign: TextAlign.center),
+              const SizedBox(height: 7),
+              Text(
+                subtitle!,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textMuted,
+                  height: 1.4,
+                ),
+              ),
             ],
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 20),
               FilledButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PetSectionEmpty extends StatelessWidget {
+  const _PetSectionEmpty({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 18),
+      child: Row(
+        children: [
+          Icon(
+            Icons.inbox_outlined,
+            size: 18,
+            color: colors.textMuted.withValues(alpha: 0.5),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colors.textMuted,
+              height: 1.3,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2057,8 +2049,7 @@ Future<void> _pickAndUploadPhoto(
   if (cancelToken.isCancelled) {
     return;
   }
-  ref.invalidate(petsProvider);
-  ref.invalidate(petPhotosProvider(petId));
+  await _refreshPetProfileMedia(ref, petId);
 }
 
 Future<void> _setAvatar(
@@ -2084,8 +2075,7 @@ Future<void> _setAvatar(
   if (cancelToken.isCancelled) {
     return;
   }
-  ref.invalidate(petsProvider);
-  ref.invalidate(petPhotosProvider(petId));
+  await _refreshPetProfileMedia(ref, petId);
 }
 
 Future<void> _setFavorite(
@@ -2106,6 +2096,7 @@ Future<void> _setFavorite(
     return;
   }
   ref.invalidate(petPhotosProvider(petId));
+  await _ignoreRefreshFailure(ref.read(petPhotosProvider(petId).future));
 }
 
 Future<void> _deletePhoto(
@@ -2130,8 +2121,7 @@ Future<void> _deletePhoto(
   if (cancelToken.isCancelled) {
     return;
   }
-  ref.invalidate(petsProvider);
-  ref.invalidate(petPhotosProvider(petId));
+  await _refreshPetProfileMedia(ref, petId);
 }
 
 bool _isPetPhotoRequestCancelled(Object error, CancelToken cancelToken) {
@@ -2180,7 +2170,7 @@ Future<void> _deletePet(
   }
 
   await ref.read(templateGenerationRepositoryProvider).deletePet(petId);
-  ref.invalidate(petsProvider);
+  await _refreshPets(ref);
   if (context.mounted) {
     context.pop();
   }
@@ -2214,6 +2204,15 @@ Future<void> _refreshPetDetails(WidgetRef ref, String petId) {
   ]);
 }
 
+Future<void> _refreshPetProfileMedia(WidgetRef ref, String petId) {
+  ref.invalidate(petsProvider);
+  ref.invalidate(petPhotosProvider(petId));
+  return Future.wait<void>([
+    _ignoreRefreshFailure(ref.read(petsProvider.future)),
+    _ignoreRefreshFailure(ref.read(petPhotosProvider(petId).future)),
+  ]);
+}
+
 Future<void> _ignoreRefreshFailure<T>(Future<T> future) async {
   try {
     await future;
@@ -2240,13 +2239,17 @@ String _templatesWithPetLocation(String petId, {String? petPhotoId}) {
 String? _petPhotoDisplayUrl(PetPhoto photo) {
   final thumbnailUrl = photo.thumbnailUrl?.trim();
   if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
-    final normalizedThumbnail = _normalizePetMediaUrl(thumbnailUrl);
+    final normalizedThumbnail = normalizePetMediaUrl(thumbnailUrl);
     if (normalizedThumbnail != null) {
       return normalizedThumbnail;
     }
   }
 
-  return _normalizePetMediaUrl(photo.url);
+  return normalizePetMediaUrl(photo.url);
+}
+
+String? _petPhotoOriginalDisplayUrl(PetPhoto photo) {
+  return normalizePetMediaUrl(photo.url);
 }
 
 Future<void> _evictPetPhotoMedia(PetPhoto photo) async {
@@ -2257,7 +2260,7 @@ Future<void> _evictPetPhotoMedia(PetPhoto photo) async {
 }
 
 Future<void> _evictPetMediaUrl(String? rawUrl) async {
-  final imageUrl = _normalizePetMediaUrl(rawUrl);
+  final imageUrl = normalizePetMediaUrl(rawUrl);
   if (imageUrl == null) {
     return;
   }
@@ -2267,26 +2270,6 @@ Future<void> _evictPetMediaUrl(String? rawUrl) async {
   } on Object {
     // Provider invalidation still refreshes metadata; image-cache eviction is best-effort.
   }
-}
-
-String? _normalizePetMediaUrl(String? rawUrl) {
-  final trimmed = rawUrl?.trim();
-  if (trimmed == null || trimmed.isEmpty) {
-    return null;
-  }
-
-  final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
-  final parsed = Uri.tryParse(sanitized);
-  final candidate = parsed?.hasScheme == true
-      ? parsed.toString()
-      : Uri.tryParse(AppConfig.apiBaseUrl)
-            ?.resolve(sanitized.startsWith('/') ? sanitized : '/$sanitized')
-            .toString();
-  if (candidate == null) {
-    return null;
-  }
-
-  return parseSafeProfileAvatarUri(candidate)?.toString();
 }
 
 PetProfile? _findPet(List<PetProfile> pets, String petId) {

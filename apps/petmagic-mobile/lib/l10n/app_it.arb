@@ -214,8 +214,8 @@
   "petsHistoryTitle": "Cronologia generazioni",
   "petsNoPhotosTitle": "Ancora nessuna foto.",
   "petsNoGenerationsTitle": "Ancora nessuna generazione.",
-  "petsStatsPhotos": "Foto: {count}",
-  "petsStatsGenerations": "Generazioni: {count}",
+  "petsStatsPhotos": "{count} foto",
+  "petsStatsGenerations": "{count} generazioni",
   "petsGenerateWithPet": "Genera con animale",
   "petsGenerateWithName": "Genera con {name}",
   "petsCreateWithName": "Crea con {name}",
@@ -528,7 +528,6 @@
   "generationStatusContactSupportAction": "Contatta supporto",
   "generationStatusOpenGalleryAction": "Apri galleria",
   "generationStatusOpenStatusAction": "Apri stato",
-  "generationStatusCancelGenerationAction": "Annulla generazione",
   "generationStatusResultUnavailableForSave": "Il risultato non e ancora disponibile per il salvataggio.",
   "generationStatusResultUnavailableForShare": "Il risultato non e ancora disponibile per la condivisione.",
   "generationStatusSaveFileDialogTitle": "Salva file",
@@ -539,7 +538,6 @@
   "generationStatusDeletedMessage": "Eliminato",
   "generationStatusFullscreenControlsHint": "Tocca per mostrare/nascondere i controlli",
   "generationStatusDeleteSoonMessage": "L'eliminazione sara disponibile presto.",
-  "generationStatusCancelSoonMessage": "L'annullamento della generazione sara disponibile presto.",
   "generationStatusRetrySoonMessage": "Scegli un'altra foto e avvia di nuovo la generazione.",
   "generationStatusFeedbackThanksMessage": "Grazie! Il tuo feedback aiuta a migliorare PetMagic.",
   "generationStatusResultTitle": "Risultato PetMagic",
@@ -600,7 +598,7 @@
     }
   },
   "generationStatusCollapseAction": "Comprimi ▲",
-  "generationStatusActiveInfoHint": "Puoi chiudere l'app. Ti avviseremo quando il risultato sara pronto.",
+  "generationStatusActiveInfoHint": "La generazione continua sul server. Mostreremo il risultato nella Galleria quando sara pronto.",
   "generationStatusUnreadCount": "{count} nuovi",
   "@generationStatusUnreadCount": {
     "placeholders": {

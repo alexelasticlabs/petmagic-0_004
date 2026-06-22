@@ -34,6 +34,10 @@ function normalizeConfiguredApiBaseUrl(
     if (parsed.protocol !== "https:" && !(allowLocalApiBaseUrlInProduction && isLocalHost)) {
       throw new Error("Admin production API base URL must use HTTPS.");
     }
+
+    if (isPlaceholderHost(parsed.hostname)) {
+      throw new Error("Admin production API base URL cannot use example.com placeholder hosts.");
+    }
   }
 
   return parsed;
@@ -57,6 +61,11 @@ function isLocalDevelopmentHost(hostname: string): boolean {
     normalized === "::1" ||
     normalized === "0.0.0.0"
   );
+}
+
+function isPlaceholderHost(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return normalized === "example.com" || normalized.endsWith(".example.com");
 }
 
 export function apiImageRemotePatterns(

@@ -82,6 +82,7 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
     final hasKeyboard = MediaQuery.viewInsetsOf(context).bottom > 0;
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     final location = widget.location;
+    final colors = context.petMagicColors;
     AppPerformanceTrace.setRouteLabel(location);
     final navigationShell = widget.navigationShell;
     final showBottomNav = !hasKeyboard && isCurrentRoute;
@@ -90,6 +91,7 @@ class _PetMagicShellState extends ConsumerState<PetMagicShell> {
         _resolveCurrentIndexFromLocation(location);
 
     return Scaffold(
+      backgroundColor: colors.backgroundBottom,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -241,34 +243,41 @@ class _BottomNavBackdrop extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final isDegraded = PerformanceGuard.isDegradedMode(context);
+    final blurSigma = isDegraded ? 8.0 : 12.0;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final height =
+        bottomPadding +
+        _bottomNavHeight +
+        _bottomNavOuterGap +
+        _bottomNavBackdropExtra;
+    final scrim = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colors.backgroundBottom.withValues(alpha: 0),
+            colors.backgroundBottom.withValues(alpha: isLight ? 0.24 : 0.10),
+            colors.backgroundBottom.withValues(alpha: isLight ? 0.46 : 0.18),
+          ],
+          stops: const [0, 0.48, 1],
+        ),
+      ),
+      child: const SizedBox.expand(),
+    );
 
-    return RepaintBoundary(
-      child: IgnorePointer(
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            height:
-                bottomPadding +
-                _bottomNavHeight +
-                _bottomNavOuterGap +
-                _bottomNavBackdropExtra,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  colors.backgroundBottom.withValues(alpha: 0),
-                  colors.backgroundBottom.withValues(
-                    alpha: isLight ? 0.50 : 0.18,
-                  ),
-                  colors.backgroundBottom.withValues(
-                    alpha: isLight ? 0.86 : 0.42,
-                  ),
-                  colors.backgroundBottom.withValues(alpha: isLight ? 1 : 0.74),
-                ],
-                stops: const [0, 0.34, 0.68, 1],
-              ),
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: height,
+      child: RepaintBoundary(
+        child: IgnorePointer(
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: scrim,
             ),
           ),
         ),
@@ -292,6 +301,7 @@ class _FloatingBottomNav extends ConsumerWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final isDegraded = PerformanceGuard.isDegradedMode(context);
+    final blurSigma = isDegraded ? 10.0 : 18.0;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final unreadCount = ref.watch(
       generationHistoryControllerProvider.select((state) => state.unreadCount),
@@ -309,12 +319,17 @@ class _FloatingBottomNav extends ConsumerWidget {
     ];
     final navSurface = DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surfaceGlass.withValues(
-          alpha: isLight ? 0.99 : (isDegraded ? 0.84 : 0.68),
-        ),
-        borderRadius: BorderRadius.circular(15),
+        color: isLight
+            ? colors.surfaceGlass.withValues(alpha: isDegraded ? 0.94 : 0.78)
+            : Color.alphaBlend(
+                Colors.black.withValues(alpha: isDegraded ? 0.40 : 0.30),
+                colors.surfaceGlass.withValues(alpha: isDegraded ? 0.78 : 0.56),
+              ),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: colors.border.withValues(alpha: isLight ? 0.92 : 0.22),
+          color: isLight
+              ? Colors.white.withValues(alpha: 0.74)
+              : Colors.white.withValues(alpha: 0.11),
           width: isLight ? 1.1 : 1,
         ),
       ),
@@ -365,44 +380,45 @@ class _FloatingBottomNav extends ConsumerWidget {
                 bottom: 1,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(18),
                     boxShadow: isDegraded
                         ? [
                             BoxShadow(
                               color: colors.shadow.withValues(
-                                alpha: isLight ? 0.24 : 0.18,
+                                alpha: isLight ? 0.20 : 0.24,
                               ),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
                             ),
                           ]
                         : [
                             BoxShadow(
                               color: colors.shadow.withValues(
-                                alpha: isLight ? 0.50 : 0.3,
+                                alpha: isLight ? 0.30 : 0.38,
                               ),
-                              blurRadius: isLight ? 20 : 14,
-                              offset: const Offset(0, 5),
+                              blurRadius: isLight ? 24 : 22,
+                              offset: const Offset(0, 8),
                             ),
                             BoxShadow(
-                              color: colors.backgroundBottom.withValues(
-                                alpha: isLight ? 0.42 : 0.18,
+                              color: Colors.black.withValues(
+                                alpha: isLight ? 0.08 : 0.18,
                               ),
-                              blurRadius: isLight ? 30 : 18,
-                              offset: const Offset(0, 8),
+                              blurRadius: 34,
+                              offset: const Offset(0, 14),
                             ),
                           ],
                   ),
                 ),
               ),
               ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: isDegraded || PerformanceGuard.shouldAvoidBlur(context)
-                    ? navSurface
-                    : BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                        child: navSurface,
-                      ),
+                borderRadius: BorderRadius.circular(18),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: blurSigma,
+                    sigmaY: blurSigma,
+                  ),
+                  child: navSurface,
+                ),
               ),
             ],
           ),
@@ -434,6 +450,7 @@ class _ActiveGenerationBannerSlot extends ConsumerWidget {
     if (activeGeneration == null ||
         activeGeneration.isTerminal ||
         dismissedGenerationId == activeGeneration.generationId ||
+        location == GenerationsGalleryPage.routePath ||
         location.startsWith(GenerationStatusPage.routePrefix)) {
       return const SizedBox.shrink();
     }
@@ -475,7 +492,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
           bottomPadding + _bottomNavOuterGap + _bottomNavHeight + 10,
         ),
         child: PressableScale(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           haptic: PressableScaleHaptic.selection,
           onTap: () => context.push(
             GenerationStatusPage.routeFor(generation.generationId),
@@ -483,7 +500,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: colors.surfaceGlass.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: colors.accent.withValues(alpha: isLight ? 0.36 : 0.22),
               ),
@@ -496,7 +513,7 @@ class _ActiveGenerationBanner extends StatelessWidget {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+              padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -505,8 +522,8 @@ class _ActiveGenerationBanner extends StatelessWidget {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(11),
                         child: SizedBox(
-                          width: 34,
-                          height: 34,
+                          width: 30,
+                          height: 30,
                           child: previewUrl == null || previewUrl.isEmpty
                               ? ColoredBox(
                                   color: colors.surfaceStrong,
@@ -538,18 +555,47 @@ class _ActiveGenerationBanner extends StatelessWidget {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          text.shellActiveGenerationLabel(
-                            generation.templateTitle ??
-                                text.shellActiveGenerationFallback,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              generation.templateTitle ??
+                                  text.shellActiveGenerationFallback,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: colors.textStrong,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              text.templateFlowStepCreateMagic,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: colors.textMuted,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 42,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            minHeight: 4,
+                            value: progress / 100,
+                            color: colors.accent,
+                            backgroundColor: colors.border.withValues(
+                              alpha: 0.55,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: colors.textStrong,
-                                fontWeight: FontWeight.w900,
-                              ),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -562,6 +608,10 @@ class _ActiveGenerationBanner extends StatelessWidget {
                       ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
                         onPressed: onDismiss,
                         icon: Icon(
                           Icons.keyboard_arrow_up_rounded,
@@ -569,16 +619,6 @@ class _ActiveGenerationBanner extends StatelessWidget {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      minHeight: 4,
-                      value: progress / 100,
-                      color: colors.accent,
-                      backgroundColor: colors.border.withValues(alpha: 0.55),
-                    ),
                   ),
                 ],
               ),

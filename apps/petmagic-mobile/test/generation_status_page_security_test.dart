@@ -164,6 +164,79 @@ void main() {
     },
   );
 
+  testWidgets(
+    'active generation status exposes gallery continuation without cancel',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final router = GoRouter(
+        initialLocation: GenerationStatusPage.routeFor('generation-1'),
+        routes: [
+          GoRoute(
+            path: '/creations',
+            builder: (context, state) =>
+                const Scaffold(body: Text('creations-route')),
+          ),
+          GoRoute(
+            path: '${GenerationStatusPage.routePrefix}/:generationId',
+            builder: (context, state) => GenerationStatusPage(
+              generationId: state.pathParameters['generationId'] ?? '',
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(
+              _FakeTemplateGenerationRepository(
+                _generation(status: TemplateGenerationStatus.processing),
+              ),
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: router,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final text = AppLocalizations.of(
+        tester.element(find.byType(GenerationStatusPage)),
+      );
+
+      expect(find.text(text.generationStatusBackgroundHint), findsOneWidget);
+      expect(find.text('Cancel generation'), findsNothing);
+
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text(text.generationStatusOpenGalleryAction), findsOneWidget);
+      expect(find.text('Cancel generation'), findsNothing);
+
+      await tester.tapAt(const Offset(8, 8));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(text.generationStatusContinueInAppAction));
+      await tester.pumpAndSettle();
+      expect(find.text('creations-route'), findsOneWidget);
+    },
+  );
+
   testWidgets('generation status failed action preserves pet context', (
     tester,
   ) async {
@@ -257,7 +330,7 @@ void main() {
       RegExp(
         r'_templatesLocationForGeneration\(generation\)',
       ).allMatches(buildBody).length,
-      greaterThanOrEqualTo(2),
+      greaterThanOrEqualTo(1),
     );
     expect(sheetBody, contains('_templatesLocationForGeneration(generation)'));
     expect(

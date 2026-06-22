@@ -408,6 +408,69 @@ void main() {
     expect(find.text('Wallet route'), findsOneWidget);
   });
 
+  testWidgets('bottom navigation blurs over iOS home indicator area', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationControllerProvider.overrideWith(
+            _IdleTemplateGenerationController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _IdleGenerationHistoryController.new,
+          ),
+        ],
+        child: MediaQuery(
+          data: const MediaQueryData(viewPadding: EdgeInsets.only(bottom: 34)),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            home: const PetMagicShell(
+              location: WalletPage.routePath,
+              child: Scaffold(body: Text('Wallet route')),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final solidSafeAreaBand = find.byWidgetPredicate((widget) {
+      return widget is Positioned &&
+          widget.left == 0 &&
+          widget.right == 0 &&
+          widget.bottom == 0 &&
+          widget.height == 44;
+    });
+
+    expect(solidSafeAreaBand, findsNothing);
+    expect(
+      find.byWidgetPredicate((widget) {
+        return widget is Positioned &&
+            widget.left == 0 &&
+            widget.right == 0 &&
+            widget.bottom == 0 &&
+            widget.height == 114;
+      }),
+      findsOneWidget,
+    );
+    expect(find.byType(BackdropFilter), findsAtLeastNWidgets(2));
+  });
+
   testWidgets('rewards page redeems promo codes with friendly errors', (
     tester,
   ) async {

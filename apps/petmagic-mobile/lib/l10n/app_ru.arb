@@ -131,8 +131,8 @@
   "petsHistoryTitle": "История генераций",
   "petsNoPhotosTitle": "Фото пока нет.",
   "petsNoGenerationsTitle": "Генераций пока нет.",
-  "petsStatsPhotos": "Фото: {count}",
-  "petsStatsGenerations": "Генерации: {count}",
+  "petsStatsPhotos": "{count} фото",
+  "petsStatsGenerations": "{count} генераций",
   "petsGenerateWithPet": "Создать с питомцем",
   "petsGenerateWithName": "Создать с {name}",
   "petsCreateWithName": "Создать с {name}",
@@ -1133,7 +1133,6 @@
   "generationStatusContactSupportAction": "Сообщить в поддержку",
   "generationStatusOpenGalleryAction": "Открыть галерею",
   "generationStatusOpenStatusAction": "Открыть статус",
-  "generationStatusCancelGenerationAction": "Отменить генерацию",
   "generationStatusResultUnavailableForSave": "Результат пока недоступен для сохранения.",
   "generationStatusResultUnavailableForShare": "Результат пока недоступен для шаринга.",
   "generationStatusSaveFileDialogTitle": "Сохранить файл",
@@ -1144,7 +1143,6 @@
   "generationStatusDeletedMessage": "Удалено",
   "generationStatusFullscreenControlsHint": "Нажмите, чтобы скрыть/показать элементы управления",
   "generationStatusDeleteSoonMessage": "Удаление скоро добавим.",
-  "generationStatusCancelSoonMessage": "Отмена генерации появится в ближайшем обновлении.",
   "generationStatusRetrySoonMessage": "Попробуйте выбрать фото и запустить генерацию снова.",
   "generationStatusFeedbackThanksMessage": "Спасибо! Ваш отзыв поможет улучшить PetMagic.",
   "generationStatusResultTitle": "Результат PetMagic",
@@ -1205,7 +1203,7 @@
     }
   },
   "generationStatusCollapseAction": "Свернуть ▲",
-  "generationStatusActiveInfoHint": "Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.",
+  "generationStatusActiveInfoHint": "Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.",
   "generationStatusUnreadCount": "{count} новых",
   "@generationStatusUnreadCount": {
     "placeholders": {

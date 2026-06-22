@@ -460,16 +460,9 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       ],
                     ),
                   ] else ...[
-                    _StageCard(generation: generation),
+                    _ActiveGenerationCard(generation: generation),
                     const SizedBox(height: 14),
-                    _BackgroundHintCard(generation: generation),
-                    const SizedBox(height: 14),
-                    _ActiveActions(
-                      onContinue: () => context.go(
-                        _templatesLocationForGeneration(generation),
-                      ),
-                      onCancel: _cancelSoon,
-                    ),
+                    _ActiveActions(onContinue: () => context.go('/creations')),
                     const SizedBox(height: 14),
                     _DetailsCard(
                       title: text.generationStatusDetailsTitle,
@@ -675,15 +668,6 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                               context.go('/creations');
                             },
                           ),
-                          _StatusSheetActionTile(
-                            icon: Icons.close_rounded,
-                            label: text.generationStatusCancelGenerationAction,
-                            onTap: () {
-                              Navigator.of(sheetContext).pop();
-                              _cancelSoon();
-                            },
-                            isDestructive: true,
-                          ),
                         ],
                       ],
                     ),
@@ -812,10 +796,6 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
         setState(() => _isDeleting = false);
       }
     }
-  }
-
-  void _cancelSoon() {
-    _showInfo(AppLocalizations.of(context).generationStatusCancelSoonMessage);
   }
 
   void _retrySoon(TemplateGenerationResult generation) {

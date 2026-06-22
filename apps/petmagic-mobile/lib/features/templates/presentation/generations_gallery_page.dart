@@ -72,6 +72,7 @@ class _GalleryPageViewState {
     required this.isConnectionRecovered,
     required this.lastSyncedAtUtc,
     required this.errorMessage,
+    required this.cachedItemsByFilter,
   });
 
   factory _GalleryPageViewState.from(GenerationHistoryState state) {
@@ -84,6 +85,7 @@ class _GalleryPageViewState {
       isConnectionRecovered: state.isConnectionRecovered,
       lastSyncedAtUtc: state.lastSyncedAtUtc,
       errorMessage: state.errorMessage,
+      cachedItemsByFilter: state.cachedItemsByFilter,
     );
   }
 
@@ -95,6 +97,8 @@ class _GalleryPageViewState {
   final bool isConnectionRecovered;
   final DateTime? lastSyncedAtUtc;
   final String? errorMessage;
+  final Map<GenerationHistoryFilter, List<TemplateGenerationResult>>
+  cachedItemsByFilter;
 
   @override
   bool operator ==(Object other) {
@@ -106,7 +110,8 @@ class _GalleryPageViewState {
         shouldShowOfflineBanner == other.shouldShowOfflineBanner &&
         isConnectionRecovered == other.isConnectionRecovered &&
         lastSyncedAtUtc == other.lastSyncedAtUtc &&
-        errorMessage == other.errorMessage;
+        errorMessage == other.errorMessage &&
+        identical(cachedItemsByFilter, other.cachedItemsByFilter);
   }
 
   @override
@@ -119,6 +124,7 @@ class _GalleryPageViewState {
     isConnectionRecovered,
     lastSyncedAtUtc,
     errorMessage,
+    identityHashCode(cachedItemsByFilter),
   );
 }
 
@@ -206,6 +212,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     );
     final shouldShowPremiumUpsell =
         isAuthenticated && hasPremiumAccess == false;
+    final filterCounts = _GalleryFilterCounts.fromState(state);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -220,7 +227,6 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         body: SafeArea(
           child: Stack(
             children: [
-              const Positioned.fill(child: _GalleryAtmosphere()),
               RefreshIndicator.adaptive(
                 color: colors.accent,
                 onRefresh: () {
@@ -238,7 +244,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                   ),
                   slivers: [
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 8),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 6),
                       sliver: SliverToBoxAdapter(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,14 +270,19 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
                             const SizedBox(height: 6),
                             Text(
                               subtitleForFilter(text, state.filter),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: colors.textSoft,
                                     height: 1.35,
                                   ),
                             ),
-                            const SizedBox(height: 16),
-                            _FilterBar(selected: state.filter),
+                            const SizedBox(height: 14),
+                            _FilterBar(
+                              selected: state.filter,
+                              counts: filterCounts,
+                            ),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 220),
                               child: shouldShowPremiumUpsell
@@ -396,8 +407,11 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
       ];
     }
     if (filteredItems.isEmpty) {
-      return const [
-        SliverFillRemaining(hasScrollBody: false, child: _EmptyState()),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _EmptyState(filter: state.filter),
+        ),
       ];
     }
 

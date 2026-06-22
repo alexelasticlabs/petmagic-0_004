@@ -214,8 +214,8 @@
   "petsHistoryTitle": "Generierungsverlauf",
   "petsNoPhotosTitle": "Noch keine Fotos.",
   "petsNoGenerationsTitle": "Noch keine Generierungen.",
-  "petsStatsPhotos": "Fotos: {count}",
-  "petsStatsGenerations": "Generierungen: {count}",
+  "petsStatsPhotos": "{count} Fotos",
+  "petsStatsGenerations": "{count} Generierungen",
   "petsGenerateWithPet": "Mit Haustier generieren",
   "petsGenerateWithName": "Mit {name} generieren",
   "petsCreateWithName": "Mit {name} erstellen",
@@ -517,7 +517,6 @@
   "generationStatusContactSupportAction": "Support kontaktieren",
   "generationStatusOpenGalleryAction": "Galerie offnen",
   "generationStatusOpenStatusAction": "Status offnen",
-  "generationStatusCancelGenerationAction": "Generierung abbrechen",
   "generationStatusResultUnavailableForSave": "Das Ergebnis ist zum Speichern noch nicht verfugbar.",
   "generationStatusResultUnavailableForShare": "Das Ergebnis ist zum Teilen noch nicht verfugbar.",
   "generationStatusSaveFileDialogTitle": "Datei speichern",
@@ -528,7 +527,6 @@
   "generationStatusDeletedMessage": "Geloscht",
   "generationStatusFullscreenControlsHint": "Tippe, um Steuerung ein/auszublenden",
   "generationStatusDeleteSoonMessage": "Loschen wird bald verfugbar sein.",
-  "generationStatusCancelSoonMessage": "Der Abbruch der Generierung ist bald verfugbar.",
   "generationStatusRetrySoonMessage": "Wahle ein anderes Foto und starte die Generierung erneut.",
   "generationStatusFeedbackThanksMessage": "Danke! Dein Feedback hilft, PetMagic zu verbessern.",
   "generationStatusResultTitle": "PetMagic-Ergebnis",
@@ -589,7 +587,7 @@
     }
   },
   "generationStatusCollapseAction": "Einklappen ▲",
-  "generationStatusActiveInfoHint": "Du kannst die App schliessen. Wir benachrichtigen dich, wenn das Ergebnis fertig ist.",
+  "generationStatusActiveInfoHint": "Die Generierung lauft auf dem Server weiter. Wir zeigen das Ergebnis in der Galerie, sobald es fertig ist.",
   "generationStatusUnreadCount": "{count} neu",
   "@generationStatusUnreadCount": {
     "placeholders": {

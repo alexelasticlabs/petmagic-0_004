@@ -897,13 +897,13 @@ abstract class AppLocalizations {
   /// No description provided for @petsStatsPhotos.
   ///
   /// In en, this message translates to:
-  /// **'Photos: {count}'**
+  /// **'{count} photos'**
   String petsStatsPhotos(Object count);
 
   /// No description provided for @petsStatsGenerations.
   ///
   /// In en, this message translates to:
-  /// **'Generations: {count}'**
+  /// **'{count} generations'**
   String petsStatsGenerations(Object count);
 
   /// No description provided for @petsGenerateWithPet.
@@ -5715,12 +5715,6 @@ abstract class AppLocalizations {
   /// **'Open status'**
   String get generationStatusOpenStatusAction;
 
-  /// No description provided for @generationStatusCancelGenerationAction.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel generation'**
-  String get generationStatusCancelGenerationAction;
-
   /// No description provided for @generationStatusResultUnavailableForSave.
   ///
   /// In en, this message translates to:
@@ -5780,12 +5774,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Deletion will be available soon.'**
   String get generationStatusDeleteSoonMessage;
-
-  /// No description provided for @generationStatusCancelSoonMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Generation cancellation is coming soon.'**
-  String get generationStatusCancelSoonMessage;
 
   /// No description provided for @generationStatusRetrySoonMessage.
   ///
@@ -6078,7 +6066,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusActiveInfoHint.
   ///
   /// In en, this message translates to:
-  /// **'You can close the app. We will notify you when the result is ready.'**
+  /// **'Generation continues on the server. We will show the result in Gallery when it is ready.'**
   String get generationStatusActiveInfoHint;
 
   /// No description provided for @generationStatusUnreadCount.

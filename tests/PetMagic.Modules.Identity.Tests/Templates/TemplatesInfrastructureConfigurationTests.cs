@@ -30,6 +30,7 @@ public sealed class TemplatesInfrastructureConfigurationTests
 
         Assert.Equal(TemplateStorageProviders.Local, options.StorageProvider);
         Assert.Equal(TemplateAiProviders.Fake, options.AiProvider);
+        Assert.False(options.SeedSampleTemplates);
         Assert.True(options.GenerationWorkerEnabled);
         Assert.Equal(1_000, options.GenerationWorkerPollIntervalMilliseconds);
         Assert.Equal(1, options.MaxConcurrentJobsPerWorker);
@@ -268,6 +269,32 @@ public sealed class TemplatesInfrastructureConfigurationTests
         var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
 
         Assert.Contains("Economy-backed template generation billing", exception.Message);
+    }
+
+    [Fact]
+    public void AddTemplatesInfrastructure_ShouldRejectSampleTemplateSeed_InProduction()
+    {
+        var services = CreateServices();
+        var configuration = CreateConfiguration(new Dictionary<string, string?>
+        {
+            ["Templates:StorageProvider"] = TemplateStorageProviders.R2,
+            ["Templates:AiProvider"] = TemplateAiProviders.Fal,
+            ["Templates:SeedSampleTemplates"] = "true",
+            ["Templates:R2:AccountId"] = "test-account",
+            ["Templates:R2:AccessKey"] = "test-access-key",
+            ["Templates:R2:SecretKey"] = "test-secret-key",
+            ["Templates:R2:BucketName"] = "petmagic-test",
+            ["Templates:R2:PublicBaseUrl"] = "https://cdn.example.test",
+            ["Templates:Fal:ApiKey"] = "test-fal-key"
+        });
+        var environment = new TestHostEnvironment(Directory.GetCurrentDirectory())
+        {
+            EnvironmentName = Environments.Production
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => services.AddTemplatesInfrastructure(configuration, environment));
+
+        Assert.Contains("Sample template seed data", exception.Message);
     }
 
     [Theory]

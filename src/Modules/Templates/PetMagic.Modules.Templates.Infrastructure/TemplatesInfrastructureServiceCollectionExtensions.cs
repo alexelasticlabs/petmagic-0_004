@@ -9,7 +9,6 @@ using Microsoft.Extensions.Hosting;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
-using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
@@ -74,7 +73,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             ]),
             PreviewMaxFileSizeBytes = ParseLong(section["PreviewMaxFileSizeBytes"], 25 * 1024 * 1024),
             ReferenceMotionMaxFileSizeBytes = ParseLong(section["ReferenceMotionMaxFileSizeBytes"], 100 * 1024 * 1024),
-            SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], true),
+            SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
             MaxConcurrentJobsPerWorker = ParsePositiveInt(section["MaxConcurrentJobsPerWorker"], 1),
@@ -239,121 +238,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         await SyncWatermarkSettingsStoreAsync(scope.ServiceProvider, dbContext, options, cancellationToken: default);
         await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
 
-        if (!options.SeedSampleTemplates)
+        if (options.SeedSampleTemplates)
         {
-            return;
+            throw new InvalidOperationException("Sample template seed data has been removed. Create template catalog entries through the admin API.");
         }
-
-        // Idempotent patch: backfill MusicDescription on the seed video template if it was seeded before this field was populated.
-        var seedVideoTemplateId = Guid.Parse("39C5F7A0-74AE-4DE6-84F4-82B842D63FA0");
-        await dbContext.TemplateItems
-            .Where(x => x.Id == seedVideoTemplateId && x.MusicDescription == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(x => x.MusicDescription, "Upbeat meme dance track"));
-
-        if (await dbContext.TemplateItems.AnyAsync())
-        {
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        dbContext.TemplateCategories.AddRange(
-            new TemplateCategory
-            {
-                Id = Guid.Parse("667D3514-6549-4B18-8427-A0F08503BA91"),
-                Name = "Portrait",
-                NormalizedName = "PORTRAIT",
-                IsArchived = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            },
-            new TemplateCategory
-            {
-                Id = Guid.Parse("A5B2B18A-5093-4144-9489-947F1690E998"),
-                Name = "Dance",
-                NormalizedName = "DANCE",
-                IsArchived = false,
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            }
-        );
-
-        dbContext.TemplateItems.AddRange(
-            new TemplateItem
-            {
-                Id = Guid.Parse("9CA5BE83-5919-491E-95FE-8AB5C3772232"),
-                TemplateType = TemplateType.Image,
-                Title = "Cozy Portrait",
-                ShortDescription = "Cozy image template card for admin and public catalog flows.",
-                PetPhotoRequirements = "One pet in the photo\nClear face\nGood lighting",
-                Category = "Portrait",
-                Tags = "cozy,portrait",
-                IsPremium = false,
-                TokenCost = 20,
-                Status = TemplateStatus.Active,
-                ImageModel = options.AllowedImageModels[0],
-                ImagePrompt = options.DefaultImagePrompt,
-                Assets =
-                [
-                    new TemplateAsset
-                    {
-                        Id = Guid.Parse("5BD7DA22-FED0-4205-8230-752C81D0B415"),
-                        AssetKind = TemplateAssetKind.Preview,
-                        Url = "https://cdn.petmagic.dev/templates/cozy-portrait-preview.jpg",
-                        FileName = "cozy-portrait-preview.jpg",
-                        ContentType = "image/jpeg"
-                    }
-                ],
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            },
-            new TemplateItem
-            {
-                Id = Guid.Parse("39C5F7A0-74AE-4DE6-84F4-82B842D63FA0"),
-                TemplateType = TemplateType.Video,
-                Title = "Viral Dance",
-                ShortDescription = "Premium motion-control template with calculated orientation.",
-                PetPhotoRequirements = "Full body visible\nPet facing camera\nNo cropped head or legs",
-                Category = "Dance",
-                Tags = "viral,dance",
-                IsPremium = true,
-                TokenCost = 60,
-                Status = TemplateStatus.Active,
-                MusicDescription = "Upbeat meme dance track",
-                ReferenceVideoDurationSeconds = 7.5,
-                CharacterOrientation = CharacterOrientation.Image,
-                PreprocessingModel = options.AllowedPreprocessingModels[0],
-                PreprocessingPrompt = options.DefaultPreprocessingPrompt,
-                KlingModel = options.AllowedKlingModels[0],
-                KlingPrompt = options.DefaultKlingPrompt,
-                KeepOriginalSound = true,
-                Assets =
-                [
-                    new TemplateAsset
-                    {
-                        Id = Guid.Parse("4BC4D241-31EA-434B-A557-61292B8A7BFB"),
-                        AssetKind = TemplateAssetKind.Preview,
-                        Url = "https://cdn.petmagic.dev/templates/viral-dance-preview.mp4",
-                        FileName = "viral-dance-preview.mp4",
-                        ContentType = "video/mp4",
-                        DurationSeconds = 7.5
-                    },
-                    new TemplateAsset
-                    {
-                        Id = Guid.Parse("7BE8FA3A-D5B9-4C9A-A43A-C0C88FBB1FF5"),
-                        AssetKind = TemplateAssetKind.ReferenceMotion,
-                        Url = "https://cdn.petmagic.dev/templates/viral-dance-reference.mp4",
-                        FileName = "viral-dance-reference.mp4",
-                        ContentType = "video/mp4",
-                        DurationSeconds = 7.5
-                    }
-                ],
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now
-            }
-        );
-
-        await dbContext.SaveChangesAsync();
-        await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
     }
 
     private static async Task SyncWatermarkSettingsStoreAsync(
@@ -581,6 +469,11 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fake))
         {
             throw new InvalidOperationException("Fake templates AI provider cannot be used in Production.");
+        }
+
+        if (options.SeedSampleTemplates)
+        {
+            throw new InvalidOperationException("Sample template seed data cannot be enabled in Production.");
         }
 
         if (IsProvider(options.StorageProvider, TemplateStorageProviders.R2) && !options.R2.IsConfigured)

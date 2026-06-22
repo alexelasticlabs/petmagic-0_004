@@ -142,6 +142,7 @@ Set<String> generationMediaAllowedHosts() {
     'cdn.petmagic.app',
     'cdn.petmagic.ai',
     'r2.dev',
+    'r2.cloudflarestorage.com',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);
@@ -158,6 +159,7 @@ Set<String> profileAvatarAllowedHosts() {
     'cdn.petmagic.app',
     'cdn.petmagic.ai',
     'r2.dev',
+    'r2.cloudflarestorage.com',
   };
 
   final apiBaseUri = Uri.tryParse(AppConfig.apiBaseUrl);

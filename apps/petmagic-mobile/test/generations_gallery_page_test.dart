@@ -68,10 +68,12 @@ void main() {
         .first;
     await tester.scrollUntilVisible(
       showMore,
-      120,
+      220,
       scrollable: galleryScrollable,
     );
-    await tester.tap(showMore);
+    await tester.ensureVisible(showMore);
+    await tester.pumpAndSettle();
+    await tester.tap(showMore, warnIfMissed: false);
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -276,6 +278,8 @@ void main() {
     expect(find.text('Funny Hoodie'), findsNothing);
     expect(find.text(text.templateFlowStepCreateMagic), findsOneWidget);
     expect(find.text('65%'), findsOneWidget);
+    expect(find.text(text.generationStatusActiveInfoHint), findsOneWidget);
+    expect(find.text('Cancel generation'), findsNothing);
     expect(
       find.text(text.generationStatusEtaEstimated('1-2 мин')),
       findsOneWidget,
@@ -1103,9 +1107,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('active card open button marks read and opens details', (
-    tester,
-  ) async {
+  testWidgets('active card tap marks read and opens details', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -1114,9 +1116,7 @@ void main() {
 
     await tester.pumpWidget(harness.app());
     await tester.pumpAndSettle();
-    final text = _text(tester);
-
-    await tester.tap(find.text(text.generationStatusOpenStatusAction).first);
+    await tester.tap(find.text('Little Space Explorer'));
     await tester.pumpAndSettle();
 
     expect(harness.controller.markReadCalls, contains('g-active-1'));

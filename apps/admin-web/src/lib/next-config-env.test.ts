@@ -56,20 +56,26 @@ describe("next admin env config", () => {
   });
 
   it("uses only the configured HTTPS API host in production image patterns", () => {
-    expect(apiImageRemotePatterns("https://api.example.com", "production")).toEqual([
+    expect(apiImageRemotePatterns("https://api.petmagic.app", "production")).toEqual([
       {
         protocol: "https",
-        hostname: "api.example.com",
+        hostname: "api.petmagic.app",
         port: "",
         pathname: "/user-avatars/**",
       },
       {
         protocol: "https",
-        hostname: "api.example.com",
+        hostname: "api.petmagic.app",
         port: "",
         pathname: "/support-attachments/**",
       },
     ]);
+  });
+
+  it("rejects placeholder production API hosts", () => {
+    expect(() => apiImageRemotePatterns("https://api.example.com", "production")).toThrow(
+      /placeholder/
+    );
   });
 
   it("keeps local image hosts available outside production", () => {
@@ -105,7 +111,7 @@ describe("next admin env config", () => {
 
     expect(publicFrontendLines.length).toBeGreaterThan(0);
     expect(publicFrontendLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\/backend/);
-    expect(publicFrontendLines.join("\n")).toMatch(/https:\/\/.*example\.com/);
+    expect(publicFrontendLines.join("\n")).toMatch(/https:\/\/.*petmagic\.app/);
   });
 
   it("keeps admin dev, staging, and production env examples separated", () => {
@@ -118,16 +124,16 @@ describe("next admin env config", () => {
     expect(baseExample).toContain(".env.staging.example");
     expect(baseExample).toContain(".env.production.example");
     expect(devLines).toEqual([
-      "NEXT_PUBLIC_API_BASE_URL=http://localhost:5000",
-      "INTERNAL_API_BASE_URL=http://localhost:5000",
+      "NEXT_PUBLIC_API_BASE_URL=http://localhost:5001",
+      "INTERNAL_API_BASE_URL=http://localhost:5001",
     ]);
     expect(stagingLines).toEqual([
-      "NEXT_PUBLIC_API_BASE_URL=https://api-staging.example.com",
-      "INTERNAL_API_BASE_URL=https://api-staging.example.com",
+      "NEXT_PUBLIC_API_BASE_URL=https://api-staging.petmagic.app",
+      "INTERNAL_API_BASE_URL=https://api-staging.petmagic.app",
     ]);
     expect(productionLines).toEqual([
-      "NEXT_PUBLIC_API_BASE_URL=https://api.example.com",
-      "INTERNAL_API_BASE_URL=https://api.example.com",
+      "NEXT_PUBLIC_API_BASE_URL=https://api.petmagic.app",
+      "INTERNAL_API_BASE_URL=https://api.petmagic.app",
     ]);
     expect(stagingLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);
     expect(productionLines.join("\n")).not.toMatch(/localhost|127\.0\.0\.1|http:\/\//);

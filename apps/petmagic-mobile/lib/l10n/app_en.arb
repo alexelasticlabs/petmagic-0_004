@@ -131,13 +131,13 @@
   "petsHistoryTitle": "Generation history",
   "petsNoPhotosTitle": "No photos yet.",
   "petsNoGenerationsTitle": "No generations yet.",
-  "petsStatsPhotos": "Photos: {count}",
+  "petsStatsPhotos": "{count} photos",
   "@petsStatsPhotos": {
     "placeholders": {
       "count": {}
     }
   },
-  "petsStatsGenerations": "Generations: {count}",
+  "petsStatsGenerations": "{count} generations",
   "@petsStatsGenerations": {
     "placeholders": {
       "count": {}
@@ -1163,7 +1163,6 @@
   "generationStatusContactSupportAction": "Contact support",
   "generationStatusOpenGalleryAction": "Open gallery",
   "generationStatusOpenStatusAction": "Open status",
-  "generationStatusCancelGenerationAction": "Cancel generation",
   "generationStatusResultUnavailableForSave": "Result is not available for saving yet.",
   "generationStatusResultUnavailableForShare": "Result is not available for sharing yet.",
   "generationStatusSaveFileDialogTitle": "Save file",
@@ -1174,7 +1173,6 @@
   "generationStatusDeletedMessage": "Deleted",
   "generationStatusFullscreenControlsHint": "Tap to hide/show controls",
   "generationStatusDeleteSoonMessage": "Deletion will be available soon.",
-  "generationStatusCancelSoonMessage": "Generation cancellation is coming soon.",
   "generationStatusRetrySoonMessage": "Choose another photo and start generation again.",
   "generationStatusFeedbackThanksMessage": "Thanks! Your feedback helps improve PetMagic.",
   "generationStatusResultTitle": "PetMagic result",
@@ -1235,7 +1233,7 @@
     }
   },
   "generationStatusCollapseAction": "Collapse ▲",
-  "generationStatusActiveInfoHint": "You can close the app. We will notify you when the result is ready.",
+  "generationStatusActiveInfoHint": "Generation continues on the server. We will show the result in Gallery when it is ready.",
   "generationStatusUnreadCount": "{count} new",
   "@generationStatusUnreadCount": {
     "placeholders": {

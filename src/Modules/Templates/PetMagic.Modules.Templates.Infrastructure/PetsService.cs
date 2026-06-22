@@ -55,10 +55,9 @@ internal sealed class PetsService(
                     .OrderByDescending(photo => photo.MediaAssetId == x.AvatarMediaAssetId || photo.IsAvatar)
                     .ThenBy(photo => photo.SortOrder)
                     .ThenBy(photo => photo.CreatedAtUtc)
-                    .Select(photo => photo.ThumbnailStoragePath
-                        ?? photo.ThumbnailUrl
-                        ?? photo.MediaAsset.StoragePath
-                        ?? photo.MediaAsset.Url)
+                    .Select(photo => photo.MediaAsset.Url != string.Empty
+                        ? photo.MediaAsset.Url
+                        : photo.MediaAsset.StoragePath)
                     .FirstOrDefault()))
             .ToArrayAsync(cancellationToken);
 
@@ -389,7 +388,9 @@ internal sealed class PetsService(
                 dbContext.TemplateGenerationJobs.Count(job => job.UserId == userId && job.PetId == x.Id),
                 x.Photos
                     .Where(photo => !photo.IsDeleted && photo.MediaAssetId == x.AvatarMediaAssetId)
-                    .Select(photo => photo.ThumbnailUrl ?? photo.MediaAsset.Url)
+                    .Select(photo => photo.MediaAsset.Url != string.Empty
+                        ? photo.MediaAsset.Url
+                        : photo.ThumbnailUrl)
                     .FirstOrDefault()))
             .ToArrayAsync(cancellationToken);
 
@@ -538,21 +539,14 @@ internal sealed class PetsService(
             .OrderByDescending(x => x.MediaAssetId == avatarMediaAssetId || x.IsAvatar)
             .ThenBy(x => x.SortOrder)
             .ThenBy(x => x.CreatedAtUtc)
-            .Select(x => x.ThumbnailStoragePath ?? x.ThumbnailUrl ?? x.MediaAsset.StoragePath ?? x.MediaAsset.Url)
+            .Select(x => x.MediaAsset.Url != string.Empty ? x.MediaAsset.Url : x.MediaAsset.StoragePath)
             .FirstOrDefaultAsync(cancellationToken);
         return await MapPetAsync(pet, photosCount, generationsCount, avatarUrl, cancellationToken);
     }
 
     private async Task<PetResponse> MapPetAsync(Pet pet, int photosCount, int generationsCount, string? avatarUrl, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(avatarUrl))
-        {
-            var signed = await mediaStorage.CreateReadUrlAsync(
-                avatarUrl,
-                TimeSpan.FromSeconds(options.UserMediaReadUrlTtlSeconds),
-                cancellationToken);
-            avatarUrl = signed.IsSuccess ? signed.Value : avatarUrl;
-        }
+        avatarUrl = await ResolvePetMediaReadUrlAsync(avatarUrl, cancellationToken);
 
         return new PetResponse(
             pet.Id,
@@ -572,28 +566,13 @@ internal sealed class PetsService(
 
     private async Task<PetPhotoResponse> MapPhotoAsync(PetPhoto photo, TemplateMediaRecord media, CancellationToken cancellationToken)
     {
-        var url = string.IsNullOrWhiteSpace(media.StoragePath) ? media.Url : media.StoragePath;
-        var signed = await mediaStorage.CreateReadUrlAsync(
-            url,
-            TimeSpan.FromSeconds(options.UserMediaReadUrlTtlSeconds),
-            cancellationToken);
-        if (signed.IsSuccess)
-        {
-            url = signed.Value;
-        }
+        var url = !string.IsNullOrWhiteSpace(media.Url) ? media.Url : media.StoragePath;
+        url = await ResolvePetMediaReadUrlAsync(url, cancellationToken) ?? url;
 
-        string? thumbnailUrl = photo.ThumbnailStoragePath ?? photo.ThumbnailUrl;
-        if (!string.IsNullOrWhiteSpace(thumbnailUrl))
-        {
-            var signedThumbnail = await mediaStorage.CreateReadUrlAsync(
-                thumbnailUrl,
-                TimeSpan.FromSeconds(options.UserMediaReadUrlTtlSeconds),
-                cancellationToken);
-            if (signedThumbnail.IsSuccess)
-            {
-                thumbnailUrl = signedThumbnail.Value;
-            }
-        }
+        var thumbnailUrl = !string.IsNullOrWhiteSpace(photo.ThumbnailUrl)
+            ? photo.ThumbnailUrl
+            : photo.ThumbnailStoragePath;
+        thumbnailUrl = await ResolvePetMediaReadUrlAsync(thumbnailUrl, cancellationToken);
 
         return new PetPhotoResponse(
             photo.Id,
@@ -610,6 +589,26 @@ internal sealed class PetsService(
             photo.Status,
             photo.CreatedAtUtc,
             photo.IsDeleted);
+    }
+
+    private async Task<string?> ResolvePetMediaReadUrlAsync(string? mediaUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(mediaUrl))
+        {
+            return null;
+        }
+
+        var trimmed = mediaUrl.Trim();
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+        {
+            return trimmed;
+        }
+
+        var signed = await mediaStorage.CreateReadUrlAsync(
+            trimmed,
+            TimeSpan.FromSeconds(options.UserMediaReadUrlTtlSeconds),
+            cancellationToken);
+        return signed.IsSuccess ? signed.Value : trimmed;
     }
 
     private Task<Pet?> FindActivePetAsync(Guid userId, Guid petId, CancellationToken cancellationToken)

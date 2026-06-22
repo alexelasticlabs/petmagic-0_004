@@ -214,8 +214,8 @@
   "petsHistoryTitle": "Historique des générations",
   "petsNoPhotosTitle": "Aucune photo pour le moment.",
   "petsNoGenerationsTitle": "Aucune génération pour le moment.",
-  "petsStatsPhotos": "Photos : {count}",
-  "petsStatsGenerations": "Générations : {count}",
+  "petsStatsPhotos": "{count} photos",
+  "petsStatsGenerations": "{count} générations",
   "petsGenerateWithPet": "Générer avec l'animal",
   "petsGenerateWithName": "Générer avec {name}",
   "petsCreateWithName": "Créer avec {name}",
@@ -528,7 +528,6 @@
   "generationStatusContactSupportAction": "Contacter le support",
   "generationStatusOpenGalleryAction": "Ouvrir la galerie",
   "generationStatusOpenStatusAction": "Ouvrir le statut",
-  "generationStatusCancelGenerationAction": "Annuler la generation",
   "generationStatusResultUnavailableForSave": "Le resultat n'est pas encore disponible pour l'enregistrement.",
   "generationStatusResultUnavailableForShare": "Le resultat n'est pas encore disponible pour le partage.",
   "generationStatusSaveFileDialogTitle": "Enregistrer le fichier",
@@ -539,7 +538,6 @@
   "generationStatusDeletedMessage": "Supprime",
   "generationStatusFullscreenControlsHint": "Appuyez pour masquer/afficher les controles",
   "generationStatusDeleteSoonMessage": "La suppression sera disponible prochainement.",
-  "generationStatusCancelSoonMessage": "L'annulation de la generation sera bientot disponible.",
   "generationStatusRetrySoonMessage": "Choisissez une autre photo et relancez la generation.",
   "generationStatusFeedbackThanksMessage": "Merci ! Votre retour aide a ameliorer PetMagic.",
   "generationStatusResultTitle": "Resultat PetMagic",
@@ -600,7 +598,7 @@
     }
   },
   "generationStatusCollapseAction": "Reduire ▲",
-  "generationStatusActiveInfoHint": "Vous pouvez fermer l'application. Nous vous informerons lorsque le resultat sera pret.",
+  "generationStatusActiveInfoHint": "La generation continue sur le serveur. Nous afficherons le resultat dans la Galerie lorsqu'il sera pret.",
   "generationStatusUnreadCount": "{count} nouveaux",
   "@generationStatusUnreadCount": {
     "placeholders": {

@@ -214,8 +214,8 @@
   "petsHistoryTitle": "Historia generowania",
   "petsNoPhotosTitle": "Brak zdjęć.",
   "petsNoGenerationsTitle": "Brak wygenerowanych prac.",
-  "petsStatsPhotos": "Zdjęcia: {count}",
-  "petsStatsGenerations": "Generacje: {count}",
+  "petsStatsPhotos": "{count} zdjęć",
+  "petsStatsGenerations": "{count} generacji",
   "petsGenerateWithPet": "Generuj z pupilem",
   "petsGenerateWithName": "Generuj z {name}",
   "petsCreateWithName": "Twórz z {name}",
@@ -528,7 +528,6 @@
   "generationStatusContactSupportAction": "Skontaktuj sie ze wsparciem",
   "generationStatusOpenGalleryAction": "Otworz galerie",
   "generationStatusOpenStatusAction": "Otworz status",
-  "generationStatusCancelGenerationAction": "Anuluj generowanie",
   "generationStatusResultUnavailableForSave": "Wynik nie jest jeszcze dostepny do zapisu.",
   "generationStatusResultUnavailableForShare": "Wynik nie jest jeszcze dostepny do udostepniania.",
   "generationStatusSaveFileDialogTitle": "Zapisz plik",
@@ -539,7 +538,6 @@
   "generationStatusDeletedMessage": "Usunieto",
   "generationStatusFullscreenControlsHint": "Dotknij, aby ukryc/pokazac kontrolki",
   "generationStatusDeleteSoonMessage": "Usuwanie bedzie wkrotce dostepne.",
-  "generationStatusCancelSoonMessage": "Anulowanie generowania bedzie wkrotce dostepne.",
   "generationStatusRetrySoonMessage": "Wybierz inne zdjecie i uruchom generowanie ponownie.",
   "generationStatusFeedbackThanksMessage": "Dziekujemy! Twoja opinia pomaga ulepszac PetMagic.",
   "generationStatusResultTitle": "Wynik PetMagic",
@@ -600,7 +598,7 @@
     }
   },
   "generationStatusCollapseAction": "Zwin ▲",
-  "generationStatusActiveInfoHint": "Mozesz zamknac aplikacje. Powiadomimy Cie, gdy wynik bedzie gotowy.",
+  "generationStatusActiveInfoHint": "Generowanie trwa na serwerze. Pokazemy wynik w Galerii, gdy bedzie gotowy.",
   "generationStatusUnreadCount": "{count} nowych",
   "@generationStatusUnreadCount": {
     "placeholders": {

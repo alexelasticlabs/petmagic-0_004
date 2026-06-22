@@ -159,6 +159,13 @@ void main() {
       );
       expect(
         parseSafeExternalUri(
+          'https://example-account.r2.cloudflarestorage.com/petmagic/templates-media/result.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
           'https://evil.example/generations/result.jpg',
           allowedHttpsHosts: allowedHosts,
         ),
@@ -175,6 +182,13 @@ void main() {
       expect(
         parseSafeExternalUri(
           'https://cdn.petmagic.ai/avatars/user.jpg',
+          allowedHttpsHosts: allowedHosts,
+        ),
+        isNotNull,
+      );
+      expect(
+        parseSafeExternalUri(
+          'https://example-account.r2.cloudflarestorage.com/petmagic/templates-media/avatar.jpg',
           allowedHttpsHosts: allowedHosts,
         ),
         isNotNull,

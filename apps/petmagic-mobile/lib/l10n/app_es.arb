@@ -214,8 +214,8 @@
   "petsHistoryTitle": "Historial de generaciones",
   "petsNoPhotosTitle": "Aún no hay fotos.",
   "petsNoGenerationsTitle": "Aún no hay generaciones.",
-  "petsStatsPhotos": "Fotos: {count}",
-  "petsStatsGenerations": "Generaciones: {count}",
+  "petsStatsPhotos": "{count} fotos",
+  "petsStatsGenerations": "{count} generaciones",
   "petsGenerateWithPet": "Generar con mascota",
   "petsGenerateWithName": "Generar con {name}",
   "petsCreateWithName": "Crear con {name}",
@@ -528,7 +528,6 @@
   "generationStatusContactSupportAction": "Contactar soporte",
   "generationStatusOpenGalleryAction": "Abrir galeria",
   "generationStatusOpenStatusAction": "Abrir estado",
-  "generationStatusCancelGenerationAction": "Cancelar generacion",
   "generationStatusResultUnavailableForSave": "El resultado aun no esta disponible para guardar.",
   "generationStatusResultUnavailableForShare": "El resultado aun no esta disponible para compartir.",
   "generationStatusSaveFileDialogTitle": "Guardar archivo",
@@ -539,7 +538,6 @@
   "generationStatusDeletedMessage": "Eliminado",
   "generationStatusFullscreenControlsHint": "Toca para ocultar/mostrar controles",
   "generationStatusDeleteSoonMessage": "La eliminacion estara disponible pronto.",
-  "generationStatusCancelSoonMessage": "La cancelacion de la generacion estara disponible pronto.",
   "generationStatusRetrySoonMessage": "Elige otra foto e inicia la generacion nuevamente.",
   "generationStatusFeedbackThanksMessage": "Gracias! Tu feedback ayuda a mejorar PetMagic.",
   "generationStatusResultTitle": "Resultado de PetMagic",
@@ -600,7 +598,7 @@
     }
   },
   "generationStatusCollapseAction": "Ocultar ▲",
-  "generationStatusActiveInfoHint": "Puedes cerrar la app. Te avisaremos cuando el resultado este listo.",
+  "generationStatusActiveInfoHint": "La generacion continua en el servidor. Mostraremos el resultado en la Galeria cuando este listo.",
   "generationStatusUnreadCount": "{count} nuevos",
   "@generationStatusUnreadCount": {
     "placeholders": {

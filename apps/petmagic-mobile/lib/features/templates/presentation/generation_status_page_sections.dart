@@ -225,68 +225,586 @@ class _StatusHero extends StatelessWidget {
   }
 }
 
-class _StageCard extends StatelessWidget {
-  const _StageCard({required this.generation});
+class _ActiveGenerationCard extends StatelessWidget {
+  const _ActiveGenerationCard({required this.generation});
 
   final TemplateGenerationResult generation;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    return _Panel(
-      child: Column(
-        children: [
-          _StageRow(
-            label: text.generationStatusStageQueued,
-            done: generation.effectiveProgressPercent >= 10,
-          ),
-          _StageRow(
-            label: text.templateFlowStepProcessPhoto,
-            done: generation.effectiveProgressPercent >= 30,
-          ),
-          _StageRow(
-            label: text.templateFlowStepCreateMagic,
-            done: generation.effectiveProgressPercent >= 65,
-          ),
-          _StageRow(
-            label: text.templateFlowStepFinalTouches,
-            done: generation.effectiveProgressPercent >= 90,
-          ),
-          _StageRow(
-            label: text.generationStatusStageDone,
-            done: generation.isCompleted,
+    final colors = context.petMagicColors;
+    final progress = generation.effectiveProgressPercent.clamp(0, 100);
+    final progressValue = progress / 100;
+    final statusColor = generationStatusColor(colors, generation);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceGlass.withValues(alpha: 0.98),
+            colors.surfaceStrong.withValues(alpha: 0.86),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colors.border.withValues(alpha: 0.76)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.34),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      colors.gold.withValues(alpha: 0.07),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ActivePreviewFrame(generation: generation),
+                      const SizedBox(width: 13),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _StatusBadge(
+                              label: statusTitle(text, generation),
+                              icon: generationStatusIcon(generation),
+                              color: statusColor,
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              generation.templateTitle ??
+                                  text.generationStatusResultTitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: colors.textStrong,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.12,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 7,
+                              runSpacing: 7,
+                              children: [
+                                _MetaPill(
+                                  icon: isVideoGeneration(generation)
+                                      ? Icons.movie_creation_rounded
+                                      : Icons.image_rounded,
+                                  label: typeLabel(text, generation),
+                                ),
+                                _MetaPill(
+                                  icon: Icons.bolt_rounded,
+                                  label: '${generation.tokenCost} PawSpark',
+                                  color: colors.gold,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '$progress%',
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              color: colors.textStrong,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                            ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 3),
+                          child: Text(
+                            etaLabel(text, generation),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: colors.textSoft,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _PremiumProgressBar(value: progressValue, color: statusColor),
+                  const SizedBox(height: 18),
+                  _StageTimeline(generation: generation),
+                  const SizedBox(height: 16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colors.surfaceStrong.withValues(alpha: 0.56),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: colors.gold.withValues(alpha: 0.22),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.cloud_done_outlined,
+                            color: colors.gold,
+                            size: 19,
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              text.generationStatusBackgroundHint,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colors.textSoft,
+                                    height: 1.35,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _StageRow extends StatelessWidget {
-  const _StageRow({required this.label, required this.done});
+class _ActivePreviewFrame extends StatelessWidget {
+  const _ActivePreviewFrame({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final previewUrl = _activePreviewUrl(generation);
+    final localPreviewFile = _localMediaFile(generation.localPreviewPath);
+    const size = 104.0;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: colors.gold.withValues(alpha: 0.32)),
+          boxShadow: [
+            BoxShadow(
+              color: colors.shadow.withValues(alpha: 0.30),
+              blurRadius: 18,
+              offset: const Offset(0, 9),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(21),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (localPreviewFile != null)
+                Image.file(
+                  localPreviewFile,
+                  fit: BoxFit.cover,
+                  cacheWidth: 320,
+                  filterQuality: FilterQuality.medium,
+                )
+              else if (previewUrl != null)
+                CachedNetworkImage(
+                  imageUrl: previewUrl,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 320,
+                  maxWidthDiskCache: 320,
+                  filterQuality: FilterQuality.medium,
+                  errorWidget: (context, url, error) =>
+                      _ActivePreviewPlaceholder(label: text.imageLabel),
+                )
+              else
+                _ActivePreviewPlaceholder(label: typeLabel(text, generation)),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 46,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.62),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 9,
+                bottom: 8,
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  color: colors.gold,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivePreviewPlaceholder extends StatelessWidget {
+  const _ActivePreviewPlaceholder({required this.label});
 
   final String label;
-  final bool done;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colors.surfaceStrong,
+            colors.surfaceStrong.withValues(alpha: 0.68),
+            colors.gold.withValues(alpha: 0.12),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.pets_rounded, color: colors.gold, size: 28),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colors.textSoft,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.34)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 15),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  const _MetaPill({required this.icon, required this.label, this.color});
+
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final tint = color ?? colors.textSoft;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: tint, size: 13),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colors.textSoft,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PremiumProgressBar extends StatelessWidget {
+  const _PremiumProgressBar({required this.value, required this.color});
+
+  final double value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final clamped = value.clamp(0, 1).toDouble();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: SizedBox(
+        height: 11,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: colors.border.withValues(alpha: 0.62)),
+            FractionallySizedBox(
+              widthFactor: clamped,
+              alignment: Alignment.centerLeft,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [color, colors.gold.withValues(alpha: 0.92)],
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: clamped,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StageTimeline extends StatelessWidget {
+  const _StageTimeline({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final stages = [
+      _ActiveStage(
+        label: text.generationStatusStageQueued,
+        icon: Icons.schedule_rounded,
+        threshold: 10,
+      ),
+      _ActiveStage(
+        label: text.templateFlowStepProcessPhoto,
+        icon: Icons.photo_filter_rounded,
+        threshold: 30,
+      ),
+      _ActiveStage(
+        label: text.templateFlowStepCreateMagic,
+        icon: Icons.auto_awesome_rounded,
+        threshold: 65,
+      ),
+      _ActiveStage(
+        label: text.templateFlowStepFinalTouches,
+        icon: Icons.stars_rounded,
+        threshold: 90,
+      ),
+      _ActiveStage(
+        label: text.generationStatusStageDone,
+        icon: Icons.check_rounded,
+        threshold: 100,
+      ),
+    ];
+
+    return Column(
+      children: [
+        for (var index = 0; index < stages.length; index++)
+          _TimelineRow(
+            stage: stages[index],
+            generation: generation,
+            isLast: index == stages.length - 1,
+          ),
+      ],
+    );
+  }
+}
+
+class _ActiveStage {
+  const _ActiveStage({
+    required this.label,
+    required this.icon,
+    required this.threshold,
+  });
+
+  final String label;
+  final IconData icon;
+  final int threshold;
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({
+    required this.stage,
+    required this.generation,
+    required this.isLast,
+  });
+
+  final _ActiveStage stage;
+  final TemplateGenerationResult generation;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final progress = generation.effectiveProgressPercent;
+    final isDone = progress >= stage.threshold || generation.isCompleted;
+    final isActive = !generation.isCompleted && _isCurrentStage(generation);
+    final tint = isDone
+        ? colors.accent
+        : isActive
+        ? colors.gold
+        : colors.textMuted;
+
+    return IntrinsicHeight(
       child: Row(
         children: [
-          Icon(
-            done ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-            color: done ? colors.accent : colors.textMuted,
-            size: 20,
+          Column(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tint.withValues(alpha: isDone || isActive ? 0.16 : 0),
+                  border: Border.all(
+                    color: tint.withValues(
+                      alpha: isDone || isActive ? 0.42 : 0.30,
+                    ),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    isDone ? Icons.check_rounded : stage.icon,
+                    color: tint,
+                    size: 15,
+                  ),
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1,
+                    margin: const EdgeInsets.symmetric(vertical: 3),
+                    color: (isDone ? colors.accent : colors.border).withValues(
+                      alpha: isDone ? 0.44 : 0.72,
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: done ? colors.textStrong : colors.textMuted,
-                fontWeight: FontWeight.w700,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 11, top: 1),
+              child: Text(
+                stage.label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: isDone || isActive
+                      ? colors.textStrong
+                      : colors.textMuted,
+                  fontWeight: isDone || isActive
+                      ? FontWeight.w800
+                      : FontWeight.w700,
+                  height: 1.2,
+                ),
               ),
             ),
           ),
@@ -294,6 +812,44 @@ class _StageRow extends StatelessWidget {
       ),
     );
   }
+
+  bool _isCurrentStage(TemplateGenerationResult generation) {
+    final stageValue = generation.stage;
+    if (stageValue == null || stageValue.isEmpty) {
+      final progress = generation.effectiveProgressPercent;
+      return progress < stage.threshold && progress >= stage.threshold - 25;
+    }
+
+    return switch (stageValue) {
+      'queued' => stage.threshold == 10,
+      'preprocessing' || 'processing' => stage.threshold == 30,
+      'generating' => stage.threshold == 65,
+      'finalizing' => stage.threshold == 90,
+      _ => false,
+    };
+  }
+}
+
+String? _activePreviewUrl(TemplateGenerationResult generation) {
+  for (final candidate in [
+    generation.inputPreviewUrl,
+    generation.sourceImageAsset?.url,
+    generation.normalizedImageUrl,
+    generation.resultPreviewUrl,
+    generation.outputUrl,
+  ]) {
+    final value = candidate?.trim();
+    if (value == null || value.isEmpty) {
+      continue;
+    }
+
+    final safeUri = parseSafeGenerationMediaUri(value);
+    if (safeUri != null) {
+      return safeUri.toString();
+    }
+  }
+
+  return null;
 }
 
 class _ResultCard extends StatefulWidget {
@@ -566,36 +1122,6 @@ class _FailureCard extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colors.textMuted,
               fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BackgroundHintCard extends StatelessWidget {
-  const _BackgroundHintCard({required this.generation});
-
-  final TemplateGenerationResult generation;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
-    return _Panel(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.notifications_active_outlined, color: colors.gold),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text.generationStatusBackgroundHint,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.textSoft,
-                height: 1.4,
-              ),
             ),
           ),
         ],
@@ -893,10 +1419,9 @@ class _FailedActions extends StatelessWidget {
 }
 
 class _ActiveActions extends StatelessWidget {
-  const _ActiveActions({required this.onContinue, required this.onCancel});
+  const _ActiveActions({required this.onContinue});
 
   final VoidCallback onContinue;
-  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -907,11 +1432,6 @@ class _ActiveActions extends StatelessWidget {
         FilledButton(
           onPressed: onContinue,
           child: Text(text.generationStatusContinueInAppAction),
-        ),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: onCancel,
-          child: Text(text.generationStatusCancelGenerationAction),
         ),
       ],
     );

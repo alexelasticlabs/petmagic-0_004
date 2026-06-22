@@ -38,12 +38,12 @@ class _ActiveCard extends ConsumerWidget {
     return _CardEntrance(
       child: RepaintBoundary(
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           onTap: openGeneration,
           child: Ink(
             decoration: BoxDecoration(
               color: colors.surfaceGlass,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: generation.isUnread
                     ? colors.accent.withValues(alpha: 0.7)
@@ -52,24 +52,24 @@ class _ActiveCard extends ConsumerWidget {
               boxShadow: [
                 BoxShadow(
                   color: colors.shadow.withValues(alpha: 0.16),
-                  blurRadius: 18,
-                  offset: const Offset(0, 7),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(9),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width: 88,
-                    height: 88,
+                    width: 76,
+                    height: 76,
                     child: Stack(
                       children: [
                         Positioned.fill(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(13),
                             child: localPreviewFile != null
                                 ? Image.file(
                                     localPreviewFile,
@@ -103,21 +103,45 @@ class _ActiveCard extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          generation.templateTitle ??
-                              text.generationStatusResultTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: colors.textStrong,
-                                fontWeight: FontWeight.w900,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                generation.templateTitle ??
+                                    text.generationStatusResultTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(
+                                      color: colors.textStrong,
+                                      fontWeight: FontWeight.w900,
+                                      height: 1.15,
+                                    ),
                               ),
+                            ),
+                            const SizedBox(width: 6),
+                            Tooltip(
+                              message: text.generationStatusOpenStatusAction,
+                              child: InkResponse(
+                                radius: 18,
+                                onTap: openGeneration,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(3),
+                                  child: Icon(
+                                    Icons.open_in_new_rounded,
+                                    size: 17,
+                                    color: colors.textMuted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -130,16 +154,29 @@ class _ActiveCard extends ConsumerWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          stageStatusLabel(text, generation),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: statusColor(colors, generation),
-                                fontWeight: FontWeight.w800,
+                        const SizedBox(height: 7),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: _StatusPill(
+                                label: stageStatusLabel(text, generation),
+                                generation: generation,
                               ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                estimatedTimeLabel(text, generation),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: colors.textSoft,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 7),
                         Row(
@@ -165,42 +202,44 @@ class _ActiveCard extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 7),
-                        Text(
-                          estimatedTimeLabel(text, generation),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.labelMedium
-                              ?.copyWith(
-                                color: colors.textSoft,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: FilledButton.tonal(
-                            onPressed: openGeneration,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: colors.accent.withValues(
-                                alpha: 0.22,
-                              ),
-                              foregroundColor: colors.accent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 8,
-                              ),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            child: Text(text.generationStatusOpenStatusAction),
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.generation});
+
+  final String label;
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final tint = statusColor(colors, generation);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tint.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: tint.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: tint,
+            fontWeight: FontWeight.w900,
           ),
         ),
       ),

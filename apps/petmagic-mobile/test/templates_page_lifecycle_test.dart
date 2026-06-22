@@ -1176,7 +1176,9 @@ void main() {
     });
     const petId = 'pet/42 #x?kind=dog&name=Bella';
     const petPhotoId = 'photo/7 #main?pose=1&tag=a';
-    final generationRepository = _PetFlowGenerationRepository();
+    final generationRepository = _PetFlowGenerationRepository(
+      photoId: petPhotoId,
+    );
     final router = GoRouter(
       initialLocation: Uri(
         path: TemplatesPage.routePath,
@@ -1260,8 +1262,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Start'), findsOneWidget);
-    await tester.tap(find.text('Start'));
+    expect(find.text('Create magic'), findsOneWidget);
+    await tester.tap(find.text('Create magic'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -1273,7 +1275,7 @@ void main() {
     expect(find.text('status:generation-pet-1'), findsOneWidget);
   });
 
-  testWidgets('selected pet shortcut preserves selected pet photo', (
+  testWidgets('selected pet dropdown preserves selected pet photo', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -1358,6 +1360,11 @@ void main() {
     await tester.tap(find.text('Bella').first);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(ListTile), findsOneWidget);
+
+    await tester.tap(find.text('Bella').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     final petTemplate = find.text('Pet portrait').first;
     await tester.ensureVisible(petTemplate);
@@ -1368,7 +1375,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Create magic'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -1480,12 +1487,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
 
     await tester.tap(find.text('Bella').first);
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
     await tester.scrollUntilVisible(
       find.byTooltip('Use for generation'),
       120,
-      scrollable: find.byType(Scrollable),
+      scrollable: find.byType(Scrollable).first,
     );
     await tester.tap(find.byTooltip('Use for generation'));
     await tester.pump();
@@ -1500,7 +1508,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    await tester.tap(find.text('Start'));
+    await tester.tap(find.text('Create magic'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -1946,13 +1954,14 @@ class _RandomTemplatesRepository implements TemplatesRepository {
 }
 
 class _PetFlowGenerationRepository extends TemplateGenerationRepository {
-  _PetFlowGenerationRepository()
+  _PetFlowGenerationRepository({this.photoId = 'photo-7'})
     : super(
         dio: Dio(),
         sessionStorage: AuthSessionStorage(),
         preferences: SharedPreferencesAsync(),
       );
 
+  final String photoId;
   int startFromPetCalls = 0;
   String? lastPetId;
   String? lastPetPhotoId;
@@ -1968,6 +1977,28 @@ class _PetFlowGenerationRepository extends TemplateGenerationRepository {
   @override
   Future<List<PetProfile>> fetchPets({CancelToken? cancelToken}) async {
     return const [];
+  }
+
+  @override
+  Future<List<PetPhoto>> fetchPetPhotos(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    return [
+      PetPhoto(
+        id: photoId,
+        petId: petId,
+        mediaAssetId: 'pet-photo-asset-1',
+        url: 'https://cdn.petmagic.app/pet-original.jpg',
+        thumbnailUrl: 'https://cdn.petmagic.app/pet-thumb.jpg',
+        fileName: 'pet.jpg',
+        contentType: 'image/jpeg',
+        isFavorite: true,
+        isAvatar: true,
+        sortOrder: 1,
+        createdAtUtc: DateTime.utc(2035),
+      ),
+    ];
   }
 
   @override
@@ -2020,7 +2051,7 @@ class _CrossGalleryPetFlowRepository extends _PetFlowGenerationRepository {
         name: 'Bella',
         type: 'dog',
         breed: 'Corgi',
-        avatarUrl: 'https://cdn.petmagic.test/bella-avatar.jpg',
+        avatarUrl: 'https://cdn.petmagic.app/bella-avatar.jpg',
         photosCount: 1,
         generationsCount: createdCreations.length,
         createdAtUtc: DateTime.utc(2035),
@@ -2039,8 +2070,8 @@ class _CrossGalleryPetFlowRepository extends _PetFlowGenerationRepository {
         id: 'photo-7',
         petId: petId,
         mediaAssetId: 'pet-photo-asset-7',
-        url: 'https://cdn.petmagic.test/bella-original.jpg',
-        thumbnailUrl: 'https://cdn.petmagic.test/bella-thumb.jpg',
+        url: 'https://cdn.petmagic.app/bella-original.jpg',
+        thumbnailUrl: 'https://cdn.petmagic.app/bella-thumb.jpg',
         fileName: 'bella.jpg',
         contentType: 'image/jpeg',
         isFavorite: true,
@@ -2080,9 +2111,9 @@ class _CrossGalleryPetFlowRepository extends _PetFlowGenerationRepository {
       ..add(
         generation.copyWith(
           status: TemplateGenerationStatus.completed,
-          outputUrl: 'https://cdn.petmagic.test/generated-bella.jpg',
+          outputUrl: 'https://cdn.petmagic.app/generated-bella.jpg',
           resultPreviewUrl:
-              'https://cdn.petmagic.test/generated-bella-thumb.jpg',
+              'https://cdn.petmagic.app/generated-bella-thumb.jpg',
           completedAtUtc: completedAtUtc,
           updatedAtUtc: completedAtUtc,
           isUnread: true,

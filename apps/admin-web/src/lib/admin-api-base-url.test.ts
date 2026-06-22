@@ -95,6 +95,16 @@ describe("admin-api-base-url", () => {
     ).toThrow(/HTTPS/);
   });
 
+  it("rejects placeholder production API URLs", () => {
+    expect(() =>
+      resolveAdminApiBaseUrl({
+        isServer: false,
+        publicApiBaseUrl: "https://api.example.com",
+        nodeEnv: "production",
+      })
+    ).toThrow(/placeholder/);
+  });
+
   it("rejects credentials, query strings, and fragments in configured API URLs", () => {
     expect(() =>
       resolveAdminApiBaseUrl({
@@ -125,10 +135,10 @@ describe("admin-api-base-url", () => {
     expect(
       resolveAdminApiBaseUrl({
         isServer: true,
-        internalApiBaseUrl: "https://internal-api.example.com/",
-        publicApiBaseUrl: "https://api.example.com",
+        internalApiBaseUrl: "https://internal-api.petmagic.app/",
+        publicApiBaseUrl: "https://api.petmagic.app",
         nodeEnv: "production",
       })
-    ).toBe("https://internal-api.example.com");
+    ).toBe("https://internal-api.petmagic.app");
   });
 });

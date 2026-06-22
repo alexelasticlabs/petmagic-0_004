@@ -48,18 +48,39 @@ class _ThumbnailPlaceholder extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.filter});
+
+  final GenerationHistoryFilter filter;
 
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final icon = switch (filter) {
+      GenerationHistoryFilter.active => Icons.hourglass_empty_rounded,
+      GenerationHistoryFilter.ready => Icons.collections_rounded,
+      GenerationHistoryFilter.failed => Icons.error_outline_rounded,
+      GenerationHistoryFilter.all => Icons.photo_library_outlined,
+    };
+    final message = filter == GenerationHistoryFilter.all
+        ? text.generationStatusEmptyMessage
+        : subtitleForFilter(text, filter);
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.photo_library_outlined, size: 42, color: colors.textMuted),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.surfaceGlass,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(13),
+              child: Icon(icon, size: 34, color: colors.textMuted),
+            ),
+          ),
           const SizedBox(height: 12),
           Text(
             text.generationStatusEmptyTitle,
@@ -71,7 +92,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            text.generationStatusEmptyMessage,
+            message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colors.textSoft,

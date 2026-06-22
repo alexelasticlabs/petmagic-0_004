@@ -7,7 +7,7 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 public sealed partial class TemplatesServiceTests
 {
     [Fact]
-    public async Task ListPetsAsync_ShouldUseFirstActivePhotoAsAvatarFallback()
+    public async Task ListPetsAsync_ShouldUseFirstActivePhotoOriginalAsAvatarFallback()
     {
         await using var dbContext = CreateDbContext();
         var userId = Guid.NewGuid();
@@ -62,8 +62,8 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(result.IsSuccess);
         var pet = Assert.Single(result.Value);
-        Assert.Equal("users/pets/milo/thumb.webp?signed=1", pet.AvatarUrl);
-        Assert.Equal(["users/pets/milo/thumb.webp"], storage.ReadUrls);
+        Assert.Equal("https://cdn.petmagic.test/milo-original.jpg", pet.AvatarUrl);
+        Assert.Empty(storage.ReadUrls);
         Assert.Equal(1, pet.PhotosCount);
     }
 }

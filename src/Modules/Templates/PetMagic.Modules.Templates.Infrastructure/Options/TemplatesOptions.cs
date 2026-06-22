@@ -32,7 +32,7 @@ public sealed class TemplatesOptions
 
     public long ReferenceMotionMaxFileSizeBytes { get; init; } = 100 * 1024 * 1024;
 
-    public bool SeedSampleTemplates { get; init; } = true;
+    public bool SeedSampleTemplates { get; init; }
 
     public bool GenerationWorkerEnabled { get; init; } = true;
 

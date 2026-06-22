@@ -418,12 +418,12 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String petsStatsPhotos(Object count) {
-    return 'Фото: $count';
+    return '$count фото';
   }
 
   @override
   String petsStatsGenerations(Object count) {
-    return 'Генерации: $count';
+    return '$count генераций';
   }
 
   @override
@@ -3156,9 +3156,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusOpenStatusAction => 'Открыть статус';
 
   @override
-  String get generationStatusCancelGenerationAction => 'Отменить генерацию';
-
-  @override
   String get generationStatusResultUnavailableForSave =>
       'Результат пока недоступен для сохранения.';
 
@@ -3191,10 +3188,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusDeleteSoonMessage => 'Удаление скоро добавим.';
-
-  @override
-  String get generationStatusCancelSoonMessage =>
-      'Отмена генерации появится в ближайшем обновлении.';
 
   @override
   String get generationStatusRetrySoonMessage =>
@@ -3365,7 +3358,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get generationStatusActiveInfoHint =>
-      'Вы можете закрыть приложение. Мы сообщим, когда результат будет готов.';
+      'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.';
 
   @override
   String generationStatusUnreadCount(int count) {
