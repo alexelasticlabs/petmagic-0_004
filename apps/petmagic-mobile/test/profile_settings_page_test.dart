@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,12 +6,24 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
+
   testWidgets('language sheet applies locale selection', (tester) async {
     await _pumpSettingsPage(tester);
 
@@ -93,9 +106,46 @@ void main() {
 
     expect(find.text('password-change-screen'), findsOneWidget);
   });
+
+  testWidgets('feedback sheet submits selected category without crashing', (
+    tester,
+  ) async {
+    final repository = _FakeTemplateGenerationRepository();
+    await _pumpSettingsPage(tester, templateRepository: repository);
+
+    final feedbackRow = find.text('Send feedback').first;
+    await tester.scrollUntilVisible(
+      feedbackRow,
+      320,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.ensureVisible(feedbackRow);
+    await tester.pumpAndSettle();
+
+    await tester.tap(feedbackRow);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Баг'), findsOneWidget);
+
+    await tester.tap(find.text('Баг'));
+    await tester.enterText(find.byType(TextFormField), 'Краш при отправке');
+    await tester.tap(find.widgetWithText(FilledButton, 'Отправить'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+
+    expect(repository.submittedType, 'BugReport');
+    expect(repository.submittedCategory, 'bug');
+    expect(repository.submittedMessage, 'Краш при отправке');
+    expect(repository.submittedSourceScreen, 'settings');
+    expect(tester.takeException(), isNull);
+  });
 }
 
-Future<void> _pumpSettingsPage(WidgetTester tester) async {
+Future<void> _pumpSettingsPage(
+  WidgetTester tester, {
+  TemplateGenerationRepository? templateRepository,
+}) async {
   _FakeProfileController.deleteAccountCalls = 0;
   await tester.binding.setSurfaceSize(const Size(390, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -106,6 +156,9 @@ Future<void> _pumpSettingsPage(WidgetTester tester) async {
         profileControllerProvider.overrideWith(_FakeProfileController.new),
         appPreferencesControllerProvider.overrideWith(
           _FakePreferencesController.new,
+        ),
+        templateGenerationRepositoryProvider.overrideWithValue(
+          templateRepository ?? _FakeTemplateGenerationRepository(),
         ),
       ],
       child: MaterialApp.router(
@@ -213,5 +266,39 @@ class _FakePreferencesController extends AppPreferencesController {
   @override
   Future<void> updateLocale(Locale? locale) async {
     state = state.copyWith(locale: locale, localeWasSet: true, hasLoaded: true);
+  }
+}
+
+class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
+  _FakeTemplateGenerationRepository()
+    : super(
+        dio: Dio(),
+        sessionStorage: AuthSessionStorage(),
+        preferences: SharedPreferencesAsync(),
+      );
+
+  String? submittedType;
+  String? submittedCategory;
+  String? submittedMessage;
+  String? submittedSourceScreen;
+
+  @override
+  Future<String> submitFeedback({
+    required String type,
+    required String category,
+    int? rating,
+    String? message,
+    String? generationId,
+    String? templateId,
+    String? petId,
+    String sourceScreen = 'settings',
+    CancelToken? cancelToken,
+    bool retryTransientFailures = false,
+  }) async {
+    submittedType = type;
+    submittedCategory = category;
+    submittedMessage = message;
+    submittedSourceScreen = sourceScreen;
+    return 'feedback-1';
   }
 }

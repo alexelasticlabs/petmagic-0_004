@@ -274,6 +274,260 @@ class AppLocalizationsFr extends AppLocalizations {
       'Vos compagnons et profils d\'animaux préférés.';
 
   @override
+  String get petsAddTitle => 'Ajouter un animal';
+
+  @override
+  String get petsEditTitle => 'Modifier l\'animal';
+
+  @override
+  String get petsDetailsTitle => 'Détails de l\'animal';
+
+  @override
+  String get petsCreateWithPetTitle => 'Créer avec un animal';
+
+  @override
+  String get petsManageAction => 'Gérer';
+
+  @override
+  String get petsAddAction => 'Ajouter';
+
+  @override
+  String get petsSaveAction => 'Enregistrer';
+
+  @override
+  String get petsNextAction => 'Suivant';
+
+  @override
+  String get petsBackAction => 'Retour';
+
+  @override
+  String get petsDoneAction => 'Terminé';
+
+  @override
+  String get petsCancelAction => 'Annuler';
+
+  @override
+  String get petsChangeAction => 'Changer';
+
+  @override
+  String get petsStartAction => 'Démarrer';
+
+  @override
+  String get petsRetryAction => 'Réessayer';
+
+  @override
+  String get petsNameLabel => 'Nom';
+
+  @override
+  String get petsNameStepTitle => 'Nom de l\'animal';
+
+  @override
+  String get petsNameStepSubtitle => 'Donnez-lui un nom court.';
+
+  @override
+  String get petsNameHint => 'Saisir le nom';
+
+  @override
+  String get petsNameExample => 'Exemple : Richi, Murka, Buddy';
+
+  @override
+  String get petsNameRequiredError => 'Saisissez le nom de votre animal';
+
+  @override
+  String get petsTypeBreedTitle => 'Type et race';
+
+  @override
+  String get petsTypeBreedStepSubtitle =>
+      'Choisissez le type et ajoutez la race si vous la connaissez.';
+
+  @override
+  String get petsBreedLabel => 'Race';
+
+  @override
+  String get petsBreedHint => 'Exemple : shih tzu';
+
+  @override
+  String get petsPhotoLabel => 'Image';
+
+  @override
+  String get petsPhotoStepTitle => 'Photo de l\'animal';
+
+  @override
+  String get petsPhotoStepSubtitle =>
+      'Ajoutez une photo nette où le visage est visible.';
+
+  @override
+  String get petsDogType => 'Chien';
+
+  @override
+  String get petsCatType => 'Chat';
+
+  @override
+  String get petsOtherType => 'Autre';
+
+  @override
+  String get petsChooseFirstPhotoAction => 'Choisir une première photo';
+
+  @override
+  String get petsAddPhotoAction => 'Ajouter une photo';
+
+  @override
+  String get petsAddPhotoLaterHint =>
+      'Vous pourrez ajouter une photo plus tard depuis le profil.';
+
+  @override
+  String get petsPhotoFormatHint => 'JPG, PNG jusqu\'à 10 Mo';
+
+  @override
+  String get petsPhotoSelectedLabel => 'Photo sélectionnée';
+
+  @override
+  String get petsEmptyTitle => 'Ajoutez votre premier animal';
+
+  @override
+  String get petsEmptySubtitle =>
+      'Enregistrez un profil et des photos pour générer en un geste.';
+
+  @override
+  String get petsLoadErrorTitle => 'Impossible de charger les animaux';
+
+  @override
+  String get petsLoadPetErrorTitle => 'Impossible de charger l\'animal';
+
+  @override
+  String get petsLoadPhotosErrorTitle => 'Impossible de charger les photos';
+
+  @override
+  String get petsLoadHistoryErrorTitle => 'Impossible de charger l\'historique';
+
+  @override
+  String get petsNotFoundTitle => 'Animal introuvable';
+
+  @override
+  String get petsPhotosTitle => 'Images';
+
+  @override
+  String get petsHistoryTitle => 'Historique des générations';
+
+  @override
+  String get petsNoPhotosTitle => 'Aucune photo pour le moment.';
+
+  @override
+  String get petsNoGenerationsTitle => 'Aucune génération pour le moment.';
+
+  @override
+  String petsStatsPhotos(Object count) {
+    return 'Photos : $count';
+  }
+
+  @override
+  String petsStatsGenerations(Object count) {
+    return 'Générations : $count';
+  }
+
+  @override
+  String get petsGenerateWithPet => 'Générer avec l\'animal';
+
+  @override
+  String petsGenerateWithName(Object name) {
+    return 'Générer avec $name';
+  }
+
+  @override
+  String petsCreateWithName(Object name) {
+    return 'Créer avec $name';
+  }
+
+  @override
+  String petsAddPhotoPrompt(Object name) {
+    return 'Ajoutez une photo de $name pour commencer';
+  }
+
+  @override
+  String get petsDeleteTooltip => 'Supprimer l\'animal';
+
+  @override
+  String get petsDeleteConfirmTitle => 'Supprimer l\'animal ?';
+
+  @override
+  String get petsDeleteConfirmMessage =>
+      'Le profil et ses photos enregistrées seront supprimés.';
+
+  @override
+  String get petsDeleteConfirmAction => 'Supprimer';
+
+  @override
+  String get petsAddPhotosTooltip => 'Ajouter des photos';
+
+  @override
+  String get petsSetAvatarTooltip => 'Définir comme avatar';
+
+  @override
+  String get petsMarkFavoriteTooltip => 'Ajouter aux favoris';
+
+  @override
+  String get petsUseForGenerationTooltip => 'Utiliser pour générer';
+
+  @override
+  String get petsDeletePhotoTooltip => 'Supprimer la photo';
+
+  @override
+  String get petsAvatarBadge => 'Profil';
+
+  @override
+  String get petsFavoriteBadge => 'Favori';
+
+  @override
+  String get petsPhotoUpdateError => 'Impossible de mettre à jour la photo';
+
+  @override
+  String get petsUnsupportedPhotoTypeError =>
+      'Ce type de photo n\'est pas pris en charge';
+
+  @override
+  String get petsPhotoUploadError => 'Impossible d\'envoyer la photo';
+
+  @override
+  String get petsOpenGenerationTooltip => 'Ouvrir';
+
+  @override
+  String get petsShareGenerationTooltip => 'Partager';
+
+  @override
+  String get petsUseGenerationAsInputTooltip => 'Utiliser comme source';
+
+  @override
+  String get petsTemplateFallback => 'Modèle';
+
+  @override
+  String get petsUploadAction => 'Importer';
+
+  @override
+  String get petsChooseFromMyPetsAction => 'Choisir dans Mes animaux';
+
+  @override
+  String petsGenerationCostMessage(Object count) {
+    return 'Cette génération coûte $count PawSpark.';
+  }
+
+  @override
+  String get petsNoPhotoStartMessage =>
+      'Ajoutez une photo de l\'animal pour commencer';
+
+  @override
+  String get petsFirstPetToast => 'Ajoutez votre premier animal';
+
+  @override
+  String get petsCouldNotLoadToast => 'Impossible de charger les animaux';
+
+  @override
+  String get petsAuthRequiredTitle => 'Enregistrez et utilisez vos animaux';
+
+  @override
+  String get petsAuthRequiredMessage =>
+      'Connectez-vous ou créez un compte pour enregistrer vos animaux et les utiliser dans vos générations.';
+
+  @override
   String get profilePremiumTitle => 'Passez à la version premium';
 
   @override

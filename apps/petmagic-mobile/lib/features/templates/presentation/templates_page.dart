@@ -768,8 +768,14 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     bool showChangeAction = false,
     TemplateOfTheDayItem? templateOfTheDay,
   }) async {
+    final text = AppLocalizations.of(context);
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-      await showAuthRequiredSheet(context);
+      await showAuthRequiredSheet(
+        context,
+        title: text.petsAuthRequiredTitle,
+        message: text.petsAuthRequiredMessage,
+        showSignUp: true,
+      );
       return;
     }
 
@@ -810,25 +816,25 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       builder: (context) => AlertDialog(
         title: Text(
           petName == null || petName.isEmpty
-              ? 'Generate with pet'
-              : 'Generate with $petName',
+              ? text.petsGenerateWithPet
+              : text.petsGenerateWithName(petName),
         ),
-        content: Text('This generation costs ${template.tokenCost} PawSpark.'),
+        content: Text(text.petsGenerationCostMessage(template.tokenCost)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(text.petsCancelAction),
           ),
           if (showChangeAction)
             TextButton(
               onPressed: () =>
                   Navigator.of(context).pop(_PetGenerationConfirmAction.change),
-              child: const Text('Change'),
+              child: Text(text.petsChangeAction),
             ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(context).pop(_PetGenerationConfirmAction.start),
-            child: const Text('Start'),
+            child: Text(text.petsStartAction),
           ),
         ],
       ),
@@ -884,7 +890,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
       PetMagicToast.show(
         context,
-        message: 'Добавьте фото питомца, чтобы начать',
+        message: text.petsNoPhotoStartMessage,
         tone: PetMagicToastTone.warning,
       );
     }
@@ -903,9 +909,10 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
       }
 
       if (pets.isEmpty) {
+        final text = AppLocalizations.of(context);
         PetMagicToast.show(
           context,
-          message: 'Добавьте первого питомца',
+          message: text.petsFirstPetToast,
           tone: PetMagicToastTone.info,
         );
         context.push('/profile/pets');
@@ -933,7 +940,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
       PetMagicToast.show(
         context,
-        message: 'Could not load pets',
+        message: AppLocalizations.of(context).petsCouldNotLoadToast,
         tone: PetMagicToastTone.warning,
       );
     }
@@ -1036,6 +1043,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 Future<_TemplateInputChoice?> _showTemplateInputChoiceSheet(
   BuildContext context,
 ) {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   return showPetMagicModalBottomSheet<_TemplateInputChoice>(
     context: context,
@@ -1066,7 +1074,7 @@ Future<_TemplateInputChoice?> _showTemplateInputChoiceSheet(
               ListTile(
                 leading: Icon(Icons.upload_file_rounded, color: colors.accent),
                 title: Text(
-                  'Upload',
+                  text.petsUploadAction,
                   style: TextStyle(color: colors.textStrong),
                 ),
                 onTap: () =>
@@ -1075,7 +1083,7 @@ Future<_TemplateInputChoice?> _showTemplateInputChoiceSheet(
               ListTile(
                 leading: Icon(Icons.pets_rounded, color: colors.accent),
                 title: Text(
-                  'Choose from My Pets',
+                  text.petsChooseFromMyPetsAction,
                   style: TextStyle(color: colors.textStrong),
                 ),
                 onTap: () =>
@@ -1094,6 +1102,7 @@ Future<PetProfile?> _showPetPickerSheet(
   BuildContext context,
   List<PetProfile> pets,
 ) {
+  final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   return showPetMagicModalBottomSheet<PetProfile>(
     context: context,
@@ -1138,7 +1147,10 @@ Future<PetProfile?> _showPetPickerSheet(
                       ),
                     ),
                     subtitle: Text(
-                      [pet.type, pet.breed].whereType<String>().join(' • '),
+                      [
+                        _templatePetTypeLabel(pet.type, text),
+                        pet.breed,
+                      ].whereType<String>().join(' • '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: colors.textSoft),
@@ -1152,6 +1164,14 @@ Future<PetProfile?> _showPetPickerSheet(
       ),
     ),
   );
+}
+
+String _templatePetTypeLabel(String value, AppLocalizations text) {
+  return switch (value) {
+    'dog' => text.petsDogType,
+    'cat' => text.petsCatType,
+    _ => text.petsOtherType,
+  };
 }
 
 typedef _RandomTemplateFinder =
@@ -3172,6 +3192,36 @@ String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {
   return parseSafeGenerationMediaUri(candidate)?.toString();
 }
 
+String? _normalizePetAvatarMediaUrl(String? rawUrl) {
+  final trimmed = rawUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+
+  final sanitized = Uri.encodeFull(trimmed.replaceAll('\\', '/'));
+  final parsed = Uri.tryParse(sanitized);
+  final String candidate;
+  if (parsed?.hasScheme == true) {
+    candidate = parsed.toString();
+  } else if (sanitized.startsWith('//')) {
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    final scheme = (baseUri?.scheme.isNotEmpty ?? false)
+        ? baseUri!.scheme
+        : 'http';
+    candidate = '$scheme:$sanitized';
+  } else {
+    final baseUri = Uri.tryParse(AppConfig.apiBaseUrl);
+    if (baseUri == null) {
+      return null;
+    }
+
+    final relativePath = sanitized.startsWith('/') ? sanitized : '/$sanitized';
+    candidate = baseUri.resolve(relativePath).toString();
+  }
+
+  return parseSafeProfileAvatarUri(candidate)?.toString();
+}
+
 int? _templateMediaCacheDimension(double logicalSize, double pixelRatio) {
   if (!logicalSize.isFinite || logicalSize <= 0) {
     return null;
@@ -3191,6 +3241,11 @@ class _CreateWithPetBlockSlot extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final launchState = ref.watch(appLaunchControllerProvider);
+    if (launchState.isLoading || !launchState.isAuthenticated) {
+      return const SizedBox.shrink();
+    }
+
     return _CreateWithPetBlock(
       pets: ref.watch(_templateHomePetsProvider),
       selectedPetId: selectedPetId,
@@ -3212,6 +3267,7 @@ class _CreateWithPetBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
       color: colors.textStrong,
@@ -3221,16 +3277,35 @@ class _CreateWithPetBlock extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surface.withValues(alpha: 0.76),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colors.border.withValues(alpha: 0.62)),
+        color: colors.surfaceStrong.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.66)),
+        boxShadow: [
+          BoxShadow(
+            color: colors.shadow.withValues(alpha: 0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Создать с питомцем', style: labelStyle),
+            Row(
+              children: [
+                Icon(Icons.pets_rounded, color: colors.accent, size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(text.petsCreateWithPetTitle, style: labelStyle),
+                ),
+                TextButton(
+                  onPressed: () => context.push('/profile/pets'),
+                  child: Text(text.petsManageAction),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             pets.when(
               loading: () => const SizedBox(
@@ -3244,43 +3319,127 @@ class _CreateWithPetBlock extends StatelessWidget {
                 ),
               ),
               error: (_, _) => _PetShortcutButton(
-                label: 'Add pet',
+                label: text.petsAddAction,
                 isSelected: false,
                 onPressed: () => context.push('/profile/pets'),
               ),
               data: (items) {
-                final visiblePets = items.take(2).toList(growable: false);
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  child: Row(
-                    children: [
-                      for (final pet in visiblePets) ...[
-                        _PetShortcutButton(
-                          label: pet.name,
-                          avatarUrl: pet.avatarUrl,
-                          isSelected: selectedPetId == pet.id,
-                          onPressed: () => context.go(
-                            _templatesPetShortcutLocation(
-                              petId: pet.id,
-                              selectedPetId: selectedPetId,
-                              selectedPetPhotoId: selectedPetPhotoId,
-                            ),
+                if (items.isEmpty) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: _PetShortcutButton(
+                      label: text.petsAddAction,
+                      isSelected: false,
+                      icon: Icons.add_rounded,
+                      onPressed: () => context.push('/profile/pets'),
+                    ),
+                  );
+                }
+                final selectedPet = items.firstWhere(
+                  (pet) => pet.id == selectedPetId,
+                  orElse: () => items.first,
+                );
+                return Row(
+                  children: [
+                    Expanded(
+                      child: _SelectedPetHomeButton(
+                        pet: selectedPet,
+                        isSelected: selectedPetId == selectedPet.id,
+                        onPressed: () => context.go(
+                          _templatesPetShortcutLocation(
+                            petId: selectedPet.id,
+                            selectedPetId: selectedPetId,
+                            selectedPetPhotoId: selectedPetPhotoId,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                      ],
-                      _PetShortcutButton(
-                        label: 'Add pet',
-                        isSelected: false,
-                        icon: Icons.add_rounded,
-                        onPressed: () => context.push('/profile/pets'),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton(
+                      onPressed: () => context.push('/profile/pets'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(92, 46),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      child: Text(text.profilePetsTitle),
+                    ),
+                  ],
                 );
               },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedPetHomeButton extends StatelessWidget {
+  const _SelectedPetHomeButton({
+    required this.pet,
+    required this.isSelected,
+    required this.onPressed,
+  });
+
+  final PetProfile pet;
+  final bool isSelected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 52,
+        padding: const EdgeInsets.fromLTRB(7, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: colors.surface.withValues(alpha: 0.86),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? colors.accent.withValues(alpha: 0.86)
+                : colors.border.withValues(alpha: 0.62),
+          ),
+        ),
+        child: Row(
+          children: [
+            _PetShortcutAvatar(avatarUrl: pet.avatarUrl, size: 38),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pet.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colors.textStrong,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      _templatePetTypeLabel(pet.type, text),
+                      pet.breed,
+                    ].whereType<String>().join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colors.textSoft,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.keyboard_arrow_down_rounded, color: colors.textMuted),
           ],
         ),
       ),
@@ -3352,54 +3511,65 @@ class _PetShortcutButton extends StatelessWidget {
 const int _petShortcutAvatarCacheWidth = 64;
 
 class _PetShortcutAvatar extends StatelessWidget {
-  const _PetShortcutAvatar({this.avatarUrl, this.icon});
+  const _PetShortcutAvatar({this.avatarUrl, this.icon, this.size = 26});
 
   final String? avatarUrl;
   final IconData? icon;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final iconData = icon ?? Icons.pets_rounded;
-    final url = avatarUrl;
+    final url = _normalizePetAvatarMediaUrl(avatarUrl);
 
     if (url != null && url.isNotEmpty) {
       return ClipOval(
         child: CachedNetworkImage(
           imageUrl: url,
-          width: 26,
-          height: 26,
+          width: size,
+          height: size,
           fit: BoxFit.cover,
           memCacheWidth: _petShortcutAvatarCacheWidth,
           maxWidthDiskCache: _petShortcutAvatarCacheWidth,
           filterQuality: FilterQuality.medium,
-          errorWidget: (_, _, _) => _PetShortcutIcon(iconData: iconData),
+          errorWidget: (_, _, _) =>
+              _PetShortcutIcon(iconData: iconData, size: size),
         ),
       );
     }
 
-    return _PetShortcutIcon(iconData: iconData, color: colors.accent);
+    return _PetShortcutIcon(
+      iconData: iconData,
+      color: colors.accent,
+      size: size,
+    );
   }
 }
 
 class _PetShortcutIcon extends StatelessWidget {
-  const _PetShortcutIcon({required this.iconData, this.color});
+  const _PetShortcutIcon({required this.iconData, this.color, this.size = 26});
 
   final IconData iconData;
   final Color? color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     return Container(
-      width: 26,
-      height: 26,
+      height: size,
+      width: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: colors.accent.withValues(alpha: 0.14),
         shape: BoxShape.circle,
       ),
-      child: Icon(iconData, size: 15, color: color ?? colors.textStrong),
+      child: Icon(
+        iconData,
+        size: size <= 28 ? 15 : 20,
+        color: color ?? colors.textStrong,
+      ),
     );
   }
 }

@@ -45,11 +45,16 @@ void main() {
     expect(
       source,
       contains(
-        'await _evictPetMediaUrl(currentAvatarUrl);\n'
-        '  await _evictPetPhotoMedia(uploadedPhoto);\n'
-        '  if (cancelToken.isCancelled)',
+        'if ((currentAvatarUrl == null || currentAvatarUrl.trim().isEmpty) &&\n'
+        '      !uploadedPhoto.isAvatar &&\n'
+        '      uploadedPhoto.id.isNotEmpty)',
       ),
     );
+    expect(
+      source,
+      contains('uploadedPhoto = await repository.setPetPhotoAsAvatar'),
+    );
+    expect(source, contains('await _evictPetPhotoMedia(uploadedPhoto);'));
     expect(
       source,
       contains(
@@ -68,6 +73,29 @@ void main() {
       ),
     );
   });
+
+  test(
+    'pet photo cards fall back to original URL when thumbnail is missing or unsafe',
+    () {
+      final source = File(
+        'lib/features/pets/presentation/my_pets_page.dart',
+      ).readAsStringSync();
+
+      expect(
+        source,
+        contains(
+          'if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {\n'
+          '    final normalizedThumbnail = _normalizePetMediaUrl(thumbnailUrl);\n'
+          '    if (normalizedThumbnail != null) {\n'
+          '      return normalizedThumbnail;\n'
+          '    }\n'
+          '  }\n'
+          '\n'
+          '  return _normalizePetMediaUrl(photo.url);',
+        ),
+      );
+    },
+  );
 
   for (final config in <_PetUiVariant>[
     _PetUiVariant(
@@ -116,7 +144,7 @@ void main() {
 
         expect(find.text('My pets'), findsOneWidget);
         expect(find.text('Bella'), findsOneWidget);
-        expect(find.textContaining('3 photos'), findsOneWidget);
+        expect(find.text('Photos: 3'), findsOneWidget);
         expect(find.text('Create with Bella'), findsOneWidget);
         final avatar = tester.widget<CachedNetworkImage>(
           find.byType(CachedNetworkImage).first,
@@ -138,8 +166,91 @@ void main() {
       brightness: Brightness.light,
     );
 
-    expect(find.text('Добавьте первого питомца'), findsOneWidget);
+    expect(find.text('Add your first pet'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Add pet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('My Pets add pet flow saves without crashing', (tester) async {
+    final repository = _FakePetRepository(pets: const []);
+    await _pumpMyPets(
+      tester,
+      repository: repository,
+      brightness: Brightness.light,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add pet'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Add pet'), findsWidgets);
+    expect(find.text('Pet name'), findsWidgets);
+
+    await tester.enterText(find.byType(TextField).first, 'Buddy');
+    await tester.tap(find.widgetWithText(FilledButton, 'Next').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Type and breed'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Next').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pet photo'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Done').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(repository.createdPetNames, ['Buddy']);
+    expect(repository.createdPetTypes, ['dog']);
+    expect(repository.createdPetBreeds, [null]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('My Pets add pet flow uploads selected first photo', (
+    tester,
+  ) async {
+    final previousImagePickerPlatform =
+        image_picker_platform.ImagePickerPlatform.instance;
+    final picker = _FakeImagePickerPlatform(
+      pickedFile: XFile(
+        '/tmp/petmagic-create-photo.jpg',
+        name: 'petmagic-create-photo.jpg',
+      ),
+    );
+    image_picker_platform.ImagePickerPlatform.instance = picker;
+    addTearDown(() {
+      image_picker_platform.ImagePickerPlatform.instance =
+          previousImagePickerPlatform;
+    });
+
+    final repository = _FakePetRepository(pets: const []);
+    await _pumpMyPets(
+      tester,
+      repository: repository,
+      brightness: Brightness.light,
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Add pet'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Puçu');
+    await tester.tap(find.widgetWithText(FilledButton, 'Next').hitTestable());
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Next').hitTestable());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Add photo'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Photo selected'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Done').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(picker.pickImageCalls, 1);
+    expect(repository.createdPetNames, ['Puçu']);
+    expect(repository.uploadCalls, 1);
+    expect(repository.uploadedPhotoPaths, ['/tmp/petmagic-create-photo.jpg']);
+    expect(repository.petsFetchCount, greaterThanOrEqualTo(2));
+    expect(repository.petPhotoFetchCount, greaterThanOrEqualTo(1));
     expect(tester.takeException(), isNull);
   });
 
@@ -457,7 +568,7 @@ void main() {
   );
 
   testWidgets(
-    'Pet details never loads original URLs for photo grid thumbnails',
+    'Pet details falls back to safe original URLs when thumbnail is unsafe',
     (tester) async {
       final repository = _FakePetRepository(
         pets: [
@@ -513,15 +624,11 @@ void main() {
           .widgetList<CachedNetworkImage>(find.byType(CachedNetworkImage))
           .map((image) => image.imageUrl)
           .toList(growable: false);
-      expect(networkImages, isEmpty);
-      expect(
-        networkImages,
-        isNot(contains('https://cdn.petmagic.app/original.jpg')),
-      );
+      expect(networkImages, contains('https://cdn.petmagic.app/original.jpg'));
       expect(networkImages, isNot(contains('javascript:alert(1)')));
       expect(networkImages, isNot(contains('file:///private/photo.jpg')));
       expect(networkImages, isNot(contains('data:image/png;base64,AAAA')));
-      expect(find.byIcon(Icons.broken_image_outlined), findsNWidgets(2));
+      expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
     },
   );
 
@@ -823,8 +930,6 @@ void main() {
     );
 
     await tester.tap(find.text(text.profileSignInAction).first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(text.profileSignInAction).last);
     await tester.pumpAndSettle();
 
     expect(find.text('auth-route'), findsOneWidget);
@@ -1775,7 +1880,7 @@ void main() {
     expect(find.text('Milo'), findsOneWidget);
     expect(repository.petPhotoFetchCount, 2);
     final addPhotoButton = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, Icons.add_a_photo_outlined),
+      find.widgetWithIcon(IconButton, Icons.photo_camera_outlined),
     );
     expect(addPhotoButton.onPressed, isNotNull);
 
@@ -2732,6 +2837,9 @@ class _FakePetRepository extends TemplateGenerationRepository {
   final List<String> favoriteUpdates = [];
   final List<String> deletedPhotoIds = [];
   final List<String> uploadedPhotoPaths = [];
+  final List<String> createdPetNames = [];
+  final List<String> createdPetTypes = [];
+  final List<String?> createdPetBreeds = [];
   final List<CancelToken> uploadCancelTokens = [];
   final List<CancelToken> avatarCancelTokens = [];
   Completer<void>? petsFetchCompleter;
@@ -2768,6 +2876,9 @@ class _FakePetRepository extends TemplateGenerationRepository {
     String? breed,
     CancelToken? cancelToken,
   }) async {
+    createdPetNames.add(name);
+    createdPetTypes.add(type);
+    createdPetBreeds.add(breed);
     return PetProfile(
       id: 'pet-new',
       name: name,

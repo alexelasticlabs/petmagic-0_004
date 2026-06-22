@@ -651,6 +651,45 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task CreatePackPurchaseAsync_ShouldUseHostedStripeCheckoutOnMobile()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "ios",
+            Region = "US",
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+
+        var packId = AddStarterPack(dbContext);
+        var gateway = new FakePaymentGateway();
+        var service = CreateService(dbContext, gateway: gateway);
+
+        var result = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(Guid.NewGuid(), packId, "USD", "stripe", "ios", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("checkout.stripe.com", result.Value.CheckoutUrl, StringComparison.Ordinal);
+        Assert.Null(result.Value.PaymentIntentClientSecret);
+        Assert.NotNull(gateway.LastPaymentCreateRequest);
+        Assert.False(gateway.LastPaymentCreateRequest!.UsePaymentSheet);
+    }
+
+    [Fact]
     public async Task ListPremiumPlansAsync_ShouldReturnConfiguredPlans()
     {
         await using var dbContext = CreateDbContext();
@@ -687,6 +726,45 @@ public sealed partial class EconomyServiceTests
 
         var customer = await dbContext.PaymentCustomers.SingleAsync(x => x.UserId == userId);
         Assert.Equal("stripe", customer.Provider);
+    }
+
+    [Fact]
+    public async Task CreatePremiumCheckoutAsync_ShouldUseHostedStripeCheckoutOnMobile()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.PaymentProviderConfigurations.Add(new PaymentProviderConfiguration
+        {
+            Id = Guid.NewGuid(),
+            Provider = "stripe",
+            Platform = "ios",
+            Region = "US",
+            IsEnabled = true,
+            IsRecommended = true,
+            IsSelectedByDefault = true,
+            RequiresExternalWarning = false,
+            RequiresStoreDisclosure = false,
+            AllowedFromAppVersion = "0.0.0",
+            ExternalCheckoutAllowed = true,
+            BonusTokensPercent = 0,
+            Mode = "test",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var gateway = new FakePaymentGateway();
+        var service = CreateService(dbContext, gateway: gateway);
+
+        var result = await service.CreatePremiumCheckoutAsync(
+            new CreatePremiumCheckoutCommand(Guid.NewGuid(), "yearly", "stripe", "ios", "1.0.0", "US", "en-US"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : string.Empty);
+        Assert.Contains("checkout.stripe.com", result.Value.CheckoutUrl, StringComparison.Ordinal);
+        Assert.Null(result.Value.PaymentIntentClientSecret);
+        Assert.NotNull(gateway.LastSubscriptionCheckoutRequest);
+        Assert.False(gateway.LastSubscriptionCheckoutRequest!.UsePaymentSheet);
     }
 
     [Fact]

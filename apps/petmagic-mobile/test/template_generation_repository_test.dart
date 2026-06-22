@@ -618,6 +618,36 @@ void main() {
     }
   });
 
+  test('parses pet avatar fallback fields from list response', () async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        expect(options.method, 'GET');
+        expect(options.path, '/api/pets');
+        return _jsonResponse([
+          {
+            ..._petJson(),
+            'avatarThumbnailUrl': ' https://cdn.petmagic.app/bella-thumb.jpg ',
+          },
+          {
+            ..._petJson(id: 'pet-2'),
+            'mainPhotoUrl': 'https://cdn.petmagic.app/milo-main.jpg',
+          },
+        ]);
+      });
+    final repository = TemplateGenerationRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+      preferences: SharedPreferencesAsync(),
+    );
+
+    final pets = await repository.fetchPets();
+
+    expect(pets.map((pet) => pet.avatarUrl), [
+      'https://cdn.petmagic.app/bella-thumb.jpg',
+      'https://cdn.petmagic.app/milo-main.jpg',
+    ]);
+  });
+
   test('encodes pet photo API path segments', () async {
     final tempDir = await Directory.systemTemp.createTemp(
       'petmagic-pet-photo-test-',

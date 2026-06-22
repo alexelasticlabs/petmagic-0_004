@@ -370,10 +370,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                       ),
                     ] else ...[
                       const SizedBox(height: 16),
-                      _BalanceCard(
-                        wallet: state.wallet,
-                        onRefresh: () => controller.load(refresh: true),
-                      ),
+                      _BalanceCard(wallet: state.wallet),
                       if (state.errorMessage != null) ...[
                         const SizedBox(height: 12),
                         ProfileMessageCard(

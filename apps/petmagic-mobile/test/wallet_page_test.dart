@@ -44,6 +44,7 @@ void main() {
       final text = AppLocalizations.of(walletContext);
 
       expect(find.text(text.walletBalanceEyebrow), findsOneWidget);
+      expect(find.byTooltip(text.walletRefreshTooltip), findsNothing);
       expect(find.textContaining('Недельная награда'), findsNothing);
       expect(find.text('Способы оплаты'), findsNothing);
 

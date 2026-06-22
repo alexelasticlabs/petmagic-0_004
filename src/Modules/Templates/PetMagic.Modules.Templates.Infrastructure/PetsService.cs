@@ -51,9 +51,14 @@ internal sealed class PetsService(
                 x.Photos
                     .Where(photo => !photo.IsDeleted
                         && photo.Status == "active"
-                        && !photo.MediaAsset.IsDeleted
-                        && photo.MediaAssetId == x.AvatarMediaAssetId)
-                    .Select(photo => photo.ThumbnailUrl ?? photo.MediaAsset.Url)
+                        && !photo.MediaAsset.IsDeleted)
+                    .OrderByDescending(photo => photo.MediaAssetId == x.AvatarMediaAssetId || photo.IsAvatar)
+                    .ThenBy(photo => photo.SortOrder)
+                    .ThenBy(photo => photo.CreatedAtUtc)
+                    .Select(photo => photo.ThumbnailStoragePath
+                        ?? photo.ThumbnailUrl
+                        ?? photo.MediaAsset.StoragePath
+                        ?? photo.MediaAsset.Url)
                     .FirstOrDefault()))
             .ToArrayAsync(cancellationToken);
 
@@ -515,10 +520,24 @@ internal sealed class PetsService(
 
     private async Task<PetResponse> BuildPetResponseAsync(Pet pet, CancellationToken cancellationToken)
     {
-        var photosCount = await dbContext.PetPhotos.CountAsync(x => x.PetId == pet.Id && !x.IsDeleted, cancellationToken);
-        var generationsCount = await dbContext.TemplateGenerationJobs.CountAsync(x => x.PetId == pet.Id, cancellationToken);
+        var photosCount = await dbContext.PetPhotos.CountAsync(
+            x => x.PetId == pet.Id
+                && !x.IsDeleted
+                && x.Status == "active"
+                && !x.MediaAsset.IsDeleted,
+            cancellationToken);
+        var generationsCount = await dbContext.TemplateGenerationJobs.CountAsync(
+            x => x.PetId == pet.Id && x.HiddenByUserAtUtc == null,
+            cancellationToken);
+        var avatarMediaAssetId = pet.AvatarMediaAssetId;
         var avatarUrl = await dbContext.PetPhotos
-            .Where(x => x.PetId == pet.Id && !x.IsDeleted && x.MediaAssetId == pet.AvatarMediaAssetId)
+            .Where(x => x.PetId == pet.Id
+                && !x.IsDeleted
+                && x.Status == "active"
+                && !x.MediaAsset.IsDeleted)
+            .OrderByDescending(x => x.MediaAssetId == avatarMediaAssetId || x.IsAvatar)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAtUtc)
             .Select(x => x.ThumbnailStoragePath ?? x.ThumbnailUrl ?? x.MediaAsset.StoragePath ?? x.MediaAsset.Url)
             .FirstOrDefaultAsync(cancellationToken);
         return await MapPetAsync(pet, photosCount, generationsCount, avatarUrl, cancellationToken);

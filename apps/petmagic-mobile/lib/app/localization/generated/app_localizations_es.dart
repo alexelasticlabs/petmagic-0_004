@@ -275,6 +275,260 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tus compañeros favoritos y perfiles de mascotas.';
 
   @override
+  String get petsAddTitle => 'Añadir mascota';
+
+  @override
+  String get petsEditTitle => 'Editar mascota';
+
+  @override
+  String get petsDetailsTitle => 'Detalles de la mascota';
+
+  @override
+  String get petsCreateWithPetTitle => 'Crear con mascota';
+
+  @override
+  String get petsManageAction => 'Gestionar';
+
+  @override
+  String get petsAddAction => 'Añadir';
+
+  @override
+  String get petsSaveAction => 'Guardar';
+
+  @override
+  String get petsNextAction => 'Siguiente';
+
+  @override
+  String get petsBackAction => 'Atrás';
+
+  @override
+  String get petsDoneAction => 'Listo';
+
+  @override
+  String get petsCancelAction => 'Cancelar';
+
+  @override
+  String get petsChangeAction => 'Cambiar';
+
+  @override
+  String get petsStartAction => 'Empezar';
+
+  @override
+  String get petsRetryAction => 'Reintentar';
+
+  @override
+  String get petsNameLabel => 'Nombre';
+
+  @override
+  String get petsNameStepTitle => 'Nombre de la mascota';
+
+  @override
+  String get petsNameStepSubtitle => 'Ponle un nombre corto.';
+
+  @override
+  String get petsNameHint => 'Introduce el nombre';
+
+  @override
+  String get petsNameExample => 'Ejemplo: Richi, Murka, Buddy';
+
+  @override
+  String get petsNameRequiredError => 'Introduce el nombre de tu mascota';
+
+  @override
+  String get petsTypeBreedTitle => 'Tipo y raza';
+
+  @override
+  String get petsTypeBreedStepSubtitle =>
+      'Elige el tipo y añade la raza si la sabes.';
+
+  @override
+  String get petsBreedLabel => 'Raza';
+
+  @override
+  String get petsBreedHint => 'Ejemplo: shih tzu';
+
+  @override
+  String get petsPhotoLabel => 'Foto';
+
+  @override
+  String get petsPhotoStepTitle => 'Foto de la mascota';
+
+  @override
+  String get petsPhotoStepSubtitle =>
+      'Sube una foto clara donde se vea la cara.';
+
+  @override
+  String get petsDogType => 'Perro';
+
+  @override
+  String get petsCatType => 'Gato';
+
+  @override
+  String get petsOtherType => 'Otro';
+
+  @override
+  String get petsChooseFirstPhotoAction => 'Elegir primera foto';
+
+  @override
+  String get petsAddPhotoAction => 'Añadir foto';
+
+  @override
+  String get petsAddPhotoLaterHint =>
+      'Puedes añadir una foto más tarde desde el perfil.';
+
+  @override
+  String get petsPhotoFormatHint => 'JPG, PNG hasta 10 MB';
+
+  @override
+  String get petsPhotoSelectedLabel => 'Foto seleccionada';
+
+  @override
+  String get petsEmptyTitle => 'Añade tu primera mascota';
+
+  @override
+  String get petsEmptySubtitle =>
+      'Guarda un perfil y fotos para generar en un toque.';
+
+  @override
+  String get petsLoadErrorTitle => 'No se pudieron cargar las mascotas';
+
+  @override
+  String get petsLoadPetErrorTitle => 'No se pudo cargar la mascota';
+
+  @override
+  String get petsLoadPhotosErrorTitle => 'No se pudieron cargar las fotos';
+
+  @override
+  String get petsLoadHistoryErrorTitle => 'No se pudo cargar el historial';
+
+  @override
+  String get petsNotFoundTitle => 'Mascota no encontrada';
+
+  @override
+  String get petsPhotosTitle => 'Fotos';
+
+  @override
+  String get petsHistoryTitle => 'Historial de generaciones';
+
+  @override
+  String get petsNoPhotosTitle => 'Aún no hay fotos.';
+
+  @override
+  String get petsNoGenerationsTitle => 'Aún no hay generaciones.';
+
+  @override
+  String petsStatsPhotos(Object count) {
+    return 'Fotos: $count';
+  }
+
+  @override
+  String petsStatsGenerations(Object count) {
+    return 'Generaciones: $count';
+  }
+
+  @override
+  String get petsGenerateWithPet => 'Generar con mascota';
+
+  @override
+  String petsGenerateWithName(Object name) {
+    return 'Generar con $name';
+  }
+
+  @override
+  String petsCreateWithName(Object name) {
+    return 'Crear con $name';
+  }
+
+  @override
+  String petsAddPhotoPrompt(Object name) {
+    return 'Añade una foto de $name para empezar';
+  }
+
+  @override
+  String get petsDeleteTooltip => 'Eliminar mascota';
+
+  @override
+  String get petsDeleteConfirmTitle => '¿Eliminar mascota?';
+
+  @override
+  String get petsDeleteConfirmMessage =>
+      'Se eliminarán el perfil y sus fotos guardadas.';
+
+  @override
+  String get petsDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get petsAddPhotosTooltip => 'Añadir fotos';
+
+  @override
+  String get petsSetAvatarTooltip => 'Usar como avatar';
+
+  @override
+  String get petsMarkFavoriteTooltip => 'Marcar favorita';
+
+  @override
+  String get petsUseForGenerationTooltip => 'Usar para generar';
+
+  @override
+  String get petsDeletePhotoTooltip => 'Eliminar foto';
+
+  @override
+  String get petsAvatarBadge => 'Perfil';
+
+  @override
+  String get petsFavoriteBadge => 'Favorita';
+
+  @override
+  String get petsPhotoUpdateError => 'No se pudo actualizar la foto';
+
+  @override
+  String get petsUnsupportedPhotoTypeError =>
+      'Este tipo de foto no es compatible';
+
+  @override
+  String get petsPhotoUploadError => 'No se pudo subir la foto';
+
+  @override
+  String get petsOpenGenerationTooltip => 'Abrir';
+
+  @override
+  String get petsShareGenerationTooltip => 'Compartir';
+
+  @override
+  String get petsUseGenerationAsInputTooltip => 'Usar como entrada';
+
+  @override
+  String get petsTemplateFallback => 'Plantilla';
+
+  @override
+  String get petsUploadAction => 'Subir';
+
+  @override
+  String get petsChooseFromMyPetsAction => 'Elegir de Mis mascotas';
+
+  @override
+  String petsGenerationCostMessage(Object count) {
+    return 'Esta generación cuesta $count PawSpark.';
+  }
+
+  @override
+  String get petsNoPhotoStartMessage =>
+      'Añade una foto de la mascota para empezar';
+
+  @override
+  String get petsFirstPetToast => 'Añade tu primera mascota';
+
+  @override
+  String get petsCouldNotLoadToast => 'No se pudieron cargar las mascotas';
+
+  @override
+  String get petsAuthRequiredTitle => 'Guarda y usa tus mascotas';
+
+  @override
+  String get petsAuthRequiredMessage =>
+      'Inicia sesión o crea una cuenta para guardar perfiles de mascotas y usarlos en generaciones.';
+
+  @override
   String get profilePremiumTitle => 'Ir Premium';
 
   @override

@@ -647,8 +647,7 @@ public sealed partial class EconomyService
 
     private bool IsStripeMobileModeConfigured(string? mode)
     {
-        return !string.IsNullOrWhiteSpace(ResolveStripeApiKey(mode))
-            && !string.IsNullOrWhiteSpace(ResolveStripePublishableKey(mode));
+        return !string.IsNullOrWhiteSpace(ResolveStripeApiKey(mode));
     }
 
     private IReadOnlyList<string> ResolveStripeWebhookSecrets()

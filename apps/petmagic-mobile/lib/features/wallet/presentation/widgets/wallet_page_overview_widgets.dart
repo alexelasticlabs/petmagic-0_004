@@ -119,10 +119,9 @@ class _WalletHeader extends StatelessWidget {
 }
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.wallet, required this.onRefresh});
+  const _BalanceCard({required this.wallet});
 
   final WalletStateModel? wallet;
-  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -142,12 +141,6 @@ class _BalanceCard extends StatelessWidget {
     final cardBorderColor = isDark
         ? const Color(0xFF514173)
         : const Color(0xFFD6C8FA);
-    final refreshBackground = isDark
-        ? Colors.white.withValues(alpha: 0.14)
-        : Colors.white.withValues(alpha: 0.88);
-    final refreshForeground = isDark
-        ? Colors.white.withValues(alpha: 0.90)
-        : const Color(0xFF685695);
 
     return ProfileGlassCard(
       padding: EdgeInsets.zero,
@@ -242,10 +235,9 @@ class _BalanceCard extends StatelessWidget {
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 380;
                   final contentRightInset = compact ? 132.0 : 172.0;
-                  final heroHeight = compact ? 156.0 : 184.0;
 
                   return SizedBox(
-                    height: compact ? 152 : 164,
+                    height: compact ? 158 : 170,
                     child: Stack(
                       children: [
                         Positioned.fill(
@@ -256,53 +248,23 @@ class _BalanceCard extends StatelessWidget {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(
-                                      child: Row(
-                                        children: [
-                                          Flexible(
-                                            child: Text(
-                                              text.walletBalanceEyebrow,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                color: cardTextSecondary,
-                                                fontSize: compact ? 15 : 16,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Icon(
-                                            Icons.help_outline_rounded,
-                                            size: 15,
-                                            color: cardTextSecondary,
-                                          ),
-                                        ],
+                                    Flexible(
+                                      child: Text(
+                                        text.walletBalanceEyebrow,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: cardTextSecondary,
+                                          fontSize: compact ? 15 : 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
                                       ),
                                     ),
-                                    IconButton.filledTonal(
-                                      onPressed: onRefresh,
-                                      icon: const Icon(
-                                        Icons.refresh_rounded,
-                                        size: 20,
-                                      ),
-                                      tooltip: text.walletRefreshTooltip,
-                                      visualDensity: const VisualDensity(
-                                        horizontal: -2,
-                                        vertical: -2,
-                                      ),
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 38,
-                                            height: 38,
-                                          ),
-                                      style: IconButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        foregroundColor: refreshForeground,
-                                        backgroundColor: refreshBackground,
-                                      ),
+                                    const SizedBox(width: 6),
+                                    Icon(
+                                      Icons.help_outline_rounded,
+                                      size: 15,
+                                      color: cardTextSecondary,
                                     ),
                                   ],
                                 ),
@@ -367,15 +329,13 @@ class _BalanceCard extends StatelessWidget {
                         ),
                         Positioned(
                           right: compact ? 4 : 2,
-                          bottom: compact ? -7 : -8,
+                          top: compact ? 14 : 16,
+                          bottom: compact ? 1 : 2,
                           child: IgnorePointer(
-                            child: SizedBox(
-                              height: heroHeight,
-                              child: Image.asset(
-                                _kWalletHeroLogoAsset,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
-                              ),
+                            child: Image.asset(
+                              _kWalletHeroLogoAsset,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
                             ),
                           ),
                         ),
@@ -438,6 +398,14 @@ class _PremiumUpsellCard extends StatelessWidget {
         ? const Color(0xFF1A2F61).withValues(alpha: 0.72)
         : const Color(0xFFF4E7CB).withValues(alpha: 0.95);
     final chipBorder = const Color(0xFFE1AF54).withValues(alpha: 0.72);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final veryCompactScreen = screenWidth < 360;
+    final compactScreen = screenWidth < 410;
+    final mascotWidth = veryCompactScreen
+        ? 124.0
+        : compactScreen
+        ? 148.0
+        : 170.0;
     return ProfileGlassCard(
       padding: EdgeInsets.zero,
       child: Container(
@@ -497,13 +465,20 @@ class _PremiumUpsellCard extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 final compact = constraints.maxWidth < 390;
-                final mascotWidth = compact ? 136.0 : 162.0;
-                final contentRightInset = compact
-                    ? mascotWidth * 0.72
+                final veryCompact = constraints.maxWidth < 360;
+                final contentRightInset = veryCompact
+                    ? mascotWidth * 0.92
+                    : compact
+                    ? mascotWidth * 0.86
                     : mascotWidth * 0.78;
 
                 return Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  padding: EdgeInsets.fromLTRB(
+                    compact ? 12 : 14,
+                    11,
+                    compact ? 12 : 14,
+                    12,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -526,7 +501,7 @@ class _PremiumUpsellCard extends StatelessWidget {
                               isRu ? 'Premium-кошелек' : 'Premium wallet',
                               style: TextStyle(
                                 color: textPrimary,
-                                fontSize: 11.6,
+                                fontSize: compact ? 11.0 : 11.4,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -542,7 +517,11 @@ class _PremiumUpsellCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: textPrimary,
-                            fontSize: compact ? 24 : 26,
+                            fontSize: veryCompact
+                                ? 21
+                                : compact
+                                ? 22
+                                : 24,
                             fontWeight: FontWeight.w900,
                             height: 1.02,
                           ),
@@ -559,43 +538,52 @@ class _PremiumUpsellCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: textSecondary,
-                            fontSize: compact ? 12.4 : 13.0,
-                            height: 1.25,
+                            fontSize: compact ? 11.7 : 12.4,
+                            height: 1.22,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          _PremiumFeaturePill(
-                            icon: Icons.card_giftcard_rounded,
-                            label: isRu
-                                ? '40 PowSpark каждую неделю'
-                                : '40 PowSpark every week',
-                            foregroundColor: textPrimary,
-                            backgroundColor: chipBg,
-                            borderColor: chipBorder,
-                          ),
-                          _PremiumFeaturePill(
-                            icon: Icons.auto_awesome_rounded,
-                            label: isRu ? 'Без водяного знака' : 'No watermark',
-                            foregroundColor: textPrimary,
-                            backgroundColor: chipBg,
-                            borderColor: chipBorder,
-                          ),
-                        ],
+                      const SizedBox(height: 7),
+                      Padding(
+                        padding: EdgeInsets.only(right: contentRightInset),
+                        child: Wrap(
+                          spacing: 5,
+                          runSpacing: 5,
+                          children: [
+                            _PremiumFeaturePill(
+                              icon: Icons.card_giftcard_rounded,
+                              label: isRu
+                                  ? '40 PowSpark каждую неделю'
+                                  : '40 PowSpark every week',
+                              foregroundColor: textPrimary,
+                              backgroundColor: chipBg,
+                              borderColor: chipBorder,
+                            ),
+                            _PremiumFeaturePill(
+                              icon: Icons.auto_awesome_rounded,
+                              label: isRu
+                                  ? 'Без водяного знака'
+                                  : 'No watermark',
+                              foregroundColor: textPrimary,
+                              backgroundColor: chipBg,
+                              borderColor: chipBorder,
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       SizedBox(
-                        width: compact ? 196 : 214,
+                        width: veryCompact
+                            ? 164
+                            : compact
+                            ? 178
+                            : 196,
                         child: PremiumShimmerButton(
                           label: text.profilePremiumOpenAction,
                           onTap: onOpenPremium,
-                          height: 46,
-                          borderRadius: 12,
+                          height: compact ? 40 : 42,
+                          borderRadius: 11,
                         ),
                       ),
                     ],
@@ -604,12 +592,12 @@ class _PremiumUpsellCard extends StatelessWidget {
               },
             ),
             Positioned(
-              right: -6,
-              bottom: 0,
+              right: veryCompactScreen ? -24 : -26,
+              bottom: veryCompactScreen ? -12 : -10,
               child: IgnorePointer(
                 child: Image.asset(
                   _kWalletPremiumUpsellMascotAsset,
-                  width: 162,
+                  width: mascotWidth,
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                 ),
@@ -640,7 +628,7 @@ class _PremiumFeaturePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: borderColor),
@@ -649,7 +637,7 @@ class _PremiumFeaturePill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11.5, color: foregroundColor),
+          Icon(icon, size: 10.8, color: foregroundColor),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
@@ -658,7 +646,7 @@ class _PremiumFeaturePill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: foregroundColor,
-                fontSize: 10.8,
+                fontSize: 10.2,
                 fontWeight: FontWeight.w700,
               ),
             ),

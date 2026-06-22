@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -11,7 +12,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
-import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
@@ -100,7 +101,7 @@ class MyPetsPage extends ConsumerWidget {
 
     if (launchState.isLoading || !launchState.isAuthenticated) {
       return Scaffold(
-        appBar: AppBar(title: const Text('My pets')),
+        appBar: AppBar(title: Text(text.profilePetsTitle)),
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -113,17 +114,7 @@ class MyPetsPage extends ConsumerWidget {
               ? const Center(child: CircularProgressIndicator.adaptive())
               : Padding(
                   padding: EdgeInsets.only(bottom: bottomInset),
-                  child: ProtectedAuthGate(
-                    subtitle: text.authRequiredMessage,
-                    onSignIn: () {
-                      unawaited(
-                        showAuthRequiredSheet(
-                          context,
-                          redirectPath: MyPetsPage.routePath,
-                        ),
-                      );
-                    },
-                  ),
+                  child: _PetAuthGate(redirectPath: MyPetsPage.routePath),
                 ),
         ),
       );
@@ -133,7 +124,7 @@ class MyPetsPage extends ConsumerWidget {
     final petsLoadRequiresSignIn = _isUnauthorizedError(pets.asError?.error);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My pets')),
+      appBar: AppBar(title: Text(text.profilePetsTitle)),
       body: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -149,31 +140,22 @@ class MyPetsPage extends ConsumerWidget {
             if (_isUnauthorizedError(error)) {
               return Padding(
                 padding: EdgeInsets.only(bottom: bottomInset),
-                child: ProtectedAuthGate(
-                  subtitle: text.authRequiredMessage,
-                  onSignIn: () {
-                    unawaited(
-                      showAuthRequiredSheet(
-                        context,
-                        redirectPath: MyPetsPage.routePath,
-                      ),
-                    );
-                  },
-                ),
+                child: _PetAuthGate(redirectPath: MyPetsPage.routePath),
               );
             }
 
             return _StateView(
-              title: 'Could not load pets',
-              actionLabel: 'Retry',
+              title: text.petsLoadErrorTitle,
+              actionLabel: text.petsRetryAction,
               onAction: () => ref.invalidate(petsProvider),
             );
           },
           data: (items) {
             if (items.isEmpty) {
               return _StateView(
-                title: 'Добавьте первого питомца',
-                actionLabel: 'Add pet',
+                title: text.petsEmptyTitle,
+                subtitle: text.petsEmptySubtitle,
+                actionLabel: text.petsAddAction,
                 onAction: () => _showPetForm(context, ref),
               );
             }
@@ -188,6 +170,7 @@ class MyPetsPage extends ConsumerWidget {
                   final pet = items[index];
                   return _PetCard(
                     pet: pet,
+                    text: text,
                     onTap: () => context.push(PetDetailsPage.location(pet.id)),
                     onGenerate: () =>
                         context.go(_templatesWithPetLocation(pet.id)),
@@ -203,7 +186,7 @@ class MyPetsPage extends ConsumerWidget {
           : FloatingActionButton.extended(
               onPressed: () => _showPetForm(context, ref),
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Add pet'),
+              label: Text(text.petsAddAction),
             ),
     );
   }
@@ -266,8 +249,9 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
           return;
         }
         if (mounted) {
+          final text = AppLocalizations.of(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_petPhotoUploadErrorMessage(error))),
+            SnackBar(content: Text(_petPhotoUploadErrorMessage(text, error))),
           );
         }
       } finally {
@@ -301,7 +285,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
 
     if (launchState.isLoading || !launchState.isAuthenticated) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Pet details')),
+        appBar: AppBar(title: Text(text.petsDetailsTitle)),
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -314,16 +298,8 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
               ? const Center(child: CircularProgressIndicator.adaptive())
               : Padding(
                   padding: EdgeInsets.only(bottom: bottomInset),
-                  child: ProtectedAuthGate(
-                    subtitle: text.authRequiredMessage,
-                    onSignIn: () {
-                      unawaited(
-                        showAuthRequiredSheet(
-                          context,
-                          redirectPath: PetDetailsPage.location(widget.petId),
-                        ),
-                      );
-                    },
+                  child: _PetAuthGate(
+                    redirectPath: PetDetailsPage.location(widget.petId),
                   ),
                 ),
         ),
@@ -335,7 +311,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
 
     if (petsLoadRequiresSignIn) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Pet details')),
+        appBar: AppBar(title: Text(text.petsDetailsTitle)),
         body: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -346,16 +322,8 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
           ),
           child: Padding(
             padding: EdgeInsets.only(bottom: bottomInset),
-            child: ProtectedAuthGate(
-              subtitle: text.authRequiredMessage,
-              onSignIn: () {
-                unawaited(
-                  showAuthRequiredSheet(
-                    context,
-                    redirectPath: PetDetailsPage.location(widget.petId),
-                  ),
-                );
-              },
+            child: _PetAuthGate(
+              redirectPath: PetDetailsPage.location(widget.petId),
             ),
           ),
         ),
@@ -364,10 +332,10 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pet details'),
+        title: Text(text.petsDetailsTitle),
         actions: [
           IconButton(
-            tooltip: 'Delete pet',
+            tooltip: text.petsDeleteTooltip,
             onPressed: () => _deletePet(context, ref, widget.petId),
             icon: const Icon(Icons.delete_outline_rounded),
           ),
@@ -385,14 +353,14 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
           loading: () =>
               const Center(child: CircularProgressIndicator.adaptive()),
           error: (_, _) => _StateView(
-            title: 'Could not load pet',
-            actionLabel: 'Retry',
+            title: text.petsLoadPetErrorTitle,
+            actionLabel: text.petsRetryAction,
             onAction: () => ref.invalidate(petsProvider),
           ),
           data: (items) {
             final pet = _findPet(items, widget.petId);
             if (pet == null) {
-              return const _StateView(title: 'Pet not found');
+              return _StateView(title: text.petsNotFoundTitle);
             }
 
             final photos = ref.watch(petPhotosProvider(widget.petId));
@@ -410,6 +378,7 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                     sliver: SliverToBoxAdapter(
                       child: _PetHeader(
                         pet: pet,
+                        text: text,
                         onEdit: () => _showPetForm(context, ref, pet: pet),
                         onGenerate: () =>
                             context.go(_templatesWithPetLocation(pet.id)),
@@ -419,7 +388,10 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                       ),
                     ),
                   ),
-                  _SectionTitleSliver(title: 'Photos', topPadding: 16),
+                  _SectionTitleSliver(
+                    title: text.petsPhotosTitle,
+                    topPadding: 16,
+                  ),
                   ...photos.when(
                     loading: () => const <Widget>[_PhotoGridSkeletonSliver()],
                     error: (_, _) => <Widget>[
@@ -427,7 +399,8 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                         sliver: SliverToBoxAdapter(
                           child: _InlineError(
-                            label: 'Could not load photos',
+                            label: text.petsLoadPhotosErrorTitle,
+                            retryLabel: text.petsRetryAction,
                             onRetry: () =>
                                 ref.invalidate(petPhotosProvider(widget.petId)),
                           ),
@@ -439,11 +412,12 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                         petId: pet.id,
                         currentAvatarUrl: pet.avatarUrl,
                         photos: items,
+                        text: text,
                       ),
                     ],
                   ),
                   _SectionTitleSliver(
-                    title: 'Generation history',
+                    title: text.petsHistoryTitle,
                     topPadding: 18,
                   ),
                   SliverPadding(
@@ -452,12 +426,14 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
                       child: generations.when(
                         loading: () => const LinearProgressIndicator(),
                         error: (_, _) => _InlineError(
-                          label: 'Could not load history',
+                          label: text.petsLoadHistoryErrorTitle,
+                          retryLabel: text.petsRetryAction,
                           onRetry: () => ref.invalidate(
                             petGenerationsProvider(widget.petId),
                           ),
                         ),
-                        data: (items) => _GenerationList(generations: items),
+                        data: (items) =>
+                            _GenerationList(generations: items, text: text),
                       ),
                     ),
                   ),
@@ -471,72 +447,161 @@ class _PetDetailsPageState extends ConsumerState<PetDetailsPage> {
   }
 }
 
+class _PetAuthGate extends StatelessWidget {
+  const _PetAuthGate({required this.redirectPath});
+
+  final String redirectPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    return ProtectedAuthGate(
+      title: text.petsAuthRequiredTitle,
+      subtitle: text.petsAuthRequiredMessage,
+      onSignIn: () => context.go(
+        '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(redirectPath)}',
+      ),
+      onSignUp: () => context.go(RegisterEntryPage.routePath),
+    );
+  }
+}
+
 class _PetCard extends StatelessWidget {
   const _PetCard({
     required this.pet,
+    required this.text,
     required this.onTap,
     required this.onGenerate,
   });
 
   final PetProfile pet;
+  final AppLocalizations text;
   final VoidCallback onTap;
   final VoidCallback onGenerate;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
-    return Card(
+    return Material(
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  _PetAvatar(url: pet.avatarUrl, name: pet.name, size: 64),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          pet.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colors.textStrong,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 17,
-                          ),
-                        ),
-                        Text(
-                          '${_typeLabel(pet.type)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '${pet.photosCount} photos • ${pet.generationsCount} generations',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: pet.photosCount > 0 ? onGenerate : null,
-                child: Text(
-                  'Create with ${pet.name}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: colors.surface.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colors.accent.withValues(alpha: 0.62),
+              width: 1.15,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colors.shadow.withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
               ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    _PetAvatar(url: pet.avatarUrl, name: pet.name, size: 64),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pet.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 17,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: colors.textSoft),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 5,
+                            children: [
+                              _PetMetricChip(
+                                label: text.petsStatsPhotos(pet.photosCount),
+                              ),
+                              _PetMetricChip(
+                                label: text.petsStatsGenerations(
+                                  pet.generationsCount,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: colors.textSoft,
+                      size: 24,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 40,
+                  child: FilledButton.icon(
+                    onPressed: pet.photosCount > 0 ? onGenerate : null,
+                    icon: const Icon(Icons.auto_awesome_rounded, size: 17),
+                    label: Text(
+                      text.petsCreateWithName(pet.name),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PetMetricChip extends StatelessWidget {
+  const _PetMetricChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.border.withValues(alpha: 0.48)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: colors.textSoft,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -547,6 +612,7 @@ class _PetCard extends StatelessWidget {
 class _PetHeader extends StatelessWidget {
   const _PetHeader({
     required this.pet,
+    required this.text,
     required this.onEdit,
     required this.onGenerate,
     required this.onAddPhoto,
@@ -554,6 +620,7 @@ class _PetHeader extends StatelessWidget {
   });
 
   final PetProfile pet;
+  final AppLocalizations text;
   final VoidCallback onEdit;
   final VoidCallback onGenerate;
   final VoidCallback onAddPhoto;
@@ -561,64 +628,95 @@ class _PetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final colors = context.petMagicColors;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                _PetAvatar(url: pet.avatarUrl, name: pet.name, size: 84),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        pet.name,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      Text(
-                        '${_typeLabel(pet.type)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
-                      ),
-                    ],
+            Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: colors.accent.withValues(alpha: 0.18),
+                      shape: BoxShape.circle,
+                    ),
+                    child: _PetAvatar(
+                      url: pet.avatarUrl,
+                      name: pet.name,
+                      size: 146,
+                    ),
                   ),
-                ),
-                IconButton(
-                  onPressed: onEdit,
-                  icon: const Icon(Icons.edit_outlined),
-                ),
-              ],
+                  Positioned(
+                    right: 2,
+                    bottom: 8,
+                    child: IconButton.filled(
+                      tooltip: text.petsAddPhotosTooltip,
+                      onPressed: isAddingPhoto ? null : onAddPhoto,
+                      icon: isAddingPhoto
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator.adaptive(
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.photo_camera_outlined, size: 19),
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: pet.photosCount > 0 ? onGenerate : null,
-                    icon: const Icon(Icons.auto_awesome_rounded),
-                    label: Text('Generate with ${pet.name}'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  tooltip: 'Add photos',
-                  onPressed: isAddingPhoto ? null : onAddPhoto,
-                  icon: isAddingPhoto
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator.adaptive(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(Icons.add_a_photo_outlined),
-                ),
-              ],
+            Text(
+              pet.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              '${_typeLabel(pet.type, text)}${pet.breed == null ? '' : ' • ${pet.breed}'}',
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: colors.textSoft),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: pet.photosCount > 0 ? onGenerate : null,
+              icon: const Icon(Icons.auto_awesome_rounded),
+              label: Text(
+                text.petsGenerateWithName(pet.name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: Text(text.petsEditTitle),
             ),
             if (pet.photosCount == 0) ...[
-              const SizedBox(height: 8),
-              Text('Добавьте фото ${pet.name}, чтобы начать'),
+              const SizedBox(height: 10),
+              Text(
+                text.petsAddPhotoPrompt(pet.name),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: colors.textSoft),
+              ),
             ],
           ],
         ),
@@ -665,11 +763,13 @@ class _PhotoGrid extends ConsumerStatefulWidget {
     required this.petId,
     required this.currentAvatarUrl,
     required this.photos,
+    required this.text,
   });
 
   final String petId;
   final String? currentAvatarUrl;
   final List<PetPhoto> photos;
+  final AppLocalizations text;
 
   @override
   ConsumerState<_PhotoGrid> createState() => _PhotoGridState();
@@ -718,7 +818,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Could not update photo')));
+      ).showSnackBar(SnackBar(content: Text(widget.text.petsPhotoUpdateError)));
     } finally {
       final isActiveAction = identical(
         _photoActionCancelTokens[photo.id],
@@ -747,9 +847,9 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
   @override
   Widget build(BuildContext context) {
     if (widget.photos.isEmpty) {
-      return const SliverPadding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
-        sliver: SliverToBoxAdapter(child: Text('No photos yet.')),
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        sliver: SliverToBoxAdapter(child: Text(widget.text.petsNoPhotosTitle)),
       );
     }
 
@@ -764,6 +864,7 @@ class _PhotoGridState extends ConsumerState<_PhotoGrid> {
           return _PetPhotoCard(
             photo: photo,
             isBusy: isBusy,
+            text: widget.text,
             onSetAvatar: () => _runPhotoAction(
               photo,
               (cancelToken) => _setAvatar(
@@ -819,6 +920,7 @@ class _PetPhotoCard extends StatelessWidget {
   const _PetPhotoCard({
     required this.photo,
     required this.isBusy,
+    required this.text,
     required this.onSetAvatar,
     required this.onSetFavorite,
     required this.onUseForGeneration,
@@ -827,6 +929,7 @@ class _PetPhotoCard extends StatelessWidget {
 
   final PetPhoto photo;
   final bool isBusy;
+  final AppLocalizations text;
   final VoidCallback onSetAvatar;
   final VoidCallback onSetFavorite;
   final VoidCallback? onUseForGeneration;
@@ -865,24 +968,24 @@ class _PetPhotoCard extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _PetPhotoActionButton(
-                        tooltip: 'Set as avatar',
+                        tooltip: text.petsSetAvatarTooltip,
                         icon: Icons.account_circle_outlined,
                         onPressed: isBusy ? null : onSetAvatar,
                       ),
                       _PetPhotoActionButton(
-                        tooltip: 'Mark favorite',
+                        tooltip: text.petsMarkFavoriteTooltip,
                         icon: photo.isFavorite
                             ? Icons.star_rounded
                             : Icons.star_border_rounded,
                         onPressed: isBusy ? null : onSetFavorite,
                       ),
                       _PetPhotoActionButton(
-                        tooltip: 'Use for generation',
+                        tooltip: text.petsUseForGenerationTooltip,
                         icon: Icons.auto_awesome_rounded,
                         onPressed: onUseForGeneration,
                       ),
                       _PetPhotoActionButton(
-                        tooltip: 'Delete photo',
+                        tooltip: text.petsDeletePhotoTooltip,
                         icon: Icons.delete_outline_rounded,
                         onPressed: isBusy ? null : onDelete,
                       ),
@@ -900,13 +1003,13 @@ class _PetPhotoCard extends StatelessWidget {
               runSpacing: 5,
               children: [
                 if (photo.isAvatar)
-                  const _PetPhotoBadge(
-                    label: 'Avatar',
+                  _PetPhotoBadge(
+                    label: text.petsAvatarBadge,
                     icon: Icons.account_circle_rounded,
                   ),
                 if (photo.isFavorite)
-                  const _PetPhotoBadge(
-                    label: 'Favorite',
+                  _PetPhotoBadge(
+                    label: text.petsFavoriteBadge,
                     icon: Icons.star_rounded,
                   ),
               ],
@@ -1039,29 +1142,34 @@ class _PetPhotoImageFallback extends StatelessWidget {
 }
 
 class _GenerationList extends StatelessWidget {
-  const _GenerationList({required this.generations});
+  const _GenerationList({required this.generations, required this.text});
 
   final List<TemplateGenerationResult> generations;
+  final AppLocalizations text;
 
   @override
   Widget build(BuildContext context) {
     if (generations.isEmpty) {
-      return const Text('No generations yet.');
+      return Text(text.petsNoGenerationsTitle);
     }
 
     return Column(
       children: [
         for (final generation in generations.take(12))
-          _PetGenerationHistoryTile(generation: generation),
+          _PetGenerationHistoryTile(generation: generation, text: text),
       ],
     );
   }
 }
 
 class _PetGenerationHistoryTile extends StatelessWidget {
-  const _PetGenerationHistoryTile({required this.generation});
+  const _PetGenerationHistoryTile({
+    required this.generation,
+    required this.text,
+  });
 
   final TemplateGenerationResult generation;
+  final AppLocalizations text;
 
   @override
   Widget build(BuildContext context) {
@@ -1073,20 +1181,20 @@ class _PetGenerationHistoryTile extends StatelessWidget {
       child: ListTile(
         title: Text(generation.templateTitle ?? generation.templateId),
         subtitle: Text(
-          '${generation.templateType ?? 'Template'} • ${generation.status.name} • ${_formatDate(generation.createdAtUtc)}',
+          '${generation.templateType ?? text.petsTemplateFallback} • ${generation.status.name} • ${_formatDate(generation.createdAtUtc)}',
         ),
         trailing: Wrap(
           spacing: 4,
           children: [
             IconButton(
-              tooltip: 'Open',
+              tooltip: text.petsOpenGenerationTooltip,
               onPressed: () => context.push(
                 GenerationStatusPage.routeFor(generation.generationId),
               ),
               icon: const Icon(Icons.open_in_new_rounded),
             ),
             IconButton(
-              tooltip: 'Share',
+              tooltip: text.petsShareGenerationTooltip,
               onPressed: safeOutputUrl == null
                   ? null
                   : () => SharePlus.instance.share(
@@ -1095,7 +1203,7 @@ class _PetGenerationHistoryTile extends StatelessWidget {
               icon: const Icon(Icons.ios_share_rounded),
             ),
             IconButton(
-              tooltip: 'Use as input',
+              tooltip: text.petsUseGenerationAsInputTooltip,
               onPressed: () => context.go(
                 _templatesWithPetLocation(
                   generation.petId ?? '',
@@ -1153,9 +1261,15 @@ class _PetAvatar extends StatelessWidget {
 }
 
 class _StateView extends StatelessWidget {
-  const _StateView({required this.title, this.actionLabel, this.onAction});
+  const _StateView({
+    required this.title,
+    this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final String title;
+  final String? subtitle;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -1170,6 +1284,10 @@ class _StateView extends StatelessWidget {
             const Icon(Icons.pets_rounded, size: 48),
             const SizedBox(height: 12),
             Text(title, textAlign: TextAlign.center),
+            if (subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(subtitle!, textAlign: TextAlign.center),
+            ],
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 12),
               FilledButton(onPressed: onAction, child: Text(actionLabel!)),
@@ -1182,9 +1300,14 @@ class _StateView extends StatelessWidget {
 }
 
 class _InlineError extends StatelessWidget {
-  const _InlineError({required this.label, required this.onRetry});
+  const _InlineError({
+    required this.label,
+    required this.retryLabel,
+    required this.onRetry,
+  });
 
   final String label;
+  final String retryLabel;
   final VoidCallback onRetry;
 
   @override
@@ -1192,7 +1315,7 @@ class _InlineError extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: Text(label)),
-        TextButton(onPressed: onRetry, child: const Text('Retry')),
+        TextButton(onPressed: onRetry, child: Text(retryLabel)),
       ],
     );
   }
@@ -1200,206 +1323,696 @@ class _InlineError extends StatelessWidget {
 
 Future<void> _showPetForm(
   BuildContext context,
-  WidgetRef ref, {
+  WidgetRef _, {
   PetProfile? pet,
 }) async {
-  final nameController = TextEditingController(text: pet?.name ?? '');
-  final breedController = TextEditingController(text: pet?.breed ?? '');
-  var type = pet?.type ?? 'dog';
-  XFile? photo;
-  var step = 0;
-  final picker = ImagePicker();
-
-  Future<void> save(BuildContext sheetContext) async {
-    final name = nameController.text.trim();
-    if (name.isEmpty || name.length > 40) {
-      return;
-    }
-
-    final repository = ref.read(templateGenerationRepositoryProvider);
-    final saved = pet == null
-        ? await repository.createPet(
-            name: name,
-            type: type,
-            breed: breedController.text.trim().isEmpty
-                ? null
-                : breedController.text.trim(),
-          )
-        : await repository.updatePet(
-            petId: pet.id,
-            name: name,
-            type: type,
-            breed: breedController.text.trim().isEmpty
-                ? null
-                : breedController.text.trim(),
-          );
-    final selectedPhoto = photo;
-    if (selectedPhoto != null) {
-      await repository.uploadPetPhoto(petId: saved.id, photo: selectedPhoto);
-    }
-    ref.invalidate(petsProvider);
-    ref.invalidate(petPhotosProvider(saved.id));
-    if (sheetContext.mounted) {
-      Navigator.of(sheetContext).pop();
-    }
-  }
-
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => StatefulBuilder(
-      builder: (context, setState) => Padding(
+    builder: (context) => _PetFormSheet(pet: pet),
+  );
+}
+
+class _PetFormSheet extends ConsumerStatefulWidget {
+  const _PetFormSheet({this.pet});
+
+  final PetProfile? pet;
+
+  @override
+  ConsumerState<_PetFormSheet> createState() => _PetFormSheetState();
+}
+
+class _PetFormSheetState extends ConsumerState<_PetFormSheet> {
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.pet?.name ?? '',
+  );
+  late final TextEditingController _breedController = TextEditingController(
+    text: widget.pet?.breed ?? '',
+  );
+  late String _type = widget.pet?.type ?? 'dog';
+  final _picker = ImagePicker();
+  XFile? _photo;
+  var _step = 0;
+  var _isSaving = false;
+  var _showNameError = false;
+
+  bool get _isEditing => widget.pet != null;
+  bool get _isNameValid => _nameController.text.trim().isNotEmpty;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _breedController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _nameController.text.trim();
+    if (_isSaving || name.isEmpty || name.length > 40) {
+      setState(() => _showNameError = true);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final repository = ref.read(templateGenerationRepositoryProvider);
+      final breed = _breedController.text.trim();
+      final pet = widget.pet;
+      final saved = pet == null
+          ? await repository.createPet(
+              name: name,
+              type: _type,
+              breed: breed.isEmpty ? null : breed,
+            )
+          : await repository.updatePet(
+              petId: pet.id,
+              name: name,
+              type: _type,
+              breed: breed.isEmpty ? null : breed,
+            );
+      if (!mounted) {
+        return;
+      }
+
+      final selectedPhoto = _photo;
+      if (selectedPhoto != null) {
+        final uploadedPhoto = await repository.uploadPetPhoto(
+          petId: saved.id,
+          photo: selectedPhoto,
+        );
+        if (!uploadedPhoto.isAvatar && uploadedPhoto.id.isNotEmpty) {
+          await repository.setPetPhotoAsAvatar(
+            petId: saved.id,
+            photoId: uploadedPhoto.id,
+          );
+        }
+        if (!mounted) {
+          return;
+        }
+      }
+
+      ref.invalidate(petsProvider);
+      ref.invalidate(petPhotosProvider(saved.id));
+      await Future.wait([
+        _ignoreRefreshFailure(ref.read(petsProvider.future)),
+        _ignoreRefreshFailure(ref.read(petPhotosProvider(saved.id).future)),
+      ]);
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      imageQuality: 92,
+    );
+    if (!mounted || picked == null) {
+      return;
+    }
+
+    setState(() => _photo = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    return SafeArea(
+      top: false,
+      child: Padding(
         padding: EdgeInsets.fromLTRB(
           16,
-          16,
+          12,
           16,
           16 + MediaQuery.viewInsetsOf(context).bottom,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              pet == null ? 'Add pet' : 'Edit pet',
-              style: Theme.of(context).textTheme.titleLarge,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.surfaceStrong,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colors.border.withValues(alpha: 0.72)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: colors.border,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _PetFormProgress(currentStep: _isEditing ? 2 : _step),
+                const SizedBox(height: 22),
+                Text(
+                  _isEditing ? text.petsEditTitle : text.petsAddTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: colors.textStrong,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (!_isEditing)
+                  _buildCreateStepper(text)
+                else
+                  _buildEditForm(text),
+              ],
             ),
-            const SizedBox(height: 12),
-            if (pet == null)
-              Stepper(
-                currentStep: step,
-                type: StepperType.vertical,
-                margin: EdgeInsets.zero,
-                onStepTapped: (value) => setState(() => step = value),
-                controlsBuilder: (context, details) {
-                  final isLast = step == 2;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Row(
-                      children: [
-                        FilledButton(
-                          onPressed: () async {
-                            if (step == 0 &&
-                                nameController.text.trim().isEmpty) {
-                              return;
-                            }
-
-                            if (!isLast) {
-                              setState(() => step += 1);
-                              return;
-                            }
-
-                            await save(context);
-                          },
-                          child: Text(isLast ? 'Save' : 'Next'),
-                        ),
-                        if (step > 0) ...[
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () => setState(() => step -= 1),
-                            child: const Text('Back'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-                steps: [
-                  Step(
-                    title: const Text('Name'),
-                    isActive: step >= 0,
-                    content: TextField(
-                      controller: nameController,
-                      maxLength: 40,
-                      decoration: const InputDecoration(labelText: 'Name'),
-                    ),
-                  ),
-                  Step(
-                    title: const Text('Type and breed'),
-                    isActive: step >= 1,
-                    content: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(value: 'dog', label: Text('Dog')),
-                            ButtonSegment(value: 'cat', label: Text('Cat')),
-                            ButtonSegment(value: 'other', label: Text('Other')),
-                          ],
-                          selected: {type},
-                          onSelectionChanged: (value) =>
-                              setState(() => type = value.first),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: breedController,
-                          maxLength: 60,
-                          decoration: const InputDecoration(labelText: 'Breed'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Step(
-                    title: const Text('Photo'),
-                    isActive: step >= 2,
-                    content: Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final picked = await picker.pickImage(
-                            source: ImageSource.gallery,
-                            maxWidth: 2048,
-                            imageQuality: 92,
-                          );
-                          if (picked != null) {
-                            setState(() => photo = picked);
-                          }
-                        },
-                        icon: const Icon(Icons.add_a_photo_outlined),
-                        label: Text(
-                          photo == null
-                              ? 'Choose first photo'
-                              : 'Photo selected',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            else ...[
-              TextField(
-                controller: nameController,
-                maxLength: 40,
-                decoration: const InputDecoration(labelText: 'Name'),
-              ),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'dog', label: Text('Dog')),
-                  ButtonSegment(value: 'cat', label: Text('Cat')),
-                  ButtonSegment(value: 'other', label: Text('Other')),
-                ],
-                selected: {type},
-                onSelectionChanged: (value) =>
-                    setState(() => type = value.first),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: breedController,
-                maxLength: 60,
-                decoration: const InputDecoration(labelText: 'Breed'),
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: () => save(context),
-                child: const Text('Save'),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
-  nameController.dispose();
-  breedController.dispose();
+  Widget _buildCreateStepper(AppLocalizations text) {
+    final isLast = _step == 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: switch (_step) {
+            0 => _PetNameStep(
+              key: const ValueKey('pet-name-step'),
+              controller: _nameController,
+              enabled: !_isSaving,
+              showError: _showNameError && !_isNameValid,
+              text: text,
+              onChanged: (_) {
+                if (_showNameError && _isNameValid) {
+                  setState(() => _showNameError = false);
+                }
+              },
+            ),
+            1 => _PetTypeStep(
+              key: const ValueKey('pet-type-step'),
+              type: _type,
+              breedController: _breedController,
+              enabled: !_isSaving,
+              text: text,
+              onTypeChanged: (value) => setState(() => _type = value),
+            ),
+            _ => _PetPhotoStep(
+              key: const ValueKey('pet-photo-step'),
+              photo: _photo,
+              enabled: !_isSaving,
+              text: text,
+              onPickPhoto: _pickPhoto,
+            ),
+          },
+        ),
+        const SizedBox(height: 22),
+        Row(
+          children: [
+            if (_step > 0) ...[
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isSaving
+                      ? null
+                      : () => setState(() => _step -= 1),
+                  child: Text(text.petsBackAction),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            if (_step == 0)
+              Expanded(
+                child: _PetFormPrimaryButton(
+                  label: isLast ? text.petsDoneAction : text.petsNextAction,
+                  isSaving: _isSaving,
+                  onPressed: () async {
+                    if (!_isNameValid) {
+                      setState(() => _showNameError = true);
+                      return;
+                    }
+                    setState(() => _step += 1);
+                  },
+                ),
+              )
+            else
+              SizedBox(
+                width: 132,
+                child: _PetFormPrimaryButton(
+                  label: isLast ? text.petsDoneAction : text.petsNextAction,
+                  isSaving: _isSaving,
+                  onPressed: () async {
+                    if (!isLast) {
+                      setState(() => _step += 1);
+                      return;
+                    }
+
+                    await _save();
+                  },
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditForm(AppLocalizations text) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PetNameStep(
+          controller: _nameController,
+          enabled: !_isSaving,
+          showError: _showNameError && !_isNameValid,
+          text: text,
+          onChanged: (_) {
+            if (_showNameError && _isNameValid) {
+              setState(() => _showNameError = false);
+            }
+          },
+        ),
+        const SizedBox(height: 18),
+        _PetTypeStep(
+          type: _type,
+          breedController: _breedController,
+          enabled: !_isSaving,
+          text: text,
+          onTypeChanged: (value) => setState(() => _type = value),
+        ),
+        const SizedBox(height: 20),
+        FilledButton(
+          onPressed: _isSaving ? null : _save,
+          child: Text(text.petsSaveAction),
+        ),
+      ],
+    );
+  }
+}
+
+class _PetFormProgress extends StatelessWidget {
+  const _PetFormProgress({required this.currentStep});
+
+  final int currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Row(
+      children: [
+        for (var index = 0; index < 3; index++) ...[
+          _PetProgressDot(index: index, currentStep: currentStep),
+          if (index < 2)
+            Expanded(
+              child: Container(
+                height: 2,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: index < currentStep
+                    ? colors.accent.withValues(alpha: 0.78)
+                    : colors.border.withValues(alpha: 0.62),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _PetFormPrimaryButton extends StatelessWidget {
+  const _PetFormPrimaryButton({
+    required this.label,
+    required this.isSaving,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool isSaving;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: isSaving ? null : () => unawaited(onPressed()),
+      child: isSaving
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator.adaptive(strokeWidth: 2),
+            )
+          : Text(label),
+    );
+  }
+}
+
+class _PetProgressDot extends StatelessWidget {
+  const _PetProgressDot({required this.index, required this.currentStep});
+
+  final int index;
+  final int currentStep;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final isDone = index < currentStep;
+    final isActive = index == currentStep;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 30,
+      height: 30,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isActive ? colors.accent : Colors.transparent,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: isDone || isActive
+              ? colors.accent
+              : colors.border.withValues(alpha: 0.82),
+          width: 1.4,
+        ),
+      ),
+      child: isDone
+          ? Icon(Icons.check_rounded, size: 17, color: colors.accent)
+          : Text(
+              '${index + 1}',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: isActive ? Colors.black : colors.textMuted,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+    );
+  }
+}
+
+class _PetNameStep extends StatelessWidget {
+  const _PetNameStep({
+    super.key,
+    required this.controller,
+    required this.enabled,
+    required this.showError,
+    required this.text,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final bool enabled;
+  final bool showError;
+  final AppLocalizations text;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PetStepHeading(
+          title: text.petsNameStepTitle,
+          subtitle: text.petsNameStepSubtitle,
+        ),
+        const SizedBox(height: 18),
+        TextField(
+          controller: controller,
+          maxLength: 40,
+          enabled: enabled,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            hintText: text.petsNameHint,
+            errorText: showError ? text.petsNameRequiredError : null,
+            counterStyle: TextStyle(color: colors.textMuted),
+          ),
+        ),
+        Text(
+          text.petsNameExample,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: colors.textMuted,
+            height: 1.25,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PetTypeStep extends StatelessWidget {
+  const _PetTypeStep({
+    super.key,
+    required this.type,
+    required this.breedController,
+    required this.enabled,
+    required this.text,
+    required this.onTypeChanged,
+  });
+
+  final String type;
+  final TextEditingController breedController;
+  final bool enabled;
+  final AppLocalizations text;
+  final ValueChanged<String> onTypeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PetStepHeading(
+          title: text.petsTypeBreedTitle,
+          subtitle: text.petsTypeBreedStepSubtitle,
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            Expanded(
+              child: _PetTypeChip(
+                label: text.petsDogType,
+                icon: Icons.pets_rounded,
+                selected: type == 'dog',
+                onTap: enabled ? () => onTypeChanged('dog') : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _PetTypeChip(
+                label: text.petsCatType,
+                icon: Icons.cruelty_free_outlined,
+                selected: type == 'cat',
+                onTap: enabled ? () => onTypeChanged('cat') : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _PetTypeChip(
+                label: text.petsOtherType,
+                icon: Icons.inventory_2_outlined,
+                selected: type == 'other',
+                onTap: enabled ? () => onTypeChanged('other') : null,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        TextField(
+          controller: breedController,
+          maxLength: 60,
+          enabled: enabled,
+          decoration: InputDecoration(
+            labelText: text.petsBreedLabel,
+            hintText: text.petsBreedHint,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PetTypeChip extends StatelessWidget {
+  const _PetTypeChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 48,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected
+              ? colors.accent.withValues(alpha: 0.18)
+              : colors.surface.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected
+                ? colors.accent
+                : colors.border.withValues(alpha: 0.7),
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 16,
+                color: selected ? colors.accent : colors.textSoft,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: selected ? colors.accent : colors.textSoft,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PetPhotoStep extends StatelessWidget {
+  const _PetPhotoStep({
+    super.key,
+    required this.photo,
+    required this.enabled,
+    required this.text,
+    required this.onPickPhoto,
+  });
+
+  final XFile? photo;
+  final bool enabled;
+  final AppLocalizations text;
+  final VoidCallback onPickPhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    final selectedPhoto = photo;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PetStepHeading(
+          title: text.petsPhotoStepTitle,
+          subtitle: text.petsPhotoStepSubtitle,
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: enabled ? onPickPhoto : null,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.surface.withValues(alpha: 0.86),
+                border: Border.all(
+                  color: colors.accent.withValues(alpha: 0.62),
+                  width: 1.5,
+                ),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: selectedPhoto == null
+                  ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_a_photo_outlined,
+                          color: colors.accent,
+                          size: 30,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          text.petsAddPhotoAction,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: colors.accent,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          text.petsPhotoFormatHint,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: colors.textMuted, height: 1.15),
+                        ),
+                      ],
+                    )
+                  : Image.file(File(selectedPhoto.path), fit: BoxFit.cover),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          selectedPhoto == null
+              ? text.petsAddPhotoLaterHint
+              : text.petsPhotoSelectedLabel,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: colors.textMuted,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PetStepHeading extends StatelessWidget {
+  const _PetStepHeading({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.petMagicColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: colors.textStrong,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Text(
+          subtitle,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: colors.textSoft, height: 1.32),
+        ),
+      ],
+    );
+  }
 }
 
 Future<void> _pickAndUploadPhoto(
@@ -1418,11 +2031,26 @@ Future<void> _pickAndUploadPhoto(
     return;
   }
 
-  final uploadedPhoto = await ref
-      .read(templateGenerationRepositoryProvider)
-      .uploadPetPhoto(petId: petId, photo: picked, cancelToken: cancelToken);
+  final repository = ref.read(templateGenerationRepositoryProvider);
+  var uploadedPhoto = await repository.uploadPetPhoto(
+    petId: petId,
+    photo: picked,
+    cancelToken: cancelToken,
+  );
   if (cancelToken.isCancelled) {
     return;
+  }
+  if ((currentAvatarUrl == null || currentAvatarUrl.trim().isEmpty) &&
+      !uploadedPhoto.isAvatar &&
+      uploadedPhoto.id.isNotEmpty) {
+    uploadedPhoto = await repository.setPetPhotoAsAvatar(
+      petId: petId,
+      photoId: uploadedPhoto.id,
+      cancelToken: cancelToken,
+    );
+    if (cancelToken.isCancelled) {
+      return;
+    }
   }
   await _evictPetMediaUrl(currentAvatarUrl);
   await _evictPetPhotoMedia(uploadedPhoto);
@@ -1515,13 +2143,13 @@ bool _isUnauthorizedError(Object? error) {
   return error is AppException && error.statusCode == 401;
 }
 
-String _petPhotoUploadErrorMessage(Object error) {
+String _petPhotoUploadErrorMessage(AppLocalizations text, Object error) {
   if (error is AppException &&
       error.message.trim() == 'pets.photo_type_not_allowed') {
-    return 'This photo type is not supported';
+    return text.petsUnsupportedPhotoTypeError;
   }
 
-  return 'Could not upload photo';
+  return text.petsPhotoUploadError;
 }
 
 Future<void> _deletePet(
@@ -1529,6 +2157,28 @@ Future<void> _deletePet(
   WidgetRef ref,
   String petId,
 ) async {
+  final text = AppLocalizations.of(context);
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(text.petsDeleteConfirmTitle),
+      content: Text(text.petsDeleteConfirmMessage),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: Text(text.petsCancelAction),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: Text(text.petsDeleteConfirmAction),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) {
+    return;
+  }
+
   await ref.read(templateGenerationRepositoryProvider).deletePet(petId);
   ref.invalidate(petsProvider);
   if (context.mounted) {
@@ -1536,11 +2186,11 @@ Future<void> _deletePet(
   }
 }
 
-String _typeLabel(String value) {
+String _typeLabel(String value, AppLocalizations text) {
   return switch (value) {
-    'dog' => 'Dog',
-    'cat' => 'Cat',
-    _ => 'Other',
+    'dog' => text.petsDogType,
+    'cat' => text.petsCatType,
+    _ => text.petsOtherType,
   };
 }
 
@@ -1588,7 +2238,15 @@ String _templatesWithPetLocation(String petId, {String? petPhotoId}) {
 }
 
 String? _petPhotoDisplayUrl(PetPhoto photo) {
-  return _normalizePetMediaUrl(photo.thumbnailUrl);
+  final thumbnailUrl = photo.thumbnailUrl?.trim();
+  if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
+    final normalizedThumbnail = _normalizePetMediaUrl(thumbnailUrl);
+    if (normalizedThumbnail != null) {
+      return normalizedThumbnail;
+    }
+  }
+
+  return _normalizePetMediaUrl(photo.url);
 }
 
 Future<void> _evictPetPhotoMedia(PetPhoto photo) async {

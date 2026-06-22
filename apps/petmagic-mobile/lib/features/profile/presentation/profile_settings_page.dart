@@ -508,9 +508,6 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
   BuildContext context,
 ) {
   final copy = _settingsFeedbackCopy(context);
-  final colors = context.petMagicColors;
-  var selected = copy.options.first;
-  var message = '';
 
   return showModalBottomSheet<_SettingsFeedbackDraft>(
     context: context,
@@ -518,85 +515,103 @@ Future<_SettingsFeedbackDraft?> _showSettingsFeedbackSheet(
     showDragHandle: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-          return AnimatedPadding(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            padding: EdgeInsets.only(bottom: bottomInset),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.backgroundBottom,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(28),
-                ),
-                border: Border.all(color: colors.border.withValues(alpha: 0.7)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        copy.sheetTitle,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: colors.textStrong,
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final option in copy.options)
-                            ChoiceChip(
-                              selected: selected == option,
-                              label: Text(option.$3),
-                              onSelected: (_) =>
-                                  setState(() => selected = option),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      TextFormField(
-                        minLines: 3,
-                        maxLines: 5,
-                        onChanged: (value) => message = value,
-                        decoration: InputDecoration(
-                          labelText: copy.messageLabel,
-                          hintText: copy.messageHint,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      FilledButton(
-                        onPressed: () {
-                          final trimmedMessage = message.trim();
-                          Navigator.of(sheetContext).pop(
-                            _SettingsFeedbackDraft(
-                              type: selected.$1,
-                              category: selected.$2,
-                              message: trimmedMessage.isEmpty
-                                  ? null
-                                  : trimmedMessage,
-                            ),
-                          );
-                        },
-                        child: Text(copy.submit),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      );
+      return _SettingsFeedbackSheet(copy: copy);
     },
   );
+}
+
+class _SettingsFeedbackSheet extends StatefulWidget {
+  const _SettingsFeedbackSheet({required this.copy});
+
+  final _SettingsFeedbackCopy copy;
+
+  @override
+  State<_SettingsFeedbackSheet> createState() => _SettingsFeedbackSheetState();
+}
+
+class _SettingsFeedbackSheetState extends State<_SettingsFeedbackSheet> {
+  late (String, String, String) _selected = widget.copy.options.first;
+  final _messageController = TextEditingController();
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = widget.copy;
+    final colors = context.petMagicColors;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.backgroundBottom,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(color: colors.border.withValues(alpha: 0.7)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  copy.sheetTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colors.textStrong,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in copy.options)
+                      ChoiceChip(
+                        selected: _selected == option,
+                        label: Text(option.$3),
+                        onSelected: (_) => setState(() => _selected = option),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _messageController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: InputDecoration(
+                    labelText: copy.messageLabel,
+                    hintText: copy.messageHint,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: () {
+                    final trimmedMessage = _messageController.text.trim();
+                    Navigator.of(context).pop(
+                      _SettingsFeedbackDraft(
+                        type: _selected.$1,
+                        category: _selected.$2,
+                        message: trimmedMessage.isEmpty ? null : trimmedMessage,
+                      ),
+                    );
+                  },
+                  child: Text(copy.submit),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

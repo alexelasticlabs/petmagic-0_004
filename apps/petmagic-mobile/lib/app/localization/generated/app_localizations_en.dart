@@ -274,6 +274,259 @@ class AppLocalizationsEn extends AppLocalizations {
       'Your favorite companions and pet profiles.';
 
   @override
+  String get petsAddTitle => 'Add pet';
+
+  @override
+  String get petsEditTitle => 'Edit pet';
+
+  @override
+  String get petsDetailsTitle => 'Pet details';
+
+  @override
+  String get petsCreateWithPetTitle => 'Create with a pet';
+
+  @override
+  String get petsManageAction => 'Manage';
+
+  @override
+  String get petsAddAction => 'Add pet';
+
+  @override
+  String get petsSaveAction => 'Save';
+
+  @override
+  String get petsNextAction => 'Next';
+
+  @override
+  String get petsBackAction => 'Back';
+
+  @override
+  String get petsDoneAction => 'Done';
+
+  @override
+  String get petsCancelAction => 'Cancel';
+
+  @override
+  String get petsChangeAction => 'Change';
+
+  @override
+  String get petsStartAction => 'Start';
+
+  @override
+  String get petsRetryAction => 'Retry';
+
+  @override
+  String get petsNameLabel => 'Name';
+
+  @override
+  String get petsNameStepTitle => 'Pet name';
+
+  @override
+  String get petsNameStepSubtitle => 'Give your pet a short name.';
+
+  @override
+  String get petsNameHint => 'Enter name';
+
+  @override
+  String get petsNameExample => 'Example: Richi, Murka, Buddy';
+
+  @override
+  String get petsNameRequiredError => 'Enter your pet\'s name';
+
+  @override
+  String get petsTypeBreedTitle => 'Type and breed';
+
+  @override
+  String get petsTypeBreedStepSubtitle =>
+      'Choose pet type and add the breed if you know it.';
+
+  @override
+  String get petsBreedLabel => 'Breed';
+
+  @override
+  String get petsBreedHint => 'Example: Shih Tzu';
+
+  @override
+  String get petsPhotoLabel => 'Photo';
+
+  @override
+  String get petsPhotoStepTitle => 'Pet photo';
+
+  @override
+  String get petsPhotoStepSubtitle =>
+      'Upload a clear photo where the face is visible.';
+
+  @override
+  String get petsDogType => 'Dog';
+
+  @override
+  String get petsCatType => 'Cat';
+
+  @override
+  String get petsOtherType => 'Other';
+
+  @override
+  String get petsChooseFirstPhotoAction => 'Choose first photo';
+
+  @override
+  String get petsAddPhotoAction => 'Add photo';
+
+  @override
+  String get petsAddPhotoLaterHint =>
+      'You can add a photo later from the pet profile.';
+
+  @override
+  String get petsPhotoFormatHint => 'JPG, PNG up to 10 MB';
+
+  @override
+  String get petsPhotoSelectedLabel => 'Photo selected';
+
+  @override
+  String get petsEmptyTitle => 'Add your first pet';
+
+  @override
+  String get petsEmptySubtitle =>
+      'Save a profile and photos so generation starts in one tap.';
+
+  @override
+  String get petsLoadErrorTitle => 'Could not load pets';
+
+  @override
+  String get petsLoadPetErrorTitle => 'Could not load pet';
+
+  @override
+  String get petsLoadPhotosErrorTitle => 'Could not load photos';
+
+  @override
+  String get petsLoadHistoryErrorTitle => 'Could not load history';
+
+  @override
+  String get petsNotFoundTitle => 'Pet not found';
+
+  @override
+  String get petsPhotosTitle => 'Photos';
+
+  @override
+  String get petsHistoryTitle => 'Generation history';
+
+  @override
+  String get petsNoPhotosTitle => 'No photos yet.';
+
+  @override
+  String get petsNoGenerationsTitle => 'No generations yet.';
+
+  @override
+  String petsStatsPhotos(Object count) {
+    return 'Photos: $count';
+  }
+
+  @override
+  String petsStatsGenerations(Object count) {
+    return 'Generations: $count';
+  }
+
+  @override
+  String get petsGenerateWithPet => 'Generate with pet';
+
+  @override
+  String petsGenerateWithName(Object name) {
+    return 'Generate with $name';
+  }
+
+  @override
+  String petsCreateWithName(Object name) {
+    return 'Create with $name';
+  }
+
+  @override
+  String petsAddPhotoPrompt(Object name) {
+    return 'Add a photo of $name to start';
+  }
+
+  @override
+  String get petsDeleteTooltip => 'Delete pet';
+
+  @override
+  String get petsDeleteConfirmTitle => 'Delete pet?';
+
+  @override
+  String get petsDeleteConfirmMessage =>
+      'This removes the pet profile and its saved photos.';
+
+  @override
+  String get petsDeleteConfirmAction => 'Delete';
+
+  @override
+  String get petsAddPhotosTooltip => 'Add photos';
+
+  @override
+  String get petsSetAvatarTooltip => 'Set as avatar';
+
+  @override
+  String get petsMarkFavoriteTooltip => 'Mark favorite';
+
+  @override
+  String get petsUseForGenerationTooltip => 'Use for generation';
+
+  @override
+  String get petsDeletePhotoTooltip => 'Delete photo';
+
+  @override
+  String get petsAvatarBadge => 'Avatar';
+
+  @override
+  String get petsFavoriteBadge => 'Favorite';
+
+  @override
+  String get petsPhotoUpdateError => 'Could not update photo';
+
+  @override
+  String get petsUnsupportedPhotoTypeError =>
+      'This photo type is not supported';
+
+  @override
+  String get petsPhotoUploadError => 'Could not upload photo';
+
+  @override
+  String get petsOpenGenerationTooltip => 'Open';
+
+  @override
+  String get petsShareGenerationTooltip => 'Share';
+
+  @override
+  String get petsUseGenerationAsInputTooltip => 'Use as input';
+
+  @override
+  String get petsTemplateFallback => 'Template';
+
+  @override
+  String get petsUploadAction => 'Upload';
+
+  @override
+  String get petsChooseFromMyPetsAction => 'Choose from My Pets';
+
+  @override
+  String petsGenerationCostMessage(Object count) {
+    return 'This generation costs $count PawSpark.';
+  }
+
+  @override
+  String get petsNoPhotoStartMessage => 'Add a pet photo to start';
+
+  @override
+  String get petsFirstPetToast => 'Add your first pet';
+
+  @override
+  String get petsCouldNotLoadToast => 'Could not load pets';
+
+  @override
+  String get petsAuthRequiredTitle => 'Save and use your pets';
+
+  @override
+  String get petsAuthRequiredMessage =>
+      'Sign in or create an account to save pet profiles and use them for generations.';
+
+  @override
   String get profilePremiumTitle => 'Go Premium';
 
   @override

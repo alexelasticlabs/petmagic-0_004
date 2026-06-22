@@ -1477,7 +1477,14 @@ class PetProfile {
       type: json['type'] as String? ?? 'other',
       breed: json['breed'] as String?,
       avatarMediaAssetId: json['avatarMediaAssetId'] as String?,
-      avatarUrl: json['avatarUrl'] as String?,
+      avatarUrl: _firstNonEmptyString(json, const [
+        'avatarUrl',
+        'avatarPhotoUrl',
+        'avatarThumbnailUrl',
+        'mainPhotoUrl',
+        'photoUrl',
+        'thumbnailUrl',
+      ]),
       photosCount: (json['photosCount'] as num?)?.toInt() ?? 0,
       generationsCount: (json['generationsCount'] as num?)?.toInt() ?? 0,
       createdAtUtc:
@@ -1487,6 +1494,20 @@ class PetProfile {
           TemplateGenerationDto._dateTime(json['updatedAtUtc']) ??
           DateTime.now().toUtc(),
     );
+  }
+
+  static String? _firstNonEmptyString(
+    Map<String, dynamic> json,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = json[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    return null;
   }
 }
 

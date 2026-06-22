@@ -275,6 +275,259 @@ class AppLocalizationsPl extends AppLocalizations {
       'Twoi ulubieni towarzysze i profile zwierząt.';
 
   @override
+  String get petsAddTitle => 'Dodaj pupila';
+
+  @override
+  String get petsEditTitle => 'Edytuj pupila';
+
+  @override
+  String get petsDetailsTitle => 'Szczegóły pupila';
+
+  @override
+  String get petsCreateWithPetTitle => 'Twórz z pupilem';
+
+  @override
+  String get petsManageAction => 'Zarządzaj';
+
+  @override
+  String get petsAddAction => 'Dodaj';
+
+  @override
+  String get petsSaveAction => 'Zapisz';
+
+  @override
+  String get petsNextAction => 'Dalej';
+
+  @override
+  String get petsBackAction => 'Wstecz';
+
+  @override
+  String get petsDoneAction => 'Gotowe';
+
+  @override
+  String get petsCancelAction => 'Anuluj';
+
+  @override
+  String get petsChangeAction => 'Zmień';
+
+  @override
+  String get petsStartAction => 'Zacznij';
+
+  @override
+  String get petsRetryAction => 'Spróbuj ponownie';
+
+  @override
+  String get petsNameLabel => 'Imię';
+
+  @override
+  String get petsNameStepTitle => 'Imię pupila';
+
+  @override
+  String get petsNameStepSubtitle => 'Nadaj pupilowi krótkie imię.';
+
+  @override
+  String get petsNameHint => 'Wpisz imię';
+
+  @override
+  String get petsNameExample => 'Przykład: Richi, Murka, Buddy';
+
+  @override
+  String get petsNameRequiredError => 'Wpisz imię pupila';
+
+  @override
+  String get petsTypeBreedTitle => 'Typ i rasa';
+
+  @override
+  String get petsTypeBreedStepSubtitle =>
+      'Wybierz typ i dodaj rasę, jeśli ją znasz.';
+
+  @override
+  String get petsBreedLabel => 'Rasa';
+
+  @override
+  String get petsBreedHint => 'Przykład: shih tzu';
+
+  @override
+  String get petsPhotoLabel => 'Zdjęcie';
+
+  @override
+  String get petsPhotoStepTitle => 'Zdjęcie pupila';
+
+  @override
+  String get petsPhotoStepSubtitle =>
+      'Dodaj wyraźne zdjęcie, na którym widać pyszczek.';
+
+  @override
+  String get petsDogType => 'Pies';
+
+  @override
+  String get petsCatType => 'Kot';
+
+  @override
+  String get petsOtherType => 'Inne';
+
+  @override
+  String get petsChooseFirstPhotoAction => 'Wybierz pierwsze zdjęcie';
+
+  @override
+  String get petsAddPhotoAction => 'Dodaj zdjęcie';
+
+  @override
+  String get petsAddPhotoLaterHint =>
+      'Możesz dodać zdjęcie później w profilu pupila.';
+
+  @override
+  String get petsPhotoFormatHint => 'JPG, PNG do 10 MB';
+
+  @override
+  String get petsPhotoSelectedLabel => 'Zdjęcie wybrane';
+
+  @override
+  String get petsEmptyTitle => 'Dodaj pierwszego pupila';
+
+  @override
+  String get petsEmptySubtitle =>
+      'Zapisz profil i zdjęcia, aby generować jednym dotknięciem.';
+
+  @override
+  String get petsLoadErrorTitle => 'Nie udało się wczytać pupili';
+
+  @override
+  String get petsLoadPetErrorTitle => 'Nie udało się wczytać pupila';
+
+  @override
+  String get petsLoadPhotosErrorTitle => 'Nie udało się wczytać zdjęć';
+
+  @override
+  String get petsLoadHistoryErrorTitle => 'Nie udało się wczytać historii';
+
+  @override
+  String get petsNotFoundTitle => 'Nie znaleziono pupila';
+
+  @override
+  String get petsPhotosTitle => 'Zdjęcia';
+
+  @override
+  String get petsHistoryTitle => 'Historia generowania';
+
+  @override
+  String get petsNoPhotosTitle => 'Brak zdjęć.';
+
+  @override
+  String get petsNoGenerationsTitle => 'Brak wygenerowanych prac.';
+
+  @override
+  String petsStatsPhotos(Object count) {
+    return 'Zdjęcia: $count';
+  }
+
+  @override
+  String petsStatsGenerations(Object count) {
+    return 'Generacje: $count';
+  }
+
+  @override
+  String get petsGenerateWithPet => 'Generuj z pupilem';
+
+  @override
+  String petsGenerateWithName(Object name) {
+    return 'Generuj z $name';
+  }
+
+  @override
+  String petsCreateWithName(Object name) {
+    return 'Twórz z $name';
+  }
+
+  @override
+  String petsAddPhotoPrompt(Object name) {
+    return 'Dodaj zdjęcie $name, aby zacząć';
+  }
+
+  @override
+  String get petsDeleteTooltip => 'Usuń pupila';
+
+  @override
+  String get petsDeleteConfirmTitle => 'Usunąć pupila?';
+
+  @override
+  String get petsDeleteConfirmMessage =>
+      'Profil pupila i zapisane zdjęcia zostaną usunięte.';
+
+  @override
+  String get petsDeleteConfirmAction => 'Usuń';
+
+  @override
+  String get petsAddPhotosTooltip => 'Dodaj zdjęcia';
+
+  @override
+  String get petsSetAvatarTooltip => 'Ustaw jako awatar';
+
+  @override
+  String get petsMarkFavoriteTooltip => 'Oznacz jako ulubione';
+
+  @override
+  String get petsUseForGenerationTooltip => 'Użyj do generowania';
+
+  @override
+  String get petsDeletePhotoTooltip => 'Usuń zdjęcie';
+
+  @override
+  String get petsAvatarBadge => 'Awatar';
+
+  @override
+  String get petsFavoriteBadge => 'Ulubione';
+
+  @override
+  String get petsPhotoUpdateError => 'Nie udało się zaktualizować zdjęcia';
+
+  @override
+  String get petsUnsupportedPhotoTypeError =>
+      'Ten typ zdjęcia nie jest obsługiwany';
+
+  @override
+  String get petsPhotoUploadError => 'Nie udało się przesłać zdjęcia';
+
+  @override
+  String get petsOpenGenerationTooltip => 'Otwórz';
+
+  @override
+  String get petsShareGenerationTooltip => 'Udostępnij';
+
+  @override
+  String get petsUseGenerationAsInputTooltip => 'Użyj jako źródła';
+
+  @override
+  String get petsTemplateFallback => 'Szablon';
+
+  @override
+  String get petsUploadAction => 'Prześlij';
+
+  @override
+  String get petsChooseFromMyPetsAction => 'Wybierz z Moich pupili';
+
+  @override
+  String petsGenerationCostMessage(Object count) {
+    return 'Ta generacja kosztuje $count PawSpark.';
+  }
+
+  @override
+  String get petsNoPhotoStartMessage => 'Dodaj zdjęcie pupila, aby zacząć';
+
+  @override
+  String get petsFirstPetToast => 'Dodaj pierwszego pupila';
+
+  @override
+  String get petsCouldNotLoadToast => 'Nie udało się wczytać pupili';
+
+  @override
+  String get petsAuthRequiredTitle => 'Zapisuj i używaj swoich pupili';
+
+  @override
+  String get petsAuthRequiredMessage =>
+      'Zaloguj się lub utwórz konto, aby zapisywać profile pupili i używać ich w generacjach.';
+
+  @override
   String get profilePremiumTitle => 'Przejdź na Premium';
 
   @override

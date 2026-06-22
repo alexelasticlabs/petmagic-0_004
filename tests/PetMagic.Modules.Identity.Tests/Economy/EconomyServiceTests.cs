@@ -193,10 +193,13 @@ public sealed partial class EconomyServiceTests
 
     private sealed class FakePaymentGateway : IPaymentGateway
     {
+        public PaymentCreateRequest? LastPaymentCreateRequest { get; private set; }
+
         public SubscriptionCheckoutCreateRequest? LastSubscriptionCheckoutRequest { get; private set; }
 
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
+            LastPaymentCreateRequest = request;
             var sessionId = $"cs_test_{request.OrderId:N}";
             var url = $"https://checkout.stripe.com/pay/{sessionId}";
             return Task.FromResult(Result.Success(new PaymentCreateResponse(sessionId, url)));

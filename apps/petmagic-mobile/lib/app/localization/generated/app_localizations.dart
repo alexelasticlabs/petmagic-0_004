@@ -618,6 +618,474 @@ abstract class AppLocalizations {
   /// **'Your favorite companions and pet profiles.'**
   String get profilePetsSubtitle;
 
+  /// No description provided for @petsAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add pet'**
+  String get petsAddTitle;
+
+  /// No description provided for @petsEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit pet'**
+  String get petsEditTitle;
+
+  /// No description provided for @petsDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet details'**
+  String get petsDetailsTitle;
+
+  /// No description provided for @petsCreateWithPetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create with a pet'**
+  String get petsCreateWithPetTitle;
+
+  /// No description provided for @petsManageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get petsManageAction;
+
+  /// No description provided for @petsAddAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add pet'**
+  String get petsAddAction;
+
+  /// No description provided for @petsSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get petsSaveAction;
+
+  /// No description provided for @petsNextAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get petsNextAction;
+
+  /// No description provided for @petsBackAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get petsBackAction;
+
+  /// No description provided for @petsDoneAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get petsDoneAction;
+
+  /// No description provided for @petsCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get petsCancelAction;
+
+  /// No description provided for @petsChangeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get petsChangeAction;
+
+  /// No description provided for @petsStartAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get petsStartAction;
+
+  /// No description provided for @petsRetryAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get petsRetryAction;
+
+  /// No description provided for @petsNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get petsNameLabel;
+
+  /// No description provided for @petsNameStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet name'**
+  String get petsNameStepTitle;
+
+  /// No description provided for @petsNameStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Give your pet a short name.'**
+  String get petsNameStepSubtitle;
+
+  /// No description provided for @petsNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter name'**
+  String get petsNameHint;
+
+  /// No description provided for @petsNameExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: Richi, Murka, Buddy'**
+  String get petsNameExample;
+
+  /// No description provided for @petsNameRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your pet\'s name'**
+  String get petsNameRequiredError;
+
+  /// No description provided for @petsTypeBreedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Type and breed'**
+  String get petsTypeBreedTitle;
+
+  /// No description provided for @petsTypeBreedStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose pet type and add the breed if you know it.'**
+  String get petsTypeBreedStepSubtitle;
+
+  /// No description provided for @petsBreedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Breed'**
+  String get petsBreedLabel;
+
+  /// No description provided for @petsBreedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: Shih Tzu'**
+  String get petsBreedHint;
+
+  /// No description provided for @petsPhotoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo'**
+  String get petsPhotoLabel;
+
+  /// No description provided for @petsPhotoStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet photo'**
+  String get petsPhotoStepTitle;
+
+  /// No description provided for @petsPhotoStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a clear photo where the face is visible.'**
+  String get petsPhotoStepSubtitle;
+
+  /// No description provided for @petsDogType.
+  ///
+  /// In en, this message translates to:
+  /// **'Dog'**
+  String get petsDogType;
+
+  /// No description provided for @petsCatType.
+  ///
+  /// In en, this message translates to:
+  /// **'Cat'**
+  String get petsCatType;
+
+  /// No description provided for @petsOtherType.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get petsOtherType;
+
+  /// No description provided for @petsChooseFirstPhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose first photo'**
+  String get petsChooseFirstPhotoAction;
+
+  /// No description provided for @petsAddPhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photo'**
+  String get petsAddPhotoAction;
+
+  /// No description provided for @petsAddPhotoLaterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add a photo later from the pet profile.'**
+  String get petsAddPhotoLaterHint;
+
+  /// No description provided for @petsPhotoFormatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'JPG, PNG up to 10 MB'**
+  String get petsPhotoFormatHint;
+
+  /// No description provided for @petsPhotoSelectedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo selected'**
+  String get petsPhotoSelectedLabel;
+
+  /// No description provided for @petsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first pet'**
+  String get petsEmptyTitle;
+
+  /// No description provided for @petsEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save a profile and photos so generation starts in one tap.'**
+  String get petsEmptySubtitle;
+
+  /// No description provided for @petsLoadErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load pets'**
+  String get petsLoadErrorTitle;
+
+  /// No description provided for @petsLoadPetErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load pet'**
+  String get petsLoadPetErrorTitle;
+
+  /// No description provided for @petsLoadPhotosErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load photos'**
+  String get petsLoadPhotosErrorTitle;
+
+  /// No description provided for @petsLoadHistoryErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load history'**
+  String get petsLoadHistoryErrorTitle;
+
+  /// No description provided for @petsNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet not found'**
+  String get petsNotFoundTitle;
+
+  /// No description provided for @petsPhotosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos'**
+  String get petsPhotosTitle;
+
+  /// No description provided for @petsHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation history'**
+  String get petsHistoryTitle;
+
+  /// No description provided for @petsNoPhotosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No photos yet.'**
+  String get petsNoPhotosTitle;
+
+  /// No description provided for @petsNoGenerationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No generations yet.'**
+  String get petsNoGenerationsTitle;
+
+  /// No description provided for @petsStatsPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos: {count}'**
+  String petsStatsPhotos(Object count);
+
+  /// No description provided for @petsStatsGenerations.
+  ///
+  /// In en, this message translates to:
+  /// **'Generations: {count}'**
+  String petsStatsGenerations(Object count);
+
+  /// No description provided for @petsGenerateWithPet.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate with pet'**
+  String get petsGenerateWithPet;
+
+  /// No description provided for @petsGenerateWithName.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate with {name}'**
+  String petsGenerateWithName(Object name);
+
+  /// No description provided for @petsCreateWithName.
+  ///
+  /// In en, this message translates to:
+  /// **'Create with {name}'**
+  String petsCreateWithName(Object name);
+
+  /// No description provided for @petsAddPhotoPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo of {name} to start'**
+  String petsAddPhotoPrompt(Object name);
+
+  /// No description provided for @petsDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete pet'**
+  String get petsDeleteTooltip;
+
+  /// No description provided for @petsDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete pet?'**
+  String get petsDeleteConfirmTitle;
+
+  /// No description provided for @petsDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the pet profile and its saved photos.'**
+  String get petsDeleteConfirmMessage;
+
+  /// No description provided for @petsDeleteConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get petsDeleteConfirmAction;
+
+  /// No description provided for @petsAddPhotosTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add photos'**
+  String get petsAddPhotosTooltip;
+
+  /// No description provided for @petsSetAvatarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as avatar'**
+  String get petsSetAvatarTooltip;
+
+  /// No description provided for @petsMarkFavoriteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark favorite'**
+  String get petsMarkFavoriteTooltip;
+
+  /// No description provided for @petsUseForGenerationTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Use for generation'**
+  String get petsUseForGenerationTooltip;
+
+  /// No description provided for @petsDeletePhotoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete photo'**
+  String get petsDeletePhotoTooltip;
+
+  /// No description provided for @petsAvatarBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Avatar'**
+  String get petsAvatarBadge;
+
+  /// No description provided for @petsFavoriteBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get petsFavoriteBadge;
+
+  /// No description provided for @petsPhotoUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update photo'**
+  String get petsPhotoUpdateError;
+
+  /// No description provided for @petsUnsupportedPhotoTypeError.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo type is not supported'**
+  String get petsUnsupportedPhotoTypeError;
+
+  /// No description provided for @petsPhotoUploadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upload photo'**
+  String get petsPhotoUploadError;
+
+  /// No description provided for @petsOpenGenerationTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get petsOpenGenerationTooltip;
+
+  /// No description provided for @petsShareGenerationTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get petsShareGenerationTooltip;
+
+  /// No description provided for @petsUseGenerationAsInputTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as input'**
+  String get petsUseGenerationAsInputTooltip;
+
+  /// No description provided for @petsTemplateFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Template'**
+  String get petsTemplateFallback;
+
+  /// No description provided for @petsUploadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get petsUploadAction;
+
+  /// No description provided for @petsChooseFromMyPetsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose from My Pets'**
+  String get petsChooseFromMyPetsAction;
+
+  /// No description provided for @petsGenerationCostMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This generation costs {count} PawSpark.'**
+  String petsGenerationCostMessage(Object count);
+
+  /// No description provided for @petsNoPhotoStartMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a pet photo to start'**
+  String get petsNoPhotoStartMessage;
+
+  /// No description provided for @petsFirstPetToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Add your first pet'**
+  String get petsFirstPetToast;
+
+  /// No description provided for @petsCouldNotLoadToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load pets'**
+  String get petsCouldNotLoadToast;
+
+  /// No description provided for @petsAuthRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save and use your pets'**
+  String get petsAuthRequiredTitle;
+
+  /// No description provided for @petsAuthRequiredMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in or create an account to save pet profiles and use them for generations.'**
+  String get petsAuthRequiredMessage;
+
   /// No description provided for @profilePremiumTitle.
   ///
   /// In en, this message translates to:

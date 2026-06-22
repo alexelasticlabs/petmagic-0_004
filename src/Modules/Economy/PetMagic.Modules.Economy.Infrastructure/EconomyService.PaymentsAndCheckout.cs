@@ -507,8 +507,9 @@ public sealed partial class EconomyService
             return Result.Success(ToPurchaseCheckoutResponse(confirmResult.Value));
         }
 
-        var usePaymentSheet = string.Equals(command.Platform, "android", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(command.Platform, "ios", StringComparison.OrdinalIgnoreCase);
+        // The current Flutter app does not bundle Stripe PaymentSheet. Use hosted
+        // Checkout for mobile too so the client always receives a checkout URL.
+        var usePaymentSheet = false;
         string? stripePublishableKey = null;
         string? orderCustomerId = null;
 

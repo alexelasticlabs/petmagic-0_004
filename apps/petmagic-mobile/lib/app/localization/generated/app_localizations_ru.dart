@@ -275,6 +275,258 @@ class AppLocalizationsRu extends AppLocalizations {
   String get profilePetsSubtitle => 'Ваши любимцы и их профили в приложении.';
 
   @override
+  String get petsAddTitle => 'Добавить питомца';
+
+  @override
+  String get petsEditTitle => 'Редактировать питомца';
+
+  @override
+  String get petsDetailsTitle => 'Питомец';
+
+  @override
+  String get petsCreateWithPetTitle => 'Создать с питомцем';
+
+  @override
+  String get petsManageAction => 'Управлять';
+
+  @override
+  String get petsAddAction => 'Добавить';
+
+  @override
+  String get petsSaveAction => 'Сохранить';
+
+  @override
+  String get petsNextAction => 'Далее';
+
+  @override
+  String get petsBackAction => 'Назад';
+
+  @override
+  String get petsDoneAction => 'Готово';
+
+  @override
+  String get petsCancelAction => 'Отмена';
+
+  @override
+  String get petsChangeAction => 'Сменить';
+
+  @override
+  String get petsStartAction => 'Начать';
+
+  @override
+  String get petsRetryAction => 'Повторить';
+
+  @override
+  String get petsNameLabel => 'Имя';
+
+  @override
+  String get petsNameStepTitle => 'Имя питомца';
+
+  @override
+  String get petsNameStepSubtitle => 'Дайте питомцу короткую кличку.';
+
+  @override
+  String get petsNameHint => 'Введите имя';
+
+  @override
+  String get petsNameExample => 'Например: Ричи, Мурка, Бадди';
+
+  @override
+  String get petsNameRequiredError => 'Введите имя питомца';
+
+  @override
+  String get petsTypeBreedTitle => 'Тип и порода';
+
+  @override
+  String get petsTypeBreedStepSubtitle =>
+      'Выберите тип питомца и укажите породу, если знаете.';
+
+  @override
+  String get petsBreedLabel => 'Порода';
+
+  @override
+  String get petsBreedHint => 'Например: ши-тцу';
+
+  @override
+  String get petsPhotoLabel => 'Фото';
+
+  @override
+  String get petsPhotoStepTitle => 'Фото питомца';
+
+  @override
+  String get petsPhotoStepSubtitle =>
+      'Загрузите чёткое фото, где хорошо видна мордочка.';
+
+  @override
+  String get petsDogType => 'Собака';
+
+  @override
+  String get petsCatType => 'Кошка';
+
+  @override
+  String get petsOtherType => 'Другое';
+
+  @override
+  String get petsChooseFirstPhotoAction => 'Выбрать первое фото';
+
+  @override
+  String get petsAddPhotoAction => 'Добавить фото';
+
+  @override
+  String get petsAddPhotoLaterHint =>
+      'Фото можно добавить позже в профиле питомца.';
+
+  @override
+  String get petsPhotoFormatHint => 'JPG, PNG до 10 МБ';
+
+  @override
+  String get petsPhotoSelectedLabel => 'Фото выбрано';
+
+  @override
+  String get petsEmptyTitle => 'Добавьте первого питомца';
+
+  @override
+  String get petsEmptySubtitle =>
+      'Сохраните профиль и фото, чтобы запускать генерацию в одно касание.';
+
+  @override
+  String get petsLoadErrorTitle => 'Не удалось загрузить питомцев';
+
+  @override
+  String get petsLoadPetErrorTitle => 'Не удалось загрузить питомца';
+
+  @override
+  String get petsLoadPhotosErrorTitle => 'Не удалось загрузить фото';
+
+  @override
+  String get petsLoadHistoryErrorTitle => 'Не удалось загрузить историю';
+
+  @override
+  String get petsNotFoundTitle => 'Питомец не найден';
+
+  @override
+  String get petsPhotosTitle => 'Фото';
+
+  @override
+  String get petsHistoryTitle => 'История генераций';
+
+  @override
+  String get petsNoPhotosTitle => 'Фото пока нет.';
+
+  @override
+  String get petsNoGenerationsTitle => 'Генераций пока нет.';
+
+  @override
+  String petsStatsPhotos(Object count) {
+    return 'Фото: $count';
+  }
+
+  @override
+  String petsStatsGenerations(Object count) {
+    return 'Генерации: $count';
+  }
+
+  @override
+  String get petsGenerateWithPet => 'Создать с питомцем';
+
+  @override
+  String petsGenerateWithName(Object name) {
+    return 'Создать с $name';
+  }
+
+  @override
+  String petsCreateWithName(Object name) {
+    return 'Создать с $name';
+  }
+
+  @override
+  String petsAddPhotoPrompt(Object name) {
+    return 'Добавьте фото $name, чтобы начать';
+  }
+
+  @override
+  String get petsDeleteTooltip => 'Удалить питомца';
+
+  @override
+  String get petsDeleteConfirmTitle => 'Удалить питомца?';
+
+  @override
+  String get petsDeleteConfirmMessage =>
+      'Профиль питомца и сохранённые фото будут удалены.';
+
+  @override
+  String get petsDeleteConfirmAction => 'Удалить';
+
+  @override
+  String get petsAddPhotosTooltip => 'Добавить фото';
+
+  @override
+  String get petsSetAvatarTooltip => 'Сделать аватаром';
+
+  @override
+  String get petsMarkFavoriteTooltip => 'В избранное';
+
+  @override
+  String get petsUseForGenerationTooltip => 'Использовать для генерации';
+
+  @override
+  String get petsDeletePhotoTooltip => 'Удалить фото';
+
+  @override
+  String get petsAvatarBadge => 'Аватар';
+
+  @override
+  String get petsFavoriteBadge => 'Избранное';
+
+  @override
+  String get petsPhotoUpdateError => 'Не удалось обновить фото';
+
+  @override
+  String get petsUnsupportedPhotoTypeError => 'Этот тип фото не поддерживается';
+
+  @override
+  String get petsPhotoUploadError => 'Не удалось загрузить фото';
+
+  @override
+  String get petsOpenGenerationTooltip => 'Открыть';
+
+  @override
+  String get petsShareGenerationTooltip => 'Поделиться';
+
+  @override
+  String get petsUseGenerationAsInputTooltip => 'Использовать как исходник';
+
+  @override
+  String get petsTemplateFallback => 'Шаблон';
+
+  @override
+  String get petsUploadAction => 'Загрузить';
+
+  @override
+  String get petsChooseFromMyPetsAction => 'Выбрать из моих питомцев';
+
+  @override
+  String petsGenerationCostMessage(Object count) {
+    return 'Генерация стоит $count PawSpark.';
+  }
+
+  @override
+  String get petsNoPhotoStartMessage => 'Добавьте фото питомца, чтобы начать';
+
+  @override
+  String get petsFirstPetToast => 'Добавьте первого питомца';
+
+  @override
+  String get petsCouldNotLoadToast => 'Не удалось загрузить питомцев';
+
+  @override
+  String get petsAuthRequiredTitle => 'Сохраняйте и используйте питомцев';
+
+  @override
+  String get petsAuthRequiredMessage =>
+      'Войдите или зарегистрируйтесь, чтобы сохранять профили питомцев и создавать с ними генерации.';
+
+  @override
   String get profilePremiumTitle => 'Перейти на Premium';
 
   @override

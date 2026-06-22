@@ -11,6 +11,9 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 Future<void> showAuthRequiredSheet(
   BuildContext context, {
   String? redirectPath,
+  String? title,
+  String? message,
+  bool showSignUp = false,
 }) {
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
@@ -66,7 +69,7 @@ Future<void> showAuthRequiredSheet(
               ),
               const SizedBox(height: 16),
               Text(
-                text.authRequiredTitle,
+                title ?? text.authRequiredTitle,
                 style: TextStyle(
                   color: colors.textStrong,
                   fontSize: 24,
@@ -75,7 +78,7 @@ Future<void> showAuthRequiredSheet(
               ),
               const SizedBox(height: 10),
               Text(
-                text.authRequiredMessage,
+                message ?? text.authRequiredMessage,
                 style: TextStyle(
                   color: colors.textSoft,
                   fontSize: 15,
@@ -99,10 +102,23 @@ Future<void> showAuthRequiredSheet(
                   child: Text(text.profileSignInAction),
                 ),
               ),
+              if (showSignUp) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.of(sheetContext).pop();
+                      router.go(RegisterEntryPage.routePath);
+                    },
+                    child: Text(text.authSignUpAction),
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: TextButton(
                   onPressed: () => Navigator.of(sheetContext).pop(),
                   child: Text(text.authRequiredContinueBrowsing),
                 ),

@@ -6,11 +6,15 @@ class ProtectedAuthGate extends StatelessWidget {
   const ProtectedAuthGate({
     required this.subtitle,
     required this.onSignIn,
+    this.title,
+    this.onSignUp,
     super.key,
   });
 
+  final String? title;
   final String subtitle;
   final VoidCallback onSignIn;
+  final VoidCallback? onSignUp;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +36,7 @@ class ProtectedAuthGate extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                text.authSignInRequired,
+                title ?? text.authSignInRequired,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: colors.textStrong,
@@ -60,6 +64,16 @@ class ProtectedAuthGate extends StatelessWidget {
                   label: Text(text.profileSignInAction),
                 ),
               ),
+              if (onSignUp != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: onSignUp,
+                    child: Text(text.authSignUpAction),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

@@ -85,6 +85,114 @@
   "profileStatPending": "Pending",
   "profilePetsTitle": "My pets",
   "profilePetsSubtitle": "Your favorite companions and pet profiles.",
+  "petsAddTitle": "Add pet",
+  "petsEditTitle": "Edit pet",
+  "petsDetailsTitle": "Pet details",
+  "petsCreateWithPetTitle": "Create with a pet",
+  "petsManageAction": "Manage",
+  "petsAddAction": "Add pet",
+  "petsSaveAction": "Save",
+  "petsNextAction": "Next",
+  "petsBackAction": "Back",
+  "petsDoneAction": "Done",
+  "petsCancelAction": "Cancel",
+  "petsChangeAction": "Change",
+  "petsStartAction": "Start",
+  "petsRetryAction": "Retry",
+  "petsNameLabel": "Name",
+  "petsNameStepTitle": "Pet name",
+  "petsNameStepSubtitle": "Give your pet a short name.",
+  "petsNameHint": "Enter name",
+  "petsNameExample": "Example: Richi, Murka, Buddy",
+  "petsNameRequiredError": "Enter your pet's name",
+  "petsTypeBreedTitle": "Type and breed",
+  "petsTypeBreedStepSubtitle": "Choose pet type and add the breed if you know it.",
+  "petsBreedLabel": "Breed",
+  "petsBreedHint": "Example: Shih Tzu",
+  "petsPhotoLabel": "Photo",
+  "petsPhotoStepTitle": "Pet photo",
+  "petsPhotoStepSubtitle": "Upload a clear photo where the face is visible.",
+  "petsDogType": "Dog",
+  "petsCatType": "Cat",
+  "petsOtherType": "Other",
+  "petsChooseFirstPhotoAction": "Choose first photo",
+  "petsAddPhotoAction": "Add photo",
+  "petsAddPhotoLaterHint": "You can add a photo later from the pet profile.",
+  "petsPhotoFormatHint": "JPG, PNG up to 10 MB",
+  "petsPhotoSelectedLabel": "Photo selected",
+  "petsEmptyTitle": "Add your first pet",
+  "petsEmptySubtitle": "Save a profile and photos so generation starts in one tap.",
+  "petsLoadErrorTitle": "Could not load pets",
+  "petsLoadPetErrorTitle": "Could not load pet",
+  "petsLoadPhotosErrorTitle": "Could not load photos",
+  "petsLoadHistoryErrorTitle": "Could not load history",
+  "petsNotFoundTitle": "Pet not found",
+  "petsPhotosTitle": "Photos",
+  "petsHistoryTitle": "Generation history",
+  "petsNoPhotosTitle": "No photos yet.",
+  "petsNoGenerationsTitle": "No generations yet.",
+  "petsStatsPhotos": "Photos: {count}",
+  "@petsStatsPhotos": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "petsStatsGenerations": "Generations: {count}",
+  "@petsStatsGenerations": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "petsGenerateWithPet": "Generate with pet",
+  "petsGenerateWithName": "Generate with {name}",
+  "@petsGenerateWithName": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "petsCreateWithName": "Create with {name}",
+  "@petsCreateWithName": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "petsAddPhotoPrompt": "Add a photo of {name} to start",
+  "@petsAddPhotoPrompt": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "petsDeleteTooltip": "Delete pet",
+  "petsDeleteConfirmTitle": "Delete pet?",
+  "petsDeleteConfirmMessage": "This removes the pet profile and its saved photos.",
+  "petsDeleteConfirmAction": "Delete",
+  "petsAddPhotosTooltip": "Add photos",
+  "petsSetAvatarTooltip": "Set as avatar",
+  "petsMarkFavoriteTooltip": "Mark favorite",
+  "petsUseForGenerationTooltip": "Use for generation",
+  "petsDeletePhotoTooltip": "Delete photo",
+  "petsAvatarBadge": "Avatar",
+  "petsFavoriteBadge": "Favorite",
+  "petsPhotoUpdateError": "Could not update photo",
+  "petsUnsupportedPhotoTypeError": "This photo type is not supported",
+  "petsPhotoUploadError": "Could not upload photo",
+  "petsOpenGenerationTooltip": "Open",
+  "petsShareGenerationTooltip": "Share",
+  "petsUseGenerationAsInputTooltip": "Use as input",
+  "petsTemplateFallback": "Template",
+  "petsUploadAction": "Upload",
+  "petsChooseFromMyPetsAction": "Choose from My Pets",
+  "petsGenerationCostMessage": "This generation costs {count} PawSpark.",
+  "@petsGenerationCostMessage": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "petsNoPhotoStartMessage": "Add a pet photo to start",
+  "petsFirstPetToast": "Add your first pet",
+  "petsCouldNotLoadToast": "Could not load pets",
+  "petsAuthRequiredTitle": "Save and use your pets",
+  "petsAuthRequiredMessage": "Sign in or create an account to save pet profiles and use them for generations.",
   "profilePremiumTitle": "Go Premium",
   "profilePremiumSubtitle": "Unlock all templates and premium editing flows.",
   "profilePremiumPlanLabel": "Premium Plan",
