@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using System.Text.Json;
 
@@ -98,7 +99,11 @@ public sealed partial class TemplatesServiceTests
         });
         job.PetId = petId;
         await dbContext.SaveChangesAsync();
-        var service = new PetsService(dbContext, new RecordingMediaStorage(signReadUrls: true), CreateTemplatesOptions());
+        var service = new PetsService(
+            dbContext,
+            new RecordingMediaStorage(signReadUrls: true),
+            CreateTemplatesOptions(),
+            NullLogger<PetsService>.Instance);
 
         var free = await service.ListGenerationsAsync(userId, petId, isPremium: false, CancellationToken.None);
         var premium = await service.ListGenerationsAsync(userId, petId, isPremium: true, CancellationToken.None);

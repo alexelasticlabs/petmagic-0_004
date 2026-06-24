@@ -39,6 +39,8 @@
     <ProjectReference Include="..\..\Modules\SupportChat\PetMagic.Modules.SupportChat.Infrastructure\PetMagic.Modules.SupportChat.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Modules\Templates\PetMagic.Modules.Templates.Api\PetMagic.Modules.Templates.Api.csproj" />
     <ProjectReference Include="..\..\Modules\Templates\PetMagic.Modules.Templates.Infrastructure\PetMagic.Modules.Templates.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Modules\Gamification\PetMagic.Modules.Gamification.Api\PetMagic.Modules.Gamification.Api.csproj" />
+    <ProjectReference Include="..\..\Modules\Gamification\PetMagic.Modules.Gamification.Infrastructure\PetMagic.Modules.Gamification.Infrastructure.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 

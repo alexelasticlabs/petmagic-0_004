@@ -32,6 +32,12 @@
     <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Domain/PetMagic.Modules.Templates.Domain.csproj" />
     <Project Path="src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/PetMagic.Modules.Templates.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/Gamification/">
+    <Project Path="src/Modules/Gamification/PetMagic.Modules.Gamification.Api/PetMagic.Modules.Gamification.Api.csproj" />
+    <Project Path="src/Modules/Gamification/PetMagic.Modules.Gamification.Application/PetMagic.Modules.Gamification.Application.csproj" />
+    <Project Path="src/Modules/Gamification/PetMagic.Modules.Gamification.Domain/PetMagic.Modules.Gamification.Domain.csproj" />
+    <Project Path="src/Modules/Gamification/PetMagic.Modules.Gamification.Infrastructure/PetMagic.Modules.Gamification.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PetMagic.Modules.Identity.Tests/PetMagic.Modules.Identity.Tests.csproj" />
   </Folder>

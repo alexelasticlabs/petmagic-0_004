@@ -25,6 +25,8 @@ import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/streak_section.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/challenges_section.dart';
 
 part 'rewards_page_referral_cards.dart';
 part 'rewards_page_shared_widgets.dart';
@@ -413,6 +415,10 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                         tone: colors.gold,
                       ),
                     ],
+                    const SizedBox(height: 16),
+                    const StreakSection(),
+                    const SizedBox(height: 16),
+                    const ChallengesSection(),
                     const SizedBox(height: 16),
                     _PromoCodeCard(
                       isSubmitting: state.isRedeeming,

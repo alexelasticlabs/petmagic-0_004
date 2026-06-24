@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Http;
@@ -22,6 +23,8 @@ using PetMagic.Modules.SupportChat.Api;
 using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Gamification.Api;
+using PetMagic.Modules.Gamification.Infrastructure;
 
 using Serilog;
 using Serilog.Events;
@@ -60,6 +63,10 @@ try
     builder.Services.Configure<LoggingOptions>(builder.Configuration.GetSection(LoggingOptions.SectionName));
     builder.Services.AddMemoryCache();
     builder.Services.AddHttpContextAccessor();
+    builder.Services.AddResponseCompression(options =>
+    {
+        options.EnableForHttps = true;
+    });
     builder.Services.AddTransient<CorrelationIdDelegatingHandler>();
     builder.Services.ConfigureAll<HttpClientFactoryOptions>(CorrelationIdHttpClientFactoryOptions.AddCorrelationIdHandler);
 
@@ -245,7 +252,12 @@ try
         .AddSupportChatInfrastructure(builder.Configuration, builder.Environment.IsProduction())
         .AddSupportChatApiModule()
         .AddTemplatesInfrastructure(builder.Configuration, builder.Environment)
-        .AddTemplatesApiModule();
+        .AddTemplatesApiModule()
+        .AddGamificationInfrastructure(builder.Configuration)
+        .AddGamificationApiModule();
+
+    builder.Services.AddHealthChecks()
+        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
     builder.Services
         .AddOpenTelemetry()
@@ -280,6 +292,7 @@ try
     app.UseMiddleware<GlobalExceptionMiddleware>();
     app.UseMiddleware<StructuredRequestLoggingMiddleware>();
     app.UseMiddleware<RequestMetricsMiddleware>();
+    app.UseResponseCompression();
 
     if (!app.Environment.IsDevelopment())
     {
@@ -368,18 +381,37 @@ try
     app.UseAuthorization();
     app.UseMiddleware<RequestLogContextMiddleware>();
 
-    app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
-        .AllowAnonymous();
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        ResponseWriter = async (context, report) =>
+        {
+            context.Response.ContentType = "application/json";
+            var result = new
+            {
+                status = report.Status.ToString(),
+                checks = report.Entries.Select(e => new
+                {
+                    name = e.Key,
+                    status = e.Value.Status.ToString(),
+                    duration = e.Value.Duration
+                }),
+                totalDuration = report.TotalDuration
+            };
+            await context.Response.WriteAsJsonAsync(result);
+        }
+    }).AllowAnonymous();
 
     app.MapEconomyApiModule();
     app.MapIdentityApiModule();
     app.MapSupportChatApiModule();
     app.MapTemplatesApiModule();
+    app.MapGamificationApiModule();
 
     await app.Services.EnsureEconomySeedDataAsync();
     await app.Services.EnsureIdentitySeedDataAsync();
     await app.Services.EnsureSupportChatSeedDataAsync();
     await app.Services.EnsureTemplatesSeedDataAsync();
+    await app.Services.EnsureGamificationSeedDataAsync();
 
     app.Run();
 }

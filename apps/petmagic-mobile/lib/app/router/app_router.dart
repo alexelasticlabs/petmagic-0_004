@@ -28,6 +28,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generations_gall
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_loader_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_page_transitions.dart';
@@ -250,6 +251,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: MyPetsPage.routePath,
         pageBuilder: (context, state) =>
             _buildFadeSlidePage(state: state, child: const MyPetsPage()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AchievementsPage.routePath,
+        pageBuilder: (context, state) =>
+            _buildFadeSlidePage(state: state, child: const AchievementsPage()),
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,

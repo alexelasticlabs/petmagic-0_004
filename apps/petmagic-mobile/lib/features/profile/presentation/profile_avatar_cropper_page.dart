@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/profile/presentation/avatar_crop_viewport.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 @visibleForTesting
@@ -205,7 +206,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
         math.min(cropRect.width.round(), math.min(maxWidth, maxHeight)),
       );
 
-      final jpgBytes = await compute(_cropAvatarImage, <String, Object>{
+      final jpgBytes = await compute(optimizeAvatarCropBytes, <String, Object>{
         'bytes': sourceImageBytes,
         'x': clampedLeft,
         'y': clampedTop,
@@ -545,41 +546,4 @@ Map<String, Object>? _prepareAvatarPreview(Uint8List sourceBytes) {
     'height': decoded.height,
     'previewBytes': Uint8List.fromList(img.encodeJpg(decoded, quality: 95)),
   };
-}
-
-Uint8List? _cropAvatarImage(Map<String, Object> request) {
-  final sourceBytes = request['bytes'];
-  final x = request['x'];
-  final y = request['y'];
-  final size = request['size'];
-  if (sourceBytes is! Uint8List || x is! int || y is! int || size is! int) {
-    return null;
-  }
-
-  final decodedSource = img.decodeImage(sourceBytes);
-  if (decodedSource == null) {
-    return null;
-  }
-
-  final decoded = img.bakeOrientation(decodedSource);
-  final clampedX = x.clamp(0, decoded.width - 1);
-  final clampedY = y.clamp(0, decoded.height - 1);
-  final maxWidth = decoded.width - clampedX;
-  final maxHeight = decoded.height - clampedY;
-  final cropSize = math.max(1, math.min(size, math.min(maxWidth, maxHeight)));
-  final cropped = img.copyCrop(
-    decoded,
-    x: clampedX,
-    y: clampedY,
-    width: cropSize,
-    height: cropSize,
-  );
-  final resized = img.copyResize(
-    cropped,
-    width: 1200,
-    height: 1200,
-    interpolation: img.Interpolation.cubic,
-  );
-
-  return Uint8List.fromList(img.encodeJpg(resized, quality: 92));
 }

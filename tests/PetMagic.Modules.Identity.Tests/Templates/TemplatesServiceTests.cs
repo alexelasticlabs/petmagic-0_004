@@ -284,9 +284,11 @@ public sealed partial class TemplatesServiceTests
         public List<string> DeletedUrls { get; } = [];
         public List<string> ReadUrls { get; } = [];
         public List<TimeSpan> ReadTtls { get; } = [];
+        public List<MediaUploadCommand> StoredAssets { get; } = [];
 
         public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
         {
+            StoredAssets.Add(asset);
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(
                 new StoredMediaResponse(
                     $"http://localhost:5000/stub/{asset.FileName}",

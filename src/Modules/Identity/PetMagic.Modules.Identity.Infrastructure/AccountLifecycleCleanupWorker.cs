@@ -93,15 +93,20 @@ internal sealed class AccountLifecycleCleanupWorker(
             .Where(x => expiredUserIds.Contains(x.Id))
             .ToListAsync(cancellationToken);
 
-        foreach (var userId in expiredUserIds)
-        {
-            var sessions = dbContext.RefreshTokenSessions.Where(x => x.UserId == userId);
-            var codes = dbContext.UserEmailCodes.Where(x => x.UserId == userId);
-            var jobs = dbContext.EmailDispatchJobs.Where(x => x.UserId == userId);
-            dbContext.RefreshTokenSessions.RemoveRange(sessions);
-            dbContext.UserEmailCodes.RemoveRange(codes);
-            dbContext.EmailDispatchJobs.RemoveRange(jobs);
-        }
+        var userIdHashSet = new HashSet<Guid>(expiredUserIds);
+        var sessions = await dbContext.RefreshTokenSessions
+            .Where(x => userIdHashSet.Contains(x.UserId))
+            .ToListAsync(cancellationToken);
+        var codes = await dbContext.UserEmailCodes
+            .Where(x => userIdHashSet.Contains(x.UserId))
+            .ToListAsync(cancellationToken);
+        var jobs = await dbContext.EmailDispatchJobs
+            .Where(x => x.UserId.HasValue && userIdHashSet.Contains(x.UserId.Value))
+            .ToListAsync(cancellationToken);
+
+        dbContext.RefreshTokenSessions.RemoveRange(sessions);
+        dbContext.UserEmailCodes.RemoveRange(codes);
+        dbContext.EmailDispatchJobs.RemoveRange(jobs);
 
         dbContext.AuditEvents.AddRange(expiredUserIds.Select(userId => new AuditEvent
         {

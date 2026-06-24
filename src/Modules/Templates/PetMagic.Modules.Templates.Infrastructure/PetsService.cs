@@ -1,7 +1,9 @@
 using System.Diagnostics;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -21,6 +23,7 @@ internal sealed class PetsService(
     TemplatesDbContext dbContext,
     IMediaStorage mediaStorage,
     TemplatesOptions options,
+    ILogger<PetsService> logger,
     TemplateWatermarkSettingsStore? watermarkSettings = null) : IPetsService
 {
     private static readonly HashSet<string> ValidPetTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -156,9 +159,10 @@ internal sealed class PetsService(
         }
 
         var photoId = Guid.NewGuid();
-        var petPhotoUpload = command.Photo with
+        var normalizedPhotoUpload = await NormalizePetPhotoUploadAsync(command.Photo, cancellationToken);
+        var petPhotoUpload = normalizedPhotoUpload with
         {
-            PreferredStorageKey = BuildPetPhotoStorageKey(command.UserId, command.PetId, photoId, command.Photo.ContentType)
+            PreferredStorageKey = BuildPetPhotoStorageKey(command.UserId, command.PetId, photoId, normalizedPhotoUpload.ContentType)
         };
         var stored = await mediaStorage.StoreAsync(petPhotoUpload, cancellationToken);
         if (stored.IsFailure)
@@ -223,6 +227,54 @@ internal sealed class PetsService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(await MapPhotoAsync(photo, media, cancellationToken));
+    }
+
+    private async Task<MediaUploadCommand> NormalizePetPhotoUploadAsync(MediaUploadCommand upload, CancellationToken cancellationToken)
+    {
+        byte[]? sourceBytes = upload.Content;
+        if (sourceBytes is null)
+        {
+            sourceBytes = await ReadAllBytesAsync(upload.ContentStream, cancellationToken);
+            if (sourceBytes is null)
+            {
+                return upload;
+            }
+        }
+
+        var normalizedImage = UploadedImageNormalizer.NormalizeOrKeep(
+            sourceBytes,
+            upload.ContentType,
+            UploadedImageProfile.PetPhoto);
+        logger.LogInformation(
+            "Pet photo upload processed. WasNormalized={WasNormalized} Reason={Reason} OriginalBytes={OriginalBytes} OutputBytes={OutputBytes}",
+            normalizedImage.WasNormalized,
+            normalizedImage.DecisionReason,
+            sourceBytes.LongLength,
+            normalizedImage.Content.LongLength);
+        return new MediaUploadCommand(
+            upload.FileName,
+            normalizedImage.ContentType,
+            normalizedImage.Content,
+            null,
+            normalizedImage.Content.LongLength,
+            upload.PreferredStorageKey);
+    }
+
+    private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
+    {
+        if (stream is null)
+        {
+            return null;
+        }
+
+        if (stream.CanSeek)
+        {
+            stream.Position = 0;
+        }
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
     }
 
     public async Task<Result<IReadOnlyList<PetPhotoResponse>>> ListPhotosAsync(Guid userId, Guid petId, CancellationToken cancellationToken)

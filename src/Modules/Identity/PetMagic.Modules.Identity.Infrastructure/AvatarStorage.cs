@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Options;
 
@@ -38,7 +40,10 @@ public interface IAvatarStorage
     Task<Result> DeleteAsync(string? avatarUrl, CancellationToken cancellationToken);
 }
 
-internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvironment hostEnvironment) : IAvatarStorage
+internal sealed class LocalAvatarStorage(
+    AvatarStorageOptions options,
+    IHostEnvironment hostEnvironment,
+    ILogger<LocalAvatarStorage> logger) : IAvatarStorage
 {
     private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -64,6 +69,30 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarContentTypeNotAllowed);
         }
 
+        var avatarBytes = avatar.Content;
+        if (avatarBytes is null)
+        {
+            avatarBytes = await ReadAllBytesAsync(avatar.ContentStream, cancellationToken);
+            if (avatarBytes is null)
+            {
+                return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
+            }
+        }
+
+        var normalizedImage = UploadedImageNormalizer.NormalizeOrKeep(
+            avatarBytes,
+            normalizedContentType,
+            UploadedImageProfile.Avatar);
+        normalizedContentType = normalizedImage.ContentType;
+        extension = normalizedImage.FileExtension;
+        contentLength = normalizedImage.Content.LongLength;
+        logger.LogInformation(
+            "Avatar upload processed. WasNormalized={WasNormalized} Reason={Reason} OriginalBytes={OriginalBytes} OutputBytes={OutputBytes}",
+            normalizedImage.WasNormalized,
+            normalizedImage.DecisionReason,
+            avatarBytes.LongLength,
+            normalizedImage.Content.LongLength);
+
         var root = ResolveRootPath();
         Directory.CreateDirectory(root);
 
@@ -76,24 +105,7 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
         Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
         try
         {
-            if (avatar.Content is not null)
-            {
-                await File.WriteAllBytesAsync(physicalPath, avatar.Content, cancellationToken);
-            }
-            else if (avatar.ContentStream is not null)
-            {
-                if (avatar.ContentStream.CanSeek)
-                {
-                    avatar.ContentStream.Position = 0;
-                }
-
-                await using var output = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await avatar.ContentStream.CopyToAsync(output, cancellationToken);
-            }
-            else
-            {
-                return Result.Failure<StoredAvatarResponse>(IdentityErrors.InvalidAvatarUpload);
-            }
+            await File.WriteAllBytesAsync(physicalPath, normalizedImage.Content, cancellationToken);
         }
         catch
         {
@@ -111,6 +123,23 @@ internal sealed class LocalAvatarStorage(AvatarStorageOptions options, IHostEnvi
             normalizedContentType,
             contentLength,
             physicalPath));
+    }
+
+    private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
+    {
+        if (stream is null)
+        {
+            return null;
+        }
+
+        if (stream.CanSeek)
+        {
+            stream.Position = 0;
+        }
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
     }
 
     public Task<Result> DeleteAsync(string? avatarUrl, CancellationToken cancellationToken)

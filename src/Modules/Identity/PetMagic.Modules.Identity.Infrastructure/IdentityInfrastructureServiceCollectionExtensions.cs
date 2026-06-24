@@ -336,7 +336,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         {
             PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "user-avatars"),
-            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 5 * 1024 * 1024)
+            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 8 * 1024 * 1024)
         };
     }
 

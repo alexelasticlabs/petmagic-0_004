@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
@@ -12,12 +13,14 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
+import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
 final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
   return SupportChatRepository(
     dio: ref.watch(dioProvider),
     sessionStorage: ref.watch(authSessionStorageProvider),
     authSessionCoordinator: ref.watch(authSessionCoordinatorProvider),
+    imageUploadOptimizer: const ImageUploadOptimizer(),
   );
 });
 
@@ -25,13 +28,17 @@ class SupportChatRepository {
   SupportChatRepository({
     required Dio dio,
     required AuthSessionStorage sessionStorage,
+    ImageUploadOptimizer? imageUploadOptimizer,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
+       _imageUploadOptimizer =
+           imageUploadOptimizer ?? const ImageUploadOptimizer(),
        _authSessionCoordinator =
            authSessionCoordinator ??
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
+  final ImageUploadOptimizer _imageUploadOptimizer;
   final AuthSessionCoordinator _authSessionCoordinator;
 
   static const _maxAttachmentCount = 5;
@@ -139,38 +146,39 @@ class SupportChatRepository {
     ProgressCallback? onSendProgress,
     CancelToken? cancelToken,
   }) async {
-    final uploadContentType = await _validateAttachmentForUpload(
+    final prepared = await _prepareAttachmentForUpload(
       filePath: filePath,
-      contentType: contentType,
-    );
-    final safeFileName = _safeMultipartFileName(
       fileName: fileName,
-      filePath: filePath,
+      contentType: contentType,
+      cancelToken: cancelToken,
     );
+    try {
+      final trimmedBody = body?.trim() ?? '';
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.post<Map<String, dynamic>>(
+          '/api/support/conversation/$conversationId/attachments',
+          data: FormData.fromMap({
+            if (trimmedBody.isNotEmpty) 'body': trimmedBody,
+            'locale': localeTag,
+            if (replyToMessageId?.trim().isNotEmpty == true)
+              'replyToMessageId': replyToMessageId!.trim(),
+            'file': await MultipartFile.fromFile(
+              prepared.filePath,
+              filename: prepared.safeFileName,
+              contentType: MediaType.parse(prepared.contentType),
+            ),
+          }),
+          options: authenticatedMultipartRequestOptions(session.accessToken),
+          onSendProgress: onSendProgress,
+          cancelToken: cancelToken,
+        ),
+        retryTransientFailures: false,
+      );
 
-    final trimmedBody = body?.trim() ?? '';
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/attachments',
-        data: FormData.fromMap({
-          if (trimmedBody.isNotEmpty) 'body': trimmedBody,
-          'locale': localeTag,
-          if (replyToMessageId?.trim().isNotEmpty == true)
-            'replyToMessageId': replyToMessageId!.trim(),
-          'file': await MultipartFile.fromFile(
-            filePath,
-            filename: safeFileName,
-            contentType: MediaType.parse(uploadContentType),
-          ),
-        }),
-        options: authenticatedMultipartRequestOptions(session.accessToken),
-        onSendProgress: onSendProgress,
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return SupportChatMessage.fromJson(response.data ?? const {});
+      return SupportChatMessage.fromJson(response.data ?? const {});
+    } finally {
+      await prepared.dispose();
+    }
   }
 
   Future<SupportChatMessage> sendAttachments({
@@ -192,50 +200,52 @@ class SupportChatRepository {
       throw const AppException('support.attachment_too_many', statusCode: 400);
     }
 
-    final validatedAttachments =
-        <({SupportChatUploadAttachment attachment, String contentType})>[];
-    for (final attachment in attachments) {
-      final uploadContentType = await _validateAttachmentForUpload(
-        filePath: attachment.filePath,
-        contentType: attachment.contentType,
-      );
-      validatedAttachments.add((
-        attachment: attachment,
-        contentType: uploadContentType,
-      ));
-    }
-
-    final multipartFiles = await Future.wait(
-      validatedAttachments.map(
-        (entry) => MultipartFile.fromFile(
-          entry.attachment.filePath,
-          filename: _safeMultipartFileName(
-            fileName: entry.attachment.fileName,
-            filePath: entry.attachment.filePath,
+    final preparedAttachments = <PreparedSupportAttachmentUpload>[];
+    try {
+      for (final attachment in attachments) {
+        preparedAttachments.add(
+          await _prepareAttachmentForUpload(
+            filePath: attachment.filePath,
+            fileName: attachment.fileName,
+            contentType: attachment.contentType,
+            cancelToken: cancelToken,
           ),
-          contentType: MediaType.parse(entry.contentType),
-        ),
-      ),
-    );
-    final trimmedBody = body?.trim() ?? '';
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/messages/attachments',
-        data: FormData.fromMap({
-          if (trimmedBody.isNotEmpty) 'body': trimmedBody,
-          'locale': localeTag,
-          if (replyToMessageId?.trim().isNotEmpty == true)
-            'replyToMessageId': replyToMessageId!.trim(),
-          'files': multipartFiles,
-        }),
-        options: authenticatedMultipartRequestOptions(session.accessToken),
-        onSendProgress: onSendProgress,
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
+        );
+      }
 
-    return SupportChatMessage.fromJson(response.data ?? const {});
+      final multipartFiles = await Future.wait(
+        preparedAttachments.map(
+          (entry) => MultipartFile.fromFile(
+            entry.filePath,
+            filename: entry.safeFileName,
+            contentType: MediaType.parse(entry.contentType),
+          ),
+        ),
+      );
+      final trimmedBody = body?.trim() ?? '';
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.post<Map<String, dynamic>>(
+          '/api/support/conversation/$conversationId/messages/attachments',
+          data: FormData.fromMap({
+            if (trimmedBody.isNotEmpty) 'body': trimmedBody,
+            'locale': localeTag,
+            if (replyToMessageId?.trim().isNotEmpty == true)
+              'replyToMessageId': replyToMessageId!.trim(),
+            'files': multipartFiles,
+          }),
+          options: authenticatedMultipartRequestOptions(session.accessToken),
+          onSendProgress: onSendProgress,
+          cancelToken: cancelToken,
+        ),
+        retryTransientFailures: false,
+      );
+
+      return SupportChatMessage.fromJson(response.data ?? const {});
+    } finally {
+      for (final prepared in preparedAttachments) {
+        await prepared.dispose();
+      }
+    }
   }
 
   Future<SupportChatMessage> retryAttachment({
@@ -246,32 +256,33 @@ class SupportChatRepository {
     required String contentType,
     CancelToken? cancelToken,
   }) async {
-    final uploadContentType = await _validateAttachmentForUpload(
+    final prepared = await _prepareAttachmentForUpload(
       filePath: filePath,
-      contentType: contentType,
-    );
-    final safeFileName = _safeMultipartFileName(
       fileName: fileName,
-      filePath: filePath,
+      contentType: contentType,
+      cancelToken: cancelToken,
     );
+    try {
+      final response = await _authorizedRequest<Map<String, dynamic>>(
+        (session) async => _dio.post<Map<String, dynamic>>(
+          '/api/support/conversation/$conversationId/messages/$messageId/attachment/retry',
+          data: FormData.fromMap({
+            'file': await MultipartFile.fromFile(
+              prepared.filePath,
+              filename: prepared.safeFileName,
+              contentType: MediaType.parse(prepared.contentType),
+            ),
+          }),
+          options: authenticatedMultipartRequestOptions(session.accessToken),
+          cancelToken: cancelToken,
+        ),
+        retryTransientFailures: false,
+      );
 
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) async => _dio.post<Map<String, dynamic>>(
-        '/api/support/conversation/$conversationId/messages/$messageId/attachment/retry',
-        data: FormData.fromMap({
-          'file': await MultipartFile.fromFile(
-            filePath,
-            filename: safeFileName,
-            contentType: MediaType.parse(uploadContentType),
-          ),
-        }),
-        options: authenticatedMultipartRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return SupportChatMessage.fromJson(response.data ?? const {});
+      return SupportChatMessage.fromJson(response.data ?? const {});
+    } finally {
+      await prepared.dispose();
+    }
   }
 
   Future<void> markConversationRead(String conversationId) async {
@@ -581,6 +592,38 @@ class SupportChatRepository {
         .replaceAll(RegExp(r'^_+|_+$'), '');
   }
 
+  Future<PreparedSupportAttachmentUpload> _prepareAttachmentForUpload({
+    required String filePath,
+    required String fileName,
+    required String contentType,
+    CancelToken? cancelToken,
+  }) async {
+    final isImage = contentType.toLowerCase().startsWith('image/');
+    final optimizedFile = isImage
+        ? await _imageUploadOptimizer.optimizeForSupportImage(
+            XFile(filePath, name: fileName, mimeType: contentType),
+            cancelToken: cancelToken,
+          )
+        : null;
+    final uploadFile =
+        optimizedFile?.file ??
+        XFile(filePath, name: fileName, mimeType: contentType);
+    final uploadContentType = await _validateAttachmentForUpload(
+      filePath: uploadFile.path,
+      contentType: uploadFile.mimeType ?? contentType,
+    );
+
+    return PreparedSupportAttachmentUpload(
+      filePath: uploadFile.path,
+      contentType: uploadContentType,
+      safeFileName: _safeMultipartFileName(
+        fileName: uploadFile.name,
+        filePath: uploadFile.path,
+      ),
+      optimizedFile: optimizedFile,
+    );
+  }
+
   AppException _mapDioException(
     DioException error, {
     required String fallbackMessage,
@@ -605,4 +648,20 @@ class SupportChatRepository {
       includeCause: false,
     );
   }
+}
+
+class PreparedSupportAttachmentUpload {
+  const PreparedSupportAttachmentUpload({
+    required this.filePath,
+    required this.contentType,
+    required this.safeFileName,
+    this.optimizedFile,
+  });
+
+  final String filePath;
+  final String contentType;
+  final String safeFileName;
+  final OptimizedUploadFile? optimizedFile;
+
+  Future<void> dispose() => optimizedFile?.dispose() ?? Future.value();
 }

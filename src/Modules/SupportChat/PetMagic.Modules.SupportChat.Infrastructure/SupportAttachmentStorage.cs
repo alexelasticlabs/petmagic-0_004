@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 
@@ -28,7 +30,8 @@ public sealed class SupportAttachmentStorageOptions
 
 internal sealed class LocalSupportAttachmentStorage(
     SupportAttachmentStorageOptions options,
-    IHostEnvironment hostEnvironment) : ISupportAttachmentStorage
+    IHostEnvironment hostEnvironment,
+    ILogger<LocalSupportAttachmentStorage> logger) : ISupportAttachmentStorage
 {
     private static readonly Dictionary<string, string> AllowedContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -105,6 +108,36 @@ internal sealed class LocalSupportAttachmentStorage(
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentFileTooLarge);
         }
 
+        byte[]? normalizedAttachmentBytes = null;
+        if (normalizedContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            var attachmentBytes = attachment.Content;
+            if (attachmentBytes is null)
+            {
+                attachmentBytes = await ReadAllBytesAsync(attachment.ContentStream, cancellationToken);
+                if (attachmentBytes is null)
+                {
+                    return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
+                }
+            }
+
+            var normalizedImage = UploadedImageNormalizer.NormalizeOrKeep(
+                attachmentBytes,
+                normalizedContentType,
+                UploadedImageProfile.SupportImage);
+            normalizedAttachmentBytes = normalizedImage.Content;
+            normalizedContentType = normalizedImage.ContentType;
+            extension = normalizedImage.FileExtension;
+            contentLength = normalizedImage.Content.LongLength;
+            logger.LogInformation(
+                "Support attachment processed. WasNormalized={WasNormalized} Reason={Reason} OriginalBytes={OriginalBytes} OutputBytes={OutputBytes} ContentType={ContentType}",
+                normalizedImage.WasNormalized,
+                normalizedImage.DecisionReason,
+                attachmentBytes.LongLength,
+                normalizedImage.Content.LongLength,
+                normalizedContentType);
+        }
+
         var root = ResolveRootPath();
         Directory.CreateDirectory(root);
 
@@ -119,7 +152,11 @@ internal sealed class LocalSupportAttachmentStorage(
 
         try
         {
-            if (attachment.Content is not null)
+            if (normalizedAttachmentBytes is not null)
+            {
+                await File.WriteAllBytesAsync(physicalPath, normalizedAttachmentBytes, cancellationToken);
+            }
+            else if (attachment.Content is not null)
             {
                 await File.WriteAllBytesAsync(physicalPath, attachment.Content, cancellationToken);
             }
@@ -229,6 +266,23 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         return relativePath.Replace('\\', '/');
+    }
+
+    private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
+    {
+        if (stream is null)
+        {
+            return null;
+        }
+
+        if (stream.CanSeek)
+        {
+            stream.Position = 0;
+        }
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
     }
 
     private static bool TryResolveStoredFileFormat(

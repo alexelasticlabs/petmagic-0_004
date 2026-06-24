@@ -790,16 +790,25 @@ class TemplatesController extends Notifier<TemplatesState> {
       }
     }
 
-    for (final url in uniqueUrls) {
+    const concurrencyLimit = 3;
+    final urlList = uniqueUrls.toList();
+    for (var i = 0; i < urlList.length; i += concurrencyLimit) {
       if (!_shouldContinuePreviewWarmup(requestVersion, queryKey)) {
         return;
       }
 
-      try {
-        await ref.read(templateThumbnailWarmupProvider)(url);
-      } catch (_) {
-        // Warmup is best-effort only.
-      }
+      final chunk = urlList.skip(i).take(concurrencyLimit).toList();
+      await Future.wait(
+        chunk.map(_warmupSingleUrl),
+      );
+    }
+  }
+
+  Future<void> _warmupSingleUrl(String url) async {
+    try {
+      await ref.read(templateThumbnailWarmupProvider)(url);
+    } catch (_) {
+      // Warmup is best-effort only.
     }
   }
 

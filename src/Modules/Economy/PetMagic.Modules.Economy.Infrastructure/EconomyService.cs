@@ -1,6 +1,7 @@
 using System.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,6 +23,7 @@ public sealed partial class EconomyService(
     IPaymentGateway paymentGateway,
     IStoreSubscriptionVerifier storeSubscriptionVerifier,
     IOptions<EconomyOptions> options,
+    IMemoryCache memoryCache,
     IEconomyPushTokenService? pushTokenService = null,
     IEconomyPushNotificationSender? pushNotificationSender = null,
     IIdentityService? identityService = null,
@@ -337,14 +339,18 @@ public sealed partial class EconomyService(
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.RefereeUserId == userId, cancellationToken);
 
-        var referredUsers = await dbContext.ReferralAttributions
+        var aggregation = await dbContext.ReferralAttributions
             .AsNoTracking()
             .Where(x => x.ReferrerUserId == userId)
-            .ToListAsync(cancellationToken);
-
-        var rewarded = referredUsers
-            .Where(x => string.Equals(x.Status, ReferralAttributionStatus.Rewarded, StringComparison.Ordinal))
-            .ToList();
+            .GroupBy(x => 1)
+            .Select(g => new
+            {
+                TotalCount = g.Count(),
+                RewardedCount = g.Count(x => x.Status == ReferralAttributionStatus.Rewarded),
+                PendingCount = g.Count(x => x.Status == ReferralAttributionStatus.Pending),
+                TotalRewardSpark = g.Where(x => x.Status == ReferralAttributionStatus.Rewarded).Sum(x => x.RewardSpark)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         return Result.Success(new RewardsSummaryResponse(
             profile.Code,
@@ -353,10 +359,10 @@ public sealed partial class EconomyService(
             activatedReferral?.ReferrerCode,
             activatedReferral?.CreatedAtUtc,
             activatedReferral?.QualifiedAtUtc,
-            rewarded.Sum(x => x.RewardSpark),
-            referredUsers.Count,
-            referredUsers.Count(x => string.Equals(x.Status, ReferralAttributionStatus.Pending, StringComparison.Ordinal)),
-            rewarded.Count));
+            aggregation?.TotalRewardSpark ?? 0,
+            aggregation?.TotalCount ?? 0,
+            aggregation?.PendingCount ?? 0,
+            aggregation?.RewardedCount ?? 0));
     }
 
     public async Task<Result<ReferralCodeAppliedResponse>> ApplyReferralCodeAsync(ApplyReferralCodeCommand command, CancellationToken cancellationToken)

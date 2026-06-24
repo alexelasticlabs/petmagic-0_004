@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
@@ -8,19 +9,29 @@ using PetMagic.Modules.SupportChat.Infrastructure.Entities;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure;
 
-public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supportChatDbContext) : ISupportReplyTemplateCatalogService
+public sealed class SupportReplyTemplateCatalogService(
+    SupportChatDbContext supportChatDbContext,
+    IMemoryCache memoryCache) : ISupportReplyTemplateCatalogService
 {
     private static readonly Error TemplateNotFound = new("support.template_not_found", "Support reply template was not found.");
 
     public async Task<Result<IReadOnlyList<SupportReplyTemplateResponse>>> ListAdminTemplatesAsync(CancellationToken cancellationToken)
     {
+        const string cacheKey = "support_chat:reply_templates";
+        if (memoryCache.TryGetValue(cacheKey, out IReadOnlyList<SupportReplyTemplateResponse>? cached) && cached is not null)
+        {
+            return Result.Success(cached);
+        }
+
         var templates = await supportChatDbContext.SupportReplyTemplates
             .AsNoTracking()
             .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Title)
             .ToListAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<SupportReplyTemplateResponse>>([.. templates.Select(ToResponse)]);
+        var result = (IReadOnlyList<SupportReplyTemplateResponse>)[.. templates.Select(ToResponse)];
+        memoryCache.Set(cacheKey, result, TimeSpan.FromMinutes(5));
+        return Result.Success(result);
     }
 
     public async Task<Result<SupportReplyTemplateResponse>> UpsertAdminTemplateAsync(UpsertSupportReplyTemplateCommand command, CancellationToken cancellationToken)
@@ -52,6 +63,7 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
         template.UpdatedAtUtc = now;
 
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        memoryCache.Remove("support_chat:reply_templates");
         return Result.Success(ToResponse(template));
     }
 
@@ -67,6 +79,7 @@ public sealed class SupportReplyTemplateCatalogService(SupportChatDbContext supp
 
         supportChatDbContext.SupportReplyTemplates.Remove(template);
         await supportChatDbContext.SaveChangesAsync(cancellationToken);
+        memoryCache.Remove("support_chat:reply_templates");
         return Result.Success();
     }
 

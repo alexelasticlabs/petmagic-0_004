@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
@@ -131,9 +132,17 @@ public sealed partial class EconomyService
             UpdatedAtUtc = DateTime.UtcNow
         };
 
-        dbContext.Wallets.Add(wallet);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return wallet;
+        try
+        {
+            dbContext.Wallets.Add(wallet);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return wallet;
+        }
+        catch (DbUpdateException) when (dbContext.Database.IsRelational())
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.Wallets.FirstAsync(x => x.UserId == userId, cancellationToken);
+        }
     }
 
     private async Task<ReferralProfile> GetOrCreateReferralProfileAsync(Guid userId, CancellationToken cancellationToken)
@@ -153,9 +162,17 @@ public sealed partial class EconomyService
             UpdatedAtUtc = now
         };
 
-        dbContext.ReferralProfiles.Add(profile);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return profile;
+        try
+        {
+            dbContext.ReferralProfiles.Add(profile);
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return profile;
+        }
+        catch (DbUpdateException) when (dbContext.Database.IsRelational())
+        {
+            dbContext.ChangeTracker.Clear();
+            return await dbContext.ReferralProfiles.FirstAsync(x => x.UserId == userId, cancellationToken);
+        }
     }
 
     private async Task<string> GenerateUniqueReferralCodeAsync(CancellationToken cancellationToken)
@@ -539,10 +556,16 @@ public sealed partial class EconomyService
         var platform = EconomyPaymentProviderPolicy.NormalizePlatform(query.Platform);
         var region = EconomyPaymentProviderPolicy.NormalizeRegion(query.Country);
         var isEuRegion = EconomyPaymentProviderPolicy.IsEuRegion(region);
-        var configs = await dbContext.PaymentProviderConfigurations
-            .AsNoTracking()
-            .Where(x => x.IsEnabled)
-            .ToListAsync(cancellationToken);
+
+        const string configsCacheKey = "economy:payment_provider_configs";
+        if (!memoryCache.TryGetValue(configsCacheKey, out List<PaymentProviderConfiguration>? configs) || configs is null)
+        {
+            configs = await dbContext.PaymentProviderConfigurations
+                .AsNoTracking()
+                .Where(x => x.IsEnabled)
+                .ToListAsync(cancellationToken);
+            memoryCache.Set(configsCacheKey, configs, TimeSpan.FromMinutes(5));
+        }
 
         var methods = new List<PaywallPaymentMethodResponse>();
 

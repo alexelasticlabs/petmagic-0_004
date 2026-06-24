@@ -8,5 +8,5 @@ public sealed class AvatarStorageOptions
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "user-avatars");
 
-    public long MaxFileSizeBytes { get; init; } = 5 * 1024 * 1024;
+    public long MaxFileSizeBytes { get; init; } = 8 * 1024 * 1024;
 }

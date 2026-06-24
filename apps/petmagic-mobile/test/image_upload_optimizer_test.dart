@@ -26,10 +26,13 @@ void main() {
     final sourceBytes = _noisyJpegBytes(width: 1200, height: 900);
     await File(sourcePath).writeAsBytes(sourceBytes, flush: true);
 
-    final optimizer = ImageUploadOptimizer(
-      minInputBytes: 1,
-      maxDimension: 420,
-      jpegQuality: 60,
+    const optimizer = ImageUploadOptimizer(
+      generationSourceProfile: ImageUploadOptimizationProfile(
+        logProfileName: 'test_generation',
+        minInputBytes: 1,
+        maxDimension: 420,
+        jpegQuality: 60,
+      ),
     );
     final optimized = await optimizer.optimizeGenerationSource(
       XFile(sourcePath, name: r'C:\Users\pet\source-photo.png'),
@@ -55,10 +58,13 @@ void main() {
     final sourcePath = '${tempDir.path}/source-photo.heic';
     await File(sourcePath).writeAsBytes(List<int>.filled(32, 7), flush: true);
 
-    final optimizer = ImageUploadOptimizer(
-      minInputBytes: 1,
-      maxDimension: 420,
-      jpegQuality: 60,
+    const optimizer = ImageUploadOptimizer(
+      generationSourceProfile: ImageUploadOptimizationProfile(
+        logProfileName: 'test_generation',
+        minInputBytes: 1,
+        maxDimension: 420,
+        jpegQuality: 60,
+      ),
     );
     final optimized = await optimizer.optimizeGenerationSource(
       XFile(sourcePath, name: 'source-photo.heic', mimeType: 'image/heic'),
@@ -69,6 +75,32 @@ void main() {
 
     await optimized.dispose();
     expect(await File(sourcePath).exists(), true);
+  });
+
+  test('compresses large support images with support profile', () async {
+    final sourcePath = '${tempDir.path}/support-photo.jpg';
+    final sourceBytes = _noisyJpegBytes(width: 2200, height: 1600);
+    await File(sourcePath).writeAsBytes(sourceBytes, flush: true);
+
+    const optimizer = ImageUploadOptimizer(
+      supportImageProfile: ImageUploadOptimizationProfile(
+        logProfileName: 'test_support',
+        minInputBytes: 1,
+        maxDimension: 900,
+        jpegQuality: 55,
+      ),
+    );
+    final optimized = await optimizer.optimizeForSupportImage(
+      XFile(sourcePath, name: 'support-photo.jpg', mimeType: 'image/jpeg'),
+    );
+
+    expect(optimized.isTemporary, true);
+    expect(
+      await File(optimized.file.path).length(),
+      lessThan(sourceBytes.length),
+    );
+
+    await optimized.dispose();
   });
 }
 

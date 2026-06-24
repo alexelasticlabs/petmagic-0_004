@@ -37,6 +37,7 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   static const Duration _recoveredBannerDuration = Duration(seconds: 3);
   static const Duration _offlineProbeInterval = Duration(seconds: 5);
   static const Duration _internetProbeTimeout = Duration(seconds: 2);
+  static const Duration _probeDebounceWindow = Duration(seconds: 5);
 
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -44,6 +45,8 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   Timer? _restoreBannerTimer;
   bool _lastKnownInternet = true;
   bool _started = false;
+  bool? _lastProbeResult;
+  DateTime? _lastProbeTime;
 
   @override
   NetworkStatusState build() {
@@ -250,12 +253,23 @@ class NetworkStatusController extends Notifier<NetworkStatusState> {
   }
 
   Future<bool> _probeInternet() async {
+    if (_lastProbeResult != null &&
+        _lastProbeTime != null &&
+        DateTime.now().difference(_lastProbeTime!) < _probeDebounceWindow) {
+      return _lastProbeResult!;
+    }
+
     try {
       final lookup = await InternetAddress.lookup(
         'one.one.one.one',
       ).timeout(_internetProbeTimeout);
-      return lookup.any((item) => item.rawAddress.isNotEmpty);
+      final result = lookup.any((item) => item.rawAddress.isNotEmpty);
+      _lastProbeResult = result;
+      _lastProbeTime = DateTime.now();
+      return result;
     } on Object {
+      _lastProbeResult = false;
+      _lastProbeTime = DateTime.now();
       return false;
     }
   }

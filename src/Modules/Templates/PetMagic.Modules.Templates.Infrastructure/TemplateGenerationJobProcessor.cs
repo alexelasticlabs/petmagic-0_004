@@ -12,6 +12,7 @@ using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Data;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 using PetMagic.Modules.Templates.Infrastructure.Options;
+using PetMagic.Modules.Gamification.Application.Abstractions;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -30,7 +31,8 @@ internal sealed class TemplateGenerationJobProcessor(
     TemplatesOptions options,
     ILogger<TemplateGenerationJobProcessor> logger,
     ITemplateWatermarkRenderer? watermarkRenderer = null,
-    TemplateWatermarkSettingsStore? watermarkSettings = null)
+    TemplateWatermarkSettingsStore? watermarkSettings = null,
+    IGamificationService? gamificationService = null)
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
@@ -547,6 +549,7 @@ internal sealed class TemplateGenerationJobProcessor(
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
+        await NotifyGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         logger.LogInformation(
             "Template generation job completed. ElapsedMs={ElapsedMs}",
@@ -675,6 +678,7 @@ internal sealed class TemplateGenerationJobProcessor(
             "Template generation result uploaded. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
         TemplateGenerationMetrics.RecordJobCompleted(job);
+        await NotifyGamificationAsync(job, cancellationToken);
         await PublishStatusChangedAsync(job, cancellationToken);
         logger.LogInformation(
             "Template generation job completed. ElapsedMs={ElapsedMs}",
@@ -1177,6 +1181,30 @@ internal sealed class TemplateGenerationJobProcessor(
             {
                 LocalConcurrencySlots.Remove(slot.Value);
             }
+        }
+    }
+
+    private async Task NotifyGamificationAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
+    {
+        if (gamificationService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var petId = job.PetId ?? job.UserId;
+            await gamificationService.ProcessGenerationCompletedAsync(
+                job.UserId,
+                petId,
+                job.TemplateId,
+                isTemplateOfTheDay: false,
+                isPremium: false,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to notify gamification service for job {JobId}. Generation still completed.", job.Id);
         }
     }
 }

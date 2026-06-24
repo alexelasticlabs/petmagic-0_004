@@ -44,6 +44,25 @@ public sealed partial class IdentityService(
     private const int MaxCodeAttempts = 5;
     private const int MaxCodesPerHourPerEmail = 5;
 
+    private static readonly object SigningKeyCacheLock = new();
+    private static string? _cachedSigningKeyValue;
+    private static SigningCredentials? _cachedSigningCredentials;
+
+    private static SigningCredentials GetOrCreateSigningCredentials(string signingKey)
+    {
+        lock (SigningKeyCacheLock)
+        {
+            if (_cachedSigningCredentials is null || !string.Equals(_cachedSigningKeyValue, signingKey, StringComparison.Ordinal))
+            {
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey));
+                _cachedSigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+                _cachedSigningKeyValue = signingKey;
+            }
+
+            return _cachedSigningCredentials;
+        }
+    }
+
     public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken)
     {
         return Task.FromResult(Result.Success(legalDocumentsCatalog.GetCurrentDocuments(locale)));
@@ -233,8 +252,7 @@ public sealed partial class IdentityService(
         };
         claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Value.SigningKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var credentials = GetOrCreateSigningCredentials(jwtOptions.Value.SigningKey);
 
         var jwt = new JwtSecurityToken(
             issuer: jwtOptions.Value.Issuer,
@@ -285,7 +303,7 @@ public sealed partial class IdentityService(
         return Result.Success();
     }
 
-    private async Task WriteAuditAsync(
+    private Task WriteAuditAsync(
         Guid? subjectUserId,
         string action,
         string details,
@@ -320,7 +338,7 @@ public sealed partial class IdentityService(
             OccurredAtUtc = now
         });
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     private void LogAuthInformation(string operation, Guid userId, string result)

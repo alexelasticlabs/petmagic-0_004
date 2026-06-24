@@ -19,6 +19,10 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_page.
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/widgets/gamification_summary_card.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
+import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
@@ -201,6 +205,11 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                         ),
                       ),
                       const SizedBox(height: 12),
+                      MotionEntrance(
+                        delay: const Duration(milliseconds: 170),
+                        child: _GamificationHighlightsWrapper(),
+                      ),
+                      const SizedBox(height: 12),
                       if (shouldShowPremiumCta) ...[
                         MotionEntrance(
                           delay: const Duration(milliseconds: 200),
@@ -234,6 +243,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 subtitle: text.profilePetsSubtitle,
                                 iconColor: colors.accent,
                                 onTap: () => context.push(MyPetsPage.routePath),
+                              ),
+                              ProfileSettingsRow(
+                                icon: Icons.emoji_events_outlined,
+                                title: 'Achievements',
+                                subtitle: 'View your badges and milestones',
+                                iconColor: const Color(0xFFFFD700),
+                                onTap: () => context.push(AchievementsPage.routePath),
                               ),
                               ProfileSettingsRow(
                                 icon: Icons.privacy_tip_outlined,
@@ -1218,4 +1234,23 @@ class _HeaderActionIcon extends StatelessWidget {
 String _formatProfileNumber(BuildContext context, int value) {
   final locale = Localizations.localeOf(context).toLanguageTag();
   return NumberFormat.decimalPattern(locale).format(value);
+}
+
+class _GamificationHighlightsWrapper extends ConsumerWidget {
+  const _GamificationHighlightsWrapper();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(gamificationSummaryProvider);
+
+    return summaryAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (summary) => GamificationHighlightsCard(
+        summary: summary,
+        onStreakTap: () => context.push(RewardsPage.routePath),
+        onAchievementsTap: () => context.push(AchievementsPage.routePath),
+      ),
+    );
+  }
 }

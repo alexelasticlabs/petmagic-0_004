@@ -1,6 +1,7 @@
 using System.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
@@ -19,6 +20,12 @@ public sealed partial class EconomyService
 {
     public async Task<Result<IReadOnlyList<CurrencyPackResponse>>> ListPacksAsync(CancellationToken cancellationToken)
     {
+        const string cacheKey = "economy:currency_packs";
+        if (memoryCache.TryGetValue(cacheKey, out IReadOnlyList<CurrencyPackResponse>? cached) && cached is not null)
+        {
+            return Result.Success(cached);
+        }
+
         var packEntities = await dbContext.CurrencyPacks
             .Where(x => x.IsActive)
             .OrderBy(x => x.CurrencyCode)
@@ -39,6 +46,7 @@ public sealed partial class EconomyService
                 ResolvePackStoreProductId(x, "app_store")))
             .ToList();
 
+        memoryCache.Set(cacheKey, (IReadOnlyList<CurrencyPackResponse>)packs, TimeSpan.FromMinutes(10));
         return Result.Success<IReadOnlyList<CurrencyPackResponse>>(packs);
     }
 
@@ -70,6 +78,12 @@ public sealed partial class EconomyService
 
     public async Task<Result<IReadOnlyList<PremiumPlanResponse>>> ListPremiumPlansAsync(CancellationToken cancellationToken)
     {
+        const string cacheKey = "economy:premium_plans";
+        if (memoryCache.TryGetValue(cacheKey, out IReadOnlyList<PremiumPlanResponse>? cached) && cached is not null)
+        {
+            return Result.Success(cached);
+        }
+
         var configuredPlans = await dbContext.SubscriptionPlans
             .AsNoTracking()
             .Where(x => x.IsActive)
@@ -95,6 +109,7 @@ public sealed partial class EconomyService
                     x.AppleProductId))
                 .ToList();
 
+            memoryCache.Set(cacheKey, (IReadOnlyList<PremiumPlanResponse>)plans, TimeSpan.FromMinutes(10));
             return Result.Success<IReadOnlyList<PremiumPlanResponse>>(plans);
         }
 
@@ -115,6 +130,7 @@ public sealed partial class EconomyService
                 x.AppStoreProductId))
             .ToList();
 
+        memoryCache.Set(cacheKey, (IReadOnlyList<PremiumPlanResponse>)catalogPlans, TimeSpan.FromMinutes(10));
         return Result.Success<IReadOnlyList<PremiumPlanResponse>>(catalogPlans);
     }
 

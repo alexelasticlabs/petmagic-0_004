@@ -1060,6 +1060,10 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
       return const [];
     }
 
+    if (localReadyRecords.isEmpty && deletedGenerationIds.isEmpty) {
+      return source;
+    }
+
     final localById = {
       for (final record in localReadyRecords) record.generationId: record,
     };
@@ -1071,6 +1075,11 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           if (localRecord == null ||
               localRecord.isDeletedLocally ||
               !_localRecordMatchesGeneration(localRecord, item)) {
+            if (item.localPreviewPath == null &&
+                item.localOutputPath == null &&
+                !item.isLocalMediaReady) {
+              return item;
+            }
             return _applyLocalReadState(
               item.copyWith(
                 clearLocalPreviewPath: true,
@@ -1080,6 +1089,11 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
             );
           }
 
+          if (item.localPreviewPath == localRecord.previewLocalPath &&
+              item.localOutputPath == localRecord.outputLocalPath &&
+              item.isLocalMediaReady == localRecord.isDownloadComplete) {
+            return item;
+          }
           return _applyLocalReadState(
             item.copyWith(
               localPreviewPath: localRecord.previewLocalPath,

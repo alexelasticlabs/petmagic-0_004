@@ -34,15 +34,17 @@ final sessionScopeResetProvider = Provider<void>((ref) {
       return;
     }
 
-    ref.invalidate(walletControllerProvider);
-    ref.invalidate(templatesControllerProvider);
-    ref.invalidate(generationHistoryControllerProvider);
-    ref.invalidate(templateGenerationControllerProvider);
-    ref.invalidate(premiumControllerProvider);
-    ref.invalidate(premiumSubscriptionSummaryProvider);
-    ref.invalidate(linkedAccountsProvider);
-    ref.invalidate(profileControllerProvider);
-    ref.invalidate(supportChatControllerProvider);
+    Future.microtask(() {
+      ref.invalidate(walletControllerProvider);
+      ref.invalidate(templatesControllerProvider);
+      ref.invalidate(generationHistoryControllerProvider);
+      ref.invalidate(templateGenerationControllerProvider);
+      ref.invalidate(premiumControllerProvider);
+      ref.invalidate(premiumSubscriptionSummaryProvider);
+      ref.invalidate(linkedAccountsProvider);
+      ref.invalidate(profileControllerProvider);
+      ref.invalidate(supportChatControllerProvider);
+    });
 
     if (!next.isAuthenticated) {
       final templateGenerationRepository = ref.read(

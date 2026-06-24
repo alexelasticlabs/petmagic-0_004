@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PetMagic.Modules.Gamification.Application\PetMagic.Modules.Gamification.Application.csproj" />
+    <ProjectReference Include="..\PetMagic.Modules.Gamification.Domain\PetMagic.Modules.Gamification.Domain.csproj" />
+    <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

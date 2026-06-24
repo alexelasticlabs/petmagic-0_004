@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Caching.Memory;
+
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -8,6 +10,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed partial class TemplatesService(
     TemplatesDbContext dbContext,
     TemplatesOptions options,
+    IMemoryCache memoryCache,
     IMediaMetadataReader metadataReader,
     IMediaStorage mediaStorage,
     ITemplateMediaLifecycleService mediaLifecycleService,

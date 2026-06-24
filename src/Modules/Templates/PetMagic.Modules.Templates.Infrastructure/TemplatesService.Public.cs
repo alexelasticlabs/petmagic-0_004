@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -29,7 +30,13 @@ internal sealed partial class TemplatesService
 
         baseQuery = ApplyTemplateTagFilter(baseQuery, normalizedTags);
 
-        var totalCount = await baseQuery.LongCountAsync(cancellationToken);
+        var countCacheKey = $"templates:count:{normalizedCategory}:{query.Type}:{query.PremiumOnly}:{string.Join(",", normalizedTags)}";
+        if (!memoryCache.TryGetValue(countCacheKey, out long totalCount))
+        {
+            totalCount = await baseQuery.LongCountAsync(cancellationToken);
+            memoryCache.Set(countCacheKey, totalCount, TimeSpan.FromSeconds(30));
+        }
+
         var offset = ((long)page - 1) * pageSize;
         if (offset > int.MaxValue)
         {
