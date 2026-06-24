@@ -38,7 +38,11 @@ public sealed class GlobalExceptionMiddleware(
 
             if (context.Response.HasStarted)
             {
-                throw;
+                logger.LogWarning(
+                    "Exception occurred after response started for {HttpMethod} {RequestPath}. Connection will be terminated.",
+                    context.Request.Method,
+                    context.Request.Path.Value ?? string.Empty);
+                return;
             }
 
             context.Response.Clear();

@@ -22,7 +22,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         var pushOptions = BuildSupportChatPushOptions(configuration);
         ValidateProductionPushConfiguration(pushOptions, isProduction);
 
-        services.AddDbContext<SupportChatDbContext>(options =>
+        services.AddDbContextPool<SupportChatDbContext>(options =>
         {
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });

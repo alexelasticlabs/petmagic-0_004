@@ -919,7 +919,7 @@ String _friendlyError(AppLocalizations text, String value) {
   }
 
   if (value.contains('wallet.request_failed') ||
-      value.contains('appexception(400)')) {
+      value.contains('wallet.bad_request')) {
     return text.walletRedeemServerError;
   }
 
@@ -927,7 +927,8 @@ String _friendlyError(AppLocalizations text, String value) {
     return text.walletDataUnavailableFallback;
   }
 
-  if (value.contains('AppException(500)') ||
+  if (value.contains('wallet.server_error') ||
+      value.contains('wallet.internal_error') ||
       value.contains('processing your request')) {
     return text.walletRedeemServerError;
   }

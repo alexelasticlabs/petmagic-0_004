@@ -148,7 +148,7 @@ void main() {
 
   test('template page pet shortcut avatar is cached at bounded size', () async {
     final source = await File(
-      'lib/features/templates/presentation/templates_page.dart',
+      'lib/features/templates/presentation/widgets/create_with_pet_block.dart',
     ).readAsString();
 
     expect(source, contains('const int _petShortcutAvatarCacheWidth = 64;'));

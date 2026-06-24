@@ -5,13 +5,9 @@ public sealed class AdminTemplateEndpointHardeningTests
     [Fact]
     public void UserGenerationHistory_ShouldUseStablePaginationOrder()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "Templates",
-            "PetMagic.Modules.Templates.Infrastructure",
-            "TemplateGenerationService.cs"));
+        var source = ReadAllPartialFiles(
+            "TemplateGenerationService",
+            "PetMagic.Modules.Templates.Infrastructure");
 
         Assert.Contains(".OrderByDescending(x => x.CreatedAtUtc)", source, StringComparison.Ordinal);
         Assert.Contains(".ThenByDescending(x => x.Id)", source, StringComparison.Ordinal);
@@ -127,13 +123,9 @@ public sealed class AdminTemplateEndpointHardeningTests
     [Fact]
     public void GenerationHistoryComparePreviews_ShouldUseBatchLookup()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "Templates",
-            "PetMagic.Modules.Templates.Infrastructure",
-            "TemplateGenerationService.cs"));
+        var source = ReadAllPartialFiles(
+            "TemplateGenerationService",
+            "PetMagic.Modules.Templates.Infrastructure");
         var historyMapper = ExtractMethodBody(source, "private async Task<IReadOnlyList<TemplateGenerationResponse>> MapResponsesWithQueueMetricsAsync");
         var batchLookup = ExtractMethodBody(source, "private async Task<CompareAccessContext> BuildCompareAccessContextAsync");
 
@@ -291,6 +283,14 @@ public sealed class AdminTemplateEndpointHardeningTests
         }
 
         throw new InvalidOperationException("Could not locate repository root.");
+    }
+
+    private static string ReadAllPartialFiles(string baseFileName, string namespacePath)
+    {
+        var root = FindRepositoryRoot();
+        var dir = Path.Combine(root, "src", "Modules", "Templates", namespacePath);
+        var files = Directory.GetFiles(dir, $"{baseFileName}*.cs");
+        return string.Join("\n", files.Select(File.ReadAllText));
     }
 
     private static string ExtractMethodBody(string source, string methodName)

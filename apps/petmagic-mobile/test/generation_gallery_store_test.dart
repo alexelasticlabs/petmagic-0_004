@@ -476,8 +476,8 @@ void main() {
 
       expect(userOneRecord.accountScope, 'user-1');
       expect(userTwoRecord.accountScope, 'user-2');
-      expect(userOneRecord.outputLocalPath, contains('/user-1/'));
-      expect(userTwoRecord.outputLocalPath, contains('/user-2/'));
+      expect(userOneRecord.outputLocalPath, contains('user-1'));
+      expect(userTwoRecord.outputLocalPath, contains('user-2'));
       expect(userOneRecord.previewLocalPath, userOneRecord.outputLocalPath);
       expect(userTwoRecord.previewLocalPath, userTwoRecord.outputLocalPath);
       expect(

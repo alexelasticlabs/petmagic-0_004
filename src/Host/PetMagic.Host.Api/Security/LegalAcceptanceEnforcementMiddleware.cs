@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.Modules.Identity.Application.Abstractions;
@@ -14,7 +15,8 @@ namespace PetMagic.Host.Api.Security;
 
 public sealed class LegalAcceptanceEnforcementMiddleware(
     RequestDelegate next,
-    ILogger<LegalAcceptanceEnforcementMiddleware> logger)
+    ILogger<LegalAcceptanceEnforcementMiddleware> logger,
+    IMemoryCache cache)
 {
     private static readonly PathString[] AllowedPaths =
     [
@@ -38,6 +40,7 @@ public sealed class LegalAcceptanceEnforcementMiddleware(
 
     private const string LegalAcceptanceRequiredCode = "auth.legal_acceptance_required";
     private const string LegalAcceptanceRequiredMessage = "Current legal documents must be accepted before using this endpoint.";
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
     public async Task InvokeAsync(HttpContext context, UserManager<AppUser> userManager, ILegalDocumentsCatalog legalDocumentsCatalog)
     {
@@ -57,11 +60,18 @@ public sealed class LegalAcceptanceEnforcementMiddleware(
             return;
         }
 
-        var user = await userManager.Users
-            .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == userId, context.RequestAborted);
+        var cacheKey = $"legal_acceptance:{userId}";
+        if (!cache.TryGetValue(cacheKey, out bool requiresAcceptance))
+        {
+            var user = await userManager.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == userId, context.RequestAborted);
 
-        if (user is null || !RequiresAcceptance(user, legalDocumentsCatalog))
+            requiresAcceptance = user is not null && RequiresAcceptance(user, legalDocumentsCatalog);
+            cache.Set(cacheKey, requiresAcceptance, CacheDuration);
+        }
+
+        if (!requiresAcceptance)
         {
             await next(context);
             return;

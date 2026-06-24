@@ -5,6 +5,7 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
+import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 class ApiLoggingInterceptor extends Interceptor {
@@ -136,19 +137,10 @@ class ApiLoggingInterceptor extends Interceptor {
 
   String _requestPath(RequestOptions options) {
     if (options.path.isNotEmpty) {
-      return _stripQuery(options.path);
+      return stripQuery(options.path);
     }
 
-    return _stripQuery(options.uri.path);
-  }
-
-  String _stripQuery(String value) {
-    final queryIndex = value.indexOf('?');
-    if (queryIndex < 0) {
-      return value;
-    }
-
-    return value.substring(0, queryIndex);
+    return stripQuery(options.uri.path);
   }
 
   String _requestOrigin(RequestOptions options) {

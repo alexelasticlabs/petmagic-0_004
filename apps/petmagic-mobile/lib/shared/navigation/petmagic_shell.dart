@@ -19,7 +19,7 @@ import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 const _bottomNavHeight = 42.0;
 const _bottomNavOuterGap = 10.0;
 const _bottomNavContentInsetExtra = 18.0;
-const _bottomNavBackdropExtra = 28.0;
+const _bottomNavBackdropExtra = 64.0;
 const _bottomSheetBottomGap = 14.0;
 const _activeGenerationThumbnailCacheWidth = 96;
 
@@ -244,24 +244,31 @@ class _BottomNavBackdrop extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final isDegraded = PerformanceGuard.isDegradedMode(context);
-    final blurSigma = isDegraded ? 8.0 : 12.0;
+    final blurSigma = isDegraded ? 12.0 : 24.0;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final height =
         bottomPadding +
         _bottomNavHeight +
         _bottomNavOuterGap +
         _bottomNavBackdropExtra;
-    final scrim = DecoratedBox(
+    final glassFill = DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: isLight ? 0.26 : 0.18),
+      ),
+      child: const SizedBox.expand(),
+    );
+    final glassTint = DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            colors.backgroundBottom.withValues(alpha: 0),
-            colors.backgroundBottom.withValues(alpha: isLight ? 0.24 : 0.10),
-            colors.backgroundBottom.withValues(alpha: isLight ? 0.46 : 0.18),
+            colors.surface.withValues(alpha: isLight ? 0.08 : 0.05),
+            colors.surface.withValues(alpha: isLight ? 0.12 : 0.08),
+            colors.surface.withValues(alpha: isLight ? 0.18 : 0.12),
+            colors.surface.withValues(alpha: isLight ? 0.24 : 0.16),
           ],
-          stops: const [0, 0.48, 1],
+          stops: const [0, 0.38, 0.76, 1],
         ),
       ),
       child: const SizedBox.expand(),
@@ -274,11 +281,20 @@ class _BottomNavBackdrop extends StatelessWidget {
       height: height,
       child: RepaintBoundary(
         child: IgnorePointer(
-          child: ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-              child: scrim,
-            ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(
+                    sigmaX: blurSigma,
+                    sigmaY: blurSigma,
+                  ),
+                  child: glassFill,
+                ),
+              ),
+              glassTint,
+            ],
           ),
         ),
       ),

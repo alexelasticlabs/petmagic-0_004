@@ -14,6 +14,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
+Future<void> _safeDeleteTempDir(Directory dir) async {
+  if (!await dir.exists()) return;
+  for (var i = 0; i < 3; i++) {
+    try {
+      await dir.delete(recursive: true);
+      return;
+    } on FileSystemException {
+      if (i < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+    }
+  }
+}
+
 void main() {
   setUp(() {
     SharedPreferencesAsyncPlatform.instance =
@@ -120,7 +134,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final file = await _writeTinyJpeg(tempDir, 'source.jpg');
@@ -199,7 +213,7 @@ void main() {
       );
       addTearDown(() async {
         if (await tempDir.exists()) {
-          await tempDir.delete(recursive: true);
+          await _safeDeleteTempDir(tempDir);
         }
       });
 
@@ -238,7 +252,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
 
@@ -287,7 +301,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
 
@@ -336,7 +350,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
 
@@ -386,7 +400,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
 
@@ -430,7 +444,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final file = await _writeTinyJpeg(tempDir, 'pet.jpg');
@@ -477,7 +491,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final file = await _writeTinyJpeg(tempDir, 'pet.jpg');
@@ -526,7 +540,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final heicFile = await _writeFtypImage(tempDir, 'pet.heic', 'heic');
@@ -654,7 +668,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final file = await _writeTinyJpeg(tempDir, 'pet.jpg');
@@ -832,7 +846,7 @@ void main() {
     );
     addTearDown(() async {
       if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
+        await _safeDeleteTempDir(tempDir);
       }
     });
     final file = await _writeTinyJpeg(tempDir, 'pet.jpg');

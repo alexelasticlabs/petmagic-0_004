@@ -29,13 +29,12 @@ public sealed partial class IdentityService
         var normalizedSearch = search?.Trim();
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
-            var loweredSearch = normalizedSearch.ToLowerInvariant();
             var matchesUserId = Guid.TryParse(normalizedSearch, out var searchedUserId);
 
             query = query.Where(user =>
                 (matchesUserId && user.Id == searchedUserId)
-                || (user.Email != null && user.Email.ToLower().Contains(loweredSearch))
-                || (user.DisplayName != null && user.DisplayName.ToLower().Contains(loweredSearch)));
+                || (user.Email != null && EF.Functions.ILike(user.Email, $"%{normalizedSearch}%"))
+                || (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, $"%{normalizedSearch}%")));
         }
 
         var normalizedRole = NormalizeSystemRole(role);

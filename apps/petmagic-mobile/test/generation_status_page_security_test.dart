@@ -842,6 +842,8 @@ void main() {
       expect(mediaActions.sharedFileNames, [
         'Movie_Star_Pet_Poster_generation-1.jpg',
       ]);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     },
   );

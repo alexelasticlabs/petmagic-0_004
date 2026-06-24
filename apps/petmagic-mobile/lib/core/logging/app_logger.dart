@@ -3,7 +3,9 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
+import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:petmagic_mobile/core/network/request_identity.dart';
 
 class AppLogger {
@@ -201,19 +203,10 @@ class AppLogger {
 
   static String _requestPath(RequestOptions options) {
     if (options.path.isNotEmpty) {
-      return _stripQuery(options.path);
+      return stripQuery(options.path);
     }
 
-    return _stripQuery(options.uri.path);
-  }
-
-  static String _stripQuery(String value) {
-    final queryIndex = value.indexOf('?');
-    if (queryIndex < 0) {
-      return value;
-    }
-
-    return value.substring(0, queryIndex);
+    return stripQuery(options.uri.path);
   }
 
   static Map<String, Object> _sanitizeContext(Map<String, Object?> context) {

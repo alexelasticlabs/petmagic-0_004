@@ -115,7 +115,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IOptions<EconomyOptions>>(Microsoft.Extensions.Options.Options.Create(economyOptions));
 
-        services.AddDbContext<EconomyDbContext>(options =>
+        services.AddDbContextPool<EconomyDbContext>(options =>
         {
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
@@ -123,6 +123,8 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         services.AddScoped<EconomyAdminConfigurationService>();
         services.AddScoped<EconomyAdminRedeemCodeService>();
         services.AddScoped<IEconomyService, EconomyService>();
+        services.AddScoped<IEconomyAdminService>(sp =>
+            (IEconomyAdminService)sp.GetRequiredService<IEconomyService>());
         services.AddScoped<IAdminUserEconomyAnalyticsReader, AdminUserEconomyAnalyticsReader>();
         services.AddSingleton<IGoogleStoreWebhookTokenVerifier, GoogleStoreWebhookTokenVerifier>();
         services.AddSingleton<IStoreWebhookSecurityValidator, StoreWebhookSecurityValidator>();
@@ -295,13 +297,9 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             dbContext,
             IsProductionEnvironment() ? "live" : "test");
 
-        if (await dbContext.CurrencyPacks.AnyAsync())
+        if (!await dbContext.CurrencyPacks.AnyAsync())
         {
-            dbContext.CurrencyPacks.RemoveRange(dbContext.CurrencyPacks);
-            await dbContext.SaveChangesAsync();
-        }
-
-        dbContext.CurrencyPacks.AddRange(
+            dbContext.CurrencyPacks.AddRange(
             new CurrencyPack
             {
                 Id = Guid.NewGuid(),
@@ -376,6 +374,7 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             });
 
         await dbContext.SaveChangesAsync();
+        }
     }
 
     private static async Task SeedSubscriptionPlansAsync(EconomyDbContext dbContext)

@@ -27,7 +27,7 @@ public sealed partial class EconomyService(
     IIdentityService? identityService = null,
     ILogger<EconomyService>? logger = null,
     IAdminAuditLog? adminAuditLog = null,
-    IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null) : IEconomyService
+    IStoreWebhookSecurityValidator? storeWebhookSecurityValidator = null) : IEconomyService, IEconomyAdminService
 {
     private readonly EconomyAdminConfigurationService _adminConfigurationService =
         new(dbContext, options);

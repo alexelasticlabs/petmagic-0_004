@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
@@ -22,18 +23,23 @@ const _supportedLanguageCodes = <String>{
 final dioProvider = Provider<Dio>((ref) {
   final resolver = ref.watch(apiBaseUrlResolverProvider);
 
+  final headers = <String, String>{
+    'Accept': 'application/json',
+    'X-PetMagic-Client': 'mobile-flutter',
+  };
+
+  if (kDebugMode) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+    headers['Bypass-Tunnel-Reminder'] = 'true';
+  }
+
   final dio = Dio(
     BaseOptions(
       baseUrl: AppConfig.apiBaseUrl,
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 25),
       sendTimeout: const Duration(seconds: 20),
-      headers: const {
-        'Accept': 'application/json',
-        'X-PetMagic-Client': 'mobile-flutter',
-        'ngrok-skip-browser-warning': 'true',
-        'Bypass-Tunnel-Reminder': 'true',
-      },
+      headers: headers,
     ),
   );
 
@@ -66,7 +72,7 @@ String _resolvePreferredLocaleTag(Ref ref) {
 String _normalizeLocaleTag(Locale locale) {
   final languageCode = locale.languageCode.toLowerCase();
   if (!_supportedLanguageCodes.contains(languageCode)) {
-    return 'ru';
+    return 'en';
   }
 
   final countryCode = locale.countryCode?.toUpperCase();

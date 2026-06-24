@@ -55,6 +55,10 @@ void main() {
         InMemorySharedPreferencesAsync.empty();
   });
 
+  tearDown(() {
+    PetMagicNotificationCenter.instance.clearQueue();
+  });
+
   testWidgets('shows welcome screen for first-time guest', (tester) async {
     await _pumpApp(tester);
 
@@ -901,6 +905,7 @@ void main() {
 
       router.go(GenerationsGalleryPage.routePath);
       await _pumpFrames(tester);
+      await tester.pumpAndSettle();
       expect(find.byType(GenerationsGalleryPage), findsOneWidget);
       expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
       expect(
@@ -913,15 +918,15 @@ void main() {
       router.go(MyPetsPage.routePath);
       await _pumpFrames(tester);
       expect(find.byType(MyPetsPage), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
-      expect(find.text(text.authRequiredMessage), findsAtLeastNWidgets(1));
+      expect(find.text(text.petsAuthRequiredTitle), findsAtLeastNWidgets(1));
+      expect(find.text(text.petsAuthRequiredMessage), findsAtLeastNWidgets(1));
       expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
 
       router.go(PetDetailsPage.location('pet-router'));
       await _pumpFrames(tester);
       expect(find.byType(PetDetailsPage), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
-      expect(find.text(text.authRequiredMessage), findsAtLeastNWidgets(1));
+      expect(find.text(text.petsAuthRequiredTitle), findsAtLeastNWidgets(1));
+      expect(find.text(text.petsAuthRequiredMessage), findsAtLeastNWidgets(1));
       expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
       expect(generationRepository.fetchPetPhotosCalls, 0);
       expect(generationRepository.fetchPetGenerationsCalls, 0);

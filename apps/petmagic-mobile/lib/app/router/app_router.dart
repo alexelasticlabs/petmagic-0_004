@@ -25,6 +25,7 @@ import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_preview_loader_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/template_preview_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/all_transactions_page.dart';
@@ -260,25 +261,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
-        path: TemplatePreviewPage.routePath,
-        redirect: (context, state) =>
-            state.extra is TemplateItem ||
-                state.extra is TemplatePreviewRouteArgs
-            ? null
-            : TemplatesPage.routePath,
+        path: '${TemplatePreviewPage.routePath}/:templateId',
+        redirect: (context, state) {
+          if (state.extra is TemplateItem || state.extra is TemplatePreviewRouteArgs) {
+            return null;
+          }
+          final templateId = state.pathParameters['templateId'];
+          if (templateId != null && templateId.isNotEmpty) {
+            return null;
+          }
+          return TemplatesPage.routePath;
+        },
         pageBuilder: (context, state) {
-          final extra = state.extra!;
-          final args = switch (extra) {
-            final TemplatePreviewRouteArgs value => value,
-            final TemplateItem value => TemplatePreviewRouteArgs(
-              template: value,
+          final extra = state.extra;
+          final TemplatePreviewRouteArgs args;
+          if (extra is TemplatePreviewRouteArgs) {
+            args = extra;
+          } else if (extra is TemplateItem) {
+            args = TemplatePreviewRouteArgs(
+              template: extra,
               hasPremiumAccess: false,
               isAuthenticated: false,
-            ),
-            _ => throw StateError(
-              'Unexpected template preview route args type.',
-            ),
-          };
+            );
+          } else {
+            final templateId = state.pathParameters['templateId'] ?? '';
+            return _buildFadeSlidePage(
+              state: state,
+              child: TemplatePreviewLoaderPage(templateId: templateId),
+            );
+          }
 
           return _buildFadeSlidePage(
             state: state,

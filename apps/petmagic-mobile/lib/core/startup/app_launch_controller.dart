@@ -125,6 +125,10 @@ class AppLaunchController extends Notifier<AppLaunchState> {
         );
       }
 
+      if (!ref.mounted || !state.isLoading) {
+        return;
+      }
+
       try {
         final onboardingSeen = await _readOnboardingSeenWithTimeout();
         if (onboardingSeen == null) {
@@ -137,7 +141,7 @@ class AppLaunchController extends Notifier<AppLaunchState> {
         _logAppLaunchFailure('read_onboarding', error, stackTrace);
       }
 
-      if (!ref.mounted) {
+      if (!ref.mounted || !state.isLoading) {
         return;
       }
 

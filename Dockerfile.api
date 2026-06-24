@@ -30,9 +30,12 @@ RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgssapi-krb5-2 curl \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -r appuser
 WORKDIR /app
 COPY --from=builder /app/publish .
-RUN mkdir -p /app/wwwroot/support-attachments /app/wwwroot/user-avatars /app/wwwroot/templates-media
+RUN mkdir -p /app/wwwroot/support-attachments /app/wwwroot/user-avatars /app/wwwroot/templates-media \
+    && chown -R appuser:appuser /app
+USER appuser
 EXPOSE 5000
 ENTRYPOINT ["dotnet", "PetMagic.Host.Api.dll"]

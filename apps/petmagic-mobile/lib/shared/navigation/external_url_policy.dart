@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/network/network_utils.dart';
 
 const _localDebugHosts = <String>{
   'localhost',
@@ -171,20 +172,5 @@ Set<String> profileAvatarAllowedHosts() {
 }
 
 bool _isPrivateIpv4Host(String host) {
-  final octets = host.split('.');
-  if (octets.length != 4) {
-    return false;
-  }
-
-  final first = int.tryParse(octets[0]);
-  final second = int.tryParse(octets[1]);
-  if (first == null || second == null) {
-    return false;
-  }
-
-  final isClassA = first == 10;
-  final isClassB = first == 172 && second >= 16 && second <= 31;
-  final isClassC = first == 192 && second == 168;
-
-  return isClassA || isClassB || isClassC;
+  return isPrivateIpv4(host);
 }

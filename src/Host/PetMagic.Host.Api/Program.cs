@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Http;
 
@@ -204,7 +205,7 @@ try
 
         options.AddPolicy("webhooks", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
-                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                partitionKey: RateLimitPartitionKeys.WebhookProvider(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = RateLimitPermit("Webhooks", 120),
@@ -270,6 +271,11 @@ try
     Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "user-avatars"));
     Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "templates-media"));
 
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    });
+
     app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseMiddleware<GlobalExceptionMiddleware>();
     app.UseMiddleware<StructuredRequestLoggingMiddleware>();
@@ -286,6 +292,7 @@ try
         context.Response.Headers.TryAdd("X-Content-Type-Options", "nosniff");
         context.Response.Headers.TryAdd("X-Frame-Options", "DENY");
         context.Response.Headers.TryAdd("Referrer-Policy", "no-referrer");
+        context.Response.Headers.TryAdd("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
         await next();
     });
 

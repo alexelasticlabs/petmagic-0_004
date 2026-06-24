@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/network/network_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final apiBaseUrlResolverProvider = Provider<ApiBaseUrlResolver>((ref) {
@@ -273,8 +274,10 @@ class ApiBaseUrlResolver {
       );
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set('X-PetMagic-Client', 'mobile-flutter');
-      request.headers.set('ngrok-skip-browser-warning', 'true');
-      request.headers.set('Bypass-Tunnel-Reminder', 'true');
+      if (kDebugMode) {
+        request.headers.set('ngrok-skip-browser-warning', 'true');
+        request.headers.set('Bypass-Tunnel-Reminder', 'true');
+      }
 
       final response = await request.close().timeout(_probeReadTimeout);
       await response.drain<void>();
@@ -447,22 +450,7 @@ class ApiBaseUrlResolver {
   }
 
   bool _isPrivateIpv4(InternetAddress address) {
-    final octets = address.address.split('.');
-    if (octets.length != 4) {
-      return false;
-    }
-
-    final first = int.tryParse(octets[0]);
-    final second = int.tryParse(octets[1]);
-    if (first == null || second == null) {
-      return false;
-    }
-
-    final isClassA = first == 10;
-    final isClassB = first == 172 && second >= 16 && second <= 31;
-    final isClassC = first == 192 && second == 168;
-
-    return isClassA || isClassB || isClassC;
+    return isPrivateIpv4(address.address);
   }
 
   Future<String?> _readPersistedBaseUrl() async {

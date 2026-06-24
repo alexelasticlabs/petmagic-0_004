@@ -120,7 +120,7 @@ public static class AdminEconomyEndpoints
         [FromQuery] int? take,
         [FromQuery] string? source,
         [FromQuery] Guid? userId,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminWalletLedgerAsync(skip ?? 0, take ?? 50, source, userId, cancellationToken);
@@ -133,7 +133,7 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Ok<AdminEconomyDashboardMetricsResponse>> GetDashboardMetricsAsync(
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminDashboardMetricsAsync(cancellationToken);
@@ -156,7 +156,7 @@ public static class AdminEconomyEndpoints
             return invalidFilterProblem;
         }
 
-        var service = serviceProvider.GetRequiredService<IEconomyService>();
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.GetAdminPurchaseHistoryAsync(skip ?? 0, take ?? 50, status, provider, search, userId, cancellationToken);
         if (result.IsFailure)
         {
@@ -169,7 +169,7 @@ public static class AdminEconomyEndpoints
     private static async Task<Results<Ok<PurchaseHistoryItemResponse>, ProblemHttpResult>> RefundPurchaseAsync(
         [FromRoute] Guid orderId,
         [FromBody] AdminRefundPurchaseRequest? request,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.RefundAdminPurchaseAsync(
@@ -216,7 +216,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] Guid userId,
         [FromBody] AdminRevokePremiumRequest? request,
         [FromServices] IValidator<AdminRevokePremiumSubscriptionCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new AdminRevokePremiumSubscriptionCommand(
@@ -246,7 +246,7 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Ok<IReadOnlyList<AdminCurrencyPackResponse>>> ListPacksAsync(
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminCurrencyPacksAsync(cancellationToken);
@@ -268,7 +268,7 @@ public static class AdminEconomyEndpoints
             return invalidFilterProblem;
         }
 
-        var service = serviceProvider.GetRequiredService<IEconomyService>();
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.GetAdminSubscriptionsAsync(skip ?? 0, take ?? 50, status, provider, search, cancellationToken);
         if (result.IsFailure)
         {
@@ -279,7 +279,7 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Ok<IReadOnlyList<AdminSubscriptionPlanResponse>>> ListSubscriptionPlansAsync(
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminSubscriptionPlansAsync(cancellationToken);
@@ -287,7 +287,7 @@ public static class AdminEconomyEndpoints
     }
 
     private static async Task<Ok<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>> ListPaymentProviderConfigurationsAsync(
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminPaymentProviderConfigurationsAsync(cancellationToken);
@@ -308,7 +308,7 @@ public static class AdminEconomyEndpoints
             return invalidFilterProblem;
         }
 
-        var service = serviceProvider.GetRequiredService<IEconomyService>();
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.GetAdminSubscriptionEventsAsync(skip ?? 0, take ?? 50, provider, status, cancellationToken);
         if (result.IsFailure)
         {
@@ -322,7 +322,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] Guid packId,
         [FromBody] UpdatePackRequest request,
         [FromServices] IValidator<UpdateCurrencyPackCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new UpdateCurrencyPackCommand(
@@ -356,7 +356,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] string planId,
         [FromBody] UpdateSubscriptionPlanRequest request,
         [FromServices] IValidator<UpdateSubscriptionPlanCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new UpdateSubscriptionPlanCommand(
@@ -394,7 +394,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] Guid configurationId,
         [FromBody] UpdatePaymentProviderConfigurationRequest request,
         [FromServices] IValidator<UpdatePaymentProviderConfigurationCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new UpdatePaymentProviderConfigurationCommand(
@@ -436,7 +436,7 @@ public static class AdminEconomyEndpoints
     private static async Task<Results<Ok<AdminPaymentProviderConfigurationResponse>, ValidationProblem, ProblemHttpResult>> CreatePaymentProviderConfigurationAsync(
         [FromBody] CreatePaymentProviderConfigurationRequest request,
         [FromServices] IValidator<CreatePaymentProviderConfigurationCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new CreatePaymentProviderConfigurationCommand(
@@ -480,7 +480,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] Guid configurationId,
         [FromBody] ClonePaymentProviderConfigurationRequest request,
         [FromServices] IValidator<ClonePaymentProviderConfigurationCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new ClonePaymentProviderConfigurationCommand(
@@ -511,7 +511,7 @@ public static class AdminEconomyEndpoints
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> DeletePaymentProviderConfigurationAsync(
         [FromRoute] Guid configurationId,
         [FromServices] IValidator<DeletePaymentProviderConfigurationCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new DeletePaymentProviderConfigurationCommand(configurationId);
@@ -537,7 +537,7 @@ public static class AdminEconomyEndpoints
     private static async Task<Results<Ok<AdminPaymentProviderConfigurationMatchResponse>, ValidationProblem, ProblemHttpResult>> TestPaymentProviderConfigurationMatchAsync(
         [FromBody] TestPaymentProviderConfigurationMatchRequest request,
         [FromServices] IValidator<TestPaymentProviderConfigurationMatchQuery> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var query = new TestPaymentProviderConfigurationMatchQuery(
@@ -578,7 +578,7 @@ public static class AdminEconomyEndpoints
         }
 
         var query = new AdminRedeemCodeListQuery(skip ?? 0, take ?? 50, search, status, rewardKind, sort);
-        var service = serviceProvider.GetRequiredService<IEconomyService>();
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.ListAdminRedeemCodesAsync(query, cancellationToken);
         return TypedResults.Ok(result.Value);
     }
@@ -597,7 +597,7 @@ public static class AdminEconomyEndpoints
         }
 
         var query = new AdminRedeemCodeListQuery(Search: search, Status: status, RewardKind: rewardKind);
-        var service = serviceProvider.GetRequiredService<IEconomyService>();
+        var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.GetAdminRedeemCodeMetricsAsync(query, cancellationToken);
         return TypedResults.Ok(result.Value);
     }
@@ -699,7 +699,7 @@ public static class AdminEconomyEndpoints
         [FromQuery] int skip,
         [FromQuery] int take,
         [FromQuery] Guid? userId,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminRedeemCodeActivationsAsync(redeemCodeId, skip, take, userId, cancellationToken);
@@ -717,7 +717,7 @@ public static class AdminEconomyEndpoints
     private static async Task<Results<Ok<AdminRedeemCodeResponse>, ValidationProblem, ProblemHttpResult>> CreateRedeemCodeAsync(
         [FromBody] CreateRedeemCodeRequest request,
         [FromServices] IValidator<CreateRedeemCodeCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new CreateRedeemCodeCommand(
@@ -757,7 +757,7 @@ public static class AdminEconomyEndpoints
         [FromRoute] Guid redeemCodeId,
         [FromBody] UpdateRedeemCodeRequest request,
         [FromServices] IValidator<UpdateRedeemCodeCommand> validator,
-        [FromServices] IEconomyService service,
+        [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var command = new UpdateRedeemCodeCommand(

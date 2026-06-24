@@ -36,7 +36,7 @@ void main() {
     final contentsFiles = Directory('ios/Runner/Assets.xcassets')
         .listSync(recursive: true)
         .whereType<File>()
-        .where((file) => file.path.endsWith('/Contents.json'))
+        .where((file) => file.path.endsWith('Contents.json'))
         .toList();
 
     expect(contentsFiles, isNotEmpty);

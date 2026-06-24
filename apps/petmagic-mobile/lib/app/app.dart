@@ -200,7 +200,7 @@ class PetMagicApp extends ConsumerWidget {
       locale: preferences.locale,
       localeListResolutionCallback: (locales, supportedLocales) {
         if (locales == null || locales.isEmpty) {
-          return const Locale('ru');
+          return const Locale('en');
         }
 
         for (final locale in locales) {
@@ -215,7 +215,7 @@ class PetMagicApp extends ConsumerWidget {
           }
         }
 
-        return const Locale('ru');
+        return const Locale('en');
       },
     );
   }

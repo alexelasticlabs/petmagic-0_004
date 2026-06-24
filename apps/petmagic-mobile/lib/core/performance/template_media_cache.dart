@@ -382,7 +382,7 @@ class TemplateMediaCache {
     }
 
     try {
-      if (!rememberedFile.file.existsSync()) {
+      if (!await rememberedFile.file.exists()) {
         return null;
       }
     } on FileSystemException {

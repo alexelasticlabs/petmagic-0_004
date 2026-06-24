@@ -36,7 +36,8 @@ public static class SupportChatApiModule
     public static IApplicationBuilder MapSupportChatApiModule(this WebApplication app)
     {
         app.MapSupportChatEndpoints();
-        app.MapHub<SupportChatHub>(SupportChatHub.RoutePattern);
+        app.MapHub<SupportChatHub>(SupportChatHub.RoutePattern)
+            .RequireCors("AdminWeb");
         return app;
     }
 }

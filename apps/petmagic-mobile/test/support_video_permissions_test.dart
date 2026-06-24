@@ -9,7 +9,7 @@ void main() {
     ).readAsString();
 
     final videoMethod = RegExp(
-      r'Future<void> _pickCameraVideoAttachmentImpl\(\) async \{([\s\S]*?)final picked = await _imagePicker\.pickVideo',
+      r'Future<void> _pickCameraVideoAttachmentImpl\(\) async \{([\s\S]*?)_imagePicker\.pickVideo',
     ).firstMatch(source);
 
     expect(videoMethod, isNotNull);

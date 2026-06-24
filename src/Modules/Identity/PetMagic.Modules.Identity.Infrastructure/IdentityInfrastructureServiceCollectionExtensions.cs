@@ -41,7 +41,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         ValidateJwtConfiguration(jwtOptions, environment);
         ValidateBootstrapAdminConfiguration(bootstrapAdminOptions, environment);
 
-        services.AddDbContext<IdentityDbContext>(options =>
+        services.AddDbContextPool<IdentityDbContext>(options =>
         {
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });
@@ -446,9 +446,9 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException("Jwt:SigningKey contains a placeholder value and must be replaced outside development.");
         }
 
-        if (options.SigningKey.Length < 32)
+        if (options.SigningKey.Length < 64)
         {
-            throw new InvalidOperationException("Jwt:SigningKey must be at least 32 characters long outside development.");
+            throw new InvalidOperationException("Jwt:SigningKey must be at least 64 characters long outside development.");
         }
     }
 

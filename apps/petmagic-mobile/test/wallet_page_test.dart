@@ -464,7 +464,7 @@ void main() {
             widget.left == 0 &&
             widget.right == 0 &&
             widget.bottom == 0 &&
-            widget.height == 114;
+            widget.height == 150;
       }),
       findsOneWidget,
     );

@@ -19,5 +19,9 @@ class MediaLifecyclePolicy {
     _activeVideoPreviews -= 1;
   }
 
+  static void reset() {
+    _activeVideoPreviews = 0;
+  }
+
   static int get activeVideoPreviews => _activeVideoPreviews;
 }

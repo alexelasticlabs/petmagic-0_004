@@ -114,6 +114,10 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
         connection.state != HubConnectionState.Disconnected) {
       await connection.stop();
     }
+
+    if (!_eventsController.isClosed) {
+      await _eventsController.close();
+    }
   }
 
   Future<HubConnection> _buildOrReuseConnection(String baseUrl) async {

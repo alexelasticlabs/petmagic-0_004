@@ -559,35 +559,16 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
         return;
       }
 
-      MobileLegalDocuments legalDocuments;
-      try {
-        legalDocuments = await ref.read(
-          currentLegalDocumentsProvider(locale).future,
-        );
-      } catch (error, stackTrace) {
-        AppLogger.warn(
-          feature: 'Profile.Auth',
-          operation: 'load_legal_documents_for_registration',
-          message: 'Legal documents could not be loaded for registration',
-          context: {'locale': locale},
-          error: error,
-          stackTrace: stackTrace,
-        );
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _consentErrorMessage = 'auth.legal_documents_unavailable';
-        });
-        return;
+      MobileLegalDocuments? legalDocuments;
+      final cached = ref.read(currentLegalDocumentsProvider(locale));
+      if (cached is AsyncData<MobileLegalDocuments>) {
+        legalDocuments = cached.value;
       }
 
-      if (legalDocuments.termsOfUse.version.trim().isEmpty ||
-          legalDocuments.privacyPolicy.version.trim().isEmpty) {
-        setState(() {
-          _consentErrorMessage = 'auth.legal_documents_unavailable';
-        });
-        return;
+      if (legalDocuments != null &&
+          (legalDocuments.termsOfUse.version.trim().isEmpty ||
+              legalDocuments.privacyPolicy.version.trim().isEmpty)) {
+        legalDocuments = null;
       }
 
       await controller.register(

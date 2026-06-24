@@ -85,13 +85,13 @@ void main() {
         source,
         contains(
           'if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {\n'
-          '    final normalizedThumbnail = _normalizePetMediaUrl(thumbnailUrl);\n'
+          '    final normalizedThumbnail = normalizePetMediaUrl(thumbnailUrl);\n'
           '    if (normalizedThumbnail != null) {\n'
           '      return normalizedThumbnail;\n'
           '    }\n'
           '  }\n'
           '\n'
-          '  return _normalizePetMediaUrl(photo.url);',
+          '  return normalizePetMediaUrl(photo.url);',
         ),
       );
     },
@@ -144,8 +144,8 @@ void main() {
 
         expect(find.text('My pets'), findsOneWidget);
         expect(find.text('Bella'), findsOneWidget);
-        expect(find.text('Photos: 3'), findsOneWidget);
-        expect(find.text('Create with Bella'), findsOneWidget);
+        expect(find.textContaining('3 photos'), findsOneWidget);
+        expect(find.textContaining('7 generations'), findsOneWidget);
         final avatar = tester.widget<CachedNetworkImage>(
           find.byType(CachedNetworkImage).first,
         );
@@ -418,6 +418,20 @@ void main() {
           updatedAtUtc: DateTime.utc(2026),
         ),
       ],
+      photos: [
+        PetPhoto(
+          id: 'photo-1',
+          petId: petId,
+          mediaAssetId: 'media-1',
+          url: 'https://cdn.petmagic.app/original.jpg',
+          fileName: 'bella.jpg',
+          contentType: 'image/jpeg',
+          isFavorite: false,
+          isAvatar: false,
+          sortOrder: 1,
+          createdAtUtc: DateTime.utc(2026),
+        ),
+      ],
     );
 
     await _pumpMyPets(
@@ -434,8 +448,13 @@ void main() {
       ),
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Create with Bella'));
-    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bella'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Generate with Bella'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('decoded:$petId|<none>'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -628,7 +647,7 @@ void main() {
       expect(networkImages, isNot(contains('javascript:alert(1)')));
       expect(networkImages, isNot(contains('file:///private/photo.jpg')));
       expect(networkImages, isNot(contains('data:image/png;base64,AAAA')));
-      expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.pets_rounded), findsOneWidget);
     },
   );
 
@@ -2592,6 +2611,11 @@ Future<void> _pumpMyPets(
       GoRoute(
         path: MyPetsPage.routePath,
         builder: (context, state) => const MyPetsPage(),
+      ),
+      GoRoute(
+        path: PetDetailsPage.routePath,
+        builder: (context, state) =>
+            PetDetailsPage(petId: state.pathParameters['petId'] ?? ''),
       ),
       GoRoute(
         path: TemplatesPage.routePath,

@@ -152,7 +152,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
         services.AddSingleton(options);
         services.AddSingleton<TemplateWatermarkSettingsStore>();
-        services.AddDbContext<TemplatesDbContext>(dbOptions =>
+        services.AddDbContextPool<TemplatesDbContext>(dbOptions =>
         {
             dbOptions.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
         });

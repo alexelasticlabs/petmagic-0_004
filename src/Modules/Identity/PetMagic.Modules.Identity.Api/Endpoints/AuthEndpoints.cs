@@ -1242,7 +1242,7 @@ public static class AuthEndpoints
 
     private static CookieOptions BuildRefreshCookieOptions(HttpContext context)
     {
-        var secureCookie = context.Request.IsHttps;
+        var secureCookie = IsSecureConnection(context);
 
         return new CookieOptions
         {
@@ -1257,7 +1257,7 @@ public static class AuthEndpoints
 
     private static CookieOptions BuildRefreshCookieDeletionOptions(HttpContext context)
     {
-        var secureCookie = context.Request.IsHttps;
+        var secureCookie = IsSecureConnection(context);
 
         return new CookieOptions
         {
@@ -1267,6 +1267,22 @@ public static class AuthEndpoints
             IsEssential = true,
             Path = RefreshTokenCookiePath
         };
+    }
+
+    private static bool IsSecureConnection(HttpContext context)
+    {
+        if (context.Request.IsHttps)
+        {
+            return true;
+        }
+
+        if (context.Request.Headers.TryGetValue("X-Forwarded-Proto", out var proto)
+            && string.Equals(proto.ToString(), "https", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static string? NormalizeExternalProvider(string provider)

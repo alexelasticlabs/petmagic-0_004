@@ -28,6 +28,11 @@ class PerformanceGuard {
   }
 
   static bool shouldReduceMotion(BuildContext context) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery != null && mediaQuery.disableAnimations) {
+      return true;
+    }
+
     final features =
         SchedulerBinding.instance.platformDispatcher.accessibilityFeatures;
     return features.disableAnimations ||

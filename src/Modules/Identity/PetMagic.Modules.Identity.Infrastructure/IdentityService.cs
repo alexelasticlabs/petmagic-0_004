@@ -176,14 +176,14 @@ public sealed partial class IdentityService(
         var updateResult = await userManager.UpdateAsync(user);
         if (!updateResult.Succeeded)
         {
-            await avatarStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
+            await avatarStorage.DeleteAsync(storeResult.Value.Url, cancellationToken);
             return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
         }
 
         if (!string.IsNullOrWhiteSpace(previousAvatarUrl)
             && !string.Equals(previousAvatarUrl, storeResult.Value.Url, StringComparison.OrdinalIgnoreCase))
         {
-            await avatarStorage.DeleteAsync(previousAvatarUrl, CancellationToken.None);
+            await avatarStorage.DeleteAsync(previousAvatarUrl, cancellationToken);
         }
 
         await WriteAuditAsync(user.Id, "user.avatar.updated", "User avatar uploaded or replaced.", cancellationToken);
@@ -212,7 +212,7 @@ public sealed partial class IdentityService(
             return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
         }
 
-        await avatarStorage.DeleteAsync(previousAvatarUrl, CancellationToken.None);
+        await avatarStorage.DeleteAsync(previousAvatarUrl, cancellationToken);
         await WriteAuditAsync(user.Id, "user.avatar.removed", "User avatar removed.", cancellationToken);
         var roles = await userManager.GetRolesAsync(user);
         return Result.Success(ToUserProfileResponse(user, roles));
