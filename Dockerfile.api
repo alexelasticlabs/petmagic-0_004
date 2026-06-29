@@ -34,8 +34,12 @@ RUN apt-get update \
     && useradd -m -r appuser
 WORKDIR /app
 COPY --from=builder /app/publish .
+COPY scripts/docker/run-dotnet-app.sh /usr/local/bin/run-dotnet-app.sh
+RUN chmod +x /usr/local/bin/run-dotnet-app.sh
 RUN mkdir -p /app/wwwroot/support-attachments /app/wwwroot/user-avatars /app/wwwroot/templates-media \
-    && chown -R appuser:appuser /app
-USER appuser
+    && mkdir -p /home/appuser/.aspnet/DataProtection-Keys \
+    && chown -R appuser:appuser /app /home/appuser
+ENV APP_DLL=PetMagic.Host.Api.dll
+ENV APP_VOLUME_DIRS="/app/wwwroot/support-attachments /app/wwwroot/user-avatars /app/wwwroot/templates-media /home/appuser/.aspnet/DataProtection-Keys"
 EXPOSE 5000
-ENTRYPOINT ["dotnet", "PetMagic.Host.Api.dll"]
+ENTRYPOINT ["/usr/local/bin/run-dotnet-app.sh"]

@@ -55,9 +55,9 @@ services:
       EMAIL_USE_SSL: "${EMAIL_USE_SSL:-false}"
       EMAIL_FROM_ADDRESS: "${EMAIL_FROM_ADDRESS:-no-reply@petmagic.app}"
       EMAIL_FROM_NAME: "${EMAIL_FROM_NAME:-PetMagic}"
-      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
-      STRIPE_PUBLISHABLE_KEY: "${STRIPE_PUBLISHABLE_KEY:-}"
-      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
+      STRIPE_TEST_SECRET_KEY: "${STRIPE_TEST_SECRET_KEY:-}"
+      STRIPE_TEST_PUBLISHABLE_KEY: "${STRIPE_TEST_PUBLISHABLE_KEY:-}"
+      STRIPE_TEST_WEBHOOK_SECRET: "${STRIPE_TEST_WEBHOOK_SECRET:-}"
       STRIPE_CHECKOUT_SUCCESS_URL: "${STRIPE_CHECKOUT_SUCCESS_URL:-petmagic://checkout/success?session_id={CHECKOUT_SESSION_ID}}"
       STRIPE_CHECKOUT_CANCEL_URL: "${STRIPE_CHECKOUT_CANCEL_URL:-petmagic://checkout/cancel}"
       STRIPE_BILLING_PORTAL_RETURN_URL: "${STRIPE_BILLING_PORTAL_RETURN_URL:-}"
@@ -82,6 +82,7 @@ services:
       RateLimiting__AuthRegister__PermitLimit: "${RATE_LIMIT_AUTH_REGISTER_PERMIT:-8}"
       RateLimiting__AuthPasswordReset__PermitLimit: "${RATE_LIMIT_AUTH_PASSWORD_RESET_PERMIT:-10}"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4317
+      AllowedHosts: "*"
     ports:
       - "${BACKEND_HOST_PORT:-5001}:5000"
     healthcheck:
@@ -91,7 +92,7 @@ services:
       retries: 12
       start_period: 10s
     volumes:
-      - backend_data_protection:/root/.aspnet/DataProtection-Keys
+      - backend_data_protection:/home/appuser/.aspnet/DataProtection-Keys
       - backend_support_attachments:/app/wwwroot/support-attachments
       - backend_user_avatars:/app/wwwroot/user-avatars
       - backend_template_media:/app/wwwroot/templates-media

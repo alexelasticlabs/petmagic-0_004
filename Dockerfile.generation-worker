@@ -34,7 +34,10 @@ RUN apt-get update \
     && useradd -m -r appuser
 WORKDIR /app
 COPY --from=builder /app/publish .
+COPY scripts/docker/run-dotnet-app.sh /usr/local/bin/run-dotnet-app.sh
+RUN chmod +x /usr/local/bin/run-dotnet-app.sh
 RUN mkdir -p /app/wwwroot/templates-media \
     && chown -R appuser:appuser /app
-USER appuser
-ENTRYPOINT ["dotnet", "PetMagic.Host.GenerationWorker.dll"]
+ENV APP_DLL=PetMagic.Host.GenerationWorker.dll
+ENV APP_VOLUME_DIRS="/app/wwwroot/templates-media"
+ENTRYPOINT ["/usr/local/bin/run-dotnet-app.sh"]

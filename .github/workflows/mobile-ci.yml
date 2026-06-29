@@ -37,6 +37,9 @@ jobs:
       - name: Verify generation localization completeness
         run: dart run tool/check_generation_status_l10n.dart
 
+      - name: Verify localization completeness
+        run: dart run tool/check_l10n_completeness.dart
+
       - name: Analyze
         run: flutter analyze --fatal-infos
 
