@@ -495,7 +495,7 @@ void main() {
             _templatesState(tester).query.search == 'timeout' &&
             _templatesState(tester).errorMessage ==
                 'templates.server_timeout' &&
-            find.text(text.templatesErrorTitle).evaluate().isNotEmpty,
+            find.text(text.appUnavailableServerTitle).evaluate().isNotEmpty,
         maxPumps: 200,
       );
 
@@ -504,7 +504,7 @@ void main() {
       expect(state.isEmpty, isFalse);
       expect(state.isLoading, isFalse);
       expect(state.isRefreshing, isFalse);
-      expect(find.text(text.templatesServerTimeoutError), findsOneWidget);
+      expect(find.text(text.appUnavailableServerTitle), findsOneWidget);
       expect(find.text('template-0000'), findsNothing);
       expect(
         backend.feedQueries.where((query) => query['search'] == 'timeout'),

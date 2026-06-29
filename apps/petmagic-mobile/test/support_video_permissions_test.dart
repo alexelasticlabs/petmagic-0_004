@@ -23,6 +23,9 @@ void main() {
       final source = await File(
         'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
       ).readAsString();
+      final pickerSource = await File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
+      ).readAsString();
 
       final filePickerMethod = RegExp(
         r'Future<void> _pickFileAttachmentsImpl\(\) async \{([\s\S]*?)final pickedFiles =',
@@ -35,16 +38,20 @@ void main() {
 
       final recentPickerMethod = RegExp(
         r'Future<void> _initializeAssets\(\) async \{([\s\S]*?)PhotoManager\.requestPermissionExtend',
-      ).firstMatch(source);
+      ).firstMatch(pickerSource);
       expect(recentPickerMethod, isNotNull);
       expect(
         recentPickerMethod!.group(1),
         contains('_requestMixedMediaGalleryPermission()'),
       );
 
-      final helperMatches = RegExp(
+      final actionsHelperMatches = RegExp(
         r'Future<bool> _requestMixedMediaGalleryPermission\(\) async \{([\s\S]*?)\n  \}',
       ).allMatches(source).toList();
+      final pickerHelperMatches = RegExp(
+        r'Future<bool> _requestMixedMediaGalleryPermission\(\) async \{([\s\S]*?)\n  \}',
+      ).allMatches(pickerSource).toList();
+      final helperMatches = [...actionsHelperMatches, ...pickerHelperMatches];
       expect(helperMatches.length, greaterThanOrEqualTo(2));
       for (final helper in helperMatches) {
         final body = helper.group(1)!;

@@ -9,10 +9,9 @@ void main() {
     for (final dependency in const {
       'cupertino_icons': '^1.0.9',
       'go_router': '^17.3.0',
-      'google_fonts': '^6.3.3',
+      'google_fonts': '^8.1.0',
       'image_picker': '^1.2.2',
-      'photo_manager': '^3.9.0',
-      'share_plus': '^11.1.0',
+      'share_plus': '^13.2.0',
       'in_app_purchase': '^3.3.0',
       'firebase_core': '^4.10.0',
       'firebase_messaging': '^16.3.0',
@@ -25,6 +24,12 @@ void main() {
             '${dependency.key} should not drift below the version covered by release gates.',
       );
     }
+
+    expect(pubspec, contains('photo_manager:'));
+    expect(
+      pubspec,
+      contains('path: third_party/flutter_plugins/photo_manager'),
+    );
   });
 
   test('dependency surface excludes stale notification plugin lock entries', () {

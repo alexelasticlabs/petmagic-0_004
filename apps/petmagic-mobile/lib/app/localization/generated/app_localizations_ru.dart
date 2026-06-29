@@ -21,6 +21,39 @@ class AppLocalizationsRu extends AppLocalizations {
   String get navProfile => 'Профиль';
 
   @override
+  String get notificationOpenAction => 'Открыть';
+
+  @override
+  String get notificationDefaultTitle => 'Обновление PetMagic';
+
+  @override
+  String get notificationSupportTitle => 'Поддержка PetMagic ответила';
+
+  @override
+  String get notificationGenerationTitle => 'Обновление генерации PetMagic';
+
+  @override
+  String get notificationWalletTitle => 'Обновление кошелька PetMagic';
+
+  @override
+  String get notificationPremiumTitle => 'Обновление Premium PetMagic';
+
+  @override
+  String get notificationSupportBody =>
+      'Откройте чат поддержки, чтобы увидеть новый ответ.';
+
+  @override
+  String get notificationGenerationBody => 'Статус вашей генерации изменился.';
+
+  @override
+  String get notificationWalletBody =>
+      'Откройте кошелёк, чтобы проверить последнее изменение баланса.';
+
+  @override
+  String get notificationPremiumBody =>
+      'Откройте профиль, чтобы проверить последнее изменение Premium.';
+
+  @override
   String get comingSoonMessage =>
       'Раздел подготовлен для следующей продуктовой волны.';
 
@@ -112,6 +145,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateOfTheDayFeedBadge => 'Выбор дня';
+
+  @override
+  String get templateOfTheDayLoadFailed => 'Не удалось загрузить шаблон дня.';
 
   @override
   String get allFilter => 'Все';
@@ -506,6 +542,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String get petsChooseFromMyPetsAction => 'Выбрать из моих питомцев';
 
   @override
+  String get petsActionSheetUploadSubtitle => 'Добавить фото или видео';
+
+  @override
+  String get petsActionSheetMyPetsSubtitle => 'Использовать питомца из профиля';
+
+  @override
+  String get petsActionSheetSourceTitle => 'Источник контента';
+
+  @override
+  String get petsActionSheetUploadSemantic => 'Загрузить фото или видео';
+
+  @override
+  String get petsActionSheetMyPetsSemantic => 'Выбрать питомца из профиля';
+
+  @override
   String petsGenerationCostMessage(Object count) {
     return 'Генерация стоит $count PawSpark.';
   }
@@ -607,7 +658,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionAutoRenewOff => 'Отключено';
 
   @override
-  String get subscriptionTokensSectionTitle => 'Premium PawSpark';
+  String get subscriptionTokensSectionTitle => 'PawSpark в подписке';
 
   @override
   String get subscriptionTokensAvailableLabel => 'Доступно сейчас';
@@ -666,7 +717,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionPaymentProviderGooglePlay => 'Google Play';
 
   @override
-  String get subscriptionPaymentProviderAppStore => 'Apple / App Store';
+  String get subscriptionPaymentProviderAppStore => 'App Store';
 
   @override
   String get subscriptionChangePaymentAction => 'Изменить способ оплаты';
@@ -744,6 +795,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletPremiumStatus => 'Premium-кошелек';
 
   @override
+  String get premiumUpsellHeadline => 'Premium выгоднее';
+
+  @override
+  String get premiumUpsellSubtitle =>
+      '40 PawSpark каждую неделю\nБез водяного знака, экспорт высокого качества';
+
+  @override
+  String get premiumUpsellWeeklyCredits => '40 PawSpark каждую неделю';
+
+  @override
   String get walletFreeStatus => 'Базовый кошелек';
 
   @override
@@ -812,13 +873,23 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletWhatYouCanCreateTitle => 'Хватит примерно на:';
 
   @override
-  String walletApproxPhotos(int count) {
+  String walletApproxPhotos(Object count) {
     return '$count фото';
   }
 
   @override
-  String walletApproxVideos(int count) {
+  String walletApproxVideos(Object count) {
     return '$count видео';
+  }
+
+  @override
+  String walletApproxPhotosOnly(Object photos) {
+    return '≈ $photos';
+  }
+
+  @override
+  String walletApproxPhotosOrVideos(Object photos, Object videos) {
+    return '≈ $photos или $videos';
   }
 
   @override
@@ -852,12 +923,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsLastUpdatedNow => 'только что';
 
   @override
-  String rewardsLastUpdatedMinutes(int count) {
+  String rewardsLastUpdatedMinutes(Object count) {
     return '$count мин назад';
   }
 
   @override
-  String rewardsLastUpdatedHours(int count) {
+  String rewardsLastUpdatedHours(Object count) {
     return '$count ч назад';
   }
 
@@ -953,7 +1024,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralBonusLabel => 'Покупок друзей';
 
   @override
-  String rewardsReferralBonusPerFriend(int count) {
+  String rewardsReferralBonusPerFriend(Object count) {
     return '+$count PawSpark за друга';
   }
 
@@ -965,7 +1036,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get rewardsReferralHowItWorksAction => 'Как это работает?';
 
   @override
-  String rewardsReferralShareMessage(Object code, int bonus) {
+  String rewardsReferralShareMessage(Object bonus, Object code) {
     return 'Присоединяйся к PetMagic по моему коду $code. Бонус начисляется после первой успешной платной покупки. После твоей первой покупки я получу +$bonus PawSpark.';
   }
 
@@ -1123,7 +1194,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get walletCheckoutOrderSectionTitle => 'Ваше пополнение';
 
   @override
-  String walletCheckoutSucceeded(int spark) {
+  String walletCheckoutSucceeded(Object spark) {
     return 'Оплата подтверждена. +$spark PawSpark уже в вашем кошельке.';
   }
 
@@ -1382,7 +1453,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumIncludesTitle => 'Что входит в Premium';
 
   @override
-  String premiumTokenEstimate(Object videos, Object photos) {
+  String premiumTokenEstimate(Object photos, Object videos) {
     return 'Примерно $videos видео или $photos фото в месяц, в зависимости от сложности шаблона.';
   }
 
@@ -1398,7 +1469,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Выберите, как хотите оформить подписку';
 
   @override
-  String get premiumPaymentStripe => 'Stripe';
+  String get premiumPaymentStripe => 'Банковская карта';
 
   @override
   String get premiumPaymentStripeSubtitle =>
@@ -1526,7 +1597,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после подтверждения от Stripe.';
 
   @override
-  String premiumContinueWithPlan(Object plan, Object price, Object period) {
+  String premiumContinueWithPlan(Object period, Object plan, Object price) {
     return 'Продолжить с тарифом $plan — $price $period';
   }
 
@@ -2333,6 +2404,52 @@ class AppLocalizationsRu extends AppLocalizations {
       'Для добавления файлов нужен доступ к файлам.';
 
   @override
+  String get permissionsAccessNeededTitle => 'Нужен доступ';
+
+  @override
+  String get permissionsOpenSettingsAction => 'Открыть настройки';
+
+  @override
+  String get permissionsGalleryAccessDeniedMessage =>
+      'Разрешите доступ к галерее, чтобы выбрать фото.';
+
+  @override
+  String get permissionsGalleryAccessBlockedMessage =>
+      'Доступ к галерее отключен. Откройте настройки устройства и разрешите его.';
+
+  @override
+  String get permissionsMediaAccessDeniedMessage =>
+      'Разрешите доступ к фото и видео, чтобы добавить вложения.';
+
+  @override
+  String get permissionsMediaAccessBlockedMessage =>
+      'Доступ к фото и видео отключен. Откройте настройки устройства и разрешите его.';
+
+  @override
+  String get permissionsCameraAccessDeniedMessage =>
+      'Разрешите доступ к камере, чтобы сделать фото.';
+
+  @override
+  String get permissionsCameraAccessBlockedMessage =>
+      'Доступ к камере отключен. Откройте настройки устройства и разрешите его.';
+
+  @override
+  String get permissionsCameraVideoAccessDeniedMessage =>
+      'Разрешите доступ к камере, чтобы записать видео.';
+
+  @override
+  String get permissionsCameraVideoAccessBlockedMessage =>
+      'Доступ к камере отключен. Откройте настройки устройства и разрешите запись видео.';
+
+  @override
+  String get permissionsMicrophoneAccessDeniedMessage =>
+      'Разрешите доступ к микрофону, чтобы записать видео со звуком.';
+
+  @override
+  String get permissionsMicrophoneAccessBlockedMessage =>
+      'Доступ к микрофону отключен. Откройте настройки устройства и разрешите запись видео со звуком.';
+
+  @override
   String get supportChatAttachmentExpiredPlaceholder =>
       'Файл был удалён через 30 дней';
 
@@ -2578,6 +2695,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get retryAction => 'Повторить';
 
   @override
+  String get closeAction => 'Закрыть';
+
+  @override
   String get emptyTemplatesTitle => 'Шаблонов пока нет';
 
   @override
@@ -2745,10 +2865,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get authForgotPasswordAction => 'Забыли пароль?';
 
   @override
-  String get authForgotPasswordComingSoon =>
-      'Восстановление пароля скоро появится.';
-
-  @override
   String get authPasswordResetTitle => 'Восстановление пароля';
 
   @override
@@ -2792,6 +2908,12 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get authAcceptTermsLabel =>
       'Я принимаю Условия использования и Политику конфиденциальности';
+
+  @override
+  String get authTermsLinkText => 'Условия использования';
+
+  @override
+  String get authPrivacyLinkText => 'Политику конфиденциальности';
 
   @override
   String get authReceiveUpdatesLabel =>
@@ -2839,9 +2961,6 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get authSignUpAction => 'Регистрация';
-
-  @override
-  String get authSocialComingSoon => 'Социальный вход скоро появится.';
 
   @override
   String get authPasswordMismatch => 'Пароли не совпадают.';
@@ -2941,19 +3060,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get templateGuestPreview => 'Гостевой просмотр';
 
   @override
-  String get templateActionComingSoon => 'Студия шаблонов скоро появится.';
-
-  @override
-  String get tokensActionComingSoon => 'Кошелёк PawSpark скоро появится.';
-
-  @override
-  String get rewardsActionComingSoon => 'Центр наград скоро появится.';
-
-  @override
   String get templateFlowPhotoSourceGallery => 'Галерея';
 
   @override
   String get templateFlowPhotoSourceCamera => 'Камера';
+
+  @override
+  String get petsActionSheetGallerySubtitle =>
+      'Выбрать фото или видео из галереи';
+
+  @override
+  String get petsActionSheetCameraSubtitle =>
+      'Сделать фото или видео прямо сейчас';
+
+  @override
+  String get petsActionSheetGallerySemantic =>
+      'Выбрать фото или видео из галереи';
+
+  @override
+  String get petsActionSheetCameraSemantic => 'Сделать фото или видео с камеры';
 
   @override
   String get templateFlowReadyTitle => 'Готово к созданию!';
@@ -3000,11 +3125,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String templateFlowInsufficientBalanceMessage(
-    Object tokenCost,
     Object balance,
+    Object tokenCost,
   ) {
     return 'Шаблон стоит $tokenCost PawSpark. Ваш баланс: $balance PawSpark.';
   }
+
+  @override
+  String get templateFlowInsufficientBalanceUpsellMessage =>
+      'Купите PawSpark разово или оформите Premium с 40 PawSpark каждую неделю.';
 
   @override
   String get templateFlowChooseAnotherTemplateAction => 'Выбрать другой шаблон';
@@ -3067,6 +3196,183 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get templateFlowLoadingVideo => 'Загружаем видео...';
+
+  @override
+  String get generationResultInputTitle => 'Использовать результат';
+
+  @override
+  String get generationResultInputParentTitle => 'Готовый результат';
+
+  @override
+  String get generationResultInputParentHint =>
+      'Этот результат будет использован как основа';
+
+  @override
+  String get generationResultInputMediaUnavailable => 'Медиа недоступно';
+
+  @override
+  String get generationResultInputRecommendedBadge => 'Рекомендуем';
+
+  @override
+  String get generationResultInputEmpty => 'Нет совместимых шаблонов.';
+
+  @override
+  String get generationResultInputError =>
+      'Не удалось использовать этот результат. Попробуйте ещё раз.';
+
+  @override
+  String get generationResultInputNoCredits =>
+      'Недостаточно PawSpark для новой генерации.';
+
+  @override
+  String get generationResultInputStartAction => 'Запустить';
+
+  @override
+  String generationResultInputCostEstimate(Object credits) {
+    return 'Генерация будет стоить $credits PawSpark.';
+  }
+
+  @override
+  String get petGenerationLaunchTitle => 'Запуск магии';
+
+  @override
+  String petGenerationLaunchTitleWithName(Object name) {
+    return 'Магия для $name';
+  }
+
+  @override
+  String get petGenerationLaunchSubtitle =>
+      'Проверьте шаблон, стоимость PawSpark и точное фото питомца перед созданием.';
+
+  @override
+  String get petGenerationLaunchPhotoSectionTitle => 'Фото для генерации';
+
+  @override
+  String get petGenerationLaunchSelectedPhotoLabel =>
+      'Это фото будет отправлено в генерацию';
+
+  @override
+  String get petGenerationLaunchUploadPhotoAction => 'Загрузить новое';
+
+  @override
+  String get petGenerationLaunchChoosePhotoTitle => 'Выберите фото питомца';
+
+  @override
+  String get petGenerationLaunchLoadingPhotos => 'Загружаем фото...';
+
+  @override
+  String get petGenerationLaunchPhotoLoadError =>
+      'Не удалось загрузить фото питомца. Попробуйте ещё раз.';
+
+  @override
+  String get petGenerationLaunchSelectedPhotoMissing =>
+      'Выберите доступное фото питомца перед стартом. PawSpark не списаны.';
+
+  @override
+  String get petGenerationLaunchPhotoTypeError =>
+      'Выберите фото в формате JPG, PNG или WebP. PawSpark не списаны.';
+
+  @override
+  String get petGenerationLaunchUploadError =>
+      'Не удалось загрузить фото. PawSpark не списаны.';
+
+  @override
+  String get petGenerationLaunchStartError =>
+      'Не удалось запустить генерацию. PawSpark не списаны, попробуйте ещё раз.';
+
+  @override
+  String get galleryPremiumUpsellTitle => 'Экспорт без водяного знака';
+
+  @override
+  String get galleryPremiumUpsellSubtitle => 'Premium уберет логотип PetMagic';
+
+  @override
+  String get templateFlowCompletedPremiumHeadline => 'Хотите создавать больше?';
+
+  @override
+  String get templateFlowCompletedPremiumMessage =>
+      'Premium дает 40 PawSpark каждую неделю, premium-шаблоны и экспорт без водяного знака.';
+
+  @override
+  String get templateDetailHeroImageTitle => 'Создайте изображение с питомцем';
+
+  @override
+  String get templateDetailHeroVideoTitle => 'Создайте видео с питомцем';
+
+  @override
+  String get templateDetailFallbackTitle => 'Шаблон PetMagic';
+
+  @override
+  String get templateDetailFallbackDescriptionImage =>
+      'Загрузите чёткое фото питомца, и PetMagic создаст аккуратный результат.';
+
+  @override
+  String get templateDetailFallbackDescriptionVideo =>
+      'Загрузите чёткое фото питомца, и PetMagic превратит его в готовое видео.';
+
+  @override
+  String get templateDetailCategoryTemplate => 'Шаблон';
+
+  @override
+  String get templateDetailCategoryPortrait => 'Портрет';
+
+  @override
+  String get templateDetailCategoryVideo => 'Видео';
+
+  @override
+  String get templateDetailRequirementOnePet => 'Один питомец на фото';
+
+  @override
+  String get templateDetailRequirementClearFace => 'Морда хорошо видна';
+
+  @override
+  String get templateDetailRequirementGoodLighting => 'Хорошее освещение';
+
+  @override
+  String get templateDetailRequirementFullBodyVisible =>
+      'Питомец виден целиком';
+
+  @override
+  String get templateDetailRequirementFacingCamera =>
+      'Питомец смотрит в камеру';
+
+  @override
+  String get templateDetailRequirementNoCroppedHeadOrLegs =>
+      'Голова и лапы не обрезаны';
+
+  @override
+  String get templateDetailQualityWarning =>
+      'Для лучшего результата используйте яркое и чёткое фото.';
+
+  @override
+  String get templateDetailUploadPhotoForVideoAction =>
+      'Загрузить фото для видео';
+
+  @override
+  String get templateDetailPreviewMissingTitle => 'Превью недоступно';
+
+  @override
+  String get templateDetailPreviewMissingSubtitleImage =>
+      'Вы всё равно можете загрузить фото питомца и создать это изображение.';
+
+  @override
+  String get templateDetailPreviewMissingSubtitleVideo =>
+      'Вы всё равно можете загрузить фото питомца и создать это видео.';
+
+  @override
+  String get templateDetailTimeLabel => 'Время';
+
+  @override
+  String get templateDetailFormatLabel => 'Формат';
+
+  @override
+  String get templateDetailVideoEta => '2-4 мин';
+
+  @override
+  String get templateDetailImageEta => '1-2 мин';
+
+  @override
+  String get templateDetailScrollHint => 'Прокрутите для деталей';
 
   @override
   String get templateFlowBestPhotoTitle => 'Лучшее фото для этого шаблона:';
@@ -3349,7 +3655,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusFilterFailed => 'Ошибка';
 
   @override
-  String generationStatusShowMoreAction(int hiddenCount) {
+  String generationStatusShowMoreAction(Object hiddenCount) {
     return 'Показать еще ($hiddenCount) ▾';
   }
 
@@ -3361,7 +3667,7 @@ class AppLocalizationsRu extends AppLocalizations {
       'Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.';
 
   @override
-  String generationStatusUnreadCount(int count) {
+  String generationStatusUnreadCount(Object count) {
     return '$count новых';
   }
 
@@ -3606,6 +3912,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumCheckoutTotalLabel => 'Итого';
 
   @override
+  String get premiumPaywallFeedbackTitle => 'Что остановило вас от подписки?';
+
+  @override
+  String get premiumPaywallFeedbackCommentLabel => 'Комментарий';
+
+  @override
+  String get premiumPaywallFeedbackCommentHint =>
+      'Расскажите, что сделало бы Premium полезнее для вас';
+
+  @override
+  String get premiumPaywallFeedbackSubmitAction => 'Отправить отзыв';
+
+  @override
+  String get premiumPaywallFeedbackThanksMessage =>
+      'Спасибо! Ваш отзыв поможет улучшить Premium.';
+
+  @override
+  String get premiumPaywallFeedbackOptionExpensive => 'Слишком дорого';
+
+  @override
+  String get premiumPaywallFeedbackOptionLowValue => 'Недостаточно пользы';
+
+  @override
+  String get premiumPaywallFeedbackOptionPaymentProblem => 'Проблема с оплатой';
+
+  @override
+  String get premiumPaywallFeedbackOptionJustBrowsing => 'Просто смотрю';
+
+  @override
+  String get premiumPaywallFeedbackOptionOther => 'Другое';
+
+  @override
   String get premiumBenefitAiGenerationsTitle => '30 AI-генераций';
 
   @override
@@ -3643,7 +3981,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionCancelConfirmTitle => 'Отменить подписку?';
 
   @override
-  String subscriptionCancelConfirmBody(String date) {
+  String subscriptionCancelConfirmBody(Object date) {
     return 'Premium останется активным до $date. Новые списания будут отключены.';
   }
 
@@ -3674,24 +4012,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get subscriptionBillingPeriodYearly => 'Годовой';
 
   @override
-  String get generationStatusWatermarkRemoved => 'Watermark убран';
+  String get generationStatusWatermarkRemoved => 'Водяной знак убран';
 
   @override
   String get generationStatusWatermarkAddedFreePlan =>
-      'Watermark добавлен на бесплатном плане';
+      'Водяной знак добавлен на бесплатном плане';
 
   @override
-  String get generationStatusShareWithWatermark => 'Поделиться с watermark';
+  String get generationStatusShareWithWatermark =>
+      'Поделиться с водяным знаком';
 
   @override
   String get generationStatusDownloadWithoutWatermark =>
-      'Скачать без watermark';
+      'Скачать без водяного знака';
 
   @override
-  String get generationStatusSaveWithWatermark => 'Сохранить с watermark';
+  String get generationStatusSaveWithWatermark => 'Сохранить с водяным знаком';
 
   @override
-  String get generationStatusRemoveWatermark => 'Убрать watermark';
+  String get generationStatusRemoveWatermark => 'Убрать водяной знак';
 
   @override
   String get generationStatusRemovingWatermark => 'Убираем...';
@@ -3700,25 +4039,25 @@ class AppLocalizationsRu extends AppLocalizations {
   String get generationStatusUpgradePremium => 'Перейти на Premium';
 
   @override
-  String get generationStatusRemoveWatermarkSheetTitle => 'Убрать watermark';
+  String get generationStatusRemoveWatermarkSheetTitle => 'Убрать водяной знак';
 
   @override
-  String generationStatusRemoveWatermarkSheetBody(int cost) {
-    return 'Используйте $cost credit для этого результата или перейдите на Premium для чистых скачиваний.';
+  String generationStatusRemoveWatermarkSheetBody(Object cost) {
+    return 'Используйте $cost PawSpark для этого результата или перейдите на Premium для чистых скачиваний.';
   }
 
   @override
-  String generationStatusRemoveWatermarkUseCredit(int cost) {
-    return 'Использовать $cost credit';
+  String generationStatusRemoveWatermarkUseCredit(Object cost) {
+    return 'Использовать $cost PawSpark';
   }
 
   @override
   String get generationStatusRemoveWatermarkFailed =>
-      'Не удалось убрать watermark. Попробуйте ещё раз.';
+      'Не удалось убрать водяной знак. Попробуйте ещё раз.';
 
   @override
   String get generationStatusRemoveWatermarkNoCredits =>
-      'Недостаточно credits. Купите credits или Premium.';
+      'Недостаточно PawSpark. Купите PawSpark или Premium.';
 
   @override
   String get globalOfflineBannerTitle => 'Нет подключения к интернету';
@@ -3732,6 +4071,20 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get globalOnlineRestoredBannerMessage => 'Вы снова в сети.';
+
+  @override
+  String get appUnavailableOfflineTitle => 'Нет подключения';
+
+  @override
+  String get appUnavailableOfflineMessage =>
+      'Проверьте интернет и попробуйте снова. Мы автоматически повторим загрузку, когда соединение восстановится.';
+
+  @override
+  String get appUnavailableServerTitle => 'Сервер недоступен';
+
+  @override
+  String get appUnavailableServerMessage =>
+      'PetMagic сейчас не может связаться с бекендом. Попробуйте ещё раз через минуту.';
 
   @override
   String get generationStatusCompareAction => 'Сравнить';
@@ -3753,4 +4106,512 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get generationStatusCompareOpenFailed =>
       'Не удалось открыть сравнение.';
+
+  @override
+  String gamificationLevel(Object level) {
+    return 'Уровень $level';
+  }
+
+  @override
+  String gamificationXpProgress(Object current, Object required, Object total) {
+    return '$current/$required XP';
+  }
+
+  @override
+  String get gamificationEvolutionEgg => 'Яйцо';
+
+  @override
+  String get gamificationEvolutionBaby => 'Малыш';
+
+  @override
+  String get gamificationEvolutionTeen => 'Подросток';
+
+  @override
+  String get gamificationEvolutionAdult => 'Взрослый';
+
+  @override
+  String get gamificationEvolutionLegendary => 'Легендарный';
+
+  @override
+  String get gamificationLevelUp => 'Новый уровень!';
+
+  @override
+  String get gamificationStreakTitle => 'Ежедневная серия';
+
+  @override
+  String gamificationStreakDays(Object count) {
+    return '$count дней';
+  }
+
+  @override
+  String get gamificationStreakAtRisk => 'Ваша серия под угрозой!';
+
+  @override
+  String get gamificationStreakFreeze => 'Использовать заморозку';
+
+  @override
+  String get gamificationStreakFreezeUsed => 'Серия спасена!';
+
+  @override
+  String gamificationStreakFreezeRemaining(Object count) {
+    return 'Осталось заморозок: $count';
+  }
+
+  @override
+  String get gamificationAchievementsTitle => 'Достижения';
+
+  @override
+  String get gamificationAchievementUnlocked => 'Достижение разблокировано!';
+
+  @override
+  String get gamificationAchievementSecret => 'Секретное достижение';
+
+  @override
+  String gamificationAchievementProgress(Object current, Object target) {
+    return 'Прогресс: $current/$target';
+  }
+
+  @override
+  String get gamificationChallengeTitle => 'Еженедельные задания';
+
+  @override
+  String get gamificationChallengeComplete => 'Выполнено!';
+
+  @override
+  String get gamificationChallengeClaim => 'Забрать награду';
+
+  @override
+  String get gamificationChallengeGenerateImages => 'Генерация изображений';
+
+  @override
+  String get gamificationChallengeGenerateImagesDesc =>
+      'Сгенерируйте изображения с любым шаблоном';
+
+  @override
+  String get gamificationChallengeTryTemplates => 'Попробуйте разные шаблоны';
+
+  @override
+  String get gamificationChallengeTryTemplatesDesc =>
+      'Используйте разные шаблоны на этой неделе';
+
+  @override
+  String get gamificationChallengeShareCreations => 'Поделитесь работами';
+
+  @override
+  String get gamificationChallengeShareCreationsDesc =>
+      'Поделитесь своими работами с друзьями';
+
+  @override
+  String get gamificationStatsGenerations => 'Генерации';
+
+  @override
+  String get gamificationStatsDaysActive => 'Дней активности';
+
+  @override
+  String get gamificationStatsFavoriteTemplate => 'Любимый шаблон';
+
+  @override
+  String gamificationMilestone3(Object spark) {
+    return 'Бонус за 3 дня: +$spark Spark!';
+  }
+
+  @override
+  String gamificationMilestone7(Object spark) {
+    return 'Бонус за 7 дней: +$spark Spark!';
+  }
+
+  @override
+  String gamificationMilestone14(Object spark) {
+    return 'Бонус за 14 дней: +$spark Spark!';
+  }
+
+  @override
+  String gamificationMilestone30(Object spark) {
+    return 'Бонус за 30 дней: +$spark Spark!';
+  }
+
+  @override
+  String get gamificationPetStats => 'Статистика питомца';
+
+  @override
+  String get gamificationTopPet => 'Лучший питомец';
+
+  @override
+  String get gamificationYourProgress => 'Ваш прогресс';
+
+  @override
+  String get gamificationBest => 'Рекорд';
+
+  @override
+  String gamificationFreezeAvailable(Object count) {
+    return '$count заморозка доступна';
+  }
+
+  @override
+  String gamificationFreezesAvailable(Object count) {
+    return 'Заморозок доступно: $count';
+  }
+
+  @override
+  String get gamificationKeepGenerating =>
+      'Продолжайте генерировать, чтобы разблокировать больше!';
+
+  @override
+  String gamificationUnlocked(Object total, Object unlocked) {
+    return '$unlocked / $total разблокировано';
+  }
+
+  @override
+  String get gamificationLoadFailed => 'Не удалось загрузить достижения';
+
+  @override
+  String get gamificationDayStreak => 'дней подряд';
+
+  @override
+  String get gamificationHubSubtitle =>
+      'Следите за серией, заданиями и этапами прогресса в одном месте.';
+
+  @override
+  String get gamificationHubEntrySubtitle =>
+      'Серия, недельные цели и ключевые достижения.';
+
+  @override
+  String get gamificationWeekFocusTitle => 'На этой неделе';
+
+  @override
+  String get gamificationWeekFocusSubtitle =>
+      'Держите темп, закрывайте задания и берегите серию.';
+
+  @override
+  String get gamificationNextMilestoneTitle => 'Следующая цель';
+
+  @override
+  String get gamificationFilterAll => 'Все';
+
+  @override
+  String get gamificationFilterUnlocked => 'Открытые';
+
+  @override
+  String get gamificationFilterInProgress => 'В процессе';
+
+  @override
+  String get gamificationFilterSecret => 'Секретные';
+
+  @override
+  String get gamificationNoAchievementsInFilter =>
+      'Для этого фильтра пока ничего нет.';
+
+  @override
+  String get gamificationStatusUnlocked => 'Открыто';
+
+  @override
+  String get gamificationStatusInProgress => 'В процессе';
+
+  @override
+  String get achievementFirstMagic => 'Первая магия';
+
+  @override
+  String get achievementFirstMagicDesc => 'Создайте свою первую AI-генерацию';
+
+  @override
+  String get achievementApprentice10 => 'Ученик';
+
+  @override
+  String get achievementApprentice10Desc => 'Выполните 10 генераций';
+
+  @override
+  String get achievementMagician100 => 'Волшебник';
+
+  @override
+  String get achievementMagician100Desc => 'Выполните 100 генераций';
+
+  @override
+  String get achievementArchmage500 => 'Архимаг';
+
+  @override
+  String get achievementArchmage500Desc => 'Выполните 500 генераций';
+
+  @override
+  String get achievementStreak3 => 'Разогрев';
+
+  @override
+  String get achievementStreak3Desc => 'Поддерживайте серию 3 дня';
+
+  @override
+  String get achievementStreak7 => 'Воин недели';
+
+  @override
+  String get achievementStreak7Desc => 'Поддерживайте серию 7 дней';
+
+  @override
+  String get achievementStreak14 => 'Чемпион двух недель';
+
+  @override
+  String get achievementStreak14Desc => 'Поддерживайте серию 14 дней';
+
+  @override
+  String get achievementStreak30 => 'Мастер месяца';
+
+  @override
+  String get achievementStreak30Desc => 'Поддерживайте серию 30 дней';
+
+  @override
+  String get achievementPackLeader => 'Вожак стаи';
+
+  @override
+  String get achievementPackLeaderDesc => 'Имейте 5 питомцев';
+
+  @override
+  String get achievementEvolutionBaby => 'Первые шаги';
+
+  @override
+  String get achievementEvolutionBabyDesc =>
+      'Эволюционируйте питомца до стадии Малыш';
+
+  @override
+  String get achievementEvolutionLegendary => 'Легендарный страж';
+
+  @override
+  String get achievementEvolutionLegendaryDesc =>
+      'Эволюционируйте питомца до Легендарной стадии';
+
+  @override
+  String get achievementTrendsetter => 'Первопроходец';
+
+  @override
+  String get achievementTrendsetterDesc => 'Используйте Шаблон дня';
+
+  @override
+  String get achievementDailyRitual => 'Ежедневный ритуал';
+
+  @override
+  String get achievementDailyRitualDesc => 'Сгенерируйте 5 раз за один день';
+
+  @override
+  String get achievementTemplateCollector => 'Коллекционер шаблонов';
+
+  @override
+  String get achievementTemplateCollectorDesc =>
+      'Используйте 20 разных шаблонов';
+
+  @override
+  String get achievementNightOwl => 'Сова';
+
+  @override
+  String get achievementNightOwlDesc => 'Генерируйте между 2 и 5 часами ночи';
+
+  @override
+  String generationStatusGenerateSimilarCost(Object cost) {
+    return 'Стоимость: $cost PawSpark';
+  }
+
+  @override
+  String get generationStatusGenerateSimilarConfirmAction => 'Генерировать';
+
+  @override
+  String get generationStatusGenerateSimilarCancelAction => 'Отмена';
+
+  @override
+  String get generationStatusGenerateSimilarSourceUnavailable =>
+      'Исходный файл недоступен.';
+
+  @override
+  String get generationStatusGenerateSimilarInsufficientBalance =>
+      'Недостаточно PawSpark.';
+
+  @override
+  String get generationStatusGenerateSimilarFailed =>
+      'Не удалось сгенерировать. Попробуйте ещё раз.';
+
+  @override
+  String get generationStatusFailedFeedbackTitle => 'Что произошло?';
+
+  @override
+  String get generationStatusFailedFeedbackNotCompleted => 'Не завершилась';
+
+  @override
+  String get generationStatusFailedFeedbackTooLong => 'Слишком долго';
+
+  @override
+  String get generationStatusFailedFeedbackPawSparkCharged =>
+      'Списались PawSpark';
+
+  @override
+  String get generationStatusFailedFeedbackStuck => 'Зависло';
+
+  @override
+  String get generationStatusFailedFeedbackOther => 'Другое';
+
+  @override
+  String get generationStatusReportFeedbackTitle => 'Что не так с результатом?';
+
+  @override
+  String get generationStatusReportFeedbackLowQuality => 'Плохое качество';
+
+  @override
+  String get generationStatusReportFeedbackWrongPet => 'Не тот питомец';
+
+  @override
+  String get generationStatusReportFeedbackDistortion => 'Искажение';
+
+  @override
+  String get generationStatusReportFeedbackInappropriate =>
+      'Неподходящий результат';
+
+  @override
+  String get generationStatusReportFeedbackWrongTemplate => 'Не тот шаблон';
+
+  @override
+  String get generationStatusReportFeedbackWatermark => 'Водяной знак';
+
+  @override
+  String get generationStatusReportFeedbackPayment => 'Оплата';
+
+  @override
+  String get generationStatusReportFeedbackOther => 'Другое';
+
+  @override
+  String get generationStatusCreateVideoFromResultAction =>
+      'Создать видео из этого';
+
+  @override
+  String get generationStatusGenerateSimilarAction => 'Похожий вариант';
+
+  @override
+  String get generationStatusGenerateSimilarLoading =>
+      'Создаём похожий вариант...';
+
+  @override
+  String get generationStatusUseAsInputAction => 'Взять за основу';
+
+  @override
+  String get profileSettingsFeedbackTitle => 'Отправить отзыв';
+
+  @override
+  String get profileSettingsFeedbackSubtitle =>
+      'Идея, ошибка, оплата или общий комментарий';
+
+  @override
+  String get profileSettingsFeedbackSheetTitle => 'Отправить отзыв';
+
+  @override
+  String get profileSettingsFeedbackMessageLabel => 'Комментарий';
+
+  @override
+  String get profileSettingsFeedbackMessageHint =>
+      'Добавьте детали, если хотите';
+
+  @override
+  String get profileSettingsFeedbackSubmitAction => 'Отправить';
+
+  @override
+  String get profileSettingsFeedbackThanksMessage =>
+      'Спасибо! Ваш отзыв поможет улучшить PetMagic.';
+
+  @override
+  String get profileSettingsFeedbackOptionGeneral => 'Общее';
+
+  @override
+  String get profileSettingsFeedbackOptionFeatureRequest => 'Пожелание';
+
+  @override
+  String get profileSettingsFeedbackOptionBug => 'Ошибка';
+
+  @override
+  String get profileSettingsFeedbackOptionPayment => 'Оплата';
+
+  @override
+  String get profileNotificationsPushPhotoReadySubtitle =>
+      'Когда AI-фото готово к просмотру';
+
+  @override
+  String get profileNotificationsPushVideoReadySubtitle =>
+      'Когда AI-видео завершило обработку';
+
+  @override
+  String get profileNotificationsPushGenerationErrorsSubtitle =>
+      'Если генерация завершилась с ошибкой';
+
+  @override
+  String get profileNotificationsPushRemindersSubtitle =>
+      'Напоминания об использовании приложения';
+
+  @override
+  String get profileNotificationsPushNewTemplatesSubtitle =>
+      'Новые стили и шаблоны генерации';
+
+  @override
+  String get profileNotificationsPushPurchasesAndSubscriptionsSubtitle =>
+      'Подтверждения оплат и статус подписки';
+
+  @override
+  String get profileNotificationsEmailOffersSubtitle =>
+      'Скидки, акции и промо-предложения';
+
+  @override
+  String get profileNotificationsEmailNewsSubtitle =>
+      'Обновления приложения и новые функции';
+
+  @override
+  String get profileNotificationsEmailAccountAlertsSubtitle =>
+      'Уведомления безопасности и о смене данных';
+
+  @override
+  String get passwordChangeStepRequestCode => 'Запрос кода';
+
+  @override
+  String get passwordChangeStepNewPassword => 'Новый пароль';
+
+  @override
+  String get subscriptionTokensWeeklyGrantPeriodSuffix => ' / 7д';
+
+  @override
+  String subscriptionGrantCountdownDaysHoursMinutes(
+    int days,
+    int hours,
+    int minutes,
+  ) {
+    return '$daysд $hoursч $minutesм';
+  }
+
+  @override
+  String subscriptionGrantCountdownHoursMinutesSeconds(
+    int hours,
+    int minutes,
+    int seconds,
+  ) {
+    return '$hoursч $minutesм $secondsс';
+  }
+
+  @override
+  String subscriptionGrantCountdownMinutesSeconds(int minutes, int seconds) {
+    return '$minutesм $secondsс';
+  }
+
+  @override
+  String get subscriptionGrantReadyLabel => '✦ Готово к начислению!';
+
+  @override
+  String subscriptionGrantNextLabel(String countdown) {
+    return 'Следующее начисление: $countdown';
+  }
+
+  @override
+  String get subscriptionBenefitTokensDescription =>
+      'Автоматически каждые 7 дней';
+
+  @override
+  String get subscriptionBenefitFirstBonusDescription =>
+      'Мгновенно при покупке';
+
+  @override
+  String get subscriptionBenefitTemplatesDescription =>
+      'Все сценарии разблокированы';
+
+  @override
+  String get subscriptionBenefitPriorityGenerationDescription =>
+      'Ваши задачи в приоритете';
+
+  @override
+  String get subscriptionBenefitNoWatermarkDescription => 'Чистый результат';
 }

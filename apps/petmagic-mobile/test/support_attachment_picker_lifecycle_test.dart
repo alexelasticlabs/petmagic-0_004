@@ -7,6 +7,12 @@ void main() {
     'support recent media picker exits loading state on PhotoManager errors',
     () {
       final source = File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
+      ).readAsStringSync();
+      final pageSource = File(
+        'lib/features/support/presentation/support_chat_page.dart',
+      ).readAsStringSync();
+      final actionsSource = File(
         'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
       ).readAsStringSync();
 
@@ -16,6 +22,15 @@ void main() {
       final retryBody = _methodBody(source, '_retryInitializeAssets');
 
       expect(source, contains('bool _assetLoadFailed = false;'));
+      expect(
+        pageSource,
+        contains("part 'widgets/support_chat_attachment_picker.part.dart';"),
+      );
+      expect(
+        actionsSource,
+        isNot(contains('class _SupportAttachmentPickerSheet')),
+      );
+      expect(source, contains('class _SupportAttachmentPickerSheet'));
       expect(
         initializeBody,
         contains('PhotoManager.requestPermissionExtend()'),

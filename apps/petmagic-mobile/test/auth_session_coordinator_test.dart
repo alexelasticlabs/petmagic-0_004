@@ -64,6 +64,60 @@ void main() {
     expect(storage.savedSessions.single.accessToken, 'new-access');
   });
 
+  test('authorizedRequest retries once after forbidden stale session', () async {
+    var refreshCalls = 0;
+    final dio = Dio()
+      ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+        if (options.path == '/api/auth/refresh') {
+          refreshCalls++;
+          return ResponseBody.fromString(
+            jsonEncode(_sessionJson(accessToken: 'refreshed-access')),
+            200,
+            headers: {
+              Headers.contentTypeHeader: [Headers.jsonContentType],
+            },
+          );
+        }
+
+        throw StateError('Unexpected path: ${options.path}');
+      });
+
+    final storage = _InMemoryAuthSessionStorage(
+      session: _session(
+        accessToken: 'stale-access',
+        expiresAtUtc: DateTime.now().toUtc().add(const Duration(hours: 1)),
+      ),
+    );
+    final coordinator = AuthSessionCoordinator(
+      dio: dio,
+      sessionStorage: storage,
+    );
+
+    var attempt = 0;
+    final response = await coordinator.authorizedRequest<String>(
+      request: (session) async {
+        attempt++;
+        if (attempt == 1) {
+          throw _forbiddenDioException();
+        }
+
+        return Response<String>(
+          requestOptions: RequestOptions(path: '/api/protected'),
+          statusCode: 200,
+          data: session.accessToken,
+        );
+      },
+      mapError: _mapDioException,
+      requestFailedMessage: 'request.failed',
+      sessionExpiredMessage: 'session.expired',
+    );
+
+    expect(response.data, 'refreshed-access');
+    expect(refreshCalls, 1);
+    expect(storage.savedSessions, hasLength(1));
+    expect(storage.savedSessions.single.accessToken, 'refreshed-access');
+  });
+
   test('requireValidSession coalesces concurrent refresh requests', () async {
     var refreshCalls = 0;
     final unblockRefresh = Completer<void>();
@@ -335,6 +389,19 @@ DioException _serverUnavailableDioException() {
       requestOptions: requestOptions,
       statusCode: 503,
       data: const {'title': 'ServiceUnavailable'},
+    ),
+  );
+}
+
+DioException _forbiddenDioException() {
+  final requestOptions = RequestOptions(path: '/api/protected');
+  return DioException.badResponse(
+    statusCode: 403,
+    requestOptions: requestOptions,
+    response: Response<Map<String, Object?>>(
+      requestOptions: requestOptions,
+      statusCode: 403,
+      data: const {'title': 'Forbidden'},
     ),
   );
 }

@@ -6,8 +6,12 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
@@ -20,11 +24,11 @@ import 'package:petmagic_mobile/shared/payments/payment_method_sheet.dart';
 import 'package:petmagic_mobile/shared/payments/stripe_paymentsheet_coordinator.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
-import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'widgets/wallet_page_activity_widgets.dart';
@@ -34,7 +38,6 @@ class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
 
   static const routePath = '/profile/wallet';
-  static const legacyRoutePath = '/wallet';
 
   @override
   ConsumerState<WalletPage> createState() => _WalletPageState();
@@ -238,6 +241,18 @@ class _WalletPageState extends ConsumerState<WalletPage>
     );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final unavailableKind = state.wallet == null && !state.isInitialLoading
+        ? classifyAppUnavailable(
+            raw: state.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
+    final legalAcceptanceRequired = isLegalAcceptanceRequiredError(
+      state.errorMessage,
+    );
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
     final bottomNavInset = hasShell
@@ -264,6 +279,52 @@ class _WalletPageState extends ConsumerState<WalletPage>
         ),
       );
     }
+
+    if (state.wallet == null &&
+        !state.isInitialLoading &&
+        legalAcceptanceRequired) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, bottomNavInset),
+            child: _WalletUnavailableCard(
+              message:
+                  mapCommonAuthFeedbackMessage(
+                    text,
+                    state.errorMessage,
+                    preferAuthRequiredMessage: true,
+                  ) ??
+                  text.profileLegalAcceptanceRequired,
+              onAction: () => context.go(LegalAcceptanceGatePage.routePath),
+              actionLabel: text.profileLegalAcceptAction,
+            ),
+          ),
+        ),
+      );
+    }
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      final currentState = ref.read(walletControllerProvider);
+      final currentUnavailableKind =
+          currentState.wallet == null && !currentState.isInitialLoading
+          ? classifyAppUnavailable(
+              raw: currentState.errorMessage,
+              hasInternet: next.hasInternet,
+            )
+          : null;
+      if (currentUnavailableKind == null) {
+        return;
+      }
+
+      unawaited(controller.load(refresh: true));
+    });
 
     ref.listen(walletControllerProvider, (previous, next) {
       if (!mounted) {
@@ -344,6 +405,12 @@ class _WalletPageState extends ConsumerState<WalletPage>
       child: SafeArea(
         child: state.isInitialLoading
             ? const Center(child: CircularProgressIndicator.adaptive())
+            : unavailableKind != null
+            ? PetMagicUnavailableView(
+                kind: unavailableKind,
+                onRetry: () => unawaited(controller.load(refresh: true)),
+                padding: EdgeInsets.fromLTRB(28, 36, 28, bottomNavInset),
+              )
             : RefreshIndicator.adaptive(
                 onRefresh: () async {
                   await PetMagicHaptics.medium();
@@ -366,7 +433,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
                           state.errorMessage ??
                               text.walletDataUnavailableFallback,
                         ),
-                        onRetry: () => controller.load(refresh: true),
+                        onAction: () => controller.load(refresh: true),
                       ),
                     ] else ...[
                       const SizedBox(height: 16),
@@ -856,12 +923,13 @@ Color _ledgerTone(WalletLedgerItem item, PetMagicColors colors) {
 }
 
 String _friendlyError(AppLocalizations text, String value) {
-  if (value.contains('auth.sign_in_required')) {
-    return text.authRequiredMessage;
-  }
-
-  if (value.contains('auth.session_expired')) {
-    return text.authExternalSessionExpired;
+  final authMessage = mapCommonAuthFeedbackMessage(
+    text,
+    value,
+    preferAuthRequiredMessage: true,
+  );
+  if (authMessage != null) {
+    return authMessage;
   }
 
   if (value.contains('wallet.ledger_failed') ||

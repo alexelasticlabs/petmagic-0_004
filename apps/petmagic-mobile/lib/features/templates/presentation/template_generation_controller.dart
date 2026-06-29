@@ -418,17 +418,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       return;
     }
 
-    _activeCorrelationId =
-        active.correlationId ?? _createGenerationCorrelationId();
-    if (active.correlationId == null) {
-      await _repository.rememberActiveGeneration(
-        generationId: active.generationId,
-        correlationId: _activeCorrelationId,
-      );
-      if (!_isRestoreCurrent(restoreEpoch)) {
-        return;
-      }
-    }
+    _activeCorrelationId = active.correlationId;
     state = state.copyWith(isPolling: true, clearError: true);
 
     CancelToken? requestCancelToken;
@@ -540,6 +530,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 bool _isSafeGenerationErrorKey(String value) {
   return value == 'auth.sign_in_required' ||
       value == 'auth.session_expired' ||
+      value == 'auth.legal_acceptance_required' ||
       value == 'economy.insufficient_balance' ||
       value == 'templates.insufficient_balance' ||
       value == 'templates.server_unavailable' ||

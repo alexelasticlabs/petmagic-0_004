@@ -118,16 +118,26 @@ class _SupportConversationViewport extends StatelessWidget {
           SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
-              child: _SupportEmptyState(
-                icon: Icons.support_agent_rounded,
-                title: text.supportChatEmptyTitle,
-                description: state.errorMessage != null
-                    ? _mapSupportError(text, state.errorMessage!)
-                    : (showLoadingFallback
-                          ? _mapSupportError(text, loadingFallbackMessageCode)
-                          : text.supportChatEmptyMessage),
-                actionLabel: text.retryAction,
-                onAction: onRetryInitialize,
+              child: Builder(
+                builder: (context) {
+                  final legalAcceptanceRequired =
+                      isLegalAcceptanceRequiredError(state.errorMessage);
+                  return _SupportEmptyState(
+                    icon: Icons.support_agent_rounded,
+                    title: text.supportChatEmptyTitle,
+                    description: state.errorMessage != null
+                        ? _mapSupportError(text, state.errorMessage!)
+                        : (showLoadingFallback
+                              ? _mapSupportError(text, loadingFallbackMessageCode)
+                              : text.supportChatEmptyMessage),
+                    actionLabel: legalAcceptanceRequired
+                        ? text.profileLegalAcceptAction
+                        : text.retryAction,
+                    onAction: legalAcceptanceRequired
+                        ? () => context.go(LegalAcceptanceGatePage.routePath)
+                        : onRetryInitialize,
+                  );
+                },
               ),
             ),
           ),

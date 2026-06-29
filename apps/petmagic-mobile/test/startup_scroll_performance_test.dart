@@ -11,6 +11,9 @@ void main() {
       ),
     ]) {
       final source = File(policy.path).readAsStringSync();
+      final contentSource = File(
+        'lib/features/startup/presentation/guest_welcome_content.part.dart',
+      ).readAsStringSync();
 
       expect(
         'ListView('.allMatches(source).length,
@@ -29,6 +32,10 @@ void main() {
         reason:
             '${policy.path} should not wrap vertical startup scroll in LayoutBuilder.',
       );
+      expect(source, contains("part 'guest_welcome_content.part.dart';"));
+      expect(source, isNot(contains('class _WelcomeHeroCard')));
+      expect(contentSource, contains('class _WelcomeHeroCard'));
+      expect(contentSource, contains('class _WelcomeCtaBlock'));
     }
   });
 }

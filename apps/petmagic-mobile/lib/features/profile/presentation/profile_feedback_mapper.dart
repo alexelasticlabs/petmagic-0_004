@@ -12,6 +12,8 @@ String mapProfileFeedbackMessage(String raw, AppLocalizations text) {
       return text.authAcceptTermsRequired;
     case 'auth.legal_documents_unavailable':
       return text.authLegalUnavailable;
+    case 'auth.legal_acceptance_required':
+      return text.profileLegalAcceptanceRequired;
     case 'auth.password_reset_code_invalid':
       return text.authPasswordResetCodeInvalid;
     case 'auth.email_code_invalid':

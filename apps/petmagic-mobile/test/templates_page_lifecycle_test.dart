@@ -10,6 +10,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
@@ -35,6 +37,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'package:visibility_detector/visibility_detector.dart';
+import 'test_permission_fakes.dart';
 
 void main() {
   setUpAll(() {
@@ -658,9 +661,7 @@ void main() {
   test(
     'template of the day pet flow uses canonical generation analytics event',
     () {
-      final source = File(
-        'lib/features/templates/presentation/templates_page.dart',
-      ).readAsStringSync();
+      final source = _readTemplatesPageLibrarySource();
 
       expect(source, isNot(contains('generation_started_from_pet')));
       expect(source, contains("'generation_started'"));
@@ -1161,6 +1162,101 @@ void main() {
 
     expect(repository.fetchTemplateCalls, 1);
     expect(find.text('opened:Detail payload'), findsOneWidget);
+  });
+
+  testWidgets('templates gallery denial shows localized permission warning', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final permissionCoordinator = FakeAppPermissionCoordinator(
+      states: const {AppPermissionType.photos: AppPermissionState.denied},
+    );
+    final repository = _RandomTemplatesRepository(
+      templateDetailsById: {
+        'feed-template': _template('feed-template', 'Detail payload'),
+      },
+    );
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const Scaffold(body: TemplatesPage()),
+        ),
+        GoRoute(
+          path: TemplatePreviewPage.routePath,
+          builder: (context, state) => Scaffold(
+            body: Center(
+              child: FilledButton(
+                onPressed: () => context.pop<TemplateDetailAction>(
+                  TemplateDetailAction.upload,
+                ),
+                child: const Text('Upload'),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(_IdleWalletController.new),
+          templatesControllerProvider.overrideWith(
+            () => _FakeTemplatesController(
+              items: [_template('feed-template', 'Feed payload')],
+            ),
+          ),
+          templatesRepositoryProvider.overrideWithValue(repository),
+          appPermissionCoordinatorProvider.overrideWithValue(
+            permissionCoordinator,
+          ),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp.router(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Feed payload').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Upload').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Upload').last);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Gallery'));
+    await tester.pump();
+
+    final notification = PetMagicNotificationCenter.instance.current;
+    expect(
+      notification?.message,
+      'Allow access to your gallery to choose a photo.',
+    );
+    expect(notification?.action, isNull);
+    await PetMagicNotificationCenter.instance.clearQueue();
+    await tester.pump();
   });
 
   testWidgets('pet route starts generation with selected pet photo', (
@@ -1969,7 +2065,7 @@ class _PetFlowGenerationRepository extends TemplateGenerationRepository {
   final rememberedGenerationIds = <String>[];
 
   @override
-  Future<({String? correlationId, String generationId})?>
+  Future<({String correlationId, String generationId})?>
   readActiveGeneration() async {
     return null;
   }
@@ -2181,4 +2277,16 @@ class _PetFlowHistoryController extends GenerationHistoryController {
         items.where((item) => item.isFailed).toList(growable: false),
     };
   }
+}
+
+String _readTemplatesPageLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/templates_page.dart',
+    'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }

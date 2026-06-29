@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -232,7 +233,7 @@ class _ShellTabFadeTransitionState extends State<_ShellTabFadeTransition>
   }
 
   bool _disableAnimations(BuildContext context) {
-    return PerformanceGuard.shouldReduceMotion(context);
+    return PerformanceGuard.shouldDisableSharedRouteAnimations(context);
   }
 }
 
@@ -244,15 +245,21 @@ class _BottomNavBackdrop extends StatelessWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final isDegraded = PerformanceGuard.isDegradedMode(context);
-    final shouldAvoidBlur = PerformanceGuard.shouldAvoidBlur(context);
-    final blurSigma = isDegraded ? 8.0 : 18.0;
-    final blurTopInset = isDegraded ? 12.0 : 16.0;
+    final disableGlass = PerformanceGuard.shouldDisableGlassEffects(context);
+    final blurSigma = switch ((defaultTargetPlatform, isDegraded)) {
+      (TargetPlatform.android, true) => 0.0,
+      (TargetPlatform.android, false) => 10.0,
+      (_, true) => 8.0,
+      _ => 18.0,
+    };
+    final blurTopInset = isDegraded ? 10.0 : 16.0;
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
+    final backdropExtra = disableGlass ? 44.0 : _bottomNavBackdropExtra;
     final height =
         bottomPadding +
         _bottomNavHeight +
         _bottomNavOuterGap +
-        _bottomNavBackdropExtra;
+        backdropExtra;
     final blurLayer = DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -355,7 +362,7 @@ class _BottomNavBackdrop extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (!shouldAvoidBlur)
+              if (!disableGlass)
                 Padding(
                   padding: EdgeInsets.only(top: blurTopInset),
                   child: ClipRect(
@@ -411,7 +418,13 @@ class _FloatingBottomNav extends ConsumerWidget {
     final colors = context.petMagicColors;
     final isLight = Theme.of(context).brightness == Brightness.light;
     final isDegraded = PerformanceGuard.isDegradedMode(context);
-    final blurSigma = isDegraded ? 10.0 : 18.0;
+    final disableGlass = PerformanceGuard.shouldDisableGlassEffects(context);
+    final blurSigma = switch ((defaultTargetPlatform, isDegraded)) {
+      (TargetPlatform.android, true) => 0.0,
+      (TargetPlatform.android, false) => 10.0,
+      (_, true) => 10.0,
+      _ => 18.0,
+    };
     final bottomPadding = MediaQuery.viewPaddingOf(context).bottom;
     final unreadCount = ref.watch(
       generationHistoryControllerProvider.select((state) => state.unreadCount),
@@ -491,7 +504,17 @@ class _FloatingBottomNav extends ConsumerWidget {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),
-                    boxShadow: isDegraded
+                    boxShadow: disableGlass
+                        ? [
+                            BoxShadow(
+                              color: colors.shadow.withValues(
+                                alpha: isLight ? 0.14 : 0.18,
+                              ),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : isDegraded
                         ? [
                             BoxShadow(
                               color: colors.shadow.withValues(
@@ -520,16 +543,19 @@ class _FloatingBottomNav extends ConsumerWidget {
                   ),
                 ),
               ),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(
-                    sigmaX: blurSigma,
-                    sigmaY: blurSigma,
+              if (disableGlass)
+                navSurface
+              else
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(18),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: blurSigma,
+                      sigmaY: blurSigma,
+                    ),
+                    child: navSurface,
                   ),
-                  child: navSurface,
                 ),
-              ),
             ],
           ),
         ),

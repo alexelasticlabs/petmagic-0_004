@@ -102,6 +102,20 @@ void main() {
 
     await optimized.dispose();
   });
+
+  test('skips already-small pet photos', () async {
+    final sourcePath = '${tempDir.path}/pet-photo.jpg';
+    final sourceBytes = _noisyJpegBytes(width: 320, height: 240);
+    await File(sourcePath).writeAsBytes(sourceBytes, flush: true);
+
+    const optimizer = ImageUploadOptimizer();
+    final optimized = await optimizer.optimizeForPetPhoto(
+      XFile(sourcePath, name: 'pet-photo.jpg', mimeType: 'image/jpeg'),
+    );
+
+    expect(optimized.isTemporary, false);
+    expect(optimized.file.path, sourcePath);
+  });
 }
 
 Uint8List _noisyJpegBytes({required int width, required int height}) {

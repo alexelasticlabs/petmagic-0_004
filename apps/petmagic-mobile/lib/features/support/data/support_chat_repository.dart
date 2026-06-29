@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
+import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
   return SupportChatRepository(
@@ -42,8 +43,8 @@ class SupportChatRepository {
   final AuthSessionCoordinator _authSessionCoordinator;
 
   static const _maxAttachmentCount = 5;
-  static const _imageMaxFileSizeBytes = 10 * 1024 * 1024;
-  static const _videoMaxFileSizeBytes = 50 * 1024 * 1024;
+  static const _imageMaxFileSizeBytes = UploadMediaPolicy.supportImageMaxBytes;
+  static const _videoMaxFileSizeBytes = UploadMediaPolicy.supportVideoMaxBytes;
 
   Future<SupportChatConversation> openConversation({
     String? initialMessage,

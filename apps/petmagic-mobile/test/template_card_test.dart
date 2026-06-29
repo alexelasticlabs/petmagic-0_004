@@ -211,7 +211,13 @@ void main() {
       previewUrl: previewUrl,
     );
 
-    await tester.pumpWidget(_buildHost(template));
+    await tester.pumpWidget(
+      _buildHost(
+        template,
+        previewControllerFactory: (_) async =>
+            VideoPlayerController.file(File(cachedPreviewPath!)),
+      ),
+    );
     await tester.pump();
     _showTemplateCard(tester);
     expect(MediaLifecyclePolicy.activeVideoPreviews, equals(1));
@@ -234,7 +240,13 @@ void main() {
       timeout: const Duration(seconds: 2),
     );
 
-    await tester.pumpWidget(_buildHost(template));
+    await tester.pumpWidget(
+      _buildHost(
+        template,
+        previewControllerFactory: (_) async =>
+            VideoPlayerController.file(File(cachedPreviewPath!)),
+      ),
+    );
     await tester.pump();
     _showTemplateCard(tester);
     expect(MediaLifecyclePolicy.activeVideoPreviews, equals(1));

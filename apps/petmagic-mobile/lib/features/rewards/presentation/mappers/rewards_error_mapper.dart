@@ -1,4 +1,5 @@
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 
 String? rewardsWarningMessage(AppLocalizations text, String? raw) {
   if (raw == null) {
@@ -24,15 +25,16 @@ String? rewardsWarningMessage(AppLocalizations text, String? raw) {
 }
 
 String friendlyRewardsError(AppLocalizations text, String raw) {
+  final authMessage = mapCommonAuthFeedbackMessage(
+    text,
+    raw,
+    preferAuthRequiredMessage: true,
+  );
+  if (authMessage != null) {
+    return authMessage;
+  }
+
   final value = raw.toLowerCase();
-
-  if (value.contains('auth.sign_in_required')) {
-    return text.authRequiredMessage;
-  }
-
-  if (value.contains('auth.session_expired')) {
-    return text.authExternalSessionExpired;
-  }
 
   if (value.contains('referral_code_not_found')) {
     return text.rewardsReferralCodeNotFoundError;

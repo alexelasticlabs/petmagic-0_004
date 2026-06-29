@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 
 class XpProgressBar extends StatelessWidget {
   const XpProgressBar({
@@ -154,23 +155,23 @@ class _EvolutionBadgeState extends State<EvolutionBadge>
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     );
-    if (widget.showGlow && widget.evolutionStage != 'egg') {
-      _glowController.repeat(reverse: true);
-    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimationState();
   }
 
   @override
   void didUpdateWidget(EvolutionBadge oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.showGlow && widget.evolutionStage != 'egg') {
-      _glowController.repeat(reverse: true);
-    } else {
-      _glowController.stop();
-    }
+    _syncAnimationState();
   }
 
   @override
   void dispose() {
+    _glowController.stop();
     _glowController.dispose();
     super.dispose();
   }
@@ -210,6 +211,21 @@ class _EvolutionBadgeState extends State<EvolutionBadge>
         );
       },
     );
+  }
+
+  void _syncAnimationState() {
+    final shouldAnimate =
+        widget.showGlow &&
+        widget.evolutionStage != 'egg' &&
+        PerformanceGuard.shouldAnimateRepeatingEffects(context);
+    if (!shouldAnimate) {
+      _glowController.stop();
+      return;
+    }
+
+    if (!_glowController.isAnimating) {
+      _glowController.repeat(reverse: true);
+    }
   }
 }
 

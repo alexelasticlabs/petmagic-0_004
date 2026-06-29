@@ -60,7 +60,7 @@ class AuthSessionCoordinator {
       if (CancelToken.isCancel(error)) {
         throw const RequestCancelledException();
       }
-      if (error.response?.statusCode != 401) {
+      if (!_shouldAttemptRefresh(error)) {
         throw mapError(error, fallbackMessage: requestFailedMessage);
       }
     }
@@ -170,6 +170,11 @@ class AuthSessionCoordinator {
     }
 
     return statusCode == 400 || statusCode == 401 || statusCode == 403;
+  }
+
+  bool _shouldAttemptRefresh(DioException error) {
+    final statusCode = error.response?.statusCode;
+    return statusCode == 401 || statusCode == 403;
   }
 
   Future<T> _executeWithTransientRetry<T>({

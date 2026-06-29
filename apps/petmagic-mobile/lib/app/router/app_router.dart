@@ -268,9 +268,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
+        path: TemplatePreviewPage.routePath,
+        redirect: (context, state) {
+          final extra = state.extra;
+          if (extra is TemplateItem || extra is TemplatePreviewRouteArgs) {
+            return null;
+          }
+          return TemplatesPage.routePath;
+        },
+        pageBuilder: (context, state) {
+          final previewPage = _buildTemplatePreviewPageFromState(state);
+          if (previewPage != null) {
+            return previewPage;
+          }
+
+          return _buildFadeSlidePage(
+            state: state,
+            child: const TemplatesPage(),
+          );
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
         path: '${TemplatePreviewPage.routePath}/:templateId',
         redirect: (context, state) {
-          if (state.extra is TemplateItem || state.extra is TemplatePreviewRouteArgs) {
+          if (state.extra is TemplateItem ||
+              state.extra is TemplatePreviewRouteArgs) {
             return null;
           }
           final templateId = state.pathParameters['templateId'];
@@ -298,14 +321,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             );
           }
 
-          return _buildFadeSlidePage(
-            state: state,
-            child: TemplatePreviewPage(
-              template: args.template,
-              hasPremiumAccess: args.hasPremiumAccess,
-              isAuthenticated: args.isAuthenticated,
-            ),
-          );
+          return _buildTemplatePreviewPage(state: state, args: args);
         },
       ),
       GoRoute(
@@ -342,19 +358,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
-        path: WalletPage.legacyRoutePath,
-        redirect: (context, state) => WalletPage.routePath,
-      ),
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
         path: WalletPage.routePath,
         pageBuilder: (context, state) =>
             _buildFadeSlidePage(state: state, child: const WalletPage()),
-      ),
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: AllTransactionsPage.legacyRoutePath,
-        redirect: (context, state) => AllTransactionsPage.routePath,
       ),
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -456,4 +462,42 @@ CustomTransitionPage<T> _buildFadeSlidePage<T>({
   required Widget child,
 }) {
   return buildPetMagicFadeSlidePage(state: state, child: child);
+}
+
+CustomTransitionPage<dynamic>? _buildTemplatePreviewPageFromState(
+  GoRouterState state,
+) {
+  final extra = state.extra;
+  final TemplatePreviewRouteArgs? args;
+  if (extra is TemplatePreviewRouteArgs) {
+    args = extra;
+  } else if (extra is TemplateItem) {
+    args = TemplatePreviewRouteArgs(
+      template: extra,
+      hasPremiumAccess: false,
+      isAuthenticated: false,
+    );
+  } else {
+    args = null;
+  }
+
+  if (args == null) {
+    return null;
+  }
+
+  return _buildTemplatePreviewPage(state: state, args: args);
+}
+
+CustomTransitionPage<dynamic> _buildTemplatePreviewPage({
+  required GoRouterState state,
+  required TemplatePreviewRouteArgs args,
+}) {
+  return _buildFadeSlidePage(
+    state: state,
+    child: TemplatePreviewPage(
+      template: args.template,
+      hasPremiumAccess: args.hasPremiumAccess,
+      isAuthenticated: args.isAuthenticated,
+    ),
+  );
 }

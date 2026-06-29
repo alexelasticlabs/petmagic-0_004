@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
+import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
 
 void main() {
   late Directory tempDir;
@@ -149,7 +151,7 @@ void main() {
       localeTag: 'en',
     );
 
-    expect(uploadedFileName, 'pet_photo.jpg');
+    expect(uploadedFileName, 'photo.jpg');
     expect(uploadedFileName, isNot(contains('/private')));
     expect(uploadedFileName, isNot(contains('/')));
     expect(uploadedFileName, isNot(contains(r'\')));
@@ -191,6 +193,51 @@ void main() {
     );
 
     expect(didAttemptUpload, isFalse);
+  });
+
+  test('uploads support images from optimized temp payloads', () async {
+    final source = File('${tempDir.path}/source.bin');
+    await source.writeAsBytes('%PDF-1.7 not an image'.codeUnits, flush: true);
+    final optimizedFile = await _createJpegFile(tempDir, 'optimized.jpg');
+
+    String? uploadedFileName;
+    String? uploadedContentType;
+    final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+      ..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final formData = options.data as FormData;
+            final file = formData.files.single.value;
+            uploadedFileName = file.filename;
+            uploadedContentType = file.contentType.toString();
+            handler.resolve(
+              Response<Map<String, dynamic>>(
+                requestOptions: options,
+                statusCode: 200,
+                data: _supportMessageJson(),
+              ),
+            );
+          },
+        ),
+      );
+    final repository = SupportChatRepository(
+      dio: dio,
+      sessionStorage: _SessionStorage(_session()),
+      imageUploadOptimizer: _FakeImageUploadOptimizer(
+        supportImage: optimizedFile,
+      ),
+    );
+
+    await repository.sendAttachment(
+      conversationId: 'conversation-1',
+      filePath: source.path,
+      fileName: 'source.bin',
+      contentType: 'image/png',
+      localeTag: 'en',
+    );
+
+    expect(uploadedFileName, 'optimized.jpg');
+    expect(uploadedContentType, 'image/jpeg');
   });
 
   test(
@@ -304,4 +351,25 @@ class _SessionStorage extends AuthSessionStorage {
 
   @override
   Future<AuthSession?> read() async => _session;
+}
+
+class _FakeImageUploadOptimizer extends ImageUploadOptimizer {
+  const _FakeImageUploadOptimizer({this.supportImage});
+
+  final File? supportImage;
+
+  @override
+  Future<OptimizedUploadFile> optimizeForSupportImage(
+    XFile source, {
+    CancelToken? cancelToken,
+  }) async {
+    final file = supportImage;
+    if (file == null) {
+      return OptimizedUploadFile.original(source);
+    }
+
+    return OptimizedUploadFile.original(
+      XFile(file.path, name: 'optimized.jpg', mimeType: 'image/jpeg'),
+    );
+  }
 }

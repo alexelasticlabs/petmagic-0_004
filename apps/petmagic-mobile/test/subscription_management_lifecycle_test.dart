@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,88 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_controller
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 
 void main() {
+  test('subscription management dynamic copy uses localizations', () async {
+    final pageSource = await File(
+      'lib/features/premium/presentation/subscription_management_page.dart',
+    ).readAsString();
+    final contentSource = await File(
+      'lib/features/premium/presentation/subscription_management_content.part.dart',
+    ).readAsString();
+    final source = '$pageSource\n$contentSource';
+
+    const expectedGetters = <String>[
+      'subscriptionTokensWeeklyGrantPeriodSuffix',
+      'subscriptionGrantCountdownDaysHoursMinutes',
+      'subscriptionGrantCountdownHoursMinutesSeconds',
+      'subscriptionGrantCountdownMinutesSeconds',
+      'subscriptionGrantReadyLabel',
+      'subscriptionGrantNextLabel',
+      'subscriptionBenefitTokensDescription',
+      'subscriptionBenefitFirstBonusDescription',
+      'subscriptionBenefitTemplatesDescription',
+      'subscriptionBenefitPriorityGenerationDescription',
+      'subscriptionBenefitNoWatermarkDescription',
+    ];
+    const removedLiterals = <String>[
+      ' / 7д',
+      'Готово к начислению',
+      'Следующее начисление',
+      'Автоматически каждые 7 дней',
+      'Мгновенно при покупке',
+      'Все сценарии разблокированы',
+      'Ваши задачи в приоритете',
+      'Чистый результат',
+    ];
+
+    for (final getter in expectedGetters) {
+      expect(source, contains(getter));
+    }
+    for (final literal in removedLiterals) {
+      expect(source, isNot(contains(literal)));
+    }
+    expect(
+      pageSource,
+      contains("part 'subscription_management_content.part.dart';"),
+    );
+    expect(pageSource, isNot(contains('class _SubscriptionContent')));
+    expect(contentSource, contains('class _SubscriptionContent'));
+  });
+
+  test(
+    'subscription management localization keys exist in every locale',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+      const requiredKeys = <String>[
+        'subscriptionTokensWeeklyGrantPeriodSuffix',
+        'subscriptionGrantCountdownDaysHoursMinutes',
+        'subscriptionGrantCountdownHoursMinutesSeconds',
+        'subscriptionGrantCountdownMinutesSeconds',
+        'subscriptionGrantReadyLabel',
+        'subscriptionGrantNextLabel',
+        'subscriptionBenefitTokensDescription',
+        'subscriptionBenefitFirstBonusDescription',
+        'subscriptionBenefitTemplatesDescription',
+        'subscriptionBenefitPriorityGenerationDescription',
+        'subscriptionBenefitNoWatermarkDescription',
+      ];
+
+      for (final path in arbFiles) {
+        final source = await File(path).readAsString();
+        for (final key in requiredKeys) {
+          expect(source, contains('"$key"'), reason: '$path is missing $key');
+        }
+      }
+    },
+  );
+
   testWidgets('subscription summary failure shows retry and reloads safely', (
     tester,
   ) async {
@@ -172,6 +255,46 @@ void main() {
 
     await tester.pump(const Duration(seconds: 3));
   });
+
+  testWidgets(
+    'subscription page renders canonical canceled status as expired',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            premiumSubscriptionSummaryProvider.overrideWith(
+              (ref) async => const PremiumSubscriptionSummaryView(
+                isPremium: true,
+                canManageSubscription: true,
+                status: 'Canceled',
+                manageSubscriptionAction: 'StripeCustomerPortal',
+                provider: PremiumSubscriptionProviderView.stripe,
+                planName: 'PetMagic Premium',
+                cancelAtPeriodEnd: false,
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            home: const SubscriptionManagementPage(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final context = tester.element(find.byType(SubscriptionManagementPage));
+      final text = AppLocalizations.of(context);
+
+      expect(find.text(text.subscriptionStatusExpired), findsOneWidget);
+      expect(find.text('PetMagic Premium'), findsWidgets);
+    },
+  );
 }
 
 class _DelayedRestorePremiumController extends PremiumController {

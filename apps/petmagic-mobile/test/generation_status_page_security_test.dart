@@ -23,6 +23,11 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
+  final generationStatusPageSource = File(
+    'lib/features/templates/presentation/generation_status_page.dart',
+  ).readAsStringSync();
+  final generationStatusLibrarySource = _readGenerationStatusLibrarySource();
+
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
@@ -33,9 +38,7 @@ void main() {
   });
 
   test('generation status load errors are mapped before reaching UI state', () {
-    final source = File(
-      'lib/features/templates/presentation/generation_status_page.dart',
-    ).readAsStringSync();
+    final source = generationStatusLibrarySource;
     final loadBody = _methodBody(source, 'Future<void> _load');
     final errorBody = _methodBody(
       source,
@@ -53,12 +56,79 @@ void main() {
     expect(source, contains('_statusLoadErrorText(text, _errorMessage!)'));
   });
 
+  test('generation status feedback UI stays in a dedicated part file', () {
+    final pageSource = generationStatusPageSource;
+    final sectionsSource = File(
+      'lib/features/templates/presentation/generation_status_page_sections.dart',
+    ).readAsStringSync();
+    final feedbackSource = File(
+      'lib/features/templates/presentation/generation_status_page_feedback.part.dart',
+    ).readAsStringSync();
+
+    expect(
+      pageSource,
+      contains("part 'generation_status_page_feedback.part.dart';"),
+    );
+    expect(sectionsSource, isNot(contains('class _FeedbackCard')));
+    expect(sectionsSource, isNot(contains('class _ProblemFeedbackSheet')));
+    expect(sectionsSource, isNot(contains('class _NegativeFeedbackSheet')));
+    expect(feedbackSource, contains("part of 'generation_status_page.dart';"));
+    expect(feedbackSource, contains('class _FeedbackCard'));
+    expect(feedbackSource, contains('class _ProblemFeedbackSheet'));
+    expect(feedbackSource, contains('class _NegativeFeedbackSheet'));
+  });
+
+  test('generation status compare viewer stays in a dedicated part file', () {
+    final pageSource = generationStatusPageSource;
+    final sectionsSource = File(
+      'lib/features/templates/presentation/generation_status_page_sections.dart',
+    ).readAsStringSync();
+    final compareSource = File(
+      'lib/features/templates/presentation/generation_status_page_compare_viewer.part.dart',
+    ).readAsStringSync();
+
+    expect(
+      pageSource,
+      contains("part 'generation_status_page_compare_viewer.part.dart';"),
+    );
+    expect(sectionsSource, isNot(contains('class _BeforeAfterCompareViewer')));
+    expect(sectionsSource, isNot(contains('class _CompareImageLayer')));
+    expect(sectionsSource, isNot(contains('class _CompareViewerSkeleton')));
+    expect(compareSource, contains("part of 'generation_status_page.dart';"));
+    expect(compareSource, contains('class _BeforeAfterCompareViewer'));
+    expect(compareSource, contains('class _CompareImageLayer'));
+    expect(compareSource, contains('class _CompareViewerSkeleton'));
+  });
+
+  test('generation status fullscreen viewer stays in a dedicated part file', () {
+    final pageSource = generationStatusPageSource;
+    final sectionsSource = File(
+      'lib/features/templates/presentation/generation_status_page_sections.dart',
+    ).readAsStringSync();
+    final fullscreenSource = File(
+      'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
+    ).readAsStringSync();
+
+    expect(
+      pageSource,
+      contains("part 'generation_status_page_fullscreen_viewer.part.dart';"),
+    );
+    expect(sectionsSource, isNot(contains('class _FullscreenResultViewer')));
+    expect(sectionsSource, isNot(contains('class _FullscreenVideoControls')));
+    expect(
+      fullscreenSource,
+      contains("part of 'generation_status_page.dart';"),
+    );
+    expect(fullscreenSource, contains('class _FullscreenResultViewer'));
+    expect(fullscreenSource, contains('class _FullscreenVideoControls'));
+    expect(fullscreenSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
+    expect(fullscreenSource, contains('_resultFullscreenImageCacheWidth'));
+  });
+
   test(
     'generation status async feedback and toast paths guard mounted state',
     () {
-      final source = File(
-        'lib/features/templates/presentation/generation_status_page.dart',
-      ).readAsStringSync();
+      final source = generationStatusLibrarySource;
 
       final ratingBody = _methodBody(
         source,
@@ -70,7 +140,7 @@ void main() {
       expect(submitBody, contains('if (!mounted)'));
       expect(
         submitBody.indexOf('if (!mounted)'),
-        lessThan(submitBody.indexOf('setState(')),
+        lessThan(submitBody.indexOf('_setPageState(')),
       );
 
       final showInfoBody = _methodBody(source, 'void _showInfo');
@@ -85,9 +155,7 @@ void main() {
   test(
     'generation status back button preserves existing navigation stack first',
     () {
-      final source = File(
-        'lib/features/templates/presentation/generation_status_page.dart',
-      ).readAsStringSync();
+      final source = generationStatusLibrarySource;
       final buildBody = _methodBody(source, 'Widget build');
       final backBody = _methodBody(source, 'void _handleBackNavigation');
 
@@ -318,9 +386,7 @@ void main() {
   });
 
   test('generation status failed retry and sheet keep pet context helper', () {
-    final source = File(
-      'lib/features/templates/presentation/generation_status_page.dart',
-    ).readAsStringSync();
+    final source = generationStatusLibrarySource;
     final buildBody = _methodBody(source, 'Widget build');
     final sheetBody = _methodBody(source, 'Future<void> _openActionsSheet');
     final retryBody = _methodBody(source, 'void _retrySoon');
@@ -342,9 +408,7 @@ void main() {
   test(
     'generation status media actions stop after local-media lookup if unmounted',
     () {
-      final source = File(
-        'lib/features/templates/presentation/generation_status_page.dart',
-      ).readAsStringSync();
+      final source = generationStatusLibrarySource;
       final saveBody = _methodBody(source, 'Future<void> _saveToGallery');
       final shareBody = _methodBody(source, 'Future<void> _shareResult');
 
@@ -367,7 +431,7 @@ void main() {
   test('generation result aspect ratio probe is cached and detached', () {
     final source = File(
       'lib/features/templates/presentation/generation_status_page_sections.dart',
-    ).readAsStringSync();
+    ).readAsStringSync().replaceAll('\r\n', '\n');
 
     expect(source, contains('CachedNetworkImageProvider('));
     expect(
@@ -381,11 +445,15 @@ void main() {
   });
 
   test('generation result media URLs are checked before network use', () {
-    final pageSource = File(
-      'lib/features/templates/presentation/generation_status_page.dart',
-    ).readAsStringSync();
+    final pageSource = generationStatusLibrarySource;
     final sectionsSource = File(
       'lib/features/templates/presentation/generation_status_page_sections.dart',
+    ).readAsStringSync();
+    final compareSource = File(
+      'lib/features/templates/presentation/generation_status_page_compare_viewer.part.dart',
+    ).readAsStringSync();
+    final fullscreenSource = File(
+      'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
     ).readAsStringSync();
 
     expect(
@@ -399,14 +467,14 @@ void main() {
     expect(pageSource, contains('ClipboardData(text: safeUri.toString())'));
     expect(sectionsSource, contains('parseSafeGenerationMediaUri(url)'));
     expect(sectionsSource, contains('parseSafeGenerationMediaUri(outputUrl)'));
-    expect(sectionsSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
+    expect(fullscreenSource, contains('parseSafeGenerationMediaUri(mediaUrl)'));
     expect(
-      sectionsSource,
+      fullscreenSource,
       contains('VideoPlayerController.networkUrl(safeUri)'),
     );
-    expect(sectionsSource, contains('imageUrl: safeMediaUrl'));
+    expect(fullscreenSource, contains('imageUrl: safeMediaUrl'));
     expect(
-      sectionsSource,
+      fullscreenSource,
       isNot(contains('VideoPlayerController.networkUrl(Uri.parse(mediaUrl))')),
     );
     expect(
@@ -417,15 +485,13 @@ void main() {
       pageSource,
       contains("_recordCompareAnalytics(generation, 'compare_clicked')"),
     );
-    expect(sectionsSource, contains('class _BeforeAfterCompareViewer'));
+    expect(compareSource, contains('class _BeforeAfterCompareViewer'));
   });
 
   test(
     'generation status local media sync checks page lifecycle before apply',
     () {
-      final source = File(
-        'lib/features/templates/presentation/generation_status_page.dart',
-      ).readAsStringSync();
+      final source = generationStatusLibrarySource;
       final materializeBody = _methodBody(
         source,
         'Future<void> _materializeLocalMediaAndRefresh',
@@ -1395,6 +1461,18 @@ void main() {
   );
 }
 
+String _readGenerationStatusLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/generation_status_page.dart',
+    'lib/features/templates/presentation/generation_status_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
+    'lib/features/templates/presentation/generation_status_page_feedback_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
+}
+
 class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
   _FakeTemplateGenerationRepository(
     this.generation, {
@@ -1470,11 +1548,11 @@ class _FakeTemplateGenerationRepository extends TemplateGenerationRepository {
       throw DioException.badResponse(
         statusCode: removeWatermarkStatusCode!,
         requestOptions: RequestOptions(
-          path: '/api/generations/$generationId/remove-watermark',
+          path: '/api/templates/generations/$generationId/remove-watermark',
         ),
         response: Response<Map<String, Object?>>(
           requestOptions: RequestOptions(
-            path: '/api/generations/$generationId/remove-watermark',
+            path: '/api/templates/generations/$generationId/remove-watermark',
           ),
           statusCode: removeWatermarkStatusCode,
           data: const {'title': 'economy.insufficient_balance'},

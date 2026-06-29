@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_async_state_view.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_image_state.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_interactive_surface.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 void main() {
   testWidgets('PetMagicAnimatedButtonChild animates loading content', (
@@ -48,6 +51,36 @@ void main() {
     await tester.pump();
 
     expect(retryCount, 1);
+  });
+
+  testWidgets('PetMagicUnavailableView renders offline copy', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const PetMagicUnavailableView(
+          kind: AppUnavailableKind.offline,
+          onRetry: _noop,
+        ),
+      ),
+    );
+
+    expect(find.text("You're offline"), findsOneWidget);
+    expect(find.textContaining("We'll retry automatically"), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('PetMagicUnavailableView renders server copy', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        const PetMagicUnavailableView(
+          kind: AppUnavailableKind.serverUnavailable,
+          onRetry: _noop,
+        ),
+      ),
+    );
+
+    expect(find.text('Server is unavailable'), findsOneWidget);
+    expect(find.textContaining('could not reach the backend'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
   });
 
   testWidgets('PetMagicImageState shows fallback retry state', (tester) async {
@@ -122,6 +155,10 @@ Widget _host(Widget child) {
   return MaterialApp(
     theme: AppTheme.light(),
     darkTheme: AppTheme.dark(),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: Center(child: child)),
   );
 }
+
+void _noop() {}

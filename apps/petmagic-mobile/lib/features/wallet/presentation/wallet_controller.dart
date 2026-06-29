@@ -1202,6 +1202,7 @@ String _stripeReferenceType(String? value) {
 bool _isSafeWalletErrorKey(String value) {
   return value == 'auth.sign_in_required' ||
       value == 'auth.session_expired' ||
+      value == 'auth.legal_acceptance_required' ||
       value == 'wallet.ledger_failed' ||
       value == 'wallet.packs_failed' ||
       value == 'wallet.purchases_failed' ||

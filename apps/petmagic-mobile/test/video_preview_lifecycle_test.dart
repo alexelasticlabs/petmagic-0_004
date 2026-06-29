@@ -5,9 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('network video preview lifecycle', () {
     test('generation result previews ignore stale async initialization', () {
-      final source = File(
+      final sectionsSource = File(
         'lib/features/templates/presentation/generation_status_page_sections.dart',
       ).readAsStringSync();
+      final fullscreenSource = File(
+        'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
+      ).readAsStringSync();
+      final source = '$sectionsSource\n$fullscreenSource';
 
       expect(source, contains('int _initializeRequestVersion = 0;'));
       expect(source, contains('int _videoInitializeRequestVersion = 0;'));
@@ -34,11 +38,19 @@ void main() {
       final parentSource = File(
         'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
       ).readAsStringSync();
-      final source = File(
+      final contentSource = File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsStringSync();
+      final source = File(
+        'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
+      ).readAsStringSync().replaceAll('\r\n', '\n');
 
       expect(parentSource, contains("import 'dart:async';"));
+      expect(
+        parentSource,
+        contains("part 'template_flow_media_preview.part.dart';"),
+      );
+      expect(contentSource, isNot(contains('class _NetworkVideoPreview')));
       expect(
         parentSource,
         contains(

@@ -344,14 +344,17 @@ void main() {
   );
 
   test(
-    'persists generated correlation id when restoring legacy active generation',
+    'restores active generation with repository-provided correlation id',
     () async {
       final repository = _FakeTemplateGenerationRepository(
         fetchError: const AppException(
           'templates.server_unavailable',
           statusCode: 503,
         ),
-      )..activeGeneration = (generationId: 'generation-1', correlationId: null);
+      )..activeGeneration = (
+        generationId: 'generation-1',
+        correlationId: 'generation-restored-1',
+      );
       final container = ProviderContainer(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
@@ -368,7 +371,7 @@ void main() {
       final restored = repository.activeGeneration;
       expect(repository.fetchCalls, 1);
       expect(restored?.generationId, 'generation-1');
-      expect(restored?.correlationId, startsWith('generation-'));
+      expect(restored?.correlationId, 'generation-restored-1');
       expect(repository.fetchCorrelationIds.single, restored?.correlationId);
     },
   );
@@ -379,7 +382,10 @@ void main() {
       final restoreReadCompleter = Completer<void>();
       final repository = _FakeTemplateGenerationRepository(
         readActiveCompleter: restoreReadCompleter,
-      )..activeGeneration = (generationId: 'generation-1', correlationId: null);
+      )..activeGeneration = (
+        generationId: 'generation-1',
+        correlationId: 'generation-restored-1',
+      );
       final container = ProviderContainer(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
@@ -509,7 +515,7 @@ class _FakeTemplateGenerationRepository
   final List<XFile> startSourceImages = <XFile>[];
   final List<String?> startCorrelationIds = <String?>[];
   final List<String?> fetchCorrelationIds = <String?>[];
-  ({String generationId, String? correlationId})? activeGeneration;
+  ({String generationId, String correlationId})? activeGeneration;
 
   @override
   Future<TemplateGenerationResult> startGeneration({
@@ -572,7 +578,7 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
-  Future<({String generationId, String? correlationId})?>
+  Future<({String generationId, String correlationId})?>
   readActiveGeneration() async {
     final completer = readActiveCompleter;
     if (completer != null) {
@@ -591,7 +597,7 @@ class _FakeTemplateGenerationRepository
     }
     activeGeneration = (
       generationId: generationId,
-      correlationId: correlationId,
+      correlationId: correlationId ?? 'generation-fake-correlation',
     );
     final completer = rememberCompleter;
     if (completer != null) {

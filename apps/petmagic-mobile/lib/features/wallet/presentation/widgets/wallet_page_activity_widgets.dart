@@ -85,9 +85,13 @@ class _FeaturedPackTile extends StatelessWidget {
     final valueLabel = _valuePerCurrencyLabel(pack);
     final photosApprox = (pack.totalSpark / _kPhotoCostSpark).floor();
     final videosApprox = (pack.totalSpark / _kVideoCostSpark).floor();
+    final photosApproxLabel = text.walletApproxPhotos(photosApprox);
     final usageLabel = videosApprox > 0
-        ? '≈ ${text.walletApproxPhotos(photosApprox)} или ${text.walletApproxVideos(videosApprox)}'
-        : '≈ ${text.walletApproxPhotos(photosApprox)}';
+        ? text.walletApproxPhotosOrVideos(
+            photosApproxLabel,
+            text.walletApproxVideos(videosApprox),
+          )
+        : text.walletApproxPhotosOnly(photosApproxLabel);
     final badgeLabel = isBestOffer
         ? '🔥 ${text.walletBestValueBadge}'
         : (isPopular ? text.walletPopularBadge : null);
@@ -681,10 +685,15 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _WalletUnavailableCard extends StatelessWidget {
-  const _WalletUnavailableCard({required this.message, required this.onRetry});
+  const _WalletUnavailableCard({
+    required this.message,
+    required this.onAction,
+    this.actionLabel,
+  });
 
   final String message;
-  final VoidCallback onRetry;
+  final VoidCallback onAction;
+  final String? actionLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -731,9 +740,9 @@ class _WalletUnavailableCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           FilledButton.icon(
-            onPressed: onRetry,
+            onPressed: onAction,
             icon: const Icon(Icons.refresh_rounded),
-            label: Text(text.walletTryAgainAction),
+            label: Text(actionLabel ?? text.walletTryAgainAction),
           ),
         ],
       ),

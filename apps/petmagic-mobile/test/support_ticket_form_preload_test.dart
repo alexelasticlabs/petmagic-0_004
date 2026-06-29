@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -15,6 +17,8 @@ import 'package:petmagic_mobile/features/support/data/support_chat_repository.da
 import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'test_permission_fakes.dart';
 
 late _SupportPreloadTracker _preloadTracker;
 
@@ -102,9 +106,60 @@ void main() {
     expect(repository.sendAttachmentCalls, 0);
   });
 
+  testWidgets(
+    'support ticket gallery denial shows localized warning with settings action',
+    (tester) async {
+      addTearDown(() async {
+        await PetMagicNotificationCenter.instance.clearQueue();
+      });
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(_IdleWalletController.new),
+            premiumControllerProvider.overrideWith(_IdlePremiumController.new),
+            appPermissionCoordinatorProvider.overrideWithValue(
+              FakeAppPermissionCoordinator(
+                states: const {
+                  AppPermissionType.photos:
+                      AppPermissionState.permanentlyDenied,
+                },
+              ),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.tap(find.text('Add screenshot'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Choose from gallery'));
+      await tester.pump();
+
+      final notification = PetMagicNotificationCenter.instance.current;
+      expect(
+        notification?.message,
+        'Gallery access is off. Open device settings to allow it.',
+      );
+      expect(notification?.action?.label, 'Open settings');
+      await PetMagicNotificationCenter.instance.clearQueue();
+      await tester.pump();
+    },
+  );
+
   test('support ticket form uses a lazy scroll surface', () async {
     final source = await File(
-      'lib/features/support/presentation/support_ticket_form_page.dart',
+      'lib/features/support/presentation/support_ticket_form_content.part.dart',
     ).readAsString();
     final buildBody = _methodBody(source, 'Widget build');
 

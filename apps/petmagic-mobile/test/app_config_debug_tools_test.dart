@@ -49,9 +49,7 @@ void main() {
     final shell = File(
       'lib/shared/navigation/petmagic_shell.dart',
     ).readAsStringSync();
-    final templatesPage = File(
-      'lib/features/templates/presentation/templates_page.dart',
-    ).readAsStringSync();
+    final templatesPage = _readTemplatesPageLibrarySource();
 
     expect(app, isNot(contains('ref.watch(networkStatusControllerProvider);')));
     expect(shell, contains('class _ActiveGenerationBannerSlot'));
@@ -93,16 +91,28 @@ void main() {
 
   test('Android app Gradle config uses Flutter built-in Kotlin support', () {
     final properties = File('android/gradle.properties').readAsStringSync();
+    final settings = File('android/settings.gradle.kts').readAsStringSync();
     final gradle = File('android/app/build.gradle.kts').readAsStringSync();
 
     expect(properties, contains('android.builtInKotlin=true'));
+    expect(settings, contains('id("org.jetbrains.kotlin.android") version '));
     expect(gradle, isNot(contains('id("kotlin-android")')));
     expect(gradle, isNot(contains('id("org.jetbrains.kotlin.android")')));
     expect(gradle, isNot(contains('kotlinOptions')));
-    expect(gradle, contains('kotlin {\n    compilerOptions {'));
-    expect(
-      gradle,
-      contains('jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17'),
-    );
+    expect(gradle, contains('kotlin {'));
+    expect(gradle, contains('sourceCompatibility = JavaVersion.VERSION_17'));
+    expect(gradle, contains('targetCompatibility = JavaVersion.VERSION_17'));
   });
+}
+
+String _readTemplatesPageLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/templates_page.dart',
+    'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }

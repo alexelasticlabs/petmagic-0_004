@@ -4,6 +4,16 @@
   "navCreations": "Галерея",
   "navRewards": "Бонусы",
   "navProfile": "Профиль",
+  "notificationOpenAction": "Открыть",
+  "notificationDefaultTitle": "Обновление PetMagic",
+  "notificationSupportTitle": "Поддержка PetMagic ответила",
+  "notificationGenerationTitle": "Обновление генерации PetMagic",
+  "notificationWalletTitle": "Обновление кошелька PetMagic",
+  "notificationPremiumTitle": "Обновление Premium PetMagic",
+  "notificationSupportBody": "Откройте чат поддержки, чтобы увидеть новый ответ.",
+  "notificationGenerationBody": "Статус вашей генерации изменился.",
+  "notificationWalletBody": "Откройте кошелёк, чтобы проверить последнее изменение баланса.",
+  "notificationPremiumBody": "Откройте профиль, чтобы проверить последнее изменение Premium.",
   "comingSoonMessage": "Раздел подготовлен для следующей продуктовой волны.",
   "createMagicTitle": "Создай магию",
   "pickTemplateSubtitle": "Выберите шаблон для питомца",
@@ -33,6 +43,7 @@
   "templateOfTheDaySubtitle": "Магическая идея дня",
   "templateOfTheDayTryAction": "Попробовать шаблон",
   "templateOfTheDayFeedBadge": "Выбор дня",
+  "templateOfTheDayLoadFailed": "Не удалось загрузить шаблон дня.",
   "allFilter": "Все",
   "videosFilter": "Видео",
   "imagesFilter": "Изображения",
@@ -157,6 +168,11 @@
   "petsTemplateFallback": "Шаблон",
   "petsUploadAction": "Загрузить",
   "petsChooseFromMyPetsAction": "Выбрать из моих питомцев",
+  "petsActionSheetUploadSubtitle": "Добавить фото или видео",
+  "petsActionSheetMyPetsSubtitle": "Использовать питомца из профиля",
+  "petsActionSheetSourceTitle": "Источник контента",
+  "petsActionSheetUploadSemantic": "Загрузить фото или видео",
+  "petsActionSheetMyPetsSemantic": "Выбрать питомца из профиля",
   "petsGenerationCostMessage": "Генерация стоит {count} PawSpark.",
   "petsNoPhotoStartMessage": "Добавьте фото питомца, чтобы начать",
   "petsFirstPetToast": "Добавьте первого питомца",
@@ -189,7 +205,7 @@
   "subscriptionAutoRenewLabel": "Автопродление",
   "subscriptionAutoRenewOn": "Включено",
   "subscriptionAutoRenewOff": "Отключено",
-  "subscriptionTokensSectionTitle": "Premium PawSpark",
+  "subscriptionTokensSectionTitle": "PawSpark в подписке",
   "subscriptionTokensAvailableLabel": "Доступно сейчас",
   "subscriptionTokensPerPeriodLabel": "Каждые 7 дней",
   "subscriptionTokensNextGrantLabel": "Следующее начисление",
@@ -213,15 +229,11 @@
   "subscriptionPaymentCardLabel": "Карта",
   "subscriptionPaymentProviderStripe": "Карта через Stripe",
   "subscriptionPaymentProviderGooglePlay": "Google Play",
-  "subscriptionPaymentProviderAppStore": "Apple / App Store",
+  "subscriptionPaymentProviderAppStore": "App Store",
   "subscriptionChangePaymentAction": "Изменить способ оплаты",
   "subscriptionCancelAction": "Отменить подписку",
   "subscriptionCancelledHint": "Подписка активна до {date}. После этого автопродление не произойдёт.",
-  "@subscriptionCancelledHint": {
-    "placeholders": {
-      "date": {}
-    }
-  },
+  "@subscriptionCancelledHint": {},
   "profileWalletTitle": "Кошелек",
   "profileWalletHistoryHint": "Баланс, покупки и история операций.",
   "walletPageTitle": "PawSpark кошелек",
@@ -232,11 +244,7 @@
   "profileWalletPreviewLoadingStatus": "Обновляем статус",
   "profileWalletPreviewWeeklyReady": "Недельная награда готова",
   "profileWalletPreviewAdCount": "Реклама сегодня: {count}",
-  "@profileWalletPreviewAdCount": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@profileWalletPreviewAdCount": {},
   "profileWalletLoadingHint": "Загружаем баланс...",
   "profileWalletEmptyHint": "Откройте баланс и историю",
   "walletDataUnavailableFallback": "Данные кошелька сейчас недоступны.",
@@ -246,13 +254,12 @@
   "walletBalanceUnit": "PawSpark",
   "walletBalanceExplanation": "PawSpark — внутренняя валюта PetMagic. Используйте её для создания фото, видео и доступа к премиум-шаблонам.",
   "walletPremiumStatus": "Premium-кошелек",
+  "premiumUpsellHeadline": "Premium выгоднее",
+  "premiumUpsellSubtitle": "40 PawSpark каждую неделю\nБез водяного знака, экспорт высокого качества",
+  "premiumUpsellWeeklyCredits": "40 PawSpark каждую неделю",
   "walletFreeStatus": "Базовый кошелек",
   "walletAdRewardsCount": "Наград за рекламу: {count}",
-  "@walletAdRewardsCount": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletAdRewardsCount": {},
   "walletQuickActionsTitle": "Промокоды",
   "walletRedeemAction": "Активировать",
   "walletRewardsTitle": "Бонус за рекламу",
@@ -260,11 +267,7 @@
   "walletAdRewardCompactTitle": "Получить PawSpark бесплатно",
   "walletAdRewardCompactDescription": "Посмотрите короткую рекламу и получите +15 PawSpark.",
   "walletAdRewardRemaining": "Сегодня осталось: {count}",
-  "@walletAdRewardRemaining": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletAdRewardRemaining": {},
   "walletWatchAdAction": "Смотреть рекламу +15",
   "walletAdDailyLimitReached": "Реклама сейчас недоступна. Попробуйте у нас позже.",
   "walletPromoTitle": "Есть промокод?",
@@ -277,21 +280,11 @@
   "walletViewPremiumAction": "Посмотреть Premium",
   "walletWhatYouCanCreateTitle": "Хватит примерно на:",
   "walletApproxPhotos": "{count} фото",
-  "@walletApproxPhotos": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@walletApproxPhotos": {},
   "walletApproxVideos": "{count} видео",
-  "@walletApproxVideos": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@walletApproxVideos": {},
+  "walletApproxPhotosOnly": "≈ {photos}",
+  "walletApproxPhotosOrVideos": "≈ {photos} или {videos}",
   "walletSpendPhotoSubtitle": "Фото\nот 10 Spark",
   "walletSpendVideoSubtitle": "Видео\nот 50 Spark",
   "walletSpendPremiumSubtitle": "Premium\nот 80 Spark",
@@ -300,28 +293,12 @@
   "rewardsPageTitle": "Бонусы",
   "rewardsPageSubtitle": "Получайте PawSpark за промокоды и приглашения",
   "rewardsLastUpdatedLabel": "Обновлено: {value}",
-  "@rewardsLastUpdatedLabel": {
-    "placeholders": {
-      "value": {}
-    }
-  },
+  "@rewardsLastUpdatedLabel": {},
   "rewardsLastUpdatedNow": "только что",
   "rewardsLastUpdatedMinutes": "{count} мин назад",
-  "@rewardsLastUpdatedMinutes": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@rewardsLastUpdatedMinutes": {},
   "rewardsLastUpdatedHours": "{count} ч назад",
-  "@rewardsLastUpdatedHours": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@rewardsLastUpdatedHours": {},
   "rewardsPromoTitle": "Промокод",
   "rewardsPromoSubtitle": "Введите промокод и получите бонус",
   "rewardsPromoEmptyError": "Введите промокод.",
@@ -351,24 +328,11 @@
   "rewardsReferralFriendsLabel": "Друзей",
   "rewardsReferralBonusLabel": "Покупок друзей",
   "rewardsReferralBonusPerFriend": "+{count} PawSpark за друга",
-  "@rewardsReferralBonusPerFriend": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@rewardsReferralBonusPerFriend": {},
   "rewardsReferralRulesNote": "Бонус начисляется после первой успешной покупки друга.",
   "rewardsReferralHowItWorksAction": "Как это работает?",
   "rewardsReferralShareMessage": "Присоединяйся к PetMagic по моему коду {code}. Бонус начисляется после первой успешной платной покупки. После твоей первой покупки я получу +{bonus} PawSpark.",
-  "@rewardsReferralShareMessage": {
-    "placeholders": {
-      "code": {},
-      "bonus": {
-        "type": "int"
-      }
-    }
-  },
+  "@rewardsReferralShareMessage": {},
   "rewardsHistoryTitle": "История",
   "rewardsHistorySubtitle": "Последние промокоды, рефералки, реклама и еженедельные награды.",
   "rewardsHistoryEmpty": "Бонусов пока нет. Промокоды и реферальные награды появятся здесь.",
@@ -384,53 +348,25 @@
   "rewardsReferralPaidUserError": "Реферальный код нужно активировать до первой успешной платной покупки.",
   "walletBuySparkTitle": "Пополнить PawSpark",
   "walletPackTotalSpark": "{count} PawSpark",
-  "@walletPackTotalSpark": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletPackTotalSpark": {},
   "walletPopularBadge": "Популярно",
   "walletBestValueLabel": "Лучшее соотношение",
   "walletPackBonus": "+{count} бонус",
-  "@walletPackBonus": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletPackBonus": {},
   "walletPackBonusPill": "Бонус +{count}",
-  "@walletPackBonusPill": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletPackBonusPill": {},
   "walletPackBaseSpark": "{count} база",
-  "@walletPackBaseSpark": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletPackBaseSpark": {},
   "walletBuyForPrice": "Купить за {price}",
-  "@walletBuyForPrice": {
-    "placeholders": {
-      "price": {}
-    }
-  },
+  "@walletBuyForPrice": {},
   "walletPackDetailsAction": "Подробнее",
   "walletPackDetailSubtitle": "Проверьте состав пакета перед переходом к оплате.",
   "walletCheckoutHint": "Оплата откроется в защищенном Stripe Checkout. После оплаты PawSpark сразу зачисляются на ваш баланс.",
   "walletCheckoutProductSubtitle": "Разовое пополнение вашего баланса PawSpark для создания фото и видео в PetMagic",
   "walletCheckoutTokensImmediately": "{count} PawSpark сразу после оплаты",
-  "@walletCheckoutTokensImmediately": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletCheckoutTokensImmediately": {},
   "walletCheckoutBonusTokens": "+{count} бонусных PawSpark в подарок",
-  "@walletCheckoutBonusTokens": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletCheckoutBonusTokens": {},
   "walletCheckoutIncludesTitle": "Что вы получите",
   "walletCheckoutFeaturePremiumTemplates": "Premium-шаблоны",
   "walletCheckoutFeaturePriority": "Приоритетная генерация",
@@ -446,37 +382,17 @@
   "walletPaymentStoreUnavailableAppStore": "App Store временно недоступен на этом устройстве. Пока используйте Stripe.",
   "walletCheckoutOrderSectionTitle": "Ваше пополнение",
   "walletCheckoutSucceeded": "Оплата подтверждена. +{spark} PawSpark уже в вашем кошельке.",
-  "@walletCheckoutSucceeded": {
-    "placeholders": {
-      "spark": {
-        "type": "int"
-      }
-    }
-  },
+  "@walletCheckoutSucceeded": {},
   "walletPackBreakdown": "{base} база + {bonus} бонус",
-  "@walletPackBreakdown": {
-    "placeholders": {
-      "base": {},
-      "bonus": {}
-    }
-  },
+  "@walletPackBreakdown": {},
   "walletRecentTransactionsTitle": "Последние операции",
   "walletViewAllTransactions": "Все операции",
   "walletNoActivity": "Операций в кошельке пока нет.",
   "walletBalanceAfter": "Баланс: {count}",
-  "@walletBalanceAfter": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@walletBalanceAfter": {},
   "walletPurchaseHistoryTitle": "История покупок",
   "walletPurchaseSummary": "{count} PawSpark • {date}",
-  "@walletPurchaseSummary": {
-    "placeholders": {
-      "count": {},
-      "date": {}
-    }
-  },
+  "@walletPurchaseSummary": {},
   "walletPurchaseJustConfirmed": "Только что подтверждено",
   "walletUnavailableTitle": "Кошелек временно недоступен",
   "walletTryAgainAction": "Попробовать снова",
@@ -541,36 +457,19 @@
   "premiumYearlyPeriod": "/ год",
   "premiumPopularBadge": "Самый популярный",
   "premiumTokensPerWeek": "{count} PawSpark / неделя",
-  "@premiumTokensPerWeek": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@premiumTokensPerWeek": {},
   "premiumTokensPerMonth": "{count} PawSpark / месяц",
-  "@premiumTokensPerMonth": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@premiumTokensPerMonth": {},
   "premiumDiscountLabel": "Экономия {percent}%",
-  "@premiumDiscountLabel": {
-    "placeholders": {
-      "percent": {}
-    }
-  },
+  "@premiumDiscountLabel": {},
   "premiumCancelAnytime": "Можно отменить в любой момент",
   "premiumIncludesTitle": "Что входит в Premium",
   "premiumTokenEstimate": "Примерно {videos} видео или {photos} фото в месяц, в зависимости от сложности шаблона.",
-  "@premiumTokenEstimate": {
-    "placeholders": {
-      "videos": {},
-      "photos": {}
-    }
-  },
+  "@premiumTokenEstimate": {},
   "premiumSocialProof": "Самый популярный тариф для тех, кто регулярно создаёт контент в PetMagic.",
   "premiumPaymentTitle": "Способ оплаты",
   "premiumPaymentChooseSubtitle": "Выберите, как хотите оформить подписку",
-  "premiumPaymentStripe": "Stripe",
+  "premiumPaymentStripe": "Банковская карта",
   "premiumPaymentStripeSubtitle": "Оплата картой, Apple Pay или Google Pay",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Оплата через Google Play",
@@ -581,11 +480,7 @@
   "premiumPaymentTrustNoStorage": "PetMagic не хранит данные вашей карты.",
   "premiumPaymentTrustManageInApp": "Продление и отмена подписки управляются внутри PetMagic.",
   "paymentBonusPercentBadge": "+{percent}% бонус",
-  "@paymentBonusPercentBadge": {
-    "placeholders": {
-      "percent": {}
-    }
-  },
+  "@paymentBonusPercentBadge": {},
   "premiumComparisonTitle": "Что меняется с Premium",
   "premiumFreeColumn": "Бесплатно",
   "premiumPremiumColumn": "Premium",
@@ -593,11 +488,7 @@
   "premiumComparisonPremiumTemplates": "Premium-шаблоны",
   "premiumComparisonTokens": "PawSpark в месяц",
   "premiumComparisonPremiumTokens": "До {count}",
-  "@premiumComparisonPremiumTokens": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@premiumComparisonPremiumTokens": {},
   "premiumComparisonPremiumTokensFallback": "40 PawSpark / неделю",
   "premiumComparisonFast": "Быстрая генерация",
   "premiumComparisonHighQuality": "Экспорт высокого качества",
@@ -611,11 +502,7 @@
   "premiumSecurePaymentSubtitle": "Управлять подпиской или отменить ее можно в настройках оплаты в любой момент.",
   "premiumContinueAction": "Разблокировать Premium",
   "paymentContinueViaProviderAction": "Продолжить через {provider}",
-  "@paymentContinueViaProviderAction": {
-    "placeholders": {
-      "provider": {}
-    }
-  },
+  "@paymentContinueViaProviderAction": {},
   "paymentChooseAnotherMethodAction": "Выбрать другой способ оплаты",
   "externalCheckoutStripeTitle": "Оплата через Stripe",
   "externalCheckoutStripeMessage": "Stripe Checkout откроется в защищенном встроенном браузере. После возврата в PetMagic мы автоматически проверим статус оплаты и только потом обновим подписку или баланс.",
@@ -624,13 +511,7 @@
   "externalCheckoutCheckingMessage": "Ждем подтверждение от Stripe. Обычно это занимает несколько секунд.",
   "externalCheckoutPendingVerificationMessage": "Оплата еще не подтверждена. Мы обновим Premium или баланс сразу после подтверждения от Stripe.",
   "premiumContinueWithPlan": "Продолжить с тарифом {plan} — {price} {period}",
-  "@premiumContinueWithPlan": {
-    "placeholders": {
-      "plan": {},
-      "price": {},
-      "period": {}
-    }
-  },
+  "@premiumContinueWithPlan": {},
   "premiumManageAction": "Управлять подпиской",
   "premiumRestoreAction": "Восстановить покупки",
   "premiumTermsNotice": "Продолжая, вы соглашаетесь с Условиями использования и Политикой конфиденциальности.",
@@ -841,12 +722,7 @@
   "supportChatAttachmentStatusFailed": "Ошибка",
   "supportChatAttachmentStatusRetry": "Повтор",
   "supportChatAttachmentUploadingWithCount": "Загружаем фото {current} из {total}",
-  "@supportChatAttachmentUploadingWithCount": {
-    "placeholders": {
-      "current": {},
-      "total": {}
-    }
-  },
+  "@supportChatAttachmentUploadingWithCount": {},
   "supportChatImageUploadFailedLabel": "Не удалось загрузить изображение",
   "supportChatFileFallbackLabel": "Файл",
   "supportChatSystemNoticeTitle": "Запрос отправлен",
@@ -869,6 +745,18 @@
   "supportChatCameraPermissionPhotoError": "Для съемки фото нужен доступ к камере.",
   "supportChatCameraPermissionVideoError": "Для записи видео нужен доступ к камере.",
   "supportChatFilesPermissionError": "Для добавления файлов нужен доступ к файлам.",
+  "permissionsAccessNeededTitle": "Нужен доступ",
+  "permissionsOpenSettingsAction": "Открыть настройки",
+  "permissionsGalleryAccessDeniedMessage": "Разрешите доступ к галерее, чтобы выбрать фото.",
+  "permissionsGalleryAccessBlockedMessage": "Доступ к галерее отключен. Откройте настройки устройства и разрешите его.",
+  "permissionsMediaAccessDeniedMessage": "Разрешите доступ к фото и видео, чтобы добавить вложения.",
+  "permissionsMediaAccessBlockedMessage": "Доступ к фото и видео отключен. Откройте настройки устройства и разрешите его.",
+  "permissionsCameraAccessDeniedMessage": "Разрешите доступ к камере, чтобы сделать фото.",
+  "permissionsCameraAccessBlockedMessage": "Доступ к камере отключен. Откройте настройки устройства и разрешите его.",
+  "permissionsCameraVideoAccessDeniedMessage": "Разрешите доступ к камере, чтобы записать видео.",
+  "permissionsCameraVideoAccessBlockedMessage": "Доступ к камере отключен. Откройте настройки устройства и разрешите запись видео.",
+  "permissionsMicrophoneAccessDeniedMessage": "Разрешите доступ к микрофону, чтобы записать видео со звуком.",
+  "permissionsMicrophoneAccessBlockedMessage": "Доступ к микрофону отключен. Откройте настройки устройства и разрешите запись видео со звуком.",
   "supportChatAttachmentExpiredPlaceholder": "Файл был удалён через 30 дней",
   "supportChatReplyLabel": "Ответ",
   "supportChatReplyToPrefix": "Ответ на сообщение",
@@ -891,11 +779,7 @@
   "supportChatArchiveAction": "В архив",
   "supportChatRateTitle": "Оцените ответ поддержки",
   "supportChatRatedLabel": "Ваша оценка: {rating}/5",
-  "@supportChatRatedLabel": {
-    "placeholders": {
-      "rating": {}
-    }
-  },
+  "@supportChatRatedLabel": {},
   "supportChatReadOnlyHint": "Диалог доступен только для просмотра",
   "supportHomeTitle": "Помощь и поддержка",
   "supportHomeSubtitle": "Чем мы можем помочь?",
@@ -940,11 +824,7 @@
   "profileSettingsLanguageItalian": "Итальянский",
   "profileSettingsLanguagePolish": "Польский",
   "profileSettingsVersionLabel": "Версия приложения {version}",
-  "@profileSettingsVersionLabel": {
-    "placeholders": {
-      "version": {}
-    }
-  },
+  "@profileSettingsVersionLabel": {},
   "magicLoadingPreparing": "Готовим магию...",
   "magicLoadingCutestAngle": "Ищем самый милый ракурс...",
   "magicLoadingAiPaws": "Запускаем AI-лапки...",
@@ -954,6 +834,7 @@
   "imageLabel": "Изображение",
   "templatesErrorTitle": "Шаблоны не загрузились",
   "retryAction": "Повторить",
+  "closeAction": "Закрыть",
   "emptyTemplatesTitle": "Шаблонов пока нет",
   "emptyTemplatesMessage": "Попробуйте другой фильтр или обновите каталог.",
   "templatesFeedEmptyError": "Шаблоны временно недоступны.",
@@ -1003,7 +884,6 @@
   "authPasswordTooShort": "Пароль должен содержать минимум 8 символов.",
   "authPasswordPolicyInvalid": "Пароль должен содержать минимум 8 символов, заглавную и строчную буквы и цифру.",
   "authForgotPasswordAction": "Забыли пароль?",
-  "authForgotPasswordComingSoon": "Восстановление пароля скоро появится.",
   "authPasswordResetTitle": "Восстановление пароля",
   "authPasswordResetSubtitle": "Введите email, и мы отправим код для сброса пароля.",
   "authPasswordResetCodeTitle": "Введите код из письма",
@@ -1017,6 +897,8 @@
   "authPasswordResetCodeInvalid": "Код восстановления недействителен или уже истек.",
   "authOrContinueWith": "или продолжить через",
   "authAcceptTermsLabel": "Я принимаю Условия использования и Политику конфиденциальности",
+  "authTermsLinkText": "Условия использования",
+  "authPrivacyLinkText": "Политику конфиденциальности",
   "authReceiveUpdatesLabel": "Я хочу получать новости и предложения от PetMagic",
   "authAcceptTermsRequired": "Чтобы создать аккаунт, нужно принять Условия использования и Политику конфиденциальности.",
   "authReviewTermsAction": "Открыть соглашение",
@@ -1031,7 +913,6 @@
   "authNoAccountPrompt": "Еще нет аккаунта?",
   "authHaveAccountPrompt": "Уже есть аккаунт?",
   "authSignUpAction": "Регистрация",
-  "authSocialComingSoon": "Социальный вход скоро появится.",
   "authPasswordMismatch": "Пароли не совпадают.",
   "authExternalCancelled": "Вход был отменен.",
   "authExternalFailed": "Не удалось выполнить вход через внешний сервис. Попробуйте еще раз.",
@@ -1061,11 +942,12 @@
   "templateTryAction": "Попробовать шаблон",
   "templateUnlockPremiumAction": "Разблокировать Premium",
   "templateGuestPreview": "Гостевой просмотр",
-  "templateActionComingSoon": "Студия шаблонов скоро появится.",
-  "tokensActionComingSoon": "Кошелёк PawSpark скоро появится.",
-  "rewardsActionComingSoon": "Центр наград скоро появится.",
   "templateFlowPhotoSourceGallery": "Галерея",
   "templateFlowPhotoSourceCamera": "Камера",
+  "petsActionSheetGallerySubtitle": "Выбрать фото или видео из галереи",
+  "petsActionSheetCameraSubtitle": "Сделать фото или видео прямо сейчас",
+  "petsActionSheetGallerySemantic": "Выбрать фото или видео из галереи",
+  "petsActionSheetCameraSemantic": "Сделать фото или видео с камеры",
   "templateFlowReadyTitle": "Готово к созданию!",
   "templateFlowCheckDetailsSubtitle": "Проверьте детали перед созданием",
   "templateFlowTemplateLabel": "Шаблон",
@@ -1080,12 +962,8 @@
   "templateFlowPremiumLockedMessage": "Оформите подписку, чтобы использовать эксклюзивные стили, эффекты и Premium-шаблоны.",
   "templateFlowInsufficientBalanceTitle": "Недостаточно PawSpark",
   "templateFlowInsufficientBalanceMessage": "Шаблон стоит {tokenCost} PawSpark. Ваш баланс: {balance} PawSpark.",
-  "@templateFlowInsufficientBalanceMessage": {
-    "placeholders": {
-      "tokenCost": {},
-      "balance": {}
-    }
-  },
+  "templateFlowInsufficientBalanceUpsellMessage": "Купите PawSpark разово или оформите Premium с 40 PawSpark каждую неделю.",
+  "@templateFlowInsufficientBalanceMessage": {},
   "templateFlowChooseAnotherTemplateAction": "Выбрать другой шаблон",
   "templateFlowCreateFailedTitle": "Не получилось создать магию",
   "templateFlowCreateFailedBalanceHint": "Пополните баланс и запустите создание еще раз.",
@@ -1106,6 +984,59 @@
   "templateFlowLoadingPreview": "Загружаем превью...",
   "templateFlowPreviewUnavailable": "Превью недоступно",
   "templateFlowLoadingVideo": "Загружаем видео...",
+  "generationResultInputTitle": "Использовать результат",
+  "generationResultInputParentTitle": "Готовый результат",
+  "generationResultInputParentHint": "Этот результат будет использован как основа",
+  "generationResultInputMediaUnavailable": "Медиа недоступно",
+  "generationResultInputRecommendedBadge": "Рекомендуем",
+  "generationResultInputEmpty": "Нет совместимых шаблонов.",
+  "generationResultInputError": "Не удалось использовать этот результат. Попробуйте ещё раз.",
+  "generationResultInputNoCredits": "Недостаточно PawSpark для новой генерации.",
+  "generationResultInputStartAction": "Запустить",
+  "generationResultInputCostEstimate": "Генерация будет стоить {credits} PawSpark.",
+  "@generationResultInputCostEstimate": {},
+  "petGenerationLaunchTitle": "Запуск магии",
+  "petGenerationLaunchTitleWithName": "Магия для {name}",
+  "@petGenerationLaunchTitleWithName": {},
+  "petGenerationLaunchSubtitle": "Проверьте шаблон, стоимость PawSpark и точное фото питомца перед созданием.",
+  "petGenerationLaunchPhotoSectionTitle": "Фото для генерации",
+  "petGenerationLaunchSelectedPhotoLabel": "Это фото будет отправлено в генерацию",
+  "petGenerationLaunchUploadPhotoAction": "Загрузить новое",
+  "petGenerationLaunchChoosePhotoTitle": "Выберите фото питомца",
+  "petGenerationLaunchLoadingPhotos": "Загружаем фото...",
+  "petGenerationLaunchPhotoLoadError": "Не удалось загрузить фото питомца. Попробуйте ещё раз.",
+  "petGenerationLaunchSelectedPhotoMissing": "Выберите доступное фото питомца перед стартом. PawSpark не списаны.",
+  "petGenerationLaunchPhotoTypeError": "Выберите фото в формате JPG, PNG или WebP. PawSpark не списаны.",
+  "petGenerationLaunchUploadError": "Не удалось загрузить фото. PawSpark не списаны.",
+  "petGenerationLaunchStartError": "Не удалось запустить генерацию. PawSpark не списаны, попробуйте ещё раз.",
+  "galleryPremiumUpsellTitle": "Экспорт без водяного знака",
+  "galleryPremiumUpsellSubtitle": "Premium уберет логотип PetMagic",
+  "templateFlowCompletedPremiumHeadline": "Хотите создавать больше?",
+  "templateFlowCompletedPremiumMessage": "Premium дает 40 PawSpark каждую неделю, premium-шаблоны и экспорт без водяного знака.",
+  "templateDetailHeroImageTitle": "Создайте изображение с питомцем",
+  "templateDetailHeroVideoTitle": "Создайте видео с питомцем",
+  "templateDetailFallbackTitle": "Шаблон PetMagic",
+  "templateDetailFallbackDescriptionImage": "Загрузите чёткое фото питомца, и PetMagic создаст аккуратный результат.",
+  "templateDetailFallbackDescriptionVideo": "Загрузите чёткое фото питомца, и PetMagic превратит его в готовое видео.",
+  "templateDetailCategoryTemplate": "Шаблон",
+  "templateDetailCategoryPortrait": "Портрет",
+  "templateDetailCategoryVideo": "Видео",
+  "templateDetailRequirementOnePet": "Один питомец на фото",
+  "templateDetailRequirementClearFace": "Морда хорошо видна",
+  "templateDetailRequirementGoodLighting": "Хорошее освещение",
+  "templateDetailRequirementFullBodyVisible": "Питомец виден целиком",
+  "templateDetailRequirementFacingCamera": "Питомец смотрит в камеру",
+  "templateDetailRequirementNoCroppedHeadOrLegs": "Голова и лапы не обрезаны",
+  "templateDetailQualityWarning": "Для лучшего результата используйте яркое и чёткое фото.",
+  "templateDetailUploadPhotoForVideoAction": "Загрузить фото для видео",
+  "templateDetailPreviewMissingTitle": "Превью недоступно",
+  "templateDetailPreviewMissingSubtitleImage": "Вы всё равно можете загрузить фото питомца и создать это изображение.",
+  "templateDetailPreviewMissingSubtitleVideo": "Вы всё равно можете загрузить фото питомца и создать это видео.",
+  "templateDetailTimeLabel": "Время",
+  "templateDetailFormatLabel": "Формат",
+  "templateDetailVideoEta": "2-4 мин",
+  "templateDetailImageEta": "1-2 мин",
+  "templateDetailScrollHint": "Прокрутите для деталей",
   "templateFlowBestPhotoTitle": "Лучшее фото для этого шаблона:",
   "templateFlowUploadPetPhotoAction": "Загрузить фото питомца",
   "templateFlowUploadPetPhotoLockedAction": "Загрузка фото доступна в Premium",
@@ -1170,11 +1101,7 @@
   "generationStatusFeedbackReasonStyleDisliked": "Не понравился стиль",
   "generationStatusFeedbackReasonOther": "Другое",
   "generationStatusEtaEstimated": "Примерно {value} осталось",
-  "@generationStatusEtaEstimated": {
-    "placeholders": {
-      "value": {}
-    }
-  },
+  "@generationStatusEtaEstimated": {},
   "generationStatusEtaQueued": "Ожидание в очереди",
   "generationStatusEtaFinalizing": "Почти готово",
   "generationStatusEtaDefault": "Примерно 1-2 мин осталось",
@@ -1195,23 +1122,11 @@
   "generationStatusFilterReady": "Готово",
   "generationStatusFilterFailed": "Ошибка",
   "generationStatusShowMoreAction": "Показать еще ({hiddenCount}) ▾",
-  "@generationStatusShowMoreAction": {
-    "placeholders": {
-      "hiddenCount": {
-        "type": "int"
-      }
-    }
-  },
+  "@generationStatusShowMoreAction": {},
   "generationStatusCollapseAction": "Свернуть ▲",
   "generationStatusActiveInfoHint": "Генерация продолжается на сервере. Мы покажем результат в Галерее, когда все будет готово.",
   "generationStatusUnreadCount": "{count} новых",
-  "@generationStatusUnreadCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@generationStatusUnreadCount": {},
   "generationStatusEmptyTitle": "Здесь появятся ваши результаты",
   "generationStatusEmptyMessage": "Выберите шаблон, загрузите фото питомца и создайте первый магический арт.",
   "generationStatusSubtitleAll": "Ваши магические создания",
@@ -1221,37 +1136,17 @@
   "generationStatusOfflineBannerTitle": "Вы офлайн",
   "generationStatusOfflineBannerMessage": "Показываем ранее сохраненные результаты на этом устройстве.",
   "generationStatusOfflineBannerSyncedAt": "Последняя синхронизация: {value}",
-  "@generationStatusOfflineBannerSyncedAt": {
-    "placeholders": {
-      "value": {}
-    }
-  },
+  "@generationStatusOfflineBannerSyncedAt": {},
   "generationStatusOnlineBannerTitle": "Сеть восстановлена",
   "generationStatusOnlineBannerMessage": "Загружены актуальные данные.",
   "generationStatusOnlineBannerSyncedAt": "Обновлено: {value}",
-  "@generationStatusOnlineBannerSyncedAt": {
-    "placeholders": {
-      "value": {}
-    }
-  },
+  "@generationStatusOnlineBannerSyncedAt": {},
   "generationStatusDateToday": "Сегодня, {time}",
-  "@generationStatusDateToday": {
-    "placeholders": {
-      "time": {}
-    }
-  },
+  "@generationStatusDateToday": {},
   "generationStatusDateYesterday": "Вчера, {time}",
-  "@generationStatusDateYesterday": {
-    "placeholders": {
-      "time": {}
-    }
-  },
+  "@generationStatusDateYesterday": {},
   "shellActiveGenerationLabel": "✨ Создаем {templateTitle}",
-  "@shellActiveGenerationLabel": {
-    "placeholders": {
-      "templateTitle": {}
-    }
-  },
+  "@shellActiveGenerationLabel": {},
   "shellActiveGenerationFallback": "результат",
   "walletStripeCardBrandsLabel": "Visa • Mastercard",
   "walletStripeWalletsLabel": "Apple Pay • Google Pay",
@@ -1260,18 +1155,10 @@
   "walletCheckoutTaxIncludedValue": "Включено",
   "walletCheckoutTotalLabel": "Итого",
   "walletCheckoutPayAction": "Оплатить {price}",
-  "@walletCheckoutPayAction": {
-    "placeholders": {
-      "price": {}
-    }
-  },
+  "@walletCheckoutPayAction": {},
   "emailVerificationTitle": "Подтверждение email",
   "emailVerificationCodeSentMessage": "Мы отправили 6-значный код на {email}.",
-  "@emailVerificationCodeSentMessage": {
-    "placeholders": {
-      "email": {}
-    }
-  },
+  "@emailVerificationCodeSentMessage": {},
   "emailVerificationCodeLabel": "Код",
   "emailVerificationWorkingLabel": "Выполняем...",
   "emailVerificationVerifyAction": "Подтвердить",
@@ -1301,11 +1188,7 @@
   "premiumCheckoutHeroBadge": "Подписка Premium",
   "premiumCheckoutHeroSubtitle": "Регулярный доступ к Premium с безлимитными шаблонами и более быстрой генерацией в PetMagic.",
   "premiumCheckoutTokensPerPeriod": "{count} PawSpark каждый платежный период",
-  "@premiumCheckoutTokensPerPeriod": {
-    "placeholders": {
-      "count": {}
-    }
-  },
+  "@premiumCheckoutTokensPerPeriod": {},
   "premiumCheckoutIncludesTitle": "Что вы получите",
   "premiumCheckoutIncludedTemplates": "Доступ к Premium-шаблонам",
   "premiumCheckoutIncludedPriority": "Приоритетная очередь генерации",
@@ -1318,18 +1201,20 @@
   "premiumCheckoutPeriodMonthly": "Ежемесячно",
   "premiumCheckoutPeriodYearly": "Ежегодно",
   "premiumCheckoutContinueAction": "Продолжить через {provider}",
-  "@premiumCheckoutContinueAction": {
-    "placeholders": {
-      "provider": {}
-    }
-  },
+  "@premiumCheckoutContinueAction": {},
   "premiumCheckoutPayAction": "Оплатить {price}",
-  "@premiumCheckoutPayAction": {
-    "placeholders": {
-      "price": {}
-    }
-  },
+  "@premiumCheckoutPayAction": {},
   "premiumCheckoutTotalLabel": "Итого",
+  "premiumPaywallFeedbackTitle": "Что остановило вас от подписки?",
+  "premiumPaywallFeedbackCommentLabel": "Комментарий",
+  "premiumPaywallFeedbackCommentHint": "Расскажите, что сделало бы Premium полезнее для вас",
+  "premiumPaywallFeedbackSubmitAction": "Отправить отзыв",
+  "premiumPaywallFeedbackThanksMessage": "Спасибо! Ваш отзыв поможет улучшить Premium.",
+  "premiumPaywallFeedbackOptionExpensive": "Слишком дорого",
+  "premiumPaywallFeedbackOptionLowValue": "Недостаточно пользы",
+  "premiumPaywallFeedbackOptionPaymentProblem": "Проблема с оплатой",
+  "premiumPaywallFeedbackOptionJustBrowsing": "Просто смотрю",
+  "premiumPaywallFeedbackOptionOther": "Другое",
   "premiumBenefitAiGenerationsTitle": "30 AI-генераций",
   "premiumBenefitAiGenerationsSubtitle": "каждый месяц",
   "premiumBenefitPremiumTemplatesTitle": "Premium-шаблоны",
@@ -1343,13 +1228,7 @@
   "subscriptionDangerZoneTitle": "Опасная зона",
   "subscriptionCancelConfirmTitle": "Отменить подписку?",
   "subscriptionCancelConfirmBody": "Premium останется активным до {date}. Новые списания будут отключены.",
-  "@subscriptionCancelConfirmBody": {
-    "placeholders": {
-      "date": {
-        "type": "String"
-      }
-    }
-  },
+  "@subscriptionCancelConfirmBody": {},
   "subscriptionCancelConfirmAction": "Подтвердить",
   "subscriptionCancelConfirmKeep": "Сохранить Premium",
   "subscriptionRestoreSuccessMessage": "Покупки восстановлены",
@@ -1358,27 +1237,219 @@
   "subscriptionBillingPeriodLabel": "Период подписки",
   "subscriptionBillingPeriodMonthly": "Ежемесячный",
   "subscriptionBillingPeriodYearly": "Годовой",
-  "generationStatusWatermarkRemoved": "Watermark убран",
-  "generationStatusWatermarkAddedFreePlan": "Watermark добавлен на бесплатном плане",
-  "generationStatusShareWithWatermark": "Поделиться с watermark",
-  "generationStatusDownloadWithoutWatermark": "Скачать без watermark",
-  "generationStatusSaveWithWatermark": "Сохранить с watermark",
-  "generationStatusRemoveWatermark": "Убрать watermark",
+  "generationStatusWatermarkRemoved": "Водяной знак убран",
+  "generationStatusWatermarkAddedFreePlan": "Водяной знак добавлен на бесплатном плане",
+  "generationStatusShareWithWatermark": "Поделиться с водяным знаком",
+  "generationStatusDownloadWithoutWatermark": "Скачать без водяного знака",
+  "generationStatusSaveWithWatermark": "Сохранить с водяным знаком",
+  "generationStatusRemoveWatermark": "Убрать водяной знак",
   "generationStatusRemovingWatermark": "Убираем...",
   "generationStatusUpgradePremium": "Перейти на Premium",
-  "generationStatusRemoveWatermarkSheetTitle": "Убрать watermark",
-  "generationStatusRemoveWatermarkSheetBody": "Используйте {cost} credit для этого результата или перейдите на Premium для чистых скачиваний.",
-  "generationStatusRemoveWatermarkUseCredit": "Использовать {cost} credit",
-  "generationStatusRemoveWatermarkFailed": "Не удалось убрать watermark. Попробуйте ещё раз.",
-  "generationStatusRemoveWatermarkNoCredits": "Недостаточно credits. Купите credits или Premium.",
+  "generationStatusRemoveWatermarkSheetTitle": "Убрать водяной знак",
+  "generationStatusRemoveWatermarkSheetBody": "Используйте {cost} PawSpark для этого результата или перейдите на Premium для чистых скачиваний.",
+  "generationStatusRemoveWatermarkUseCredit": "Использовать {cost} PawSpark",
+  "generationStatusRemoveWatermarkFailed": "Не удалось убрать водяной знак. Попробуйте ещё раз.",
+  "generationStatusRemoveWatermarkNoCredits": "Недостаточно PawSpark. Купите PawSpark или Premium.",
   "globalOfflineBannerTitle": "Нет подключения к интернету",
   "globalOfflineBannerMessage": "Часть функций недоступна, пока соединение не восстановится.",
   "globalOnlineRestoredBannerTitle": "Соединение восстановлено",
   "globalOnlineRestoredBannerMessage": "Вы снова в сети.",
+  "appUnavailableOfflineTitle": "Нет подключения",
+  "appUnavailableOfflineMessage": "Проверьте интернет и попробуйте снова. Мы автоматически повторим загрузку, когда соединение восстановится.",
+  "appUnavailableServerTitle": "Сервер недоступен",
+  "appUnavailableServerMessage": "PetMagic сейчас не может связаться с бекендом. Попробуйте ещё раз через минуту.",
   "generationStatusCompareAction": "Сравнить",
   "generationStatusCompareBeforeLabel": "До",
   "generationStatusCompareAfterLabel": "После",
   "generationStatusCompareBeforeUnavailable": "Исходное фото больше недоступно.",
   "generationStatusCompareResultUnavailable": "Результат недоступен.",
-  "generationStatusCompareOpenFailed": "Не удалось открыть сравнение."
+  "generationStatusCompareOpenFailed": "Не удалось открыть сравнение.",
+  "gamificationLevel": "Уровень {level}",
+  "gamificationXpProgress": "{current}/{required} XP",
+  "gamificationEvolutionEgg": "Яйцо",
+  "gamificationEvolutionBaby": "Малыш",
+  "gamificationEvolutionTeen": "Подросток",
+  "gamificationEvolutionAdult": "Взрослый",
+  "gamificationEvolutionLegendary": "Легендарный",
+  "gamificationLevelUp": "Новый уровень!",
+  "gamificationStreakTitle": "Ежедневная серия",
+  "gamificationStreakDays": "{count} дней",
+  "gamificationStreakAtRisk": "Ваша серия под угрозой!",
+  "gamificationStreakFreeze": "Использовать заморозку",
+  "gamificationStreakFreezeUsed": "Серия спасена!",
+  "gamificationStreakFreezeRemaining": "Осталось заморозок: {count}",
+  "gamificationAchievementsTitle": "Достижения",
+  "gamificationAchievementUnlocked": "Достижение разблокировано!",
+  "gamificationAchievementSecret": "Секретное достижение",
+  "gamificationAchievementProgress": "Прогресс: {current}/{target}",
+  "gamificationChallengeTitle": "Еженедельные задания",
+  "gamificationChallengeComplete": "Выполнено!",
+  "gamificationChallengeClaim": "Забрать награду",
+  "gamificationChallengeGenerateImages": "Генерация изображений",
+  "gamificationChallengeGenerateImagesDesc": "Сгенерируйте изображения с любым шаблоном",
+  "gamificationChallengeTryTemplates": "Попробуйте разные шаблоны",
+  "gamificationChallengeTryTemplatesDesc": "Используйте разные шаблоны на этой неделе",
+  "gamificationChallengeShareCreations": "Поделитесь работами",
+  "gamificationChallengeShareCreationsDesc": "Поделитесь своими работами с друзьями",
+  "gamificationStatsGenerations": "Генерации",
+  "gamificationStatsDaysActive": "Дней активности",
+  "gamificationStatsFavoriteTemplate": "Любимый шаблон",
+  "gamificationMilestone3": "Бонус за 3 дня: +{spark} Spark!",
+  "gamificationMilestone7": "Бонус за 7 дней: +{spark} Spark!",
+  "gamificationMilestone14": "Бонус за 14 дней: +{spark} Spark!",
+  "gamificationMilestone30": "Бонус за 30 дней: +{spark} Spark!",
+  "gamificationPetStats": "Статистика питомца",
+  "gamificationTopPet": "Лучший питомец",
+  "gamificationYourProgress": "Ваш прогресс",
+  "gamificationBest": "Рекорд",
+  "gamificationFreezeAvailable": "{count} заморозка доступна",
+  "gamificationFreezesAvailable": "Заморозок доступно: {count}",
+  "gamificationKeepGenerating": "Продолжайте генерировать, чтобы разблокировать больше!",
+  "gamificationUnlocked": "{unlocked} / {total} разблокировано",
+  "gamificationLoadFailed": "Не удалось загрузить достижения",
+  "gamificationDayStreak": "дней подряд",
+  "gamificationHubSubtitle": "Следите за серией, заданиями и этапами прогресса в одном месте.",
+  "gamificationHubEntrySubtitle": "Серия, недельные цели и ключевые достижения.",
+  "gamificationWeekFocusTitle": "На этой неделе",
+  "gamificationWeekFocusSubtitle": "Держите темп, закрывайте задания и берегите серию.",
+  "gamificationNextMilestoneTitle": "Следующая цель",
+  "gamificationFilterAll": "Все",
+  "gamificationFilterUnlocked": "Открытые",
+  "gamificationFilterInProgress": "В процессе",
+  "gamificationFilterSecret": "Секретные",
+  "gamificationNoAchievementsInFilter": "Для этого фильтра пока ничего нет.",
+  "gamificationStatusUnlocked": "Открыто",
+  "gamificationStatusInProgress": "В процессе",
+  "achievementFirstMagic": "Первая магия",
+  "achievementFirstMagicDesc": "Создайте свою первую AI-генерацию",
+  "achievementApprentice10": "Ученик",
+  "achievementApprentice10Desc": "Выполните 10 генераций",
+  "achievementMagician100": "Волшебник",
+  "achievementMagician100Desc": "Выполните 100 генераций",
+  "achievementArchmage500": "Архимаг",
+  "achievementArchmage500Desc": "Выполните 500 генераций",
+  "achievementStreak3": "Разогрев",
+  "achievementStreak3Desc": "Поддерживайте серию 3 дня",
+  "achievementStreak7": "Воин недели",
+  "achievementStreak7Desc": "Поддерживайте серию 7 дней",
+  "achievementStreak14": "Чемпион двух недель",
+  "achievementStreak14Desc": "Поддерживайте серию 14 дней",
+  "achievementStreak30": "Мастер месяца",
+  "achievementStreak30Desc": "Поддерживайте серию 30 дней",
+  "achievementPackLeader": "Вожак стаи",
+  "achievementPackLeaderDesc": "Имейте 5 питомцев",
+  "achievementEvolutionBaby": "Первые шаги",
+  "achievementEvolutionBabyDesc": "Эволюционируйте питомца до стадии Малыш",
+  "achievementEvolutionLegendary": "Легендарный страж",
+  "achievementEvolutionLegendaryDesc": "Эволюционируйте питомца до Легендарной стадии",
+  "achievementTrendsetter": "Первопроходец",
+  "achievementTrendsetterDesc": "Используйте Шаблон дня",
+  "achievementDailyRitual": "Ежедневный ритуал",
+  "achievementDailyRitualDesc": "Сгенерируйте 5 раз за один день",
+  "achievementTemplateCollector": "Коллекционер шаблонов",
+  "achievementTemplateCollectorDesc": "Используйте 20 разных шаблонов",
+  "achievementNightOwl": "Сова",
+  "achievementNightOwlDesc": "Генерируйте между 2 и 5 часами ночи",
+  "generationStatusGenerateSimilarCost": "Стоимость: {cost} PawSpark",
+  "@generationStatusGenerateSimilarCost": {},
+  "generationStatusGenerateSimilarConfirmAction": "Генерировать",
+  "generationStatusGenerateSimilarCancelAction": "Отмена",
+  "generationStatusGenerateSimilarSourceUnavailable": "Исходный файл недоступен.",
+  "generationStatusGenerateSimilarInsufficientBalance": "Недостаточно PawSpark.",
+  "generationStatusGenerateSimilarFailed": "Не удалось сгенерировать. Попробуйте ещё раз.",
+  "generationStatusFailedFeedbackTitle": "Что произошло?",
+  "generationStatusFailedFeedbackNotCompleted": "Не завершилась",
+  "generationStatusFailedFeedbackTooLong": "Слишком долго",
+  "generationStatusFailedFeedbackPawSparkCharged": "Списались PawSpark",
+  "generationStatusFailedFeedbackStuck": "Зависло",
+  "generationStatusFailedFeedbackOther": "Другое",
+  "generationStatusReportFeedbackTitle": "Что не так с результатом?",
+  "generationStatusReportFeedbackLowQuality": "Плохое качество",
+  "generationStatusReportFeedbackWrongPet": "Не тот питомец",
+  "generationStatusReportFeedbackDistortion": "Искажение",
+  "generationStatusReportFeedbackInappropriate": "Неподходящий результат",
+  "generationStatusReportFeedbackWrongTemplate": "Не тот шаблон",
+  "generationStatusReportFeedbackWatermark": "Водяной знак",
+  "generationStatusReportFeedbackPayment": "Оплата",
+  "generationStatusReportFeedbackOther": "Другое",
+  "generationStatusCreateVideoFromResultAction": "Создать видео из этого",
+  "generationStatusGenerateSimilarAction": "Похожий вариант",
+  "generationStatusGenerateSimilarLoading": "Создаём похожий вариант...",
+  "generationStatusUseAsInputAction": "Взять за основу",
+  "profileSettingsFeedbackTitle": "Отправить отзыв",
+  "profileSettingsFeedbackSubtitle": "Идея, ошибка, оплата или общий комментарий",
+  "profileSettingsFeedbackSheetTitle": "Отправить отзыв",
+  "profileSettingsFeedbackMessageLabel": "Комментарий",
+  "profileSettingsFeedbackMessageHint": "Добавьте детали, если хотите",
+  "profileSettingsFeedbackSubmitAction": "Отправить",
+  "profileSettingsFeedbackThanksMessage": "Спасибо! Ваш отзыв поможет улучшить PetMagic.",
+  "profileSettingsFeedbackOptionGeneral": "Общее",
+  "profileSettingsFeedbackOptionFeatureRequest": "Пожелание",
+  "profileSettingsFeedbackOptionBug": "Ошибка",
+  "profileSettingsFeedbackOptionPayment": "Оплата",
+  "profileNotificationsPushPhotoReadySubtitle": "Когда AI-фото готово к просмотру",
+  "profileNotificationsPushVideoReadySubtitle": "Когда AI-видео завершило обработку",
+  "profileNotificationsPushGenerationErrorsSubtitle": "Если генерация завершилась с ошибкой",
+  "profileNotificationsPushRemindersSubtitle": "Напоминания об использовании приложения",
+  "profileNotificationsPushNewTemplatesSubtitle": "Новые стили и шаблоны генерации",
+  "profileNotificationsPushPurchasesAndSubscriptionsSubtitle": "Подтверждения оплат и статус подписки",
+  "profileNotificationsEmailOffersSubtitle": "Скидки, акции и промо-предложения",
+  "profileNotificationsEmailNewsSubtitle": "Обновления приложения и новые функции",
+  "profileNotificationsEmailAccountAlertsSubtitle": "Уведомления безопасности и о смене данных",
+  "passwordChangeStepRequestCode": "Запрос кода",
+  "passwordChangeStepNewPassword": "Новый пароль",
+  "subscriptionTokensWeeklyGrantPeriodSuffix": " / 7д",
+  "subscriptionGrantCountdownDaysHoursMinutes": "{days}д {hours}ч {minutes}м",
+  "subscriptionGrantCountdownHoursMinutesSeconds": "{hours}ч {minutes}м {seconds}с",
+  "subscriptionGrantCountdownMinutesSeconds": "{minutes}м {seconds}с",
+  "subscriptionGrantReadyLabel": "✦ Готово к начислению!",
+  "subscriptionGrantNextLabel": "Следующее начисление: {countdown}",
+  "subscriptionBenefitTokensDescription": "Автоматически каждые 7 дней",
+  "subscriptionBenefitFirstBonusDescription": "Мгновенно при покупке",
+  "subscriptionBenefitTemplatesDescription": "Все сценарии разблокированы",
+  "subscriptionBenefitPriorityGenerationDescription": "Ваши задачи в приоритете",
+  "subscriptionBenefitNoWatermarkDescription": "Чистый результат",
+  "@subscriptionGrantCountdownDaysHoursMinutes": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "@subscriptionGrantCountdownHoursMinutesSeconds": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@subscriptionGrantCountdownMinutesSeconds": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@subscriptionGrantNextLabel": {
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  }
 }

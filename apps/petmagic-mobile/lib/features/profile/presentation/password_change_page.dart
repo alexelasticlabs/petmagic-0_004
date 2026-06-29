@@ -136,12 +136,10 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
                 ],
               ),
               const SizedBox(height: 16),
-              // Индикатор шагов
               _PasswordChangeStepIndicator(
                 currentStep: state.codeRequested ? 1 : 0,
               ),
               const SizedBox(height: 16),
-              // Email карточка
               ProfileGlassCard(
                 child: Row(
                   children: [
@@ -355,10 +353,17 @@ class _PasswordChangeStepIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
 
-    const steps = [
-      (label: 'Запрос кода', icon: Icons.mark_email_unread_outlined),
-      (label: 'Новый пароль', icon: Icons.lock_reset_rounded),
+    final steps = [
+      (
+        label: text.passwordChangeStepRequestCode,
+        icon: Icons.mark_email_unread_outlined,
+      ),
+      (
+        label: text.passwordChangeStepNewPassword,
+        icon: Icons.lock_reset_rounded,
+      ),
     ];
 
     return Row(

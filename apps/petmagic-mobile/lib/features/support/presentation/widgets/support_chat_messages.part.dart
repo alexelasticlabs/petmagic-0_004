@@ -50,7 +50,8 @@ class _MessageBubble extends StatelessWidget {
     final attachmentFileName =
         primaryAttachment?.fileName.trim().isNotEmpty == true
         ? primaryAttachment!.fileName.trim()
-        : message.attachmentFileName?.trim();
+        : message.attachmentDisplayFileName?.trim();
+    final attachmentSizeBytes = message.attachmentDisplaySizeBytes;
     final normalizedBody = message.body.trim();
     final attachmentNames = <String>{
       for (final attachment in message.attachments)
@@ -400,7 +401,7 @@ class _MessageBubble extends StatelessWidget {
                                           _formatAttachmentSize(
                                             context,
                                             primaryAttachment?.sizeBytes ??
-                                                message.attachmentFileSizeBytes,
+                                                attachmentSizeBytes,
                                           ),
                                           style: TextStyle(
                                             color: metaColor,

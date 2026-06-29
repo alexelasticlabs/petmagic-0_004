@@ -21,27 +21,29 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   video_player: ^2.11.1
   visibility_detector: ^0.4.0+2
-  google_fonts: ^6.3.3
+  google_fonts: ^8.1.0
   shared_preferences: ^2.5.5
   flutter_secure_storage: ^10.3.1
   intl: ^0.20.2
   image_picker: ^1.2.2
   image: ^4.9.1
   http_parser: ^4.1.2
-  app_links: ^6.4.1
-  google_sign_in: ^6.3.0
-  sign_in_with_apple: ^7.0.1
+  app_links: ^7.2.0
+  google_sign_in: ^7.2.0
+  sign_in_with_apple:
+    path: third_party/flutter_plugins/sign_in_with_apple
   url_launcher: ^6.3.2
-  share_plus: ^11.1.0
-  photo_manager: ^3.9.0
+  share_plus: ^13.2.0
+  photo_manager:
+    path: third_party/flutter_plugins/photo_manager
   in_app_purchase: ^3.3.0
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
   flutter_localizations:
     sdk: flutter
   signalr_netcore: ^1.4.4
-  permission_handler: ^11.4.0
-  connectivity_plus: ^6.1.5
+  permission_handler: ^12.0.3
+  connectivity_plus: ^7.2.0
   path_provider: ^2.1.5
 
 dev_dependencies:

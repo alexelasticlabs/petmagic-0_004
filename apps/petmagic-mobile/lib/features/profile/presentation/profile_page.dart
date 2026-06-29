@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -22,19 +26,15 @@ import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/gamification_summary_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
-import 'package:petmagic_mobile/features/rewards/presentation/rewards_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
-import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 const _profilePremiumDogAsset = 'assets/rewards/profile-premium-dog.png';
-bool _isRuProfileLocale(BuildContext context) =>
-    Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
-
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -44,12 +44,14 @@ class ProfilePage extends ConsumerStatefulWidget {
   ConsumerState<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends ConsumerState<ProfilePage> {
+class _ProfilePageState extends ConsumerState<ProfilePage>
+    with WidgetsBindingObserver {
   bool _isOpeningSubscription = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future.microtask(() {
       if (!mounted) {
         return;
@@ -63,7 +65,30 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    final profileState = ref.read(profileControllerProvider);
+    final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    final unavailableKind =
+        !profileState.isLoading && profileState.profile == null
+        ? classifyAppUnavailable(
+            raw: profileState.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
+    if (unavailableKind == null) {
+      return;
+    }
+
+    unawaited(ref.read(profileControllerProvider.notifier).initialize());
   }
 
   @override
@@ -91,8 +116,42 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomNavInset = petMagicScrollableBottomInset(context);
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
+    final unavailableKind = !state.isLoading && state.profile == null
+        ? classifyAppUnavailable(
+            raw: ref.watch(
+              profileControllerProvider.select((state) => state.errorMessage),
+            ),
+            hasInternet: hasInternet,
+          )
+        : null;
 
-    if (!state.isLoading && !state.isAuthenticated) {
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      final profileState = ref.read(profileControllerProvider);
+      final currentUnavailableKind =
+          !profileState.isLoading && profileState.profile == null
+          ? classifyAppUnavailable(
+              raw: profileState.errorMessage,
+              hasInternet: next.hasInternet,
+            )
+          : null;
+      if (currentUnavailableKind == null) {
+        return;
+      }
+
+      unawaited(controller.initialize());
+    });
+
+    if (!state.isLoading && !state.isAuthenticated && unavailableKind == null) {
       return ProfileScreenBackground(
         child: SafeArea(
           child: Padding(
@@ -104,6 +163,18 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                 redirectPath: ProfilePage.routePath,
               ),
             ),
+          ),
+        ),
+      );
+    }
+
+    if (unavailableKind != null) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: PetMagicUnavailableView(
+            kind: unavailableKind,
+            onRetry: () => unawaited(controller.initialize()),
+            padding: EdgeInsets.fromLTRB(28, 36, 28, bottomNavInset),
           ),
         ),
       );
@@ -243,13 +314,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                                 subtitle: text.profilePetsSubtitle,
                                 iconColor: colors.accent,
                                 onTap: () => context.push(MyPetsPage.routePath),
-                              ),
-                              ProfileSettingsRow(
-                                icon: Icons.emoji_events_outlined,
-                                title: 'Achievements',
-                                subtitle: 'View your badges and milestones',
-                                iconColor: const Color(0xFFFFD700),
-                                onTap: () => context.push(AchievementsPage.routePath),
                               ),
                               ProfileSettingsRow(
                                 icon: Icons.privacy_tip_outlined,
@@ -474,6 +538,7 @@ class _WalletHighlightCard extends StatelessWidget {
         : weeklyReady
         ? text.profileWalletPreviewWeeklyReady
         : text.profileWalletPreviewAdCount(walletValue.adRewardsRemainingToday);
+    const cardAccent = Color(0xFF00F2A6);
     final rewardColor = walletValue == null
         ? colors.textMuted
         : weeklyReady
@@ -486,37 +551,11 @@ class _WalletHighlightCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: colors.border.withValues(alpha: isLight ? 1 : 0.95),
-              width: isLight ? 1.2 : 1.1,
-            ),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                if (isLight) ...[
-                  const Color(0xFFF1F6FF),
-                  const Color(0xFFE7F0FF),
-                  const Color(0xFFF5F9FF),
-                ] else ...[
-                  const Color(0xFF0A162B),
-                  const Color(0xFF0D213F),
-                  const Color(0xFF0B1A33),
-                ],
-              ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.shadow.withValues(alpha: isLight ? 0.2 : 0.34),
-                blurRadius: isLight ? 20 : 26,
-                offset: Offset(0, isLight ? 10 : 14),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+          child: PetMagicAccentCard(
+            accentColor: cardAccent,
+            borderOpacity: isLight ? 0.2 : 0.28,
+            glowOpacity: isLight ? 0.1 : 0.15,
+            glowAlignment: const Alignment(-0.94, -0.16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -526,10 +565,13 @@ class _WalletHighlightCard extends StatelessWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isLight
-                            ? Colors.white.withValues(alpha: 0.55)
-                            : colors.backgroundBottom.withValues(alpha: 0.2),
+                        color: Colors.black.withValues(
+                          alpha: isLight ? 0.04 : 0.16,
+                        ),
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: cardAccent.withValues(alpha: 0.24),
+                        ),
                       ),
                       child: Icon(
                         Icons.account_balance_wallet_rounded,
@@ -545,7 +587,7 @@ class _WalletHighlightCard extends StatelessWidget {
                           Text(
                             text.profileWalletPreviewEyebrow,
                             style: TextStyle(
-                              color: colors.textSoft,
+                              color: colors.textSoft.withValues(alpha: 0.78),
                               fontSize: 11.5,
                               fontWeight: FontWeight.w800,
                             ),
@@ -583,7 +625,7 @@ class _WalletHighlightCard extends StatelessWidget {
                 Text(
                   text.profileWalletPreviewSubtitle,
                   style: TextStyle(
-                    color: colors.textSoft,
+                    color: colors.textSoft.withValues(alpha: 0.82),
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
                   ),
@@ -624,8 +666,9 @@ class _PremiumBannerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final isRu = _isRuProfileLocale(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
+    final colors = context.petMagicColors;
+    const accent = Color(0xFFFFC107);
 
     return Material(
       color: Colors.transparent,
@@ -636,250 +679,117 @@ class _PremiumBannerCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: Ink(
-            decoration: BoxDecoration(
+            child: PetMagicAccentCard(
+              accentColor: accent,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(
-                  0xFFE0A91E,
-                ).withValues(alpha: isLight ? 0.78 : 0.88),
-                width: 1.15,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: PremiumBannerStyle.gradient(isLight),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: isLight
-                      ? const Color(0xFFD7B35D).withValues(alpha: 0.25)
-                      : const Color(0xFF02070F).withValues(alpha: 0.55),
-                  blurRadius: isLight ? 12 : 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: SizedBox(
-              height: 168,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(-0.3, 0.35),
-                          radius: 1.2,
-                          colors: [
-                            const Color(
-                              0xFFF4C64D,
-                            ).withValues(alpha: isLight ? 0.2 : 0.18),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    right: 4,
-                    bottom: 0,
-                    child: IgnorePointer(
-                      child: Image.asset(
-                        _profilePremiumDogAsset,
-                        height: 136,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 140, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: const Color(
-                                0xFFE0A91E,
-                              ).withValues(alpha: isLight ? 0.7 : 0.8),
-                            ),
-                            color: const Color(
-                              0xFF201300,
-                            ).withValues(alpha: isLight ? 0.08 : 0.24),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const PremiumCrownIcon(size: 12),
-                              const SizedBox(width: 5),
-                              Text(
-                                text.premiumLabel,
-                                style: TextStyle(
-                                  color: const Color(0xFFEABA47),
-                                  fontSize: 10.4,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          isRu ? 'Premium выгоднее' : 'Premium is better',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF1E1608)
-                                : const Color(0xFFEABF55),
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          isRu
-                              ? '40 PowSpark каждую неделю\nБез водяного знака, экспорт\nвысокого качества'
-                              : '40 PowSpark every week\nNo watermark, high-quality\nexport',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isLight
-                                ? const Color(0xFF3B3324)
-                                : const Color(0xFFE3DFD2),
-                            fontSize: 11.2,
-                            height: 1.25,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        PremiumShimmerButton(
-                          label: text.profilePremiumOpenAction,
-                          onTap: onTap,
-                          height: 42,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileGoldShimmerButton extends StatefulWidget {
-  const _ProfileGoldShimmerButton({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  State<_ProfileGoldShimmerButton> createState() =>
-      _ProfileGoldShimmerButtonState();
-}
-
-class _ProfileGoldShimmerButtonState extends State<_ProfileGoldShimmerButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1900),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: widget.onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFE0A91E).withValues(alpha: 0.34),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            clipBehavior: Clip.antiAlias,
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                final t = _controller.value;
-                final shimmerStart = -1.6 + (t * 2.8);
-                return Stack(
-                  alignment: Alignment.center,
+              padding: EdgeInsets.zero,
+              borderOpacity: isLight ? 0.2 : 0.28,
+              glowOpacity: isLight ? 0.1 : 0.15,
+              glowAlignment: const Alignment(-0.92, -0.9),
+              child: SizedBox(
+                height: 168,
+                child: Stack(
                   children: [
-                    Container(
-                      height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
-                        ),
-                      ),
-                      child: child,
-                    ),
-                    Positioned.fill(
+                    Positioned(
+                      top: 14,
+                      left: 16,
                       child: IgnorePointer(
-                        child: DecoratedBox(
+                        child: Container(
+                          width: 54,
+                          height: 54,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment(shimmerStart, -1),
-                              end: Alignment(shimmerStart + 0.9, 1),
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
                               colors: [
-                                Colors.transparent,
-                                Colors.white.withValues(alpha: 0.68),
+                                accent.withValues(alpha: isLight ? 0.12 : 0.18),
                                 Colors.transparent,
                               ],
-                              stops: const [0.23, 0.5, 0.77],
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                );
-              },
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      widget.label,
-                      style: const TextStyle(
-                        color: Color(0xFF261903),
-                        fontSize: 11.2,
-                        fontWeight: FontWeight.w900,
+                    Positioned(
+                      right: 4,
+                      bottom: 0,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: isLight ? 0.82 : 0.94,
+                          child: Image.asset(
+                            _profilePremiumDogAsset,
+                            height: 136,
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high,
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Color(0xFF261903),
-                      size: 15,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 140, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.24),
+                              ),
+                              color: accent.withValues(
+                                alpha: isLight ? 0.1 : 0.14,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const PremiumCrownIcon(size: 12),
+                                const SizedBox(width: 5),
+                                Text(
+                                  text.premiumLabel,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD666),
+                                    fontSize: 10.4,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            text.premiumUpsellHeadline,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.textStrong,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            text.premiumUpsellSubtitle,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colors.textSoft.withValues(alpha: 0.86),
+                              fontSize: 11.2,
+                              height: 1.25,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const Spacer(),
+                          PremiumShimmerButton(
+                            label: text.profilePremiumOpenAction,
+                            onTap: onTap,
+                            height: 42,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1242,14 +1152,21 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(gamificationSummaryProvider);
+    final achievementsAsync = ref.watch(achievementsProvider);
+    final achievements = achievementsAsync.asData?.value;
 
     return summaryAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
       data: (summary) => GamificationHighlightsCard(
         summary: summary,
-        onStreakTap: () => context.push(RewardsPage.routePath),
+        unlockedAchievementsCount: achievements
+            ?.where((achievement) => achievement.isUnlocked)
+            .length,
+        totalAchievementsCount: achievements?.length,
+        onStreakTap: () => context.push(AchievementsPage.routePath),
         onAchievementsTap: () => context.push(AchievementsPage.routePath),
+        onPetTap: () => context.push(MyPetsPage.routePath),
       ),
     );
   }

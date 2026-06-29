@@ -117,18 +117,41 @@ void main() {
     final source = File(
       'lib/core/notifications/notification_coordinator.dart',
     ).readAsStringSync();
+    final foregroundCopySource = File(
+      'lib/core/notifications/notification_foreground_copy.dart',
+    ).readAsStringSync();
     final displayBody = _methodBody(source, '_shouldDisplayForeground');
     final fallbackBody = _methodBody(source, '_fallbackBody');
     final actionLabelBody = _methodBody(source, '_openActionLabel');
 
     expect(displayBody, contains("type == 'wallet'"));
     expect(displayBody, contains("type == 'premium'"));
-    expect(displayBody, contains("status == 'canceled'"));
-    expect(displayBody, contains("status == 'cancelled'"));
+    expect(displayBody, contains("status == 'inactive'"));
     expect(displayBody, contains("status == 'expired'"));
-    expect(fallbackBody, contains("type == 'premium'"));
-    expect(actionLabelBody, contains("'ru' => 'Открыть'"));
-    expect(actionLabelBody, contains("_ => 'Open'"));
+    expect(fallbackBody, contains('NotificationForegroundCopy.bodyForType'));
+    expect(
+      actionLabelBody,
+      contains('NotificationForegroundCopy.openActionForLocale'),
+    );
+    expect(source, isNot(contains("'ru' => 'Открыть'")));
+    expect(source, isNot(contains('PetMagic Support replied')));
+    expect(
+      source,
+      isNot(contains('Open support chat to see the latest response.')),
+    );
+    expect(
+      foregroundCopySource,
+      contains('lookupAppLocalizations(supportedLocale)'),
+    );
+    expect(foregroundCopySource, contains("const Locale('en')"));
+    expect(
+      foregroundCopySource,
+      contains('AppLocalizations.supportedLocales.any'),
+    );
+    expect(foregroundCopySource, contains('notificationOpenAction'));
+    expect(foregroundCopySource, contains('notificationSupportTitle'));
+    expect(foregroundCopySource, contains('notificationWalletBody'));
+    expect(foregroundCopySource, isNot(contains('Открыть')));
   });
 
   test('notification tap handling deduplicates repeated message opens', () {

@@ -1786,7 +1786,7 @@ void main() {
     expect(loadedState.locale, const Locale('en'));
   });
 
-  test('app preferences controller migrates legacy en_US locale', () async {
+  test('app preferences controller preserves stored country-specific locale', () async {
     SharedPreferences.setMockInitialValues(const {
       'petmagic_mobile_locale': 'en_US',
     });
@@ -1799,7 +1799,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     final state = container.read(appPreferencesControllerProvider);
-    expect(state.locale, const Locale('en'));
+    expect(state.locale, const Locale('en', 'US'));
   });
 }
 

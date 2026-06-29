@@ -7,15 +7,16 @@ import 'package:flutter/widgets.dart';
 class PerformanceGuard {
   PerformanceGuard._();
 
+  static bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
+
   static bool isDegradedMode(BuildContext context) {
-    final view = _primaryView();
-    if (view == null) {
+    final metrics = _resolveMetrics(context);
+    if (metrics == null) {
       return false;
     }
 
-    final shortestLogicalSide =
-        view.physicalSize.shortestSide / view.devicePixelRatio;
-    final devicePixelRatio = view.devicePixelRatio;
+    final shortestLogicalSide = metrics.shortestLogicalSide;
+    final devicePixelRatio = metrics.devicePixelRatio;
     final isPhone = shortestLogicalSide < 600;
     final isCompactPhone = shortestLogicalSide <= 390;
     final isDensePhone = shortestLogicalSide <= 430 && devicePixelRatio >= 2.75;
@@ -41,15 +42,37 @@ class PerformanceGuard {
   }
 
   static bool shouldAvoidBlur(BuildContext context) {
-    final view = _primaryView();
-    if (view == null) {
+    final metrics = _resolveMetrics(context);
+    if (metrics == null) {
       return shouldReduceMotion(context);
     }
 
-    final shortestLogicalSide =
-        view.physicalSize.shortestSide / view.devicePixelRatio;
+    final shortestLogicalSide = metrics.shortestLogicalSide;
     final isPhone = shortestLogicalSide < 600;
     return isPhone || shouldReduceMotion(context);
+  }
+
+  static bool shouldDisableGlassEffects(BuildContext context) {
+    return shouldReduceMotion(context) ||
+        (_isAndroid && (shouldAvoidBlur(context) || isDegradedMode(context)));
+  }
+
+  static bool shouldDisableDecorativeAnimations(BuildContext context) {
+    return shouldReduceMotion(context) ||
+        (_isAndroid && (shouldAvoidBlur(context) || isDegradedMode(context)));
+  }
+
+  static bool shouldUseStaticPlaceholders(BuildContext context) {
+    return shouldDisableDecorativeAnimations(context);
+  }
+
+  static bool shouldDisableSharedRouteAnimations(BuildContext context) {
+    return shouldDisableDecorativeAnimations(context);
+  }
+
+  static bool shouldAnimateRepeatingEffects(BuildContext context) {
+    return !shouldDisableDecorativeAnimations(context) &&
+        TickerMode.valuesOf(context).enabled;
   }
 
   static FlutterView? _primaryView() {
@@ -66,4 +89,35 @@ class PerformanceGuard {
 
     return views.first;
   }
+
+  static _PerformanceMetrics? _resolveMetrics(BuildContext context) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    if (mediaQuery != null && mediaQuery.size != Size.zero) {
+      return _PerformanceMetrics(
+        shortestLogicalSide: mediaQuery.size.shortestSide,
+        devicePixelRatio: mediaQuery.devicePixelRatio,
+      );
+    }
+
+    final view = _primaryView();
+    if (view == null) {
+      return null;
+    }
+
+    return _PerformanceMetrics(
+      shortestLogicalSide:
+          view.physicalSize.shortestSide / view.devicePixelRatio,
+      devicePixelRatio: view.devicePixelRatio,
+    );
+  }
+}
+
+class _PerformanceMetrics {
+  const _PerformanceMetrics({
+    required this.shortestLogicalSide,
+    required this.devicePixelRatio,
+  });
+
+  final double shortestLogicalSide;
+  final double devicePixelRatio;
 }

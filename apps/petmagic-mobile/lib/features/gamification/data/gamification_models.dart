@@ -125,7 +125,8 @@ class StreakModel {
       freezesAvailable: (json['freezesAvailable'] as num?)?.toInt() ?? 0,
       freezesPerWeek: (json['freezesPerWeek'] as num?)?.toInt() ?? 1,
       lastActiveDate: json['lastActiveDate'] as String? ?? '',
-      activeDaysThisWeek: (json['activeDaysThisWeek'] as List<dynamic>?)
+      activeDaysThisWeek:
+          (json['activeDaysThisWeek'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -197,15 +198,20 @@ class GamificationSummaryModel {
       streak: json['streak'] is Map<String, dynamic>
           ? StreakModel.fromJson(json['streak'] as Map<String, dynamic>)
           : null,
-      recentAchievements: (json['recentAchievements'] as List<dynamic>?)
+      recentAchievements:
+          (json['recentAchievements'] as List<dynamic>?)
               ?.map((e) => AchievementModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
-      activeChallenges: (json['activeChallenges'] as List<dynamic>?)
-              ?.map((e) => WeeklyChallengeModel.fromJson(e as Map<String, dynamic>))
+      activeChallenges:
+          (json['activeChallenges'] as List<dynamic>?)
+              ?.map(
+                (e) => WeeklyChallengeModel.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           const [],
-      topPets: (json['topPets'] as List<dynamic>?)
+      topPets:
+          (json['topPets'] as List<dynamic>?)
               ?.map((e) => PetProgressModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],

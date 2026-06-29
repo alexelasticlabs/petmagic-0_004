@@ -35,7 +35,7 @@ void main() {
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
           null: [active, ready],
-          'ready': [ready],
+          'completed': [ready],
         },
         unreadCount: 2,
       );
@@ -64,7 +64,7 @@ void main() {
       ]);
       expect(repository.fetchCalls, [
         (status: null, take: 50),
-        (status: 'ready', take: 50),
+        (status: 'completed', take: 50),
       ]);
       expect(repository.fetchUnreadCountCalls, 2);
     },
@@ -85,7 +85,7 @@ void main() {
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
           null: [active],
-          'ready': [ready],
+          'completed': [ready],
         },
         fetchCompletersByStatus: {null: allFetchCompleter},
       );
@@ -109,7 +109,7 @@ void main() {
 
       expect(repository.fetchCalls, [
         (status: null, take: 50),
-        (status: 'ready', take: 50),
+        (status: 'completed', take: 50),
       ]);
       expect(harness.state.filter, GenerationHistoryFilter.ready);
       expect(harness.state.items.map((item) => item.generationId), [
@@ -160,7 +160,7 @@ void main() {
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
           null: [active],
-          'ready': [ready],
+          'completed': [ready],
         },
         fetchCompletersByStatus: {null: allFetchCompleter},
       );
@@ -360,7 +360,7 @@ void main() {
       );
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
-          'ready': [ready],
+          'completed': [ready],
         },
         persistedByStatus: {
           null: [active],
@@ -374,7 +374,7 @@ void main() {
 
       await harness.controller.load(filter: GenerationHistoryFilter.ready);
 
-      expect(repository.fetchCalls, [(status: 'ready', take: 50)]);
+      expect(repository.fetchCalls, [(status: 'completed', take: 50)]);
       expect(harness.state.filter, GenerationHistoryFilter.ready);
       expect(harness.state.items.map((item) => item.generationId), [
         'generation-ready',
@@ -464,7 +464,7 @@ void main() {
       remoteByStatus: {
         null: [active],
         'active': [active],
-        'ready': const <TemplateGenerationResult>[],
+        'completed': const <TemplateGenerationResult>[],
       },
       unreadCount: 1,
     );
@@ -729,7 +729,7 @@ void main() {
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
           'active': [active],
-          'ready': const <TemplateGenerationResult>[],
+          'completed': const <TemplateGenerationResult>[],
         },
       );
       final store = _FakeGenerationGalleryStore();
@@ -1057,12 +1057,12 @@ void main() {
       final repository = _FakeTemplateGenerationRepository(
         remoteByStatus: {
           null: [ready],
-          'ready': [ready],
+          'completed': [ready],
         },
         persistedByStatus: {
-          'ready': [ready],
+          'completed': [ready],
         },
-        fetchCompletersByStatus: {'ready': readyFetchCompleter},
+        fetchCompletersByStatus: {'completed': readyFetchCompleter},
         unreadCount: 1,
         markReadCompleter: markReadCompleter,
       );

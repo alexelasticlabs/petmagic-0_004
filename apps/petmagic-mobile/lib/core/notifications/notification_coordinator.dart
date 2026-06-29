@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/notifications/notification_foreground_copy.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -489,10 +490,6 @@ class NotificationCoordinator {
       final status = (message.data['status'] as String?)?.toLowerCase();
       return status == 'active' ||
           status == 'inactive' ||
-          status == 'succeeded' ||
-          status == 'success' ||
-          status == 'canceled' ||
-          status == 'cancelled' ||
           status == 'expired' ||
           status == 'failed' ||
           status == 'error';
@@ -508,6 +505,9 @@ class NotificationCoordinator {
     }
 
     final status = (message.data['status'] as String?)?.toLowerCase();
+    if (type == 'premium' && status == 'active') {
+      return PetMagicToastTone.success;
+    }
     if (status == 'succeeded' || status == 'success' || status == 'completed') {
       return PetMagicToastTone.success;
     }
@@ -519,49 +519,23 @@ class NotificationCoordinator {
   }
 
   String _fallbackTitle(String? type) {
-    if (type == 'support_chat') {
-      return 'PetMagic Support replied';
-    }
-    if (type == 'template_generation') {
-      return 'PetMagic generation update';
-    }
-    if (type == 'wallet') {
-      return 'PetMagic wallet update';
-    }
-    if (type == 'premium') {
-      return 'PetMagic premium update';
-    }
-    return 'PetMagic update';
+    return NotificationForegroundCopy.titleForType(
+      PlatformDispatcher.instance.locale,
+      type,
+    );
   }
 
   String _fallbackBody(String? type) {
-    if (type == 'support_chat') {
-      return 'Open support chat to see the latest response.';
-    }
-    if (type == 'template_generation') {
-      return 'Your generation status has changed.';
-    }
-    if (type == 'wallet') {
-      return 'Open your wallet to review the latest balance update.';
-    }
-    if (type == 'premium') {
-      return 'Open your profile to review the latest Premium update.';
-    }
-    return '';
+    return NotificationForegroundCopy.bodyForType(
+      PlatformDispatcher.instance.locale,
+      type,
+    );
   }
 
   String _openActionLabel() {
-    final languageCode = PlatformDispatcher.instance.locale.languageCode
-        .toLowerCase();
-    return switch (languageCode) {
-      'ru' => 'Открыть',
-      'es' => 'Abrir',
-      'fr' => 'Ouvrir',
-      'it' => 'Apri',
-      'pl' => 'Otwórz',
-      'de' => 'Öffnen',
-      _ => 'Open',
-    };
+    return NotificationForegroundCopy.openActionForLocale(
+      PlatformDispatcher.instance.locale,
+    );
   }
 
   void _logNotificationFailure(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,48 @@ import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart'
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 
 void main() {
+  test('premium animated background stays in a dedicated part file', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/premium/presentation/premium_page_content.part.dart',
+    ).readAsStringSync();
+    final backgroundSource = File(
+      'lib/features/premium/presentation/premium_page_background.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("part 'premium_page_background.part.dart';"));
+    expect(contentSource, isNot(contains('class _PremiumGoldenBackground')));
+    expect(contentSource, isNot(contains('class _PremiumSparkleLayer')));
+    expect(contentSource, isNot(contains('class _PremiumSparklePainter')));
+    expect(backgroundSource, contains("part of 'premium_page.dart';"));
+    expect(backgroundSource, contains('class _PremiumGoldenBackground'));
+    expect(backgroundSource, contains('class _PremiumSparkleLayer'));
+    expect(backgroundSource, contains('class _PremiumSparklePainter'));
+  });
+
+  test('premium plan cards stay in a dedicated part file', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/premium/presentation/premium_page_content.part.dart',
+    ).readAsStringSync();
+    final plansSource = File(
+      'lib/features/premium/presentation/premium_page_plans.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("part 'premium_page_plans.part.dart';"));
+    expect(contentSource, isNot(contains('class _PlansSection')));
+    expect(contentSource, isNot(contains('class _PlanCard')));
+    expect(contentSource, isNot(contains('class _BillingChip')));
+    expect(plansSource, contains("part of 'premium_page.dart';"));
+    expect(plansSource, contains('class _PlansSection'));
+    expect(plansSource, contains('class _PlanCard'));
+    expect(plansSource, contains('class _BillingChip'));
+  });
+
   testWidgets('premium page renders monthly/yearly plans and manage action', (
     tester,
   ) async {

@@ -195,7 +195,9 @@ class _ResultInputRepository extends TemplateGenerationRepository {
     await _startCompleter.future;
     if (cancelToken?.isCancelled ?? false) {
       throw DioException(
-        requestOptions: RequestOptions(path: '/api/generations/from-result'),
+        requestOptions: RequestOptions(
+          path: '/api/templates/generations/from-result',
+        ),
         type: DioExceptionType.cancel,
       );
     }

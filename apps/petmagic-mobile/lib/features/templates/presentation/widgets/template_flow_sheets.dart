@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -26,10 +28,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 part 'template_flow_sheets_content.part.dart';
+part 'template_flow_media_preview.part.dart';
 
 enum TemplateDetailAction { upload }
-
-enum PetPhotoSourceAction { gallery, camera }
 
 enum TemplateBlockedAction { wallet, premium, chooseAnother }
 
@@ -70,62 +71,6 @@ Future<TemplateDetailAction?> showTemplateDetailSheet(
           ),
         );
       },
-    ),
-  );
-}
-
-Future<PetPhotoSourceAction?> showPetPhotoSourceSheet(BuildContext context) {
-  final text = AppLocalizations.of(context);
-  final colors = context.petMagicColors;
-  return showPetMagicModalBottomSheet<PetPhotoSourceAction>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    builder: (sheetContext, bottomInset) => SafeArea(
-      top: false,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surfaceStrong,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: colors.border.withValues(alpha: 0.8)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              _SheetHandle(color: colors.border),
-              const SizedBox(height: 6),
-              ListTile(
-                leading: Icon(
-                  Icons.photo_library_outlined,
-                  color: colors.accent,
-                ),
-                title: Text(
-                  text.templateFlowPhotoSourceGallery,
-                  style: TextStyle(color: colors.textStrong),
-                ),
-                onTap: () => Navigator.of(
-                  sheetContext,
-                ).pop(PetPhotoSourceAction.gallery),
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.photo_camera_outlined,
-                  color: colors.accent,
-                ),
-                title: Text(
-                  text.templateFlowPhotoSourceCamera,
-                  style: TextStyle(color: colors.textStrong),
-                ),
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(PetPhotoSourceAction.camera),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
     ),
   );
 }
@@ -481,8 +426,6 @@ class _InsufficientBalanceBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final isRu =
-        Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -562,7 +505,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            isRu ? 'PowSpark закончились' : 'No PowSpark left',
+                            text.templateFlowInsufficientBalanceTitle,
                             style: TextStyle(
                               color: isLight
                                   ? const Color(0xFF1E1608)
@@ -576,9 +519,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      isRu
-                          ? 'Вы можете купить PowSpark разово\nили оформить Premium и получать\n40 PowSpark каждую неделю.'
-                          : 'You can buy PowSpark once\nor get Premium and receive\n40 PowSpark every week.',
+                      text.templateFlowInsufficientBalanceUpsellMessage,
                       style: TextStyle(
                         color: isLight
                             ? const Color(0xFF3B3324)
@@ -698,16 +639,39 @@ class _TemplateGoldShimmerButtonState extends State<_TemplateGoldShimmerButton>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1900),
-  )..repeat();
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimationState();
+  }
+
+  @override
+  void deactivate() {
+    _controller.stop();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _syncAnimationState();
+  }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final animateShimmer = PerformanceGuard.shouldAnimateRepeatingEffects(
+      context,
+    );
+
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -730,64 +694,95 @@ class _TemplateGoldShimmerButtonState extends State<_TemplateGoldShimmerButton>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
               clipBehavior: Clip.antiAlias,
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  final t = _controller.value;
-                  final shimmerStart = -1.6 + (t * 2.8);
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
-                          ),
-                        ),
-                        child: child,
-                      ),
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment(shimmerStart, -1),
-                                end: Alignment(shimmerStart + 0.9, 1),
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.white.withValues(alpha: 0.68),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.23, 0.5, 0.77],
+              child: animateShimmer
+                  ? AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        final t = _controller.value;
+                        final shimmerStart = -1.6 + (t * 2.8);
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFFF4C64D),
+                                    Color(0xFFEAB13A),
+                                  ],
+                                ),
+                              ),
+                              child: child,
+                            ),
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment(shimmerStart, -1),
+                                      end: Alignment(shimmerStart + 0.9, 1),
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.white.withValues(alpha: 0.68),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.23, 0.5, 0.77],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                          ],
+                        );
+                      },
+                      child: _buildButtonSurface(),
+                    )
+                  : DecoratedBox(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
                         ),
                       ),
-                    ],
-                  );
-                },
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      widget.label,
-                      style: const TextStyle(
-                        color: Color(0xFF261903),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      child: _buildButtonSurface(),
                     ),
-                  ),
-                ),
-              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildButtonSurface() {
+    return Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          widget.label,
+          style: const TextStyle(
+            color: Color(0xFF261903),
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _syncAnimationState() {
+    if (!PerformanceGuard.shouldAnimateRepeatingEffects(context)) {
+      if (_controller.isAnimating) {
+        _controller.stop();
+      }
+      return;
+    }
+
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 }
 
@@ -838,13 +833,17 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
           : 0.48,
     TemplateGenerationStatus.generating => 0.74,
     TemplateGenerationStatus.finalizing => 0.9,
-    TemplateGenerationStatus.succeeded => 1,
     TemplateGenerationStatus.completed => 1,
     TemplateGenerationStatus.failed => 1,
   };
 }
 
 String _generationErrorText(AppLocalizations text, String raw) {
+  final authMessage = mapCommonAuthFeedbackMessage(text, raw);
+  if (authMessage != null) {
+    return authMessage;
+  }
+
   if (raw == 'templates.insufficient_balance') {
     return text.templateFlowInsufficientBalanceError;
   }
@@ -864,122 +863,109 @@ String _generationErrorText(AppLocalizations text, String raw) {
   return text.templateFlowStartFailedError;
 }
 
-bool _isRussian(Locale locale) => locale.languageCode.toLowerCase() == 'ru';
-
-String _templateHeroTitle(Locale locale, {required bool isVideo}) {
-  if (_isRussian(locale)) {
-    return isVideo
-        ? '🐾 Оживите любимца в памятном ролике'
-        : '✨ Превратите питомца в милый портрет';
-  }
-
+String _templateHeroTitle(AppLocalizations text, {required bool isVideo}) {
   return isVideo
-      ? '🐾 Turn your pet into a memorable video'
-      : '✨ Turn your pet into an adorable portrait';
+      ? text.templateDetailHeroVideoTitle
+      : text.templateDetailHeroImageTitle;
 }
 
-String _templateDisplayTitle(Locale locale, String rawTitle) {
+String _templateDisplayTitle(AppLocalizations text, String rawTitle) {
   final normalized = rawTitle.trim();
   if (normalized.isEmpty || _isTechnicalTemplateText(normalized)) {
-    return _isRussian(locale) ? 'Портрет питомца' : 'Pet portrait';
+    return text.templateDetailFallbackTitle;
   }
 
   return normalized;
 }
 
 String _templateDisplayDescription(
-  Locale locale,
+  AppLocalizations text,
   String rawDescription, {
   required bool isVideo,
 }) {
   final normalized = rawDescription.trim();
   if (normalized.isEmpty || _isTechnicalTemplateText(normalized)) {
-    if (_isRussian(locale)) {
-      return isVideo
-          ? 'Создайте короткое эмоциональное видео с вашим питомцем и поделитесь им с близкими.'
-          : 'Создайте тёплое памятное фото вашего любимца в стиле PetMagic.';
-    }
-
     return isVideo
-        ? 'Create a short emotional video with your pet and share it with your loved ones.'
-        : 'Create a warm memorable portrait of your pet in PetMagic style.';
+        ? text.templateDetailFallbackDescriptionVideo
+        : text.templateDetailFallbackDescriptionImage;
   }
 
   return normalized;
 }
 
-String _templateDisplayCategory(Locale locale, String rawCategory) {
+String _templateDisplayCategory(AppLocalizations text, String rawCategory) {
   final normalized = rawCategory.trim();
   if (normalized.isEmpty) {
-    return _isRussian(locale) ? 'Шаблон' : 'Template';
-  }
-
-  if (_isRussian(locale)) {
-    final lower = normalized.toLowerCase();
-    if (lower == 'portrait') return 'Портрет';
-    if (lower == 'video') return 'Видео';
-  }
-
-  return normalized;
-}
-
-String _templateDisplayRequirement(Locale locale, String raw) {
-  final normalized = raw.trim();
-  if (!_isRussian(locale)) {
-    return normalized;
+    return text.templateDetailCategoryTemplate;
   }
 
   final lower = normalized.toLowerCase();
-  if (lower == 'one pet in the photo') return 'Один питомец в кадре';
-  if (lower == 'clear face') return 'Хорошо видно морду';
-  if (lower == 'good lighting') return 'Хорошее освещение';
-  if (lower == 'full body visible') return 'Питомец полностью в кадре';
-  if (lower == 'pet facing camera') return 'Питомец смотрит в камеру';
-  if (lower == 'no cropped head or legs') {
-    return 'Голова и лапы не обрезаны';
+  if (lower == 'portrait') {
+    return text.templateDetailCategoryPortrait;
+  }
+  if (lower == 'video') {
+    return text.templateDetailCategoryVideo;
   }
 
   return normalized;
 }
 
-String _templateBestResultTitle(Locale locale) {
-  return _isRussian(locale)
-      ? 'Для лучшего результата:'
-      : 'For the best result:';
-}
-
-String _templateQualityWarning(Locale locale) {
-  return _isRussian(locale)
-      ? 'Результат зависит от качества фотографии.'
-      : 'Result quality depends on your photo quality.';
-}
-
-String _templateUploadActionLabel(Locale locale, {required bool isVideo}) {
-  if (_isRussian(locale)) {
-    return isVideo
-        ? 'Загрузить фото питомца для видео'
-        : 'Загрузить фото питомца';
+String _templateDisplayRequirement(AppLocalizations text, String raw) {
+  final normalized = raw.trim();
+  final lower = normalized.toLowerCase();
+  if (lower == 'one pet in the photo') {
+    return text.templateDetailRequirementOnePet;
+  }
+  if (lower == 'clear face') {
+    return text.templateDetailRequirementClearFace;
+  }
+  if (lower == 'good lighting') {
+    return text.templateDetailRequirementGoodLighting;
+  }
+  if (lower == 'full body visible') {
+    return text.templateDetailRequirementFullBodyVisible;
+  }
+  if (lower == 'pet facing camera') {
+    return text.templateDetailRequirementFacingCamera;
+  }
+  if (lower == 'no cropped head or legs') {
+    return text.templateDetailRequirementNoCroppedHeadOrLegs;
   }
 
-  return isVideo ? 'Upload pet photo for video' : 'Upload a pet photo';
+  return normalized;
 }
 
-String _templatePreviewMissingTitle(Locale locale) {
-  return _isRussian(locale)
-      ? '📷 Превью скоро появится'
-      : '🐾 Preview coming soon';
+String _templateQualityWarning(AppLocalizations text) {
+  return text.templateDetailQualityWarning;
 }
 
-String _templatePreviewMissingSubtitle(Locale locale, {required bool isVideo}) {
-  if (_isRussian(locale)) {
-    return isVideo
-        ? 'Этот шаблон уже доступен для генерации. Загрузите фото питомца и попробуйте.'
-        : 'Шаблон уже доступен для генерации. Загрузите фото питомца и попробуйте.';
-  }
-
+String _templateUploadActionLabel(
+  AppLocalizations text, {
+  required bool isVideo,
+}) {
   return isVideo
-      ? 'This template is already available. Upload your pet photo and try it now.'
-      : 'This template is already available for generation. Upload your pet photo and try it.';
+      ? text.templateDetailUploadPhotoForVideoAction
+      : text.templateFlowUploadPetPhotoAction;
+}
+
+String _templatePreviewMissingTitle(AppLocalizations text) {
+  return text.templateDetailPreviewMissingTitle;
+}
+
+String _templatePreviewMissingSubtitle(
+  AppLocalizations text, {
+  required bool isVideo,
+}) {
+  return isVideo
+      ? text.templateDetailPreviewMissingSubtitleVideo
+      : text.templateDetailPreviewMissingSubtitleImage;
+}
+
+String _templateEstimatedDuration(
+  AppLocalizations text, {
+  required bool isVideo,
+}) {
+  return isVideo ? text.templateDetailVideoEta : text.templateDetailImageEta;
 }
 
 bool _isTechnicalTemplateText(String text) {

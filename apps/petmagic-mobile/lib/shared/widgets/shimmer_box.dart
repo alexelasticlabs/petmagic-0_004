@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/widgets/motion.dart';
 
 class ShimmerBox extends StatefulWidget {
@@ -38,6 +39,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _syncResolvedColors();
+    _syncDuration();
     _syncAnimationState();
   }
 
@@ -48,6 +50,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
         oldWidget.highlightColor != widget.highlightColor ||
         oldWidget.enabled != widget.enabled) {
       _syncResolvedColors();
+      _syncDuration();
       _syncAnimationState();
     }
   }
@@ -73,8 +76,7 @@ class _ShimmerBoxState extends State<ShimmerBox>
 
   @override
   Widget build(BuildContext context) {
-    final reduceMotion = PetMotion.reduceMotion(context);
-    if (!widget.enabled || reduceMotion) {
+    if (_useStaticPlaceholder(context)) {
       return widget.child;
     }
 
@@ -115,8 +117,14 @@ class _ShimmerBoxState extends State<ShimmerBox>
         theme.colorScheme.surface.withValues(alpha: 0.32);
   }
 
+  void _syncDuration() {
+    _controller.duration = PerformanceGuard.isDegradedMode(context)
+        ? const Duration(milliseconds: 1900)
+        : const Duration(milliseconds: 1400);
+  }
+
   void _syncAnimationState() {
-    if (!widget.enabled || PetMotion.reduceMotion(context)) {
+    if (_useStaticPlaceholder(context)) {
       if (_controller.isAnimating) {
         _controller.stop();
       }
@@ -126,6 +134,12 @@ class _ShimmerBoxState extends State<ShimmerBox>
     if (!_controller.isAnimating) {
       _controller.repeat();
     }
+  }
+
+  bool _useStaticPlaceholder(BuildContext context) {
+    return !widget.enabled ||
+        PetMotion.reduceMotion(context) ||
+        PerformanceGuard.shouldUseStaticPlaceholders(context);
   }
 }
 

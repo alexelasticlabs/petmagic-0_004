@@ -22,7 +22,7 @@ extension GenerationHistoryFilterApi on GenerationHistoryFilter {
     return switch (this) {
       GenerationHistoryFilter.all => null,
       GenerationHistoryFilter.active => 'active',
-      GenerationHistoryFilter.ready => 'ready',
+      GenerationHistoryFilter.ready => 'completed',
       GenerationHistoryFilter.failed => 'failed',
     };
   }
@@ -1061,7 +1061,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
     }
 
     if (localReadyRecords.isEmpty && deletedGenerationIds.isEmpty) {
-      return source;
+      return source.map(_applyLocalReadState).toList(growable: false);
     }
 
     final localById = {
@@ -1078,7 +1078,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
             if (item.localPreviewPath == null &&
                 item.localOutputPath == null &&
                 !item.isLocalMediaReady) {
-              return item;
+              return _applyLocalReadState(item);
             }
             return _applyLocalReadState(
               item.copyWith(
@@ -1092,7 +1092,7 @@ class GenerationHistoryController extends Notifier<GenerationHistoryState> {
           if (item.localPreviewPath == localRecord.previewLocalPath &&
               item.localOutputPath == localRecord.outputLocalPath &&
               item.isLocalMediaReady == localRecord.isDownloadComplete) {
-            return item;
+            return _applyLocalReadState(item);
           }
           return _applyLocalReadState(
             item.copyWith(

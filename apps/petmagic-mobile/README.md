@@ -6,7 +6,7 @@ Flutter iOS/Android client for PetMagic. The app starts with a production-orient
 
 - Flutter 3.41+
 - Dart 3.11+
-- Backend API running locally at `http://localhost:5001`
+- Backend API running locally at `http://localhost:5000`
 
 ## Run
 
@@ -16,24 +16,24 @@ flutter gen-l10n
 flutter run
 ```
 
-For Android emulator, the app defaults to `http://10.0.2.2:5001` and keeps `:5000` as a fallback for older setups. For iOS simulator, it defaults to `http://localhost:5001`.
+For Android emulator, the app defaults to `http://10.0.2.2:5000`. For iOS simulator, it defaults to `http://localhost:5000`.
 
 If you run on a physical Android device over USB, mirror your host port first:
 
 ```bash
-adb reverse tcp:5001 tcp:5001
+adb reverse tcp:5000 tcp:5000
 ```
 
-Then keep the default `http://127.0.0.1:5001` or pass it explicitly:
+Then keep the default `http://127.0.0.1:5000` or pass it explicitly:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5001
+flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5000
 ```
 
 Override the API URL when needed:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:5001
+flutter run --dart-define=API_BASE_URL=http://localhost:5000
 flutter run --dart-define=API_BASE_URL=https://api.petmagic.app
 ```
 

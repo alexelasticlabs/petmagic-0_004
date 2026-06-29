@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
@@ -19,6 +20,8 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+part 'premium_page_background.part.dart';
+part 'premium_page_plans.part.dart';
 part 'premium_page_content.part.dart';
 
 // ─── Color constants ────────────────────────────────────────────────────────
@@ -669,36 +672,19 @@ class _PaywallFeedbackCopy {
 }
 
 _PaywallFeedbackCopy _paywallFeedbackCopy(BuildContext context) {
-  final isRu = Localizations.localeOf(context).languageCode == 'ru';
-  if (isRu) {
-    return const _PaywallFeedbackCopy(
-      title: 'Что остановило?',
-      commentLabel: 'Комментарий',
-      commentHint: 'Можно оставить пустым',
-      submit: 'Отправить',
-      thanks: 'Спасибо за feedback',
-      options: [
-        ('expensive', 'Дорого'),
-        ('low_value', 'Мало пользы'),
-        ('payment_problem', 'Проблема с оплатой'),
-        ('just_browsing', 'Просто смотрю'),
-        ('other', 'Другое'),
-      ],
-    );
-  }
-
-  return const _PaywallFeedbackCopy(
-    title: 'What stopped you?',
-    commentLabel: 'Comment',
-    commentHint: 'Optional',
-    submit: 'Send',
-    thanks: 'Thanks for the feedback',
+  final text = AppLocalizations.of(context);
+  return _PaywallFeedbackCopy(
+    title: text.premiumPaywallFeedbackTitle,
+    commentLabel: text.premiumPaywallFeedbackCommentLabel,
+    commentHint: text.premiumPaywallFeedbackCommentHint,
+    submit: text.premiumPaywallFeedbackSubmitAction,
+    thanks: text.premiumPaywallFeedbackThanksMessage,
     options: [
-      ('expensive', 'Too expensive'),
-      ('low_value', 'Not useful enough'),
-      ('payment_problem', 'Payment problem'),
-      ('just_browsing', 'Just browsing'),
-      ('other', 'Other'),
+      ('expensive', text.premiumPaywallFeedbackOptionExpensive),
+      ('low_value', text.premiumPaywallFeedbackOptionLowValue),
+      ('payment_problem', text.premiumPaywallFeedbackOptionPaymentProblem),
+      ('just_browsing', text.premiumPaywallFeedbackOptionJustBrowsing),
+      ('other', text.premiumPaywallFeedbackOptionOther),
     ],
   );
 }

@@ -67,6 +67,8 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   static const _invalidSessionCode = 'auth.external_ticket_invalid';
   static const _genericFailedCode = 'auth.external_invalid';
   static const _cancelledCode = 'auth.external_cancelled';
+  static Future<void>? _googleSignInInitialization;
+  static String? _initializedGoogleServerClientId;
 
   MobileExternalAuthRepository({
     required Dio dio,
@@ -76,6 +78,8 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     Future<bool> Function(Uri uri, LaunchMode mode)? launchUrlDelegate,
     Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)?
     googleSignInDelegate,
+    Future<void> Function(String? serverClientId)?
+    googleSignInInitializeDelegate,
     Future<AuthorizationCredentialAppleID> Function()? appleSignInDelegate,
     Stream<Uri>? uriLinkStream,
   }) : _dio = dio,
@@ -85,8 +89,12 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
        _launchUrl =
            launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
-       _googleSignIn =
-           googleSignInDelegate ?? ((googleSignIn) => googleSignIn.signIn()),
+         _googleSignIn =
+           googleSignInDelegate ?? ((googleSignIn) => googleSignIn.authenticate()),
+         _initializeGoogleSignInDelegate =
+           googleSignInInitializeDelegate ??
+           ((serverClientId) =>
+             GoogleSignIn.instance.initialize(serverClientId: serverClientId)),
        _appleSignIn =
            appleSignInDelegate ??
            (() => SignInWithApple.getAppleIDCredential(
@@ -109,6 +117,8 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   final Future<bool> Function(Uri uri, LaunchMode mode) _launchUrl;
   final Future<GoogleSignInAccount?> Function(GoogleSignIn googleSignIn)
   _googleSignIn;
+  final Future<void> Function(String? serverClientId)
+  _initializeGoogleSignInDelegate;
   final Future<AuthorizationCredentialAppleID> Function() _appleSignIn;
   final Stream<Uri> _uriLinkStream;
 
@@ -132,12 +142,10 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
       return;
     }
 
-    await _resetGoogleSession(GoogleSignIn(scopes: const ['email']));
+    await _resetGoogleSession();
   }
 
   Future<AuthSession> _authenticateWithNativeGoogle() async {
-    GoogleSignIn? googleSignIn;
-
     try {
       final serverClientId = await _resolveGoogleServerClientId();
       AppLogger.info(
@@ -151,10 +159,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       );
 
-      googleSignIn = GoogleSignIn(
-        scopes: const ['email'],
-        serverClientId: serverClientId,
-      );
+      final googleSignIn = await _getGoogleSignIn(serverClientId: serverClientId);
 
       final account = await _googleSignIn(googleSignIn);
       if (account == null) {
@@ -170,7 +175,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       );
 
-      final authentication = await account.authentication;
+      final authentication = account.authentication;
       final idToken = authentication.idToken;
       if (idToken == null || idToken.isEmpty) {
         throw const AppException(_genericFailedCode);
@@ -215,10 +220,10 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         provider: ExternalAuthProvider.google,
         status: _classifyMappedFailure(error.message),
       );
-      await _resetGoogleSession(googleSignIn);
+      await _resetGoogleSession();
       rethrow;
     } on DioException catch (error) {
-      await _resetGoogleSession(googleSignIn);
+      await _resetGoogleSession();
       final mapped = _mapDioException(
         error,
         fallbackMessage: _genericFailedCode,
@@ -240,9 +245,38 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         error,
         stackTrace,
       );
-      await _resetGoogleSession(googleSignIn);
+      await _resetGoogleSession();
       throw const AppException(_genericFailedCode);
     }
+  }
+
+  Future<GoogleSignIn> _getGoogleSignIn({
+    required String? serverClientId,
+  }) async {
+    final googleSignIn = GoogleSignIn.instance;
+    final initialization =
+        _googleSignInInitialization ??= _initializeGoogleSignIn(serverClientId);
+    await initialization;
+    if (_initializedGoogleServerClientId != serverClientId) {
+      AppLogger.info(
+        feature: 'Profile.ExternalAuth',
+        operation: 'google_native_auth_stage',
+        message: 'Google Sign-In already initialized with different config',
+        context: {
+          'stage': 'google_sign_in_reused',
+          'requested_server_client_id_present': serverClientId != null,
+          'initialized_server_client_id_present':
+              _initializedGoogleServerClientId != null,
+        },
+      );
+    }
+
+    return googleSignIn;
+  }
+
+  Future<void> _initializeGoogleSignIn(String? serverClientId) async {
+    await _initializeGoogleSignInDelegate(serverClientId);
+    _initializedGoogleServerClientId = serverClientId;
   }
 
   Future<String?> _resolveGoogleServerClientId() async {
@@ -353,10 +387,15 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
-  Future<void> _resetGoogleSession(GoogleSignIn? googleSignIn) async {
-    if (googleSignIn == null) {
+  Future<void> _resetGoogleSession() async {
+    final initialization = _googleSignInInitialization;
+    if (initialization == null) {
       return;
     }
+
+    await initialization;
+
+    final googleSignIn = GoogleSignIn.instance;
 
     try {
       await googleSignIn.disconnect();

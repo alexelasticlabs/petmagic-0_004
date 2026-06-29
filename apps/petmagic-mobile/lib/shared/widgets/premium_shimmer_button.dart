@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 
 class PremiumShimmerButton extends StatefulWidget {
   const PremiumShimmerButton({
@@ -28,7 +29,16 @@ class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2000),
-    )..repeat();
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.duration = PerformanceGuard.isDegradedMode(context)
+        ? const Duration(milliseconds: 2600)
+        : const Duration(milliseconds: 2000);
+    _syncAnimationState();
   }
 
   @override
@@ -40,9 +50,7 @@ class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
   @override
   void activate() {
     super.activate();
-    if (!_controller.isAnimating) {
-      _controller.repeat();
-    }
+    _syncAnimationState();
   }
 
   @override
@@ -54,6 +62,9 @@ class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
 
   @override
   Widget build(BuildContext context) {
+    final useStaticShimmer =
+        PerformanceGuard.shouldUseStaticPlaceholders(context);
+
     return SizedBox(
       width: double.infinity,
       height: widget.height,
@@ -76,74 +87,112 @@ class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(widget.borderRadius),
               clipBehavior: Clip.antiAlias,
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  final t = _controller.value;
-                  final shimmerStart = -1.6 + (t * 2.8);
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
-                          ),
+              child: useStaticShimmer
+                  ? Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFFF4C64D), Color(0xFFEAB13A)],
                         ),
-                        child: child,
                       ),
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment(shimmerStart, -1),
-                                end: Alignment(shimmerStart + 0.9, 1),
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.white.withValues(alpha: 0.62),
-                                  Colors.transparent,
-                                ],
-                                stops: const [0.23, 0.5, 0.77],
+                      child: _PremiumButtonSurface(label: widget.label),
+                    )
+                  : AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        final t = _controller.value;
+                        final shimmerStart = -1.6 + (t * 2.8);
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Color(0xFFF4C64D),
+                                    Color(0xFFEAB13A),
+                                  ],
+                                ),
+                              ),
+                              child: child,
+                            ),
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment(shimmerStart, -1),
+                                      end: Alignment(shimmerStart + 0.9, 1),
+                                      colors: [
+                                        Colors.transparent,
+                                        Colors.white.withValues(alpha: 0.62),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.23, 0.5, 0.77],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.label,
-                            style: const TextStyle(
-                              color: Color(0xFF261903),
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            color: Color(0xFF261903),
-                            size: 17,
-                          ),
-                        ],
-                      ),
+                          ],
+                        );
+                      },
+                      child: _PremiumButtonSurface(label: widget.label),
                     ),
-                  ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _syncAnimationState() {
+    if (PerformanceGuard.shouldUseStaticPlaceholders(context)) {
+      if (_controller.isAnimating) {
+        _controller.stop();
+      }
+      return;
+    }
+
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+}
+
+class _PremiumButtonSurface extends StatelessWidget {
+  const _PremiumButtonSurface({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF261903),
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
-            ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                color: Color(0xFF261903),
+                size: 17,
+              ),
+            ],
           ),
         ),
       ),

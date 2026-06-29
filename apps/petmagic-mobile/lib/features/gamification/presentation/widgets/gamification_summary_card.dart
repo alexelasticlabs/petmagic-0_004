@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/xp_progress_bar.dart';
@@ -8,12 +9,16 @@ class GamificationHighlightsCard extends StatelessWidget {
   const GamificationHighlightsCard({
     super.key,
     this.summary,
+    this.unlockedAchievementsCount,
+    this.totalAchievementsCount,
     this.onStreakTap,
     this.onAchievementsTap,
     this.onPetTap,
   });
 
   final GamificationSummaryModel? summary;
+  final int? unlockedAchievementsCount;
+  final int? totalAchievementsCount;
   final VoidCallback? onStreakTap;
   final VoidCallback? onAchievementsTap;
   final VoidCallback? onPetTap;
@@ -21,10 +26,15 @@ class GamificationHighlightsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
     final streak = summary?.streak;
     final topPet = summary?.topPets.isNotEmpty == true
         ? summary!.topPets.first
         : null;
+    final achievementsValue =
+        unlockedAchievementsCount != null && totalAchievementsCount != null
+        ? '${unlockedAchievementsCount!}/${totalAchievementsCount!}'
+        : '...';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -44,11 +54,11 @@ class GamificationHighlightsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Your Progress',
+            text.gamificationYourProgress,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-                    color: colors.textStrong,
+              color: colors.textStrong,
             ),
           ),
           const SizedBox(height: 12),
@@ -59,8 +69,10 @@ class GamificationHighlightsCard extends StatelessWidget {
                   onTap: onStreakTap,
                   child: _MiniStat(
                     emoji: '🔥',
-                    label: 'Streak',
-                    value: streak != null ? '${streak.currentStreak} days' : '0 days',
+                    label: text.gamificationStreakTitle,
+                    value: streak != null
+                        ? '${streak.currentStreak} ${text.gamificationDayStreak}'
+                        : '0 ${text.gamificationDayStreak}',
                     color: const Color(0xFFFF6D00),
                   ),
                 ),
@@ -71,10 +83,8 @@ class GamificationHighlightsCard extends StatelessWidget {
                   onTap: onAchievementsTap,
                   child: _MiniStat(
                     emoji: '🏆',
-                    label: 'Achievements',
-                    value: summary != null
-                        ? '${summary!.recentAchievements.where((a) => a.isUnlocked).length}'
-                        : '0',
+                    label: text.gamificationAchievementsTitle,
+                    value: achievementsValue,
                     color: const Color(0xFFFFD700),
                   ),
                 ),
@@ -105,7 +115,7 @@ class GamificationHighlightsCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Top Pet — Level ${topPet.level}',
+                            '${text.gamificationTopPet} · ${text.gamificationLevel(topPet.level)}',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -125,11 +135,7 @@ class GamificationHighlightsCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: colors.textSoft,
-                    ),
+                    Icon(Icons.chevron_right, size: 18, color: colors.textSoft),
                   ],
                 ),
               ),
@@ -177,13 +183,7 @@ class _MiniStat extends StatelessWidget {
               color: color,
             ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-                    color: colors.textSoft,
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 11, color: colors.textSoft)),
         ],
       ),
     );

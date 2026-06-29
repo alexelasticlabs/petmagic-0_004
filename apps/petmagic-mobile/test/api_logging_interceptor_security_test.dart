@@ -10,7 +10,8 @@ void main() {
 
     expect(source, contains("'path': _requestPath(err.requestOptions),"));
     expect(source, isNot(contains("'path': err.requestOptions.path,")));
-    expect(source, contains('String _stripQuery(String value)'));
+    expect(source, contains('return stripQuery(options.path);'));
+    expect(source, contains('return stripQuery(options.uri.path);'));
   });
 
   test('API logging skips expected cancellation noise', () {

@@ -121,9 +121,7 @@ void main() {
   );
 
   test('templates feed keeps a lazy paged sliver grid surface', () async {
-    final source = await File(
-      'lib/features/templates/presentation/templates_page.dart',
-    ).readAsString();
+    final source = _readTemplatesPageLibrarySource();
 
     expect(source, contains('SliverGrid.builder('));
     expect(source, contains('itemCount: visibleEntries.length'));
@@ -846,6 +844,10 @@ void main() {
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
+      final previewSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
+      ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
+      final flowSource = '$contentSource\n$previewSource';
 
       expect(
         sheetSource,
@@ -853,22 +855,22 @@ void main() {
           "import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';",
         ),
       );
-      expect(contentSource, contains('parseSafeGenerationMediaUri('));
-      expect(contentSource, contains('generation.outputUrl'));
-      expect(contentSource, contains('asset?.url'));
+      expect(flowSource, contains('parseSafeGenerationMediaUri('));
+      expect(flowSource, contains('generation.outputUrl'));
+      expect(flowSource, contains('asset?.url'));
       expect(
-        contentSource,
+        flowSource,
         contains('final resultCacheWidth = _templatePreviewCacheDimension('),
       );
-      expect(contentSource, contains('memCacheWidth: resultCacheWidth'));
-      expect(contentSource, contains('maxWidthDiskCache: resultCacheWidth'));
-      expect(contentSource, isNot(contains('imageUrl: asset.url')));
+      expect(flowSource, contains('memCacheWidth: resultCacheWidth'));
+      expect(flowSource, contains('maxWidthDiskCache: resultCacheWidth'));
+      expect(flowSource, isNot(contains('imageUrl: asset.url')));
       expect(
-        contentSource,
+        flowSource,
         isNot(contains('_NetworkVideoPreview(url: asset.url)')),
       );
       expect(
-        contentSource,
+        flowSource,
         isNot(contains('VideoPlayerController.networkUrl(Uri.parse(url))')),
       );
     },
@@ -882,8 +884,8 @@ void main() {
       'lib/features/templates/presentation/widgets/template_card.dart',
     ).readAsString();
     final contentSource = await File(
-      'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
-    ).readAsString();
+      'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
+    ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
 
     expect(cardSource, contains('VisibilityDetector('));
     expect(cardSource, contains('_prewarmVisibilityFraction'));
@@ -919,6 +921,10 @@ void main() {
       contains(
         "import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';",
       ),
+    );
+    expect(
+      sheetSource,
+      contains("part 'template_flow_media_preview.part.dart';"),
     );
     expect(contentSource, contains('useSharedPreviewCache: true'));
     expect(contentSource, contains('VisibilityDetector('));
@@ -1063,9 +1069,16 @@ void main() {
   );
 
   test('generation status result media decodes with bounded cache sizes', () async {
-    final source = await File(
+    final sectionsSource = await File(
       'lib/features/templates/presentation/generation_status_page_sections.dart',
     ).readAsString();
+    final fullscreenSource = await File(
+      'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
+    ).readAsString();
+    final compareSource = await File(
+      'lib/features/templates/presentation/generation_status_page_compare_viewer.part.dart',
+    ).readAsString();
+    final source = '$sectionsSource\n$fullscreenSource\n$compareSource';
 
     expect(source, contains('const int _resultCardImageCacheWidth = 1080;'));
     expect(
@@ -1180,4 +1193,16 @@ Future<File> _writeCacheFile(
   await file.writeAsBytes(List<int>.filled(bytes, 1), flush: true);
   await file.setLastModified(modifiedAt);
   return file;
+}
+
+String _readTemplatesPageLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/templates_page.dart',
+    'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }

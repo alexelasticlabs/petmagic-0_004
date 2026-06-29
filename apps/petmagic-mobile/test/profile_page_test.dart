@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -73,7 +76,7 @@ void main() {
     );
 
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 500));
 
     final profileContext = tester.element(find.byType(ProfilePage));
     final text = AppLocalizations.of(profileContext);
@@ -129,6 +132,35 @@ void main() {
         overrides: [
           profileControllerProvider.overrideWith(_FakeProfileController.new),
           walletControllerProvider.overrideWith(_FakeWalletController.new),
+          gamificationSummaryProvider.overrideWith(
+            (ref) async => const GamificationSummaryModel(
+              streak: StreakModel(
+                currentStreak: 4,
+                longestStreak: 8,
+                freezesAvailable: 1,
+                freezesPerWeek: 1,
+                lastActiveDate: '2026-06-29',
+                activeDaysThisWeek: ['mon', 'tue', 'wed', 'thu'],
+              ),
+            ),
+          ),
+          achievementsProvider.overrideWith(
+            (ref) async => const [
+              AchievementModel(
+                key: 'first_magic',
+                category: 'generation',
+                rarity: 'common',
+                titleKey: 'achievementFirstMagic',
+                descriptionKey: 'achievementFirstMagicDesc',
+                requirementValue: 1,
+                currentProgress: 1,
+                rewardSpark: 10,
+                isSecret: false,
+                isUnlocked: true,
+                iconEmoji: '✨',
+              ),
+            ],
+          ),
           premiumSubscriptionSummaryProvider.overrideWith(
             (ref) async => const PremiumSubscriptionSummaryView(
               isPremium: false,
@@ -255,6 +287,123 @@ void main() {
     expect(find.text('Away route'), findsOneWidget);
     expect(tester.takeException(), isNull);
     expect(profileController.initializeCalls, initialInitializeCalls);
+  });
+
+  testWidgets('profile keeps a single achievements entrypoint and opens it', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final router = GoRouter(
+      initialLocation: ProfilePage.routePath,
+      routes: [
+        GoRoute(
+          path: ProfilePage.routePath,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ProfilePage()),
+        ),
+        GoRoute(
+          path: AchievementsPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Achievements route')),
+          ),
+        ),
+        GoRoute(
+          path: ProfileSettingsPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Settings route')),
+          ),
+        ),
+        GoRoute(
+          path: SupportChatPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Support route')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileControllerProvider.overrideWith(_FakeProfileController.new),
+          walletControllerProvider.overrideWith(_FakeWalletController.new),
+          gamificationSummaryProvider.overrideWith(
+            (ref) async => const GamificationSummaryModel(
+              streak: StreakModel(
+                currentStreak: 4,
+                longestStreak: 8,
+                freezesAvailable: 1,
+                freezesPerWeek: 1,
+                lastActiveDate: '2026-06-29',
+                activeDaysThisWeek: ['mon', 'tue', 'wed', 'thu'],
+              ),
+            ),
+          ),
+          achievementsProvider.overrideWith(
+            (ref) async => const [
+              AchievementModel(
+                key: 'first_magic',
+                category: 'generation',
+                rarity: 'common',
+                titleKey: 'achievementFirstMagic',
+                descriptionKey: 'achievementFirstMagicDesc',
+                requirementValue: 1,
+                currentProgress: 1,
+                rewardSpark: 10,
+                isSecret: false,
+                isUnlocked: true,
+                iconEmoji: '✨',
+              ),
+            ],
+          ),
+          premiumSubscriptionSummaryProvider.overrideWith(
+            (ref) async => const PremiumSubscriptionSummaryView(
+              isPremium: false,
+              canManageSubscription: false,
+              status: 'inactive',
+              manageSubscriptionAction: '',
+              provider: PremiumSubscriptionProviderView.unknown,
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final profileContext = tester.element(find.byType(ProfilePage));
+    final text = AppLocalizations.of(profileContext);
+
+    await tester.fling(find.byType(ListView), const Offset(0, -900), 1200);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text(text.gamificationAchievementsTitle), findsOneWidget);
+
+    await tester.tap(find.text(text.gamificationAchievementsTitle));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
+
+    expect(find.text('Achievements route'), findsOneWidget);
   });
 }
 

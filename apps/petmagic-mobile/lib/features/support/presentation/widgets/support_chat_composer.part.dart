@@ -108,6 +108,22 @@ class _SupportReplyComposerPreview extends StatelessWidget {
 
     final primaryAttachment = message.primaryAttachment;
     if (primaryAttachment == null) {
+      final pendingAttachment = message.pendingAttachment;
+      if (pendingAttachment != null) {
+        if (pendingAttachment.mimeType.startsWith('video/')) {
+          return text.supportChatVideoLabel;
+        }
+
+        if (pendingAttachment.mimeType.startsWith('image/')) {
+          return text.supportChatPhotoAttachedLabel;
+        }
+
+        final pendingFileName = pendingAttachment.fileName.trim();
+        return pendingFileName.isNotEmpty
+            ? pendingFileName
+            : text.supportChatFileFallbackLabel;
+      }
+
       return text.supportChatReplyOriginalUnavailable;
     }
 

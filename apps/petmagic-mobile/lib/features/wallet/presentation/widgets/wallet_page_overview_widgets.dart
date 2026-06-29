@@ -5,8 +5,6 @@ const int _kVideoCostSpark = 33;
 const String _kWalletHeroLogoAsset = 'assets/rewards/wallet-hero-logo.png';
 const String _kWalletPremiumUpsellMascotAsset =
     'assets/rewards/premium-upsell-dog.png';
-bool _isRuLocale(BuildContext context) =>
-    Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
 
 class _WalletHeader extends StatelessWidget {
   const _WalletHeader({required this.title, required this.subtitle});
@@ -127,248 +125,133 @@ class _BalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = context.petMagicColors;
     final balance = wallet?.balance ?? 0;
-    final cardTextPrimary = isDark ? Colors.white : const Color(0xFF1E1631);
+    const cardAccent = Color(0xFF00F2A6);
     final cardTextSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.80)
-        : const Color(0xFF61537F);
-    final cardAccent = isDark
-        ? const Color(0xFFC4A7FF)
-        : const Color(0xFF8C67FF);
-    final cardGradientColors = isDark
-        ? const [Color(0xFF130E22), Color(0xFF2A1F45), Color(0xFF171028)]
-        : const [Color(0xFFF7F0FF), Color(0xFFF0E5FF), Color(0xFFFBF8FF)];
-    final cardBorderColor = isDark
-        ? const Color(0xFF514173)
-        : const Color(0xFFD6C8FA);
+        ? Colors.white.withValues(alpha: 0.52)
+        : const Color(0xFF43606A);
 
-    return ProfileGlassCard(
+    return PetMagicAccentCard(
+      accentColor: cardAccent,
       padding: EdgeInsets.zero,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: cardBorderColor),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? const Color(0xFF7E5BEE).withValues(alpha: 0.24)
-                  : const Color(0xFFA77CFF).withValues(alpha: 0.28),
-              blurRadius: isDark ? 34 : 28,
-              spreadRadius: isDark ? 2 : 1.2,
-              offset: const Offset(0, 12),
+      borderRadius: BorderRadius.circular(26),
+      borderOpacity: isDark ? 0.3 : 0.22,
+      glowOpacity: isDark ? 0.16 : 0.1,
+      glowAlignment: const Alignment(-0.96, -0.08),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 380;
+          final mascotWidth = compact ? 104.0 : 126.0;
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 14 : 16,
+              compact ? 14 : 16,
+              compact ? 10 : 12,
+              compact ? 14 : 16,
             ),
-          ],
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: const [0.0, 0.52, 1.0],
-            colors: cardGradientColors,
-          ),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: -24,
-              left: -34,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFFB794FF).withValues(alpha: 0.30),
-                      Colors.transparent,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        text.walletBalanceEyebrow,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: cardTextSecondary,
+                          fontSize: compact ? 13 : 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Container(
+                            width: compact ? 40 : 44,
+                            height: compact ? 40 : 44,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.18 : 0.06,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: cardAccent.withValues(
+                                  alpha: isDark ? 0.3 : 0.22,
+                                ),
+                              ),
+                            ),
+                            child: const Center(
+                              child: PawSparkIcon(size: 22, showGlow: true),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                NumberFormat.decimalPattern().format(balance),
+                                style: TextStyle(
+                                  color: colors.textStrong,
+                                  fontSize: compact ? 48 : 56,
+                                  fontWeight: FontWeight.w900,
+                                  height: 0.94,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 14,
+                            color: cardAccent.withValues(alpha: 0.88),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              text.walletBalanceUnit,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: cardTextSecondary,
+                                fontSize: compact ? 15 : 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                child: const SizedBox(width: 180, height: 180),
-              ),
-            ),
-            Positioned(
-              right: -28,
-              bottom: -34,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFF9765FF).withValues(alpha: 0.24),
-                      Colors.transparent,
-                    ],
+                const SizedBox(width: 10),
+                IgnorePointer(
+                  child: Opacity(
+                    opacity: isDark ? 0.2 : 0.13,
+                    child: Image.asset(
+                      _kWalletHeroLogoAsset,
+                      width: mascotWidth,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.high,
+                    ),
                   ),
                 ),
-                child: const SizedBox(width: 190, height: 190),
-              ),
+              ],
             ),
-            Positioned(
-              right: 86,
-              top: 70,
-              child: IgnorePointer(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _SparkleDot(
-                      size: 4,
-                      color: cardAccent.withValues(alpha: 0.65),
-                    ),
-                    _SparkleDot(
-                      size: 3,
-                      color: Colors.white.withValues(alpha: 0.65),
-                    ),
-                    _SparkleDot(
-                      size: 5,
-                      color: const Color(0xFFD5BEFF).withValues(alpha: 0.70),
-                    ),
-                    _SparkleDot(
-                      size: 2.8,
-                      color: Colors.white.withValues(alpha: 0.6),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 380;
-                  final contentRightInset = compact ? 132.0 : 172.0;
-
-                  return SizedBox(
-                    height: compact ? 158 : 170,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Padding(
-                            padding: EdgeInsets.only(right: contentRightInset),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        text.walletBalanceEyebrow,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: cardTextSecondary,
-                                          fontSize: compact ? 15 : 16,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Icon(
-                                      Icons.help_outline_rounded,
-                                      size: 15,
-                                      color: cardTextSecondary,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 9),
-                                FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  alignment: Alignment.centerLeft,
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: compact ? 38 : 42,
-                                        height: compact ? 38 : 42,
-                                        decoration: BoxDecoration(
-                                          color: const Color(
-                                            0xFFB7A0FF,
-                                          ).withValues(alpha: 0.35),
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: const Color(
-                                              0xFFD9C8FF,
-                                            ).withValues(alpha: 0.8),
-                                          ),
-                                        ),
-                                        child: const Center(
-                                          child: PawSparkIcon(size: 22),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Text(
-                                        NumberFormat.decimalPattern().format(
-                                          balance,
-                                        ),
-                                        style: TextStyle(
-                                          color: cardTextPrimary,
-                                          fontSize: compact ? 60 : 68,
-                                          fontWeight: FontWeight.w900,
-                                          height: 0.88,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  text.walletBalanceUnit,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: cardTextSecondary,
-                                    fontSize: compact ? 24 : 28,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const Spacer(),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: compact ? 4 : 2,
-                          top: compact ? 14 : 16,
-                          bottom: compact ? 1 : 2,
-                          child: IgnorePointer(
-                            child: Image.asset(
-                              _kWalletHeroLogoAsset,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SparkleDot extends StatelessWidget {
-  const _SparkleDot({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 4),
-        ],
+          );
+        },
       ),
     );
   }
@@ -383,21 +266,14 @@ class _PremiumUpsellCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isRu = _isRuLocale(context);
-    final gradientColors = PremiumBannerStyle.gradient(!isDark);
-    final borderColor = const Color(
-      0xFFE1AF54,
-    ).withValues(alpha: isDark ? 0.82 : 0.90);
-    final textPrimary = isDark
-        ? const Color(0xFFF7C96A)
-        : const Color(0xFF735018);
+    final colors = context.petMagicColors;
+    final textPrimary = colors.textStrong;
     final textSecondary = isDark
-        ? Colors.white.withValues(alpha: 0.90)
-        : const Color(0xFF2D3B54);
-    final chipBg = isDark
-        ? const Color(0xFF1A2F61).withValues(alpha: 0.72)
-        : const Color(0xFFF4E7CB).withValues(alpha: 0.95);
-    final chipBorder = const Color(0xFFE1AF54).withValues(alpha: 0.72);
+        ? Colors.white.withValues(alpha: 0.8)
+        : const Color(0xFF32485A);
+    const accent = Color(0xFFFFC107);
+    final chipBg = accent.withValues(alpha: isDark ? 0.14 : 0.1);
+    final chipBorder = accent.withValues(alpha: isDark ? 0.26 : 0.22);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final veryCompactScreen = screenWidth < 360;
     final compactScreen = screenWidth < 410;
@@ -406,195 +282,163 @@ class _PremiumUpsellCard extends StatelessWidget {
         : compactScreen
         ? 148.0
         : 170.0;
-    return ProfileGlassCard(
+    return PetMagicAccentCard(
+      accentColor: accent,
       padding: EdgeInsets.zero,
-      child: Container(
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: borderColor, width: 1.25),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF081538).withValues(alpha: 0.36),
-              blurRadius: 18,
-              spreadRadius: 0.7,
-              offset: const Offset(0, 8),
-            ),
-          ],
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: const [0.0, 0.55, 1.0],
-            colors: gradientColors,
-          ),
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              top: -18,
-              left: -22,
-              child: DecoratedBox(
+      borderRadius: BorderRadius.circular(22),
+      borderOpacity: isDark ? 0.28 : 0.2,
+      glowOpacity: isDark ? 0.15 : 0.1,
+      glowAlignment: const Alignment(-0.94, -0.92),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 10,
+            left: 12,
+            child: IgnorePointer(
+              child: Container(
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFFF3C464).withValues(alpha: 0.18),
+                      accent.withValues(alpha: isDark ? 0.18 : 0.12),
                       Colors.transparent,
                     ],
                   ),
                 ),
-                child: const SizedBox(width: 120, height: 120),
               ),
             ),
-            Positioned(
-              right: 62,
-              top: 24,
-              child: _SparkleDot(
-                size: 3,
-                color: const Color(0xFFF3C464).withValues(alpha: 0.6),
-              ),
-            ),
-            Positioned(
-              right: 36,
-              top: 54,
-              child: _SparkleDot(
-                size: 2.4,
-                color: Colors.white.withValues(alpha: 0.56),
-              ),
-            ),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final compact = constraints.maxWidth < 390;
-                final veryCompact = constraints.maxWidth < 360;
-                final contentRightInset = veryCompact
-                    ? mascotWidth * 0.92
-                    : compact
-                    ? mascotWidth * 0.86
-                    : mascotWidth * 0.78;
+          ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 390;
+              final veryCompact = constraints.maxWidth < 360;
+              final contentRightInset = veryCompact
+                  ? mascotWidth * 0.92
+                  : compact
+                  ? mascotWidth * 0.86
+                  : mascotWidth * 0.78;
 
-                return Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 12 : 14,
-                    11,
-                    compact ? 12 : 14,
-                    12,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(999),
-                          color: chipBg,
-                          border: Border.all(color: chipBorder),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const PremiumCrownIcon(size: 14),
-                            const SizedBox(width: 6),
-                            Text(
-                              isRu ? 'Premium-кошелек' : 'Premium wallet',
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontSize: compact ? 11.0 : 11.4,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 12 : 14,
+                  12,
+                  compact ? 12 : 14,
+                  12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
                       ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: EdgeInsets.only(right: contentRightInset),
-                        child: Text(
-                          isRu ? 'Premium выгоднее' : 'Premium is better',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textPrimary,
-                            fontSize: veryCompact
-                                ? 21
-                                : compact
-                                ? 22
-                                : 24,
-                            fontWeight: FontWeight.w900,
-                            height: 1.02,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        color: chipBg,
+                        border: Border.all(color: chipBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const PremiumCrownIcon(size: 14),
+                          const SizedBox(width: 6),
+                          Text(
+                            text.walletPremiumStatus,
+                            style: TextStyle(
+                              color: const Color(0xFFFFD666),
+                              fontSize: compact ? 11.0 : 11.4,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: EdgeInsets.only(right: contentRightInset),
+                      child: Text(
+                        text.premiumUpsellHeadline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: veryCompact
+                              ? 21
+                              : compact
+                              ? 22
+                              : 24,
+                          fontWeight: FontWeight.w900,
+                          height: 1.02,
                         ),
                       ),
-                      const SizedBox(height: 5),
-                      Padding(
-                        padding: EdgeInsets.only(right: contentRightInset),
-                        child: Text(
-                          isRu
-                              ? '40 PowSpark каждую неделю\nбез водяного знака, экспорт высокого качества'
-                              : '40 PowSpark every week\nno watermark, high-quality export',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: textSecondary,
-                            fontSize: compact ? 11.7 : 12.4,
-                            height: 1.22,
-                            fontWeight: FontWeight.w600,
+                    ),
+                    const SizedBox(height: 5),
+                    Padding(
+                      padding: EdgeInsets.only(right: contentRightInset),
+                      child: Text(
+                        text.premiumUpsellSubtitle,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: compact ? 11.7 : 12.4,
+                          height: 1.22,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Padding(
+                      padding: EdgeInsets.only(right: contentRightInset),
+                      child: Wrap(
+                        spacing: 5,
+                        runSpacing: 5,
+                        children: [
+                          _PremiumFeaturePill(
+                            icon: Icons.card_giftcard_rounded,
+                            label: text.premiumUpsellWeeklyCredits,
+                            foregroundColor: const Color(0xFFFFD666),
+                            backgroundColor: chipBg,
+                            borderColor: chipBorder,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 7),
-                      Padding(
-                        padding: EdgeInsets.only(right: contentRightInset),
-                        child: Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: [
-                            _PremiumFeaturePill(
-                              icon: Icons.card_giftcard_rounded,
-                              label: isRu
-                                  ? '40 PowSpark каждую неделю'
-                                  : '40 PowSpark every week',
-                              foregroundColor: textPrimary,
-                              backgroundColor: chipBg,
-                              borderColor: chipBorder,
+                          _PremiumFeaturePill(
+                            icon: Icons.auto_awesome_rounded,
+                            label: text.profilePremiumBenefitNoWatermark,
+                            foregroundColor: colors.textSoft,
+                            backgroundColor: colors.surfaceStrong.withValues(
+                              alpha: isDark ? 0.46 : 0.72,
                             ),
-                            _PremiumFeaturePill(
-                              icon: Icons.auto_awesome_rounded,
-                              label: isRu
-                                  ? 'Без водяного знака'
-                                  : 'No watermark',
-                              foregroundColor: textPrimary,
-                              backgroundColor: chipBg,
-                              borderColor: chipBorder,
+                            borderColor: colors.border.withValues(
+                              alpha: isDark ? 0.68 : 0.78,
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: veryCompact
-                            ? 164
-                            : compact
-                            ? 178
-                            : 196,
-                        child: PremiumShimmerButton(
-                          label: text.profilePremiumOpenAction,
-                          onTap: onOpenPremium,
-                          height: compact ? 40 : 42,
-                          borderRadius: 11,
-                        ),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: veryCompact ? 164 : compact ? 178 : 196,
+                      child: PremiumShimmerButton(
+                        label: text.profilePremiumOpenAction,
+                        onTap: onOpenPremium,
+                        height: compact ? 40 : 42,
+                        borderRadius: 11,
                       ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            Positioned(
-              right: veryCompactScreen ? -24 : -26,
-              bottom: veryCompactScreen ? -12 : -10,
-              child: IgnorePointer(
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          Positioned(
+            right: veryCompactScreen ? -24 : -26,
+            bottom: veryCompactScreen ? -12 : -10,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: isDark ? 0.92 : 0.82,
                 child: Image.asset(
                   _kWalletPremiumUpsellMascotAsset,
                   width: mascotWidth,
@@ -603,8 +447,8 @@ class _PremiumUpsellCard extends StatelessWidget {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -653,109 +497,6 @@ class _PremiumFeaturePill extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _GoldShimmerButton extends StatefulWidget {
-  const _GoldShimmerButton({
-    required this.label,
-    required this.onPressed,
-    required this.backgroundColor,
-    required this.foregroundColor,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-  final Color backgroundColor;
-  final Color foregroundColor;
-
-  @override
-  State<_GoldShimmerButton> createState() => _GoldShimmerButtonState();
-}
-
-class _GoldShimmerButtonState extends State<_GoldShimmerButton>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2200),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        final t = _controller.value;
-        final shimmerStart = -1.6 + (t * 2.8);
-
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            children: [
-              FilledButton(
-                onPressed: widget.onPressed,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 46),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  backgroundColor: widget.backgroundColor,
-                  foregroundColor: widget.foregroundColor,
-                  textStyle: const TextStyle(
-                    fontSize: 13.8,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.label),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.arrow_forward_rounded, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment(shimmerStart, -1),
-                          end: Alignment(shimmerStart + 0.9, 1),
-                          colors: [
-                            Colors.transparent,
-                            const Color(0xFFFFF3C9).withValues(alpha: 0.0),
-                            const Color(0xFFFFF3C9).withValues(alpha: 0.42),
-                            const Color(0xFFFFF3C9).withValues(alpha: 0.0),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.30, 0.5, 0.70, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,17 @@ import 'package:petmagic_mobile/shared/notifications/petmagic_notification_cente
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
+  test('wallet pack approximation copy uses localizations', () {
+    final source = File(
+      'lib/features/wallet/presentation/widgets/wallet_page_activity_widgets.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('walletApproxPhotosOnly'));
+    expect(source, contains('walletApproxPhotosOrVideos'));
+    expect(source, isNot(contains(' или ')));
+    expect(source, isNot(contains("'≈ ")));
+  });
+
   testWidgets(
     'wallet page stays stable on narrow screens and shows featured pricing',
     (tester) async {
@@ -112,7 +124,7 @@ void main() {
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
     expect(find.text(text.authSignInRequired), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
-    expect(find.text(text.walletUnavailableTitle), findsNothing);
+    expect(find.text(text.appUnavailableServerTitle), findsNothing);
   });
 
   testWidgets('authenticated wallet unavailable state still shows retry card', (
@@ -133,9 +145,32 @@ void main() {
     final text = AppLocalizations.of(walletContext);
 
     expect(find.byType(ProtectedAuthGate), findsNothing);
-    expect(find.text(text.walletUnavailableTitle), findsOneWidget);
-    expect(find.text(text.walletTryAgainAction), findsOneWidget);
+    expect(find.text(text.appUnavailableServerTitle), findsOneWidget);
+    expect(find.text(text.retryAction), findsOneWidget);
   });
+
+  testWidgets(
+    'wallet page shows legal acceptance action for legal gate errors',
+    (tester) async {
+      await _pumpWalletPage(
+        tester,
+        repository: _FakeWalletRepository(
+          wallet: _walletState,
+          ledger: _ledgerItems,
+          packs: _packs,
+          purchases: _purchases,
+          walletError: AppException('auth.legal_acceptance_required'),
+        ),
+      );
+
+      final walletContext = tester.element(find.byType(WalletPage));
+      final text = AppLocalizations.of(walletContext);
+
+      expect(find.text(text.appUnavailableServerTitle), findsNothing);
+      expect(find.text(text.profileLegalAcceptanceRequired), findsOneWidget);
+      expect(find.text(text.profileLegalAcceptAction), findsOneWidget);
+    },
+  );
 
   testWidgets('all transactions renders ledger rows lazily', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 760));
@@ -367,6 +402,29 @@ void main() {
     expect(find.text(text.authSignInRequired), findsOneWidget);
     expect(find.text(text.authRequiredMessage), findsOneWidget);
   });
+
+  testWidgets(
+    'rewards page shows legal acceptance action for legal gate errors',
+    (tester) async {
+      await _pumpRewardsPage(
+        tester,
+        repository: _FakeWalletRepository(
+          wallet: _walletState,
+          ledger: _ledgerItems,
+          packs: _packs,
+          purchases: _purchases,
+          walletError: AppException('auth.legal_acceptance_required'),
+        ),
+      );
+
+      final rewardsContext = tester.element(find.byType(RewardsPage));
+      final text = AppLocalizations.of(rewardsContext);
+
+      expect(find.text(text.appUnavailableServerTitle), findsNothing);
+      expect(find.text(text.profileLegalAcceptanceRequired), findsOneWidget);
+      expect(find.text(text.profileLegalAcceptAction), findsOneWidget);
+    },
+  );
 
   testWidgets('wallet navigation hides while keyboard is open', (tester) async {
     await tester.pumpWidget(
@@ -611,6 +669,31 @@ void main() {
 
     expect(find.text(text.rewardsReferralTitle), findsWidgets);
     expect(find.byKey(const Key('rewards_referral_show_input')), findsWidgets);
+  });
+
+  testWidgets('rewards page keeps gamification content out of bonuses flow', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await _pumpRewardsPage(
+      tester,
+      repository: _FakeWalletRepository(
+        wallet: _walletState,
+        ledger: _ledgerItems,
+        packs: _packs,
+        purchases: _purchases,
+      ),
+    );
+
+    final rewardsContext = tester.element(find.byType(RewardsPage));
+    final text = AppLocalizations.of(rewardsContext);
+
+    expect(find.text(text.gamificationStreakTitle), findsNothing);
+    expect(find.text(text.gamificationChallengeTitle), findsNothing);
+    expect(find.text(text.rewardsPromoTitle), findsOneWidget);
+    expect(find.text(text.rewardsReferralTitle), findsWidgets);
   });
 
   testWidgets('rewards page hides payment unavailable purchase hint', (
@@ -902,6 +985,7 @@ class _FakeWalletRepository extends WalletRepository {
     required this.packs,
     required this.purchases,
     this.failWallet = false,
+    this.walletError,
     this.failLedger = false,
     this.failPurchases = false,
     this.redeemError,
@@ -913,6 +997,7 @@ class _FakeWalletRepository extends WalletRepository {
   final List<CurrencyPackModel> packs;
   final List<PurchaseHistoryItem> purchases;
   final bool failWallet;
+  final AppException? walletError;
   final bool failLedger;
   final bool failPurchases;
   final AppException? redeemError;
@@ -920,6 +1005,11 @@ class _FakeWalletRepository extends WalletRepository {
 
   @override
   Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    final configuredWalletError = walletError;
+    if (configuredWalletError != null) {
+      throw configuredWalletError;
+    }
+
     if (failWallet) {
       throw Exception('wallet failed');
     }

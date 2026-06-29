@@ -132,6 +132,66 @@ abstract class AppLocalizations {
   /// **'Profile'**
   String get navProfile;
 
+  /// No description provided for @notificationOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get notificationOpenAction;
+
+  /// No description provided for @notificationDefaultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic update'**
+  String get notificationDefaultTitle;
+
+  /// No description provided for @notificationSupportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic Support replied'**
+  String get notificationSupportTitle;
+
+  /// No description provided for @notificationGenerationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic generation update'**
+  String get notificationGenerationTitle;
+
+  /// No description provided for @notificationWalletTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic wallet update'**
+  String get notificationWalletTitle;
+
+  /// No description provided for @notificationPremiumTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic premium update'**
+  String get notificationPremiumTitle;
+
+  /// No description provided for @notificationSupportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open support chat to see the latest response.'**
+  String get notificationSupportBody;
+
+  /// No description provided for @notificationGenerationBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your generation status has changed.'**
+  String get notificationGenerationBody;
+
+  /// No description provided for @notificationWalletBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your wallet to review the latest balance update.'**
+  String get notificationWalletBody;
+
+  /// No description provided for @notificationPremiumBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open your profile to review the latest Premium update.'**
+  String get notificationPremiumBody;
+
   /// No description provided for @comingSoonMessage.
   ///
   /// In en, this message translates to:
@@ -305,6 +365,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Today\'s pick'**
   String get templateOfTheDayFeedBadge;
+
+  /// No description provided for @templateOfTheDayLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load Template of the Day.'**
+  String get templateOfTheDayLoadFailed;
 
   /// No description provided for @allFilter.
   ///
@@ -1050,6 +1116,36 @@ abstract class AppLocalizations {
   /// **'Choose from My Pets'**
   String get petsChooseFromMyPetsAction;
 
+  /// No description provided for @petsActionSheetUploadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a photo or video'**
+  String get petsActionSheetUploadSubtitle;
+
+  /// No description provided for @petsActionSheetMyPetsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a pet from your profile'**
+  String get petsActionSheetMyPetsSubtitle;
+
+  /// No description provided for @petsActionSheetSourceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Content source'**
+  String get petsActionSheetSourceTitle;
+
+  /// No description provided for @petsActionSheetUploadSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a photo or video'**
+  String get petsActionSheetUploadSemantic;
+
+  /// No description provided for @petsActionSheetMyPetsSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a pet from your profile'**
+  String get petsActionSheetMyPetsSemantic;
+
   /// No description provided for @petsGenerationCostMessage.
   ///
   /// In en, this message translates to:
@@ -1482,6 +1578,24 @@ abstract class AppLocalizations {
   /// **'Premium wallet'**
   String get walletPremiumStatus;
 
+  /// No description provided for @premiumUpsellHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium is better'**
+  String get premiumUpsellHeadline;
+
+  /// No description provided for @premiumUpsellSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'40 PawSpark every week\nNo watermark, high-quality export'**
+  String get premiumUpsellSubtitle;
+
+  /// No description provided for @premiumUpsellWeeklyCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'40 PawSpark every week'**
+  String get premiumUpsellWeeklyCredits;
+
   /// No description provided for @walletFreeStatus.
   ///
   /// In en, this message translates to:
@@ -1606,13 +1720,25 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} photos'**
-  String walletApproxPhotos(int count);
+  String walletApproxPhotos(Object count);
 
   /// No description provided for @walletApproxVideos.
   ///
   /// In en, this message translates to:
   /// **'{count} videos'**
-  String walletApproxVideos(int count);
+  String walletApproxVideos(Object count);
+
+  /// No description provided for @walletApproxPhotosOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {photos}'**
+  String walletApproxPhotosOnly(Object photos);
+
+  /// No description provided for @walletApproxPhotosOrVideos.
+  ///
+  /// In en, this message translates to:
+  /// **'≈ {photos} or {videos}'**
+  String walletApproxPhotosOrVideos(Object photos, Object videos);
 
   /// No description provided for @walletSpendPhotoSubtitle.
   ///
@@ -1672,13 +1798,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} min ago'**
-  String rewardsLastUpdatedMinutes(int count);
+  String rewardsLastUpdatedMinutes(Object count);
 
   /// No description provided for @rewardsLastUpdatedHours.
   ///
   /// In en, this message translates to:
   /// **'{count} h ago'**
-  String rewardsLastUpdatedHours(int count);
+  String rewardsLastUpdatedHours(Object count);
 
   /// No description provided for @rewardsPromoTitle.
   ///
@@ -1852,7 +1978,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'+{count} PawSpark per invited friend'**
-  String rewardsReferralBonusPerFriend(int count);
+  String rewardsReferralBonusPerFriend(Object count);
 
   /// No description provided for @rewardsReferralRulesNote.
   ///
@@ -1870,7 +1996,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Join me in PetMagic! Use my referral code {code}. Bonus is credited after your first successful paid purchase. After your first purchase I\'ll receive +{bonus} PawSpark.'**
-  String rewardsReferralShareMessage(Object code, int bonus);
+  String rewardsReferralShareMessage(Object bonus, Object code);
 
   /// No description provided for @rewardsHistoryTitle.
   ///
@@ -2122,7 +2248,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Payment confirmed. +{spark} PawSpark is already in your wallet.'**
-  String walletCheckoutSucceeded(int spark);
+  String walletCheckoutSucceeded(Object spark);
 
   /// No description provided for @walletPackBreakdown.
   ///
@@ -2578,7 +2704,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{videos} videos or {photos} photos per month, depending on template complexity.'**
-  String premiumTokenEstimate(Object videos, Object photos);
+  String premiumTokenEstimate(Object photos, Object videos);
 
   /// No description provided for @premiumSocialProof.
   ///
@@ -2830,7 +2956,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Continue with {plan} — {price} {period}'**
-  String premiumContinueWithPlan(Object plan, Object price, Object period);
+  String premiumContinueWithPlan(Object period, Object plan, Object price);
 
   /// No description provided for @premiumManageAction.
   ///
@@ -4224,6 +4350,78 @@ abstract class AppLocalizations {
   /// **'Files permission is required to attach files.'**
   String get supportChatFilesPermissionError;
 
+  /// No description provided for @permissionsAccessNeededTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Access needed'**
+  String get permissionsAccessNeededTitle;
+
+  /// No description provided for @permissionsOpenSettingsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get permissionsOpenSettingsAction;
+
+  /// No description provided for @permissionsGalleryAccessDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow access to your gallery to choose a photo.'**
+  String get permissionsGalleryAccessDeniedMessage;
+
+  /// No description provided for @permissionsGalleryAccessBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery access is off. Open device settings to allow it.'**
+  String get permissionsGalleryAccessBlockedMessage;
+
+  /// No description provided for @permissionsMediaAccessDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow access to your photos and videos to add attachments.'**
+  String get permissionsMediaAccessDeniedMessage;
+
+  /// No description provided for @permissionsMediaAccessBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Photos and videos access is off. Open device settings to allow it.'**
+  String get permissionsMediaAccessBlockedMessage;
+
+  /// No description provided for @permissionsCameraAccessDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow camera access to take a photo.'**
+  String get permissionsCameraAccessDeniedMessage;
+
+  /// No description provided for @permissionsCameraAccessBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is off. Open device settings to allow it.'**
+  String get permissionsCameraAccessBlockedMessage;
+
+  /// No description provided for @permissionsCameraVideoAccessDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow camera access to record a video.'**
+  String get permissionsCameraVideoAccessDeniedMessage;
+
+  /// No description provided for @permissionsCameraVideoAccessBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is off. Open device settings to allow video recording.'**
+  String get permissionsCameraVideoAccessBlockedMessage;
+
+  /// No description provided for @permissionsMicrophoneAccessDeniedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow microphone access to record a video with sound.'**
+  String get permissionsMicrophoneAccessDeniedMessage;
+
+  /// No description provided for @permissionsMicrophoneAccessBlockedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is off. Open device settings to allow video recording with sound.'**
+  String get permissionsMicrophoneAccessBlockedMessage;
+
   /// No description provided for @supportChatAttachmentExpiredPlaceholder.
   ///
   /// In en, this message translates to:
@@ -4674,6 +4872,12 @@ abstract class AppLocalizations {
   /// **'Retry'**
   String get retryAction;
 
+  /// No description provided for @closeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeAction;
+
   /// No description provided for @emptyTemplatesTitle.
   ///
   /// In en, this message translates to:
@@ -4968,12 +5172,6 @@ abstract class AppLocalizations {
   /// **'Forgot password?'**
   String get authForgotPasswordAction;
 
-  /// No description provided for @authForgotPasswordComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Password recovery is coming soon.'**
-  String get authForgotPasswordComingSoon;
-
   /// No description provided for @authPasswordResetTitle.
   ///
   /// In en, this message translates to:
@@ -5051,6 +5249,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'I agree to the Terms of Use and Privacy Policy'**
   String get authAcceptTermsLabel;
+
+  /// No description provided for @authTermsLinkText.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms of Use'**
+  String get authTermsLinkText;
+
+  /// No description provided for @authPrivacyLinkText.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get authPrivacyLinkText;
 
   /// No description provided for @authReceiveUpdatesLabel.
   ///
@@ -5135,12 +5345,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign Up'**
   String get authSignUpAction;
-
-  /// No description provided for @authSocialComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Social sign-in is coming soon.'**
-  String get authSocialComingSoon;
 
   /// No description provided for @authPasswordMismatch.
   ///
@@ -5316,24 +5520,6 @@ abstract class AppLocalizations {
   /// **'Guest preview'**
   String get templateGuestPreview;
 
-  /// No description provided for @templateActionComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Template studio is coming soon.'**
-  String get templateActionComingSoon;
-
-  /// No description provided for @tokensActionComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'PawSpark wallet is coming soon.'**
-  String get tokensActionComingSoon;
-
-  /// No description provided for @rewardsActionComingSoon.
-  ///
-  /// In en, this message translates to:
-  /// **'Rewards center is coming soon.'**
-  String get rewardsActionComingSoon;
-
   /// No description provided for @templateFlowPhotoSourceGallery.
   ///
   /// In en, this message translates to:
@@ -5345,6 +5531,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Camera'**
   String get templateFlowPhotoSourceCamera;
+
+  /// No description provided for @petsActionSheetGallerySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo or video from your gallery'**
+  String get petsActionSheetGallerySubtitle;
+
+  /// No description provided for @petsActionSheetCameraSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo or video right now'**
+  String get petsActionSheetCameraSubtitle;
+
+  /// No description provided for @petsActionSheetGallerySemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a photo or video from your gallery'**
+  String get petsActionSheetGallerySemantic;
+
+  /// No description provided for @petsActionSheetCameraSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a photo or video with your camera'**
+  String get petsActionSheetCameraSemantic;
 
   /// No description provided for @templateFlowReadyTitle.
   ///
@@ -5429,9 +5639,15 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This template costs {tokenCost} PawSpark. Your balance: {balance} PawSpark.'**
   String templateFlowInsufficientBalanceMessage(
-    Object tokenCost,
     Object balance,
+    Object tokenCost,
   );
+
+  /// No description provided for @templateFlowInsufficientBalanceUpsellMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy PawSpark once or get Premium with 40 PawSpark every week.'**
+  String get templateFlowInsufficientBalanceUpsellMessage;
 
   /// No description provided for @templateFlowChooseAnotherTemplateAction.
   ///
@@ -5552,6 +5768,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading video...'**
   String get templateFlowLoadingVideo;
+
+  /// No description provided for @generationResultInputTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use result'**
+  String get generationResultInputTitle;
+
+  /// No description provided for @generationResultInputParentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed result'**
+  String get generationResultInputParentTitle;
+
+  /// No description provided for @generationResultInputParentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This result will be used as the base'**
+  String get generationResultInputParentHint;
+
+  /// No description provided for @generationResultInputMediaUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Media unavailable'**
+  String get generationResultInputMediaUnavailable;
+
+  /// No description provided for @generationResultInputRecommendedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended'**
+  String get generationResultInputRecommendedBadge;
+
+  /// No description provided for @generationResultInputEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No compatible templates.'**
+  String get generationResultInputEmpty;
+
+  /// No description provided for @generationResultInputError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not use this result. Please try again.'**
+  String get generationResultInputError;
+
+  /// No description provided for @generationResultInputNoCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough PawSpark for the new generation.'**
+  String get generationResultInputNoCredits;
+
+  /// No description provided for @generationResultInputStartAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get generationResultInputStartAction;
+
+  /// No description provided for @generationResultInputCostEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation will cost {credits} PawSpark.'**
+  String generationResultInputCostEstimate(Object credits);
+
+  /// No description provided for @petGenerationLaunchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Magic generation launch'**
+  String get petGenerationLaunchTitle;
+
+  /// No description provided for @petGenerationLaunchTitleWithName.
+  ///
+  /// In en, this message translates to:
+  /// **'Magic launch for {name}'**
+  String petGenerationLaunchTitleWithName(Object name);
+
+  /// No description provided for @petGenerationLaunchSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the template, PawSpark cost, and exact pet photo before creating.'**
+  String get petGenerationLaunchSubtitle;
+
+  /// No description provided for @petGenerationLaunchPhotoSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Photo for generation'**
+  String get petGenerationLaunchPhotoSectionTitle;
+
+  /// No description provided for @petGenerationLaunchSelectedPhotoLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'This photo will be sent to generation'**
+  String get petGenerationLaunchSelectedPhotoLabel;
+
+  /// No description provided for @petGenerationLaunchUploadPhotoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload new'**
+  String get petGenerationLaunchUploadPhotoAction;
+
+  /// No description provided for @petGenerationLaunchChoosePhotoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a pet photo'**
+  String get petGenerationLaunchChoosePhotoTitle;
+
+  /// No description provided for @petGenerationLaunchLoadingPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading photos...'**
+  String get petGenerationLaunchLoadingPhotos;
+
+  /// No description provided for @petGenerationLaunchPhotoLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load pet photos. Please try again.'**
+  String get petGenerationLaunchPhotoLoadError;
+
+  /// No description provided for @petGenerationLaunchSelectedPhotoMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an available pet photo before starting. No PawSpark was charged.'**
+  String get petGenerationLaunchSelectedPhotoMissing;
+
+  /// No description provided for @petGenerationLaunchPhotoTypeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a JPG, PNG, or WebP photo. No PawSpark was charged.'**
+  String get petGenerationLaunchPhotoTypeError;
+
+  /// No description provided for @petGenerationLaunchUploadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upload the photo. No PawSpark was charged.'**
+  String get petGenerationLaunchUploadError;
+
+  /// No description provided for @petGenerationLaunchStartError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start generation. No PawSpark was charged. Please try again.'**
+  String get petGenerationLaunchStartError;
+
+  /// No description provided for @galleryPremiumUpsellTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark-free export'**
+  String get galleryPremiumUpsellTitle;
+
+  /// No description provided for @galleryPremiumUpsellSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium removes the PetMagic logo'**
+  String get galleryPremiumUpsellSubtitle;
+
+  /// No description provided for @templateFlowCompletedPremiumHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Want to create more?'**
+  String get templateFlowCompletedPremiumHeadline;
+
+  /// No description provided for @templateFlowCompletedPremiumMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium gives you 40 PawSpark every week, premium templates, and watermark-free export.'**
+  String get templateFlowCompletedPremiumMessage;
+
+  /// No description provided for @templateDetailHeroImageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create an image with your pet'**
+  String get templateDetailHeroImageTitle;
+
+  /// No description provided for @templateDetailHeroVideoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a video with your pet'**
+  String get templateDetailHeroVideoTitle;
+
+  /// No description provided for @templateDetailFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic template'**
+  String get templateDetailFallbackTitle;
+
+  /// No description provided for @templateDetailFallbackDescriptionImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a clear pet photo and PetMagic will create a polished image result.'**
+  String get templateDetailFallbackDescriptionImage;
+
+  /// No description provided for @templateDetailFallbackDescriptionVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a clear pet photo and PetMagic will turn it into a ready-to-share video.'**
+  String get templateDetailFallbackDescriptionVideo;
+
+  /// No description provided for @templateDetailCategoryTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Template'**
+  String get templateDetailCategoryTemplate;
+
+  /// No description provided for @templateDetailCategoryPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get templateDetailCategoryPortrait;
+
+  /// No description provided for @templateDetailCategoryVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get templateDetailCategoryVideo;
+
+  /// No description provided for @templateDetailRequirementOnePet.
+  ///
+  /// In en, this message translates to:
+  /// **'One pet in the photo'**
+  String get templateDetailRequirementOnePet;
+
+  /// No description provided for @templateDetailRequirementClearFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear face'**
+  String get templateDetailRequirementClearFace;
+
+  /// No description provided for @templateDetailRequirementGoodLighting.
+  ///
+  /// In en, this message translates to:
+  /// **'Good lighting'**
+  String get templateDetailRequirementGoodLighting;
+
+  /// No description provided for @templateDetailRequirementFullBodyVisible.
+  ///
+  /// In en, this message translates to:
+  /// **'Full body visible'**
+  String get templateDetailRequirementFullBodyVisible;
+
+  /// No description provided for @templateDetailRequirementFacingCamera.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet facing camera'**
+  String get templateDetailRequirementFacingCamera;
+
+  /// No description provided for @templateDetailRequirementNoCroppedHeadOrLegs.
+  ///
+  /// In en, this message translates to:
+  /// **'No cropped head or legs'**
+  String get templateDetailRequirementNoCroppedHeadOrLegs;
+
+  /// No description provided for @templateDetailQualityWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a bright, sharp photo for the best result.'**
+  String get templateDetailQualityWarning;
+
+  /// No description provided for @templateDetailUploadPhotoForVideoAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload photo for video'**
+  String get templateDetailUploadPhotoForVideoAction;
+
+  /// No description provided for @templateDetailPreviewMissingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview is unavailable'**
+  String get templateDetailPreviewMissingTitle;
+
+  /// No description provided for @templateDetailPreviewMissingSubtitleImage.
+  ///
+  /// In en, this message translates to:
+  /// **'You can still upload a pet photo and create this image.'**
+  String get templateDetailPreviewMissingSubtitleImage;
+
+  /// No description provided for @templateDetailPreviewMissingSubtitleVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'You can still upload a pet photo and create this video.'**
+  String get templateDetailPreviewMissingSubtitleVideo;
+
+  /// No description provided for @templateDetailTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get templateDetailTimeLabel;
+
+  /// No description provided for @templateDetailFormatLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get templateDetailFormatLabel;
+
+  /// No description provided for @templateDetailVideoEta.
+  ///
+  /// In en, this message translates to:
+  /// **'2-4 min'**
+  String get templateDetailVideoEta;
+
+  /// No description provided for @templateDetailImageEta.
+  ///
+  /// In en, this message translates to:
+  /// **'1-2 min'**
+  String get templateDetailImageEta;
+
+  /// No description provided for @templateDetailScrollHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scroll for details'**
+  String get templateDetailScrollHint;
 
   /// No description provided for @templateFlowBestPhotoTitle.
   ///
@@ -6055,7 +6577,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Show more ({hiddenCount}) ▾'**
-  String generationStatusShowMoreAction(int hiddenCount);
+  String generationStatusShowMoreAction(Object hiddenCount);
 
   /// No description provided for @generationStatusCollapseAction.
   ///
@@ -6073,7 +6595,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'{count} new'**
-  String generationStatusUnreadCount(int count);
+  String generationStatusUnreadCount(Object count);
 
   /// No description provided for @generationStatusEmptyTitle.
   ///
@@ -6483,6 +7005,66 @@ abstract class AppLocalizations {
   /// **'Total'**
   String get premiumCheckoutTotalLabel;
 
+  /// No description provided for @premiumPaywallFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What stopped you from subscribing?'**
+  String get premiumPaywallFeedbackTitle;
+
+  /// No description provided for @premiumPaywallFeedbackCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get premiumPaywallFeedbackCommentLabel;
+
+  /// No description provided for @premiumPaywallFeedbackCommentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what would make Premium better for you'**
+  String get premiumPaywallFeedbackCommentHint;
+
+  /// No description provided for @premiumPaywallFeedbackSubmitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get premiumPaywallFeedbackSubmitAction;
+
+  /// No description provided for @premiumPaywallFeedbackThanksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks! Your feedback helps improve Premium.'**
+  String get premiumPaywallFeedbackThanksMessage;
+
+  /// No description provided for @premiumPaywallFeedbackOptionExpensive.
+  ///
+  /// In en, this message translates to:
+  /// **'Too expensive'**
+  String get premiumPaywallFeedbackOptionExpensive;
+
+  /// No description provided for @premiumPaywallFeedbackOptionLowValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough value'**
+  String get premiumPaywallFeedbackOptionLowValue;
+
+  /// No description provided for @premiumPaywallFeedbackOptionPaymentProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment problem'**
+  String get premiumPaywallFeedbackOptionPaymentProblem;
+
+  /// No description provided for @premiumPaywallFeedbackOptionJustBrowsing.
+  ///
+  /// In en, this message translates to:
+  /// **'Just browsing'**
+  String get premiumPaywallFeedbackOptionJustBrowsing;
+
+  /// No description provided for @premiumPaywallFeedbackOptionOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get premiumPaywallFeedbackOptionOther;
+
   /// No description provided for @premiumBenefitAiGenerationsTitle.
   ///
   /// In en, this message translates to:
@@ -6559,7 +7141,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Premium will stay active until {date}. New charges will be disabled.'**
-  String subscriptionCancelConfirmBody(String date);
+  String subscriptionCancelConfirmBody(Object date);
 
   /// No description provided for @subscriptionCancelConfirmAction.
   ///
@@ -6667,13 +7249,13 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Use {cost} credit for this result, or upgrade to Premium for clean downloads.'**
-  String generationStatusRemoveWatermarkSheetBody(int cost);
+  String generationStatusRemoveWatermarkSheetBody(Object cost);
 
   /// No description provided for @generationStatusRemoveWatermarkUseCredit.
   ///
   /// In en, this message translates to:
   /// **'Use {cost} credit'**
-  String generationStatusRemoveWatermarkUseCredit(int cost);
+  String generationStatusRemoveWatermarkUseCredit(Object cost);
 
   /// No description provided for @generationStatusRemoveWatermarkFailed.
   ///
@@ -6711,6 +7293,30 @@ abstract class AppLocalizations {
   /// **'You\'re back online.'**
   String get globalOnlineRestoredBannerMessage;
 
+  /// No description provided for @appUnavailableOfflineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re offline'**
+  String get appUnavailableOfflineTitle;
+
+  /// No description provided for @appUnavailableOfflineMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your connection and try again. We\'ll retry automatically when you\'re back online.'**
+  String get appUnavailableOfflineMessage;
+
+  /// No description provided for @appUnavailableServerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Server is unavailable'**
+  String get appUnavailableServerTitle;
+
+  /// No description provided for @appUnavailableServerMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'PetMagic could not reach the backend right now. Please try again in a moment.'**
+  String get appUnavailableServerMessage;
+
   /// No description provided for @generationStatusCompareAction.
   ///
   /// In en, this message translates to:
@@ -6746,6 +7352,878 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not open comparison.'**
   String get generationStatusCompareOpenFailed;
+
+  /// No description provided for @gamificationLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level {level}'**
+  String gamificationLevel(Object level);
+
+  /// No description provided for @gamificationXpProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} / {total} XP'**
+  String gamificationXpProgress(Object current, Object required, Object total);
+
+  /// No description provided for @gamificationEvolutionEgg.
+  ///
+  /// In en, this message translates to:
+  /// **'Egg'**
+  String get gamificationEvolutionEgg;
+
+  /// No description provided for @gamificationEvolutionBaby.
+  ///
+  /// In en, this message translates to:
+  /// **'Baby'**
+  String get gamificationEvolutionBaby;
+
+  /// No description provided for @gamificationEvolutionTeen.
+  ///
+  /// In en, this message translates to:
+  /// **'Teen'**
+  String get gamificationEvolutionTeen;
+
+  /// No description provided for @gamificationEvolutionAdult.
+  ///
+  /// In en, this message translates to:
+  /// **'Adult'**
+  String get gamificationEvolutionAdult;
+
+  /// No description provided for @gamificationEvolutionLegendary.
+  ///
+  /// In en, this message translates to:
+  /// **'Legendary'**
+  String get gamificationEvolutionLegendary;
+
+  /// No description provided for @gamificationLevelUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Level Up!'**
+  String get gamificationLevelUp;
+
+  /// No description provided for @gamificationStreakTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Streak'**
+  String get gamificationStreakTitle;
+
+  /// No description provided for @gamificationStreakDays.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days'**
+  String gamificationStreakDays(Object count);
+
+  /// No description provided for @gamificationStreakAtRisk.
+  ///
+  /// In en, this message translates to:
+  /// **'Your streak is at risk!'**
+  String get gamificationStreakAtRisk;
+
+  /// No description provided for @gamificationStreakFreeze.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Freeze'**
+  String get gamificationStreakFreeze;
+
+  /// No description provided for @gamificationStreakFreezeUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak saved!'**
+  String get gamificationStreakFreezeUsed;
+
+  /// No description provided for @gamificationStreakFreezeRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} freezes remaining'**
+  String gamificationStreakFreezeRemaining(Object count);
+
+  /// No description provided for @gamificationAchievementsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Achievements'**
+  String get gamificationAchievementsTitle;
+
+  /// No description provided for @gamificationAchievementUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Achievement Unlocked!'**
+  String get gamificationAchievementUnlocked;
+
+  /// No description provided for @gamificationAchievementSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'???'**
+  String get gamificationAchievementSecret;
+
+  /// No description provided for @gamificationAchievementProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} / {target}'**
+  String gamificationAchievementProgress(Object current, Object target);
+
+  /// No description provided for @gamificationChallengeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Challenges'**
+  String get gamificationChallengeTitle;
+
+  /// No description provided for @gamificationChallengeComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete!'**
+  String get gamificationChallengeComplete;
+
+  /// No description provided for @gamificationChallengeClaim.
+  ///
+  /// In en, this message translates to:
+  /// **'Claim Reward'**
+  String get gamificationChallengeClaim;
+
+  /// No description provided for @gamificationChallengeGenerateImages.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Images'**
+  String get gamificationChallengeGenerateImages;
+
+  /// No description provided for @gamificationChallengeGenerateImagesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate images using any template'**
+  String get gamificationChallengeGenerateImagesDesc;
+
+  /// No description provided for @gamificationChallengeTryTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Different Templates'**
+  String get gamificationChallengeTryTemplates;
+
+  /// No description provided for @gamificationChallengeTryTemplatesDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use different templates this week'**
+  String get gamificationChallengeTryTemplatesDesc;
+
+  /// No description provided for @gamificationChallengeShareCreations.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Creations'**
+  String get gamificationChallengeShareCreations;
+
+  /// No description provided for @gamificationChallengeShareCreationsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Share your creations with friends'**
+  String get gamificationChallengeShareCreationsDesc;
+
+  /// No description provided for @gamificationStatsGenerations.
+  ///
+  /// In en, this message translates to:
+  /// **'Generations'**
+  String get gamificationStatsGenerations;
+
+  /// No description provided for @gamificationStatsDaysActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Days Active'**
+  String get gamificationStatsDaysActive;
+
+  /// No description provided for @gamificationStatsFavoriteTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite Template'**
+  String get gamificationStatsFavoriteTemplate;
+
+  /// No description provided for @gamificationMilestone3.
+  ///
+  /// In en, this message translates to:
+  /// **'3-day streak bonus: +{spark} Spark!'**
+  String gamificationMilestone3(Object spark);
+
+  /// No description provided for @gamificationMilestone7.
+  ///
+  /// In en, this message translates to:
+  /// **'7-day streak bonus: +{spark} Spark!'**
+  String gamificationMilestone7(Object spark);
+
+  /// No description provided for @gamificationMilestone14.
+  ///
+  /// In en, this message translates to:
+  /// **'14-day streak bonus: +{spark} Spark!'**
+  String gamificationMilestone14(Object spark);
+
+  /// No description provided for @gamificationMilestone30.
+  ///
+  /// In en, this message translates to:
+  /// **'30-day streak bonus: +{spark} Spark!'**
+  String gamificationMilestone30(Object spark);
+
+  /// No description provided for @gamificationPetStats.
+  ///
+  /// In en, this message translates to:
+  /// **'Pet Stats'**
+  String get gamificationPetStats;
+
+  /// No description provided for @gamificationTopPet.
+  ///
+  /// In en, this message translates to:
+  /// **'Top Pet'**
+  String get gamificationTopPet;
+
+  /// No description provided for @gamificationYourProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Progress'**
+  String get gamificationYourProgress;
+
+  /// No description provided for @gamificationBest.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get gamificationBest;
+
+  /// No description provided for @gamificationFreezeAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} freeze available'**
+  String gamificationFreezeAvailable(Object count);
+
+  /// No description provided for @gamificationFreezesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} freezes available'**
+  String gamificationFreezesAvailable(Object count);
+
+  /// No description provided for @gamificationKeepGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep generating to unlock more!'**
+  String get gamificationKeepGenerating;
+
+  /// No description provided for @gamificationUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'{unlocked} / {total} Unlocked'**
+  String gamificationUnlocked(Object total, Object unlocked);
+
+  /// No description provided for @gamificationLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load achievements'**
+  String get gamificationLoadFailed;
+
+  /// No description provided for @gamificationDayStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'day streak'**
+  String get gamificationDayStreak;
+
+  /// No description provided for @gamificationHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track your streak, challenges and milestones in one place.'**
+  String get gamificationHubSubtitle;
+
+  /// No description provided for @gamificationHubEntrySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Streak, weekly goals and achievement milestones.'**
+  String get gamificationHubEntrySubtitle;
+
+  /// No description provided for @gamificationWeekFocusTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This week'**
+  String get gamificationWeekFocusTitle;
+
+  /// No description provided for @gamificationWeekFocusSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep momentum, finish challenges and protect your streak.'**
+  String get gamificationWeekFocusSubtitle;
+
+  /// No description provided for @gamificationNextMilestoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Next milestone'**
+  String get gamificationNextMilestoneTitle;
+
+  /// No description provided for @gamificationFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get gamificationFilterAll;
+
+  /// No description provided for @gamificationFilterUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get gamificationFilterUnlocked;
+
+  /// No description provided for @gamificationFilterInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get gamificationFilterInProgress;
+
+  /// No description provided for @gamificationFilterSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret'**
+  String get gamificationFilterSecret;
+
+  /// No description provided for @gamificationNoAchievementsInFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches this filter yet.'**
+  String get gamificationNoAchievementsInFilter;
+
+  /// No description provided for @gamificationStatusUnlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlocked'**
+  String get gamificationStatusUnlocked;
+
+  /// No description provided for @gamificationStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get gamificationStatusInProgress;
+
+  /// No description provided for @achievementFirstMagic.
+  ///
+  /// In en, this message translates to:
+  /// **'First Magic'**
+  String get achievementFirstMagic;
+
+  /// No description provided for @achievementFirstMagicDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first AI generation'**
+  String get achievementFirstMagicDesc;
+
+  /// No description provided for @achievementApprentice10.
+  ///
+  /// In en, this message translates to:
+  /// **'Apprentice'**
+  String get achievementApprentice10;
+
+  /// No description provided for @achievementApprentice10Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete 10 generations'**
+  String get achievementApprentice10Desc;
+
+  /// No description provided for @achievementMagician100.
+  ///
+  /// In en, this message translates to:
+  /// **'Magician'**
+  String get achievementMagician100;
+
+  /// No description provided for @achievementMagician100Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete 100 generations'**
+  String get achievementMagician100Desc;
+
+  /// No description provided for @achievementArchmage500.
+  ///
+  /// In en, this message translates to:
+  /// **'Archmage'**
+  String get achievementArchmage500;
+
+  /// No description provided for @achievementArchmage500Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete 500 generations'**
+  String get achievementArchmage500Desc;
+
+  /// No description provided for @achievementStreak3.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting Warmed Up'**
+  String get achievementStreak3;
+
+  /// No description provided for @achievementStreak3Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintain a 3-day streak'**
+  String get achievementStreak3Desc;
+
+  /// No description provided for @achievementStreak7.
+  ///
+  /// In en, this message translates to:
+  /// **'Week Warrior'**
+  String get achievementStreak7;
+
+  /// No description provided for @achievementStreak7Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintain a 7-day streak'**
+  String get achievementStreak7Desc;
+
+  /// No description provided for @achievementStreak14.
+  ///
+  /// In en, this message translates to:
+  /// **'Two Week Champion'**
+  String get achievementStreak14;
+
+  /// No description provided for @achievementStreak14Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintain a 14-day streak'**
+  String get achievementStreak14Desc;
+
+  /// No description provided for @achievementStreak30.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly Master'**
+  String get achievementStreak30;
+
+  /// No description provided for @achievementStreak30Desc.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintain a 30-day streak'**
+  String get achievementStreak30Desc;
+
+  /// No description provided for @achievementPackLeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Pack Leader'**
+  String get achievementPackLeader;
+
+  /// No description provided for @achievementPackLeaderDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Have 5 pets'**
+  String get achievementPackLeaderDesc;
+
+  /// No description provided for @achievementEvolutionBaby.
+  ///
+  /// In en, this message translates to:
+  /// **'First Steps'**
+  String get achievementEvolutionBaby;
+
+  /// No description provided for @achievementEvolutionBabyDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Evolve a pet to Baby stage'**
+  String get achievementEvolutionBabyDesc;
+
+  /// No description provided for @achievementEvolutionLegendary.
+  ///
+  /// In en, this message translates to:
+  /// **'Legendary Guardian'**
+  String get achievementEvolutionLegendary;
+
+  /// No description provided for @achievementEvolutionLegendaryDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Evolve a pet to Legendary stage'**
+  String get achievementEvolutionLegendaryDesc;
+
+  /// No description provided for @achievementTrendsetter.
+  ///
+  /// In en, this message translates to:
+  /// **'Trendsetter'**
+  String get achievementTrendsetter;
+
+  /// No description provided for @achievementTrendsetterDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Template of the Day'**
+  String get achievementTrendsetterDesc;
+
+  /// No description provided for @achievementDailyRitual.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Ritual'**
+  String get achievementDailyRitual;
+
+  /// No description provided for @achievementDailyRitualDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate 5 times in one day'**
+  String get achievementDailyRitualDesc;
+
+  /// No description provided for @achievementTemplateCollector.
+  ///
+  /// In en, this message translates to:
+  /// **'Template Collector'**
+  String get achievementTemplateCollector;
+
+  /// No description provided for @achievementTemplateCollectorDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 20 different templates'**
+  String get achievementTemplateCollectorDesc;
+
+  /// No description provided for @achievementNightOwl.
+  ///
+  /// In en, this message translates to:
+  /// **'Night Owl'**
+  String get achievementNightOwl;
+
+  /// No description provided for @achievementNightOwlDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate between 2 AM and 5 AM'**
+  String get achievementNightOwlDesc;
+
+  /// No description provided for @generationStatusGenerateSimilarCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost: {cost} PawSpark'**
+  String generationStatusGenerateSimilarCost(Object cost);
+
+  /// No description provided for @generationStatusGenerateSimilarConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate'**
+  String get generationStatusGenerateSimilarConfirmAction;
+
+  /// No description provided for @generationStatusGenerateSimilarCancelAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get generationStatusGenerateSimilarCancelAction;
+
+  /// No description provided for @generationStatusGenerateSimilarSourceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Source file is unavailable.'**
+  String get generationStatusGenerateSimilarSourceUnavailable;
+
+  /// No description provided for @generationStatusGenerateSimilarInsufficientBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough PawSpark.'**
+  String get generationStatusGenerateSimilarInsufficientBalance;
+
+  /// No description provided for @generationStatusGenerateSimilarFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not generate. Please try again.'**
+  String get generationStatusGenerateSimilarFailed;
+
+  /// No description provided for @generationStatusFailedFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What happened?'**
+  String get generationStatusFailedFeedbackTitle;
+
+  /// No description provided for @generationStatusFailedFeedbackNotCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Did not finish'**
+  String get generationStatusFailedFeedbackNotCompleted;
+
+  /// No description provided for @generationStatusFailedFeedbackTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Too long'**
+  String get generationStatusFailedFeedbackTooLong;
+
+  /// No description provided for @generationStatusFailedFeedbackPawSparkCharged.
+  ///
+  /// In en, this message translates to:
+  /// **'PawSpark were charged'**
+  String get generationStatusFailedFeedbackPawSparkCharged;
+
+  /// No description provided for @generationStatusFailedFeedbackStuck.
+  ///
+  /// In en, this message translates to:
+  /// **'Stuck'**
+  String get generationStatusFailedFeedbackStuck;
+
+  /// No description provided for @generationStatusFailedFeedbackOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get generationStatusFailedFeedbackOther;
+
+  /// No description provided for @generationStatusReportFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is wrong with the result?'**
+  String get generationStatusReportFeedbackTitle;
+
+  /// No description provided for @generationStatusReportFeedbackLowQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Low quality'**
+  String get generationStatusReportFeedbackLowQuality;
+
+  /// No description provided for @generationStatusReportFeedbackWrongPet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong pet'**
+  String get generationStatusReportFeedbackWrongPet;
+
+  /// No description provided for @generationStatusReportFeedbackDistortion.
+  ///
+  /// In en, this message translates to:
+  /// **'Distortion'**
+  String get generationStatusReportFeedbackDistortion;
+
+  /// No description provided for @generationStatusReportFeedbackInappropriate.
+  ///
+  /// In en, this message translates to:
+  /// **'Inappropriate'**
+  String get generationStatusReportFeedbackInappropriate;
+
+  /// No description provided for @generationStatusReportFeedbackWrongTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong template'**
+  String get generationStatusReportFeedbackWrongTemplate;
+
+  /// No description provided for @generationStatusReportFeedbackWatermark.
+  ///
+  /// In en, this message translates to:
+  /// **'Watermark'**
+  String get generationStatusReportFeedbackWatermark;
+
+  /// No description provided for @generationStatusReportFeedbackPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get generationStatusReportFeedbackPayment;
+
+  /// No description provided for @generationStatusReportFeedbackOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get generationStatusReportFeedbackOther;
+
+  /// No description provided for @generationStatusCreateVideoFromResultAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create video from this'**
+  String get generationStatusCreateVideoFromResultAction;
+
+  /// No description provided for @generationStatusGenerateSimilarAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate similar'**
+  String get generationStatusGenerateSimilarAction;
+
+  /// No description provided for @generationStatusGenerateSimilarLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Creating a similar version...'**
+  String get generationStatusGenerateSimilarLoading;
+
+  /// No description provided for @generationStatusUseAsInputAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as input'**
+  String get generationStatusUseAsInputAction;
+
+  /// No description provided for @profileSettingsFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get profileSettingsFeedbackTitle;
+
+  /// No description provided for @profileSettingsFeedbackSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Idea, bug, payment, or general comment'**
+  String get profileSettingsFeedbackSubtitle;
+
+  /// No description provided for @profileSettingsFeedbackSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send feedback'**
+  String get profileSettingsFeedbackSheetTitle;
+
+  /// No description provided for @profileSettingsFeedbackMessageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get profileSettingsFeedbackMessageLabel;
+
+  /// No description provided for @profileSettingsFeedbackMessageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add details if you want'**
+  String get profileSettingsFeedbackMessageHint;
+
+  /// No description provided for @profileSettingsFeedbackSubmitAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get profileSettingsFeedbackSubmitAction;
+
+  /// No description provided for @profileSettingsFeedbackThanksMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks! Your feedback helps improve PetMagic.'**
+  String get profileSettingsFeedbackThanksMessage;
+
+  /// No description provided for @profileSettingsFeedbackOptionGeneral.
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get profileSettingsFeedbackOptionGeneral;
+
+  /// No description provided for @profileSettingsFeedbackOptionFeatureRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Feature request'**
+  String get profileSettingsFeedbackOptionFeatureRequest;
+
+  /// No description provided for @profileSettingsFeedbackOptionBug.
+  ///
+  /// In en, this message translates to:
+  /// **'Bug'**
+  String get profileSettingsFeedbackOptionBug;
+
+  /// No description provided for @profileSettingsFeedbackOptionPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment'**
+  String get profileSettingsFeedbackOptionPayment;
+
+  /// No description provided for @profileNotificationsPushPhotoReadySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When an AI photo is ready to view'**
+  String get profileNotificationsPushPhotoReadySubtitle;
+
+  /// No description provided for @profileNotificationsPushVideoReadySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When an AI video finishes processing'**
+  String get profileNotificationsPushVideoReadySubtitle;
+
+  /// No description provided for @profileNotificationsPushGenerationErrorsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If a generation finishes with an error'**
+  String get profileNotificationsPushGenerationErrorsSubtitle;
+
+  /// No description provided for @profileNotificationsPushRemindersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders to use the app'**
+  String get profileNotificationsPushRemindersSubtitle;
+
+  /// No description provided for @profileNotificationsPushNewTemplatesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New generation styles and templates'**
+  String get profileNotificationsPushNewTemplatesSubtitle;
+
+  /// No description provided for @profileNotificationsPushPurchasesAndSubscriptionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment confirmations and subscription status'**
+  String get profileNotificationsPushPurchasesAndSubscriptionsSubtitle;
+
+  /// No description provided for @profileNotificationsEmailOffersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discounts, promotions, and special offers'**
+  String get profileNotificationsEmailOffersSubtitle;
+
+  /// No description provided for @profileNotificationsEmailNewsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App updates and new features'**
+  String get profileNotificationsEmailNewsSubtitle;
+
+  /// No description provided for @profileNotificationsEmailAccountAlertsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security alerts and account changes'**
+  String get profileNotificationsEmailAccountAlertsSubtitle;
+
+  /// No description provided for @passwordChangeStepRequestCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Request code'**
+  String get passwordChangeStepRequestCode;
+
+  /// No description provided for @passwordChangeStepNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get passwordChangeStepNewPassword;
+
+  /// No description provided for @subscriptionTokensWeeklyGrantPeriodSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **' / 7d'**
+  String get subscriptionTokensWeeklyGrantPeriodSuffix;
+
+  /// No description provided for @subscriptionGrantCountdownDaysHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{days}d {hours}h {minutes}m'**
+  String subscriptionGrantCountdownDaysHoursMinutes(
+    int days,
+    int hours,
+    int minutes,
+  );
+
+  /// No description provided for @subscriptionGrantCountdownHoursMinutesSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours}h {minutes}m {seconds}s'**
+  String subscriptionGrantCountdownHoursMinutesSeconds(
+    int hours,
+    int minutes,
+    int seconds,
+  );
+
+  /// No description provided for @subscriptionGrantCountdownMinutesSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes}m {seconds}s'**
+  String subscriptionGrantCountdownMinutesSeconds(int minutes, int seconds);
+
+  /// No description provided for @subscriptionGrantReadyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to grant!'**
+  String get subscriptionGrantReadyLabel;
+
+  /// No description provided for @subscriptionGrantNextLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Next grant: {countdown}'**
+  String subscriptionGrantNextLabel(String countdown);
+
+  /// No description provided for @subscriptionBenefitTokensDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically every 7 days'**
+  String get subscriptionBenefitTokensDescription;
+
+  /// No description provided for @subscriptionBenefitFirstBonusDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Instantly after purchase'**
+  String get subscriptionBenefitFirstBonusDescription;
+
+  /// No description provided for @subscriptionBenefitTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'All scenarios unlocked'**
+  String get subscriptionBenefitTemplatesDescription;
+
+  /// No description provided for @subscriptionBenefitPriorityGenerationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your jobs get priority'**
+  String get subscriptionBenefitPriorityGenerationDescription;
+
+  /// No description provided for @subscriptionBenefitNoWatermarkDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Clean result'**
+  String get subscriptionBenefitNoWatermarkDescription;
 }
 
 class _AppLocalizationsDelegate

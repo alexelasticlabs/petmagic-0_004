@@ -21,6 +21,7 @@ import 'package:petmagic_mobile/features/templates/presentation/templates_page.d
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -29,6 +30,10 @@ void main() {
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+  });
+
+  tearDown(() async {
+    await PetMagicNotificationCenter.instance.clearQueue();
   });
 
   testWidgets('renders sections and expands ready grid', (tester) async {

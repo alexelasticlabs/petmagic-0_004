@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 
 class StartupBackdrop extends StatelessWidget {
   const StartupBackdrop({required this.accentRank, super.key});
@@ -114,14 +115,20 @@ class BlurOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orb = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+
+    if (PerformanceGuard.shouldAvoidBlur(context)) {
+      return RepaintBoundary(child: orb);
+    }
+
     return RepaintBoundary(
       child: ImageFiltered(
         imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
+        child: orb,
       ),
     );
   }

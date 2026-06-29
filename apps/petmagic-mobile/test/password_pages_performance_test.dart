@@ -84,6 +84,19 @@ void main() {
     expect(buildBody, isNot(contains('SingleChildScrollView(')));
   });
 
+  test('password change step labels use localizations', () {
+    final source = File(
+      'lib/features/profile/presentation/password_change_page.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('passwordChangeStepRequestCode'));
+    expect(source, contains('passwordChangeStepNewPassword'));
+    expect(source, isNot(contains('Запрос кода')));
+    expect(source, isNot(contains('Новый пароль')));
+    expect(source, isNot(contains('Индикатор шагов')));
+    expect(source, isNot(contains('Email карточка')));
+  });
+
   test('auth entry form uses a lazy scroll surface', () {
     final source = File(
       'lib/features/profile/presentation/auth_entry_page.dart',
@@ -97,6 +110,45 @@ void main() {
     expect(buildBody, isNot(contains('SingleChildScrollView(')));
     expect(buildBody, isNot(contains('child: LayoutBuilder(')));
   });
+
+  test('auth entry legal consent link labels use localizations', () {
+    final pageSource = File(
+      'lib/features/profile/presentation/auth_entry_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/profile/presentation/auth_entry_content.part.dart',
+    ).readAsStringSync();
+    final source = '$pageSource\n$contentSource';
+
+    expect(pageSource, contains("part 'auth_entry_content.part.dart';"));
+    expect(pageSource, isNot(contains('class _SocialProviderButton')));
+    expect(contentSource, contains('class _SocialProviderButton'));
+    expect(source, contains('authTermsLinkText'));
+    expect(source, contains('authPrivacyLinkText'));
+    expect(source, isNot(contains('class _LegalConsentPhrases')));
+    expect(source, isNot(contains('Условия использования')));
+    expect(source, isNot(contains('Политику конфиденциальности')));
+  });
+
+  test(
+    'profile account info page keeps account cards split from orchestration',
+    () {
+      final pageSource = File(
+        'lib/features/profile/presentation/profile_settings_detail_page.dart',
+      ).readAsStringSync();
+      final accountContentSource = File(
+        'lib/features/profile/presentation/profile_account_info_content.part.dart',
+      ).readAsStringSync();
+
+      expect(
+        pageSource,
+        contains("part 'profile_account_info_content.part.dart';"),
+      );
+      expect(pageSource, isNot(contains('class _AccountProfileHeroCard')));
+      expect(accountContentSource, contains('class _AccountProfileHeroCard'));
+      expect(accountContentSource, contains('class _ProfileEditableNameCard'));
+    },
+  );
 }
 
 class _ControllerSyncPolicy {

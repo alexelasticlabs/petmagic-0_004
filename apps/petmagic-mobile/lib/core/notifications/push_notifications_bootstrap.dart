@@ -299,7 +299,7 @@ class _PushNotificationsBootstrapState
   }
 
   bool _isWalletRoute(String route) {
-    return route == WalletPage.routePath || route == WalletPage.legacyRoutePath;
+    return route == WalletPage.routePath;
   }
 
   bool _isProfileRoute(String route) {

@@ -4,9 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('template user-facing error mappers do not echo raw details', () {
-    final templatesPage = File(
-      'lib/features/templates/presentation/templates_page.dart',
-    ).readAsStringSync();
+    final templatesPage = _readTemplatesPageLibrarySource();
     final templateFlowSheets = File(
       'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
     ).readAsStringSync();
@@ -60,4 +58,16 @@ String _functionBody(String source, String functionName) {
   }
 
   fail('$functionName body did not close');
+}
+
+String _readTemplatesPageLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/templates_page.dart',
+    'lib/features/templates/presentation/templates_page_feed.part.dart',
+    'lib/features/templates/presentation/templates_page_generation_flow.part.dart',
+    'lib/features/templates/presentation/templates_page_lifecycle.part.dart',
+    'lib/features/templates/presentation/templates_page_template_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }

@@ -7,7 +7,6 @@ enum TemplateGenerationStatus {
   preprocessing,
   generating,
   finalizing,
-  succeeded,
   completed,
   failed,
 }
@@ -19,7 +18,6 @@ TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
     'preprocessing' => TemplateGenerationStatus.preprocessing,
     'generating' => TemplateGenerationStatus.generating,
     'finalizing' => TemplateGenerationStatus.finalizing,
-    'succeeded' => TemplateGenerationStatus.succeeded,
     'completed' => TemplateGenerationStatus.completed,
     'failed' => TemplateGenerationStatus.failed,
     _ => TemplateGenerationStatus.queued,
@@ -257,13 +255,10 @@ class TemplateGenerationResult {
   }
 
   bool get isTerminal =>
-      status == TemplateGenerationStatus.succeeded ||
       status == TemplateGenerationStatus.completed ||
       status == TemplateGenerationStatus.failed;
 
-  bool get isCompleted =>
-      status == TemplateGenerationStatus.succeeded ||
-      status == TemplateGenerationStatus.completed;
+  bool get isCompleted => status == TemplateGenerationStatus.completed;
 
   bool get isFailed => status == TemplateGenerationStatus.failed;
 
@@ -274,7 +269,6 @@ class TemplateGenerationResult {
     }
 
     return switch (status) {
-      TemplateGenerationStatus.succeeded ||
       TemplateGenerationStatus.completed => 100,
       TemplateGenerationStatus.failed => 100,
       TemplateGenerationStatus.finalizing => 90,

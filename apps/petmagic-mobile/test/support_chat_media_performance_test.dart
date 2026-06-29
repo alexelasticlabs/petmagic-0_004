@@ -6,9 +6,7 @@ void main() {
   test(
     'network image attachment previews use one bounded image provider',
     () async {
-      final source = await File(
-        'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
-      ).readAsString();
+      final source = await _supportMessageMediaSource();
       final pageSource = await File(
         'lib/features/support/presentation/support_chat_page.dart',
       ).readAsString();
@@ -66,9 +64,7 @@ void main() {
 
   test('support image previews avoid uncached Image.network widgets', () async {
     final sources = [
-      await File(
-        'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
-      ).readAsString(),
+      await _supportMessageMediaSource(),
       await File(
         'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
       ).readAsString(),
@@ -87,9 +83,7 @@ void main() {
   });
 
   test('support remote media previews require trusted attachment origins', () async {
-    final mediaSource = await File(
-      'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
-    ).readAsString();
+    final mediaSource = await _supportMessageMediaSource();
     final messagesSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsString();
@@ -177,8 +171,8 @@ void main() {
       final pageSource = await File(
         'lib/features/support/presentation/support_chat_page.dart',
       ).readAsString();
-      final actionsSource = await File(
-        'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
+      final pickerSource = await File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
       ).readAsString();
 
       expect(
@@ -186,14 +180,14 @@ void main() {
         contains('const int _supportRecentMediaThumbnailCacheExtent = 300;'),
       );
       expect(
-        actionsSource,
+        pickerSource,
         contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent'),
       );
       expect(
-        actionsSource,
+        pickerSource,
         contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'),
       );
-      expect(actionsSource, contains('filterQuality: FilterQuality.medium'));
+      expect(pickerSource, contains('filterQuality: FilterQuality.medium'));
     },
   );
 
@@ -207,4 +201,14 @@ void main() {
     expect(sectionsSource, isNot(contains('SingleChildScrollView(')));
     expect(sectionsSource, isNot(contains('child: LayoutBuilder(')));
   });
+}
+
+Future<String> _supportMessageMediaSource() async {
+  final previewSource = await File(
+    'lib/features/support/presentation/widgets/support_chat_message_media.part.dart',
+  ).readAsString();
+  final gridSource = await File(
+    'lib/features/support/presentation/widgets/support_chat_message_media_grid.part.dart',
+  ).readAsString();
+  return '$previewSource\n$gridSource';
 }

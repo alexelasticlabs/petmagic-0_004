@@ -9,8 +9,13 @@ import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
+import 'package:petmagic_mobile/core/network/network_status_controller.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/rewards/presentation/mappers/rewards_error_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
@@ -23,12 +28,12 @@ import 'package:petmagic_mobile/shared/widgets/premium_banner_style.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_haptics.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/streak_section.dart';
-import 'package:petmagic_mobile/features/gamification/presentation/challenges_section.dart';
 
 part 'rewards_page_referral_cards.dart';
+part 'rewards_page_premium_upsell.part.dart';
 part 'rewards_page_shared_widgets.dart';
 part 'rewards_page_shell_widgets.dart';
 
@@ -41,7 +46,8 @@ class RewardsPage extends ConsumerStatefulWidget {
   ConsumerState<RewardsPage> createState() => _RewardsPageState();
 }
 
-class _RewardsPageState extends ConsumerState<RewardsPage> {
+class _RewardsPageState extends ConsumerState<RewardsPage>
+    with WidgetsBindingObserver {
   Future<void> _showReferralHowItWorksSheet(int bonusSpark) async {
     final text = AppLocalizations.of(context);
 
@@ -320,6 +326,7 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
       Future.microtask(() {
         if (!mounted) {
@@ -332,6 +339,35 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    final walletState = ref.read(walletControllerProvider);
+    final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    final unavailableKind =
+        walletState.wallet == null && !walletState.isInitialLoading
+        ? classifyAppUnavailable(
+            raw: walletState.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
+    if (unavailableKind == null) {
+      return;
+    }
+
+    unawaited(ref.read(walletControllerProvider.notifier).load(refresh: true));
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
@@ -340,6 +376,9 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
     );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final hasInternet = ref.watch(
+      networkStatusControllerProvider.select((status) => status.hasInternet),
+    );
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -349,6 +388,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
               kPetMagicBottomContentInsetCompact;
     final rewards = state.rewards;
     final isPremiumUser = state.wallet?.isPremium == true;
+    final unavailableKind = state.wallet == null && !state.isInitialLoading
+        ? classifyAppUnavailable(
+            raw: state.errorMessage,
+            hasInternet: hasInternet,
+          )
+        : null;
     final rewardsSummary = rewards == null
         ? null
         : _RewardsSummaryView(
@@ -362,6 +407,9 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
             rewardedReferredUsersCount: rewards.rewardedReferredUsersCount,
           );
     final warningMessage = rewardsWarningMessage(text, state.errorMessage);
+    final legalAcceptanceRequired = isLegalAcceptanceRequiredError(
+      state.errorMessage,
+    );
 
     if (!isAuthenticated) {
       return _RewardsBackdrop(
@@ -380,12 +428,74 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
       );
     }
 
+    if (state.wallet == null &&
+        !state.isInitialLoading &&
+        legalAcceptanceRequired) {
+      return _RewardsBackdrop(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              bottomNavInset + keyboardInset,
+            ),
+            child: _RewardsLegalGateCard(
+              message:
+                  mapCommonAuthFeedbackMessage(
+                    text,
+                    state.errorMessage,
+                    preferAuthRequiredMessage: true,
+                  ) ??
+                  text.profileLegalAcceptanceRequired,
+              onOpenLegalGate: () =>
+                  context.go(LegalAcceptanceGatePage.routePath),
+            ),
+          ),
+        ),
+      );
+    }
+
+    ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
+      previous,
+      next,
+    ) {
+      if (previous?.hasInternet != false || !next.hasInternet) {
+        return;
+      }
+
+      final walletState = ref.read(walletControllerProvider);
+      final currentUnavailableKind =
+          walletState.wallet == null && !walletState.isInitialLoading
+          ? classifyAppUnavailable(
+              raw: walletState.errorMessage,
+              hasInternet: next.hasInternet,
+            )
+          : null;
+      if (currentUnavailableKind == null) {
+        return;
+      }
+
+      unawaited(controller.load(refresh: true));
+    });
+
     return _RewardsBackdrop(
       child: SafeArea(
         child: state.isInitialLoading
             ? Center(
                 child: CircularProgressIndicator.adaptive(
                   valueColor: AlwaysStoppedAnimation<Color>(colors.accent),
+                ),
+              )
+            : unavailableKind != null
+            ? PetMagicUnavailableView(
+                kind: unavailableKind,
+                onRetry: () => unawaited(controller.load(refresh: true)),
+                padding: EdgeInsets.fromLTRB(
+                  28,
+                  36,
+                  28,
+                  bottomNavInset + keyboardInset,
                 ),
               )
             : RefreshIndicator.adaptive(
@@ -416,10 +526,6 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                       ),
                     ],
                     const SizedBox(height: 16),
-                    const StreakSection(),
-                    const SizedBox(height: 16),
-                    const ChallengesSection(),
-                    const SizedBox(height: 16),
                     _PromoCodeCard(
                       isSubmitting: state.isRedeeming,
                       onSubmit: controller.applyRedeemCode,
@@ -449,6 +555,59 @@ class _RewardsPageState extends ConsumerState<RewardsPage> {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _RewardsLegalGateCard extends StatelessWidget {
+  const _RewardsLegalGateCard({
+    required this.message,
+    required this.onOpenLegalGate,
+  });
+
+  final String message;
+  final VoidCallback onOpenLegalGate;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: ProfileGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                text.rewardsPageTitle,
+                style: TextStyle(
+                  color: colors.textStrong,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: TextStyle(
+                  color: colors.textSoft,
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: onOpenLegalGate,
+                child: Text(text.profileLegalAcceptAction),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

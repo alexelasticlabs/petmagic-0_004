@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
-import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 
 class ChallengeCard extends StatelessWidget {
   const ChallengeCard({
@@ -19,6 +19,14 @@ class ChallengeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
+    final progressLabel = text.gamificationAchievementProgress(
+      challenge.currentValue,
+      challenge.targetValue,
+    );
+    final statusText = challenge.isCompleted
+        ? text.gamificationChallengeComplete
+        : text.gamificationStatusInProgress;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -72,8 +80,8 @@ class ChallengeCard extends StatelessWidget {
                     color: const Color(0xFF4CAF50).withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    '✓ Done',
+                  child: Text(
+                    statusText,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -86,10 +94,7 @@ class ChallengeCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             description,
-            style: TextStyle(
-              fontSize: 12,
-                    color: colors.textSoft,
-            ),
+            style: TextStyle(fontSize: 12, color: colors.textSoft),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -101,8 +106,9 @@ class ChallengeCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: challenge.progressPercent,
-                    backgroundColor:
-                        colors.surfaceStrong.withValues(alpha: 0.3),
+                    backgroundColor: colors.surfaceStrong.withValues(
+                      alpha: 0.3,
+                    ),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       challenge.isCompleted
                           ? const Color(0xFF4CAF50)
@@ -114,16 +120,16 @@ class ChallengeCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Text(
-                '${challenge.currentValue} / ${challenge.targetValue}',
+                progressLabel,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                        color: colors.textSoft,
+                  color: colors.textSoft,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             children: [
               const PawSparkIcon(size: 14),
@@ -133,34 +139,20 @@ class ChallengeCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
-                    color: colors.textStrong,
+                  color: colors.textStrong,
                 ),
               ),
               const Spacer(),
-              if (challenge.isCompleted && !challenge.rewardClaimed)
-                PressableScale(
-                  onTap: () {},
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6D00), Color(0xFFFF9100)],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Claim',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFFFFFF),
-                      ),
-                    ),
-                  ),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: challenge.isCompleted
+                      ? const Color(0xFF4CAF50)
+                      : colors.textSoft,
                 ),
+              ),
             ],
           ),
         ],

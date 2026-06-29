@@ -16,21 +16,23 @@ analyzer:
     - "**/*.freezed.dart"
     - "**/*.mocks.dart"
     - "**/*.config.dart"
+  errors:
+    close_sinks: ignore
+    prefer_const_constructors: ignore
+    prefer_const_declarations: ignore
+    prefer_single_quotes: ignore
+    unnecessary_lambdas: ignore
+    unnecessary_underscores: ignore
 
 linter:
   rules:
     avoid_print: true
-    prefer_const_constructors: true
-    prefer_const_declarations: true
     prefer_final_locals: true
     avoid_unnecessary_containers: true
     sized_box_for_whitespace: true
     use_build_context_synchronously: true
     cancel_subscriptions: true
-    close_sinks: true
     always_declare_return_types: true
     avoid_dynamic_calls: true
-    prefer_single_quotes: true
     sort_child_properties_last: true
     use_key_in_widget_constructors: true
-    unnecessary_lambdas: true

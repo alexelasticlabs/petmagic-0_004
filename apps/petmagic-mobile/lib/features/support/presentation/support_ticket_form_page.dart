@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,8 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
-import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
@@ -19,6 +18,8 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+
+part 'support_ticket_form_content.part.dart';
 
 class SupportTicketFormPage extends ConsumerStatefulWidget {
   const SupportTicketFormPage({
@@ -39,12 +40,9 @@ class SupportTicketFormPage extends ConsumerStatefulWidget {
 
 class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   static const _maxAttachmentCount = 5;
-  static const _maxAttachmentFileSizeBytes = 10 * 1024 * 1024;
 
   final TextEditingController _descriptionController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
-  final AppPermissionCoordinator _permissionCoordinator =
-      AppPermissionCoordinator();
 
   void _showToast(
     String message, {
@@ -55,6 +53,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 
   List<XFile> _attachments = const [];
   bool _isSubmitting = false;
+  bool _isPickingAttachment = false;
   CancelToken? _submitCancelToken;
 
   void _logSupportTicketFailure(
@@ -105,7 +104,6 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final colors = context.petMagicColors;
     final scenarioData = buildSupportAssistantScenario(widget.scenario, text);
 
     final generationId = ref.watch(
@@ -127,144 +125,37 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       ),
     );
 
-    return ProfileScreenBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          title: Text(text.supportTicketFormTitle),
-        ),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-            children: [
-              _ContextCard(
-                label: text.supportTicketFormTopicLabel,
-                value: scenarioData.topicLabel,
-              ),
-              if (generationId != null)
-                _ContextCard(
-                  label: text.supportTicketFormRelatedGenerationLabel,
-                  value: generationId,
-                ),
-              if (paymentId != null)
-                _ContextCard(
-                  label: text.supportTicketFormRelatedPaymentLabel,
-                  value: paymentId,
-                ),
-              if (subscriptionLabel != null)
-                _ContextCard(
-                  label: text.supportTicketFormRelatedSubscriptionLabel,
-                  value: subscriptionLabel,
-                ),
-              const SizedBox(height: 10),
-              Text(
-                text.supportTicketFormDescriptionLabel,
-                style: TextStyle(
-                  color: colors.textStrong,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _descriptionController,
-                maxLines: 5,
-                minLines: 4,
-                style: TextStyle(color: colors.textStrong),
-                decoration: InputDecoration(
-                  hintText: text.supportTicketFormDescriptionHint,
-                  hintStyle: TextStyle(color: colors.textMuted),
-                  filled: true,
-                  fillColor: colors.surfaceStrong.withValues(alpha: 0.7),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colors.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: colors.accent),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Text(
-                    text.supportTicketFormAttachmentsLabel,
-                    style: TextStyle(
-                      color: colors.textStrong,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: _isSubmitting ? null : _showAttachmentOptions,
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    label: Text(text.supportTicketFormAddScreenshotAction),
-                  ),
-                ],
-              ),
-              if (_attachments.isNotEmpty) ...[
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (var i = 0; i < _attachments.length; i++)
-                      _AttachmentChip(
-                        file: _attachments[i],
-                        onRemove: _isSubmitting
-                            ? null
-                            : () {
-                                setState(() {
-                                  _attachments = [
-                                    ..._attachments.take(i),
-                                    ..._attachments.skip(i + 1),
-                                  ];
-                                });
-                              },
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-              ],
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isSubmitting
-                      ? null
-                      : () => _submit(
-                          scenario: scenarioData.key,
-                          relatedGenerationId: _asGuidOrNull(generationId),
-                          relatedPaymentId: _asGuidOrNull(paymentId),
-                        ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colors.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    _isSubmitting
-                        ? text.supportTicketFormSubmittingLabel
-                        : text.supportTicketFormSubmitAction,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    return _SupportTicketFormContent(
+      scenarioData: scenarioData,
+      generationId: generationId,
+      paymentId: paymentId,
+      subscriptionLabel: subscriptionLabel,
+      descriptionController: _descriptionController,
+      attachments: _attachments,
+      isSubmitting: _isSubmitting,
+      isPickingAttachment: _isPickingAttachment,
+      onAddAttachment: _showAttachmentOptions,
+      onRemoveAttachment: (index) {
+        setState(() {
+          _attachments = [
+            ..._attachments.take(index),
+            ..._attachments.skip(index + 1),
+          ];
+        });
+      },
+      onSubmit: () => _submit(
+        scenario: scenarioData.key,
+        relatedGenerationId: _asGuidOrNull(generationId),
+        relatedPaymentId: _asGuidOrNull(paymentId),
       ),
     );
   }
 
   Future<void> _showAttachmentOptions() async {
+    if (_isPickingAttachment) {
+      return;
+    }
+
     if (_attachments.length >= _maxAttachmentCount) {
       final text = AppLocalizations.of(context);
       _showToast(
@@ -284,11 +175,12 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
           top: false,
           child: Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: colors.surfaceStrong,
+            child: Material(
+              color: colors.surfaceStrong,
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: colors.border.withValues(alpha: 0.9)),
+                side: BorderSide(color: colors.border.withValues(alpha: 0.9)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -372,79 +264,102 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   }
 
   Future<void> _pickFromCamera() async {
-    final permission = await _permissionCoordinator.requestOnDemand(
-      AppPermissionType.camera,
-    );
-    if (!permission.granted) {
-      if (mounted) {
-        final text = AppLocalizations.of(context);
-        _showToast(
-          text.supportChatCameraPermissionPhotoError,
-          tone: PetMagicToastTone.warning,
-        );
+    await _runAttachmentPickerSession(() async {
+      final permissionFeedback = await ref
+          .read(mediaPermissionFeedbackCoordinatorProvider)
+          .request(context, MediaPermissionFlow.cameraPhoto);
+      if (!mounted || !permissionFeedback.granted) {
+        if (mounted) {
+          ref
+              .read(mediaPermissionFeedbackCoordinatorProvider)
+              .show(context, permissionFeedback);
+        }
+        return;
       }
-      return;
-    }
 
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 92,
-      maxWidth: 1800,
-    );
-    if (picked == null || !mounted) {
-      return;
-    }
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 92,
+        maxWidth: 1800,
+      );
+      if (picked == null || !mounted) {
+        return;
+      }
 
-    final valid = await _validatePickedImage(picked);
-    if (valid == null || !mounted) {
-      return;
-    }
+      final valid = await _validatePickedImage(picked);
+      if (valid == null || !mounted) {
+        return;
+      }
 
-    setState(() {
-      _attachments = [..._attachments, valid];
+      setState(() {
+        _attachments = [..._attachments, valid];
+      });
     });
   }
 
   Future<void> _pickFromGallery() async {
-    final permission = await _permissionCoordinator.requestOnDemand(
-      AppPermissionType.photos,
-    );
-    if (!permission.granted) {
-      if (mounted) {
-        final text = AppLocalizations.of(context);
-        _showToast(
-          text.supportChatAttachmentNoGalleryAccessError,
-          tone: PetMagicToastTone.warning,
-        );
+    await _runAttachmentPickerSession(() async {
+      final permissionFeedback = await ref
+          .read(mediaPermissionFeedbackCoordinatorProvider)
+          .request(context, MediaPermissionFlow.galleryPhoto);
+      if (!mounted || !permissionFeedback.granted) {
+        if (mounted) {
+          ref
+              .read(mediaPermissionFeedbackCoordinatorProvider)
+              .show(context, permissionFeedback);
+        }
+        return;
       }
-      return;
-    }
 
-    final remainingSlots = _maxAttachmentCount - _attachments.length;
-    final pickedImages = await _imagePicker.pickMultiImage(
-      imageQuality: 92,
-      maxWidth: 1800,
-    );
+      final remainingSlots = _maxAttachmentCount - _attachments.length;
+      final pickedImages = await _imagePicker.pickMultiImage(
+        imageQuality: 92,
+        maxWidth: 1800,
+      );
 
-    if (pickedImages.isEmpty || !mounted) {
-      return;
-    }
-
-    final next = <XFile>[];
-    for (final image in pickedImages.take(remainingSlots)) {
-      final valid = await _validatePickedImage(image);
-      if (valid != null) {
-        next.add(valid);
+      if (pickedImages.isEmpty || !mounted) {
+        return;
       }
-    }
 
-    if (!mounted || next.isEmpty) {
+      final next = <XFile>[];
+      for (final image in pickedImages.take(remainingSlots)) {
+        final valid = await _validatePickedImage(image);
+        if (valid != null) {
+          next.add(valid);
+        }
+      }
+
+      if (!mounted || next.isEmpty) {
+        return;
+      }
+
+      setState(() {
+        _attachments = [..._attachments, ...next];
+      });
+    });
+  }
+
+  Future<void> _runAttachmentPickerSession(
+    Future<void> Function() action,
+  ) async {
+    if (_isPickingAttachment) {
       return;
     }
 
     setState(() {
-      _attachments = [..._attachments, ...next];
+      _isPickingAttachment = true;
     });
+    try {
+      await action();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPickingAttachment = false;
+        });
+      } else {
+        _isPickingAttachment = false;
+      }
+    }
   }
 
   Future<XFile?> _validatePickedImage(XFile picked) async {
@@ -458,26 +373,6 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
         tone: PetMagicToastTone.warning,
       );
       return null;
-    }
-
-    try {
-      final fileSizeBytes = await File(picked.path).length();
-      if (!mounted) {
-        return null;
-      }
-
-      if (fileSizeBytes > _maxAttachmentFileSizeBytes) {
-        _showToast(
-          _mapSupportError(
-            AppLocalizations.of(context),
-            'support.attachment_file_too_large',
-          ),
-          tone: PetMagicToastTone.warning,
-        );
-        return null;
-      }
-    } on Object {
-      // If size cannot be resolved, backend validation will still guard limits.
     }
 
     return picked;
@@ -619,6 +514,11 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   }
 
   String _mapSupportError(AppLocalizations text, String code) {
+    final authMessage = mapCommonAuthFeedbackMessage(text, code);
+    if (authMessage != null) {
+      return authMessage;
+    }
+
     final normalized = code.toLowerCase();
     if (normalized.contains('attachment_file_too_large')) {
       return text.supportChatAttachmentTooLargeError;
@@ -670,96 +570,3 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 }
 
 enum _AttachmentSource { camera, gallery }
-
-class _ContextCard extends StatelessWidget {
-  const _ContextCard({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: ProfileGlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: colors.textMuted,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(
-                color: colors.textStrong,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AttachmentChip extends StatelessWidget {
-  const _AttachmentChip({required this.file, this.onRemove});
-
-  final XFile file;
-  final VoidCallback? onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.petMagicColors;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.surfaceStrong.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.image_outlined, size: 16, color: colors.textSoft),
-            const SizedBox(width: 6),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 140),
-              child: Text(
-                file.name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: colors.textSoft,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            if (onRemove != null) ...[
-              const SizedBox(width: 6),
-              InkWell(
-                onTap: onRemove,
-                child: Icon(
-                  Icons.close_rounded,
-                  size: 16,
-                  color: colors.textMuted,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}

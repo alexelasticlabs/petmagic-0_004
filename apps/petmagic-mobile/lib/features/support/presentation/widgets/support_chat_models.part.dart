@@ -48,8 +48,10 @@ Color _supportComposerHintColor(BuildContext context) {
 const _supportAttachmentMaxCount = 5;
 const _supportMediaGroupVisibleCellCount = 6;
 const _supportAttachmentRecentAssetCount = 48;
-const _supportAttachmentImageMaxFileSizeBytes = 10 * 1024 * 1024;
-const _supportAttachmentVideoMaxFileSizeBytes = 50 * 1024 * 1024;
+const _supportAttachmentImageMaxFileSizeBytes =
+    UploadMediaPolicy.supportImageMaxBytes;
+const _supportAttachmentVideoMaxFileSizeBytes =
+    UploadMediaPolicy.supportVideoMaxBytes;
 const _supportAttachmentVideoMaxDuration = Duration(seconds: 60);
 
 bool _isSupportSystemMessage(SupportChatMessage message) {
@@ -134,12 +136,9 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatUnavailableError;
   }
 
-  if (value.contains('auth.sign_in_required')) {
-    return text.authSignInRequired;
-  }
-
-  if (value.contains('auth.session_expired')) {
-    return text.authSessionExpired;
+  final authMessage = mapCommonAuthFeedbackMessage(text, value);
+  if (authMessage != null) {
+    return authMessage;
   }
 
   return text.supportChatUnavailableError;

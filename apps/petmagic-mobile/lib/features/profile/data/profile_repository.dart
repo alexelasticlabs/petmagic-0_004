@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/network/authenticated_request_options.dart'
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   return ProfileRepository(
@@ -46,7 +47,7 @@ class ProfileRepository {
   final AuthSessionStorage _sessionStorage;
   final AuthSessionCoordinator _authSessionCoordinator;
 
-  static const _maxAvatarBytes = 8 * 1024 * 1024;
+  static const _maxAvatarBytes = UploadMediaPolicy.avatarMaxBytes;
 
   Future<AuthSession?> readSession() => _sessionStorage.read();
 

@@ -259,8 +259,6 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
-    final isRu =
-        Localizations.localeOf(context).languageCode.toLowerCase() == 'ru';
     final isLight = Theme.of(context).brightness == Brightness.light;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -293,7 +291,7 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isRu ? 'Экспорт без водяного знака' : 'Watermark-free',
+                    text.galleryPremiumUpsellTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -305,9 +303,7 @@ class _GalleryPremiumUpsellCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 1),
                   Text(
-                    isRu
-                        ? 'Premium уберет логотип PetMagic'
-                        : 'Premium removes the PetMagic logo',
+                    text.galleryPremiumUpsellSubtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -357,16 +353,39 @@ class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2200),
-  )..repeat();
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimationState();
+  }
+
+  @override
+  void deactivate() {
+    _controller.stop();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _syncAnimationState();
+  }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!PerformanceGuard.shouldAnimateRepeatingEffects(context)) {
+      return _buildButton();
+    }
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
@@ -376,34 +395,7 @@ class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
           borderRadius: BorderRadius.circular(11),
           child: Stack(
             children: [
-              FilledButton(
-                onPressed: widget.onPressed,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 40),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: const Color(0xFFF5BD3E),
-                  foregroundColor: const Color(0xFF241403),
-                  textStyle: const TextStyle(
-                    fontSize: 12.8,
-                    fontWeight: FontWeight.w900,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                ),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(widget.label),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.arrow_forward_rounded, size: 16),
-                    ],
-                  ),
-                ),
-              ),
+              child!,
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
@@ -428,6 +420,46 @@ class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
           ),
         );
       },
+      child: _buildButton(),
     );
+  }
+
+  Widget _buildButton() {
+    return FilledButton(
+      onPressed: widget.onPressed,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        backgroundColor: const Color(0xFFF5BD3E),
+        foregroundColor: const Color(0xFF241403),
+        textStyle: const TextStyle(fontSize: 12.8, fontWeight: FontWeight.w900),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(widget.label),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_rounded, size: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _syncAnimationState() {
+    if (!PerformanceGuard.shouldAnimateRepeatingEffects(context)) {
+      if (_controller.isAnimating) {
+        _controller.stop();
+      }
+      return;
+    }
+
+    if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
   }
 }

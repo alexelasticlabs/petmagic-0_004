@@ -686,8 +686,7 @@ class _GenerationResultInputCopy {
     required this.error,
     required this.noCredits,
     required this.start,
-    required this.costPrefix,
-    required this.costSuffix,
+    required this.costBuilder,
   });
 
   final String title;
@@ -702,47 +701,25 @@ class _GenerationResultInputCopy {
   final String error;
   final String noCredits;
   final String start;
-  final String costPrefix;
-  final String costSuffix;
+  final String Function(int credits) costBuilder;
 
-  String cost(int credits) => '$costPrefix $credits $costSuffix';
+  String cost(int credits) => costBuilder(credits);
 
   static _GenerationResultInputCopy forLocale(AppLocalizations text) {
-    final isRu = text.localeName.startsWith('ru');
-    if (isRu) {
-      return const _GenerationResultInputCopy(
-        title: 'Использовать результат',
-        parentTitle: 'Готовый результат',
-        parentHint: 'Этот результат будет использован как основа',
-        mediaUnavailable: 'Медиа недоступно',
-        all: 'Все',
-        image: 'Фото',
-        video: 'Видео',
-        recommended: 'Рекомендуем',
-        empty: 'Нет совместимых шаблонов.',
-        error: 'Не удалось использовать этот результат. Попробуйте ещё раз.',
-        noCredits: 'Недостаточно PawSpark для новой генерации.',
-        start: 'Запустить',
-        costPrefix: 'Генерация будет стоить',
-        costSuffix: 'PawSpark.',
-      );
-    }
-
-    return const _GenerationResultInputCopy(
-      title: 'Use result',
-      parentTitle: 'Completed result',
-      parentHint: 'This result will be used as the base',
-      mediaUnavailable: 'Media unavailable',
-      all: 'All',
-      image: 'Image',
-      video: 'Video',
-      recommended: 'Recommended',
-      empty: 'No compatible templates.',
-      error: 'Could not use this result. Please try again.',
-      noCredits: 'Not enough PawSpark for the new generation.',
-      start: 'Start',
-      costPrefix: 'Generation will cost',
-      costSuffix: 'PawSpark.',
+    return _GenerationResultInputCopy(
+      title: text.generationResultInputTitle,
+      parentTitle: text.generationResultInputParentTitle,
+      parentHint: text.generationResultInputParentHint,
+      mediaUnavailable: text.generationResultInputMediaUnavailable,
+      all: text.allFilter,
+      image: text.imageLabel,
+      video: text.videoLabel,
+      recommended: text.generationResultInputRecommendedBadge,
+      empty: text.generationResultInputEmpty,
+      error: text.generationResultInputError,
+      noCredits: text.generationResultInputNoCredits,
+      start: text.generationResultInputStartAction,
+      costBuilder: text.generationResultInputCostEstimate,
     );
   }
 }

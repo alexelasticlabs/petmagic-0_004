@@ -713,6 +713,14 @@ class TemplatesController extends Notifier<TemplatesState> {
         resetPage: true,
       ),
       currentPage: 1,
+      items: const [],
+      clearItemsQueryKey: true,
+      clearNextCursor: true,
+      hasMore: true,
+      isLoading: true,
+      isRefreshing: false,
+      isLoadingMore: false,
+      clearError: true,
     );
     loadInitial();
   }
@@ -732,6 +740,14 @@ class TemplatesController extends Notifier<TemplatesState> {
         resetPage: true,
       ),
       currentPage: 1,
+      items: const [],
+      clearItemsQueryKey: true,
+      clearNextCursor: true,
+      hasMore: true,
+      isLoading: true,
+      isRefreshing: false,
+      isLoadingMore: false,
+      clearError: true,
     );
     loadInitial();
   }
@@ -752,6 +768,14 @@ class TemplatesController extends Notifier<TemplatesState> {
         resetPage: true,
       ),
       currentPage: 1,
+      items: const [],
+      clearItemsQueryKey: true,
+      clearNextCursor: true,
+      hasMore: true,
+      isLoading: true,
+      isRefreshing: false,
+      isLoadingMore: false,
+      clearError: true,
     );
     loadInitial();
   }
@@ -790,17 +814,12 @@ class TemplatesController extends Notifier<TemplatesState> {
       }
     }
 
-    const concurrencyLimit = 3;
-    final urlList = uniqueUrls.toList();
-    for (var i = 0; i < urlList.length; i += concurrencyLimit) {
+    final urlList = uniqueUrls.toList(growable: false);
+    for (final url in urlList) {
       if (!_shouldContinuePreviewWarmup(requestVersion, queryKey)) {
         return;
       }
-
-      final chunk = urlList.skip(i).take(concurrencyLimit).toList();
-      await Future.wait(
-        chunk.map(_warmupSingleUrl),
-      );
+      await _warmupSingleUrl(url);
     }
   }
 

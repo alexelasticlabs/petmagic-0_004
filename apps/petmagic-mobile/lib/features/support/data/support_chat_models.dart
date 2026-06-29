@@ -57,6 +57,26 @@ class SupportChatUploadAttachment {
   final String contentType;
 }
 
+class SupportChatPendingAttachment {
+  const SupportChatPendingAttachment({
+    required this.fileName,
+    required this.mimeType,
+    this.sizeBytes,
+  });
+
+  final String fileName;
+  final String mimeType;
+  final int? sizeBytes;
+
+  factory SupportChatPendingAttachment.fromJson(Map<String, dynamic> json) {
+    return SupportChatPendingAttachment(
+      fileName: json['fileName'] as String? ?? '',
+      mimeType: json['mimeType'] as String? ?? 'application/octet-stream',
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt(),
+    );
+  }
+}
+
 class SupportChatMessage {
   const SupportChatMessage({
     required this.messageId,
@@ -71,12 +91,9 @@ class SupportChatMessage {
     required this.attachments,
     this.replyToMessageId,
     this.replyToPreview,
-    this.attachmentUrl,
-    this.attachmentFileName,
-    this.attachmentContentType,
-    this.attachmentFileSizeBytes,
     this.attachmentUploadStatus,
     this.attachmentUploadErrorCode,
+    this.pendingAttachment,
     this.readAtUtc,
     this.deliveredAtUtc,
   });
@@ -93,12 +110,9 @@ class SupportChatMessage {
   final bool isRead;
   final DateTime createdAtUtc;
   final List<SupportChatAttachment> attachments;
-  final String? attachmentUrl;
-  final String? attachmentFileName;
-  final String? attachmentContentType;
-  final int? attachmentFileSizeBytes;
   final String? attachmentUploadStatus;
   final String? attachmentUploadErrorCode;
+  final SupportChatPendingAttachment? pendingAttachment;
   final DateTime? readAtUtc;
   final DateTime? deliveredAtUtc;
 
@@ -108,6 +122,23 @@ class SupportChatMessage {
 
   SupportChatAttachment? get primaryAttachment =>
       attachments.isEmpty ? null : attachments.first;
+
+  String? get attachmentDisplayFileName {
+    final attachment = primaryAttachment;
+    if (attachment != null && attachment.fileName.trim().isNotEmpty) {
+      return attachment.fileName.trim();
+    }
+
+    final pendingFileName = pendingAttachment?.fileName.trim();
+    if (pendingFileName == null || pendingFileName.isEmpty) {
+      return null;
+    }
+
+    return pendingFileName;
+  }
+
+  int? get attachmentDisplaySizeBytes =>
+      primaryAttachment?.sizeBytes ?? pendingAttachment?.sizeBytes;
 
   bool get hasAttachment => attachments.isNotEmpty;
 
@@ -142,12 +173,9 @@ class SupportChatMessage {
   SupportChatMessage copyWith({
     bool? isRead,
     DateTime? readAtUtc,
-    String? attachmentUrl,
-    String? attachmentFileName,
-    String? attachmentContentType,
-    int? attachmentFileSizeBytes,
     String? attachmentUploadStatus,
     String? attachmentUploadErrorCode,
+    SupportChatPendingAttachment? pendingAttachment,
     List<SupportChatAttachment>? attachments,
     DateTime? deliveredAtUtc,
     String? replyToMessageId,
@@ -168,31 +196,20 @@ class SupportChatMessage {
       isRead: isRead ?? this.isRead,
       createdAtUtc: createdAtUtc,
       attachments: attachments ?? this.attachments,
-      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
-      attachmentFileName: attachmentFileName ?? this.attachmentFileName,
-      attachmentContentType:
-          attachmentContentType ?? this.attachmentContentType,
-      attachmentFileSizeBytes:
-          attachmentFileSizeBytes ?? this.attachmentFileSizeBytes,
       attachmentUploadStatus:
           attachmentUploadStatus ?? this.attachmentUploadStatus,
       attachmentUploadErrorCode: clearAttachmentUploadErrorCode
           ? null
           : (attachmentUploadErrorCode ?? this.attachmentUploadErrorCode),
+      pendingAttachment: pendingAttachment ?? this.pendingAttachment,
       readAtUtc: clearReadAt ? null : (readAtUtc ?? this.readAtUtc),
       deliveredAtUtc: deliveredAtUtc ?? this.deliveredAtUtc,
     );
   }
 
   factory SupportChatMessage.fromJson(Map<String, dynamic> json) {
-    final parsedAttachments = _parseAttachments(
-      json,
-      legacyAttachmentUrl: json['attachmentUrl'] as String?,
-      legacyAttachmentFileName: json['attachmentFileName'] as String?,
-      legacyAttachmentContentType: json['attachmentContentType'] as String?,
-      legacyAttachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)
-          ?.toInt(),
-    );
+    final parsedAttachments = _parseAttachments(json);
+    final pendingAttachmentJson = json['pendingAttachment'];
 
     return SupportChatMessage(
       messageId: json['messageId'] as String? ?? '',
@@ -206,13 +223,12 @@ class SupportChatMessage {
       replyToPreview: json['replyToPreview'] as String?,
       isRead: json['isRead'] as bool? ?? false,
       attachments: parsedAttachments,
-      attachmentUrl: json['attachmentUrl'] as String?,
-      attachmentFileName: json['attachmentFileName'] as String?,
-      attachmentContentType: json['attachmentContentType'] as String?,
-      attachmentFileSizeBytes: (json['attachmentFileSizeBytes'] as num?)
-          ?.toInt(),
       attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
       attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
+      pendingAttachment:
+          pendingAttachmentJson is Map<String, dynamic>
+              ? SupportChatPendingAttachment.fromJson(pendingAttachmentJson)
+              : null,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
@@ -224,45 +240,13 @@ class SupportChatMessage {
   }
 
   static List<SupportChatAttachment> _parseAttachments(
-    Map<String, dynamic> json, {
-    required String? legacyAttachmentUrl,
-    required String? legacyAttachmentFileName,
-    required String? legacyAttachmentContentType,
-    required int? legacyAttachmentFileSizeBytes,
-  }) {
-    final parsedAttachments =
-        (json['attachments'] as List<dynamic>? ?? const [])
-            .whereType<Map<String, dynamic>>()
-            .map(SupportChatAttachment.fromJson)
-            .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
-            .toList(growable: false);
-
-    if (parsedAttachments.isNotEmpty) {
-      return parsedAttachments;
-    }
-
-    final legacyUrl = legacyAttachmentUrl?.trim();
-    final legacyMimeType = legacyAttachmentContentType?.trim();
-    if (legacyUrl == null ||
-        legacyUrl.isEmpty ||
-        legacyMimeType == null ||
-        legacyMimeType.isEmpty) {
-      return const [];
-    }
-
-    return [
-      SupportChatAttachment(
-        fileUrl: legacyUrl,
-        type: legacyMimeType.startsWith('image/')
-            ? 'image'
-            : (legacyMimeType.startsWith('video/') ? 'video' : 'file'),
-        mimeType: legacyMimeType,
-        fileName: legacyAttachmentFileName?.trim().isNotEmpty == true
-            ? legacyAttachmentFileName!.trim()
-            : legacyUrl.split('/').last,
-        sizeBytes: legacyAttachmentFileSizeBytes ?? 0,
-      ),
-    ];
+    Map<String, dynamic> json,
+  ) {
+    return (json['attachments'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(SupportChatAttachment.fromJson)
+        .where((attachment) => attachment.fileUrl.trim().isNotEmpty)
+        .toList(growable: false);
   }
 }
 

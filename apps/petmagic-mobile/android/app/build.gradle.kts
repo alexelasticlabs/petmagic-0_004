@@ -27,7 +27,6 @@ val allowInsecureReleaseSigning =
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
     // The Flutter Gradle Plugin must be applied after the Android Gradle plugin.
     id("dev.flutter.flutter-gradle-plugin")
@@ -95,6 +94,37 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    doFirst {
+        // Flutter can generate this app-source registrant with dev-only plugins.
+        // Keep production plugin registration intact while stripping test-only entries.
+        val generatedPluginRegistrant =
+            project.layout.projectDirectory.file(
+                "src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
+            ).asFile
+        if (generatedPluginRegistrant.exists()) {
+            val content = generatedPluginRegistrant.readText()
+            val sanitizedContent =
+                content.replace(
+                    Regex(
+                        """\s+try \{\s*flutterEngine\.getPlugins\(\)\.add\(new dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin\(\)\);\s*\} catch \(Exception e\) \{\s*Log\.e\(TAG, "Error registering plugin integration_test, dev\.flutter\.plugins\.integration_test\.IntegrationTestPlugin", e\);\s*\}""",
+                        RegexOption.DOT_MATCHES_ALL,
+                    ),
+                    "",
+                )
+            if (sanitizedContent != content) {
+                generatedPluginRegistrant.writeText(sanitizedContent)
+            }
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
 }
 
 flutter {

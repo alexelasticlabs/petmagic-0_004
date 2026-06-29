@@ -15,6 +15,8 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
@@ -22,21 +24,23 @@ import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.da
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'test_permission_fakes.dart';
 
 void main() {
+  final petsPageCombinedSource = _readPetsPresentationSource();
+
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
   });
 
   test('Pet photo mutations evict cached image URLs before refresh', () {
-    final source = File(
-      'lib/features/pets/presentation/my_pets_page.dart',
-    ).readAsStringSync();
+    final source = petsPageCombinedSource;
 
     expect(source, contains('Future<void> _evictPetPhotoMedia'));
     expect(source, contains('CachedNetworkImage.evictFromCache(imageUrl)'));
@@ -74,12 +78,54 @@ void main() {
     );
   });
 
+  test('pet form step widgets stay in a dedicated part file', () {
+    final pageSource = File(
+      'lib/features/pets/presentation/my_pets_page.dart',
+    ).readAsStringSync();
+    final formSource = File(
+      'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
+    ).readAsStringSync();
+    final detailsSource = File(
+      'lib/features/pets/presentation/my_pets_detail_page.part.dart',
+    ).readAsStringSync();
+    final widgetsSource = File(
+      'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+    ).readAsStringSync();
+    final actionsSource = File(
+      'lib/features/pets/presentation/my_pets_photo_actions.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("part 'my_pets_form_sheet.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_detail_page.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_display_widgets.part.dart';"));
+    expect(pageSource, contains("part 'my_pets_photo_actions.part.dart';"));
+    expect(pageSource, isNot(contains('class _PetFormProgress')));
+    expect(pageSource, isNot(contains('class _PetNameStep')));
+    expect(pageSource, isNot(contains('class _PetTypeStep')));
+    expect(pageSource, isNot(contains('class _PetPhotoStep')));
+    expect(pageSource, isNot(contains('class _PetPhotoCard')));
+    expect(pageSource, isNot(contains('class _PetHeader')));
+    expect(pageSource, isNot(contains('Future<void> _pickAndUploadPhoto')));
+    expect(pageSource, isNot(contains('Future<void> _deletePhoto')));
+    expect(formSource, contains("part of 'my_pets_page.dart';"));
+    expect(formSource, contains('class _PetFormProgress'));
+    expect(formSource, contains('class _PetNameStep'));
+    expect(formSource, contains('class _PetTypeStep'));
+    expect(formSource, contains('class _PetPhotoStep'));
+    expect(detailsSource, contains("part of 'my_pets_page.dart';"));
+    expect(detailsSource, contains('class PetDetailsPage'));
+    expect(widgetsSource, contains("part of 'my_pets_page.dart';"));
+    expect(widgetsSource, contains('class _PetPhotoCard'));
+    expect(widgetsSource, contains('class _PetHeader'));
+    expect(actionsSource, contains("part of 'my_pets_page.dart';"));
+    expect(actionsSource, contains('Future<void> _pickAndUploadPhoto'));
+    expect(actionsSource, contains('Future<void> _deletePhoto'));
+  });
+
   test(
     'pet photo cards fall back to original URL when thumbnail is missing or unsafe',
     () {
-      final source = File(
-        'lib/features/pets/presentation/my_pets_page.dart',
-      ).readAsStringSync();
+      final source = petsPageCombinedSource;
 
       expect(
         source,
@@ -1540,6 +1586,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Add photo permission denial shows localized warning', (
+    tester,
+  ) async {
+    final previousImagePickerPlatform =
+        image_picker_platform.ImagePickerPlatform.instance;
+    final picker = _FakeImagePickerPlatform(
+      pickedFile: XFile(
+        '/tmp/petmagic-upload-success.jpg',
+        name: 'petmagic-upload-success.jpg',
+      ),
+    );
+    image_picker_platform.ImagePickerPlatform.instance = picker;
+    addTearDown(() async {
+      image_picker_platform.ImagePickerPlatform.instance =
+          previousImagePickerPlatform;
+      await PetMagicNotificationCenter.instance.clearQueue();
+    });
+
+    final repository = _FakePetRepository(
+      pets: [
+        PetProfile(
+          id: 'pet-1',
+          name: 'Bella',
+          type: 'dog',
+          photosCount: 1,
+          generationsCount: 0,
+          createdAtUtc: DateTime.utc(2026),
+          updatedAtUtc: DateTime.utc(2026),
+        ),
+      ],
+      photos: [
+        PetPhoto(
+          id: 'photo-1',
+          petId: 'pet-1',
+          mediaAssetId: 'media-1',
+          url: '',
+          fileName: 'bella.jpg',
+          contentType: 'image/jpeg',
+          isFavorite: false,
+          isAvatar: false,
+          sortOrder: 1,
+          createdAtUtc: DateTime.utc(2026),
+        ),
+      ],
+    );
+
+    await _pumpPetDetails(
+      tester,
+      repository: repository,
+      permissionCoordinator: FakeAppPermissionCoordinator(
+        states: const {AppPermissionType.photos: AppPermissionState.denied},
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Add photos'));
+    await tester.pump();
+
+    expect(picker.pickImageCalls, 0);
+    expect(repository.uploadCalls, 0);
+    expect(
+      PetMagicNotificationCenter.instance.current?.message,
+      'Allow access to your gallery to choose a photo.',
+    );
+    await PetMagicNotificationCenter.instance.clearQueue();
+    await tester.pump();
+  });
+
   testWidgets('Add photo upload invalidates pets and photos after success', (
     tester,
   ) async {
@@ -2591,12 +2704,25 @@ void main() {
   });
 }
 
+String _readPetsPresentationSource() {
+  const files = [
+    'lib/features/pets/presentation/my_pets_page.dart',
+    'lib/features/pets/presentation/my_pets_detail_page.part.dart',
+    'lib/features/pets/presentation/my_pets_display_widgets.part.dart',
+    'lib/features/pets/presentation/my_pets_form_sheet.part.dart',
+    'lib/features/pets/presentation/my_pets_photo_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
+}
+
 Future<void> _pumpMyPets(
   WidgetTester tester, {
   required TemplateGenerationRepository repository,
   required Brightness brightness,
   bool authenticated = true,
   Widget Function(BuildContext, GoRouterState)? templatesBuilder,
+  AppPermissionCoordinator? permissionCoordinator,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -2635,6 +2761,9 @@ Future<void> _pumpMyPets(
               : _UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        appPermissionCoordinatorProvider.overrideWithValue(
+          permissionCoordinator ?? FakeAppPermissionCoordinator(),
+        ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),
@@ -2663,6 +2792,7 @@ Future<void> _pumpPetDetails(
   required TemplateGenerationRepository repository,
   bool authenticated = true,
   Duration settleDuration = const Duration(milliseconds: 250),
+  AppPermissionCoordinator? permissionCoordinator,
 }) async {
   final router = _petDetailsRouter(
     templatesBuilder: (context, state) =>
@@ -2676,6 +2806,7 @@ Future<void> _pumpPetDetails(
     router: router,
     authenticated: authenticated,
     settleDuration: settleDuration,
+    permissionCoordinator: permissionCoordinator,
   );
 }
 
@@ -2685,6 +2816,7 @@ Future<void> _pumpPetDetailsWithRouter(
   required GoRouter router,
   bool authenticated = true,
   Duration settleDuration = const Duration(milliseconds: 250),
+  AppPermissionCoordinator? permissionCoordinator,
 }) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
@@ -2702,6 +2834,9 @@ Future<void> _pumpPetDetailsWithRouter(
               : _UnauthenticatedAppLaunchController.new,
         ),
         templateGenerationRepositoryProvider.overrideWithValue(repository),
+        appPermissionCoordinatorProvider.overrideWithValue(
+          permissionCoordinator ?? FakeAppPermissionCoordinator(),
+        ),
       ],
       child: MaterialApp.router(
         theme: AppTheme.light(),

@@ -113,7 +113,10 @@ void main() {
     final repository = _FakeTemplateGenerationRepository();
     await _pumpSettingsPage(tester, templateRepository: repository);
 
-    final feedbackRow = find.text('Send feedback').first;
+    final text = AppLocalizations.of(
+      tester.element(find.byType(ProfileSettingsPage)),
+    );
+    final feedbackRow = find.text(text.profileSettingsFeedbackTitle).first;
     await tester.scrollUntilVisible(
       feedbackRow,
       320,
@@ -125,11 +128,16 @@ void main() {
     await tester.tap(feedbackRow);
     await tester.pumpAndSettle();
 
-    expect(find.text('Баг'), findsOneWidget);
+    expect(find.text(text.profileSettingsFeedbackOptionBug), findsOneWidget);
 
-    await tester.tap(find.text('Баг'));
+    await tester.tap(find.text(text.profileSettingsFeedbackOptionBug));
     await tester.enterText(find.byType(TextFormField), 'Краш при отправке');
-    await tester.tap(find.widgetWithText(FilledButton, 'Отправить'));
+    await tester.tap(
+      find.widgetWithText(
+        FilledButton,
+        text.profileSettingsFeedbackSubmitAction,
+      ),
+    );
     await tester.pumpAndSettle();
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();

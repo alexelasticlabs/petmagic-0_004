@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 
 class StreakCounter extends StatelessWidget {
@@ -14,14 +15,12 @@ class StreakCounter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
+    final text = AppLocalizations.of(context);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '🔥',
-          style: TextStyle(fontSize: currentStreak > 0 ? 28 : 22),
-        ),
+        Text('🔥', style: TextStyle(fontSize: currentStreak > 0 ? 28 : 22)),
         const SizedBox(width: 8),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -39,7 +38,7 @@ class StreakCounter extends StatelessWidget {
               ),
             ),
             Text(
-              'day streak',
+              text.gamificationDayStreak,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
@@ -100,18 +99,12 @@ class StreakCalendar extends StatelessWidget {
                     ? const Color(0xFFFF6D00)
                     : colors.surfaceStrong.withValues(alpha: 0.3),
                 border: isToday
-                    ? Border.all(
-                        color: const Color(0xFFFF6D00),
-                        width: 2,
-                      )
+                    ? Border.all(color: const Color(0xFFFF6D00), width: 2)
                     : null,
               ),
               alignment: Alignment.center,
               child: isActive
-                  ? const Text(
-                      '🔥',
-                      style: TextStyle(fontSize: 14),
-                    )
+                  ? const Text('🔥', style: TextStyle(fontSize: 14))
                   : Text(
                       '${date.day}',
                       style: TextStyle(

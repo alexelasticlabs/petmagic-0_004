@@ -12,9 +12,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
+import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -23,6 +26,7 @@ import 'package:petmagic_mobile/features/support/presentation/support_chat_contr
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/media_share_save.dart';
+import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
@@ -32,11 +36,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 part 'widgets/support_chat_actions.part.dart';
+part 'widgets/support_chat_attachment_picker.part.dart';
 part 'widgets/support_chat_external_media.part.dart';
 part 'widgets/support_chat_composer.part.dart';
 part 'widgets/support_chat_dialogs.part.dart';
 part 'widgets/support_chat_header.part.dart';
 part 'widgets/support_chat_messages.part.dart';
+part 'widgets/support_chat_message_media_grid.part.dart';
 part 'widgets/support_chat_message_media.part.dart';
 part 'widgets/support_chat_models.part.dart';
 part 'widgets/support_chat_sections.part.dart';
@@ -94,8 +100,6 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   final ScrollController _scrollController = ScrollController();
   final FocusNode _messageFocusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
-  final AppPermissionCoordinator _permissionCoordinator =
-      AppPermissionCoordinator();
   late final SupportChatController _controller;
   Timer? _loadingFallbackTimer;
   Timer? _messageHighlightTimer;
@@ -103,6 +107,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   bool _showLoadingFallback = false;
   bool _composerHasText = false;
   bool _composerHasFocus = false;
+  bool _attachmentPickerBusy = false;
   int _externalMediaPickerDepth = 0;
   List<_PendingSupportAttachment> _pendingAttachments = const [];
   SupportChatMessage? _replyToMessage;
@@ -293,6 +298,11 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
   Future<T> _runExternalMediaPicker<T>(Future<T> Function() action) async {
     _externalMediaPickerDepth += 1;
+    if (_externalMediaPickerDepth == 1) {
+      _controller.setScreenVisible(false);
+      _clearLoadingFallback();
+      _controller.stop();
+    }
     try {
       return await action();
     } finally {
@@ -301,6 +311,29 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
         _controller.setScreenVisible(true);
         _scheduleLoadingFallbackIfNeeded();
         unawaited(_controller.start());
+      }
+    }
+  }
+
+  Future<T?> _runAttachmentPickerSession<T>(
+    Future<T?> Function() action,
+  ) async {
+    if (_attachmentPickerBusy) {
+      return null;
+    }
+
+    _applyState(() {
+      _attachmentPickerBusy = true;
+    });
+    try {
+      return await action();
+    } finally {
+      if (mounted) {
+        _applyState(() {
+          _attachmentPickerBusy = false;
+        });
+      } else {
+        _attachmentPickerBusy = false;
       }
     }
   }

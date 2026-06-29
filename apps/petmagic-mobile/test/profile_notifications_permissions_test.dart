@@ -3,6 +3,75 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('profile notification setting subtitles use localizations', () async {
+    final source = await File(
+      'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
+    ).readAsString();
+
+    const expectedGetters = <String>[
+      'profileNotificationsPushPhotoReadySubtitle',
+      'profileNotificationsPushVideoReadySubtitle',
+      'profileNotificationsPushGenerationErrorsSubtitle',
+      'profileNotificationsPushRemindersSubtitle',
+      'profileNotificationsPushNewTemplatesSubtitle',
+      'profileNotificationsPushPurchasesAndSubscriptionsSubtitle',
+      'profileNotificationsEmailOffersSubtitle',
+      'profileNotificationsEmailNewsSubtitle',
+      'profileNotificationsEmailAccountAlertsSubtitle',
+    ];
+    const removedLiterals = <String>[
+      'Когда AI-фото готово к просмотру',
+      'Когда AI-видео завершило обработку',
+      'Если генерация завершилась с ошибкой',
+      'Напоминания об использовании приложения',
+      'Новые стили и шаблоны генерации',
+      'Подтверждения оплат и статус подписки',
+      'Скидки, акции и промо-предложения',
+      'Обновления приложения и новые функции',
+      'Уведомления безопасности и о смене данных',
+    ];
+
+    for (final getter in expectedGetters) {
+      expect(source, contains(getter));
+    }
+    for (final literal in removedLiterals) {
+      expect(source, isNot(contains(literal)));
+    }
+  });
+
+  test(
+    'profile notification subtitle keys exist in every supported locale',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+      const requiredKeys = <String>[
+        'profileNotificationsPushPhotoReadySubtitle',
+        'profileNotificationsPushVideoReadySubtitle',
+        'profileNotificationsPushGenerationErrorsSubtitle',
+        'profileNotificationsPushRemindersSubtitle',
+        'profileNotificationsPushNewTemplatesSubtitle',
+        'profileNotificationsPushPurchasesAndSubscriptionsSubtitle',
+        'profileNotificationsEmailOffersSubtitle',
+        'profileNotificationsEmailNewsSubtitle',
+        'profileNotificationsEmailAccountAlertsSubtitle',
+      ];
+
+      for (final path in arbFiles) {
+        final source = await File(path).readAsString();
+        for (final key in requiredKeys) {
+          expect(source, contains('"$key"'), reason: '$path is missing $key');
+        }
+      }
+    },
+  );
+
   test(
     'profile notification settings does not read or request media permissions',
     () async {

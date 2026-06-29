@@ -6,6 +6,7 @@ import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
 
 final gamificationRepositoryProvider = Provider<GamificationRepository>((ref) {
@@ -21,9 +22,10 @@ class GamificationRepository {
     required Dio dio,
     required AuthSessionStorage sessionStorage,
     AuthSessionCoordinator? authSessionCoordinator,
-  })  : _dio = dio,
-        _authSessionCoordinator = authSessionCoordinator ??
-            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
+  }) : _dio = dio,
+       _authSessionCoordinator =
+           authSessionCoordinator ??
+           AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   final Dio _dio;
   final AuthSessionCoordinator _authSessionCoordinator;
@@ -130,7 +132,7 @@ class GamificationRepository {
   }
 
   Future<Response<T>> _authorizedRequest<T>(
-    Future<Response<T>> Function(dynamic session) request,
+    Future<Response<T>> Function(AuthSession session) request,
   ) async {
     return _authSessionCoordinator.authorizedRequest(
       request: request,

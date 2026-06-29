@@ -440,7 +440,7 @@ class _CrossGalleryPetFlowRepository extends TemplateGenerationRepository {
   final createdCreations = <TemplateGenerationResult>[];
 
   @override
-  Future<({String? correlationId, String generationId})?>
+  Future<({String correlationId, String generationId})?>
   readActiveGeneration() async {
     return null;
   }

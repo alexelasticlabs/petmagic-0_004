@@ -5,36 +5,35 @@ import 'package:petmagic_mobile/features/gamification/data/gamification_reposito
 
 final gamificationSummaryProvider =
     FutureProvider.autoDispose<GamificationSummaryModel>((ref) {
-  ref.keepAlive();
-  final cancelToken = CancelToken();
-  ref.onDispose(cancelToken.cancel);
-  return ref
-      .watch(gamificationRepositoryProvider)
-      .fetchSummary(cancelToken: cancelToken);
-});
+      ref.keepAlive();
+      final cancelToken = CancelToken();
+      ref.onDispose(cancelToken.cancel);
+      return ref
+          .watch(gamificationRepositoryProvider)
+          .fetchSummary(cancelToken: cancelToken);
+    });
 
 final petProgressProvider = FutureProvider.autoDispose
     .family<PetProgressModel, String>((ref, petId) {
-  ref.keepAlive();
-  final cancelToken = CancelToken();
-  ref.onDispose(cancelToken.cancel);
-  return ref
-      .watch(gamificationRepositoryProvider)
-      .fetchPetProgress(petId, cancelToken: cancelToken);
-});
+      ref.keepAlive();
+      final cancelToken = CancelToken();
+      ref.onDispose(cancelToken.cancel);
+      return ref
+          .watch(gamificationRepositoryProvider)
+          .fetchPetProgress(petId, cancelToken: cancelToken);
+    });
 
-final achievementsProvider =
-    FutureProvider.autoDispose<List<AchievementModel>>((ref) {
-  ref.keepAlive();
-  final cancelToken = CancelToken();
-  ref.onDispose(cancelToken.cancel);
-  return ref
-      .watch(gamificationRepositoryProvider)
-      .fetchAchievements(cancelToken: cancelToken);
-});
+final achievementsProvider = FutureProvider.autoDispose<List<AchievementModel>>(
+  (ref) {
+    final cancelToken = CancelToken();
+    ref.onDispose(cancelToken.cancel);
+    return ref
+        .watch(gamificationRepositoryProvider)
+        .fetchAchievements(cancelToken: cancelToken);
+  },
+);
 
-final dailyStreakProvider =
-    FutureProvider.autoDispose<StreakModel?>((ref) {
+final dailyStreakProvider = FutureProvider.autoDispose<StreakModel?>((ref) {
   ref.keepAlive();
   final cancelToken = CancelToken();
   ref.onDispose(cancelToken.cancel);
@@ -45,10 +44,10 @@ final dailyStreakProvider =
 
 final weeklyChallengesProvider =
     FutureProvider.autoDispose<List<WeeklyChallengeModel>>((ref) {
-  ref.keepAlive();
-  final cancelToken = CancelToken();
-  ref.onDispose(cancelToken.cancel);
-  return ref
-      .watch(gamificationRepositoryProvider)
-      .fetchCurrentChallenges(cancelToken: cancelToken);
-});
+      ref.keepAlive();
+      final cancelToken = CancelToken();
+      ref.onDispose(cancelToken.cancel);
+      return ref
+          .watch(gamificationRepositoryProvider)
+          .fetchCurrentChallenges(cancelToken: cancelToken);
+    });

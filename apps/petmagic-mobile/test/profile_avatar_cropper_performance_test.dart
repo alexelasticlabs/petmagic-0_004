@@ -6,29 +6,47 @@ void main() {
   test(
     'avatar cropper keeps CPU-heavy image processing off the UI isolate',
     () {
-      final source = File(
+      final cropperSource = File(
         'lib/features/profile/presentation/profile_avatar_cropper_page.dart',
       ).readAsStringSync();
+      final optimizerSource = File(
+        'lib/shared/files/image_upload_optimizer.dart',
+      ).readAsStringSync();
 
-      expect(source, contains("import 'package:flutter/foundation.dart';"));
-      expect(source, contains('compute(_prepareAvatarPreview, bytes)'));
-      expect(source, contains('compute(_cropAvatarImage'));
+      expect(
+        cropperSource,
+        contains("import 'package:flutter/foundation.dart';"),
+      );
+      expect(cropperSource, contains('compute(_prepareAvatarPreview, bytes)'));
+      expect(
+        cropperSource,
+        contains('compute(optimizeAvatarCropBytes, <String, Object>{'),
+      );
 
-      final loadSourceImageBody = _methodBody(source, '_loadSourceImage');
+      final loadSourceImageBody = _methodBody(
+        cropperSource,
+        '_loadSourceImage',
+      );
       expect(loadSourceImageBody, isNot(contains('img.decodeImage')));
       expect(loadSourceImageBody, isNot(contains('img.encodeJpg')));
 
-      final saveCropBody = _methodBody(source, '_saveCrop');
+      final saveCropBody = _methodBody(cropperSource, '_saveCrop');
       expect(saveCropBody, isNot(contains('img.decodeImage')));
       expect(saveCropBody, isNot(contains('img.copyCrop')));
       expect(saveCropBody, isNot(contains('img.copyResize')));
       expect(saveCropBody, isNot(contains('img.encodeJpg')));
 
-      final prepareHelperBody = _functionBody(source, '_prepareAvatarPreview');
+      final prepareHelperBody = _functionBody(
+        cropperSource,
+        '_prepareAvatarPreview',
+      );
       expect(prepareHelperBody, contains('img.decodeImage'));
       expect(prepareHelperBody, contains('img.encodeJpg'));
 
-      final cropHelperBody = _functionBody(source, '_cropAvatarImage');
+      final cropHelperBody = _functionBody(
+        optimizerSource,
+        'optimizeAvatarCropBytes',
+      );
       expect(cropHelperBody, contains('img.decodeImage'));
       expect(cropHelperBody, contains('img.copyCrop'));
       expect(cropHelperBody, contains('img.copyResize'));

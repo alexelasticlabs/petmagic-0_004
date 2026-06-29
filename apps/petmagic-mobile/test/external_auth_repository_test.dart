@@ -118,6 +118,7 @@ void main() {
         dio: dio,
         sessionStorage: _InMemoryAuthSessionStorage(),
         appLinks: AppLinks(),
+        googleSignInInitializeDelegate: (_) async {},
         googleSignInDelegate: (googleSignIn) async {
           googleSignInCalls++;
           return null;

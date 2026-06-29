@@ -468,38 +468,24 @@ class _SettingsFeedbackDraft {
 }
 
 _SettingsFeedbackCopy _settingsFeedbackCopy(BuildContext context) {
-  final isRu = Localizations.localeOf(context).languageCode == 'ru';
-  if (isRu) {
-    return const _SettingsFeedbackCopy(
-      title: 'Send feedback',
-      subtitle: 'Идея, баг, оплата или общий комментарий',
-      sheetTitle: 'Send feedback',
-      messageLabel: 'Комментарий',
-      messageHint: 'Текст optional',
-      submit: 'Отправить',
-      thanks: 'Спасибо за feedback',
-      options: [
-        ('General', 'general', 'Общее'),
-        ('FeatureRequest', 'suggestion', 'Пожелание'),
-        ('BugReport', 'bug', 'Баг'),
-        ('PaymentIssue', 'payment', 'Оплата'),
-      ],
-    );
-  }
-
-  return const _SettingsFeedbackCopy(
-    title: 'Send feedback',
-    subtitle: 'Idea, bug, payment, or general comment',
-    sheetTitle: 'Send feedback',
-    messageLabel: 'Comment',
-    messageHint: 'Optional',
-    submit: 'Send',
-    thanks: 'Thanks for the feedback',
+  final text = AppLocalizations.of(context);
+  return _SettingsFeedbackCopy(
+    title: text.profileSettingsFeedbackTitle,
+    subtitle: text.profileSettingsFeedbackSubtitle,
+    sheetTitle: text.profileSettingsFeedbackSheetTitle,
+    messageLabel: text.profileSettingsFeedbackMessageLabel,
+    messageHint: text.profileSettingsFeedbackMessageHint,
+    submit: text.profileSettingsFeedbackSubmitAction,
+    thanks: text.profileSettingsFeedbackThanksMessage,
     options: [
-      ('General', 'general', 'General'),
-      ('FeatureRequest', 'suggestion', 'Feature request'),
-      ('BugReport', 'bug', 'Bug'),
-      ('PaymentIssue', 'payment', 'Payment'),
+      ('General', 'general', text.profileSettingsFeedbackOptionGeneral),
+      (
+        'FeatureRequest',
+        'suggestion',
+        text.profileSettingsFeedbackOptionFeatureRequest,
+      ),
+      ('BugReport', 'bug', text.profileSettingsFeedbackOptionBug),
+      ('PaymentIssue', 'payment', text.profileSettingsFeedbackOptionPayment),
     ],
   );
 }

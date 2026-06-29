@@ -806,9 +806,7 @@ class _TemplateOfTheDayAction extends StatelessWidget {
 }
 
 String templateOfTheDayLoadErrorLabel(BuildContext context) {
-  return Localizations.localeOf(context).languageCode == 'ru'
-      ? 'Не удалось загрузить шаблон дня'
-      : 'Could not load Template of the Day';
+  return AppLocalizations.of(context).templateOfTheDayLoadFailed;
 }
 
 String? _normalizeTemplateOfTheDayMediaUrl(String? rawUrl) {

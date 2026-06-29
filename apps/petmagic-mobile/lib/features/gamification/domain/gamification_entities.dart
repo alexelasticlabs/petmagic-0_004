@@ -51,11 +51,11 @@ class XpCalculator {
   static const int maxLevel = 10;
 
   static const List<int> levelThresholds = [
-    0,    // Level 1
-    50,   // Level 2
-    150,  // Level 3
-    350,  // Level 4
-    700,  // Level 5
+    0, // Level 1
+    50, // Level 2
+    150, // Level 3
+    350, // Level 4
+    700, // Level 5
     1200, // Level 6
     2000, // Level 7
     3200, // Level 8
@@ -77,8 +77,10 @@ class XpCalculator {
 
   static int getXpForCurrentLevel(int currentLevel) {
     if (currentLevel <= 0) return 0;
-    return levelThresholds[
-        (currentLevel - 1).clamp(0, levelThresholds.length - 1)];
+    return levelThresholds[(currentLevel - 1).clamp(
+      0,
+      levelThresholds.length - 1,
+    )];
   }
 
   static EvolutionStage getEvolutionStage(int level) {
