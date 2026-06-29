@@ -926,6 +926,81 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task HandleAppStoreServerNotificationAsync_ShouldIgnoreDuplicateDelivery()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(20);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "app_store",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "orig-app-duplicate-1",
+            ExternalTransactionId = "txn-app-duplicate-1",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-duplicate-1\",\"transactionId\":\"txn-app-duplicate-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
+        var signedRenewalInfo = CreateUnsignedJws("{\"autoRenewStatus\":0}");
+        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-duplicate-notification-1\",\"notificationType\":\"DID_CHANGE_RENEWAL_STATUS\",\"subtype\":\"AUTO_RENEW_DISABLED\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\",\"signedRenewalInfo\":\"{signedRenewalInfo}\"}}}}");
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+
+        var firstResult = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+        var secondResult = await service.HandleAppStoreServerNotificationAsync(
+            new AppStoreServerNotificationCommand(signedPayload),
+            CancellationToken.None);
+
+        Assert.True(firstResult.IsSuccess);
+        Assert.True(secondResult.IsSuccess);
+        Assert.True(firstResult.Value.Processed);
+        Assert.False(secondResult.Value.Processed);
+        Assert.Equal("ignored_duplicate", secondResult.Value.Status);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Equal("txn-app-duplicate-2", subscription.ExternalTransactionId);
+        Assert.Single(await dbContext.ProcessedWebhookEvents.Where(x => x.Provider == "app_store" && x.EventId == "app-duplicate-notification-1").ToListAsync());
+        Assert.Single(await dbContext.SubscriptionEventLogs.Where(x => x.Provider == "app_store").ToListAsync());
+    }
+
+    [Fact]
     public async Task HandleAppStoreServerNotificationAsync_ShouldExpireSubscriptionOnRefund()
     {
         await using var dbContext = CreateDbContext();
@@ -1141,6 +1216,86 @@ public sealed partial class EconomyServiceTests
         Assert.DoesNotContain(messageData, eventLog.PayloadJson);
         Assert.DoesNotContain("purchaseToken", eventLog.PayloadJson);
         Assert.DoesNotContain("gp-token-1", eventLog.PayloadJson);
+    }
+
+    [Fact]
+    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldIgnoreDuplicateDelivery()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var expiresAtUtc = now.AddDays(14);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "google_play",
+            PurchaseChannel = "in_app",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "order-duplicate-1",
+            ExternalTransactionId = "gp-duplicate-token-1",
+            CurrentPeriodStartUtc = now.AddDays(-5),
+            CurrentPeriodEndUtc = expiresAtUtc,
+            CancelAtPeriodEnd = false,
+            MonthlyTokenLimit = 500,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":3,\"purchaseToken\":\"gp-duplicate-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
+        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = expiresAtUtc,
+            Status = "SUBSCRIPTION_STATE_ACTIVE",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var firstResult = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-duplicate-message-1"),
+            CancellationToken.None);
+        var secondResult = await service.HandleGooglePlayDeveloperNotificationAsync(
+            new GooglePlayDeveloperNotificationCommand(messageData, "google-duplicate-message-1"),
+            CancellationToken.None);
+
+        Assert.True(firstResult.IsSuccess);
+        Assert.True(secondResult.IsSuccess);
+        Assert.True(firstResult.Value.Processed);
+        Assert.False(secondResult.Value.Processed);
+        Assert.Equal("ignored_duplicate", secondResult.Value.Status);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.Equal("gp-duplicate-token-1", subscription.ExternalTransactionId);
+        Assert.Single(await dbContext.ProcessedWebhookEvents.Where(x => x.Provider == "google_play" && x.EventId == "google-duplicate-message-1").ToListAsync());
+        Assert.Single(await dbContext.SubscriptionEventLogs.Where(x => x.Provider == "google_play").ToListAsync());
     }
 
     [Fact]

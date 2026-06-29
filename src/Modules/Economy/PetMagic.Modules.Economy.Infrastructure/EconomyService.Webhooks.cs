@@ -371,165 +371,187 @@ public sealed partial class EconomyService
         var appStoreEventType = parsed.NotificationType ?? "unknown";
         LogStoreWebhookReceived("app_store", parsed.EventId, appStoreEventType);
 
-        var alreadyProcessed = await dbContext.ProcessedWebhookEvents
-            .AnyAsync(x => x.Provider == "app_store" && x.EventId == parsed.EventId, cancellationToken);
-
-        if (alreadyProcessed)
+        if (!dbContext.Database.IsRelational()
+            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "app_store" && x.EventId == parsed.EventId, cancellationToken))
         {
             LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
             return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
         }
 
-        dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
-        {
-            Id = Guid.NewGuid(),
-            Provider = "app_store",
-            EventId = parsed.EventId,
-            EventType = appStoreEventType,
-            ProcessedAtUtc = DateTime.UtcNow
-        });
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
 
-        var processedTokenPurchase = false;
-        if (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
-            && !string.IsNullOrWhiteSpace(parsed.ProductId))
+        try
         {
-            var pendingOrder = await dbContext.PurchaseOrders
-                .Join(
-                    dbContext.CurrencyPacks.AsNoTracking(),
-                    order => order.PackId,
-                    pack => pack.Id,
-                    (order, pack) => new { order, pack })
-                .Where(x =>
-                    x.order.PaymentProvider == "app_store"
-                    && x.order.Status == PurchaseOrderStatus.Pending
-                    && x.order.ExternalPaymentId == parsed.ExternalPurchaseId)
-                .OrderByDescending(x => x.order.CreatedAtUtc)
-                .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "app_store") })
-                .FirstOrDefaultAsync(cancellationToken);
-
-            if (pendingOrder is not null
-                && string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
             {
-                var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
-                if (confirmResult.IsFailure
-                    && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                Id = Guid.NewGuid(),
+                Provider = "app_store",
+                EventId = parsed.EventId,
+                EventType = appStoreEventType,
+                ProcessedAtUtc = DateTime.UtcNow
+            });
+
+            var processedTokenPurchase = false;
+            if (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId)
+                && !string.IsNullOrWhiteSpace(parsed.ProductId))
+            {
+                var pendingOrder = await dbContext.PurchaseOrders
+                    .Join(
+                        dbContext.CurrencyPacks.AsNoTracking(),
+                        order => order.PackId,
+                        pack => pack.Id,
+                        (order, pack) => new { order, pack })
+                    .Where(x =>
+                        x.order.PaymentProvider == "app_store"
+                        && x.order.Status == PurchaseOrderStatus.Pending
+                        && x.order.ExternalPaymentId == parsed.ExternalPurchaseId)
+                    .OrderByDescending(x => x.order.CreatedAtUtc)
+                    .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "app_store") })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (pendingOrder is not null
+                    && string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
                 {
-                    return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+                    var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+                    if (confirmResult.IsFailure
+                        && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                    {
+                        return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+                    }
+
+                    processedTokenPurchase = true;
+                }
+            }
+
+            var existingSubscription = await dbContext.UserSubscriptions
+                .FirstOrDefaultAsync(
+                    x => x.Provider == "app_store"
+                        && ((!string.IsNullOrWhiteSpace(parsed.ExternalSubscriptionId) && x.ExternalSubscriptionId == parsed.ExternalSubscriptionId)
+                            || (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId) && x.ExternalTransactionId == parsed.ExternalPurchaseId)),
+                    cancellationToken);
+
+            if (existingSubscription is null)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
                 }
 
-                processedTokenPurchase = true;
+                LogStoreWebhookProcessed(
+                    "app_store",
+                    parsed.EventId,
+                    appStoreEventType,
+                    null,
+                    processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found");
+                return Result.Success(new StoreWebhookResultResponse(
+                    "app_store",
+                    parsed.EventId,
+                    processedTokenPurchase,
+                    processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found"));
             }
-        }
 
-        var existingSubscription = await dbContext.UserSubscriptions
-            .FirstOrDefaultAsync(
-                x => x.Provider == "app_store"
-                    && ((!string.IsNullOrWhiteSpace(parsed.ExternalSubscriptionId) && x.ExternalSubscriptionId == parsed.ExternalSubscriptionId)
-                        || (!string.IsNullOrWhiteSpace(parsed.ExternalPurchaseId) && x.ExternalTransactionId == parsed.ExternalPurchaseId)),
+            var plan = await ResolveStoreNotificationPlanAsync(existingSubscription.PlanId, parsed.ProductId, "app_store", cancellationToken);
+            if (plan is null)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
+            }
+
+            var status = EconomyWebhookParser.MapAppStoreNotificationStatus(parsed.NotificationType, parsed.Subtype, parsed.ExpiresAtUtc);
+            var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
+
+            if (identityService is null)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
+            }
+
+            var premiumResult = await identityService.SetPremiumStatusAsync(
+                new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
                 cancellationToken);
 
-        if (existingSubscription is null)
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            LogStoreWebhookProcessed(
+            if (premiumResult.IsFailure)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
+            }
+
+            logger?.LogInformation(
+                "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
+                "app_store",
+                existingSubscription.UserId,
+                parsed.EventId,
+                appStoreEventType,
+                status,
+                isPremium,
+                CurrentCorrelationId);
+
+            await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                existingSubscription.UserId,
+                new PremiumPushNotification(
+                    Status: isPremium ? "active" : "inactive",
+                    Provider: "app_store",
+                    PlanCode: plan.PlanCode),
+                cancellationToken);
+
+            var subscription = await UpsertUserSubscriptionAsync(
+                existingSubscription.UserId,
+                "app_store",
+                existingSubscription.PurchaseChannel,
+                existingSubscription.Region,
+                plan.PlanCode,
+                status,
+                parsed.EventId,
+                parsed.ExternalSubscriptionId ?? existingSubscription.ExternalSubscriptionId,
+                parsed.ExternalPurchaseId ?? existingSubscription.ExternalTransactionId,
+                ResolveNotificationPeriodStartUtc(plan.BillingPeriod, parsed.ExpiresAtUtc, existingSubscription.CurrentPeriodStartUtc),
+                parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc,
+                parsed.CancelAtPeriodEnd,
+                plan.MonthlyTokenLimit,
+                cancellationToken);
+
+            await AppendSubscriptionEventAsync(
+                existingSubscription.UserId,
+                subscription.Id,
+                "app_store",
+                parsed.NotificationType ?? "AppStoreNotification",
+                subscription.Status,
+                parsed.EventId,
+                subscription.ExternalSubscriptionId,
+                BuildSafeAppStoreWebhookPayloadMetadata(parsed),
+                cancellationToken);
+
+            LogSubscriptionUpdated(
                 "app_store",
                 parsed.EventId,
                 appStoreEventType,
-                null,
-                processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found");
-            return Result.Success(new StoreWebhookResultResponse(
-                "app_store",
-                parsed.EventId,
-                processedTokenPurchase,
-                processedTokenPurchase ? "processed_token_purchase" : "ignored_not_found"));
-        }
+                existingSubscription.UserId,
+                subscription.Status,
+                isPremium ? "activated" : "canceled");
 
-        var plan = await ResolveStoreNotificationPlanAsync(existingSubscription.PlanId, parsed.ProductId, "app_store", cancellationToken);
-        if (plan is null)
+            if (isPremium)
+            {
+                await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                    subscription,
+                    "app_store",
+                    cancellationToken);
+            }
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            LogStoreWebhookProcessed("app_store", parsed.EventId, appStoreEventType, existingSubscription.UserId, "processed");
+            return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));
+        }
+        catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
-            return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
+            dbContext.ChangeTracker.Clear();
+            LogDuplicateStoreWebhook("app_store", parsed.EventId, appStoreEventType);
+            return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, false, "ignored_duplicate"));
         }
-
-        var status = EconomyWebhookParser.MapAppStoreNotificationStatus(parsed.NotificationType, parsed.Subtype, parsed.ExpiresAtUtc);
-        var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
-
-        if (identityService is null)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-        }
-
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
-            cancellationToken);
-
-        if (premiumResult.IsFailure)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
-        }
-
-        logger?.LogInformation(
-            "Premium entitlement updated from App Store webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
-            "app_store",
-            existingSubscription.UserId,
-            parsed.EventId,
-            appStoreEventType,
-            status,
-            isPremium,
-            CurrentCorrelationId);
-
-        await _pushNotificationSender.NotifyPremiumUpdateAsync(
-            existingSubscription.UserId,
-            new PremiumPushNotification(
-                Status: isPremium ? "active" : "inactive",
-                Provider: "app_store",
-                PlanCode: plan.PlanCode),
-            cancellationToken);
-
-        var subscription = await UpsertUserSubscriptionAsync(
-            existingSubscription.UserId,
-            "app_store",
-            existingSubscription.PurchaseChannel,
-            existingSubscription.Region,
-            plan.PlanCode,
-            status,
-            parsed.EventId,
-            parsed.ExternalSubscriptionId ?? existingSubscription.ExternalSubscriptionId,
-            parsed.ExternalPurchaseId ?? existingSubscription.ExternalTransactionId,
-            ResolveNotificationPeriodStartUtc(plan.BillingPeriod, parsed.ExpiresAtUtc, existingSubscription.CurrentPeriodStartUtc),
-            parsed.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc,
-            parsed.CancelAtPeriodEnd,
-            plan.MonthlyTokenLimit,
-            cancellationToken);
-
-        await AppendSubscriptionEventAsync(
-            existingSubscription.UserId,
-            subscription.Id,
-            "app_store",
-            parsed.NotificationType ?? "AppStoreNotification",
-            subscription.Status,
-            parsed.EventId,
-            subscription.ExternalSubscriptionId,
-            BuildSafeAppStoreWebhookPayloadMetadata(parsed),
-            cancellationToken);
-
-        LogSubscriptionUpdated(
-            "app_store",
-            parsed.EventId,
-            appStoreEventType,
-            existingSubscription.UserId,
-            subscription.Status,
-            isPremium ? "activated" : "canceled");
-
-        if (isPremium)
-        {
-            await GrantPremiumSubscriptionAllowanceIfDueAsync(
-                subscription,
-                "app_store",
-                cancellationToken);
-        }
-
-        LogStoreWebhookProcessed("app_store", parsed.EventId, appStoreEventType, existingSubscription.UserId, "processed");
-        return Result.Success(new StoreWebhookResultResponse("app_store", parsed.EventId, true, "processed"));
     }
 
     public async Task<Result<StoreWebhookResultResponse>> HandleGooglePlayDeveloperNotificationAsync(
@@ -545,187 +567,224 @@ public sealed partial class EconomyService
         var googlePlayEventType = $"notification_{parsed.NotificationType}";
         LogStoreWebhookReceived("google_play", parsed.EventId, googlePlayEventType);
 
-        var alreadyProcessed = await dbContext.ProcessedWebhookEvents
-            .AnyAsync(x => x.Provider == "google_play" && x.EventId == parsed.EventId, cancellationToken);
-
-        if (alreadyProcessed)
+        if (!dbContext.Database.IsRelational()
+            && await dbContext.ProcessedWebhookEvents.AnyAsync(x => x.Provider == "google_play" && x.EventId == parsed.EventId, cancellationToken))
         {
             LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
             return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
         }
 
-        dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
-        {
-            Id = Guid.NewGuid(),
-            Provider = "google_play",
-            EventId = parsed.EventId,
-            EventType = googlePlayEventType,
-            ProcessedAtUtc = DateTime.UtcNow
-        });
+        await using var transaction = dbContext.Database.IsRelational()
+            ? await dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken)
+            : null;
 
-        if (parsed.IsOneTimeProductNotification)
+        try
         {
-            var pendingOrder = await dbContext.PurchaseOrders
-                .Join(
-                    dbContext.CurrencyPacks.AsNoTracking(),
-                    order => order.PackId,
-                    pack => pack.Id,
-                    (order, pack) => new { order, pack })
-                .Where(x =>
-                    x.order.PaymentProvider == "google_play"
-                    && x.order.Status == PurchaseOrderStatus.Pending
-                    && !string.IsNullOrWhiteSpace(parsed.PurchaseToken)
-                    && x.order.ExternalPaymentId == parsed.PurchaseToken)
-                .OrderByDescending(x => x.order.CreatedAtUtc)
-                .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "google_play") })
-                .FirstOrDefaultAsync(cancellationToken);
+            dbContext.ProcessedWebhookEvents.Add(new ProcessedWebhookEvent
+            {
+                Id = Guid.NewGuid(),
+                Provider = "google_play",
+                EventId = parsed.EventId,
+                EventType = googlePlayEventType,
+                ProcessedAtUtc = DateTime.UtcNow
+            });
 
-            if (pendingOrder is null
-                || string.IsNullOrWhiteSpace(parsed.ProductId)
-                || !string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+            if (parsed.IsOneTimeProductNotification)
+            {
+                var pendingOrder = await dbContext.PurchaseOrders
+                    .Join(
+                        dbContext.CurrencyPacks.AsNoTracking(),
+                        order => order.PackId,
+                        pack => pack.Id,
+                        (order, pack) => new { order, pack })
+                    .Where(x =>
+                        x.order.PaymentProvider == "google_play"
+                        && x.order.Status == PurchaseOrderStatus.Pending
+                        && !string.IsNullOrWhiteSpace(parsed.PurchaseToken)
+                        && x.order.ExternalPaymentId == parsed.PurchaseToken)
+                    .OrderByDescending(x => x.order.CreatedAtUtc)
+                    .Select(x => new { x.order, ExpectedProductId = ResolvePackStoreProductId(x.pack, "google_play") })
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (pendingOrder is null
+                    || string.IsNullOrWhiteSpace(parsed.ProductId)
+                    || !string.Equals(pendingOrder.ExpectedProductId, parsed.ProductId, StringComparison.Ordinal))
+                {
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    if (transaction is not null)
+                    {
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+
+                    LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
+                    return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
+                }
+
+                var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
+                if (confirmResult.IsFailure
+                    && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+                {
+                    return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+                }
+
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, pendingOrder.order.UserId, "processed_token_purchase");
+                return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed_token_purchase"));
+            }
+
+            if (!parsed.IsSubscriptionNotification)
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
+                LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_unknown_notification");
+                return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_unknown_notification"));
+            }
+
+            var existingSubscription = await dbContext.UserSubscriptions
+                .FirstOrDefaultAsync(
+                    x => x.Provider == "google_play"
+                        && ((!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalTransactionId == parsed.PurchaseToken)
+                            || (!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalSubscriptionId == parsed.PurchaseToken)),
+                    cancellationToken);
+
+            if (existingSubscription is null)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                if (transaction is not null)
+                {
+                    await transaction.CommitAsync(cancellationToken);
+                }
+
                 LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
                 return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
             }
 
-            var confirmResult = await ConfirmPurchaseInternalAsync(pendingOrder.order, cancellationToken);
-            if (confirmResult.IsFailure
-                && !string.Equals(confirmResult.Error.Code, EconomyErrors.PurchaseAlreadyProcessed.Code, StringComparison.Ordinal))
+            var plan = await ResolveStoreNotificationPlanAsync(existingSubscription.PlanId, parsed.ProductId, "google_play", cancellationToken);
+            if (plan is null)
             {
-                return Result.Failure<StoreWebhookResultResponse>(confirmResult.Error);
+                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
+            }
+
+            var verification = await storeSubscriptionVerifier.VerifyAsync(
+                new StoreSubscriptionVerificationRequest(
+                    existingSubscription.UserId,
+                    "google_play",
+                    plan.PlanCode,
+                    parsed.ProductId ?? string.Empty,
+                    parsed.PurchaseToken ?? string.Empty,
+                    null,
+                    parsed.PurchaseToken,
+                    null),
+                cancellationToken);
+
+            if (verification.IsFailure)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(verification.Error);
+            }
+
+            var status = EconomyWebhookParser.MapGooglePlayNotificationStatus(parsed.NotificationType, verification.Value.Status, verification.Value.IsActive);
+            var cancelAtPeriodEnd = parsed.NotificationType == 3;
+            var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
+
+            if (identityService is null)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
+            }
+
+            var premiumResult = await identityService.SetPremiumStatusAsync(
+                new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
+                cancellationToken);
+
+            if (premiumResult.IsFailure)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
+            }
+
+            logger?.LogInformation(
+                "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
+                "google_play",
+                existingSubscription.UserId,
+                parsed.EventId,
+                googlePlayEventType,
+                status,
+                isPremium,
+                CurrentCorrelationId);
+
+            await _pushNotificationSender.NotifyPremiumUpdateAsync(
+                existingSubscription.UserId,
+                new PremiumPushNotification(
+                    Status: isPremium ? "active" : "inactive",
+                    Provider: "google_play",
+                    PlanCode: plan.PlanCode),
+                cancellationToken);
+
+            var subscription = await UpsertUserSubscriptionAsync(
+                existingSubscription.UserId,
+                "google_play",
+                existingSubscription.PurchaseChannel,
+                existingSubscription.Region,
+                plan.PlanCode,
+                status,
+                parsed.EventId,
+                existingSubscription.ExternalSubscriptionId ?? verification.Value.ExternalSubscriptionId,
+                parsed.PurchaseToken ?? existingSubscription.ExternalTransactionId,
+                ResolveNotificationPeriodStartUtc(plan.BillingPeriod, verification.Value.ExpiresAtUtc, existingSubscription.CurrentPeriodStartUtc),
+                verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc,
+                cancelAtPeriodEnd,
+                plan.MonthlyTokenLimit,
+                cancellationToken);
+
+            await AppendSubscriptionEventAsync(
+                existingSubscription.UserId,
+                subscription.Id,
+                "google_play",
+                $"GooglePlayNotification:{parsed.NotificationType}",
+                subscription.Status,
+                parsed.EventId,
+                subscription.ExternalSubscriptionId,
+                BuildSafeGooglePlayWebhookPayloadMetadata(parsed),
+                cancellationToken);
+
+            LogSubscriptionUpdated(
+                "google_play",
+                parsed.EventId,
+                googlePlayEventType,
+                existingSubscription.UserId,
+                subscription.Status,
+                isPremium ? "activated" : "canceled");
+
+            if (isPremium)
+            {
+                await GrantPremiumSubscriptionAllowanceIfDueAsync(
+                    subscription,
+                    "google_play",
+                    cancellationToken);
             }
 
             await dbContext.SaveChangesAsync(cancellationToken);
-            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, pendingOrder.order.UserId, "processed_token_purchase");
-            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed_token_purchase"));
-        }
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
 
-        if (!parsed.IsSubscriptionNotification)
+            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
+            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
+        }
+        catch (DbUpdateException exception) when (IsUniqueWebhookEventConflict(exception))
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_unknown_notification");
-            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_unknown_notification"));
+            dbContext.ChangeTracker.Clear();
+            LogDuplicateStoreWebhook("google_play", parsed.EventId, googlePlayEventType);
+            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_duplicate"));
         }
-
-        var existingSubscription = await dbContext.UserSubscriptions
-            .FirstOrDefaultAsync(
-                x => x.Provider == "google_play"
-                    && ((!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalTransactionId == parsed.PurchaseToken)
-                        || (!string.IsNullOrWhiteSpace(parsed.PurchaseToken) && x.ExternalSubscriptionId == parsed.PurchaseToken)),
-                cancellationToken);
-
-        if (existingSubscription is null)
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, null, "ignored_not_found");
-            return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, false, "ignored_not_found"));
-        }
-
-        var plan = await ResolveStoreNotificationPlanAsync(existingSubscription.PlanId, parsed.ProductId, "google_play", cancellationToken);
-        if (plan is null)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumPlanNotFound);
-        }
-
-        var verification = await storeSubscriptionVerifier.VerifyAsync(
-            new StoreSubscriptionVerificationRequest(
-                existingSubscription.UserId,
-                "google_play",
-                plan.PlanCode,
-                parsed.ProductId ?? string.Empty,
-                parsed.PurchaseToken ?? string.Empty,
-                null,
-                parsed.PurchaseToken,
-                null),
-            cancellationToken);
-
-        if (verification.IsFailure)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(verification.Error);
-        }
-
-        var status = EconomyWebhookParser.MapGooglePlayNotificationStatus(parsed.NotificationType, verification.Value.Status, verification.Value.IsActive);
-        var cancelAtPeriodEnd = parsed.NotificationType == 3;
-        var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc);
-
-        if (identityService is null)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
-        }
-
-        var premiumResult = await identityService.SetPremiumStatusAsync(
-            new SetPremiumStatusCommand(existingSubscription.UserId, isPremium),
-            cancellationToken);
-
-        if (premiumResult.IsFailure)
-        {
-            return Result.Failure<StoreWebhookResultResponse>(premiumResult.Error);
-        }
-
-        logger?.LogInformation(
-            "Premium entitlement updated from Google Play webhook. Provider={Provider} UserId={UserId} EventId={EventId} EventType={EventType} Status={Status} IsPremium={IsPremium} CorrelationId={CorrelationId}",
-            "google_play",
-            existingSubscription.UserId,
-            parsed.EventId,
-            googlePlayEventType,
-            status,
-            isPremium,
-            CurrentCorrelationId);
-
-        await _pushNotificationSender.NotifyPremiumUpdateAsync(
-            existingSubscription.UserId,
-            new PremiumPushNotification(
-                Status: isPremium ? "active" : "inactive",
-                Provider: "google_play",
-                PlanCode: plan.PlanCode),
-            cancellationToken);
-
-        var subscription = await UpsertUserSubscriptionAsync(
-            existingSubscription.UserId,
-            "google_play",
-            existingSubscription.PurchaseChannel,
-            existingSubscription.Region,
-            plan.PlanCode,
-            status,
-            parsed.EventId,
-            existingSubscription.ExternalSubscriptionId ?? verification.Value.ExternalSubscriptionId,
-            parsed.PurchaseToken ?? existingSubscription.ExternalTransactionId,
-            ResolveNotificationPeriodStartUtc(plan.BillingPeriod, verification.Value.ExpiresAtUtc, existingSubscription.CurrentPeriodStartUtc),
-            verification.Value.ExpiresAtUtc ?? existingSubscription.CurrentPeriodEndUtc,
-            cancelAtPeriodEnd,
-            plan.MonthlyTokenLimit,
-            cancellationToken);
-
-        await AppendSubscriptionEventAsync(
-            existingSubscription.UserId,
-            subscription.Id,
-            "google_play",
-            $"GooglePlayNotification:{parsed.NotificationType}",
-            subscription.Status,
-            parsed.EventId,
-            subscription.ExternalSubscriptionId,
-            BuildSafeGooglePlayWebhookPayloadMetadata(parsed),
-            cancellationToken);
-
-        LogSubscriptionUpdated(
-            "google_play",
-            parsed.EventId,
-            googlePlayEventType,
-            existingSubscription.UserId,
-            subscription.Status,
-            isPremium ? "activated" : "canceled");
-
-        if (isPremium)
-        {
-            await GrantPremiumSubscriptionAllowanceIfDueAsync(
-                subscription,
-                "google_play",
-                cancellationToken);
-        }
-
-        LogStoreWebhookProcessed("google_play", parsed.EventId, googlePlayEventType, existingSubscription.UserId, "processed");
-        return Result.Success(new StoreWebhookResultResponse("google_play", parsed.EventId, true, "processed"));
     }
 
     private static string BuildSafeAppStoreWebhookPayloadMetadata(
