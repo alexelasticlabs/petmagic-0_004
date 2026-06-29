@@ -20,6 +20,9 @@ const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", impor
 const promoCodesHelpersPath = fileURLToPath(
   new URL("./promo-codes-view.helpers.ts", import.meta.url)
 );
+const promoCodesContentPath = fileURLToPath(
+  new URL("./promo-codes-view.content.ts", import.meta.url)
+);
 const promoCodesListCardPath = fileURLToPath(
   new URL("./promo-codes-list-card.tsx", import.meta.url)
 );
@@ -223,9 +226,20 @@ describe("promo code numeric form validation", () => {
 describe("promo code dangerous action hardening", () => {
   it("keeps archive confirmation open until the backend action succeeds", () => {
     const source = readFileSync(promoCodesViewPath, "utf8");
+    const contentSource = readFileSync(promoCodesContentPath, "utf8");
 
     expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
     expect(source).toContain('const canManagePromoCodes = sessionRoles.includes("Admin");');
+    expect(source).toContain(
+      'import { getPromoCodesViewText } from "@/components/promo-codes-view.content";'
+    );
+    expect(source).toContain("const promoText = useMemo(() => getPromoCodesViewText(locale), [locale]);");
+    expect(source).toContain("const archiveActionLabel = promoText.archiveActionLabel;");
+    expect(source).toContain("const promoCodesAdminOnlyMessage = promoText.adminOnlyMessage;");
+    expect(source).toContain("title: promoText.notificationTitle,");
+    expect(contentSource).toContain('archiveActionLabel: "Архивировать"');
+    expect(contentSource).toContain('adminOnlyMessage: "Управление промокодами доступно только Admin."');
+    expect(contentSource).toContain('notificationTitle: "Промокоды"');
     expect(source).toContain("if (!canManagePromoCodes || promoCodesQuery.isLoading)");
     expect(source).not.toContain(
       "if (!canManagePromoCodes || promoCodesQuery.isLoading || promoMetricsQuery.isLoading)"
@@ -266,6 +280,9 @@ describe("promo code dangerous action hardening", () => {
     expect(source).toContain("onRefresh={requestRefreshPromoCodes}");
     expect(source).toContain("promoCodesQuery.refetch()");
     expect(source).toContain("promoMetricsQuery.refetch().catch(() => undefined)");
+    expect(source).not.toContain('locale === "ru" ? "Архивировать" : "Archive"');
+    expect(source).not.toContain('locale === "ru"\n      ? "Управление промокодами доступно только Admin."');
+    expect(source).not.toContain('title: locale === "ru" ? "Промокоды" : "Promo codes"');
     expect(source).not.toContain(
       "void promoCodesQuery.refetch().catch(() => undefined);\n            void promoMetricsQuery.refetch().catch(() => undefined);"
     );
@@ -460,7 +477,7 @@ describe("promo code activation data sourcing", () => {
     expect(viewSource).toContain("Math.ceil(promoCodesTotalCount / pageSize)");
     expect(viewSource).toContain("totalCount={promoCodesTotalCount}");
     expect(readFileSync(promoCodesListCardPath, "utf8")).toContain(
-      "of ${formatNumber(totalCount, locale)}"
+      "buildPromoCodesPaginationSummary("
     );
     expect(viewSource).toContain(
       "queryKey: adminQueryKeys.economyRedeemCodes(promoCodesQueryParams)"
@@ -516,6 +533,7 @@ describe("promo code activation data sourcing", () => {
 
   it("sources promo code KPI cards from backend aggregate metrics", () => {
     const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const contentSource = readFileSync(promoCodesContentPath, "utf8");
     const queryKeysSource = readFileSync(
       fileURLToPath(new URL("../lib/admin-query-keys.ts", import.meta.url)),
       "utf8"
@@ -534,6 +552,15 @@ describe("promo code activation data sourcing", () => {
     expect(viewSource).toContain(
       "value={`${formatNumber(metrics.totalGranted, locale)} ${tokenUnit}`}"
     );
+    expect(viewSource).toContain("label={promoText.kpiCodesLabel}");
+    expect(viewSource).toContain("label={promoText.kpiActiveLabel}");
+    expect(viewSource).toContain("label={promoText.kpiUsesLabel}");
+    expect(viewSource).toContain("label={promoText.kpiGrantedLabel}");
+    expect(viewSource).toContain("hint={promoText.kpiFilteredListHint}");
+    expect(viewSource).toContain("hint={promoText.kpiUsesHint}");
+    expect(viewSource).toContain("hint={promoText.kpiGrantedHint}");
+    expect(contentSource).toContain('kpiCodesLabel: "Codes"');
+    expect(contentSource).toContain('kpiGrantedHint: "CSV export includes the current result page."');
     expect(viewSource).not.toContain("pageCodes: promoCodes.length");
     expect(viewSource).not.toContain("activeCodes: promoCodes.filter");
     expect(viewSource).not.toContain("totalUses: promoCodes.reduce");
@@ -588,6 +615,7 @@ describe("promo code sensitive display", () => {
 
   it("keeps promo code filters and pagination usable on tablet and mobile widths", () => {
     const listSource = readFileSync(promoCodesListCardPath, "utf8");
+    const contentSource = readFileSync(promoCodesContentPath, "utf8");
     const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
     const stylesSource = readFileSync(promoCodesStylesPath, "utf8");
 
@@ -611,8 +639,14 @@ describe("promo code sensitive display", () => {
     expect(listSource).not.toContain('{"<"}');
     expect(listSource).not.toContain('{">"}');
     expect(listSource).toContain('aria-current={pageNumber === currentPage ? "page" : undefined}');
-    expect(listSource).toContain("`Page ${formatNumber(pageNumber, locale)}`");
-    expect(listSource).toContain("`Страница ${formatNumber(pageNumber, locale)}`");
+    expect(listSource).toContain("buildPromoCodesPaginationSummary(");
+    expect(listSource).toContain("buildPromoCodesPageLabel(");
+    expect(listSource).toContain("ariaLabel={promoText.pageSizeAriaLabel}");
+    expect(listSource).toContain("buildPromoCodesAutoRefreshLabel(locale, secondsUntilAutoRefresh)");
+    expect(listSource).not.toContain("`Page ${formatNumber(pageNumber, locale)}`");
+    expect(listSource).not.toContain("`Страница ${formatNumber(pageNumber, locale)}`");
+    expect(contentSource).toContain("export function buildPromoCodesPageLabel");
+    expect(contentSource).toContain('pageSizeAriaLabel: "Page size"');
     expect(activationsSource).toContain("CaretDownIcon");
     expect(activationsSource).toContain("aria-label={text.promoCodesPreviousAction}");
     expect(activationsSource).toContain("aria-label={text.promoCodesNextAction}");

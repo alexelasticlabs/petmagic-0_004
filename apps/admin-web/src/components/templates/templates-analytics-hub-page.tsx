@@ -37,6 +37,12 @@ import {
   sanitizeTemplatesAnalyticsOverviewForExport,
   sanitizeTemplatesAnalyticsQueryForExport,
 } from "@/components/templates/templates-analytics-hub-export";
+import {
+  getTemplatesAnalyticsHubIntlLocale,
+  getTemplatesAnalyticsHubPageText,
+  getTemplatesAnalyticsHubPeriodOptions,
+  type TemplatesAnalyticsHubPageText,
+} from "@/components/templates/templates-analytics-hub-page.content";
 import styles from "@/components/templates/templates-analytics-hub-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
@@ -68,15 +74,6 @@ type TrendMetricKey =
   | "completedGenerations"
   | "totalProviderCostUsd";
 
-type Copy = ReturnType<typeof getCopy>;
-
-const PERIOD_OPTIONS: Array<{ key: PeriodKey; ru: string; en: string }> = [
-  { key: "7", ru: "7 дней", en: "7 days" },
-  { key: "30", ru: "30 дней", en: "30 days" },
-  { key: "90", ru: "90 дней", en: "90 days" },
-  { key: "all", ru: "Всё время", en: "All time" },
-];
-
 function formatAnalyticsDisplayText(value: string, maxLength = 120) {
   return sanitizeSensitiveText(value, maxLength);
 }
@@ -90,8 +87,8 @@ function getBoundedBarWidthPercent(value: number, minimumVisiblePercent: number)
 }
 
 export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageProps) {
-  const isRu = locale === "ru";
-  const text = useMemo(() => getCopy(locale), [locale]);
+  const text = useMemo(() => getTemplatesAnalyticsHubPageText(locale), [locale]);
+  const periodOptions = useMemo(() => getTemplatesAnalyticsHubPeriodOptions(locale), [locale]);
   const dictionary = useMemo(() => getDictionary(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
@@ -265,13 +262,13 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
     },
     {
       label: text.conversion,
-      value: formatPercent(summary.conversionPercent, isRu),
+      value: formatPercent(summary.conversionPercent, locale),
       hint: text.conversionHint,
       tone: "blue",
     },
     {
       label: text.tokens,
-      value: formatTokens(summary.totalTokenCost, isRu),
+      value: formatTokens(summary.totalTokenCost, locale),
       hint: text.tokensHint,
       tone: "amber",
     },
@@ -353,7 +350,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
 
       <AdminToolbar className={styles.toolbar}>
         <div className={styles.segmented} aria-label={text.periodLabel}>
-          {PERIOD_OPTIONS.map((option) => {
+          {periodOptions.map((option) => {
             const isActivePeriod = period === option.key;
 
             return (
@@ -365,7 +362,7 @@ export function TemplatesAnalyticsHubPage({ locale }: TemplatesAnalyticsHubPageP
                 onClick={() => setPeriod(option.key)}
               >
                 <CalendarIcon className={styles.controlIcon} />
-                <span>{isRu ? option.ru : option.en}</span>
+                <span>{option.label}</span>
               </button>
             );
           })}
@@ -613,10 +610,8 @@ function FeedbackFeedPanel({
 }: {
   items: readonly AdminTemplatesAnalyticsFeedbackItem[];
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
-  const isRu = locale === "ru";
-
   if (!items.length) {
     return <div className={styles.emptyState}>{text.feedbackEmpty}</div>;
   }
@@ -664,7 +659,7 @@ function FeedbackFeedPanel({
               </span>
               <span>
                 {text.feedbackUserLabel}:{" "}
-                {item.userId ? shortId(item.userId) : isRu ? "анон" : "guest"}
+                {item.userId ? shortId(item.userId) : text.anonymousUser}
               </span>
               {item.generationId ? (
                 <span>
@@ -688,7 +683,7 @@ function TrendChart({
   points: AdminTemplatesAnalyticsTrendPoint[];
   metric: TrendMetricKey;
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
   if (!points.length) {
     return <div className={styles.emptyChart}>{text.noTrend}</div>;
@@ -782,7 +777,7 @@ function FunnelList({
 }: {
   overview: AdminTemplatesAnalyticsOverview;
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
   const max = Math.max(
     1,
@@ -879,7 +874,7 @@ function TypePanel({
 }: {
   rows: AdminTemplatesAnalyticsBreakdown[];
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
   const dictionary = getDictionary(locale);
   return (
@@ -903,10 +898,10 @@ function TypePanel({
             <strong>{formatNumber(row.views, locale)}</strong>
             <p>
               {formatNumber(row.generationStarts, locale)} {text.startsShort} ·{" "}
-              {formatPercent(row.conversionPercent, locale === "ru")}
+              {formatPercent(row.conversionPercent, locale)}
             </p>
             <p>
-              {formatTokens(row.totalTokenCost, locale === "ru")} ·{" "}
+              {formatTokens(row.totalTokenCost, locale)} ·{" "}
               {formatMoney(row.totalProviderCostUsd, locale)}
             </p>
           </article>
@@ -950,7 +945,7 @@ function EventDimensionPanel({
                 }}
               />
             </div>
-            <em>{formatPercent(row.sharePercent, locale === "ru")}</em>
+            <em>{formatPercent(row.sharePercent, locale)}</em>
           </div>
         ))}
         {!rows.length ? <div className={styles.emptyState}>-</div> : null}
@@ -966,7 +961,7 @@ function TopTemplatesPanel({
 }: {
   rows: AdminTemplatesAnalyticsTemplateRow[];
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
   const dictionary = getDictionary(locale);
   return (
@@ -1006,7 +1001,7 @@ function TemplatesTable({
 }: {
   rows: AdminTemplatesAnalyticsTemplateRow[];
   locale: AppLocale;
-  text: Copy;
+  text: TemplatesAnalyticsHubPageText;
 }) {
   const dictionary = getDictionary(locale);
   return (
@@ -1051,8 +1046,8 @@ function TemplatesTable({
               <td>{getTemplateAccessLabel(row.isPremium, dictionary)}</td>
               <td>{formatNumber(row.views, locale)}</td>
               <td>{formatNumber(row.generationStarts, locale)}</td>
-              <td>{formatPercent(row.conversionPercent, locale === "ru")}</td>
-              <td>{formatTokens(row.totalTokenCost, locale === "ru")}</td>
+              <td>{formatPercent(row.conversionPercent, locale)}</td>
+              <td>{formatTokens(row.totalTokenCost, locale)}</td>
               <td>{formatMoney(row.totalProviderCostUsd, locale)}</td>
               <td>
                 <Link
@@ -1112,17 +1107,21 @@ function formatTrendValue(value: number, metric: TrendMetricKey, locale: AppLoca
 }
 
 function formatNumber(value: number, locale: AppLocale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.NumberFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   }).format(value);
 }
 
-function formatPercent(value: number, isRu: boolean) {
-  return `${new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", { maximumFractionDigits: 1 }).format(value)}%`;
+function formatPercent(value: number, locale: AppLocale) {
+  return `${new Intl.NumberFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
+    maximumFractionDigits: 1,
+  }).format(value)}%`;
 }
 
-function formatTokens(value: number, isRu: boolean) {
-  return `${new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", { maximumFractionDigits: value % 1 === 0 ? 0 : 1 }).format(value)} PawSpark`;
+function formatTokens(value: number, locale: AppLocale) {
+  return `${new Intl.NumberFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
+    maximumFractionDigits: value % 1 === 0 ? 0 : 1,
+  }).format(value)} PawSpark`;
 }
 
 function formatTemplateCount(value: number, locale: AppLocale, fallbackLabel: string) {
@@ -1146,7 +1145,7 @@ function formatTemplateCount(value: number, locale: AppLocale, fallbackLabel: st
 }
 
 function formatMoney(value: number, locale: AppLocale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.NumberFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
@@ -1155,14 +1154,14 @@ function formatMoney(value: number, locale: AppLocale) {
 }
 
 function formatDateTime(value: string, locale: AppLocale) {
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
 function formatShortDate(value: string, locale: AppLocale) {
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(getTemplatesAnalyticsHubIntlLocale(locale), {
     day: "2-digit",
     month: "short",
   }).format(new Date(value));
@@ -1180,158 +1179,4 @@ function shortId(value: string) {
 function formatAnalyticsValue(value: string | null | undefined) {
   const normalized = value?.trim();
   return normalized ? formatAnalyticsDisplayText(normalized, 96) : "-";
-}
-
-function getCopy(locale: AppLocale) {
-  const isRu = locale === "ru";
-
-  return {
-    eyebrow: isRu ? "Интеллект шаблонов" : "Template intelligence",
-    title: isRu ? "Аналитика шаблонов" : "Template analytics",
-    description: isRu
-      ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов."
-      : "Global view of template views, generations, spend, and performance.",
-    catalog: isRu ? "Каталог" : "Catalog",
-    export: isRu ? "Экспорт" : "Export",
-    templates: isRu ? "Шаблонов" : "Templates",
-    video: isRu ? "Видео" : "Video",
-    image: isRu ? "Изображения" : "Images",
-    updated: isRu ? "Обновлено" : "Updated",
-    active: isRu ? "Активные" : "Active",
-    premium: "Premium",
-    free: "Free",
-    loading: isRu ? "Загрузка аналитики шаблонов..." : "Loading template analytics...",
-    loadError: isRu
-      ? "Не удалось загрузить аналитику шаблонов."
-      : "Failed to load template analytics.",
-    partialErrorTitle: isRu
-      ? "Отчет показан из последнего успешного ответа"
-      : "Showing the last successful report",
-    partialErrorDescription: isRu
-      ? "Обновление аналитики не завершилось. Данные ниже остаются доступными."
-      : "Template analytics did not refresh. The report below is still available.",
-    retryAction: isRu ? "Повторить" : "Retry",
-    periodLabel: isRu ? "Период" : "Period",
-    typeFilter: isRu ? "Тип" : "Type",
-    categoryFilter: isRu ? "Категория" : "Category",
-    statusFilter: isRu ? "Статус" : "Status",
-    accessFilter: isRu ? "Доступ" : "Access",
-    sortFilter: isRu ? "Сортировка" : "Sort",
-    allTemplates: isRu ? "Все шаблоны" : "All templates",
-    allCategories: isRu ? "Все категории" : "All categories",
-    allStatuses: isRu ? "Все статусы" : "All statuses",
-    allAccess: isRu ? "Все" : "All",
-    draft: isRu ? "Черновик" : "Draft",
-    archived: isRu ? "Архив" : "Archived",
-    sortViews: isRu ? "Просмотры" : "Views",
-    sortStarts: isRu ? "Запуски" : "Starts",
-    sortConversion: isRu ? "Конверсия" : "Conversion",
-    sortCost: isRu ? "Затраты" : "Cost",
-    sortUpdated: isRu ? "Обновление" : "Updated",
-    views: isRu ? "Просмотры шаблонов" : "Template views",
-    viewsHint: isRu
-      ? "Просмотры всех выбранных шаблонов."
-      : "View events across selected templates.",
-    starts: isRu ? "Запуски генераций" : "Generation starts",
-    startsHint: isRu
-      ? "Запуски генерации за выбранный период."
-      : "Generation jobs created in the selected period.",
-    completed: isRu ? "Успешные генерации" : "Completed generations",
-    completedHint: isRu ? "Завершились готовым результатом." : "Completed with an output result.",
-    conversion: isRu ? "Конверсия в результат" : "Result conversion",
-    conversionHint: isRu
-      ? "Успешные генерации от всех запусков."
-      : "Completed jobs divided by starts.",
-    tokens: isRu ? "Потрачено PawSpark" : "PawSpark spend",
-    tokensHint: isRu
-      ? "Суммарный расход пользователей на генерации."
-      : "Total user PawSpark spend for generations.",
-    providerSpend: isRu ? "Наши затраты" : "Provider spend",
-    providerSpendHint: isRu
-      ? "Реальные USD-затраты на AI-провайдера."
-      : "Real AI provider USD costs from jobs.",
-    complaints: isRu ? "Жалобы" : "Complaints",
-    complaintsHint: isRu
-      ? "Количество complaint событий; ниже доступен список самих обращений."
-      : "Complaint event count; see the feed below for actual messages.",
-    feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
-    feedbackHint: isRu
-      ? "Последние complaint и feedback события по выбранным шаблонам с текстом сообщения и переходом в конкретный шаблон."
-      : "Latest complaint and feedback events for the selected templates with message text and a link to the specific template.",
-    feedbackEmpty: isRu
-      ? "По выбранным фильтрам пока нет жалоб или фидбека."
-      : "There are no complaints or feedback items for the current filters yet.",
-    feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
-    feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
-    feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
-    feedbackSourceLabel: isRu ? "Источник" : "Source",
-    feedbackDeviceLabel: isRu ? "Устройство" : "Device",
-    feedbackCountryLabel: isRu ? "Страна" : "Country",
-    feedbackUserLabel: isRu ? "Пользователь" : "User",
-    feedbackGenerationLabel: isRu ? "Генерация" : "Generation",
-    chartViews: isRu ? "Просмотры" : "Views",
-    chartStarts: isRu ? "Запуски" : "Starts",
-    chartCompleted: isRu ? "Успех" : "Completed",
-    chartCost: isRu ? "Затраты" : "Cost",
-    trendTitle: isRu ? "Динамика по времени" : "Trend over time",
-    trendHint: isRu
-      ? "Дневная динамика просмотров, запусков, успешных генераций и реальных затрат."
-      : "Daily trend for views, starts, completions, and real spend.",
-    noTrend: isRu ? "Пока нет точек тренда." : "No trend points yet.",
-    currentMetric: isRu ? "Сумма выбранной метрики" : "Selected metric total",
-    funnelTitle: isRu ? "Воронка конверсии" : "Conversion funnel",
-    funnelHint: isRu
-      ? "От просмотра шаблона до результата и жалоб."
-      : "From template view to result and complaints.",
-    funnelViews: isRu ? "Увидели шаблон" : "Viewed template",
-    funnelStarts: isRu ? "Запустили генерацию" : "Started generation",
-    funnelCompleted: isRu ? "Получили результат" : "Completed result",
-    funnelFailed: isRu ? "Получили ошибку" : "Failed",
-    funnelComplaints: isRu ? "Пожаловались" : "Complaints",
-    categoriesTitle: isRu ? "Категории" : "Categories",
-    categoriesHint: isRu
-      ? "Где концентрируются просмотры, запуски и расходы."
-      : "Where views, starts, and spend concentrate.",
-    typesTitle: isRu ? "Типы шаблонов" : "Template types",
-    typesHint: isRu ? "Видео и изображения в одной сводке." : "Video and Image in one overview.",
-    sourcesTitle: isRu ? "Источники просмотров" : "View sources",
-    sourcesHint: isRu
-      ? "Откуда пользователи открывали выбранные шаблоны."
-      : "Real source events for selected templates.",
-    devicesTitle: isRu ? "Устройства" : "Devices",
-    devicesHint: isRu
-      ? "Классы устройств из публичной аналитики шаблонов."
-      : "Device class from public analytics instrumentation.",
-    geographyTitle: isRu ? "География" : "Geography",
-    geographyHint: isRu
-      ? "Страны из событий просмотра, без расчётных догадок."
-      : "Country code from view events, without guessing.",
-    startsShort: isRu ? "запусков" : "starts",
-    topTitle: isRu ? "Топ шаблонов" : "Top templates",
-    topHint: isRu
-      ? "Сортировка синхронизирована с выбранными фильтрами."
-      : "Sorted with the selected filters.",
-    tableTitle: isRu ? "Все шаблоны" : "All templates",
-    tableHint: isRu
-      ? "Сводная таблица шаблонов по просмотрам, генерациям, ошибкам и реальным затратам."
-      : "Template table with views, generations, failures, and real provider costs.",
-    templateCountLabel: isRu ? "шаблонов" : "templates",
-    refreshing: isRu ? "обновляется" : "refreshing",
-    templateColumn: isRu ? "Шаблон" : "Template",
-    typeColumn: isRu ? "Тип" : "Type",
-    categoryColumn: isRu ? "Категория" : "Category",
-    statusColumn: isRu ? "Статус" : "Status",
-    accessColumn: isRu ? "Доступ" : "Access",
-    viewsColumn: isRu ? "Просмотры" : "Views",
-    startsColumn: isRu ? "Запуски" : "Starts",
-    conversionColumn: isRu ? "Конверсия" : "Conversion",
-    tokensColumn: isRu ? "PawSpark" : "PawSpark",
-    costColumn: isRu ? "Затраты" : "Cost",
-    actionsColumn: isRu ? "Действия" : "Actions",
-    openAnalytics: isRu ? "Аналитика" : "Analytics",
-    openEditor: isRu ? "Редактор" : "Editor",
-    noRows: isRu
-      ? "Под выбранные фильтры шаблоны не найдены."
-      : "No templates match the selected filters.",
-  };
 }

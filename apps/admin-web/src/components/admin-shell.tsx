@@ -6,6 +6,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
@@ -43,11 +44,12 @@ import {
 type AdminShellProps = { locale: Locale; children: ReactNode };
 
 function AdminAccessGate({ locale }: { locale: Locale }) {
+  const copy = getAdminChromeCopy(locale);
   return (
     <div className={styles.authGate} aria-busy="true" aria-live="polite">
       <div className={styles.authGateCard}>
         <span className={styles.authGateMark}>PM</span>
-        <span>{locale === "ru" ? "Проверяем доступ..." : "Checking access..."}</span>
+        <span>{copy.accessGateChecking}</span>
       </div>
     </div>
   );
@@ -58,6 +60,7 @@ function AdminAccessGate({ locale }: { locale: Locale }) {
 ════════════════════════════════════════════════════════════════ */
 export function AdminShell({ locale, children }: AdminShellProps) {
   const text = getDictionary(locale);
+  const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const pathname = usePathname();
   const router = useRouter();
   const { addNotification } = useAdminNotifications();
@@ -105,18 +108,13 @@ export function AdminShell({ locale, children }: AdminShellProps) {
     }
 
     const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
-    const message =
-      preview
-        ? locale === "ru"
-          ? `Новое сообщение в поддержке: ${preview}`
-          : `New support message: ${preview}`
-        : locale === "ru"
-          ? "В поддержке появилось новое сообщение"
-          : "A new support message arrived";
+    const message = preview
+      ? copy.realtimeSupport.withPreview(preview)
+      : copy.realtimeSupport.fallback;
     const supportConversationPathId = encodeURIComponent(event.conversationId);
 
     addNotification({
-      title: locale === "ru" ? "Поддержка" : "Support",
+      title: copy.realtimeSupport.title,
       message,
       category: "support",
       source: "support-realtime",
@@ -320,14 +318,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
   const userPanelRole = getAdminPanelRole(sessionRoles);
   const userRole =
     userPanelRole === "Moderator"
-      ? locale === "ru"
-        ? "Модератор"
-        : "Moderator"
-      : locale === "ru"
-        ? "Администратор"
-        : "Administrator";
+      ? copy.roles.moderator
+      : copy.roles.admin;
   const userInitial = (userName || "A")[0].toUpperCase();
-  const userBadgeName = userName || (locale === "ru" ? "Администратор" : "Administrator");
+  const userBadgeName = userName || copy.roles.adminFallback;
   const pageMeta = getAdminPageMeta(locale, currentPath, userName);
   const ruPath = buildLocaleSwitchPath("ru", pathname);
   const enPath = buildLocaleSwitchPath("en", pathname);
@@ -377,14 +371,10 @@ export function AdminShell({ locale, children }: AdminShellProps) {
 
       <ConfirmationDialog
         open={logoutDialogOpen}
-        title={locale === "ru" ? "Выйти из админ-панели?" : "Log out of admin panel?"}
-        description={
-          locale === "ru"
-            ? "Текущая сессия будет очищена, и для возврата потребуется повторный вход."
-            : "The current session will be cleared and signing in again will be required."
-        }
+        title={copy.logoutDialog.title}
+        description={copy.logoutDialog.description}
         confirmLabel={text.navLogout}
-        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        cancelLabel={copy.logoutDialog.cancel}
         tone="danger"
         isSubmitting={isLoggingOut}
         onCancel={() => {

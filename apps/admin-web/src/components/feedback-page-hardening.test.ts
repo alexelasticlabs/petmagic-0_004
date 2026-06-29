@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const feedbackPagePath = fileURLToPath(new URL("./feedback-page.tsx", import.meta.url));
+const feedbackPageContentPath = fileURLToPath(new URL("./feedback-page.content.ts", import.meta.url));
 const feedbackStylesPath = fileURLToPath(new URL("./feedback-page.module.css", import.meta.url));
 
 describe("feedback page hardening", () => {
@@ -139,9 +140,10 @@ describe("feedback page hardening", () => {
 
   it("shows loading and retry states for selected feedback details", () => {
     const source = readFileSync(feedbackPagePath, "utf8");
+    const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
-    expect(source).toContain("detailsLoading:");
-    expect(source).toContain("detailsError:");
+    expect(contentSource).toContain("detailsLoading:");
+    expect(contentSource).toContain("detailsError:");
     expect(source).toContain("selectedId && detailsQuery.isLoading");
     expect(source).toContain("selectedId && detailsQuery.isError");
     expect(source).toContain(
@@ -159,10 +161,11 @@ describe("feedback page hardening", () => {
 
   it("shows mutation errors and prevents overlapping feedback detail actions", () => {
     const source = readFileSync(feedbackPagePath, "utf8");
+    const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
     expect(source).toContain("ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,");
-    expect(source).toContain("saveError:");
-    expect(source).toContain("refundError:");
+    expect(contentSource).toContain("saveError:");
+    expect(contentSource).toContain("refundError:");
     expect(source).toContain("updateMutation.isError");
     expect(source).toContain("refundMutation.isError");
     expect(source).toContain("maxLength={ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH}");
@@ -198,41 +201,45 @@ describe("feedback page hardening", () => {
     expect(source).not.toContain("onClick={() => refundMutation.mutate()}");
   });
 
-  it("keeps Russian feedback filters, actions, and detail labels localized", () => {
+  it("keeps feedback localization in a dedicated content module and localizes enum labels", () => {
     const source = readFileSync(feedbackPagePath, "utf8");
+    const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
-    expect(source).toContain('templateId: isRu ? "ID шаблона" : "Template id"');
-    expect(source).toContain('userId: isRu ? "ID пользователя" : "User id"');
-    expect(source).toContain('from: isRu ? "С даты" : "From"');
-    expect(source).toContain('to: isRu ? "По дату" : "To"');
-    expect(source).toContain('refund: isRu ? "Вернуть кредиты" : "Refund credits"');
-    expect(source).toContain('refunded: isRu ? "Кредиты возвращены" : "Refund issued"');
-    expect(source).toContain('note: isRu ? "Заметка администратора" : "Admin note"');
-    expect(source).toContain('input: isRu ? "Входные данные" : "Input"');
-    expect(source).toContain('result: isRu ? "Результат" : "Result"');
-    expect(source).toContain('planCredits: isRu ? "План / кредиты" : "Plan / credits"');
-    expect(source).toContain('source: isRu ? "Источник" : "Source"');
-    expect(source).toContain('app: isRu ? "Версия приложения" : "App"');
-    expect(source).toContain('device: isRu ? "Устройство" : "Device"');
-    expect(source).toContain('provider: isRu ? "Провайдер" : "Provider"');
-    expect(source).toContain('errorCode: isRu ? "Код ошибки" : "Error"');
-    expect(source).toContain('credits: isRu ? "кредитов" : "credits"');
-    expect(source).toContain("label={text.planCredits}");
-    expect(source).toContain("label={text.source}");
-    expect(source).toContain("label={text.app}");
-    expect(source).toContain("label={text.device}");
-    expect(source).toContain("label={text.provider}");
-    expect(source).toContain("label={text.errorCode}");
-    expect(source).toContain("{text.credits}");
-    expect(source).not.toContain('templateId: isRu ? "Template id" : "Template id"');
-    expect(source).not.toContain('from: isRu ? "From" : "From"');
-    expect(source).not.toContain('refund: isRu ? "Refund credits" : "Refund credits"');
-    expect(source).not.toContain('note: isRu ? "Admin note" : "Admin note"');
-    expect(source).not.toContain('input: isRu ? "Input" : "Input"');
-    expect(source).not.toContain('label="Plan / credits"');
-    expect(source).not.toContain('label="Provider"');
-    expect(source).not.toContain('label="Error"');
-    expect(source).not.toContain(" credits\n                </strong>");
+    expect(source).toContain(
+      'import { getFeedbackPageText, type FeedbackPageText } from "./feedback-page.content";'
+    );
+    expect(source).toContain("const text = getFeedbackPageText(locale);");
+    expect(source).toContain("const text = getFeedbackPageText(locale);");
+    expect(source).toContain("optionLabels={text.statusOptions}");
+    expect(source).toContain("optionLabels={text.priorityOptions}");
+    expect(source).toContain("optionLabels={text.typeOptions}");
+    expect(source).toContain("optionLabel(text.typeOptions, item.type)");
+    expect(source).toContain("optionLabel(text.statusOptions, item.status)");
+    expect(source).toContain("optionLabel(text.priorityOptions, item.priority)");
+    expect(source).toContain("text.ratingLabels.positive");
+    expect(source).toContain("text.userPlanPremium");
+    expect(source).toContain("text.userPlanFree");
+    expect(source).toContain("{text.statusOptions[option]}");
+    expect(source).toContain("{text.priorityOptions[option]}");
+    expect(source).not.toContain("function copy(locale: Locale)");
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(source).not.toContain("<td>{item.type}</td>");
+    expect(source).not.toContain('if (value === 1) return "Good";');
+
+    expect(contentSource).toContain("const feedbackPageText: Record<Locale, FeedbackPageText> = {");
+    expect(contentSource).toContain('title: "Отзывы"');
+    expect(contentSource).toContain('title: "Feedback"');
+    expect(contentSource).toContain('empty: "Отзывы не найдены"');
+    expect(contentSource).toContain('loading: "Загрузка отзывов"');
+    expect(contentSource).toContain('statusOptions: {');
+    expect(contentSource).toContain('InReview: "На проверке"');
+    expect(contentSource).toContain('GenerationFailure: "Сбой генерации"');
+    expect(contentSource).toContain('ratingLabels: {');
+    expect(contentSource).toContain('positive: "Хорошо"');
+    expect(contentSource).toContain('userPlanPremium: "Премиум"');
+    expect(contentSource).toContain('userPlanFree: "Бесплатный"');
+    expect(contentSource).toContain('userPlanPremium: "Premium"');
+    expect(contentSource).toContain('userPlanFree: "Free"');
   });
 
   it("keeps feedback detail form drafts synced with refreshed backend details", () => {
@@ -274,15 +281,18 @@ describe("feedback page hardening", () => {
     expect(source).toContain("userQuery.isLoading");
     expect(source).toContain("userAnalyticsQuery.isLoading");
     expect(source).toContain("text.userContextLoading");
+    expect(source).toContain("text.userPlanPremium");
+    expect(source).toContain("text.userPlanFree");
     expect(source).not.toContain('`${userQuery.data?.isPremium ? "premium" : "free"}');
   });
 
   it("keeps feedback user context failures local and retryable", () => {
     const source = readFileSync(feedbackPagePath, "utf8");
+    const contentSource = readFileSync(feedbackPageContentPath, "utf8");
     const stylesSource = readFileSync(feedbackStylesPath, "utf8");
 
-    expect(source).toContain("userContextErrorTitle:");
-    expect(source).toContain("userContextErrorDescription:");
+    expect(contentSource).toContain("userContextErrorTitle:");
+    expect(contentSource).toContain("userContextErrorDescription:");
     expect(source).toContain(
       "const hasUserContextError = Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError);"
     );

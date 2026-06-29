@@ -15,6 +15,7 @@ import {
   UsersIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import styles from "@/components/admin/admin-shell.module.css";
 import {
   getAdminNavItems,
@@ -104,10 +105,11 @@ export function AdminSidebar({
   supportUnreadCount = 0,
   roles,
 }: AdminSidebarProps) {
+  const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const navItems = useMemo(() => getAdminNavItems(locale, roles), [locale, roles]);
   const navSections = useMemo(() => buildNavSections(navItems, locale), [locale, navItems]);
-  const brandCaption = locale === "ru" ? "Операционная админ-зона" : "Operational admin workspace";
-  const navigationLabel = locale === "ru" ? "Навигация админ-панели" : "Admin navigation";
+  const brandCaption = copy.sidebar.brandCaption;
+  const navigationLabel = copy.sidebar.navigationLabel;
 
   function renderNavEntry(item: AdminNavEntry) {
     if (item.type === "group") {
@@ -169,11 +171,7 @@ export function AdminSidebar({
         {item.key === "support" && supportUnreadCount > 0 ? (
           <span
             className={styles.navBadge}
-            aria-label={
-              locale === "ru"
-                ? `${supportUnreadCount} новых сообщений в поддержке`
-                : `${supportUnreadCount} new support messages`
-            }
+            aria-label={copy.sidebar.supportUnreadLabel(supportUnreadCount)}
           >
             {supportUnreadCount > 99 ? "99+" : supportUnreadCount}
           </span>

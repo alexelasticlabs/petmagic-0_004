@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const generationsPagePath = fileURLToPath(new URL("./generations-page.tsx", import.meta.url));
+const generationsContentPath = fileURLToPath(
+  new URL("./generations-page.content.ts", import.meta.url)
+);
 const generationsStylesPath = fileURLToPath(
   new URL("./generations-page.module.css", import.meta.url)
 );
@@ -28,39 +31,55 @@ describe("generations page hardening", () => {
 
   it("localizes generation statuses and keeps unsupported retry/cancel actions out of the UI", () => {
     const source = readFileSync(generationsPagePath, "utf8");
+    const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(source).toContain('eyebrow: isRu ? "Операции" : "Operations"');
     expect(source).toContain(
-      'description: isRu\n      ? "Операционный список заданий генерации'
+      'import {\n  getGenerationsPageIntlLocale,\n  getGenerationsPageText,\n  type GenerationsPageText,\n} from "./generations-page.content";'
     );
-    expect(source).toContain('adminOnly: isRu ? "Только Admin" : "Admin only"');
-    expect(source).toContain('total: isRu ? "Всего заданий" : "Total jobs"');
-    expect(source).toContain('allJobsScope: isRu ? "Все задания" : "All jobs"');
-    expect(source).toContain(
-      'emptyDescription: isRu\n      ? "Измените фильтры или дождитесь новых заданий генерации."'
-    );
-    expect(source).toContain('job: isRu ? "Задание" : "Job"');
-    expect(source).toContain('pending: isRu ? "Ожидает" : "Pending"');
-    expect(source).toContain('running: isRu ? "В работе" : "Running"');
-    expect(source).toContain('failed: isRu ? "Ошибка" : "Failed"');
-    expect(source).toContain('cancelled: isRu ? "Отменена" : "Cancelled"');
-    expect(source).toContain('before: isRu ? "До" : "Before"');
-    expect(source).toContain('after: isRu ? "После" : "After"');
-    expect(source).toContain('compareState: isRu ? "Сравнение" : "Compare"');
-    expect(source).toContain('inputAsset: isRu ? "Входной asset" : "Input asset"');
-    expect(source).toContain('resultAsset: isRu ? "Результат asset" : "Result asset"');
-    expect(source).toContain('pet: isRu ? "Питомец" : "Pet"');
-    expect(source).toContain('petPhoto: isRu ? "Фото питомца" : "Pet photo"');
-    expect(source).toContain('debugTitle: isRu ? "Отладка" : "Debug"');
-    expect(source).toContain('grantClean: isRu ? "Выдать clean" : "Grant clean"');
-    expect(source).toContain('feedbackTab: isRu ? "Отзывы" : "Feedback"');
+    expect(source).toContain("const text = getGenerationsPageText(locale);");
+    expect(source).toContain("getGenerationsPageIntlLocale(locale)");
     expect(source).toContain("formatStatus(item.status, text)");
     expect(source).toContain("formatTemplateType(item.templateType, text)");
+    expect(source).toContain("formatInputSourceType(item.inputSourceType, text)");
+    expect(source).toContain("formatMappedLabel(text.feedbackTypeOptions, feedback.type)");
+    expect(source).toContain("formatMappedLabel(text.feedbackStatusOptions, feedback.status)");
+    expect(source).toContain("formatMappedLabel(text.feedbackPriorityOptions, feedback.priority)");
+    expect(source).not.toContain("function getCopy(locale: Locale)");
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(source).not.toContain('locale === "ru" ? "ru-RU" : "en-US"');
     expect(source).not.toContain("unsupportedActions");
     expect(source).not.toContain("Retry/cancel не показаны");
     expect(source).not.toContain("Retry/cancel are hidden");
     expect(source).not.toContain("backend does not expose");
     expect(source).not.toContain("metaItems={[");
+
+    expect(contentSource).toContain(
+      "const generationsPageText: Record<Locale, GenerationsPageText> = {"
+    );
+    expect(contentSource).toContain(
+      "export function getGenerationsPageIntlLocale(locale: Locale): string"
+    );
+    expect(contentSource).toContain('eyebrow: "Операции"');
+    expect(contentSource).toContain('description:\n      "Операционный список заданий генерации');
+    expect(contentSource).toContain('adminOnly: "Только Admin"');
+    expect(contentSource).toContain('total: "Всего заданий"');
+    expect(contentSource).toContain('allJobsScope: "Все задания"');
+    expect(contentSource).toContain('emptyDescription: "Измените фильтры или дождитесь новых заданий генерации."');
+    expect(contentSource).toContain('job: "Задание"');
+    expect(contentSource).toContain('Pending: "Ожидает"');
+    expect(contentSource).toContain('Running: "В работе"');
+    expect(contentSource).toContain('Failed: "Ошибка"');
+    expect(contentSource).toContain('Cancelled: "Отменена"');
+    expect(contentSource).toContain('before: "До"');
+    expect(contentSource).toContain('after: "После"');
+    expect(contentSource).toContain('compareState: "Сравнение"');
+    expect(contentSource).toContain('inputAsset: "Входной asset"');
+    expect(contentSource).toContain('resultAsset: "Результат asset"');
+    expect(contentSource).toContain('pet: "Питомец"');
+    expect(contentSource).toContain('petPhoto: "Фото питомца"');
+    expect(contentSource).toContain('debugTitle: "Отладка"');
+    expect(contentSource).toContain('grantClean: "Выдать clean"');
+    expect(contentSource).toContain('feedbackTab: "Отзывы"');
   });
 
   it("keeps generation search server-backed and disables repeated retry clicks", () => {
@@ -115,14 +134,11 @@ describe("generations page hardening", () => {
 
   it("keeps generation pagination accessible and usable on narrow screens", () => {
     const source = readFileSync(generationsPagePath, "utf8");
+    const contentSource = readFileSync(generationsContentPath, "utf8");
     const stylesSource = readFileSync(generationsStylesPath, "utf8");
 
-    expect(source).toContain(
-      'previousPageLabel: isRu ? "Предыдущая страница генераций" : "Previous generations page"'
-    );
-    expect(source).toContain(
-      'nextPageLabel: isRu ? "Следующая страница генераций" : "Next generations page"'
-    );
+    expect(contentSource).toContain('previousPageLabel: "Предыдущая страница генераций"');
+    expect(contentSource).toContain('nextPageLabel: "Следующая страница генераций"');
     expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
     expect(source).toContain('className={`${styles.button} ${styles.pagerButton}`}');
     expect(source).toContain("aria-label={text.previousPageLabel}");
@@ -204,19 +220,23 @@ describe("generations page hardening", () => {
 
   it("shows watermark unlock actor together with method, credits, and timestamp", () => {
     const source = readFileSync(generationsPagePath, "utf8");
+    const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(source).toContain("watermarkUnlockedBy: isRu ? \"кем\" : \"by\"");
+    expect(contentSource).toContain('watermarkUnlockedBy: "Разблокировал"');
+    expect(contentSource).toContain('watermarkUnlockedBy: "Unlocked by"');
     expect(source).toContain("const watermarkUnlockedByText = item.watermarkUnlockedByUserId");
     expect(source).toContain("formatShortId(item.watermarkUnlockedByUserId)");
     expect(source).toContain("{text.watermarkUnlockedBy} {watermarkUnlockedByText}");
+    expect(source).toContain("text.creditsLabel");
     expect(source).toContain("item.watermarkCreditsSpent");
     expect(source).toContain("item.watermarkUnlockedAtUtc");
   });
 
   it("guards clean watermark grants while a grant request or generation refresh is pending", () => {
     const source = readFileSync(generationsPagePath, "utf8");
+    const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(source).toContain("grantCleanError:");
+    expect(contentSource).toContain('grantCleanError: "Не удалось выдать clean download."');
     expect(source).toContain("const [grantCleanError, setGrantCleanError]");
     expect(source).toContain("setGrantCleanError(null);");
     expect(source).toContain("setGrantCleanError(getAdminErrorMessage(error, text.grantCleanError));");
@@ -257,8 +277,9 @@ describe("generations page hardening", () => {
 
   it("keeps expanded generation feedback failures local and retryable", () => {
     const source = readFileSync(generationsPagePath, "utf8");
+    const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(source).toContain("feedbackError: isRu");
+    expect(contentSource).toContain('feedbackError: "Не удалось загрузить отзывы по этой генерации"');
     expect(source).toContain("feedbackQuery.isError ? (");
     expect(source).toContain("title={text.feedbackError}");
     expect(source).toContain(
@@ -316,7 +337,7 @@ describe("generations page hardening", () => {
     );
     expect(source).toContain("visibleItems.length === 0");
     expect(source).toContain("visibleItems.map((item) =>");
-    expect(source).toContain("{visibleTotalCount} total / {formatDateTime(visiblePage?.generatedAtUtc, locale)}");
+    expect(source).toContain("{visibleTotalCount} {text.tableTotalLabel} /{\" \"}");
     expect(source).toContain("{text.page} {pageIndex + 1} {text.of} {visiblePageCount}");
     expect(source).toContain("const [expandedGeneration, setExpandedGeneration] = useState<{");
     expect(source).toContain("const queryKey = JSON.stringify(query);");

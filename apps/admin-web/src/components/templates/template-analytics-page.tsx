@@ -94,7 +94,6 @@ export function TemplateAnalyticsPage({ locale, templateId }: TemplateAnalyticsP
 }
 
 function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsPageProps) {
-  const isRu = locale === "ru";
   const text = useMemo(() => getTemplateAnalyticsCopy(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
@@ -256,12 +255,8 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
   const templateTitle = sanitizeSensitiveText(template.title, 120);
   const breadcrumbsRoot =
     template.templateType === "Video"
-      ? isRu
-        ? "Видео шаблоны"
-        : "Video templates"
-      : isRu
-        ? "Шаблоны изображений"
-        : "Image templates";
+      ? text.videoTemplatesLabel
+      : text.imageTemplatesLabel;
   const activeRuns = statistics.queuedRuns + statistics.processingRuns;
   const canShowAllRecentRuns = statistics.totalRuns > RECENT_RUNS_PREVIEW_LIMIT;
   const canShowFailedRecentRuns = statistics.failedRuns > 0;
@@ -369,7 +364,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     },
     {
       label: text.generationConversion,
-      value: selectedTotals ? formatPercent(selectedTotals.successRatePercent, isRu) : "...",
+      value: selectedTotals ? formatPercent(selectedTotals.successRatePercent, locale) : "...",
       hint: selectedTotals ? text.generationConversionHint : secondaryStateMessage,
       accent: "green" as MetricAccent,
       delta: selectedTotals
@@ -378,7 +373,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
     },
     {
       label: text.tokenSpend,
-      value: selectedTotals ? formatTokens(selectedTotals.totalTokenCost, isRu) : "...",
+      value: selectedTotals ? formatTokens(selectedTotals.totalTokenCost, locale) : "...",
       hint: selectedTotals ? text.tokenSpendHint : secondaryStateMessage,
       accent: "cyan" as MetricAccent,
       delta: selectedTotals
@@ -469,7 +464,7 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
           },
           {
             label: text.averageGenerationTime,
-            value: formatDuration(statistics.averageGenerationSeconds, isRu),
+            value: formatDuration(statistics.averageGenerationSeconds, locale),
           },
           { label: text.activeQueue, value: String(activeRuns) },
         ]}
@@ -519,7 +514,6 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       </AdminToolbar>
 
       <TemplateAnalyticsOverviewSection
-        isRu={isRu}
         kpiCards={kpiCards}
         locale={locale}
         template={template}
@@ -549,7 +543,6 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
         chartPoints={chartPoints}
         chartTabs={chartTabs}
         isChartMetricLocked={isAnalyticsToolbarLocked}
-        isRu={isRu}
         locale={locale}
         onChartMetricChange={setChartMetric}
         statistics={statistics}
@@ -559,7 +552,6 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
       {isSecondaryReady ? (
         <TemplateAnalyticsInsightGridSection
           events={events}
-          isRu={isRu}
           locale={locale}
           statistics={statistics}
           text={text}
@@ -650,34 +642,30 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
       {feedbackSummaryQuery.data ? (
         <AdminStateCard
-          title={isRu ? "Сводка feedback" : "Feedback summary"}
+          title={text.feedbackSummaryTitle}
           description={
             feedbackSummaryQuery.data.hasNegativeWarning
-              ? isRu
-                ? "У шаблона высокий негативный feedback."
-                : "This template has elevated negative feedback."
-              : isRu
-                ? "Сводка позитивных, нейтральных и негативных оценок по новому feedback."
-                : "Positive, neutral, and negative rate summary from the new feedback stream."
+              ? text.feedbackSummaryNegativeWarning
+              : text.feedbackSummaryDescription
           }
           tone={feedbackSummaryQuery.data.hasNegativeWarning ? "warning" : "info"}
         >
           <AdminMetricStrip
             items={[
               {
-                label: isRu ? "Позитив" : "Positive",
+                label: text.feedbackSummaryPositive,
                 value: `${feedbackSummaryQuery.data.positiveRate.toFixed(1)}% (${feedbackSummaryQuery.data.positiveCount})`,
               },
               {
-                label: isRu ? "Нейтрально" : "Neutral",
+                label: text.feedbackSummaryNeutral,
                 value: `${feedbackSummaryQuery.data.neutralRate.toFixed(1)}% (${feedbackSummaryQuery.data.neutralCount})`,
               },
               {
-                label: isRu ? "Негатив" : "Negative",
+                label: text.feedbackSummaryNegative,
                 value: `${feedbackSummaryQuery.data.negativeRate.toFixed(1)}% (${feedbackSummaryQuery.data.negativeCount})`,
               },
               {
-                label: isRu ? "Главные проблемы" : "Top issues",
+                label: text.feedbackSummaryTopIssues,
                 value:
                   feedbackSummaryQuery.data.topIssues
                     .map((issue) => `${sanitizeSensitiveText(issue.category, 80)}: ${issue.count}`)
@@ -690,7 +678,6 @@ function TemplateAnalyticsPageContent({ locale, templateId }: TemplateAnalyticsP
 
       <TemplateAnalyticsSnapshotSection
         activeRuns={activeRuns}
-        isRu={isRu}
         locale={locale}
         statistics={statistics}
         template={template}

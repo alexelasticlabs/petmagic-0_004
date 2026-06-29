@@ -811,7 +811,7 @@ export function EconomyPageProviderConfigsSection({
             : text.providerConfigDeleteConfirm
         }
         confirmLabel={text.deleteAction}
-        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        cancelLabel={text.confirmationCancel}
         isSubmitting={Boolean(
           configurationPendingDeleteId && deleteProviderConfigId === configurationPendingDeleteId
         )}

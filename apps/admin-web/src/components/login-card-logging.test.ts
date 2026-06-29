@@ -4,6 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const loginCardPath = fileURLToPath(new URL("./login-card.tsx", import.meta.url));
 const loginCardStylesPath = fileURLToPath(new URL("./login-card.module.css", import.meta.url));
+const adminChromeContentPath = fileURLToPath(
+  new URL("./admin/admin-chrome.content.ts", import.meta.url)
+);
 
 describe("login card logging", () => {
   it("does not send raw login email to client telemetry", () => {
@@ -53,10 +56,14 @@ describe("login card logging", () => {
   it("keeps login copy centralized and locks mutable fields while submitting", () => {
     const source = readFileSync(loginCardPath, "utf8");
     const stylesSource = readFileSync(loginCardStylesPath, "utf8");
+    const contentSource = readFileSync(adminChromeContentPath, "utf8");
 
-    expect(source).toContain("const authText = {");
-    expect(source).toContain("emailPlaceholder: isRu ? \"Введите email\" : \"Enter email\"");
-    expect(source).toContain("passwordPlaceholder: isRu ? \"Введите пароль\" : \"Enter password\"");
+    expect(source).toContain('import { getAdminChromeCopy }');
+    expect(source).toContain("const authText = getAdminChromeCopy(locale).loginCard;");
+    expect(contentSource).toContain('emailPlaceholder: "Введите email"');
+    expect(contentSource).toContain('emailPlaceholder: "Enter email"');
+    expect(contentSource).toContain('passwordPlaceholder: "Введите пароль"');
+    expect(contentSource).toContain('passwordPlaceholder: "Enter password"');
     expect(source).toContain("setError(authText.validationError);");
     expect(source).toContain("setError(authText.noAccess);");
     expect(source).toContain("aria-busy={isSubmitting}");
@@ -69,6 +76,8 @@ describe("login card logging", () => {
     expect(source).toContain("{authText.contactText}");
     expect(source).toContain("{authText.contactLinkText}");
     expect(source).toContain("{authText.orText}");
+    expect(source).not.toContain("const isRu = locale === \"ru\";");
+    expect(source).not.toContain("const authText = {");
     expect(source).not.toContain('placeholder={isRu ? "Введите email" : "Enter email"}');
     expect(source).not.toContain('placeholder={isRu ? "Введите пароль" : "Enter password"}');
     expect(stylesSource).toContain(".input:disabled {");

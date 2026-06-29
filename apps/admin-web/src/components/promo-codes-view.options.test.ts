@@ -6,6 +6,12 @@ import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.option
 import { getDictionary } from "@/lib/i18n";
 
 const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
+const promoCodesViewOptionsPath = fileURLToPath(
+  new URL("./promo-codes-view.options.ts", import.meta.url)
+);
+const promoCodesContentPath = fileURLToPath(
+  new URL("./promo-codes-view.content.ts", import.meta.url)
+);
 const promoCodesListCardPath = fileURLToPath(
   new URL("./promo-codes-list-card.tsx", import.meta.url)
 );
@@ -52,6 +58,8 @@ describe("buildPromoCodesViewOptions", () => {
 
   it("renders english labels for status tabs", () => {
     const text = getDictionary("en");
+    const optionsSource = readFileSync(promoCodesViewOptionsPath, "utf8");
+    const contentSource = readFileSync(promoCodesContentPath, "utf8");
 
     const result = buildPromoCodesViewOptions("en", text);
 
@@ -64,6 +72,15 @@ describe("buildPromoCodesViewOptions", () => {
       { value: "archived", label: "Archived" },
     ]);
     expect(result.pageSizeOptions[1]?.label).toBe("10 per page");
+    expect(optionsSource).toContain(
+      'import {\n  buildPromoCodesPageSizeLabel,\n  getPromoCodesViewText,\n} from "@/components/promo-codes-view.content";'
+    );
+    expect(optionsSource).toContain("const promoText = getPromoCodesViewText(locale);");
+    expect(optionsSource).not.toContain('locale === "ru" ? "Все" : "All"');
+    expect(optionsSource).not.toContain('locale === "ru" ? "Все награды" : "All rewards"');
+    expect(optionsSource).not.toContain('locale === "ru" ? `${option} на странице` : `${option} per page`');
+    expect(contentSource).toContain('statusTabAll: "All"');
+    expect(contentSource).toContain('rewardAllLabel: "All rewards"');
   });
 
   it("does not expose backend-unsupported premium rewards as production UI options", () => {

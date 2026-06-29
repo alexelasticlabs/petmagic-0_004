@@ -31,6 +31,7 @@ import { Toast } from "@/components/ui/toast";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { getUsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -235,167 +236,7 @@ function getNewUsersCountForRange(
 
 export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const text = useMemo(() => getDictionary(locale), [locale]);
-  const ui = useMemo(
-    () =>
-      locale === "ru"
-        ? {
-            summaryTotal: "Всего пользователей",
-            summaryActive: "Активные",
-            summaryPremium: "Premium",
-            summaryBlocked: "Заблокированные",
-            summaryNew: "Новые за период",
-            summaryOpenSupport: "С открытыми обращениями",
-            periodLabel: "Период",
-            period7: "7 дней",
-            period30: "30 дней",
-            period90: "90 дней",
-            searchPlaceholder: "Поиск по email или userId",
-            filterRole: "Роль",
-            filterPremium: "Premium",
-            filterActivity: "Активность",
-            filterStatus: "Статус",
-            resetFilters: "Сбросить",
-            any: "Все",
-            premiumOnly: "Только Premium",
-            freeOnly: "Без Premium",
-            activeOnly: "Только активные",
-            blockedOnly: "Только заблокированные",
-            statusActive: "Аккаунт активен",
-            statusBlocked: "Заблокирован",
-            statusUnconfirmed: "Почта не подтверждена",
-            usersCount: "Пользователей",
-            accountStatus: "Статус аккаунта",
-            premiumAndExpiry: "Premium и окончание",
-            balance: "Баланс",
-            registeredAt: "Регистрация",
-            lastActivity: "Последняя активность",
-            quickActions: "Быстрые действия",
-            openCard: "Открыть карточку",
-            openSideCard: "Карточка",
-            quickCredit: "Начислить",
-            quickDebit: "Списать",
-            walletDialogTitleCredit: "Начислить баланс",
-            walletDialogTitleDebit: "Списать баланс",
-            walletAmountLabel: "Сумма PawSpark",
-            walletReasonLabel: "Причина",
-            walletReasonRequired: "Укажите причину операции",
-            walletCancel: "Отмена",
-            walletSubmit: "Сохранить",
-            premiumEndUnknown: "Срок не задан",
-            premiumEnd: "До",
-            menuLabel: "Доп. действия",
-            noSearchResults: "По заданным фильтрам пользователей нет",
-            pageInfo: "Страница",
-            prevPage: "Назад",
-            nextPage: "Вперед",
-            previousPageLabel: "Предыдущая страница пользователей",
-            nextPageLabel: "Следующая страница пользователей",
-            sideTitle: "Карточка пользователя",
-            sideDescription: "Ключевые данные, история действий и контроль аккаунта",
-            closePanel: "Закрыть",
-            sectionProfile: "Основная информация",
-            sectionBalance: "Баланс",
-            sectionRoles: "Роли",
-            sectionPremium: "Premium",
-            sectionSupport: "Обращения в поддержку",
-            sectionPurchases: "История платежей",
-            sectionGenerations: "История генераций",
-            sectionAudit: "Audit log",
-            sectionDanger: "Опасные действия",
-            noData: "Нет данных",
-            blockedBadge: "Заблокирован",
-            activeBadge: "Активен",
-            unconfirmedBadge: "Не подтвержден",
-            sideOpenFullProfile: "Открыть полную страницу",
-            confirmCancel: "Отмена",
-            confirmDeleteTitle: "Удалить пользователя?",
-            confirmBlockTitle: "Заблокировать пользователя?",
-            confirmUnblockTitle: "Разблокировать пользователя?",
-            confirmPremiumTitle: "Изменить Premium?",
-            confirmRoleTitle: "Изменить роль?",
-            lastAdminProtected: "Последнего Admin нельзя понизить",
-            confirmAction: "Подтвердить",
-          }
-        : {
-            summaryTotal: "Total users",
-            summaryActive: "Active users",
-            summaryPremium: "Premium users",
-            summaryBlocked: "Blocked users",
-            summaryNew: "New in period",
-            summaryOpenSupport: "Users with open tickets",
-            periodLabel: "Period",
-            period7: "7 days",
-            period30: "30 days",
-            period90: "90 days",
-            searchPlaceholder: "Search by email or userId",
-            filterRole: "Role",
-            filterPremium: "Premium",
-            filterActivity: "Activity",
-            filterStatus: "Status",
-            resetFilters: "Reset",
-            any: "All",
-            premiumOnly: "Premium only",
-            freeOnly: "Free only",
-            activeOnly: "Active only",
-            blockedOnly: "Blocked only",
-            statusActive: "Account active",
-            statusBlocked: "Blocked",
-            statusUnconfirmed: "Email not confirmed",
-            usersCount: "Users",
-            accountStatus: "Account status",
-            premiumAndExpiry: "Premium and expiry",
-            balance: "Balance",
-            registeredAt: "Registered",
-            lastActivity: "Last activity",
-            quickActions: "Quick actions",
-            openCard: "Open profile",
-            openSideCard: "Card",
-            quickCredit: "Credit",
-            quickDebit: "Debit",
-            walletDialogTitleCredit: "Credit balance",
-            walletDialogTitleDebit: "Debit balance",
-            walletAmountLabel: "PawSpark amount",
-            walletReasonLabel: "Reason",
-            walletReasonRequired: "Reason is required",
-            walletCancel: "Cancel",
-            walletSubmit: "Save",
-            premiumEndUnknown: "No expiry",
-            premiumEnd: "Until",
-            menuLabel: "More actions",
-            noSearchResults: "No users match current filters",
-            pageInfo: "Page",
-            prevPage: "Prev",
-            nextPage: "Next",
-            previousPageLabel: "Previous users page",
-            nextPageLabel: "Next users page",
-            sideTitle: "User side panel",
-            sideDescription: "Key profile context, history, and controls",
-            closePanel: "Close",
-            sectionProfile: "Profile",
-            sectionBalance: "Balance",
-            sectionRoles: "Roles",
-            sectionPremium: "Premium",
-            sectionSupport: "Support tickets",
-            sectionPurchases: "Payment history",
-            sectionGenerations: "Generation history",
-            sectionAudit: "Audit log",
-            sectionDanger: "Danger zone",
-            noData: "No data",
-            blockedBadge: "Blocked",
-            activeBadge: "Active",
-            unconfirmedBadge: "Unconfirmed",
-            sideOpenFullProfile: "Open full profile",
-            confirmCancel: "Cancel",
-            confirmDeleteTitle: "Delete user?",
-            confirmBlockTitle: "Block user?",
-            confirmUnblockTitle: "Unblock user?",
-            confirmPremiumTitle: "Change Premium?",
-            confirmRoleTitle: "Change role?",
-            lastAdminProtected: "The last Admin cannot be downgraded",
-            confirmAction: "Confirm",
-          },
-    [locale]
-  );
+  const ui = useMemo(() => getUsersManagementPageText(locale), [locale]);
 
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -627,10 +468,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       requestUserConfirmation({
         userId: user.userId,
         title: nextIsActive ? ui.confirmUnblockTitle : ui.confirmBlockTitle,
-        description:
-          locale === "ru"
-            ? `${userLabel}: действие будет записано в audit log и немедленно изменит доступ пользователя.`
-            : `${userLabel}: this will be written to the audit log and immediately change user access.`,
+        description: ui.activeChangeDescription(userLabel),
         confirmLabel: nextIsActive ? text.activate : text.deactivate,
         errorMessage: text.errorLoadingUsers,
         action: () => setActive(user.userId, nextIsActive),
@@ -638,11 +476,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     },
     [
       getUserLabel,
-      locale,
       requestUserConfirmation,
       text.activate,
       text.deactivate,
       text.errorLoadingUsers,
+      ui,
       ui.confirmBlockTitle,
       ui.confirmUnblockTitle,
       canManageRoles,
@@ -659,10 +497,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       requestUserConfirmation({
         userId: user.userId,
         title: ui.confirmDeleteTitle,
-        description:
-          locale === "ru"
-            ? `${userLabel}: ${text.usersDeleteConfirm}`
-            : `${userLabel}: ${text.usersDeleteConfirm}`,
+        description: ui.deleteDescription(userLabel, text.usersDeleteConfirm),
         confirmLabel: text.usersDeleteAction,
         successMessage: text.usersDeletedSuccess,
         errorMessage: text.errorLoadingUsers,
@@ -672,12 +507,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     },
     [
       getUserLabel,
-      locale,
       requestUserConfirmation,
       text.errorLoadingUsers,
       text.usersDeleteAction,
       text.usersDeleteConfirm,
       text.usersDeletedSuccess,
+      ui,
       ui.confirmDeleteTitle,
       canManageRoles,
     ]
@@ -693,10 +528,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       requestUserConfirmation({
         userId: user.userId,
         title: ui.confirmPremiumTitle,
-        description:
-          locale === "ru"
-            ? `${userLabel}: Premium-статус изменится через admin endpoint и будет записан в audit log.`
-            : `${userLabel}: Premium status will be changed through the admin endpoint and written to the audit log.`,
+        description: ui.premiumChangeDescription(userLabel),
         confirmLabel: user.isPremium ? text.removePremium : text.makePremium,
         errorMessage: text.errorLoadingUsers,
         action: () => (user.isPremium ? revokePremium(user.userId) : setPremium(user.userId, true)),
@@ -704,11 +536,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     },
     [
       getUserLabel,
-      locale,
       requestUserConfirmation,
       text.errorLoadingUsers,
       text.makePremium,
       text.removePremium,
+      ui,
       ui.confirmPremiumTitle,
       canManageRoles,
     ]
@@ -729,10 +561,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       requestUserConfirmation({
         userId: user.userId,
         title: ui.confirmRoleTitle,
-        description:
-          locale === "ru"
-            ? `${userLabel}: ${hasRole ? "роль будет снята" : "роль будет назначена"} (${role}).`
-            : `${userLabel}: the ${role} role will be ${hasRole ? "revoked" : "assigned"}.`,
+        description: ui.roleChangeDescription(userLabel, role, hasRole),
         confirmLabel:
           role === "Admin"
             ? hasRole
@@ -748,7 +577,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     },
     [
       getUserLabel,
-      locale,
       requestUserConfirmation,
       text.assignAdmin,
       text.assignModerator,
@@ -756,6 +584,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       text.revokeAdmin,
       text.revokeModerator,
       totalAdminCount,
+      ui,
       ui.confirmRoleTitle,
       canManageRoles,
     ]

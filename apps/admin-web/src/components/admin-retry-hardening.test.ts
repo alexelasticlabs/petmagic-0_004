@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const roleManagementPath = fileURLToPath(new URL("./role-management-page.tsx", import.meta.url));
+const roleManagementContentPath = fileURLToPath(
+  new URL("./role-management-page.content.ts", import.meta.url)
+);
 const promoCodesPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
 const generationsPath = fileURLToPath(new URL("./generations-page.tsx", import.meta.url));
 
@@ -29,10 +32,9 @@ describe("admin retry hardening", () => {
 
   it("keeps role assignment search failures distinct from empty search results", () => {
     const source = readFileSync(roleManagementPath, "utf8");
+    const contentSource = readFileSync(roleManagementContentPath, "utf8");
 
-    expect(source).toContain(
-      'searchError: isRu ? "Не удалось выполнить поиск пользователей" : "Failed to search users"'
-    );
+    expect(contentSource).toContain('searchError: "Не удалось выполнить поиск пользователей"');
     expect(source).toContain("const normalizedSearch = debouncedSearch.trim();");
     expect(source).toContain("const isSearchActive = normalizedSearch.length >= 2;");
     expect(source).toContain(
@@ -70,13 +72,10 @@ describe("admin retry hardening", () => {
 
   it("keeps role list column failures local when the other role list has data", () => {
     const source = readFileSync(roleManagementPath, "utf8");
+    const contentSource = readFileSync(roleManagementContentPath, "utf8");
 
-    expect(source).toContain(
-      'adminsError: isRu ? "Не удалось загрузить Admin" : "Failed to load admins"'
-    );
-    expect(source).toContain(
-      'moderatorsError: isRu ? "Не удалось загрузить Moderator" : "Failed to load moderators"'
-    );
+    expect(contentSource).toContain('adminsError: "Не удалось загрузить Admin"');
+    expect(contentSource).toContain('moderatorsError: "Не удалось загрузить Moderator"');
     expect(source).toContain("const hasAnyRoleData = Boolean(adminsQuery.data || moderatorsQuery.data);");
     expect(source).toContain("const hasBlockingRoleError = isError && !hasAnyRoleData;");
     expect(source).toContain(") : hasBlockingRoleError ? (");

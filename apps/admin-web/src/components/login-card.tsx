@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "@/components/admin/admin-icons";
 import styles from "@/components/login-card.module.css";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -80,6 +81,7 @@ async function ensureLegalAcceptance(locale: Locale, session: AuthSession): Prom
 
 export function LoginCard({ locale }: LoginCardProps) {
   const text = getDictionary(locale);
+  const authText = getAdminChromeCopy(locale).loginCard;
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -140,22 +142,6 @@ export function LoginCard({ locale }: LoginCardProps) {
     if (existingSession === null) emailInputRef.current?.focus();
   }, [existingSession]);
 
-  const isRu = locale === "ru";
-  const authText = {
-    emailPlaceholder: isRu ? "Введите email" : "Enter email",
-    passwordPlaceholder: isRu ? "Введите пароль" : "Enter password",
-    validationError: isRu
-      ? "Введите корректный email и пароль."
-      : "Enter a valid email and password.",
-    noAccess: isRu
-      ? "Доступ к админ-панели есть только у ролей Admin или Moderator."
-      : "Admin panel access is available only for Admin or Moderator roles.",
-    hidePassword: isRu ? "Скрыть пароль" : "Hide password",
-    showPassword: isRu ? "Показать пароль" : "Show password",
-    contactText: isRu ? "Проблемы с доступом? " : "Access issues? ",
-    contactLinkText: isRu ? "Свяжитесь с администратором" : "Contact administrator",
-    orText: isRu ? "или" : "or",
-  };
   const normalizedEmail = email.trim();
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail);
   const submittedPassword = password;

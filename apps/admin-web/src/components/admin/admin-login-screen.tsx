@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import { AdminLoginPreviewChart, BrandMark } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import styles from "@/components/admin/admin-login-screen.module.css";
@@ -16,24 +17,14 @@ export function AdminLoginScreen({
   onToggleTheme,
   children,
 }: AdminLoginScreenProps) {
-  const welcomeTitle = locale === "ru" ? "Добро пожаловать!" : "Welcome!";
-  const welcomeSubtitle =
-    locale === "ru"
-      ? "Войдите в панель администратора, чтобы продолжить работу"
-      : "Sign in to the admin panel to continue your work";
-  const copyright =
-    locale === "ru"
-      ? "© 2026 Admin Panel. Все права защищены."
-      : "© 2026 Admin Panel. All rights reserved.";
-  const themeLabel = locale === "ru" ? "Тема" : "Theme";
-  const toggleThemeAriaLabel = locale === "ru" ? "Сменить тему" : "Toggle theme";
+  const copy = getAdminChromeCopy(locale).loginScreen;
 
   return (
     <div className={styles.screen}>
       <div className={styles.left}>
         <BrandMark className={styles.brandMark} />
-        <h2 className={styles.welcome}>{welcomeTitle}</h2>
-        <p className={styles.tagline}>{welcomeSubtitle}</p>
+        <h2 className={styles.welcome}>{copy.welcomeTitle}</h2>
+        <p className={styles.tagline}>{copy.welcomeSubtitle}</p>
         <LoginDashboardPreview />
       </div>
 
@@ -43,15 +34,15 @@ export function AdminLoginScreen({
             type="button"
             className={styles.themeToggle}
             onClick={onToggleTheme}
-            aria-label={toggleThemeAriaLabel}
+            aria-label={copy.toggleThemeAriaLabel}
           >
             <span className={styles.themeToggleIndicator} aria-hidden="true" />
-            <span>{themeLabel}</span>
+            <span>{copy.themeLabel}</span>
           </button>
           <AdminLangDropdown locale={locale} ruPath="/ru" enPath="/en" />
         </div>
         <div className={styles.body}>{children}</div>
-        <footer className={styles.copyright}>{copyright}</footer>
+        <footer className={styles.copyright}>{copy.copyright}</footer>
       </div>
     </div>
   );

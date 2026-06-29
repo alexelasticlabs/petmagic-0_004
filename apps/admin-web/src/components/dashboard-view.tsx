@@ -34,6 +34,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { DonutChart, RevenueChart } from "@/components/dashboard/dashboard-charts";
+import {
+  getDashboardCopy,
+  getDashboardIntlLocale,
+} from "@/components/dashboard-view.content";
 import styles from "@/components/dashboard-view.module.css";
 import { Button } from "@/components/ui/button";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -194,12 +198,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
   const copy = useMemo(() => getDashboardCopy(locale), [locale]);
   const isShowingStaleDashboard = Boolean(viewModel && dashboardQuery.isError);
   const retryLabel = dashboardQuery.isFetching
-    ? locale === "ru"
-      ? "Обновляем..."
-      : "Refreshing..."
-    : locale === "ru"
-      ? "Повторить"
-      : "Retry";
+    ? copy.states.refreshing
+    : copy.states.retry;
 
   function requestDashboardRetry() {
     if (!canViewDashboard || dashboardQuery.isFetching) {
@@ -220,21 +220,13 @@ export function DashboardView({ locale }: DashboardViewProps) {
         <AdminStateCard
           title={
             dashboardQuery.isError
-              ? locale === "ru"
-                ? "Не удалось загрузить дашборд"
-                : "Failed to load dashboard"
-              : locale === "ru"
-                ? "Загружаем данные"
-                : "Loading data"
+              ? copy.states.dashboardLoadErrorTitle
+              : copy.states.dashboardLoadingTitle
           }
           description={
             dashboardQuery.isError
-              ? locale === "ru"
-                ? "Проверьте доступ к API и повторите позже."
-                : "Please verify API access and try again."
-              : locale === "ru"
-                ? "Собираем актуальные метрики из модулей пользователей, экономики и поддержки."
-                : "Gathering live metrics from users, economy, and support modules."
+              ? copy.states.dashboardLoadErrorDescription
+              : copy.states.dashboardLoadingDescription
           }
           tone={dashboardQuery.isError ? "danger" : "info"}
           action={
@@ -264,12 +256,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
       {isShowingStaleDashboard ? (
         <AdminStateCard
           tone="warning"
-          title={locale === "ru" ? "Данные могут быть устаревшими" : "Data may be stale"}
-          description={
-            locale === "ru"
-              ? "Показываем последнюю загруженную версию дашборда, потому что обновление KPI завершилось ошибкой."
-              : "Showing the last loaded dashboard because the KPI refresh failed."
-          }
+          title={copy.states.staleTitle}
+          description={copy.states.staleDescription}
           action={
             <Button
               variant="secondary"
@@ -344,12 +332,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
           {viewModel.feedErrors.purchases ? (
             <AdminStateCard
               tone="warning"
-              title={locale === "ru" ? "Заказы временно недоступны" : "Orders temporarily unavailable"}
-              description={
-                locale === "ru"
-                  ? "KPI дашборда загружены, но лента последних платежей не ответила."
-                  : "Dashboard KPIs loaded, but the recent payments feed did not respond."
-              }
+              title={copy.states.ordersUnavailableTitle}
+              description={copy.states.ordersUnavailableDescription}
               action={
                 <Button
                   variant="secondary"
@@ -390,12 +374,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
           ) : (
             <AdminStateCard
               tone="info"
-              title={locale === "ru" ? "Платежей пока нет" : "No payments yet"}
-              description={
-                locale === "ru"
-                  ? "Последние платежи появятся здесь после первой успешной покупки."
-                  : "Recent payments will appear here after the first successful purchase."
-              }
+              title={copy.states.noPaymentsTitle}
+              description={copy.states.noPaymentsDescription}
             />
           )}
         </AdminCard>
@@ -444,12 +424,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
             <AdminStateCard
               tone="warning"
               className={styles.feedWarning}
-              title={locale === "ru" ? "Часть активности недоступна" : "Some activity is unavailable"}
-              description={
-                locale === "ru"
-                  ? "Показываем доступные события; недоступные ленты можно перезагрузить."
-                  : "Showing available events; unavailable feeds can be retried."
-              }
+              title={copy.states.activityUnavailableTitle}
+              description={copy.states.activityUnavailableDescription}
               action={
                 <Button
                   variant="secondary"
@@ -476,12 +452,8 @@ export function DashboardView({ locale }: DashboardViewProps) {
           ) : viewModel.feedErrors.purchases || viewModel.feedErrors.supportConversations ? null : (
             <AdminStateCard
               tone="info"
-              title={locale === "ru" ? "Активности пока нет" : "No recent activity"}
-              description={
-                locale === "ru"
-                  ? "События появятся после регистрации пользователей, платежей или обновлений поддержки."
-                  : "Events will appear after users register, payments update, or support tickets change."
-              }
+              title={copy.states.noActivityTitle}
+              description={copy.states.noActivityDescription}
             />
           )}
         </AdminCard>
@@ -768,6 +740,7 @@ function buildActivities(
   supportConversations: AdminSupportConversationSummary[],
   userMap: Map<string, UserListItem>
 ): DashboardActivityItem[] {
+  const copy = getDashboardCopy(locale);
   const userEvents = users
     .map((item) => ({
       id: `user:${item.userId}`,
@@ -775,10 +748,7 @@ function buildActivities(
         item: {
           id: `user:${item.userId}`,
           type: "register" as const,
-          text:
-            locale === "ru"
-              ? `${formatDashboardUserLabel(item)} зарегистрировался в системе`
-              : `${formatDashboardUserLabel(item)} registered in the system`,
+          text: copy.activityMessages.registered(formatDashboardUserLabel(item)),
           time: formatRelativeTime(item.createdAtUtc, locale),
         },
     }))
@@ -798,9 +768,9 @@ function buildActivities(
           id: `purchase:${item.orderId}`,
           type: statusType === "cancelled" ? "cancel" : "new",
           text:
-            locale === "ru"
-              ? `${userLabel}: заказ ${shortOrderId(item.orderId)} ${statusType === "cancelled" ? "завершился ошибкой" : "обновлён"}`
-              : `${userLabel}: order ${shortOrderId(item.orderId)} ${statusType === "cancelled" ? "failed" : "updated"}`,
+            statusType === "cancelled"
+              ? copy.activityMessages.orderFailed(userLabel, shortOrderId(item.orderId))
+              : copy.activityMessages.orderUpdated(userLabel, shortOrderId(item.orderId)),
           time: formatRelativeTime(timestamp, locale),
         } satisfies DashboardActivityItem,
       };
@@ -815,10 +785,10 @@ function buildActivities(
       item: {
         id: `support:${item.conversationId}`,
         type: "update" as const,
-        text:
-          locale === "ru"
-            ? `Обновлён тикет ${shortConversationId(item.conversationId)}: ${formatDashboardLabel(item.status, 48)}`
-            : `Updated ticket ${shortConversationId(item.conversationId)}: ${formatDashboardLabel(item.status, 48)}`,
+        text: copy.activityMessages.ticketUpdated(
+          shortConversationId(item.conversationId),
+          formatDashboardLabel(item.status, 48)
+        ),
         time: formatRelativeTime(item.updatedAtUtc, locale),
       },
     }))
@@ -835,6 +805,7 @@ function buildUserDistribution(
   totalUserCount: number,
   roleCounts: DashboardUserRoleCounts
 ): DashboardUserDistributionItem[] {
+  const copy = getDashboardCopy(locale);
   const admins = Math.max(0, roleCounts.admins);
   const moderators = Math.max(0, roleCounts.moderators);
   const regular = Math.max(0, roleCounts.users);
@@ -847,21 +818,21 @@ function buildUserDistribution(
     {
       color: "var(--success)",
       tone: "success",
-      label: locale === "ru" ? "Администраторы" : "Administrators",
+      label: copy.roleLabels.administrators,
       pct: toPercent(admins),
       count: formatNumber(admins, locale),
     },
     {
       color: "var(--brand)",
       tone: "brand",
-      label: locale === "ru" ? "Модераторы" : "Moderators",
+      label: copy.roleLabels.moderators,
       pct: toPercent(moderators),
       count: formatNumber(moderators, locale),
     },
     {
       color: "var(--neutral)",
       tone: "neutral",
-      label: locale === "ru" ? "Пользователи" : "Users",
+      label: copy.roleLabels.users,
       pct: toPercent(regular),
       count: formatNumber(regular, locale),
     },
@@ -917,7 +888,7 @@ function safeNumber(value: number): number {
 }
 
 function formatNumber(value: number, locale: Locale, maximumFractionDigits = 0): string {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.NumberFormat(getDashboardIntlLocale(locale), {
     maximumFractionDigits,
   }).format(value);
 }
@@ -926,7 +897,7 @@ function formatCurrency(value: number, locale: Locale, currencyCode: string): st
   const amount = Number.isFinite(value) ? value : 0;
   const safeCurrencyCode = normalizeCurrencyCode(currencyCode);
   try {
-    return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+    return new Intl.NumberFormat(getDashboardIntlLocale(locale), {
       style: "currency",
       currency: safeCurrencyCode,
       maximumFractionDigits: 2,
@@ -973,17 +944,7 @@ function mapPurchaseStatus(status: string): DashboardOrderStatusType {
 }
 
 function getOrderStatusLabel(status: DashboardOrderStatusType, locale: Locale): string {
-  if (locale === "ru") {
-    if (status === "new") return "Новый";
-    if (status === "processing") return "В обработке";
-    if (status === "delivered") return "Успешно";
-    return "Ошибка";
-  }
-
-  if (status === "new") return "New";
-  if (status === "processing") return "Processing";
-  if (status === "delivered") return "Succeeded";
-  return "Failed";
+  return getDashboardCopy(locale).orderStatusLabels[status];
 }
 
 function formatDashboardUserLabel(user: Pick<UserListItem, "displayName" | "email" | "userId">): string {
@@ -1014,26 +975,27 @@ function formatRelativeTime(value: string | null | undefined, locale: Locale): s
     return "—";
   }
 
+  const relativeTimeCopy = getDashboardCopy(locale).relativeTime;
   const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
   if (diffMinutes < 1) {
-    return locale === "ru" ? "только что" : "just now";
+    return relativeTimeCopy.justNow;
   }
 
   if (diffMinutes < 60) {
-    return locale === "ru" ? `${diffMinutes} мин назад` : `${diffMinutes} min ago`;
+    return relativeTimeCopy.minutesAgo(diffMinutes);
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) {
-    return locale === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
+    return relativeTimeCopy.hoursAgo(diffHours);
   }
 
   const diffDays = Math.round(diffHours / 24);
-  return locale === "ru" ? `${diffDays} дн назад` : `${diffDays}d ago`;
+  return relativeTimeCopy.daysAgo(diffDays);
 }
 
 function buildLast7DayLabels(locale: Locale): string[] {
-  const formatter = new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  const formatter = new Intl.DateTimeFormat(getDashboardIntlLocale(locale), {
     month: "short",
     day: "numeric",
   });
@@ -1044,76 +1006,4 @@ function buildLast7DayLabels(locale: Locale): string[] {
   }
 
   return labels;
-}
-
-function getDashboardCopy(locale: Locale) {
-  const isRu = locale === "ru";
-
-  return {
-    hero: {
-      eyebrow: "Control center",
-      title: isRu ? "Обзор админки" : "Admin Overview",
-      description: isRu
-        ? "Актуальные метрики пользователей, монетизации и поддержки в реальном времени."
-        : "Live user, monetization, and support metrics in one place.",
-    },
-    revenueChart: {
-      title: isRu ? "Динамика выручки" : "Revenue dynamics",
-      description: isRu
-        ? "Последние семь дней по успешным платежам"
-        : "Last seven days across successful payments",
-      rangeLabel: isRu ? "Неделя" : "Week",
-      ariaLabel: isRu ? "График выручки" : "Revenue chart",
-    },
-    ordersSection: {
-      title: isRu ? "Последние заказы" : "Recent orders",
-      description: isRu ? "Живая лента платежей" : "Live stream of purchase events",
-      viewAllLabel: isRu ? "Смотреть все" : "View all",
-      headers: {
-        order: isRu ? "Заказ" : "Order",
-        user: isRu ? "Пользователь" : "User",
-        amount: isRu ? "Сумма" : "Amount",
-        status: isRu ? "Статус" : "Status",
-      },
-    },
-    distributionSection: {
-      title: isRu ? "Распределение пользователей" : "User distribution",
-      totalLabel: isRu ? "Всего" : "Total",
-    },
-    activitySection: {
-      title: isRu ? "Активность" : "Activity",
-      description: isRu ? "Последние события из модулей" : "Latest events across modules",
-    },
-    stats: {
-      users: isRu ? "Пользователи" : "Users",
-      premiumUsers: isRu ? "Premium пользователи" : "Premium users",
-      activeSubscriptions: isRu ? "Активные подписки" : "Active subscriptions",
-      generationsToday: isRu ? "Генерации сегодня" : "Generations today",
-      failedGenerations: isRu ? "Ошибки генераций" : "Failed generations",
-      pendingJobs: isRu ? "Очередь генераций" : "Pending jobs",
-      paymentSuccessFailure: isRu ? "Платежи успех/ошибка" : "Payments success/fail",
-      moderationQueue: isRu ? "Очередь модерации" : "Moderation queue",
-      orders: isRu ? "Заказы" : "Orders",
-      revenue: isRu ? "Выручка" : "Revenue",
-      conversion: isRu ? "Конверсия" : "Conversion",
-      usersSubtext: isRu ? "новые за 7 дней к предыдущим 7" : "new in 7d vs previous 7d",
-      premiumUsersSubtext: isRu ? "по статусу Premium" : "by Premium status",
-      activeSubscriptionsSubtext: isRu ? "статус Active" : "status Active",
-      pendingJobsSubtext: isRu ? "ожидают обработки" : "waiting for processing",
-      paymentSuccessFailureSubtext: isRu ? "за текущие 7 дней" : "current 7-day window",
-      moderationQueueSubtext: isRu ? "pending элементы модерации" : "pending moderation items",
-      ordersSubtext: isRu ? "заказы за 7 дней к предыдущим 7" : "orders in 7d vs previous 7d",
-      revenueSubtext: isRu ? "выручка за 7 дней к предыдущим 7" : "revenue in 7d vs previous 7d",
-      conversionSubtext: isRu
-        ? "доля успешных заказов за 7 дней"
-        : "successful orders ratio in last 7d",
-      live: isRu ? "live" : "live",
-      todayShort: isRu ? "сегодня" : "today",
-      weekShort: isRu ? "за неделю" : "week",
-      monthShort: isRu ? "за 30 дней" : "30d",
-      runningShort: isRu ? "в работе" : "running",
-      currentWeek: isRu ? "текущая неделя" : "current week",
-      pp: isRu ? " п.п." : "pp",
-    },
-  };
 }

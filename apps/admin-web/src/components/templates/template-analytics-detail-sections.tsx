@@ -78,6 +78,7 @@ type FeedbackText = {
   feedbackCountryLabel: string;
   userHeader: string;
   generationIdHeader: string;
+  anonymousUser: string;
 };
 
 export function TemplateAnalyticsRecentRunsSection({
@@ -266,7 +267,6 @@ function RecentRunsTable({
   text: RecentRunsText;
   mode: RecentRunsMode;
 }) {
-  const isRu = locale === "ru";
   const hasFailureDetails = items.some(
     (item) => item.status === "Failed" || Boolean(item.failureCode)
   );
@@ -309,11 +309,11 @@ function RecentRunsTable({
                 <span
                   className={`${styles.statusChip} ${styles[getJobStatusClassName(item.status)]}`}
                 >
-                  {formatJobStatus(item.status, isRu)}
+                  {formatJobStatus(item.status, locale)}
                 </span>
               </td>
-              <td>{formatTokens(item.tokenCost, isRu)}</td>
-              <td>{formatRangeDuration(item.startedAtUtc, item.completedAtUtc, isRu)}</td>
+              <td>{formatTokens(item.tokenCost, locale)}</td>
+              <td>{formatRangeDuration(item.startedAtUtc, item.completedAtUtc, locale)}</td>
               <td>{formatModelSummary(item.usedPreprocessingModel, item.usedKlingModel)}</td>
               {hasFailureDetails ? (
                 <td>
@@ -394,8 +394,6 @@ function FeedbackList({
     );
   }
 
-  const isRu = locale === "ru";
-
   return (
     <div className={styles.feedbackList}>
       {items.map((item) => (
@@ -426,7 +424,7 @@ function FeedbackList({
               {text.feedbackCountryLabel}: {formatAnalyticsValue(item.countryCode)}
             </span>
             <span>
-              {text.userHeader}: {item.userId ? shortenId(item.userId) : isRu ? "анон" : "guest"}
+              {text.userHeader}: {item.userId ? shortenId(item.userId) : text.anonymousUser}
             </span>
             {item.generationId ? (
               <span>

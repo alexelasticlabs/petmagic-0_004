@@ -1,3 +1,7 @@
+import {
+  buildPromoCodesPageSizeLabel,
+  getPromoCodesViewText,
+} from "@/components/promo-codes-view.content";
 import { type PromoSortMode, type PromoStatusFilter } from "@/components/promo-codes-view.helpers";
 import { type SelectOption } from "@/components/ui/select";
 import { type AdminRedeemRewardKind } from "@/lib/api-client";
@@ -16,13 +20,14 @@ export function buildPromoCodesViewOptions(
   sortOptions: SelectOption[];
   pageSizeOptions: SelectOption[];
 } {
+  const promoText = getPromoCodesViewText(locale);
   const statusTabs: Array<{ value: PromoStatusFilter; label: string }> = [
-    { value: "all", label: locale === "ru" ? "Все" : "All" },
-    { value: "active", label: locale === "ru" ? "Активные" : "Active" },
-    { value: "draft", label: locale === "ru" ? "Черновики" : "Drafts" },
-    { value: "paused", label: locale === "ru" ? "Приостановленные" : "Paused" },
-    { value: "expired", label: locale === "ru" ? "Истекшие" : "Expired" },
-    { value: "archived", label: locale === "ru" ? "Архивные" : "Archived" },
+    { value: "all", label: promoText.statusTabAll },
+    { value: "active", label: promoText.statusTabActive },
+    { value: "draft", label: promoText.statusTabDraft },
+    { value: "paused", label: promoText.statusTabPaused },
+    { value: "expired", label: promoText.statusTabExpired },
+    { value: "archived", label: promoText.statusTabArchived },
   ];
 
   const statusOptions: SelectOption[] = [
@@ -37,7 +42,7 @@ export function buildPromoCodesViewOptions(
   ];
 
   const rewardOptions: SelectOption[] = [
-    { value: "all", label: locale === "ru" ? "Все награды" : "All rewards", tone: "neutral" },
+    { value: "all", label: promoText.rewardAllLabel, tone: "neutral" },
     { value: "spark", label: text.promoCodesRewardTypeSparkOption, tone: "recommended" },
   ];
 
@@ -56,7 +61,7 @@ export function buildPromoCodesViewOptions(
 
   const pageSizeOptions: SelectOption[] = PAGE_SIZE_OPTIONS.map((option) => ({
     value: option.toString(),
-    label: locale === "ru" ? `${option} на странице` : `${option} per page`,
+    label: buildPromoCodesPageSizeLabel(locale, option),
     tone: "neutral",
   }));
 

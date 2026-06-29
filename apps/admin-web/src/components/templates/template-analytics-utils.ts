@@ -183,11 +183,11 @@ export function formatTrendValue(
   failedRunsLabel: string
 ) {
   if (metric === "totalTokenCost") {
-    return formatTokens(value, locale === "ru");
+    return formatTokens(value, locale);
   }
 
   if (metric === "averageGenerationSeconds") {
-    return formatDuration(value, locale === "ru");
+    return formatDuration(value, locale);
   }
 
   return `${formatNumber(value, locale)} ${metric === "failedRuns" ? failedRunsLabel.toLowerCase() : ""}`.trim();
@@ -221,8 +221,21 @@ export function getJobStatusClassName(status: TemplateGenerationJobStatus) {
   return "statusChip_info";
 }
 
-export function formatJobStatus(status: TemplateGenerationJobStatus, isRu: boolean) {
-  if (!isRu) {
+const analyticsIntlLocales: Record<Locale, string> = {
+  ru: "ru-RU",
+  en: "en-US",
+};
+
+function toIntlLocale(locale: Locale) {
+  return analyticsIntlLocales[locale];
+}
+
+function usesRussianCopy(locale: Locale) {
+  return toIntlLocale(locale) === "ru-RU";
+}
+
+export function formatJobStatus(status: TemplateGenerationJobStatus, locale: Locale) {
+  if (!usesRussianCopy(locale)) {
     return status;
   }
 
@@ -260,8 +273,8 @@ export function formatAnalyticsValue(value: string | null | undefined) {
     : safeValue.replace(/[_-]+/g, " ");
 }
 
-export function formatPercent(value: number, isRu: boolean) {
-  const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
+export function formatPercent(value: number, locale: Locale) {
+  const formatter = new Intl.NumberFormat(toIntlLocale(locale), {
     minimumFractionDigits: value % 1 === 0 ? 0 : 1,
     maximumFractionDigits: 1,
   });
@@ -269,19 +282,19 @@ export function formatPercent(value: number, isRu: boolean) {
   return `${formatter.format(value)}%`;
 }
 
-export function formatDelta(value: number, isRu: boolean) {
+export function formatDelta(value: number, locale: Locale) {
   const sign = value > 0 ? "+" : "";
-  return `${sign}${formatPercent(value, isRu)}`;
+  return `${sign}${formatPercent(value, locale)}`;
 }
 
 export function formatNumber(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.NumberFormat(toIntlLocale(locale), {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   }).format(value);
 }
 
-export function formatTokens(value: number, isRu: boolean) {
-  const formatter = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
+export function formatTokens(value: number, locale: Locale) {
+  const formatter = new Intl.NumberFormat(toIntlLocale(locale), {
     maximumFractionDigits: value % 1 === 0 ? 0 : 1,
   });
 
@@ -293,7 +306,7 @@ export function formatUsd(value: number | null | undefined, locale: Locale) {
     return "-";
   }
 
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.NumberFormat(toIntlLocale(locale), {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
@@ -301,7 +314,7 @@ export function formatUsd(value: number | null | undefined, locale: Locale) {
   }).format(value);
 }
 
-export function formatDuration(value: number | null | undefined, isRu: boolean) {
+export function formatDuration(value: number | null | undefined, locale: Locale) {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
     return "-";
   }
@@ -314,13 +327,13 @@ export function formatDuration(value: number | null | undefined, isRu: boolean) 
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
-  return `${rounded} ${isRu ? "сек" : "sec"}`;
+  return `${rounded} ${usesRussianCopy(locale) ? "сек" : "sec"}`;
 }
 
 export function formatRangeDuration(
   startedAtUtc: string | null | undefined,
   completedAtUtc: string | null | undefined,
-  isRu: boolean
+  locale: Locale
 ) {
   if (!startedAtUtc || !completedAtUtc) {
     return "-";
@@ -332,7 +345,7 @@ export function formatRangeDuration(
     return "-";
   }
 
-  return formatDuration(Math.round((completed - started) / 1000), isRu);
+  return formatDuration(Math.round((completed - started) / 1000), locale);
 }
 
 export function formatDateTime(value: string | null | undefined, locale: Locale) {
@@ -345,7 +358,7 @@ export function formatDateTime(value: string | null | undefined, locale: Locale)
     return "-";
   }
 
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -359,7 +372,7 @@ export function formatShortDate(value: string, locale: Locale) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(toIntlLocale(locale), {
     day: "2-digit",
     month: "short",
   }).format(date);

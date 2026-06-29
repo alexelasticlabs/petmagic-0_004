@@ -1,3 +1,4 @@
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import type {
   AdminSupportConversation,
   AdminSupportConversationSummary,
@@ -44,14 +45,16 @@ export function formatDateTime(value: string | null | undefined, locale: Locale)
     return "—";
   }
 
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  const copy = getSupportConversationCopy(locale);
+  return new Intl.DateTimeFormat(copy.intlLocale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
 export function formatClockTime(value: string, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  const copy = getSupportConversationCopy(locale);
+  return new Intl.DateTimeFormat(copy.intlLocale, {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
@@ -66,27 +69,24 @@ export function formatRelativeTime(
     return "—";
   }
 
+  const copy = getSupportConversationCopy(locale);
   const timestamp = new Date(value).getTime();
   const diffMinutes = Math.max(0, Math.round((Date.now() - timestamp) / 60000));
   if (diffMinutes < 1) {
-    return locale === "ru" ? "только что" : "just now";
+    return copy.helpers.justNow;
   }
 
   if (diffMinutes < 60) {
-    if (locale === "ru") {
-      return `${diffMinutes} мин назад`;
-    }
-
-    return format === "verbose" ? `${diffMinutes} min ago` : `${diffMinutes}m ago`;
+    return copy.helpers.minutesAgo(diffMinutes, format);
   }
 
   const diffHours = Math.round(diffMinutes / 60);
   if (diffHours < 24) {
-    return locale === "ru" ? `${diffHours} ч назад` : `${diffHours}h ago`;
+    return copy.helpers.hoursAgo(diffHours);
   }
 
   const diffDays = Math.round(diffHours / 24);
-  return locale === "ru" ? `${diffDays} дн назад` : `${diffDays}d ago`;
+  return copy.helpers.daysAgo(diffDays);
 }
 
 export function getConversationSla(
@@ -94,6 +94,7 @@ export function getConversationSla(
   locale: Locale,
   unreadCount = 0
 ) {
+  const copy = getSupportConversationCopy(locale);
   const diffMinutes = Math.max(
     0,
     Math.round((Date.now() - new Date(value ?? Date.now()).getTime()) / 60000)
@@ -114,11 +115,7 @@ export function getConversationSla(
     level,
     waitLabel,
     primaryLabel:
-      unreadCount > 0
-        ? locale === "ru"
-          ? "Новый ответ пользователя"
-          : "New user reply"
-        : waitLabel,
+      unreadCount > 0 ? copy.helpers.newUserReply : waitLabel,
   };
 }
 
@@ -127,92 +124,63 @@ export function formatWaitTime(value: string | null | undefined, locale: Locale)
     return "—";
   }
 
+  const copy = getSupportConversationCopy(locale);
   const diffMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60000));
   if (diffMinutes < 60) {
-    return locale === "ru" ? `${diffMinutes} мин` : `${diffMinutes} min`;
+    return copy.helpers.waitMinutes(diffMinutes);
   }
 
   const diffHours = Math.floor(diffMinutes / 60);
   const restMinutes = diffMinutes % 60;
   if (restMinutes === 0) {
-    return locale === "ru" ? `${diffHours} ч` : `${diffHours} h`;
+    return copy.helpers.waitHours(diffHours);
   }
 
-  return locale === "ru"
-    ? `${diffHours} ч ${restMinutes} мин`
-    : `${diffHours} h ${restMinutes} min`;
+  return copy.helpers.waitHoursMinutes(diffHours, restMinutes);
 }
 
 export function getWaitPrefix(locale: Locale) {
-  return locale === "ru" ? "Ожидает" : "Waiting";
+  return getSupportConversationCopy(locale).helpers.waitPrefix;
 }
 
 export function formatAccountAge(value: string | null | undefined, locale: Locale) {
+  const copy = getSupportConversationCopy(locale);
   if (!value) {
-    return locale === "ru" ? "новый" : "new";
+    return copy.helpers.accountNew;
   }
 
   const diffDays = Math.max(1, Math.floor((Date.now() - new Date(value).getTime()) / 86400000));
   if (diffDays < 30) {
-    return locale === "ru" ? `${diffDays} дн` : `${diffDays}d`;
+    return copy.helpers.accountDays(diffDays);
   }
 
   if (diffDays < 365) {
     const diffMonths = Math.max(1, Math.floor(diffDays / 30));
-    return locale === "ru" ? `${diffMonths} мес` : `${diffMonths} mo`;
+    return copy.helpers.accountMonths(diffMonths);
   }
 
   const diffYears = Math.max(1, Math.floor(diffDays / 365));
-  return locale === "ru" ? `${diffYears} г` : `${diffYears} yr`;
+  return copy.helpers.accountYears(diffYears);
 }
 
 export function formatAccountAgeFact(value: string | null | undefined, locale: Locale) {
-  return locale === "ru"
-    ? `Аккаунт ${formatAccountAge(value, locale)}`
-    : `Account ${formatAccountAge(value, locale)}`;
+  return getSupportConversationCopy(locale).helpers.accountFact(formatAccountAge(value, locale));
 }
 
 export function formatCountFact(value: number, locale: Locale, kind: "messages" | "purchases") {
-  if (locale === "ru") {
-    if (kind === "messages") {
-      return `${value} ${pluralizeRu(value, "сообщение", "сообщения", "сообщений")}`;
-    }
-
-    return `${value} ${pluralizeRu(value, "покупка", "покупки", "покупок")}`;
-  }
-
-  if (kind === "messages") {
-    return `${value} ${value === 1 ? "message" : "messages"}`;
-  }
-
-  return `${value} ${value === 1 ? "purchase" : "purchases"}`;
-}
-
-export function pluralizeRu(value: number, one: string, few: string, many: string) {
-  const abs = Math.abs(value) % 100;
-  const last = abs % 10;
-
-  if (abs > 10 && abs < 20) {
-    return many;
-  }
-
-  if (last === 1) {
-    return one;
-  }
-
-  if (last >= 2 && last <= 4) {
-    return few;
-  }
-
-  return many;
+  const copy = getSupportConversationCopy(locale);
+  return kind === "messages"
+    ? copy.helpers.messageCount(value)
+    : copy.helpers.purchaseCount(value);
 }
 
 export function formatMoney(amount: number, currencyCode: string, locale: Locale) {
   const value = Number.isFinite(amount) ? amount : 0;
   const safeCurrencyCode = formatSafeSupportDisplay(currencyCode?.toUpperCase(), "USD", 12);
+  const copy = getSupportConversationCopy(locale);
   if (/^[A-Z]{3}$/.test(safeCurrencyCode)) {
     try {
-      return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+      return new Intl.NumberFormat(copy.intlLocale, {
         style: "currency",
         currency: safeCurrencyCode,
         maximumFractionDigits: 2,
@@ -222,7 +190,7 @@ export function formatMoney(amount: number, currencyCode: string, locale: Locale
     }
   }
 
-  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return `${new Intl.NumberFormat(copy.intlLocale, {
     maximumFractionDigits: 2,
   }).format(value)} ${safeCurrencyCode}`;
 }
@@ -351,8 +319,9 @@ export function shouldRenderMessageBody(
 }
 
 export function formatFileSize(value: number | null | undefined, locale: Locale) {
+  const copy = getSupportConversationCopy(locale);
   if (!value || value <= 0) {
-    return locale === "ru" ? "Размер не указан" : "Size unavailable";
+    return copy.helpers.fileSizeUnavailable;
   }
 
   if (value < 1024) {
@@ -361,11 +330,11 @@ export function formatFileSize(value: number | null | undefined, locale: Locale)
 
   const kilobytes = value / 1024;
   if (kilobytes < 1024) {
-    return locale === "ru" ? `${kilobytes.toFixed(1)} КБ` : `${kilobytes.toFixed(1)} KB`;
+    return copy.helpers.kilobytes(kilobytes);
   }
 
   const megabytes = kilobytes / 1024;
-  return locale === "ru" ? `${megabytes.toFixed(1)} МБ` : `${megabytes.toFixed(1)} MB`;
+  return copy.helpers.megabytes(megabytes);
 }
 
 export function initialsFor(value: string) {

@@ -5,6 +5,10 @@ const pageSource = readFileSync(
   new URL("./templates-daily-featured-page.tsx", import.meta.url),
   "utf8"
 );
+const contentSource = readFileSync(
+  new URL("./templates-daily-featured-page.content.ts", import.meta.url),
+  "utf8"
+);
 const stylesSource = readFileSync(
   new URL("./templates-daily-featured-page.module.css", import.meta.url),
   "utf8"
@@ -76,9 +80,15 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
     expect(pageSource).toContain("title={error}");
     expect(pageSource).toContain("text.retry");
-    expect(pageSource).toContain('date: isRu ? "Период" : "Date"');
-    expect(pageSource).toContain("formAdminOnly: isRu");
-    expect(pageSource).toContain('"Для изменений нужна роль Admin."');
+    expect(pageSource).toContain(
+      'from "@/components/templates/templates-daily-featured-page.content";'
+    );
+    expect(pageSource).toContain(
+      "const text = useMemo(() => getTemplatesDailyFeaturedPageText(locale), [locale]);"
+    );
+    expect(contentSource).toContain('date: "Период"');
+    expect(contentSource).toContain('formAdminOnly: "Для изменений нужна роль Admin."');
+    expect(pageSource).not.toContain('const isRu = locale === "ru";');
     expect(pageSource).not.toContain("Stable auto fallback uses active templates.");
     expect(pageSource).not.toContain("Search active templates");
     expect(pageSource).not.toContain("Admin role required.");
@@ -161,14 +171,14 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("dateOccupiedWarning");
     expect(pageSource).toContain("assignment.isManual");
     expect(pageSource).toContain("isManual: true");
-    expect(pageSource).toContain("v1 supports one manual assignment per date.");
+    expect(contentSource).toContain("v1 supports one manual assignment per date.");
   });
 
   it("blocks invalid assignment date ranges before submit", () => {
     expect(pageSource).toContain("function hasInvalidDateRange");
     expect(pageSource).toContain("invalidDateRangeWarning");
-    expect(pageSource).toContain("End date cannot be earlier than start date.");
-    expect(pageSource).toContain("Дата окончания не может быть раньше даты начала.");
+    expect(contentSource).toContain("End date cannot be earlier than start date.");
+    expect(contentSource).toContain("Дата окончания не может быть раньше даты начала.");
     expect(pageSource).toContain("isActionLocked || invalidDateRangeWarning");
     expect(pageSource).toContain("!form.templateId || invalidDateRangeWarning");
   });
@@ -192,9 +202,8 @@ describe("templates daily featured page", () => {
   });
 
   it("blocks auto-pick runs until a date is selected", () => {
-    expect(pageSource).toContain("autoPickDateRequired: isRu");
-    expect(pageSource).toContain("Select a date before running auto-pick.");
-    expect(pageSource).toContain("Выберите дату для ручного автовыбора.");
+    expect(contentSource).toContain("autoPickDateRequired: \"Выберите дату для ручного автовыбора.\"");
+    expect(contentSource).toContain("autoPickDateRequired: \"Select a date before running auto-pick.\"");
     expect(pageSource).toContain("const isAutoPickDateMissing = autoPick.date.trim().length === 0;");
     expect(pageSource).toContain("if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;");
     expect(pageSource).toContain(

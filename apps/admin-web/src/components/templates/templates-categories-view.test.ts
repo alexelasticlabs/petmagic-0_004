@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 const categoriesViewPath = fileURLToPath(
   new URL("./templates-categories-view.tsx", import.meta.url)
 );
+const categoriesViewContentPath = fileURLToPath(
+  new URL("./templates-categories-view.content.ts", import.meta.url)
+);
 const catalogStylesPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
 
 describe("template categories view actions", () => {
@@ -100,6 +103,7 @@ describe("template categories view actions", () => {
 
   it("keeps category load/action errors retryable", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
+    const contentSource = readFileSync(categoriesViewContentPath, "utf8");
 
     expect(source).toContain("const { categories, hasError, isFetching, isLoading, refresh }");
     expect(source).toContain(
@@ -115,7 +119,7 @@ describe("template categories view actions", () => {
       "if (!canViewCategories || isFetching) {\n      return;\n    }"
     );
     expect(source).toContain("onClick={requestCategoriesRetry}");
-    expect(source).toContain("retry: isRu ? \"Повторить\" : \"Retry\"");
+    expect(contentSource).toContain('retry: "Повторить"');
     expect(source).toContain("{categoryText.retry}");
     expect(source).not.toContain(
       "onClick={() => {\n                if (!canViewCategories)"
@@ -146,8 +150,14 @@ describe("template categories view actions", () => {
 
   it("keeps category page copy centralized while preserving sanitized confirmation names", () => {
     const source = readFileSync(categoriesViewPath, "utf8");
+    const contentSource = readFileSync(categoriesViewContentPath, "utf8");
 
-    expect(source).toContain("const categoryText = useMemo(");
+    expect(source).toContain(
+      'import { getTemplatesCategoriesViewText } from "@/components/templates/templates-categories-view.content";'
+    );
+    expect(source).toContain(
+      "const categoryText = useMemo(() => getTemplatesCategoriesViewText(locale), [locale]);"
+    );
     expect(source).toContain("const categoryActionsAdminOnly = categoryText.actionsAdminOnly;");
     expect(source).toContain("title: categoryText.notificationTitle,");
     expect(source).toContain("message: categoryText.createSuccess");
@@ -163,20 +173,21 @@ describe("template categories view actions", () => {
     expect(source).toContain("title={categoryText.empty}");
     expect(source).toContain("title={categoryText.deleteDialogTitle}");
     expect(source).toContain("cancelLabel={categoryText.cancel}");
-    expect(source).toContain("restoreDialogDescription: (name: string) =>");
-    expect(source).toContain("archiveDialogDescription: (name: string) =>");
-    expect(source).toContain("deleteDialogDescription: (name: string) =>");
-    expect(source).toContain("videoCategoryLabel: (name: string) =>");
-    expect(source).toContain("imageCategoryLabel: (name: string) =>");
-    expect(source).toContain("editCategoryLabel: (name: string) =>");
-    expect(source).toContain("archiveCategoryLabel: (name: string) =>");
-    expect(source).toContain("restoreCategoryLabel: (name: string) =>");
-    expect(source).toContain("deleteCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("restoreDialogDescription: (name: string) =>");
+    expect(contentSource).toContain("archiveDialogDescription: (name: string) =>");
+    expect(contentSource).toContain("deleteDialogDescription: (name: string) =>");
+    expect(contentSource).toContain("videoCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("imageCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("editCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("archiveCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("restoreCategoryLabel: (name: string) =>");
+    expect(contentSource).toContain("deleteCategoryLabel: (name: string) =>");
     expect(source).toContain("categoryText.restoreDialogDescription(\n                  formatCategoryActionName(categoryPendingArchive)");
     expect(source).toContain("categoryText.archiveDialogDescription(\n                  formatCategoryActionName(categoryPendingArchive)");
     expect(source).toContain(
       "categoryText.deleteDialogDescription(formatCategoryActionName(categoryPendingDelete))"
     );
+    expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).not.toContain('title={isRu ? "Удалить категорию?" : "Delete category?"}');
     expect(source).not.toContain('{isRu ? "Повторить" : "Retry"}');
     expect(source).not.toContain('{isRu ? "Сохранить" : "Save"}');

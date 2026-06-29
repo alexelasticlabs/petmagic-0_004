@@ -209,14 +209,14 @@ describe("api-client.templates query normalization", () => {
     ]);
   });
 
-  it("normalizes shared generation success aliases for admin template tests", async () => {
+  it("preserves canonical completed statuses for admin template tests", async () => {
     const fetchMock = vi.fn<typeof fetch>(async (input) => {
       const url = String(input);
       if (url.includes("/tests?")) {
         return Response.json([
           {
             generationId: "generation-history",
-            status: "Succeeded",
+            status: "Completed",
             tokenCost: 10,
             attemptCount: 1,
             createdAtUtc: "2026-06-14T12:00:00Z",
@@ -228,7 +228,7 @@ describe("api-client.templates query normalization", () => {
 
       return Response.json({
         generationId: "generation-single",
-        status: "Succeeded",
+        status: "Completed",
         tokenCost: 10,
         attemptCount: 1,
         createdAtUtc: "2026-06-14T12:00:00Z",

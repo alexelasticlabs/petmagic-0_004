@@ -15,6 +15,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import {
+  getModerationPageText,
+  type ModerationPageText,
+} from "@/components/moderation-page.content";
 import styles from "@/components/moderation-page.module.css";
 import { Toast } from "@/components/ui/toast";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -47,67 +51,6 @@ type DecisionState = {
 
 const PAGE_SIZE = 25;
 
-function getCopy(locale: Locale) {
-  const isRu = locale === "ru";
-  return {
-    eyebrow: isRu ? "Безопасность контента" : "Content safety",
-    title: isRu ? "Модерация" : "Moderation",
-    description: isRu
-      ? "Очередь жалоб и обратной связи по шаблонам. Решения пишутся в audit log."
-      : "Complaint and feedback queue for templates. Decisions are written to the audit log.",
-    filtersTitle: isRu ? "Фильтры" : "Filters",
-    status: isRu ? "Статус" : "Status",
-    search: isRu ? "Поиск" : "Search",
-    searchPlaceholder: isRu
-      ? "шаблон, сообщение, user/generation id"
-      : "template, message, user/generation id",
-    queueTitle: isRu ? "Очередь" : "Queue",
-    loading: isRu ? "Загрузка очереди" : "Loading queue",
-    error: isRu ? "Не удалось загрузить очередь" : "Failed to load queue",
-    empty: isRu ? "В очереди ничего нет" : "No moderation items",
-    template: isRu ? "Шаблон" : "Template",
-    event: isRu ? "Событие" : "Event",
-    message: isRu ? "Сообщение" : "Message",
-    source: isRu ? "Источник" : "Source",
-    created: isRu ? "Создано" : "Created",
-    actions: isRu ? "Действия" : "Actions",
-    approve: isRu ? "Одобрить" : "Approve",
-    reject: isRu ? "Отклонить" : "Reject",
-    reason: isRu ? "Причина/комментарий" : "Reason/comment",
-    reasonPlaceholder: isRu ? "Коротко укажите причину решения" : "Briefly explain the decision",
-    cancel: isRu ? "Отмена" : "Cancel",
-    confirmApprove: isRu ? "Одобрить элемент?" : "Approve item?",
-    confirmReject: isRu ? "Отклонить элемент?" : "Reject item?",
-    saved: isRu ? "Решение сохранено" : "Decision saved",
-    failed: isRu ? "Не удалось сохранить решение" : "Failed to save decision",
-    moderationActionsForbidden: isRu
-      ? "Действия модерации доступны только Admin или Moderator."
-      : "Moderation actions are available only to Admin or Moderator.",
-    decisionMissing: isRu ? "Выберите элемент модерации." : "Select a moderation item.",
-    reasonRequired: isRu
-      ? "Укажите причину решения: минимум 3 символа."
-      : "Enter a decision reason: at least 3 characters.",
-    previous: isRu ? "Назад" : "Previous",
-    next: isRu ? "Вперёд" : "Next",
-    pageLabel: isRu ? "Страница" : "Page",
-    previousPageLabel: isRu ? "Предыдущая страница очереди" : "Previous queue page",
-    nextPageLabel: isRu ? "Следующая страница очереди" : "Next queue page",
-    retry: isRu ? "Повторить" : "Retry",
-    statusPending: isRu ? "Ожидает" : "Pending",
-    statusApproved: isRu ? "Одобрено" : "Approved",
-    statusRejected: isRu ? "Отклонено" : "Rejected",
-    statusAll: isRu ? "Все" : "All",
-    eventComplaint: isRu ? "Жалоба" : "Complaint",
-    eventFeedback: isRu ? "Отзыв" : "Feedback",
-    templateImage: isRu ? "Изображение" : "Image",
-    templateVideo: isRu ? "Видео" : "Video",
-    userPrefix: isRu ? "пользователь" : "user",
-    workspaceBadge: isRu ? "Модератор" : "Moderator",
-    approveItemLabel: isRu ? "Одобрить элемент" : "Approve item",
-    rejectItemLabel: isRu ? "Отклонить элемент" : "Reject item",
-  };
-}
-
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
 
@@ -135,17 +78,17 @@ function formatModerationText(value: string | null | undefined, fallback = "-", 
   return sanitizeSensitiveText(trimmed || fallback, maxLength);
 }
 
-function formatModerationStatus(status: AdminModerationStatus, text: ReturnType<typeof getCopy>) {
+function formatModerationStatus(status: AdminModerationStatus, text: ModerationPageText) {
   if (status === "approved") return text.statusApproved;
   if (status === "rejected") return text.statusRejected;
   return text.statusPending;
 }
 
-function formatModerationEvent(eventType: string, text: ReturnType<typeof getCopy>) {
+function formatModerationEvent(eventType: string, text: ModerationPageText) {
   return eventType === "complaint" ? text.eventComplaint : text.eventFeedback;
 }
 
-function formatTemplateType(templateType: string, text: ReturnType<typeof getCopy>) {
+function formatTemplateType(templateType: string, text: ModerationPageText) {
   if (templateType === "Image") return text.templateImage;
   if (templateType === "Video") return text.templateVideo;
   return sanitizeSensitiveText(templateType, 48);
@@ -172,7 +115,7 @@ function getModerationDecisionContext(decision: DecisionState | null) {
 }
 
 export function ModerationPage({ locale }: ModerationPageProps) {
-  const text = getCopy(locale);
+  const text = getModerationPageText(locale);
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();

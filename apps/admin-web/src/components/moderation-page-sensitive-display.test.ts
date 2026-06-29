@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const moderationPagePath = fileURLToPath(new URL("./moderation-page.tsx", import.meta.url));
+const moderationContentPath = fileURLToPath(
+  new URL("./moderation-page.content.ts", import.meta.url)
+);
 const moderationStylesPath = fileURLToPath(
   new URL("./moderation-page.module.css", import.meta.url)
 );
@@ -41,6 +44,7 @@ describe("moderation page sensitive display", () => {
 
   it("keeps moderation queue error and pagination states recoverable", () => {
     const source = readFileSync(moderationPagePath, "utf8");
+    const contentSource = readFileSync(moderationContentPath, "utf8");
     const stylesSource = readFileSync(moderationStylesPath, "utf8");
 
     expect(source).toContain("queueQuery.refetch().catch(() => undefined)");
@@ -62,13 +66,13 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("visibleItems.map((item) => (");
     expect(source).not.toContain("items.map((item) => (");
     expect(source).toContain("<span className={styles.pageInfo}>");
-    expect(source).toContain('pageLabel: isRu ? "Страница" : "Page"');
-    expect(source).toContain(
-      'previousPageLabel: isRu ? "Предыдущая страница очереди" : "Previous queue page"'
-    );
-    expect(source).toContain(
-      'nextPageLabel: isRu ? "Следующая страница очереди" : "Next queue page"'
-    );
+    expect(source).toContain("const text = getModerationPageText(locale);");
+    expect(contentSource).toContain('pageLabel: "Страница"');
+    expect(contentSource).toContain('pageLabel: "Page"');
+    expect(contentSource).toContain('previousPageLabel: "Предыдущая страница очереди"');
+    expect(contentSource).toContain('previousPageLabel: "Previous queue page"');
+    expect(contentSource).toContain('nextPageLabel: "Следующая страница очереди"');
+    expect(contentSource).toContain('nextPageLabel: "Next queue page"');
     expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
     expect(source).toContain('className={`${styles.button} ${styles.pagerButton}`}');
     expect(source).toContain("{text.pageLabel} {page + 1}");
@@ -99,18 +103,27 @@ describe("moderation page sensitive display", () => {
 
   it("uses localized display labels for moderation actions and statuses", () => {
     const source = readFileSync(moderationPagePath, "utf8");
+    const contentSource = readFileSync(moderationContentPath, "utf8");
 
-    expect(source).toContain('eyebrow: isRu ? "Безопасность контента" : "Content safety"');
-    expect(source).toContain('? "шаблон, сообщение, user/generation id"');
-    expect(source).toContain('approve: isRu ? "Одобрить" : "Approve"');
-    expect(source).toContain('reject: isRu ? "Отклонить" : "Reject"');
-    expect(source).toContain('next: isRu ? "Вперёд" : "Next"');
-    expect(source).toContain('statusPending: isRu ? "Ожидает" : "Pending"');
-    expect(source).toContain('statusApproved: isRu ? "Одобрено" : "Approved"');
-    expect(source).toContain('statusRejected: isRu ? "Отклонено" : "Rejected"');
-    expect(source).toContain('workspaceBadge: isRu ? "Модератор" : "Moderator"');
-    expect(source).toContain('approveItemLabel: isRu ? "Одобрить элемент" : "Approve item"');
-    expect(source).toContain('rejectItemLabel: isRu ? "Отклонить элемент" : "Reject item"');
+    expect(source).toContain(
+      'import {\n  getModerationPageText,\n  type ModerationPageText,\n} from "@/components/moderation-page.content";'
+    );
+    expect(source).toContain("const text = getModerationPageText(locale);");
+    expect(contentSource).toContain('eyebrow: "Безопасность контента"');
+    expect(contentSource).toContain('eyebrow: "Content safety"');
+    expect(contentSource).toContain('searchPlaceholder: "шаблон, сообщение, user/generation id"');
+    expect(contentSource).toContain('searchPlaceholder: "template, message, user/generation id"');
+    expect(contentSource).toContain('approve: "Одобрить"');
+    expect(contentSource).toContain('approve: "Approve"');
+    expect(contentSource).toContain('reject: "Отклонить"');
+    expect(contentSource).toContain('reject: "Reject"');
+    expect(contentSource).toContain('next: "Вперёд"');
+    expect(contentSource).toContain('statusPending: "Ожидает"');
+    expect(contentSource).toContain('statusApproved: "Одобрено"');
+    expect(contentSource).toContain('statusRejected: "Отклонено"');
+    expect(contentSource).toContain('workspaceBadge: "Модератор"');
+    expect(contentSource).toContain('approveItemLabel: "Одобрить элемент"');
+    expect(contentSource).toContain('rejectItemLabel: "Отклонить элемент"');
     expect(source).toContain('badge={<AdminBadge tone="info">{text.workspaceBadge}</AdminBadge>}');
     expect(source).toContain(
       "aria-label={`${text.approveItemLabel}: ${formatModerationText("
@@ -121,6 +134,8 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain("formatModerationStatus(item.status, text)");
     expect(source).toContain("formatModerationEvent(item.eventType, text)");
     expect(source).toContain("formatTemplateType(item.templateType, text)");
+    expect(source).not.toContain("function getCopy(locale: Locale)");
+    expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).not.toContain('? "template, message, user/generation id"');
     expect(source).not.toContain('next: isRu ? "Вперед" : "Next"');
     expect(source).not.toContain('badge={<AdminBadge tone="info">Moderator</AdminBadge>}');
@@ -182,7 +197,7 @@ describe("moderation page sensitive display", () => {
     expect(source).toContain(
       'const canModerate = sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");'
     );
-    expect(source).toContain("moderationActionsForbidden: isRu");
+    expect(source).toContain("text.moderationActionsForbidden");
     expect(source).toContain("function assertCanModerate(): boolean");
     expect(source).toContain(
       'setToast({ type: "error", message: text.moderationActionsForbidden });'

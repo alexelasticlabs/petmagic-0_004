@@ -19,6 +19,7 @@ import {
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import styles from "@/components/templates/templates-catalog.module.css";
+import { getTemplatesCategoriesViewText } from "@/components/templates/templates-categories-view.content";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
@@ -100,97 +101,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const [categoryPendingDelete, setCategoryPendingDelete] =
     useState<AdminTemplateCategory | null>(null);
   const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;
-  const isRu = locale === "ru";
-  const categoryText = useMemo(
-    () => ({
-      actionsAdminOnly: isRu
-        ? "Управление категориями доступно только Admin."
-        : "Template category management is available to Admin only.",
-      notificationTitle: isRu ? "Категории шаблонов" : "Template categories",
-      createSuccess: isRu ? "Категория создана." : "Category created.",
-      createError: isRu ? "Не удалось создать категорию." : "Could not create category.",
-      updateSuccess: isRu ? "Категория обновлена." : "Category updated.",
-      updateError: isRu ? "Не удалось обновить категорию." : "Could not update category.",
-      archiveSuccess: isRu ? "Категория отправлена в архив." : "Category archived.",
-      restoreSuccess: isRu ? "Категория возвращена из архива." : "Category restored from archive.",
-      archiveError: isRu
-        ? "Не удалось изменить состояние категории."
-        : "Could not change category state.",
-      deleteSuccess: isRu ? "Категория удалена." : "Category deleted.",
-      deleteError: isRu ? "Не удалось удалить категорию." : "Could not delete category.",
-      heroEyebrow: isRu ? "Структура каталога" : "Template taxonomy",
-      heroTitle: isRu ? "Категории шаблонов" : "Template Categories",
-      heroDescription: isRu
-        ? "Управляйте списком категорий, архивом и переименованием. Переименование категории автоматически обновляет связанные шаблоны."
-        : "Manage the category registry, archive state, and rename flows. Renaming a category updates linked templates automatically.",
-      crudEnabled: isRu ? "CRUD подключен" : "CRUD enabled",
-      readOnly: isRu ? "Только просмотр" : "Read-only",
-      activeTab: isRu ? "Активные" : "Active",
-      archiveTab: isRu ? "Архив" : "Archive",
-      categoriesMeta: isRu ? "Категорий" : "Categories",
-      templatesMeta: isRu ? "Шаблонов" : "Templates",
-      retry: isRu ? "Повторить" : "Retry",
-      totalCategories: isRu ? "Всего категорий" : "Total categories",
-      totalCategoriesHint: isRu ? "Категории в реестре" : "Categories in the registry",
-      activeCategories: isRu ? "Активные категории" : "Active categories",
-      activeCategoriesHint: isRu ? "Доступны для новых шаблонов" : "Available for new templates",
-      archiveLabel: isRu ? "Архив" : "Archive",
-      archivedCategoriesHint: isRu
-        ? "Скрыты для новых шаблонов"
-        : "Hidden from new template assignment",
-      totalTemplates: isRu ? "Всего шаблонов" : "Total templates",
-      totalTemplatesHint: isRu ? "Видео и изображения вместе" : "Video and image combined",
-      newCategoryTitle: isRu ? "Новая категория" : "New category",
-      newCategoryDescription: isRu
-        ? "Сначала создайте категорию здесь, затем она появится в редакторах шаблонов."
-        : "Create categories here first so they become available in template editors.",
-      categoryPlaceholder: isRu ? "Например, Portrait Pets" : "For example, Portrait Pets",
-      addCategory: isRu ? "Добавить категорию" : "Add category",
-      categoriesTitle: isRu ? "Категории" : "Categories",
-      archivedDescription: isRu
-        ? "Архивные категории остаются в статистике и в связанных шаблонах, но не предлагаются для новых шаблонов."
-        : "Archived categories stay in stats and linked templates, but are not suggested for new templates.",
-      activeDescription: isRu
-        ? "Переименование категории синхронно обновляет поле category у связанных шаблонов."
-        : "Renaming a category synchronously updates the category field on linked templates.",
-      empty: isRu ? "Категории не найдены." : "No categories found.",
-      state: isRu ? "Состояние" : "State",
-      total: isRu ? "Всего" : "Total",
-      archivedStatus: isRu ? "Архив" : "Archived",
-      activeStatus: isRu ? "Активна" : "Active",
-      save: isRu ? "Сохранить" : "Save",
-      cancel: isRu ? "Отмена" : "Cancel",
-      restore: isRu ? "Вернуть" : "Restore",
-      restoreDialogTitle: isRu ? "Вернуть категорию?" : "Restore category?",
-      archiveDialogTitle: isRu ? "Архивировать категорию?" : "Archive category?",
-      deleteDialogTitle: isRu ? "Удалить категорию?" : "Delete category?",
-      restoreDialogDescription: (name: string) =>
-        isRu
-          ? `Вернуть категорию "${name}" в активный список?`
-          : `Restore category "${name}" to the active list?`,
-      archiveDialogDescription: (name: string) =>
-        isRu
-          ? `Архивировать категорию "${name}"? Она останется в связанных шаблонах, но не будет доступна для новых шаблонов.`
-          : `Archive category "${name}"? It will stay on linked templates but won't be available for new templates.`,
-      deleteDialogDescription: (name: string) =>
-        isRu
-          ? `Удалить категорию "${name}"? Категория удаляется только если в ней нет шаблонов.`
-          : `Delete category "${name}"? It can only be removed when no templates reference it.`,
-      videoCategoryLabel: (name: string) =>
-        isRu ? `Открыть видео-шаблоны категории ${name}` : `Open video templates in ${name}`,
-      imageCategoryLabel: (name: string) =>
-        isRu ? `Открыть image-шаблоны категории ${name}` : `Open image templates in ${name}`,
-      editCategoryLabel: (name: string) =>
-        isRu ? `Переименовать категорию ${name}` : `Rename category ${name}`,
-      archiveCategoryLabel: (name: string) =>
-        isRu ? `Архивировать категорию ${name}` : `Archive category ${name}`,
-      restoreCategoryLabel: (name: string) =>
-        isRu ? `Вернуть категорию ${name}` : `Restore category ${name}`,
-      deleteCategoryLabel: (name: string) =>
-        isRu ? `Удалить категорию ${name}` : `Delete category ${name}`,
-    }),
-    [isRu]
-  );
+  const categoryText = useMemo(() => getTemplatesCategoriesViewText(locale), [locale]);
   const categoryActionsAdminOnly = categoryText.actionsAdminOnly;
   const error = actionError ?? (hasError ? text.errorLoadingTemplates : null);
   const categoryIds = useMemo(

@@ -3,14 +3,31 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const catalogViewPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
+const catalogContentPath = fileURLToPath(
+  new URL("./templates-catalog-view.content.ts", import.meta.url)
+);
 const catalogCssPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
 
 describe("templates catalog actions", () => {
   it("confirms archive changes and sanitizes backend action errors", () => {
     const source = readFileSync(catalogViewPath, "utf8");
+    const contentSource = readFileSync(catalogContentPath, "utf8");
     const styles = readFileSync(catalogCssPath, "utf8");
 
     expect(source).toContain("import { getAdminErrorMessage }");
+    expect(source).toContain(
+      'import {\n  getTemplatesCatalogIntlLocale,\n  getTemplatesCatalogViewText,\n  type TemplatesCatalogViewText,\n} from "@/components/templates/templates-catalog-view.content";'
+    );
+    expect(source).toContain("const copy = useMemo(");
+    expect(source).toContain("() => getTemplatesCatalogViewText(locale, templateType)");
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(contentSource).toContain("const templatesCatalogLocaleText = {");
+    expect(contentSource).toContain('sortNewestDescription: "Сначала свежие шаблоны"');
+    expect(contentSource).toContain('tableTemplate: "Шаблон"');
+    expect(contentSource).toContain('archiveConfirmDescription: (templateLabel: string) =>');
+    expect(contentSource).toContain('retry: "Retry"');
+    expect(contentSource).not.toContain('const isRu = locale === "ru";');
+
     expect(source).toContain("const isTemplateActionLocked = busyTemplateId !== null;");
     expect(source).toContain("isCatalogFetching,");
     expect(source).toContain("const isCatalogRefreshing = isCatalogFetching && !isLoading;");
@@ -72,9 +89,14 @@ describe("templates catalog actions", () => {
     expect(source).toContain("hasSecondaryError,");
     expect(source).toContain("title={copy.analyticsUnavailableTitle}");
     expect(source).toContain("description={copy.analyticsUnavailableDescription}");
-    expect(source).toContain("analyticsUnavailableTitle:");
-    expect(source).toContain("analyticsUnavailableDescription:");
-    expect(source).toContain("Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}");
+    expect(contentSource).toContain('analyticsUnavailableTitle: "Метрики шаблонов временно недоступны"');
+    expect(contentSource).toContain(
+      'analyticsUnavailableDescription:\n      "The catalog is still available, but views, generations, and error metrics may be incomplete."'
+    );
+    expect(source).toContain("copy.pageSummary(currentPage, shownStart, shownEnd, totalCount)");
+    expect(contentSource).toContain(
+      'pageSummary: (currentPage: number, shownStart: number, shownEnd: number, totalCount: number) =>'
+    );
     expect(source).toContain("currentPage >= totalPages");
     expect(source).toContain("if (!isFetching && currentPage > totalPages)");
     expect(source).toContain("queueMicrotask(() => resetCatalogContext(totalPages));");
@@ -131,7 +153,7 @@ describe("templates catalog actions", () => {
     expect(source).toContain("value: formatAnalyticsInteger(analytics?.views, locale),");
     expect(source).toContain("value: formatAnalyticsInteger(analytics?.generationStarts, locale),");
     expect(source).toContain("value: formatAnalyticsInteger(analytics?.failedGenerations, locale),");
-    expect(source).toContain('new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US")');
+    expect(source).toContain("new Intl.NumberFormat(getTemplatesCatalogIntlLocale(locale))");
     expect(source).toContain("formatPercentMetric(\n                              analytics?.generationStarts ? analytics.conversionPercent : null,\n                              locale");
     expect(source).toContain("formatPercentMetric(getSuccessRatePercent(analytics), locale)");
     expect(source).toContain("{formatAnalyticsInteger(analytics?.views, locale)}");
@@ -157,7 +179,7 @@ describe("templates catalog actions", () => {
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.views ?? 0)");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.generationStarts ?? 0)");
     expect(source).not.toContain("value: formatAnalyticsInteger(analytics?.failedGenerations ?? 0)");
-    expect(source).not.toContain('new Intl.NumberFormat("ru-RU").format(value)');
+    expect(source).not.toContain('new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US").format(value)');
     expect(source).not.toContain("return `${value.toFixed(1)}%`;");
     expect(source).not.toContain("setActionError(text.errorSavingTemplate);");
     expect(source).not.toContain("setActionError(text.errorDeletingTemplate);");

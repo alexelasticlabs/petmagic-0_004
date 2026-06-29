@@ -3,6 +3,7 @@ import {
   type AdminRedeemRewardKind,
   type AdminUserDetail,
 } from "@/lib/api-client";
+import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
@@ -375,7 +376,7 @@ export function formatDateTime(value: string | null | undefined, locale: Locale)
     return "-";
   }
 
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(getPromoCodesViewText(locale).intlLocale, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -384,7 +385,7 @@ export function formatDateTime(value: string | null | undefined, locale: Locale)
 }
 
 export function formatNumber(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US").format(value);
+  return new Intl.NumberFormat(getPromoCodesViewText(locale).intlLocale).format(value);
 }
 
 export function formatSevenDayDelta(value: number, locale: Locale, text: PromoDictionary) {

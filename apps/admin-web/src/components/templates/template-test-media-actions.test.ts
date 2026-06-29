@@ -5,8 +5,14 @@ import { describe, expect, it } from "vitest";
 const templateTestPagePath = fileURLToPath(
   new URL("./template-test-page.tsx", import.meta.url)
 );
+const templateTestPageContentPath = fileURLToPath(
+  new URL("./template-test-page.content.ts", import.meta.url)
+);
 const templateEditorControllerPath = fileURLToPath(
   new URL("./use-template-editor-controller.ts", import.meta.url)
+);
+const templateEditorContentPath = fileURLToPath(
+  new URL("./template-editor.content.ts", import.meta.url)
 );
 const templateEditorPath = fileURLToPath(new URL("../template-editor.tsx", import.meta.url));
 const templatePreviewAssetSectionPath = fileURLToPath(
@@ -77,6 +83,7 @@ describe("template test media actions", () => {
 
   it("guards template test generation against invalid and repeated submits", () => {
     const source = readFileSync(templateTestPagePath, "utf8");
+    const contentSource = readFileSync(templateTestPageContentPath, "utf8");
 
     expect(source).toContain("const MAX_TEMPLATE_TEST_IMAGE_BYTES = 8 * 1024 * 1024;");
     expect(source).toContain("function isTemplateTestRunInFlight(");
@@ -137,8 +144,15 @@ describe("template test media actions", () => {
     );
     expect(source).toContain("disabled={isDisabled}");
     expect(source).toContain("aria-disabled={isDisabled}");
-    expect(source).toContain('running: isRu ? "В работе..." : "Running..."');
-    expect(source).toContain("Supports image/* up to 8 MB and drag-and-drop.");
+    expect(source).toContain(
+      'import {\n  getTemplateTestPageText,\n  type TemplateTestPageText,\n} from "@/components/templates/template-test-page.content";'
+    );
+    expect(source).toContain("const pageText = useMemo(() => getTemplateTestPageText(locale), [locale]);");
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(contentSource).toContain('running: "В работе..."');
+    expect(contentSource).toContain('running: "Running..."');
+    expect(contentSource).toContain('uploadSupport: "Поддерживается image/* до 8 MB и drag-and-drop."');
+    expect(contentSource).toContain('uploadSupport: "Supports image/* up to 8 MB and drag-and-drop."');
     expect(source).toContain("{text.templateTestHistoryEmpty}");
     expect(source).toContain("return text.templateTestStartFailed;");
     expect(source).toContain("return text.templateTestInvalidStatus;");
@@ -226,19 +240,23 @@ describe("template test media actions", () => {
 
   it("localizes template test stage placeholder labels", () => {
     const source = readFileSync(templateTestPagePath, "utf8");
+    const contentSource = readFileSync(templateTestPageContentPath, "utf8");
 
-    expect(source).toContain('stageOne: isRu ? "Этап 01" : "Stage 01"');
-    expect(source).toContain('stageTwo: isRu ? "Этап 02" : "Stage 02"');
+    expect(contentSource).toContain('stageOne: "Этап 01"');
+    expect(contentSource).toContain('stageOne: "Stage 01"');
+    expect(contentSource).toContain('stageTwo: "Этап 02"');
+    expect(contentSource).toContain('stageTwo: "Stage 02"');
     expect(source).toContain("const stageOneLabel = pageText.stageOne;");
     expect(source).toContain("const stageTwoLabel = pageText.stageTwo;");
     expect(source).toContain("placeholderEyebrow: stageOneLabel");
     expect(source).toContain("? stageTwoLabel");
     expect(source).toContain("openLabel: pageText.open");
     expect(source).toContain("downloadLabel: pageText.download");
-    expect(source).not.toContain('placeholderEyebrow: isRu ? "Stage 01" : "Stage 01"');
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(source).not.toContain('stageOne: isRu ? "Этап 01" : "Stage 01"');
+    expect(source).not.toContain('stageTwo: isRu ? "Этап 02" : "Stage 02"');
     expect(source).not.toContain('const stageOneLabel = isRu ? "Этап 01" : "Stage 01";');
     expect(source).not.toContain('const stageTwoLabel = isRu ? "Этап 02" : "Stage 02";');
-    expect(source).not.toContain('? "Stage 02"\n        : "Stage 02"');
   });
 
   it("keeps selected history media previews bound to the active run", () => {
@@ -301,15 +319,31 @@ describe("template test media actions", () => {
 
   it("keeps template editor save and upload actions admin-only at the handler layer", () => {
     const source = readFileSync(templateEditorControllerPath, "utf8");
+    const contentSource = readFileSync(templateEditorContentPath, "utf8");
 
     expect(source).toContain('const canManageTemplates = session?.user.roles.includes("Admin") ?? false;');
+    expect(source).toContain(
+      'import { getTemplateEditorRuntimeText } from "@/components/templates/template-editor.content";'
+    );
+    expect(source).toContain("const runtimeText = getTemplateEditorRuntimeText(locale);");
+    expect(source).toContain("const templateEditorActionsAdminOnly = runtimeText.actionsAdminOnly;");
+    expect(source).toContain(
+      "const notificationTitle = isVideo ? text.videoTemplatesTitle : text.imageTemplatesTitle;"
+    );
+    expect(source).toContain("title: notificationTitle,");
+    expect(contentSource).toContain('actionsAdminOnly: "Управление шаблонами доступно только Admin."');
+    expect(contentSource).toContain(
+      'actionsAdminOnly: "Template management actions are available to Admin only."'
+    );
     expect(source).toContain("useAdminTemplateCategories({\n    enabled: canManageTemplates");
     expect(source).toContain("useAdminTemplateOptions({ enabled: canManageTemplates, templateType })");
     expect(source).toContain("function assertCanManageTemplateEditor(): boolean");
     expect(source).toContain("setToast({ type: \"error\", message: templateEditorActionsAdminOnly });");
     expect(source).toContain("if (!assertCanManageTemplateEditor()) {\n      return;\n    }");
     expect(source.indexOf("if (!assertCanManageTemplateEditor())")).toBeLessThan(
-      source.indexOf("if (saveTemplateMutation.isPending)")
+      source.indexOf(
+        "if (saveTemplateMutation.isPending || uploadTemplateMediaMutation.isPending || uploadingKind !== null)"
+      )
     );
     expect(source.lastIndexOf("if (!assertCanManageTemplateEditor())")).toBeLessThan(
       source.indexOf("if (uploadTemplateMediaMutation.isPending || uploadingKind !== null)")
@@ -334,7 +368,8 @@ describe("template test media actions", () => {
     expect(editorSource).toContain("if (initializationError) {");
     expect(editorSource).toContain("title={initializationError}");
     expect(editorSource).toContain("onClick={retryInitialization}");
-    expect(editorSource).toContain('{locale === "ru" ? "Повторить" : "Retry"}');
+    expect(editorSource).toContain("{text.adminRetryAction}");
+    expect(editorSource).not.toContain('{locale === "ru" ? "Повторить" : "Retry"}');
     expect(editorSource.indexOf("if (initializationError)")).toBeLessThan(
       editorSource.indexOf("<form className={styles.editorForm}")
     );

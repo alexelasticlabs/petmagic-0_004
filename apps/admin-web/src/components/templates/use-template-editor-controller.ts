@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { getTemplateEditorRuntimeText } from "@/components/templates/template-editor.content";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
 import {
   createFormFromTemplate,
@@ -89,22 +90,14 @@ export function useTemplateEditorController({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [editorStatus, setEditorStatus] = useState<EditorVisibilityStatus>("Draft");
   const isVideo = templateType === "Video";
-  const templateEditorActionsAdminOnly =
-    locale === "ru"
-      ? "Управление шаблонами доступно только Admin."
-      : "Template management actions are available to Admin only.";
+  const runtimeText = getTemplateEditorRuntimeText(locale);
+  const templateEditorActionsAdminOnly = runtimeText.actionsAdminOnly;
+  const notificationTitle = isVideo ? text.videoTemplatesTitle : text.imageTemplatesTitle;
 
   useSyncToastToAdminNotifications(toast, {
     category: "templates",
     source: `template-editor:${templateType.toLowerCase()}`,
-    title:
-      locale === "ru"
-        ? templateType === "Video"
-          ? "Видео-шаблоны"
-          : "Изображения-шаблоны"
-        : templateType === "Video"
-          ? "Video templates"
-          : "Image templates",
+    title: notificationTitle,
     href: getTemplateCatalogPath(locale, templateType),
   });
 

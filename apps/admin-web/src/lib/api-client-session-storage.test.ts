@@ -62,7 +62,7 @@ function createStoredSessionForUser(userId: string, accessToken?: string): Store
   return {
     ...createSession(),
     accessToken,
-    refreshToken: accessToken ? "refresh-secret" : undefined,
+    refreshToken: undefined,
     user: {
       ...createSession().user,
       userId,
@@ -89,6 +89,13 @@ function stubBrowser(storage = new MemoryStorage()) {
     dispatchEvent: vi.fn(),
   });
   return storage;
+}
+
+async function seedLoggedInSession(session: StoredSession = createSession()) {
+  const fetchMock = vi.fn(async () => Response.json(session));
+  vi.stubGlobal("fetch", fetchMock);
+  await login("admin@example.com", "password");
+  return fetchMock;
 }
 
 describe("api-client session storage", () => {
@@ -126,40 +133,41 @@ describe("api-client session storage", () => {
     expect(getSession()?.accessToken).toBe("access-secret");
   });
 
-  it("migrates legacy stored tokens into volatile memory and rewrites sanitized storage", async () => {
+  it("clears persisted legacy tokens instead of reviving them", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const legacySession = createSession();
     window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(legacySession));
 
-    expect(getSession()?.accessToken).toBe("access-secret");
-
-    await new Promise<void>((resolve) => queueMicrotask(resolve));
-
-    const rawStored = window.sessionStorage.getItem(AUTH_KEY);
-    expect(rawStored).not.toBeNull();
-    expect(rawStored).not.toContain("access-secret");
-    expect(rawStored).not.toContain("refresh-secret");
-
-    const stored = JSON.parse(rawStored ?? "{}") as StoredSession;
-    expect(stored.accessToken).toBeUndefined();
-    expect(stored.refreshToken).toBeUndefined();
+    expect(getSession()).toBeNull();
+    expect(window.sessionStorage.getItem(AUTH_KEY)).toBeNull();
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).toContain("auth.legacy_session_cleared");
+    expect(serializedLogs).not.toContain("access-secret");
+    expect(serializedLogs).not.toContain("refresh-secret");
   });
 
-  it("does not reuse volatile tokens for a different sanitized session user", () => {
-    window.sessionStorage.setItem(
-      AUTH_KEY,
-      JSON.stringify(createStoredSessionForUser("admin-one", "access-one-secret"))
-    );
-
+  it("does not reuse volatile tokens for a different sanitized session user", async () => {
+    const session = {
+      ...createSession(),
+      accessToken: "access-one-secret",
+      refreshToken: "refresh-one-secret",
+      user: {
+        ...createSession().user,
+        userId: "admin-one",
+        email: "admin-one@example.com",
+      },
+    };
+    await seedLoggedInSession(session);
     expect(getSession()?.accessToken).toBe("access-one-secret");
 
     window.sessionStorage.setItem(
       AUTH_KEY,
-      JSON.stringify(createStoredSessionForUser("admin-two", undefined))
+      JSON.stringify(createStoredSessionForUser("admin-two"))
     );
 
-    const session = getSession();
-    expect(session?.user.userId).toBe("admin-two");
-    expect(session?.accessToken).toBeUndefined();
+    const resolvedSession = getSession();
+    expect(resolvedSession?.user.userId).toBe("admin-two");
+    expect(resolvedSession?.accessToken).toBeUndefined();
   });
 
   it("clears corrupted stored sessions after parse failures", () => {
@@ -211,9 +219,8 @@ describe("api-client session storage", () => {
     expect(source).toContain(
       'clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));'
     );
-    expect(source).not.toContain(
-      'clientLogger.warn("auth.session_token_migration_failed", { error: storageError });'
-    );
+    expect(source).toContain('auth.legacy_session_cleanup_failed');
+    expect(source).not.toContain('auth.session_token_migration_failed');
     expect(source).not.toContain('clientLogger.warn("auth.session_parse_failed", { error });');
     expect(source).not.toContain(
       'clientLogger.warn("auth.session_parse_cleanup_failed", { error: storageError });'
@@ -455,8 +462,7 @@ describe("api-client session storage", () => {
   });
 
   it("clears session and sends logout with correlation id without persisting tokens", async () => {
-    const legacySession = createSession();
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(legacySession));
+    await seedLoggedInSession();
     expect(getSession()?.accessToken).toBe("access-secret");
 
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
@@ -480,7 +486,7 @@ describe("api-client session storage", () => {
   });
 
   it("replays authenticated GET requests once after a successful token refresh", async () => {
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(createSession()));
+    await seedLoggedInSession();
     expect(getSession()?.accessToken).toBe("access-secret");
 
     const refreshedSession = {
@@ -507,7 +513,7 @@ describe("api-client session storage", () => {
 
   it("does not replay non-idempotent requests after token refresh and asks for manual retry", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(createSession()));
+    await seedLoggedInSession();
     expect(getSession()?.accessToken).toBe("access-secret");
 
     const refreshedSession = {
@@ -538,7 +544,7 @@ describe("api-client session storage", () => {
 
   it("clears the session when an authenticated retry still receives 401", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(createSession()));
+    await seedLoggedInSession();
     expect(getSession()?.accessToken).toBe("access-secret");
 
     const refreshedSession = {
@@ -564,7 +570,7 @@ describe("api-client session storage", () => {
 
   it("does not restore a session from a stale refresh response after logout", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
-    window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(createSession()));
+    await seedLoggedInSession();
     expect(getSession()?.accessToken).toBe("access-secret");
 
     const refreshResponse = createDeferred<Response>();

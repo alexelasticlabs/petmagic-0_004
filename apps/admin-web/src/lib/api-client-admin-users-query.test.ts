@@ -41,6 +41,12 @@ describe("admin users api client query and role guards", () => {
     process.env.INTERNAL_API_BASE_URL = originalInternalApiBaseUrl;
   });
 
+  function businessRequestUrls(fetchMock: ReturnType<typeof vi.fn<typeof fetch>>): string[] {
+    return fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => !url.endsWith("/api/auth/refresh"));
+  }
+
   it("normalizes users list query params before cache keys and request paths", () => {
     expect(
       normalizeFetchUsersQuery({
@@ -92,7 +98,7 @@ describe("admin users api client query and role guards", () => {
 
     await fetchUsers({ skip: 0, take: 25, search: " alice@example.com " });
 
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+    expect(businessRequestUrls(fetchMock)[0]).toBe(
       "https://api.example.com/api/admin/users?skip=0&take=25&search=alice%40example.com"
     );
   });
@@ -111,11 +117,15 @@ describe("admin users api client query and role guards", () => {
     await assignRole("user-1", " moderator ");
     await revokeRole("user-1", " ADMIN ");
 
-    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+    expect(businessRequestUrls(fetchMock)).toEqual([
       "https://api.example.com/api/admin/users/user-1/role",
       "https://api.example.com/api/admin/users/user-1/role",
     ]);
-    expect(fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)))).toEqual([
+    expect(
+      fetchMock.mock.calls
+        .filter((call) => !String(call[0]).endsWith("/api/auth/refresh"))
+        .map((call) => JSON.parse(String(call[1]?.body)))
+    ).toEqual([
       { role: "Moderator" },
       { role: "Admin" },
     ]);
@@ -135,7 +145,7 @@ describe("admin users api client query and role guards", () => {
     await fetchAdminUser("user/one two?x");
     await assignRole("user/one two?x", "Moderator");
 
-    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+    expect(businessRequestUrls(fetchMock)).toEqual([
       "https://api.example.com/api/admin/users/user%2Fone%20two%3Fx",
       "https://api.example.com/api/admin/users/user%2Fone%20two%3Fx/role",
     ]);
@@ -163,7 +173,10 @@ describe("admin users api client query and role guards", () => {
 
     await fetchAdminUserDashboardMetrics(controller.signal);
 
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    const businessCalls = fetchMock.mock.calls.filter(
+      (call) => !String(call[0]).endsWith("/api/auth/refresh")
+    );
+    const [url, init] = businessCalls[0] ?? [];
     expect(String(url)).toBe("https://api.example.com/api/admin/users/dashboard/metrics");
     expect(init?.method).toBe("GET");
     expect(init?.signal).toBeInstanceOf(AbortSignal);
@@ -185,8 +198,11 @@ describe("admin users api client query and role guards", () => {
 
     await adjustAdminUserWallet("user-1", "credit", 10, ` ${overlongReason} `);
 
-    const [, init] = fetchMock.mock.calls[0] ?? [];
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+    const businessCalls = fetchMock.mock.calls.filter(
+      (call) => !String(call[0]).endsWith("/api/auth/refresh")
+    );
+    const [, init] = businessCalls[0] ?? [];
+    expect(String(businessCalls[0]?.[0])).toBe(
       "https://api.example.com/api/admin/users/user-1/wallet"
     );
     expect(JSON.parse(String(init?.body))).toEqual({

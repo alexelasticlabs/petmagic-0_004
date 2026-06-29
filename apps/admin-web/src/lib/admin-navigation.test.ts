@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -8,6 +10,11 @@ import {
   stripLocalePrefix,
 } from "./admin-navigation";
 import { getDictionary } from "./i18n";
+
+const adminNavigationPath = fileURLToPath(new URL("./admin-navigation.ts", import.meta.url));
+const adminNavigationContentPath = fileURLToPath(
+  new URL("./admin-navigation.content.ts", import.meta.url)
+);
 
 describe("admin-navigation", () => {
   it("strips locale prefix from pathname", () => {
@@ -98,5 +105,19 @@ describe("admin-navigation", () => {
     expect(getAdminPageMeta("ru", "/moderation", "Admin").description).toBe(
       "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
     );
+  });
+
+  it("sources admin page meta copy from a centralized content module", () => {
+    const source = readFileSync(adminNavigationPath, "utf8");
+    const contentSource = readFileSync(adminNavigationContentPath, "utf8");
+
+    expect(source).toContain('import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";');
+    expect(source).toContain("const copy = getAdminPageMetaCopy(locale);");
+    expect(contentSource).toContain('title: "Дашборд"');
+    expect(contentSource).toContain('title: "Dashboard"');
+    expect(contentSource).toContain('fallbackAdministratorName: "администратор"');
+    expect(contentSource).toContain('fallbackAdministratorName: "administrator"');
+    expect(source).not.toContain('title: locale === "ru" ? "Дашборд" : "Dashboard"');
+    expect(source).not.toContain('title: locale === "ru" ? "Экономика" : "Economy"');
   });
 });

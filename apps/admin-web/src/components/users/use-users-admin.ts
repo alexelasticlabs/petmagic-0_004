@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { getUsersManagementPageText } from "@/components/users-management-page.content";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { fetchUsers, useAuthSession, type FetchUsersQuery, type UserListPage } from "@/lib/api-client";
@@ -39,6 +40,7 @@ function getUsersActionErrorDetails(error: unknown) {
 
 export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery) {
   const text = getDictionary(locale);
+  const usersManagementText = getUsersManagementPageText(locale);
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
@@ -51,7 +53,7 @@ export function useUsersAdmin(locale: Locale, usersQueryParams: FetchUsersQuery)
   useSyncToastToAdminNotifications(toast, {
     category: "users",
     source: "users-admin",
-    title: locale === "ru" ? "Изменения пользователей" : "User updates",
+    title: usersManagementText.notificationTitle,
     href: `/${locale}/users`,
   });
 

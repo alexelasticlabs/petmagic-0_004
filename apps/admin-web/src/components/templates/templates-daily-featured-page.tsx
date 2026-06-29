@@ -22,6 +22,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import {
+  getTemplatesDailyFeaturedPageText,
+  type TemplatesDailyFeaturedPageText,
+} from "@/components/templates/templates-daily-featured-page.content";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import { Button } from "@/components/ui/button";
@@ -71,8 +75,6 @@ type AutoPickState = {
 };
 
 type TemplateAccessFilter = "" | "premium" | "free";
-
-type DailyFeaturedCopy = ReturnType<typeof copy>;
 
 type TemplateOption = Pick<
   AdminTemplateListItem,
@@ -230,113 +232,8 @@ function hasInvalidDateRange(startDate: string, endDate: string) {
   return endDate.trim().length > 0 && endDate.trim() < (startDate || todayIso());
 }
 
-function copy(locale: Locale) {
-  const isRu = locale === "ru";
-  return {
-    eyebrow: isRu ? "Шаблоны" : "Templates",
-    title: isRu ? "Шаблон дня" : "Daily Featured",
-    description: isRu
-      ? "Планируйте витрину Template of the Day: ручные назначения, предпросмотр и автоматический выбор."
-      : "Schedule Template of the Day with manual assignments, preview, and automatic fallback picks.",
-    heroBadge: isRu ? "Витрина дня" : "Template of the Day",
-    refresh: isRu ? "Обновить" : "Refresh",
-    retry: isRu ? "Повторить" : "Retry",
-    current: isRu ? "Текущий выбор" : "Current pick",
-    schedule: isRu ? "Расписание" : "Schedule",
-    assignments: isRu ? "назначений" : "assignments",
-    form: isRu ? "Назначение" : "Assignment",
-    formDescription: isRu
-      ? "Выберите активный шаблон, период показа и текст для карточки в мобильной витрине."
-      : "Choose an active template, display window, and mobile storefront copy.",
-    formAdminOnly: isRu
-      ? "Для изменений нужна роль Admin."
-      : "Admin role required to make changes.",
-    templateSearch: isRu ? "Поиск шаблона" : "Template search",
-    templateSearchPlaceholder: isRu ? "Название, категория или тег" : "Title, category, or tag",
-    templateTypeFilter: isRu ? "Тип шаблона" : "Template type",
-    templateAccessFilter: isRu ? "Тариф" : "Access",
-    allTemplateTypes: isRu ? "Все типы" : "All types",
-    allAccessLevels: isRu ? "Все тарифы" : "All access levels",
-    activeTemplatesOnly: isRu ? "Статус: Active" : "Status: Active",
-    template: isRu ? "Шаблон" : "Template",
-    selectTemplate: isRu ? "Выберите шаблон" : "Select template",
-    startDate: isRu ? "Дата начала" : "Start date",
-    endDate: isRu ? "Дата окончания" : "End date",
-    priority: isRu ? "Приоритет" : "Priority",
-    active: isRu ? "Активно" : "Active",
-    inactive: isRu ? "Отключено" : "Disabled",
-    titleOverride: isRu ? "Заголовок для витрины" : "Storefront title",
-    subtitleOverride: isRu ? "Описание для витрины" : "Storefront subtitle",
-    badgeOverride: isRu ? "Текст бейджа" : "Badge text",
-    save: isRu ? "Сохранить" : "Save",
-    create: isRu ? "Создать" : "Create",
-    reset: isRu ? "Очистить" : "Reset",
-    edit: isRu ? "Изменить" : "Edit",
-    delete: isRu ? "Удалить" : "Delete",
-    cancel: isRu ? "Отмена" : "Cancel",
-    deleteConfirmTitle: isRu ? "Удалить назначение?" : "Delete assignment?",
-    deleteConfirmDescription: (templateTitle: string) =>
-      isRu
-        ? `Удалить назначение "${templateTitle}" из расписания? Текущий мобильный показ обновится после сохранения.`
-        : `Delete "${templateTitle}" from the schedule? The current mobile storefront pick will update after the change is saved.`,
-    editAssignmentLabel: (templateTitle: string) =>
-      isRu ? `Изменить назначение ${templateTitle}` : `Edit ${templateTitle} assignment`,
-    deleteAssignmentLabel: (templateTitle: string) =>
-      isRu ? `Удалить назначение ${templateTitle}` : `Delete ${templateTitle} assignment`,
-    preview: isRu ? "Предпросмотр" : "Preview",
-    previewEmptyTitle: isRu ? "Выберите шаблон" : "Select a template",
-    previewEmptySubtitle: isRu
-      ? "Здесь появится карточка витрины до сохранения назначения."
-      : "The storefront card preview appears here before saving.",
-    noCurrent: isRu ? "На сегодня назначение не найдено." : "No assignment is active today.",
-    noSchedule: isRu ? "Расписание пока пустое." : "No scheduled assignments yet.",
-    dateOccupiedWarning: isRu
-      ? "На выбранные даты уже есть активное ручное назначение. v1 поддерживает одно manual-назначение на дату."
-      : "The selected dates already have an active manual assignment. v1 supports one manual assignment per date.",
-    invalidDateRangeWarning: isRu
-      ? "Дата окончания не может быть раньше даты начала."
-      : "End date cannot be earlier than start date.",
-    autoPickDateRequired: isRu
-      ? "Выберите дату для ручного автовыбора."
-      : "Select a date before running auto-pick.",
-    noTemplates: isRu
-      ? "Активные шаблоны по этому запросу не найдены."
-      : "No active templates match this search.",
-    loading: isRu ? "Загружаем витрину дня." : "Loading daily featured.",
-    loadingTemplates: isRu ? "Ищем активные шаблоны." : "Searching active templates.",
-    loadError: isRu ? "Не удалось загрузить витрину дня." : "Failed to load daily featured.",
-    saveError: isRu ? "Не удалось сохранить назначение." : "Failed to save assignment.",
-    autoPick: isRu ? "Автовыбор" : "Auto-pick",
-    autoPickDescription: isRu
-      ? "Управляет fallback-выбором и daily job. Ручной запуск ниже создаёт подбор на выбранную дату."
-      : "Controls fallback picks and the daily job. The run action below creates a pick for a selected date.",
-    autoMode: isRu ? "Auto mode" : "Auto mode",
-    autoModeEnabled: isRu ? "Включен" : "Enabled",
-    autoModeDisabled: isRu ? "Отключен" : "Disabled",
-    autoModeStatus: isRu ? "Статус auto mode" : "Auto mode status",
-    autoModeSave: isRu ? "Сохранить настройки" : "Save settings",
-    autoPickRun: isRu ? "Запустить автовыбор" : "Run auto-pick",
-    allowedTypes: isRu ? "Типы" : "Allowed types",
-    allowedBoth: isRu ? "Изображения и видео" : "Images and videos",
-    excludeRecent: isRu ? "Исключить последние дни" : "Exclude recent days",
-    manual: isRu ? "Ручной" : "Manual",
-    auto: isRu ? "Авто" : "Auto",
-    premium: isRu ? "Premium" : "Premium",
-    free: isRu ? "Free" : "Free",
-    image: isRu ? "Изображение" : "Image",
-    video: isRu ? "Видео" : "Video",
-    date: isRu ? "Период" : "Date",
-    mode: isRu ? "Режим" : "Mode",
-    status: isRu ? "Статус" : "Status",
-    actions: isRu ? "Действия" : "Actions",
-    titleLabel: isRu ? "Заголовок" : "Title",
-    subtitleLabel: isRu ? "Описание" : "Subtitle",
-    badgeLabel: isRu ? "Бейдж" : "Badge",
-  };
-}
-
 export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPageProps) {
-  const text = useMemo(() => copy(locale), [locale]);
+  const text = useMemo(() => getTemplatesDailyFeaturedPageText(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
@@ -1223,7 +1120,7 @@ function AssignmentSummary({
   text,
 }: {
   assignment: AdminTemplateOfTheDay;
-  text: DailyFeaturedCopy;
+  text: TemplatesDailyFeaturedPageText;
 }) {
   return (
     <div className={styles.assignmentSummary}>

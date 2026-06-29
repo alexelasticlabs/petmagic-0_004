@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { formatDateTime } from "./format-date-time";
+
+const formatDateTimePath = fileURLToPath(new URL("./format-date-time.ts", import.meta.url));
 
 describe("format-date-time", () => {
   it("returns fallback for empty values", () => {
@@ -21,5 +25,13 @@ describe("format-date-time", () => {
     expect(enValue).not.toBe("—");
     expect(ruValue.length).toBeGreaterThan(0);
     expect(enValue.length).toBeGreaterThan(0);
+  });
+
+  it("keeps Intl locale selection centralized instead of inline locale branching", () => {
+    const source = readFileSync(formatDateTimePath, "utf8");
+
+    expect(source).toContain("const dateTimeIntlLocales: Record<Locale, string> = {");
+    expect(source).toContain("new Intl.DateTimeFormat(dateTimeIntlLocales[locale], {");
+    expect(source).not.toContain('locale === "ru" ? "ru-RU" : "en-US"');
   });
 });

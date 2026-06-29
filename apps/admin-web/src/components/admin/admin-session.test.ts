@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import { clearSession, type AuthSession } from "@/lib/api-client";
+import { clearSession, login, type AuthSession } from "@/lib/api-client";
 
 const AUTH_KEY = "petmagic_admin_auth";
 
@@ -37,6 +37,16 @@ function createSession(
   };
 }
 
+async function seedLoggedInSession(
+  roles: string[],
+  overrides: Partial<Pick<AuthSession, "accessToken" | "refreshToken" | "expiresAtUtc">> = {}
+) {
+  const session = createSession(roles, overrides);
+  const fetchMock = vi.fn(async () => Response.json(session));
+  vi.stubGlobal("fetch", fetchMock);
+  await login("admin@example.com", "password");
+}
+
 describe("ensureAdminSession", () => {
   let storage: ReturnType<typeof createStorage>;
 
@@ -54,35 +64,37 @@ describe("ensureAdminSession", () => {
     vi.unstubAllGlobals();
   });
 
-  it("allows Admin and Moderator sessions", () => {
+  it("allows Admin and Moderator sessions", async () => {
     const router = { replace: vi.fn() };
 
-    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin"])));
+    await seedLoggedInSession(["Admin"]);
     expect(ensureAdminSession("en", router)).toBe(true);
     expect(router.replace).not.toHaveBeenCalled();
 
-    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Moderator"])));
+    clearSession();
+    await seedLoggedInSession(["Moderator"]);
     expect(ensureAdminSession("ru", router)).toBe(true);
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("enforces Admin when a page requires the Admin role", () => {
+  it("enforces Admin when a page requires the Admin role", async () => {
     const router = { replace: vi.fn() };
 
-    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Moderator"])));
+    await seedLoggedInSession(["Moderator"]);
     expect(ensureAdminSession("en", router, { requiredRole: "Admin" })).toBe(false);
     expect(router.replace).toHaveBeenCalledWith("/en");
 
     router.replace.mockClear();
-    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin", "Moderator"])));
+    clearSession();
+    await seedLoggedInSession(["Admin", "Moderator"]);
     expect(ensureAdminSession("ru", router, { requiredRole: "Admin" })).toBe(true);
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("redirects sessions without admin-panel roles", () => {
+  it("redirects sessions without admin-panel roles", async () => {
     const router = { replace: vi.fn() };
 
-    storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Premium", "User"])));
+    await seedLoggedInSession(["Premium", "User"]);
 
     expect(ensureAdminSession("en", router)).toBe(false);
     expect(router.replace).toHaveBeenCalledWith("/en");
@@ -104,17 +116,13 @@ describe("ensureAdminSession", () => {
     expect(router.replace).toHaveBeenCalledWith("/ru");
   });
 
-  it("migrates persisted sessions so access and refresh tokens stay volatile", async () => {
+  it("clears legacy persisted sessions with stored tokens", () => {
     const router = { replace: vi.fn() };
 
     storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin"])));
 
-    expect(ensureAdminSession("en", router)).toBe(true);
-    await Promise.resolve();
-
-    const persistedSession = JSON.parse(storage.setItem.mock.calls.at(-1)?.[1] ?? "{}") as AuthSession;
-    expect(persistedSession.accessToken).toBeUndefined();
-    expect(persistedSession.refreshToken).toBeUndefined();
-    expect(persistedSession.user.userId).toBe("user-1");
+    expect(ensureAdminSession("en", router)).toBe(false);
+    expect(router.replace).toHaveBeenCalledWith("/en");
+    expect(storage.getItem(AUTH_KEY)).toBeNull();
   });
 });

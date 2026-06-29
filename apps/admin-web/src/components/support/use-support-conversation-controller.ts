@@ -16,6 +16,7 @@ import {
   sortSupportQueueItems,
   type SupportTimelineItem,
 } from "@/components/support/support-conversation-helpers";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import { getAvailableStatusActions } from "@/components/support/support-status-helpers";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -106,13 +107,14 @@ function buildSupportRealtimeToastMessage(
   event: { lastMessagePreview?: string | null },
   locale: Locale
 ): string {
-  const fallback = locale === "ru" ? "Новое сообщение в поддержке" : "New support message";
+  const copy = getSupportConversationCopy(locale);
+  const fallback = copy.controller.realtimeMessageFallback;
   const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
   if (!preview) {
     return fallback;
   }
 
-  return locale === "ru" ? `Новое сообщение: ${preview}` : `New support message: ${preview}`;
+  return copy.controller.realtimeMessageWithPreview(preview);
 }
 
 function isUserSupportMessageEvent(event: {
@@ -204,6 +206,7 @@ export function useSupportConversationController({
   queueStatusFilter = "all",
 }: UseSupportConversationControllerParams) {
   const text = useMemo(() => getDictionary(locale), [locale]);
+  const copy = useMemo(() => getSupportConversationCopy(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
@@ -211,10 +214,7 @@ export function useSupportConversationController({
   const sessionUserRoles = session?.user.roles ?? [];
   const canManageSupportWorkspace =
     sessionUserRoles.includes("Admin") || sessionUserRoles.includes("Moderator");
-  const supportActionsForbidden =
-    locale === "ru"
-      ? "Действия поддержки доступны только Admin или Moderator."
-      : "Support actions are available only to Admin or Moderator.";
+  const supportActionsForbidden = copy.controller.actionsForbidden;
   const [queueFilter, setQueueFilter] = useState<SupportQueueFilter>("all");
   const [queuePage, setQueuePage] = useState(1);
   const [searchQuery, setRawSearchQuery] = useState("");
@@ -260,7 +260,7 @@ export function useSupportConversationController({
     (type: ToastState["type"], message: string) => {
       const supportConversationPathId = encodeURIComponent(conversationId);
       addNotification({
-        title: locale === "ru" ? "Поддержка" : "Support",
+        title: copy.controller.notificationTitle,
         message,
         category: "support",
         source: "support-workspace",
@@ -268,7 +268,7 @@ export function useSupportConversationController({
         href: `/${locale}/support/${supportConversationPathId}`,
       });
     },
-    [addNotification, conversationId, locale]
+    [addNotification, conversationId, copy.controller.notificationTitle, locale]
   );
 
   const pushSupportError = useCallback(
@@ -643,12 +643,7 @@ export function useSupportConversationController({
         ? URL.createObjectURL(selectedAttachment)
         : undefined;
       const optimisticLastMessagePreview =
-        trimmedReply ||
-        (selectedAttachment?.name?.trim()
-          ? `${locale === "ru" ? "Вложение" : "Attachment"}: ${selectedAttachment.name.trim()}`
-          : locale === "ru"
-            ? "Вложение"
-            : "Attachment");
+        trimmedReply || copy.controller.optimisticAttachmentPreview(selectedAttachment?.name);
       const optimisticMessage = {
         messageId: optimisticMessageId,
         conversationId,
@@ -656,7 +651,7 @@ export function useSupportConversationController({
         senderDisplayName:
           session?.user.displayName?.trim() ||
           (session?.user.email ? maskEmail(session.user.email) : null) ||
-          (locale === "ru" ? "Оператор" : "Operator"),
+          copy.shared.operator,
         isFromAdmin: true,
         senderType: "Admin",
         body: trimmedReply,
@@ -907,8 +902,8 @@ export function useSupportConversationController({
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
-  const deletedUserNameFallback = locale === "ru" ? "Удаленный пользователь" : "Deleted user";
-  const deletedUserEmailFallback = locale === "ru" ? "Пользователь удален" : "User deleted";
+  const deletedUserNameFallback = copy.shared.deletedUserName;
+  const deletedUserEmailFallback = copy.shared.deletedUserEmail;
   const userEmailDisplay = conversation?.userEmail?.trim()
     ? maskEmail(conversation.userEmail)
     : isSubjectUserDeleted

@@ -28,6 +28,12 @@ import {
   type PromoSortMode,
   type PromoStatusFilter,
 } from "@/components/promo-codes-view.helpers";
+import {
+  buildPromoCodesAutoRefreshLabel,
+  buildPromoCodesPaginationSummary,
+  buildPromoCodesPageLabel,
+  type PromoCodesViewText,
+} from "@/components/promo-codes-view.content";
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";
@@ -43,6 +49,7 @@ const rewardKindColors: Record<AdminRedeemRewardKind, string> = {
 
 type PromoCodesListCardProps = {
   text: ReturnType<typeof getDictionary>;
+  promoText: PromoCodesViewText;
   locale: Locale;
   nowMs: number;
   search: string;
@@ -92,6 +99,7 @@ type PromoCodesListCardProps = {
 
 export function PromoCodesListCard({
   text,
+  promoText,
   locale,
   nowMs,
   search,
@@ -448,9 +456,12 @@ export function PromoCodesListCard({
 
           <div className={styles.pagination}>
             <span className={styles.paginationInfo}>
-              {locale === "ru"
-                ? `Показано ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} из ${formatNumber(totalCount, locale)}`
-                : `Showing ${formatNumber(shownRangeStart, locale)}-${formatNumber(shownRangeEnd, locale)} of ${formatNumber(totalCount, locale)}`}
+              {buildPromoCodesPaginationSummary(
+                locale,
+                formatNumber(shownRangeStart, locale),
+                formatNumber(shownRangeEnd, locale),
+                formatNumber(totalCount, locale)
+              )}
             </span>
             <div className={styles.paginationCenter}>
               <Button
@@ -472,11 +483,10 @@ export function PromoCodesListCard({
                     size="sm"
                     className={styles.paginationNumber}
                     aria-current={pageNumber === currentPage ? "page" : undefined}
-                    aria-label={
-                      locale === "ru"
-                        ? `Страница ${formatNumber(pageNumber, locale)}`
-                        : `Page ${formatNumber(pageNumber, locale)}`
-                    }
+                    aria-label={buildPromoCodesPageLabel(
+                      locale,
+                      formatNumber(pageNumber, locale)
+                    )}
                     onClick={() => onSelectPage(pageNumber)}
                     disabled={promoCodesQueryIsFetching}
                   >
@@ -502,7 +512,7 @@ export function PromoCodesListCard({
                 value={pageSize.toString()}
                 options={pageSizeOptions}
                 onChange={(value) => onPageSizeChange(Number(value))}
-                ariaLabel={locale === "ru" ? "Размер страницы" : "Page size"}
+                ariaLabel={promoText.pageSizeAriaLabel}
                 showSelectedDescription={false}
                 disabled={promoCodesQueryIsFetching}
               />
@@ -556,9 +566,7 @@ function PromoCodesAutoRefreshBadge({
       <span className={styles.autoRefreshDot} />
       {isFetching
         ? text.promoCodesUpdatingLabel
-        : locale === "ru"
-          ? `Автообновление: ${secondsUntilAutoRefresh}с`
-          : `Auto refresh: ${secondsUntilAutoRefresh}s`}
+        : buildPromoCodesAutoRefreshLabel(locale, secondsUntilAutoRefresh)}
     </span>
   );
 }

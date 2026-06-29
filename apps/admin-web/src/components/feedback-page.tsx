@@ -39,6 +39,8 @@ import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
+import { getFeedbackPageText, type FeedbackPageText } from "./feedback-page.content";
+
 type FeedbackPageProps = {
   locale: Locale;
 };
@@ -67,73 +69,6 @@ const typeOptions: Array<FeedbackType | "All"> = [
   "PaymentIssue",
   "General",
 ];
-
-function copy(locale: Locale) {
-  const isRu = locale === "ru";
-  return {
-    eyebrow: isRu ? "Качество" : "Quality",
-    title: "Feedback",
-    description: isRu
-      ? "Отзывы по генерациям, ошибкам, оплате и предложениям с управлением статусами."
-      : "Generation, failure, payment, and general feedback with status management.",
-    filters: isRu ? "Фильтры" : "Filters",
-    table: isRu ? "Заявки" : "Feedback items",
-    details: isRu ? "Детали" : "Details",
-    status: isRu ? "Статус" : "Status",
-    priority: isRu ? "Приоритет" : "Priority",
-    type: isRu ? "Тип" : "Type",
-    category: isRu ? "Категория" : "Category",
-    platform: isRu ? "Платформа" : "Platform",
-    templateId: isRu ? "ID шаблона" : "Template id",
-    userId: isRu ? "ID пользователя" : "User id",
-    from: isRu ? "С даты" : "From",
-    to: isRu ? "По дату" : "To",
-    user: isRu ? "Пользователь" : "User",
-    date: isRu ? "Дата" : "Date",
-    rating: isRu ? "Рейтинг" : "Rating",
-    template: isRu ? "Шаблон" : "Template",
-    message: isRu ? "Сообщение" : "Message",
-    preview: isRu ? "Превью" : "Preview",
-    show: isRu ? "Открыть" : "Open",
-    empty: isRu ? "Feedback не найден" : "No feedback found",
-    loading: isRu ? "Загрузка feedback" : "Loading feedback",
-    error: isRu ? "Не удалось загрузить feedback" : "Failed to load feedback",
-    detailsLoading: isRu ? "Загрузка деталей feedback" : "Loading feedback details",
-    detailsError: isRu ? "Не удалось загрузить детали feedback" : "Failed to load feedback details",
-    userContextErrorTitle: isRu
-      ? "Контекст пользователя временно недоступен"
-      : "User context temporarily unavailable",
-    userContextErrorDescription: isRu
-      ? "Детали feedback загружены, но профиль или аналитика пользователя не ответили."
-      : "Feedback details loaded, but the user profile or analytics did not respond.",
-    retry: isRu ? "Повторить" : "Retry",
-    save: isRu ? "Сохранить" : "Save",
-    saveError: isRu
-      ? "Не удалось сохранить изменения feedback."
-      : "Failed to save feedback changes.",
-    refund: isRu ? "Вернуть кредиты" : "Refund credits",
-    refunded: isRu ? "Кредиты возвращены" : "Refund issued",
-    refundError: isRu ? "Не удалось вернуть кредиты." : "Failed to refund credits.",
-    note: isRu ? "Заметка администратора" : "Admin note",
-    generation: isRu ? "Генерация" : "Generation",
-    input: isRu ? "Входные данные" : "Input",
-    result: isRu ? "Результат" : "Result",
-    technical: isRu ? "Технический контекст" : "Technical context",
-    planCredits: isRu ? "План / кредиты" : "Plan / credits",
-    source: isRu ? "Источник" : "Source",
-    app: isRu ? "Версия приложения" : "App",
-    device: isRu ? "Устройство" : "Device",
-    provider: isRu ? "Провайдер" : "Provider",
-    errorCode: isRu ? "Код ошибки" : "Error",
-    credits: isRu ? "кредитов" : "credits",
-    all: isRu ? "Все" : "All",
-    previous: isRu ? "Назад" : "Previous",
-    next: isRu ? "Вперёд" : "Next",
-    previousPageLabel: isRu ? "Предыдущая страница feedback" : "Previous feedback page",
-    nextPageLabel: isRu ? "Следующая страница feedback" : "Next feedback page",
-    userContextLoading: isRu ? "Загрузка..." : "Loading...",
-  };
-}
 
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -166,10 +101,21 @@ function shortId(value?: string | null) {
   return safe.length > 14 ? `${safe.slice(0, 8)}...${safe.slice(-4)}` : safe;
 }
 
-function ratingLabel(value?: number | null) {
-  if (value === 1) return "Good";
-  if (value === 0) return "Okay";
-  if (value === -1) return "Bad";
+function optionLabel<T extends string>(
+  labels: Record<T | "All", string>,
+  value?: T | null
+) {
+  if (!value) {
+    return "-";
+  }
+
+  return labels[value] ?? value;
+}
+
+function ratingLabel(value: number | null | undefined, text: FeedbackPageText) {
+  if (value === 1) return text.ratingLabels.positive;
+  if (value === 0) return text.ratingLabels.neutral;
+  if (value === -1) return text.ratingLabels.negative;
   return "-";
 }
 
@@ -188,7 +134,7 @@ function FeedbackRow({
   onOpen,
 }: {
   item: AdminFeedbackListItem;
-  text: ReturnType<typeof copy>;
+  text: FeedbackPageText;
   locale: Locale;
   onOpen: (id: string) => void;
 }) {
@@ -196,16 +142,20 @@ function FeedbackRow({
     <tr>
       <td>{formatDateTime(item.createdAtUtc, locale)}</td>
       <td className={styles.mono}>{shortId(item.userId)}</td>
-      <td>{item.type}</td>
+      <td>{optionLabel(text.typeOptions, item.type)}</td>
       <td>{item.category}</td>
-      <td>{ratingLabel(item.rating)}</td>
+      <td>{ratingLabel(item.rating, text)}</td>
       <td>{item.templateTitle ?? shortId(item.templateId)}</td>
       <td>{item.platform ?? "-"}</td>
       <td>
-        <AdminStatusBadge color={toneForStatus(item.status)}>{item.status}</AdminStatusBadge>
+        <AdminStatusBadge color={toneForStatus(item.status)}>
+          {optionLabel(text.statusOptions, item.status)}
+        </AdminStatusBadge>
       </td>
       <td>
-        <AdminStatusBadge color={toneForPriority(item.priority)}>{item.priority}</AdminStatusBadge>
+        <AdminStatusBadge color={toneForPriority(item.priority)}>
+          {optionLabel(text.priorityOptions, item.priority)}
+        </AdminStatusBadge>
       </td>
       <td>
         {item.previewUrl ? (
@@ -244,7 +194,7 @@ function DetailsPanel({
   isDetailsFetching: boolean;
   locale: Locale;
 }) {
-  const text = copy(locale);
+  const text = getFeedbackPageText(locale);
   const queryClient = useQueryClient();
   const [status, setStatus] = useState((details.status as FeedbackStatus) || "New");
   const [priority, setPriority] = useState((details.priority as FeedbackPriority) || "Low");
@@ -313,8 +263,8 @@ function DetailsPanel({
       ? text.userContextLoading
       : userQuery.data
         ? userQuery.data.isPremium
-          ? "premium"
-          : "free"
+          ? text.userPlanPremium
+          : text.userPlanFree
         : "-");
   const userCredits =
     details.userCredits ??
@@ -329,9 +279,9 @@ function DetailsPanel({
       <div className={styles.details} aria-busy={isDetailsFetching ? "true" : undefined}>
         <div className={styles.detailsMain}>
           <div className={styles.detailGrid}>
-            <Detail label={text.type} value={details.type} />
+            <Detail label={text.type} value={optionLabel(text.typeOptions, details.type)} />
             <Detail label={text.category} value={details.category} />
-            <Detail label={text.rating} value={ratingLabel(details.rating)} />
+            <Detail label={text.rating} value={ratingLabel(details.rating, text)} />
             <Detail label={text.user} value={userQuery.data?.email ?? shortId(details.userId)} />
             <Detail label={text.planCredits} value={`${userPlan} / ${userCredits}`} />
             <Detail label={text.source} value={details.sourceScreen} />
@@ -428,7 +378,9 @@ function DetailsPanel({
               {statusOptions
                 .filter((x) => x !== "All")
                 .map((option) => (
-                  <option key={option}>{option}</option>
+                  <option key={option} value={option}>
+                    {text.statusOptions[option]}
+                  </option>
                 ))}
             </select>
           </div>
@@ -443,7 +395,9 @@ function DetailsPanel({
               {priorityOptions
                 .filter((x) => x !== "All")
                 .map((option) => (
-                  <option key={option}>{option}</option>
+                  <option key={option} value={option}>
+                    {text.priorityOptions[option]}
+                  </option>
                 ))}
             </select>
           </div>
@@ -505,7 +459,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 export function FeedbackPage({ locale }: FeedbackPageProps) {
-  const text = copy(locale);
+  const text = getFeedbackPageText(locale);
   const router = useRouter();
   const session = useAuthSession();
   const canView =
@@ -659,6 +613,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
             label={text.status}
             value={status}
             options={statusOptions}
+            optionLabels={text.statusOptions}
             disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setStatus(value as typeof status);
@@ -669,6 +624,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
             label={text.priority}
             value={priority}
             options={priorityOptions}
+            optionLabels={text.priorityOptions}
             disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setPriority(value as typeof priority);
@@ -679,6 +635,7 @@ export function FeedbackPage({ locale }: FeedbackPageProps) {
             label={text.type}
             value={type}
             options={typeOptions}
+            optionLabels={text.typeOptions}
             disabled={areFeedbackFiltersLocked}
             onChange={(value) => {
               setType(value as typeof type);
@@ -911,12 +868,14 @@ function Select({
   label,
   value,
   options,
+  optionLabels,
   disabled = false,
   onChange,
 }: {
   label: string;
   value: string;
   options: readonly string[];
+  optionLabels?: Record<string, string>;
   disabled?: boolean;
   onChange: (value: string) => void;
 }) {
@@ -931,7 +890,7 @@ function Select({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabels?.[option] ?? option}
           </option>
         ))}
       </select>

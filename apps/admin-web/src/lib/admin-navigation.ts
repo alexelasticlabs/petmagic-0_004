@@ -1,4 +1,5 @@
 import { canAccessAdminSection } from "@/lib/admin-rbac";
+import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";
 import { type Locale, getDictionary } from "@/lib/i18n";
 
 export type AdminSectionKey =
@@ -154,167 +155,75 @@ export function getAdminPageMeta(
   currentPath: string,
   userName: string
 ): AdminPageMeta {
+  const copy = getAdminPageMetaCopy(locale);
   const trimmedName = userName.trim();
-  const fallbackName = locale === "ru" ? "администратор" : "administrator";
+  const fallbackName = copy.fallbackAdministratorName;
   const normalizedName = trimmedName
     ? trimmedName.charAt(0).toUpperCase() + trimmedName.slice(1)
     : fallbackName;
 
   if (matchesAdminPath(currentPath, "/dashboard")) {
     return {
-      title: locale === "ru" ? "Дашборд" : "Dashboard",
-      description:
-        locale === "ru"
-          ? `Обзор ключевых метрик и активности, ${normalizedName}.`
-          : `Overview of key metrics and activity, ${normalizedName}.`,
+      title: copy.dashboard.title,
+      description: copy.dashboard.description(normalizedName),
     };
   }
 
   if (matchesAdminPath(currentPath, "/economy")) {
-    return {
-      title: locale === "ru" ? "Экономика" : "Economy",
-      description:
-        locale === "ru"
-          ? "Баланс, покупки, история движения валюты и управление пакетами пополнения."
-          : "Balance, purchases, currency movement history, and top-up pack management.",
-    };
+    return copy.economy;
   }
 
   if (matchesAdminPath(currentPath, "/promo-codes")) {
-    return {
-      title: locale === "ru" ? "Промокоды" : "Promo codes",
-      description:
-        locale === "ru"
-          ? "Промокоды: создание, лимиты, период действия и история активаций."
-          : "Promo codes: creation, limits, availability window, and redemption history.",
-    };
+    return copy.promoCodes;
   }
 
   if (matchesAdminPath(currentPath, "/users")) {
-    return {
-      title: locale === "ru" ? "Пользователи" : "Users",
-      description:
-        locale === "ru"
-          ? "Управление ролями, премиум-статусом и доступом пользователей."
-          : "Manage roles, premium status, and user access.",
-    };
+    return copy.users;
   }
 
   if (matchesAdminPath(currentPath, "/generations")) {
-    return {
-      title: locale === "ru" ? "Генерации" : "Generations",
-      description:
-        locale === "ru"
-          ? "Очередь и история генераций с фильтрами по статусу, провайдеру, пользователю и job id."
-          : "Generation queue and history with status, provider, user, and job id filters.",
-    };
+    return copy.generations;
   }
 
   if (matchesAdminPath(currentPath, "/feedback")) {
-    return {
-      title: "Feedback",
-      description:
-        locale === "ru"
-          ? "Обратная связь по генерациям, багам, оплате и предложениям со статусами и возвратом credits."
-          : "Generation, bug, payment, and general feedback with status handling and credit refunds.",
-    };
+    return copy.feedback;
   }
 
   if (matchesAdminPath(currentPath, "/roles")) {
-    return {
-      title: locale === "ru" ? "Управление ролями" : "Role Management",
-      description:
-        locale === "ru"
-          ? "Списки Admin и Moderator, назначение и снятие Moderator с журналом аудита."
-          : "Admin and Moderator lists with Moderator assignment and removal backed by audit log.",
-    };
+    return copy.roleManagement;
   }
 
   if (matchesAdminPath(currentPath, "/support")) {
-    return {
-      title: locale === "ru" ? "Поддержка" : "Support",
-      description:
-        locale === "ru"
-          ? "Очередь диалогов поддержки с пользователями и быстрые ответы команды."
-          : "Support conversation inbox with fast team replies.",
-    };
+    return copy.support;
   }
 
   if (matchesAdminPath(currentPath, "/moderation")) {
-    return {
-      title: locale === "ru" ? "Модерация" : "Moderation",
-      description:
-        locale === "ru"
-          ? "Очередь жалоб и обратной связи по шаблонам с решением одобрить или отклонить."
-          : "Complaint and feedback queue for templates with approve/reject decisions.",
-    };
+    return copy.moderation;
   }
 
   if (matchesAnyAdminPath(currentPath, "/templates/image", "/image-templates")) {
-    return {
-      title: locale === "ru" ? "Шаблоны изображений" : "Image templates",
-      description:
-        locale === "ru"
-          ? "Каталог и настройки шаблонов для генерации изображений."
-          : "Catalog and settings for image generation templates.",
-    };
+    return copy.imageTemplates;
   }
 
   if (matchesAnyAdminPath(currentPath, "/templates/video", "/video-templates")) {
-    return {
-      title: locale === "ru" ? "Видео шаблоны" : "Video templates",
-      description:
-        locale === "ru"
-          ? "Управление видео-сценариями, референсами и моделями."
-          : "Manage video scenarios, references, and model settings.",
-    };
+    return copy.videoTemplates;
   }
 
   if (matchesAdminPath(currentPath, "/templates/categories")) {
-    return {
-      title: locale === "ru" ? "Категории шаблонов" : "Template categories",
-      description:
-        locale === "ru"
-          ? "Сводка по категориям, типам шаблонов и наполнению каталога."
-          : "Overview of categories, template types, and catalog coverage.",
-    };
+    return copy.templateCategories;
   }
 
   if (matchesAdminPath(currentPath, "/templates/daily-featured")) {
-    return {
-      title: locale === "ru" ? "Шаблон дня" : "Daily Featured",
-      description:
-        locale === "ru"
-          ? "Ручные назначения и auto-pick для Template of the Day."
-          : "Manual assignments and auto-pick for Template of the Day.",
-    };
+    return copy.templateDailyFeatured;
   }
 
   if (matchesAdminPath(currentPath, "/templates/analytics")) {
-    return {
-      title: locale === "ru" ? "Аналитика шаблонов" : "Template analytics",
-      description:
-        locale === "ru"
-          ? "Общая статистика по просмотрам, генерациям, расходам и эффективности шаблонов."
-          : "Overview of template views, generations, spend, and performance.",
-    };
+    return copy.templateAnalytics;
   }
 
   if (matchesAdminPath(currentPath, "/templates")) {
-    return {
-      title: locale === "ru" ? "Шаблоны" : "Templates",
-      description:
-        locale === "ru"
-          ? "Управление видео-шаблонами, шаблонами изображений, категориями и состояниями каталога."
-          : "Manage video and image templates, categories, and catalog states.",
-    };
+    return copy.templates;
   }
 
-  return {
-    title: locale === "ru" ? "PetMagic Admin" : "PetMagic Admin",
-    description:
-      locale === "ru"
-        ? "Рабочая зона администратора PetMagic."
-        : "PetMagic administrator workspace.",
-  };
+  return copy.workspace;
 }

@@ -36,6 +36,7 @@ import {
   shortId,
   shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { SupportInfoPanel } from "@/components/support/support-info-panel";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 import styles from "@/components/support/support-page.module.css";
@@ -105,6 +106,7 @@ export function SupportConversationPage({
   navigationMode = "route",
   onConversationSelect,
 }: SupportConversationPageProps) {
+  const copy = useMemo(() => getSupportConversationCopy(locale), [locale]);
   const [fullscreenImage, setFullscreenImage] = useState<FullscreenImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -254,53 +256,12 @@ export function SupportConversationPage({
       ? primaryStatusAction
       : (secondaryStatusActions.find((action) => action.status === "InProgress") ?? null);
   const readOnlyComposerTitle = isConversationClosed
-    ? locale === "ru"
-      ? "Диалог закрыт. Чтобы продолжить, переоткройте обращение."
-      : "Conversation is closed. Reopen it to continue."
+    ? copy.page.closedConversationReadonly
     : statusHint(conversation?.status ?? "Closed", text);
-  const imageViewerLabels = {
-    close: locale === "ru" ? "Закрыть" : "Close",
-    download: locale === "ru" ? "Скачать" : "Download",
-    jump: locale === "ru" ? "К сообщению" : "Jump to message",
-    openOriginal: locale === "ru" ? "Открыть оригинал" : "Open original",
-    share: locale === "ru" ? "Поделиться" : "Share",
-    author: locale === "ru" ? "Автор" : "Author",
-    date: locale === "ru" ? "Дата" : "Date",
-    size: locale === "ru" ? "Размер" : "Size",
-  };
-  const queueLabels = {
-    title: locale === "ru" ? "Очередь" : "Queue",
-    all: locale === "ru" ? "Все" : "All",
-    unassigned: locale === "ru" ? "Без ответств." : "Unassigned",
-    archive: locale === "ru" ? "Архив" : "Archive",
-    status: locale === "ru" ? "Статус" : "Status",
-    previousPage: locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page",
-    nextPage: locale === "ru" ? "Следующая страница очереди" : "Next queue page",
-    newMessagesTitle: (count: number) =>
-      locale === "ru"
-        ? `Новых сообщений от пользователей: ${count}`
-        : `New messages from users: ${count}`,
-    pageCount: (page: number, start: number, end: number, total: number) =>
-      locale === "ru"
-        ? `Страница ${page}: показано ${start}-${end} из ${total}`
-        : `Page ${page}: showing ${start}-${end} of ${total}`,
-  };
-  const messageLabels = {
-    fileFallback: locale === "ru" ? "Файл" : "File",
-    openPhoto: locale === "ru" ? "Открыть фото" : "Open photo",
-    openVideo: locale === "ru" ? "Открыть видео" : "Open video",
-    reply: locale === "ru" ? "Ответить" : "Reply",
-    replyTo: locale === "ru" ? "Ответ на" : "Reply to",
-    jump: locale === "ru" ? "К сообщению" : "Jump",
-    cancelReply: locale === "ru" ? "Отменить ответ" : "Cancel reply",
-    attachFile: locale === "ru" ? "Прикрепить файл" : "Attach file",
-    read: locale === "ru" ? "Прочитано" : "Read",
-    sent: locale === "ru" ? "Отправлено" : "Sent",
-  };
-  const supportWorkspaceSubtitle =
-    locale === "ru"
-      ? "Единое рабочее пространство для очереди, переписки и действий оператора"
-      : "Unified workspace for queue, conversation, and operator actions";
+  const imageViewerLabels = copy.page.imageViewer;
+  const queueLabels = copy.page.queue;
+  const messageLabels = copy.page.message;
+  const supportWorkspaceSubtitle = copy.page.workspaceSubtitle;
 
   const groupedConversationFeed = useMemo(
     () =>
@@ -621,7 +582,7 @@ export function SupportConversationPage({
       const shareData: ShareData = {
         title: formatSafeSupportDisplay(
           currentFullscreenImage.fileName,
-          "Support attachment",
+          imageViewerLabels.supportAttachmentFallback,
           120
         ),
         files: [file],
@@ -799,9 +760,7 @@ export function SupportConversationPage({
 
     const attachments = getMessageAttachments(message);
     if (attachments.length > 1) {
-      return locale === "ru"
-        ? `Вложения (${attachments.length})`
-        : `Attachments (${attachments.length})`;
+      return messageLabels.attachmentGroup(attachments.length);
     }
 
     const primaryAttachment = attachments[0];
@@ -810,18 +769,14 @@ export function SupportConversationPage({
     }
 
     if (primaryAttachment.mimeType.startsWith("image/")) {
-      return locale === "ru" ? "Фото" : "Photo";
+      return copy.shared.photo;
     }
 
     if (primaryAttachment.mimeType.startsWith("video/")) {
-      return locale === "ru" ? "Видео" : "Video";
+      return copy.shared.video;
     }
 
-    return formatSafeSupportDisplay(
-      primaryAttachment.fileName,
-      locale === "ru" ? "Файл" : "File",
-      120
-    );
+    return formatSafeSupportDisplay(primaryAttachment.fileName, copy.shared.file, 120);
   };
 
   const startReplyToMessage = (message: AdminSupportConversation["messages"][number]) => {
@@ -922,7 +877,7 @@ export function SupportConversationPage({
             kind="image"
             alt={formatSafeSupportDisplay(
               attachment.fileName || message.body,
-              "Support attachment",
+              imageViewerLabels.supportAttachmentFallback,
               120
             )}
             width={options?.single ? 360 : 180}
@@ -1174,7 +1129,7 @@ export function SupportConversationPage({
                     const queueUserLabel = item.userDisplayName?.trim()
                       ? formatSafeSupportDisplay(item.userDisplayName, "", 72)
                       : (item.userEmail?.trim() ? maskEmail(item.userEmail) : "") ||
-                        (locale === "ru" ? "Удаленный пользователь" : "Deleted user");
+                        copy.shared.deletedUserName;
 
                     const queueItemClassName = `${styles.conversationRow} ${item.isReadOnly ? styles.conversationRowClosed : ""} ${item.conversationId === conversationId ? styles.conversationRowActive : ""} ${hasUnread ? styles.conversationRowUnread : ""}`;
                     const queueItemContent = (
@@ -1218,11 +1173,7 @@ export function SupportConversationPage({
                               {item.userUnreadCount > 0 ? (
                                 <span
                                   className={`${styles.queueCountBadge} ${styles.queueCountBadgeIncoming}`}
-                                  title={
-                                    locale === "ru"
-                                      ? `Сообщений от пользователя: ${item.userUnreadCount}`
-                                      : `Messages from user: ${item.userUnreadCount}`
-                                  }
+                                  title={queueLabels.userUnreadTitle(item.userUnreadCount)}
                                 >
                                   <SupportIcon className={styles.queueBadgeIcon} />
                                   {item.userUnreadCount}
@@ -1231,11 +1182,7 @@ export function SupportConversationPage({
                               {item.adminUnreadCount > 0 ? (
                                 <span
                                   className={`${styles.queueCountBadge} ${styles.queueCountBadgeUnread}`}
-                                  title={
-                                    locale === "ru"
-                                      ? `Непрочитанных для админа: ${item.adminUnreadCount}`
-                                      : `Unread for admin: ${item.adminUnreadCount}`
-                                  }
+                                  title={queueLabels.adminUnreadTitle(item.adminUnreadCount)}
                                 >
                                   <BellIcon className={styles.queueBadgeIcon} />
                                   {item.adminUnreadCount}
@@ -1268,14 +1215,10 @@ export function SupportConversationPage({
                           </span>
                           <span className={styles.queueMetaChipMuted}>
                             {item.assignedAdminDisplayName?.trim()
-                              ? `${locale === "ru" ? "Оператор" : "Operator"}: ${formatSafeSupportDisplay(
-                                  item.assignedAdminDisplayName,
-                                  "",
-                                  72
-                                )}`
-                              : locale === "ru"
-                                ? "Без оператора"
-                                : "Unassigned"}
+                              ? queueLabels.assignedOperator(
+                                  formatSafeSupportDisplay(item.assignedAdminDisplayName, "", 72)
+                                )
+                              : queueLabels.unassignedOperator}
                           </span>
                         </div>
                       </>
@@ -1399,7 +1342,7 @@ export function SupportConversationPage({
                   <div className={styles.dropOverlay}>
                     <div className={styles.dropOverlayContent}>
                       <UploadIcon className={styles.dropOverlayIcon} />
-                      <span>{locale === "ru" ? "Перетащите фото сюда" : "Drop image here"}</span>
+                      <span>{copy.page.dragAndDropImage}</span>
                     </div>
                   </div>
                 ) : null}
@@ -1434,8 +1377,7 @@ export function SupportConversationPage({
                           </div>
                         </div>
                         <span className={styles.chatHeaderSubtext}>
-                          {userEmailDisplay ||
-                            (locale === "ru" ? "Пользователь удален" : "User deleted")}{" "}
+                          {userEmailDisplay || copy.shared.deletedUserEmail}{" "}
                           · #{shortId(conversation.initiatorUserId)}
                         </span>
                       </div>
@@ -1466,9 +1408,7 @@ export function SupportConversationPage({
                             onClick={requestOlderMessagesLoad}
                             disabled={!canManageSupportWorkspace || conversationQuery.isFetching}
                           >
-                            {locale === "ru"
-                              ? "Загрузить предыдущие сообщения"
-                              : "Load previous messages"}
+                            {copy.page.loadPreviousMessages}
                           </Button>
                         </div>
                       ) : null}
@@ -1618,9 +1558,7 @@ export function SupportConversationPage({
                                         className={`${styles.messageAttachmentStatusPill} ${styles[`messageAttachmentStatus_${normalizedAttachmentStatus}`] ?? ""}`}
                                       >
                                         {normalizedAttachmentStatus === "retry"
-                                          ? locale === "ru"
-                                            ? "Повторить"
-                                            : "Retry"
+                                          ? copy.page.retryAttachmentUpload
                                           : text.supportAttachmentFailedLabel}
                                       </span>
                                     </div>
@@ -1872,7 +1810,9 @@ export function SupportConversationPage({
               aria-modal="true"
               aria-label={formatSafeSupportDisplay(
                 fullscreenImage.fileName,
-                fullscreenImage.mediaType === "video" ? "Video preview" : "Image preview",
+                fullscreenImage.mediaType === "video"
+                  ? imageViewerLabels.videoPreview
+                  : imageViewerLabels.imagePreview,
                 120
               )}
               onClick={closeFullscreenImage}
@@ -1882,7 +1822,7 @@ export function SupportConversationPage({
                   <strong>
                     {formatSafeSupportDisplay(
                       fullscreenImage.fileName,
-                      fullscreenImage.mediaType === "video" ? "Video" : "Image",
+                      fullscreenImage.mediaType === "video" ? copy.shared.video : copy.shared.photo,
                       120
                     )}
                   </strong>
@@ -1905,7 +1845,11 @@ export function SupportConversationPage({
                     <SupportSecureMedia
                       url={fullscreenImage.attachmentFileUrl}
                       kind="image"
-                      alt={formatSafeSupportDisplay(fullscreenImage.fileName, "Support image", 120)}
+                      alt={formatSafeSupportDisplay(
+                        fullscreenImage.fileName,
+                        imageViewerLabels.supportImageAlt,
+                        120
+                      )}
                       width={1720}
                       height={980}
                       className={styles.imageViewerImage}
@@ -1934,7 +1878,7 @@ export function SupportConversationPage({
                   </div>
                   {fullscreenImage.mediaType === "video" ? (
                     <div>
-                      <span>{locale === "ru" ? "Длительность" : "Duration"}</span>
+                      <span>{copy.shared.duration}</span>
                       <strong>{formatAttachmentDuration(fullscreenImage.durationSeconds)}</strong>
                     </div>
                   ) : null}

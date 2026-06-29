@@ -10,6 +10,9 @@ import {
 } from "@/components/admin/admin-notifications";
 
 const adminTopbarPath = fileURLToPath(new URL("./admin-topbar.tsx", import.meta.url));
+const adminChromeContentPath = fileURLToPath(
+  new URL("./admin-chrome.content.ts", import.meta.url)
+);
 const adminShellStylesPath = fileURLToPath(new URL("./admin-shell.module.css", import.meta.url));
 const adminNotificationsPath = fileURLToPath(
   new URL("./admin-notifications.tsx", import.meta.url)
@@ -147,13 +150,18 @@ describe("admin notification sanitization", () => {
 
   it("sanitizes notification text again at the topbar render boundary", () => {
     const source = readFileSync(adminTopbarPath, "utf8");
+    const contentSource = readFileSync(adminChromeContentPath, "utf8");
 
     expect(source).toContain("sanitizeAdminNotificationText,");
     expect(source).toContain("const safeNotificationTitle = sanitizeAdminNotificationText(");
     expect(source).toContain("const safeNotificationMessage = sanitizeAdminNotificationText(");
-    expect(source).toContain('{locale === "ru" ? "Закреплено" : "Pinned"}');
+    expect(source).toContain("const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);");
+    expect(source).toContain("{copy.topbar.pinned}");
+    expect(contentSource).toContain('pinned: "Закреплено"');
+    expect(contentSource).toContain('pinned: "Pinned"');
     expect(source).toContain("{safeNotificationTitle}");
     expect(source).toContain("{safeNotificationMessage}");
+    expect(source).not.toContain('{locale === "ru" ? "Закреплено" : "Pinned"}');
     expect(source).not.toContain(
       '<strong className={styles.notificationCardTitle}>{item.title}</strong>'
     );
@@ -164,6 +172,7 @@ describe("admin notification sanitization", () => {
 
   it("keeps the topbar notification dialog keyboard reachable", () => {
     const source = readFileSync(adminTopbarPath, "utf8");
+    const contentSource = readFileSync(adminChromeContentPath, "utf8");
 
     expect(source).toContain("useCallback, useEffect, useId, useMemo, useRef, useState");
     expect(source).toContain("const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);");
@@ -181,8 +190,9 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("ref={notificationTriggerRef}");
     expect(source).toContain("aria-controls={isNotificationsOpen ? notificationPanelId : undefined}");
     expect(source).toContain("const notificationTriggerLabel =");
-    expect(source).toContain('? "Закрыть уведомления"');
-    expect(source).toContain('? "Close notifications"');
+    expect(source).toContain("copy.topbar.notificationTriggerLabel(isNotificationsOpen)");
+    expect(contentSource).toContain('notificationTriggerLabel: (open) => (open ? "Закрыть уведомления" : "Открыть уведомления")');
+    expect(contentSource).toContain('notificationTriggerLabel: (open) => (open ? "Close notifications" : "Open notifications")');
     expect(source).toContain("aria-label={notificationTriggerLabel}");
     expect(source).toContain("title={notificationTriggerLabel}");
     expect(source).toContain("id={notificationPanelId}");
@@ -191,7 +201,9 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("tabIndex={-1}");
     expect(source).toContain("id={notificationPanelTitleId}");
     expect(source).toContain("const notificationFiltersLabel =");
-    expect(source).toContain('? "Фильтры уведомлений"');
+    expect(source).toContain("copy.topbar.notificationFiltersLabel");
+    expect(contentSource).toContain('notificationFiltersLabel: "Фильтры уведомлений"');
+    expect(contentSource).toContain('notificationFiltersLabel: "Notification filters"');
     expect(source).toContain('role="toolbar"');
     expect(source).toContain("aria-label={notificationFiltersLabel}");
     expect(source).toContain("aria-pressed={notificationFilter === filterOption.value}");

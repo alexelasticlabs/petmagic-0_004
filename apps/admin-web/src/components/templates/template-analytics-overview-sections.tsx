@@ -40,13 +40,11 @@ type AnalyticsText = Record<string, string>;
 type MetricAccent = "blue" | "green" | "red" | "cyan" | "neutral";
 
 export function TemplateAnalyticsOverviewSection({
-  isRu,
   kpiCards,
   locale,
   template,
   text,
 }: {
-  isRu: boolean;
   kpiCards: readonly {
     label: string;
     value: string;
@@ -60,7 +58,7 @@ export function TemplateAnalyticsOverviewSection({
 }) {
   return (
     <div className={styles.overviewGrid}>
-      <TemplateProfileCard template={template} locale={locale} text={text} isRu={isRu} />
+      <TemplateProfileCard template={template} locale={locale} text={text} />
 
       <div className={styles.kpiGrid}>
         {kpiCards.map((card, index) => (
@@ -72,7 +70,7 @@ export function TemplateAnalyticsOverviewSection({
             accent={card.accent}
             delta={card.delta}
             text={text}
-            isRu={isRu}
+            locale={locale}
           />
         ))}
       </div>
@@ -85,7 +83,6 @@ export function TemplateAnalyticsVisualSection({
   chartPoints,
   chartTabs,
   isChartMetricLocked = false,
-  isRu,
   locale,
   onChartMetricChange,
   statistics,
@@ -95,7 +92,6 @@ export function TemplateAnalyticsVisualSection({
   chartPoints: readonly AdminTemplateTrendPoint[];
   chartTabs: readonly { key: TrendMetricKey; label: string }[];
   isChartMetricLocked?: boolean;
-  isRu: boolean;
   locale: Locale;
   onChartMetricChange: (value: TrendMetricKey) => void;
   statistics: AdminTemplateStatistics;
@@ -148,7 +144,7 @@ export function TemplateAnalyticsVisualSection({
           </h2>
           <p>{text.statusBreakdownHint}</p>
         </div>
-        <StatusRing statistics={statistics} text={text} isRu={isRu} />
+        <StatusRing statistics={statistics} text={text} locale={locale} />
       </section>
     </div>
   );
@@ -156,13 +152,11 @@ export function TemplateAnalyticsVisualSection({
 
 export function TemplateAnalyticsInsightGridSection({
   events,
-  isRu,
   locale,
   statistics,
   text,
 }: {
   events: AdminTemplateEventAnalytics;
-  isRu: boolean;
   locale: Locale;
   statistics: AdminTemplateStatistics;
   text: AnalyticsText;
@@ -176,7 +170,7 @@ export function TemplateAnalyticsInsightGridSection({
         rows={events.sources}
         locale={locale}
       />
-      <FunnelPanel statistics={statistics} text={text} isRu={isRu} />
+      <FunnelPanel statistics={statistics} text={text} locale={locale} />
       <AnalyticsDimensionPanel
         title={text.geographyTitle}
         hint={text.geographyHint}
@@ -197,14 +191,12 @@ export function TemplateAnalyticsInsightGridSection({
 
 export function TemplateAnalyticsSnapshotSection({
   activeRuns,
-  isRu,
   locale,
   statistics,
   template,
   text,
 }: {
   activeRuns: number;
-  isRu: boolean;
   locale: Locale;
   statistics: AdminTemplateStatistics;
   template: AdminTemplate;
@@ -228,19 +220,19 @@ export function TemplateAnalyticsSnapshotSection({
         <SummaryRow label={text.processingNow} value={String(statistics.processingRuns)} />
         <SummaryRow
           label={text.successRate}
-          value={formatPercent(statistics.successRatePercent, isRu)}
+          value={formatPercent(statistics.successRatePercent, locale)}
         />
         <SummaryRow
           label={text.totalTokenCost}
-          value={formatTokens(statistics.totalTokenCost, isRu)}
+          value={formatTokens(statistics.totalTokenCost, locale)}
         />
         <SummaryRow
           label={text.averageTokenCost}
-          value={formatTokens(statistics.averageTokenCost, isRu)}
+          value={formatTokens(statistics.averageTokenCost, locale)}
         />
         <SummaryRow
           label={text.averageGenerationTime}
-          value={formatDuration(statistics.averageGenerationSeconds, isRu)}
+          value={formatDuration(statistics.averageGenerationSeconds, locale)}
         />
         <SummaryRow label={text.lastRun} value={formatDateTime(statistics.lastRunAtUtc, locale)} />
         <SummaryRow
@@ -268,12 +260,10 @@ function TemplateProfileCard({
   template,
   locale,
   text,
-  isRu,
 }: {
   template: AdminTemplate;
   locale: Locale;
   text: AnalyticsText;
-  isRu: boolean;
 }) {
   const dictionary = getDictionary(locale);
   const previewUrl = template.previewAsset?.url;
@@ -351,7 +341,7 @@ function TemplateProfileCard({
             label={text.priceLabel}
             value={getTemplateAccessLabel(template.isPremium, dictionary)}
           />
-          <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, isRu)} />
+          <SummaryRow label={text.tokenCostLabel} value={formatTokens(template.tokenCost, locale)} />
           <SummaryRow
             label={text.estimatedTemplateCostLabel}
             value={formatUsd(template.estimatedProviderCostUsd, locale)}
@@ -377,7 +367,7 @@ function KpiCard({
   accent,
   delta,
   text,
-  isRu,
+  locale,
 }: {
   label: string;
   value: string;
@@ -385,7 +375,7 @@ function KpiCard({
   accent: MetricAccent;
   delta?: number | null;
   text: AnalyticsText;
-  isRu: boolean;
+  locale: Locale;
 }) {
   const deltaClassName =
     typeof delta === "number" && delta < 0 ? styles.deltaNegative : styles.deltaPositive;
@@ -396,7 +386,7 @@ function KpiCard({
       <strong>{value}</strong>
       <p>{hint}</p>
       {typeof delta === "number" ? (
-        <small className={deltaClassName}>{formatDelta(delta, isRu)}</small>
+        <small className={deltaClassName}>{formatDelta(delta, locale)}</small>
       ) : (
         <small className={styles.deltaMuted}>{text.compareNoBase}</small>
       )}
@@ -432,7 +422,7 @@ function AnalyticsDimensionPanel({
             <div key={row.key} className={styles.dimensionRow}>
               <div>
                 <span>{row.label}</span>
-                <strong>{formatPercent(row.sharePercent, locale === "ru")}</strong>
+                <strong>{formatPercent(row.sharePercent, locale)}</strong>
                 <em>{formatNumber(row.count, locale)}</em>
               </div>
               <i style={{ width: `${Math.min(100, Math.max(0, row.sharePercent))}%` }} />
@@ -449,11 +439,11 @@ function AnalyticsDimensionPanel({
 function FunnelPanel({
   statistics,
   text,
-  isRu,
+  locale,
 }: {
   statistics: AdminTemplateStatistics;
   text: AnalyticsText;
-  isRu: boolean;
+  locale: Locale;
 }) {
   const total = Math.max(statistics.totalRuns, 1);
   const rows = [
@@ -489,8 +479,8 @@ function FunnelPanel({
           <div key={row.label} className={styles.funnelRow}>
             <div>
               <span>{row.label}</span>
-              <strong>{formatPercent(row.percent, isRu)}</strong>
-              <em>{formatNumber(row.value, isRu ? "ru" : "en")}</em>
+              <strong>{formatPercent(row.percent, locale)}</strong>
+              <em>{formatNumber(row.value, locale)}</em>
             </div>
             <i style={{ width: `${Math.min(100, Math.max(0, row.percent))}%` }} />
           </div>
@@ -645,11 +635,11 @@ function TrendChart({
 function StatusRing({
   statistics,
   text,
-  isRu,
+  locale,
 }: {
   statistics: AdminTemplateStatistics;
   text: AnalyticsText;
-  isRu: boolean;
+  locale: Locale;
 }) {
   const total = Math.max(statistics.totalRuns, 1);
   const segments = [
@@ -678,7 +668,7 @@ function StatusRing({
         <div className={styles.ringOuter} style={{ background }}>
           <div className={styles.ringInner}>
             <strong>{statistics.totalRuns}</strong>
-            <span>{isRu ? "запусков" : "runs"}</span>
+            <span>{text.runsLabel}</span>
           </div>
         </div>
       </div>

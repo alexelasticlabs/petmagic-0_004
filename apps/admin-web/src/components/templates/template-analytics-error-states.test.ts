@@ -8,6 +8,9 @@ const templateAnalyticsPagePath = fileURLToPath(
 const templateAnalyticsStylesPath = fileURLToPath(
   new URL("./template-analytics-page.module.css", import.meta.url)
 );
+const templateAnalyticsCopyPath = fileURLToPath(
+  new URL("./template-analytics-copy.ts", import.meta.url)
+);
 const templatesAnalyticsHubPagePath = fileURLToPath(
   new URL("./templates-analytics-hub-page.tsx", import.meta.url)
 );
@@ -41,10 +44,23 @@ describe("template analytics error states", () => {
 
   it("keeps template analytics detail and hub failures retryable", () => {
     const detailSource = readFileSync(templateAnalyticsPagePath, "utf8");
+    const copySource = readFileSync(templateAnalyticsCopyPath, "utf8");
     const hubSource = readFileSync(templatesAnalyticsHubPagePath, "utf8");
     const overviewHookSource = readFileSync(overviewHookPath, "utf8");
 
     expect(overviewHookSource).toContain("isFetching: primaryQuery.isFetching || secondaryQuery.isFetching");
+
+    expect(detailSource).toContain(
+      'import { getTemplateAnalyticsCopy } from "@/components/templates/template-analytics-copy";'
+    );
+    expect(detailSource).toContain("const text = useMemo(() => getTemplateAnalyticsCopy(locale), [locale]);");
+    expect(copySource).toContain("const templateAnalyticsCopy = {");
+    expect(copySource).toContain('pageTitle: "Аналитика"');
+    expect(copySource).toContain('pageTitle: "Analytics"');
+    expect(copySource).toContain("export type TemplateAnalyticsCopy = {");
+    expect(copySource).toContain("return templateAnalyticsCopy[locale] as TemplateAnalyticsCopy;");
+    expect(copySource).not.toContain('const isRu = locale === "ru";');
+    expect(copySource).not.toContain('pageTitle: isRu ? "Аналитика" : "Analytics"');
 
     expect(detailSource).toContain("title={error ?? text.loadError}");
     expect(detailSource).toContain(
@@ -114,6 +130,7 @@ describe("template analytics error states", () => {
 
   it("sanitizes template analytics detail identifiers and feedback summary labels", () => {
     const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
+    const copySource = readFileSync(templateAnalyticsCopyPath, "utf8");
     const utilsSource = readFileSync(analyticsUtilsPath, "utf8");
 
     expect(utilsSource).toContain("const safeValue = sanitizeSensitiveText(value, 48).replace(/\\s/g, \"\");");
@@ -122,15 +139,19 @@ describe("template analytics error states", () => {
       "return safeValue.length > 13 ? `${safeValue.slice(0, 8)}...${safeValue.slice(-4)}` : safeValue;"
     );
     expect(utilsSource).not.toContain("return value.length > 13");
-    expect(pageSource).toContain('title={isRu ? "Сводка feedback" : "Feedback summary"}');
-    expect(pageSource).toContain('label: isRu ? "Позитив" : "Positive"');
-    expect(pageSource).toContain('label: isRu ? "Нейтрально" : "Neutral"');
-    expect(pageSource).toContain('label: isRu ? "Негатив" : "Negative"');
-    expect(pageSource).toContain('label: isRu ? "Главные проблемы" : "Top issues"');
+    expect(pageSource).toContain("title={text.feedbackSummaryTitle}");
+    expect(pageSource).toContain("label: text.feedbackSummaryPositive,");
+    expect(pageSource).toContain("label: text.feedbackSummaryNeutral,");
+    expect(pageSource).toContain("label: text.feedbackSummaryNegative,");
+    expect(pageSource).toContain("label: text.feedbackSummaryTopIssues,");
+    expect(copySource).toContain('feedbackSummaryTitle: "Сводка feedback"');
+    expect(copySource).toContain('feedbackSummaryTitle: "Feedback summary"');
+    expect(copySource).toContain('feedbackSummaryPositive: "Позитив"');
+    expect(copySource).toContain('feedbackSummaryNegative: "Negative"');
     expect(pageSource).toContain(
       ".map((issue) => `${sanitizeSensitiveText(issue.category, 80)}: ${issue.count}`)"
     );
-    expect(pageSource).not.toContain('title={isRu ? "Feedback summary" : "Feedback summary"}');
+    expect(pageSource).not.toContain('title={isRu ? "Сводка feedback" : "Feedback summary"}');
     expect(pageSource).not.toContain(".map((issue) => `${issue.category}: ${issue.count}`)");
   });
 

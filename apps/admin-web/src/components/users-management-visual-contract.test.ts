@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const usersPagePath = fileURLToPath(new URL("./users-management-page.tsx", import.meta.url));
+const usersContentPath = fileURLToPath(
+  new URL("./users-management-page.content.ts", import.meta.url)
+);
 const usersStylesPath = fileURLToPath(
   new URL("./users-management-page.module.css", import.meta.url)
 );
@@ -54,6 +57,7 @@ describe("users management visual contract", () => {
 
   it("keeps users pagination icon-based and accessible", () => {
     const usersSource = readFileSync(usersPagePath, "utf8");
+    const usersContentSource = readFileSync(usersContentPath, "utf8");
     const stylesSource = readFileSync(usersStylesPath, "utf8");
 
     expect(usersSource).toContain("CaretDownIcon");
@@ -63,13 +67,32 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain("title={ui.nextPageLabel}");
     expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconPrevious}`}");
     expect(usersSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
-    expect(usersSource).toContain('previousPageLabel: "Previous users page"');
-    expect(usersSource).toContain('nextPageLabel: "Next users page"');
+    expect(usersContentSource).toContain('previousPageLabel: "Previous users page"');
+    expect(usersContentSource).toContain('nextPageLabel: "Next users page"');
     expect(stylesSource).toContain(".pageInfo {");
     expect(stylesSource).toContain(".pageIconPrevious {");
     expect(stylesSource).toContain(".pageIconNext {");
     expect(usersSource).not.toContain("{ui.prevPage}");
     expect(usersSource).not.toContain("{ui.nextPage}");
+  });
+
+  it("keeps users page UI copy outside the client component", () => {
+    const usersSource = readFileSync(usersPagePath, "utf8");
+    const usersContentSource = readFileSync(usersContentPath, "utf8");
+
+    expect(usersSource).toContain(
+      'import { getUsersManagementPageText } from "@/components/users-management-page.content";'
+    );
+    expect(usersSource).toContain(
+      "const ui = useMemo(() => getUsersManagementPageText(locale), [locale]);"
+    );
+    expect(usersSource).not.toContain('summaryTotal: "Total users"');
+    expect(usersSource).not.toContain('summaryTotal: "Всего пользователей"');
+    expect(usersContentSource).toContain("export type UsersManagementPageText = {");
+    expect(usersContentSource).toContain("const usersManagementPageText: Record<Locale, UsersManagementPageText>");
+    expect(usersContentSource).toContain("export function getUsersManagementPageText");
+    expect(usersContentSource).toContain('summaryTotal: "Total users"');
+    expect(usersContentSource).toContain('summaryTotal: "Всего пользователей"');
   });
 
   it("keeps inline analytics cards theme-aware", () => {

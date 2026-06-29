@@ -37,6 +37,12 @@ import { formatDateTime } from "@/lib/format-date-time";
 import { type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
+import {
+  getGenerationsPageIntlLocale,
+  getGenerationsPageText,
+  type GenerationsPageText,
+} from "./generations-page.content";
+
 type GenerationsPageProps = {
   locale: Locale;
 };
@@ -54,103 +60,6 @@ const statusOptions: StatusFilter[] = [
   "Cancelled",
   "Retrying",
 ];
-
-function getCopy(locale: Locale) {
-  const isRu = locale === "ru";
-  return {
-    eyebrow: isRu ? "Операции" : "Operations",
-    title: isRu ? "Генерации" : "Generations",
-    description: isRu
-      ? "Операционный список заданий генерации, статусов, провайдеров, попыток и кодов ошибок."
-      : "Operational list of generation jobs, statuses, providers, attempts, and failure codes.",
-    adminOnly: isRu ? "Только Admin" : "Admin only",
-    total: isRu ? "Всего заданий" : "Total jobs",
-    pending: isRu ? "Ожидает" : "Pending",
-    running: isRu ? "В работе" : "Running",
-    completed: isRu ? "Завершена" : "Completed",
-    failed: isRu ? "Ошибка" : "Failed",
-    cancelled: isRu ? "Отменена" : "Cancelled",
-    retrying: isRu ? "Повторяется" : "Retrying",
-    allJobsScope: isRu ? "Все задания" : "All jobs",
-    filtersTitle: isRu ? "Фильтры" : "Filters",
-    filtersDescription: isRu
-      ? "Сузьте список по job id, статусу, провайдеру или user id."
-      : "Narrow the list by job id, status, provider, or user id.",
-    searchLabel: isRu ? "Job id" : "Job id",
-    searchPlaceholder: isRu ? "Поиск по generation id" : "Search by generation id",
-    statusLabel: isRu ? "Статус" : "Status",
-    providerLabel: isRu ? "Провайдер" : "Provider",
-    providerPlaceholder: isRu ? "fal, openai..." : "fal, openai...",
-    userLabel: isRu ? "User id" : "User id",
-    userPlaceholder: isRu ? "Фильтр по user id" : "Filter by user id",
-    tableTitle: isRu ? "История генераций" : "Generation history",
-    details: isRu ? "Детали" : "Details",
-    showDetails: isRu ? "Показать" : "Show",
-    hideDetails: isRu ? "Скрыть" : "Hide",
-    before: isRu ? "До" : "Before",
-    after: isRu ? "После" : "After",
-    compareReady: isRu ? "Доступно" : "Available",
-    compareUnavailable: isRu ? "Недоступно" : "Unavailable",
-    compareState: isRu ? "Сравнение" : "Compare",
-    sourceType: isRu ? "Источник" : "Source type",
-    inputAsset: isRu ? "Входной asset" : "Input asset",
-    resultAsset: isRu ? "Результат asset" : "Result asset",
-    pet: isRu ? "Питомец" : "Pet",
-    petPhoto: isRu ? "Фото питомца" : "Pet photo",
-    previewMissing: isRu ? "Превью недоступно" : "Preview unavailable",
-    debugTitle: isRu ? "Отладка" : "Debug",
-    emptyTitle: isRu ? "Генераций не найдено" : "No generations found",
-    emptyDescription: isRu
-      ? "Измените фильтры или дождитесь новых заданий генерации."
-      : "Adjust filters or wait for new generation jobs.",
-    loadingTitle: isRu ? "Загрузка генераций" : "Loading generations",
-    errorTitle: isRu ? "Не удалось загрузить генерации" : "Failed to load generations",
-    metricsErrorTitle: isRu
-      ? "Сводка генераций временно недоступна"
-      : "Generation summary temporarily unavailable",
-    metricsErrorDescription: isRu
-      ? "История генераций загружается отдельно; повторите запрос, чтобы обновить верхние счётчики."
-      : "Generation history loads separately; retry to refresh the top counters.",
-    retry: isRu ? "Повторить" : "Retry",
-    job: isRu ? "Задание" : "Job",
-    user: isRu ? "Пользователь" : "User",
-    template: isRu ? "Шаблон" : "Template",
-    status: isRu ? "Статус" : "Status",
-    provider: isRu ? "Провайдер" : "Provider",
-    cost: isRu ? "Стоимость" : "Cost",
-    attempts: isRu ? "Попытки" : "Attempts",
-    failure: isRu ? "Ошибка" : "Failure",
-    watermark: isRu ? "Watermark" : "Watermark",
-    watermarkClean: isRu ? "Без watermark" : "Clean",
-    watermarkApplied: isRu ? "С watermark" : "Watermarked",
-    watermarkNotRequired: isRu ? "Не требуется" : "Not required",
-    watermarkRemoved: isRu ? "Снят" : "Removed",
-    watermarkPending: isRu ? "Подготовка" : "Preparing",
-    watermarkUnlockedBy: isRu ? "кем" : "by",
-    grantClean: isRu ? "Выдать clean" : "Grant clean",
-    grantingClean: isRu ? "Выдаём..." : "Granting...",
-    grantCleanError: isRu
-      ? "Не удалось выдать clean download."
-      : "Failed to grant clean download.",
-    created: isRu ? "Создана" : "Created",
-    completedAt: isRu ? "Завершена" : "Completed",
-    noFailure: isRu ? "Нет" : "None",
-    allStatuses: isRu ? "Все" : "All",
-    previous: isRu ? "Назад" : "Previous",
-    next: isRu ? "Вперед" : "Next",
-    previousPageLabel: isRu ? "Предыдущая страница генераций" : "Previous generations page",
-    nextPageLabel: isRu ? "Следующая страница генераций" : "Next generations page",
-    page: isRu ? "Страница" : "Page",
-    of: isRu ? "из" : "of",
-    templateImage: isRu ? "Изображение" : "Image",
-    templateVideo: isRu ? "Видео" : "Video",
-    feedbackTab: isRu ? "Отзывы" : "Feedback",
-    feedbackEmpty: isRu ? "Feedback по генерации пока нет" : "No feedback for this generation yet",
-    feedbackError: isRu
-      ? "Не удалось загрузить feedback по этой генерации"
-      : "Failed to load feedback for this generation",
-  };
-}
 
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -197,12 +106,24 @@ function formatSafeText(value: string | null | undefined, fallback = "-") {
   return trimmed ? sanitizeSensitiveText(trimmed, 160) : fallback;
 }
 
-function formatMoney(value?: number | null) {
+function formatMappedLabel(
+  labels: Record<string, string>,
+  value: string | null | undefined,
+  fallback = "-"
+) {
+  if (!value) {
+    return fallback;
+  }
+
+  return labels[value] ?? sanitizeSensitiveText(value, 80);
+}
+
+function formatMoney(value: number | null | undefined, locale: Locale) {
   if (typeof value !== "number") {
     return "-";
   }
 
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat(getGenerationsPageIntlLocale(locale), {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 4,
@@ -213,28 +134,22 @@ function formatMetricCount(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? String(Math.max(0, value)) : "-";
 }
 
-function formatFeedbackRating(value?: number | null) {
-  if (value === 1) return "Good";
-  if (value === 0) return "Okay";
-  if (value === -1) return "Bad";
+function formatFeedbackRating(value: number | null | undefined, text: GenerationsPageText) {
+  if (value === 1) return text.ratingLabels.positive;
+  if (value === 0) return text.ratingLabels.neutral;
+  if (value === -1) return text.ratingLabels.negative;
   return "-";
 }
 
-function formatStatus(status: StatusFilter, text: ReturnType<typeof getCopy>) {
-  if (status === "All") return text.allStatuses;
-  if (status === "Pending") return text.pending;
-  if (status === "Running") return text.running;
-  if (status === "Completed") return text.completed;
-  if (status === "Failed") return text.failed;
-  if (status === "Cancelled") return text.cancelled;
-  return text.retrying;
+function formatStatus(status: StatusFilter, text: GenerationsPageText) {
+  return text.generationStatusOptions[status] ?? status;
 }
 
 function formatTemplateType(
   templateType: AdminTemplateGenerationListItem["templateType"],
-  text: ReturnType<typeof getCopy>
+  text: GenerationsPageText
 ) {
-  return templateType === "Image" ? text.templateImage : text.templateVideo;
+  return text.templateTypeLabels[templateType];
 }
 
 function formatWatermarkMethod(value?: string | null) {
@@ -244,17 +159,16 @@ function formatWatermarkMethod(value?: string | null) {
 
 function formatInputSourceType(
   value: AdminTemplateGenerationListItem["inputSourceType"],
-  locale: Locale
+  text: GenerationsPageText
 ) {
   const normalized = value.trim().toLowerCase();
-  const isRu = locale === "ru";
   if (normalized === "generation_result") {
-    return isRu ? "Результат генерации" : "Generation result";
+    return text.inputSourceTypeLabels.generation_result;
   }
   if (normalized === "pet_photo") {
-    return isRu ? "Фото питомца" : "Pet photo";
+    return text.inputSourceTypeLabels.pet_photo;
   }
-  return isRu ? "Загрузка пользователя" : "User upload";
+  return text.inputSourceTypeLabels.user_upload;
 }
 
 function GenerationRow({
@@ -269,7 +183,7 @@ function GenerationRow({
 }: {
   item: AdminTemplateGenerationListItem;
   locale: Locale;
-  text: ReturnType<typeof getCopy>;
+  text: GenerationsPageText;
   onGrantClean: (generationId: string) => void;
   grantingGenerationId: string | null;
   grantCleanPending: boolean;
@@ -289,24 +203,22 @@ function GenerationRow({
   const parentTitle = item.parentTemplateTitle
     ? sanitizeSensitiveText(item.parentTemplateTitle, 48)
     : item.similarToGenerationId
-      ? `Similar to ${formatShortId(item.similarToGenerationId)}`
-      : item.inputSourceType === "generation_result"
-        ? "Generation result"
-        : item.inputSourceType === "pet_photo"
-          ? "Pet photo"
-          : "User upload";
-  const lineagePrefix =
-    item.generationMode === "similar" ? `${parentTitle} -> similar` : parentTitle;
-  const lineageText = `${lineagePrefix} -> ${templateTitle}${
-    item.childCount > 0 ? ` -> ${item.childCount} child${item.childCount === 1 ? "" : "ren"}` : ""
+      ? `${text.lineageSimilarPrefix} ${formatShortId(item.similarToGenerationId)}`
+      : formatInputSourceType(item.inputSourceType, text);
+  const lineageText = `${parentTitle} -> ${templateTitle}${
+    item.childCount > 0
+      ? ` -> ${item.childCount} ${
+          item.childCount === 1 ? text.lineageChildSingular : text.lineageChildPlural
+        }`
+      : ""
   }`;
   const debugText =
     item.generationMode === "similar"
       ? [
           item.variationStrength
-            ? `variation ${sanitizeSensitiveText(item.variationStrength, 16)}`
+            ? `${text.variationLabel} ${sanitizeSensitiveText(item.variationStrength, 16)}`
             : null,
-          typeof item.generationSeed === "number" ? `seed ${item.generationSeed}` : null,
+          typeof item.generationSeed === "number" ? `${text.seedLabel} ${item.generationSeed}` : null,
         ]
           .filter(Boolean)
           .join(" / ")
@@ -386,7 +298,7 @@ function GenerationRow({
         </td>
         <td className={adminTableStyles.numeric}>{item.tokenCost}</td>
         <td className={adminTableStyles.numeric}>{item.attemptCount}</td>
-        <td className={adminTableStyles.numeric}>{formatMoney(item.providerCostUsd)}</td>
+        <td className={adminTableStyles.numeric}>{formatMoney(item.providerCostUsd, locale)}</td>
         <td>
           <span className={styles.failure}>{failureText}</span>
         </td>
@@ -397,7 +309,7 @@ function GenerationRow({
               <span>
                 {watermarkMethod}
                 {typeof item.watermarkCreditsSpent === "number"
-                  ? ` / ${item.watermarkCreditsSpent} credits`
+                  ? ` / ${item.watermarkCreditsSpent} ${text.creditsLabel}`
                   : ""}
               </span>
             ) : null}
@@ -477,7 +389,7 @@ function GenerationRow({
               <div className={styles.detailsGrid}>
                 <div>
                   <span>{text.sourceType}</span>
-                  <strong>{formatInputSourceType(item.inputSourceType, locale)}</strong>
+                  <strong>{formatInputSourceType(item.inputSourceType, text)}</strong>
                 </div>
                 <div>
                   <span>{text.compareState}</span>
@@ -538,11 +450,13 @@ function GenerationRow({
                     {feedbackItems.map((feedback: AdminFeedbackListItem) => (
                       <div key={feedback.id} className={styles.feedbackItem}>
                         <strong>
-                          {feedback.type} / {feedback.category} /{" "}
-                          {formatFeedbackRating(feedback.rating)}
+                          {formatMappedLabel(text.feedbackTypeOptions, feedback.type)} /{" "}
+                          {sanitizeSensitiveText(feedback.category, 80)} /{" "}
+                          {formatFeedbackRating(feedback.rating, text)}
                         </strong>
                         <span>
-                          {feedback.status} / {feedback.priority} /{" "}
+                          {formatMappedLabel(text.feedbackStatusOptions, feedback.status)} /{" "}
+                          {formatMappedLabel(text.feedbackPriorityOptions, feedback.priority)} /{" "}
                           {formatDateTime(feedback.createdAtUtc, locale)}
                         </span>
                         {feedback.message ? (
@@ -562,7 +476,7 @@ function GenerationRow({
 }
 
 export function GenerationsPage({ locale }: GenerationsPageProps) {
-  const text = getCopy(locale);
+  const text = getGenerationsPageText(locale);
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
@@ -855,7 +769,8 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
             <span className={styles.tableHeader}>
               <span className={styles.tableTitle}>{text.tableTitle}</span>
               <span className={styles.tableMeta}>
-                {visibleTotalCount} total / {formatDateTime(visiblePage?.generatedAtUtc, locale)}
+                {visibleTotalCount} {text.tableTotalLabel} /{" "}
+                {formatDateTime(visiblePage?.generatedAtUtc, locale)}
               </span>
             </span>
           }
@@ -877,7 +792,7 @@ export function GenerationsPage({ locale }: GenerationsPageProps) {
                   <th>{text.provider}</th>
                   <th>{text.cost}</th>
                   <th>{text.attempts}</th>
-                  <th>USD</th>
+                  <th>{text.usdLabel}</th>
                   <th>{text.failure}</th>
                   <th>{text.watermark}</th>
                   <th>{text.created}</th>

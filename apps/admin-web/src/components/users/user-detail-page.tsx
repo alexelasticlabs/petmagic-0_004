@@ -21,6 +21,7 @@ import { ensureAdminSession } from "@/components/admin/admin-session";
 import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
+import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";
 import styles from "@/components/users/user-detail-page.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -48,55 +49,6 @@ type UserDetailPageProps = {
 const ACTIVITY_LIMIT = 12;
 const RECENT_ITEMS_LIMIT = 8;
 const AUDIT_ITEMS_LIMIT = 12;
-
-function getUserPetsCopy(locale: Locale) {
-  const isRu = locale === "ru";
-
-  return {
-    title: isRu ? "Питомцы" : "Pets",
-    description: isRu
-      ? "Профили питомцев, фото, генерации и модерационный статус."
-      : "Pet profiles, photos, generation counts, and moderation status.",
-    noPets: isRu ? "Питомцы пока не добавлены." : "No pets yet.",
-    loadError: isRu ? "Не удалось загрузить питомцев." : "Failed to load pets.",
-    loadingPhotos: isRu ? "Загружаем фото..." : "Loading photos...",
-    photosLoadError: isRu ? "Не удалось загрузить фото питомца." : "Failed to load pet photos.",
-    noPhotos: isRu ? "Фото нет." : "No photos.",
-    loadingGenerations: isRu
-      ? "Загружаем историю генераций питомца..."
-      : "Loading pet generation history...",
-    generationsLoadError: isRu
-      ? "Не удалось загрузить генерации питомца."
-      : "Failed to load pet generations.",
-    noGenerations: isRu ? "Генераций питомца нет." : "No pet generations.",
-    photosCount: isRu ? "фото" : "photos",
-    generationsCount: isRu ? "генераций" : "generations",
-    hide: isRu ? "Скрыть" : "Hide",
-    restore: isRu ? "Восстановить" : "Restore",
-    hidePhoto: isRu ? "Скрыть фото" : "Hide photo",
-    restorePhoto: isRu ? "Восстановить фото" : "Restore photo",
-    activeStatus: isRu ? "Активен" : "Active",
-    hiddenStatus: isRu ? "Скрыт" : "Hidden",
-    hidePetLabel: isRu ? "Скрыть питомца" : "Hide pet",
-    restorePetLabel: isRu ? "Восстановить питомца" : "Restore pet",
-    hidePhotoLabel: isRu ? "Скрыть фото питомца" : "Hide pet photo",
-    restorePhotoLabel: isRu ? "Восстановить фото питомца" : "Restore pet photo",
-    statusUpdateError: isRu
-      ? "Не удалось обновить статус питомца."
-      : "Failed to update pet status.",
-    photoStatusUpdateError: isRu
-      ? "Не удалось обновить статус фото."
-      : "Failed to update photo status.",
-    showDetails: isRu ? "Показать фото и генерации" : "Show photos and generations",
-    hideDetails: isRu ? "Скрыть детали" : "Hide details",
-    avatar: isRu ? "Аватар" : "Avatar",
-    favorite: isRu ? "Избранное" : "Favorite",
-    photoAlt: isRu ? "фото питомца" : "pet photo",
-    thumbnailReady: isRu ? "thumbnail готов" : "thumbnail ready",
-    originalOnly: isRu ? "только original" : "original only",
-    fallbackTemplate: isRu ? "Шаблон" : "Template",
-  };
-}
 
 function formatBytes(value: number): string {
   if (!Number.isFinite(value) || value < 0) {
@@ -131,7 +83,7 @@ function getGenerationStatusColor(status: string): string {
   return "var(--text-muted)";
 }
 
-function formatPetStatus(status: string, text: ReturnType<typeof getUserPetsCopy>) {
+function formatPetStatus(status: string, text: UserDetailPetText) {
   if (status === "active") {
     return text.activeStatus;
   }
@@ -155,7 +107,7 @@ function getUserPetActionErrorDetails(error: unknown) {
 
 export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
   const text = getDictionary(locale);
-  const petText = useMemo(() => getUserPetsCopy(locale), [locale]);
+  const petText = useMemo(() => getUserDetailPetText(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const queryClient = useQueryClient();
@@ -659,7 +611,7 @@ function AdminPetDetails({
   locale: Locale;
   pet: AdminUserPet;
   retryLabel: string;
-  text: ReturnType<typeof getUserPetsCopy>;
+  text: UserDetailPetText;
   userId: string;
 }) {
   const queryClient = useQueryClient();

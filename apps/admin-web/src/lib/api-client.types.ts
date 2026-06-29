@@ -792,7 +792,6 @@ export type TemplateStatus = "Draft" | "Active" | "Archived";
 export type TemplateGenerationJobStatus =
   | "Queued"
   | "Processing"
-  | "Succeeded"
   | "Completed"
   | "Failed"
   | "Cancelled"

@@ -605,7 +605,7 @@ export async function startAdminTemplateTest(
       body: formData,
     }
   );
-  return normalizeAdminTemplateTestRun(run);
+  return run;
 }
 
 export async function fetchAdminTemplateTest(
@@ -620,7 +620,7 @@ export async function fetchAdminTemplateTest(
       signal,
     }
   );
-  return normalizeAdminTemplateTestRun(run);
+  return run;
 }
 
 export async function fetchAdminTemplateTestHistory(
@@ -642,11 +642,7 @@ export async function fetchAdminTemplateTestHistory(
       signal,
     }
   );
-  return runs.map(normalizeAdminTemplateTestRun);
-}
-
-function normalizeAdminTemplateTestRun(run: AdminTemplateTestRun): AdminTemplateTestRun {
-  return run.status === "Succeeded" ? { ...run, status: "Completed" } : run;
+  return runs;
 }
 
 export async function createImageTemplate(payload: ImageTemplatePayload): Promise<AdminTemplate> {

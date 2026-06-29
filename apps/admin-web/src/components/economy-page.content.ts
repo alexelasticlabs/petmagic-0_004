@@ -95,9 +95,9 @@ export const eventStatusOptions = {
   ],
 } as const;
 
-export function getEconomyText(locale: Locale) {
-  if (locale === "ru") {
-    return {
+const economyText = {
+  ru: {
+    intlLocale: "ru-RU",
       eyebrow: "Экономика и кошелек",
       title: "Экономика",
       description:
@@ -107,6 +107,7 @@ export function getEconomyText(locale: Locale) {
       errorTitle: "Не удалось загрузить экономику",
       errorDescription: "Проверьте доступ к сервису и повторите запрос.",
       partialErrorTitle: "Часть данных не обновилась",
+      retry: "Повторить",
       metaPacks: "Пакетов",
       metaLedger: "Операций",
       metaPurchases: "Покупок",
@@ -265,10 +266,31 @@ export function getEconomyText(locale: Locale) {
       providerConfigDeleteConfirm: "Удалить этот маршрут оплаты?",
       financialActionsAdminOnly: "Финансовые действия доступны только Admin.",
       notProcessedLabel: "Еще не обработано",
-    };
-  }
-
-  return {
+      watermarkTitle: "Watermark",
+      watermarkDescription:
+        "Настройки мягкого продвижения для бесплатных результатов и разового clean unlock.",
+      saveWatermarkAction: "Сохранить watermark",
+      watermarkLoadingTitle: "Загружаем watermark",
+      watermarkSettingsNotLoaded: "Настройки watermark не загружены",
+      watermarkSaved: "Настройки watermark сохранены",
+      watermarkSaveError: "Не удалось сохранить watermark",
+      watermarkEnabledState: "Включён",
+      watermarkDisabledState: "Отключён",
+      watermarkImagesLabel: "Images",
+      watermarkVideosLabel: "Videos",
+      watermarkTextLabel: "Текст",
+      watermarkCostCreditsLabel: "Cost in credits",
+      watermarkOpacityLabel: "Opacity",
+      watermarkLogoUrlLabel: "Logo URL",
+      watermarkPositionLabel: "Position",
+      watermarkSizeLabel: "Size",
+      watermarkPreviewImageTitle: "Preview image",
+      watermarkPreviewVideoFrameTitle: "Preview video frame",
+      watermarkPreviewTestImage: "Тестовое изображение",
+      watermarkPreviewTestVideoFrame: "Тестовый кадр видео",
+    },
+  en: {
+    intlLocale: "en-US",
     eyebrow: "Economy and wallet",
     title: "Economy",
     description:
@@ -278,6 +300,7 @@ export function getEconomyText(locale: Locale) {
     errorTitle: "Failed to load economy",
     errorDescription: "Check service availability and try again.",
     partialErrorTitle: "Some data did not refresh",
+    retry: "Retry",
     metaPacks: "Packs",
     metaLedger: "Ledger rows",
     metaPurchases: "Purchases",
@@ -434,7 +457,33 @@ export function getEconomyText(locale: Locale) {
     providerConfigDeleteConfirm: "Delete this payment route?",
     financialActionsAdminOnly: "Financial actions are available to Admin only.",
     notProcessedLabel: "Not processed yet",
-  };
-}
+    watermarkTitle: "Watermark",
+    watermarkDescription:
+      "Free-result promotion and one-time clean unlock settings.",
+    saveWatermarkAction: "Save watermark",
+    watermarkLoadingTitle: "Loading watermark settings",
+    watermarkSettingsNotLoaded: "Watermark settings are not loaded",
+    watermarkSaved: "Watermark settings saved",
+    watermarkSaveError: "Could not save watermark settings",
+    watermarkEnabledState: "Enabled",
+    watermarkDisabledState: "Disabled",
+    watermarkImagesLabel: "Images",
+    watermarkVideosLabel: "Videos",
+    watermarkTextLabel: "Text",
+    watermarkCostCreditsLabel: "Cost in credits",
+    watermarkOpacityLabel: "Opacity",
+    watermarkLogoUrlLabel: "Logo URL",
+    watermarkPositionLabel: "Position",
+    watermarkSizeLabel: "Size",
+    watermarkPreviewImageTitle: "Preview image",
+    watermarkPreviewVideoFrameTitle: "Preview video frame",
+    watermarkPreviewTestImage: "Test image",
+    watermarkPreviewTestVideoFrame: "Test video frame",
+  },
+} as const;
 
-export type EconomyPageText = ReturnType<typeof getEconomyText>;
+export type EconomyPageText = { [K in keyof (typeof economyText)["en"]]: string };
+
+export function getEconomyText(locale: Locale): EconomyPageText {
+  return economyText[locale] as EconomyPageText;
+}

@@ -12,6 +12,7 @@ import {
   formatSafeSupportDisplay,
   getMessageAttachments,
 } from "@/components/support/support-conversation-helpers";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import styles from "@/components/support/support-page.module.css";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import { useSupportConversationController } from "@/components/support/use-support-conversation-controller";
@@ -91,45 +92,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
     userQuery,
   } = controller;
 
-  const isRu = locale === "ru";
-  const panelText = useMemo(
-    () => ({
-      panelTabsLabel: isRu ? "Разделы панели" : "Panel tabs",
-      ticketInformation: isRu ? "Информация о тикете" : "Ticket information",
-      updated: isRu ? "Обновлён" : "Updated",
-      attachmentsTitle: (count: number) =>
-        isRu ? `Вложения (${count})` : `Attachments (${count})`,
-      viewAll: isRu ? "Смотреть все" : "View all",
-      noAttachments: isRu ? "Вложений пока нет" : "No attachments yet",
-      fileFallback: isRu ? "Файл" : "File",
-      operatorTags: isRu ? "Теги оператора" : "Operator tags",
-      addTag: isRu ? "Добавить тег" : "Add tag",
-      removeTag: isRu ? "Удалить тег" : "Remove tag",
-      tagFallback: isRu ? "Тег" : "Tag",
-      add: isRu ? "Добавить" : "Add",
-      tagHint: isRu
-        ? "Теги используются для быстрого поиска в очереди."
-        : "Tags are used for fast queue search.",
-      user: isRu ? "Пользователь" : "User",
-      purchases: isRu ? "Покупки" : "Purchases",
-      noData: isRu ? "Нет данных" : "No data",
-      ticketActions: isRu ? "Действия по тикету" : "Ticket actions",
-      closeConversationPrompt: isRu ? "Закрыть обращение?" : "Close conversation?",
-      close: isRu ? "Закрыть" : "Close",
-      cancel: isRu ? "Отмена" : "Cancel",
-      allAttachments: isRu ? "Все вложения" : "All attachments",
-      open: isRu ? "Открыть" : "Open",
-      activity: isRu ? "Активность" : "Activity",
-      failures: isRu ? "Ошибки" : "Failures",
-      occurrences: (count: number) => (isRu ? `Повторений: ${count}` : `Occurrences: ${count}`),
-      recentEvents: isRu ? "Последние события" : "Recent events",
-      noActivityData: isRu ? "Нет данных активности" : "No activity data",
-      conversationHistory: isRu ? "История диалога" : "Conversation history",
-      timeline: isRu ? "Таймлайн" : "Timeline",
-      timelineEmpty: isRu ? "История пуста" : "Timeline is empty",
-    }),
-    [isRu]
-  );
+  const panelText = useMemo(() => getSupportConversationCopy(locale).infoPanel, [locale]);
   const isUserPremium = canViewSubjectUserContext ? (userQuery.data?.isPremium ?? false) : false;
 
   useEffect(
@@ -531,7 +494,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                     <strong>{isUserPremium ? text.premiumLabel : text.freeLabel}</strong>
                   </div>
                   <div className={styles.infoPanelStatTile}>
-                    <span>{locale === "ru" ? "PawSpark" : "PawSpark"}</span>
+                    <span>{panelText.walletLabel}</span>
                     <strong>{String(analyticsQuery.data?.summary.walletBalance ?? 0)}</strong>
                   </div>
                   <div className={styles.infoPanelStatTile}>
@@ -669,7 +632,7 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
                   const attachmentKindLabel = getAttachmentKindLabel(
                     attachment.mimeType,
                     safeName,
-                    locale
+                    panelText
                   );
 
                   return (
@@ -872,7 +835,11 @@ export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) 
   );
 }
 
-function getAttachmentKindLabel(mimeType: string, fileName: string, locale: Locale) {
+function getAttachmentKindLabel(
+  mimeType: string,
+  fileName: string,
+  panelText: ReturnType<typeof getSupportConversationCopy>["infoPanel"]
+) {
   const normalizedMime = mimeType.trim().toLowerCase();
   const extensionFromName = fileName.includes(".")
     ? (fileName.split(".").pop()?.trim().toUpperCase() ?? "")
@@ -883,20 +850,20 @@ function getAttachmentKindLabel(mimeType: string, fileName: string, locale: Loca
   }
 
   if (normalizedMime.startsWith("image/")) {
-    return locale === "ru" ? "ФОТО" : "PHOTO";
+    return panelText.attachmentKinds.photo;
   }
 
   if (normalizedMime.startsWith("video/")) {
-    return locale === "ru" ? "ВИДЕО" : "VIDEO";
+    return panelText.attachmentKinds.video;
   }
 
   if (normalizedMime.startsWith("audio/")) {
-    return locale === "ru" ? "АУДИО" : "AUDIO";
+    return panelText.attachmentKinds.audio;
   }
 
   if (normalizedMime === "application/pdf") {
     return "PDF";
   }
 
-  return locale === "ru" ? "ФАЙЛ" : "FILE";
+  return panelText.attachmentKinds.file;
 }

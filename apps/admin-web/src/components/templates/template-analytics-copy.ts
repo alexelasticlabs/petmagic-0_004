@@ -1,193 +1,299 @@
 import { type Locale } from "@/lib/i18n";
 
-export function getTemplateAnalyticsCopy(locale: Locale) {
-  const isRu = locale === "ru";
-
-  return {
-    pageTitle: isRu ? "Аналитика" : "Analytics",
-    backToCatalog: isRu ? "К каталогу" : "Back to catalog",
-    openEditor: isRu ? "Открыть редактор" : "Open editor",
-    loading: isRu ? "Загрузка аналитики шаблона..." : "Loading template analytics...",
-    loadError: isRu
-      ? "Не удалось загрузить аналитику шаблона."
-      : "Failed to load template analytics.",
-    secondaryPartialErrorTitle: isRu
-      ? "Часть аналитики временно недоступна"
-      : "Some analytics are temporarily unavailable",
-    secondaryPartialErrorDescription: isRu
-      ? "Показываем доступные данные. Повторите загрузку, чтобы обновить недостающие блоки."
-      : "Available data is still shown. Retry to refresh the missing sections.",
-    retryAction: isRu ? "Повторить" : "Retry",
-    rangeLabel: isRu ? "Период аналитики" : "Analytics period",
-    range7: isRu ? "7 дней" : "7 days",
-    range30: isRu ? "30 дней" : "30 days",
-    range90: isRu ? "90 дней" : "90 days",
-    rangeAll: isRu ? "Всё время" : "All time",
-    comparePeriod: isRu ? "Сравнить период" : "Compare period",
-    exportAnalytics: isRu ? "Экспорт JSON" : "Export JSON",
-    compareNoBase: isRu ? "нет базы сравнения" : "no comparison base",
-    templateOverviewTitle: isRu ? "Карточка шаблона" : "Template card",
+const templateAnalyticsCopy = {
+  ru: {
+    pageTitle: "Аналитика",
+    videoTemplatesLabel: "Видео шаблоны",
+    imageTemplatesLabel: "Шаблоны изображений",
+    backToCatalog: "К каталогу",
+    openEditor: "Открыть редактор",
+    loading: "Загрузка аналитики шаблона...",
+    loadError: "Не удалось загрузить аналитику шаблона.",
+    secondaryPartialErrorTitle: "Часть аналитики временно недоступна",
+    secondaryPartialErrorDescription:
+      "Показываем доступные данные. Повторите загрузку, чтобы обновить недостающие блоки.",
+    retryAction: "Повторить",
+    rangeLabel: "Период аналитики",
+    range7: "7 дней",
+    range30: "30 дней",
+    range90: "90 дней",
+    rangeAll: "Всё время",
+    comparePeriod: "Сравнить период",
+    exportAnalytics: "Экспорт JSON",
+    compareNoBase: "нет базы сравнения",
+    templateOverviewTitle: "Карточка шаблона",
     templateIdLabel: "ID",
-    categoryLabel: isRu ? "Категория" : "Category",
-    priceLabel: isRu ? "Доступ" : "Access",
-    tokenCostLabel: isRu ? "Цена запуска" : "Run price",
-    estimatedTemplateCostLabel: isRu ? "Себестоимость, $" : "Provider cost, $",
-    createdLabel: isRu ? "Создан" : "Created",
-    updatedLabel: isRu ? "Обновлён" : "Updated",
-    totalRuns: isRu ? "Всего запусков" : "Total runs",
-    successRate: isRu ? "Успешность" : "Success rate",
-    completedRuns: isRu ? "Успешные" : "Completed",
-    failedRuns: isRu ? "Ошибки" : "Failed",
-    totalTokenCost: isRu ? "Всего PawSpark" : "Total PawSpark cost",
-    averageTokenCost: isRu ? "Средняя стоимость" : "Average PawSpark cost",
-    views: isRu ? "Просмотры" : "Views",
-    viewsHint: isRu
-      ? "События view из публичного template endpoint."
-      : "View events from the public template endpoint.",
-    generationStarts: isRu ? "Запуски генерации" : "Generation starts",
-    generationStartsHint: isRu
-      ? "Созданные задания генерации за выбранный период."
-      : "Generation jobs created in the selected period.",
-    successfulGenerations: isRu ? "Успешные генерации" : "Successful generations",
-    successfulGenerationsHint: isRu
-      ? "Задания, завершённые готовым видео."
-      : "Jobs completed with an output video.",
-    generationConversion: isRu ? "Конверсия в результат" : "Result conversion",
-    generationConversionHint: isRu
-      ? "Доля успешных jobs среди запусков."
-      : "Completed jobs as a share of started jobs.",
-    tokenSpend: isRu ? "Потрачено PawSpark" : "PawSpark spend",
-    tokenSpendHint: isRu
-      ? "Суммарная стоимость запусков в PawSpark."
-      : "Total PawSpark cost of runs.",
-    complaints: isRu ? "Жалобы" : "Complaints",
-    complaintsHint: isRu
-      ? "События complaint из публичного analytics endpoint."
-      : "Complaint events from the public analytics endpoint.",
-    feedbackTitle: isRu ? "Жалобы и фидбек" : "Complaints and feedback",
-    feedbackHint: isRu
-      ? "Последние обращения пользователей по шаблону: complaint и feedback события с текстом и метаданными."
-      : "Latest user complaints and feedback for this template with message text and event metadata.",
-    feedbackFilterLabel: isRu ? "Фильтр фидбека" : "Feedback filter",
-    feedbackFilterAll: isRu ? "Все" : "All",
-    feedbackFilterComplaint: isRu ? "Жалобы" : "Complaints",
-    feedbackFilterFeedback: isRu ? "Фидбек" : "Feedback",
-    feedbackSearchLabel: isRu ? "Поиск по тексту фидбека" : "Search feedback text",
-    feedbackSearchPlaceholder: isRu ? "Поиск по тексту сообщения" : "Search message text",
-    feedbackLoading: isRu ? "Загрузка обращений..." : "Loading feedback...",
-    feedbackEmpty: isRu
-      ? "Пока нет пользовательских жалоб или фидбека по этому шаблону."
-      : "There is no user complaint or feedback for this template yet.",
-    feedbackFilteredEmpty: isRu
-      ? "По текущему фильтру и поиску ничего не найдено."
-      : "No items matched the current filter and search.",
-    feedbackLoadError: isRu
-      ? "Не удалось загрузить жалобы и фидбек."
-      : "Failed to load complaints and feedback.",
-    feedbackMessageMissing: isRu ? "Без текста сообщения." : "No message text provided.",
-    feedbackTypeComplaint: isRu ? "Жалоба" : "Complaint",
-    feedbackTypeFeedback: isRu ? "Фидбек" : "Feedback",
-    feedbackSourceLabel: isRu ? "Источник" : "Source",
-    feedbackDeviceLabel: isRu ? "Устройство" : "Device",
-    feedbackCountryLabel: isRu ? "Страна" : "Country",
-    activeQueue: isRu ? "Активная очередь" : "Active queue",
-    averageGenerationTime: isRu ? "Среднее время" : "Average generation time",
-    lastRun: isRu ? "Последний запуск" : "Last run",
-    lastCompleted: isRu ? "Последний успех" : "Last completed",
-    snapshotTitle: isRu ? "Сводка по шаблону" : "Template snapshot",
-    snapshotHint: isRu
-      ? "Этот блок собирается из существующей admin statistics модели и служит опорной сводкой для dashboard выше."
-      : "This block is built from the existing admin statistics model and acts as the anchor summary for the dashboard above.",
-    trendTitle: isRu ? "Динамика запусков" : "Run trend",
-    trendHint: isRu
-      ? "Группировка generation jobs по дням создания шаблонных запусков."
-      : "Generation jobs grouped by creation day.",
-    trendEmpty: isRu
-      ? "Для этого шаблона ещё нет исторических точек тренда."
-      : "There are no trend points for this template yet.",
-    chartRuns: isRu ? "Запуски" : "Runs",
-    chartCompleted: isRu ? "Успешные" : "Completed",
-    chartFailed: isRu ? "Ошибки" : "Failed",
-    chartTokens: isRu ? "PawSpark" : "PawSpark",
-    chartDuration: isRu ? "Время" : "Duration",
-    statusBreakdownTitle: isRu ? "Состояние пайплайна" : "Pipeline health",
-    statusBreakdownHint: isRu
-      ? "Распределение текущих и завершённых состояний генерации."
-      : "Distribution of current and completed generation pipeline states.",
-    runsInQueue: isRu ? "В очереди" : "Queued",
-    processingNow: isRu ? "В обработке" : "Processing",
-    sourcesTitle: isRu ? "Источники просмотров" : "View sources",
-    sourcesHint: isRu
-      ? "Реальные source breakdown из template view events."
-      : "Real source breakdown from template view events.",
-    instrumentationPending: isRu
-      ? "Нужна запись событий в публичном приложении/API, чтобы показывать эти метрики без догадок."
-      : "Public app/API instrumentation is required to show this without guessing.",
-    retentionTitle: isRu ? "Воронка генерации" : "Generation funnel",
-    retentionHint: isRu
-      ? "Реальная operational воронка по generation jobs."
-      : "Real operational funnel from generation jobs.",
-    funnelStarted: isRu ? "Начали генерацию" : "Started generation",
-    funnelCompleted: isRu ? "Дождались результата" : "Completed result",
-    funnelFailed: isRu ? "Получили ошибку" : "Failed",
-    funnelActive: isRu ? "Ещё в работе" : "Still active",
-    geographyTitle: isRu ? "География пользователей" : "User geography",
-    geographyHint: isRu
-      ? "Реальная география из событий public traffic, если страна была записана."
-      : "Real geography from public traffic events when country was captured.",
-    devicesTitle: isRu ? "Устройства" : "Devices",
-    devicesHint: isRu
-      ? "Реальное распределение устройств из записанных analytics events."
-      : "Real device distribution from recorded analytics events.",
-    recentRunsTitle: isRu ? "Последние генерации" : "Recent generations",
-    recentRunsHint: isRu
-      ? "Последние задания по этому шаблону с минимальным operational срезом."
-      : "Latest jobs for this template with a compact operational snapshot.",
-    recentRunsAllHint: isRu
-      ? "Все доступные генерации по этому шаблону за весь период, который хранится в системе."
-      : "All available generations for this template across the full retained history.",
-    recentRunsLatest: isRu ? "Последние" : "Latest",
-    recentRunsAll: isRu ? "Все генерации" : "All generations",
-    recentRunsFailed: isRu ? "Ошибочные" : "Failed only",
-    recentRunsLoading: isRu ? "Загрузка..." : "Loading...",
-    recentRunsExpandError: isRu
-      ? "Не удалось загрузить полный список генераций."
-      : "Failed to load the full generation history.",
-    recentRunsEmpty: isRu
-      ? "У шаблона пока нет недавних генераций."
-      : "This template has no recent generations yet.",
-    failedRunsHint: isRu
-      ? "Все завершившиеся с ошибкой генерации по шаблону с кодом и текстом причины."
-      : "All failed generations for this template with failure code and reason text.",
-    failedRunsEmpty: isRu
-      ? "По этому шаблону пока нет ошибочных генераций."
-      : "There are no failed generations for this template yet.",
-    generationIdHeader: isRu ? "ID генерации" : "Generation ID",
-    userHeader: isRu ? "Пользователь" : "User",
-    recentCreated: isRu ? "Создан" : "Created",
-    recentStatus: isRu ? "Статус" : "Status",
-    recentTokens: isRu ? "PawSpark" : "PawSpark",
-    recentDuration: isRu ? "Время" : "Duration",
-    recentModels: isRu ? "Модели" : "Models",
-    failureCodeHeader: isRu ? "Код ошибки" : "Failure code",
-    failureReasonHeader: isRu ? "Причина" : "Reason",
-    recentOutput: isRu ? "Выход" : "Output",
-    openOutput: isRu ? "Открыть" : "Open",
-    outputAvailable: isRu ? "Есть результат" : "Available",
-    noOutput: isRu ? "Нет" : "None",
-    failureBreakdownTitle: isRu ? "Breakdown ошибок" : "Failure breakdown",
-    failureBreakdownHint: isRu
-      ? "Сводка по failure codes из завершившихся с ошибкой generation jobs."
-      : "Summary of failure codes from failed generation jobs.",
-    failuresEmpty: isRu
-      ? "Пока нет зарегистрированных ошибок по этому шаблону."
-      : "There are no recorded failures for this template yet.",
-    lastFailure: isRu ? "Последняя" : "Last",
-    unknownFailure: isRu ? "Неизвестная ошибка" : "Unknown failure",
-    preprocessingModel: isRu ? "Image model" : "Image model",
-    motionModel: isRu ? "Motion model" : "Motion model",
-    noData: isRu
-      ? "У шаблона пока нет запусков. После первых генераций здесь появятся полноценные метрики."
-      : "This template has no runs yet. Full metrics will appear here after the first generations.",
-  };
+    categoryLabel: "Категория",
+    priceLabel: "Доступ",
+    tokenCostLabel: "Цена запуска",
+    estimatedTemplateCostLabel: "Себестоимость, $",
+    createdLabel: "Создан",
+    updatedLabel: "Обновлён",
+    totalRuns: "Всего запусков",
+    successRate: "Успешность",
+    completedRuns: "Успешные",
+    failedRuns: "Ошибки",
+    totalTokenCost: "Всего PawSpark",
+    averageTokenCost: "Средняя стоимость",
+    views: "Просмотры",
+    viewsHint: "События view из публичного template endpoint.",
+    generationStarts: "Запуски генерации",
+    generationStartsHint: "Созданные задания генерации за выбранный период.",
+    successfulGenerations: "Успешные генерации",
+    successfulGenerationsHint: "Задания, завершённые готовым видео.",
+    generationConversion: "Конверсия в результат",
+    generationConversionHint: "Доля успешных jobs среди запусков.",
+    tokenSpend: "Потрачено PawSpark",
+    tokenSpendHint: "Суммарная стоимость запусков в PawSpark.",
+    complaints: "Жалобы",
+    complaintsHint: "События complaint из публичного analytics endpoint.",
+    feedbackTitle: "Жалобы и фидбек",
+    feedbackHint:
+      "Последние обращения пользователей по шаблону: complaint и feedback события с текстом и метаданными.",
+    feedbackFilterLabel: "Фильтр фидбека",
+    feedbackFilterAll: "Все",
+    feedbackFilterComplaint: "Жалобы",
+    feedbackFilterFeedback: "Фидбек",
+    feedbackSearchLabel: "Поиск по тексту фидбека",
+    feedbackSearchPlaceholder: "Поиск по тексту сообщения",
+    feedbackLoading: "Загрузка обращений...",
+    feedbackEmpty: "Пока нет пользовательских жалоб или фидбека по этому шаблону.",
+    feedbackFilteredEmpty: "По текущему фильтру и поиску ничего не найдено.",
+    feedbackLoadError: "Не удалось загрузить жалобы и фидбек.",
+    feedbackMessageMissing: "Без текста сообщения.",
+    feedbackTypeComplaint: "Жалоба",
+    feedbackTypeFeedback: "Фидбек",
+    feedbackSourceLabel: "Источник",
+    feedbackDeviceLabel: "Устройство",
+    feedbackCountryLabel: "Страна",
+    anonymousUser: "анон",
+    feedbackSummaryTitle: "Сводка feedback",
+    feedbackSummaryNegativeWarning: "У шаблона высокий негативный feedback.",
+    feedbackSummaryDescription:
+      "Сводка позитивных, нейтральных и негативных оценок по новому feedback.",
+    feedbackSummaryPositive: "Позитив",
+    feedbackSummaryNeutral: "Нейтрально",
+    feedbackSummaryNegative: "Негатив",
+    feedbackSummaryTopIssues: "Главные проблемы",
+    activeQueue: "Активная очередь",
+    runsLabel: "запусков",
+    averageGenerationTime: "Среднее время",
+    lastRun: "Последний запуск",
+    lastCompleted: "Последний успех",
+    snapshotTitle: "Сводка по шаблону",
+    snapshotHint:
+      "Этот блок собирается из существующей admin statistics модели и служит опорной сводкой для dashboard выше.",
+    trendTitle: "Динамика запусков",
+    trendHint: "Группировка generation jobs по дням создания шаблонных запусков.",
+    trendEmpty: "Для этого шаблона ещё нет исторических точек тренда.",
+    chartRuns: "Запуски",
+    chartCompleted: "Успешные",
+    chartFailed: "Ошибки",
+    chartTokens: "PawSpark",
+    chartDuration: "Время",
+    statusBreakdownTitle: "Состояние пайплайна",
+    statusBreakdownHint: "Распределение текущих и завершённых состояний генерации.",
+    runsInQueue: "В очереди",
+    processingNow: "В обработке",
+    sourcesTitle: "Источники просмотров",
+    sourcesHint: "Реальные source breakdown из template view events.",
+    instrumentationPending:
+      "Нужна запись событий в публичном приложении/API, чтобы показывать эти метрики без догадок.",
+    retentionTitle: "Воронка генерации",
+    retentionHint: "Реальная operational воронка по generation jobs.",
+    funnelStarted: "Начали генерацию",
+    funnelCompleted: "Дождались результата",
+    funnelFailed: "Получили ошибку",
+    funnelActive: "Ещё в работе",
+    geographyTitle: "География пользователей",
+    geographyHint: "Реальная география из событий public traffic, если страна была записана.",
+    devicesTitle: "Устройства",
+    devicesHint: "Реальное распределение устройств из записанных analytics events.",
+    recentRunsTitle: "Последние генерации",
+    recentRunsHint: "Последние задания по этому шаблону с минимальным operational срезом.",
+    recentRunsAllHint:
+      "Все доступные генерации по этому шаблону за весь период, который хранится в системе.",
+    recentRunsLatest: "Последние",
+    recentRunsAll: "Все генерации",
+    recentRunsFailed: "Ошибочные",
+    recentRunsLoading: "Загрузка...",
+    recentRunsExpandError: "Не удалось загрузить полный список генераций.",
+    recentRunsEmpty: "У шаблона пока нет недавних генераций.",
+    failedRunsHint:
+      "Все завершившиеся с ошибкой генерации по шаблону с кодом и текстом причины.",
+    failedRunsEmpty: "По этому шаблону пока нет ошибочных генераций.",
+    generationIdHeader: "ID генерации",
+    userHeader: "Пользователь",
+    recentCreated: "Создан",
+    recentStatus: "Статус",
+    recentTokens: "PawSpark",
+    recentDuration: "Время",
+    recentModels: "Модели",
+    failureCodeHeader: "Код ошибки",
+    failureReasonHeader: "Причина",
+    recentOutput: "Выход",
+    openOutput: "Открыть",
+    outputAvailable: "Есть результат",
+    noOutput: "Нет",
+    failureBreakdownTitle: "Breakdown ошибок",
+    failureBreakdownHint:
+      "Сводка по failure codes из завершившихся с ошибкой generation jobs.",
+    failuresEmpty: "Пока нет зарегистрированных ошибок по этому шаблону.",
+    lastFailure: "Последняя",
+    unknownFailure: "Неизвестная ошибка",
+    preprocessingModel: "Image model",
+    motionModel: "Motion model",
+    noData:
+      "У шаблона пока нет запусков. После первых генераций здесь появятся полноценные метрики.",
+  },
+  en: {
+    pageTitle: "Analytics",
+    videoTemplatesLabel: "Video templates",
+    imageTemplatesLabel: "Image templates",
+    backToCatalog: "Back to catalog",
+    openEditor: "Open editor",
+    loading: "Loading template analytics...",
+    loadError: "Failed to load template analytics.",
+    secondaryPartialErrorTitle: "Some analytics are temporarily unavailable",
+    secondaryPartialErrorDescription:
+      "Available data is still shown. Retry to refresh the missing sections.",
+    retryAction: "Retry",
+    rangeLabel: "Analytics period",
+    range7: "7 days",
+    range30: "30 days",
+    range90: "90 days",
+    rangeAll: "All time",
+    comparePeriod: "Compare period",
+    exportAnalytics: "Export JSON",
+    compareNoBase: "no comparison base",
+    templateOverviewTitle: "Template card",
+    templateIdLabel: "ID",
+    categoryLabel: "Category",
+    priceLabel: "Access",
+    tokenCostLabel: "Run price",
+    estimatedTemplateCostLabel: "Provider cost, $",
+    createdLabel: "Created",
+    updatedLabel: "Updated",
+    totalRuns: "Total runs",
+    successRate: "Success rate",
+    completedRuns: "Completed",
+    failedRuns: "Failed",
+    totalTokenCost: "Total PawSpark cost",
+    averageTokenCost: "Average PawSpark cost",
+    views: "Views",
+    viewsHint: "View events from the public template endpoint.",
+    generationStarts: "Generation starts",
+    generationStartsHint: "Generation jobs created in the selected period.",
+    successfulGenerations: "Successful generations",
+    successfulGenerationsHint: "Jobs completed with an output video.",
+    generationConversion: "Result conversion",
+    generationConversionHint: "Completed jobs as a share of started jobs.",
+    tokenSpend: "PawSpark spend",
+    tokenSpendHint: "Total PawSpark cost of runs.",
+    complaints: "Complaints",
+    complaintsHint: "Complaint events from the public analytics endpoint.",
+    feedbackTitle: "Complaints and feedback",
+    feedbackHint:
+      "Latest user complaints and feedback for this template with message text and event metadata.",
+    feedbackFilterLabel: "Feedback filter",
+    feedbackFilterAll: "All",
+    feedbackFilterComplaint: "Complaints",
+    feedbackFilterFeedback: "Feedback",
+    feedbackSearchLabel: "Search feedback text",
+    feedbackSearchPlaceholder: "Search message text",
+    feedbackLoading: "Loading feedback...",
+    feedbackEmpty: "There is no user complaint or feedback for this template yet.",
+    feedbackFilteredEmpty: "No items matched the current filter and search.",
+    feedbackLoadError: "Failed to load complaints and feedback.",
+    feedbackMessageMissing: "No message text provided.",
+    feedbackTypeComplaint: "Complaint",
+    feedbackTypeFeedback: "Feedback",
+    feedbackSourceLabel: "Source",
+    feedbackDeviceLabel: "Device",
+    feedbackCountryLabel: "Country",
+    anonymousUser: "guest",
+    feedbackSummaryTitle: "Feedback summary",
+    feedbackSummaryNegativeWarning: "This template has elevated negative feedback.",
+    feedbackSummaryDescription: "Positive, neutral, and negative rate summary from the new feedback stream.",
+    feedbackSummaryPositive: "Positive",
+    feedbackSummaryNeutral: "Neutral",
+    feedbackSummaryNegative: "Negative",
+    feedbackSummaryTopIssues: "Top issues",
+    activeQueue: "Active queue",
+    runsLabel: "runs",
+    averageGenerationTime: "Average generation time",
+    lastRun: "Last run",
+    lastCompleted: "Last completed",
+    snapshotTitle: "Template snapshot",
+    snapshotHint:
+      "This block is built from the existing admin statistics model and acts as the anchor summary for the dashboard above.",
+    trendTitle: "Run trend",
+    trendHint: "Generation jobs grouped by creation day.",
+    trendEmpty: "There are no trend points for this template yet.",
+    chartRuns: "Runs",
+    chartCompleted: "Completed",
+    chartFailed: "Failed",
+    chartTokens: "PawSpark",
+    chartDuration: "Duration",
+    statusBreakdownTitle: "Pipeline health",
+    statusBreakdownHint: "Distribution of current and completed generation pipeline states.",
+    runsInQueue: "Queued",
+    processingNow: "Processing",
+    sourcesTitle: "View sources",
+    sourcesHint: "Real source breakdown from template view events.",
+    instrumentationPending:
+      "Public app/API instrumentation is required to show this without guessing.",
+    retentionTitle: "Generation funnel",
+    retentionHint: "Real operational funnel from generation jobs.",
+    funnelStarted: "Started generation",
+    funnelCompleted: "Completed result",
+    funnelFailed: "Failed",
+    funnelActive: "Still active",
+    geographyTitle: "User geography",
+    geographyHint: "Real geography from public traffic events when country was captured.",
+    devicesTitle: "Devices",
+    devicesHint: "Real device distribution from recorded analytics events.",
+    recentRunsTitle: "Recent generations",
+    recentRunsHint: "Latest jobs for this template with a compact operational snapshot.",
+    recentRunsAllHint:
+      "All available generations for this template across the full retained history.",
+    recentRunsLatest: "Latest",
+    recentRunsAll: "All generations",
+    recentRunsFailed: "Failed only",
+    recentRunsLoading: "Loading...",
+    recentRunsExpandError: "Failed to load the full generation history.",
+    recentRunsEmpty: "This template has no recent generations yet.",
+    failedRunsHint: "All failed generations for this template with failure code and reason text.",
+    failedRunsEmpty: "There are no failed generations for this template yet.",
+    generationIdHeader: "Generation ID",
+    userHeader: "User",
+    recentCreated: "Created",
+    recentStatus: "Status",
+    recentTokens: "PawSpark",
+    recentDuration: "Duration",
+    recentModels: "Models",
+    failureCodeHeader: "Failure code",
+    failureReasonHeader: "Reason",
+    recentOutput: "Output",
+    openOutput: "Open",
+    outputAvailable: "Available",
+    noOutput: "None",
+    failureBreakdownTitle: "Failure breakdown",
+    failureBreakdownHint: "Summary of failure codes from failed generation jobs.",
+    failuresEmpty: "There are no recorded failures for this template yet.",
+    lastFailure: "Last",
+    unknownFailure: "Unknown failure",
+    preprocessingModel: "Image model",
+    motionModel: "Motion model",
+    noData:
+      "This template has no runs yet. Full metrics will appear here after the first generations.",
+  },
+} as const;
+
+export type TemplateAnalyticsCopy = {
+  [K in keyof (typeof templateAnalyticsCopy)["en"]]: string;
+};
+
+export function getTemplateAnalyticsCopy(locale: Locale): TemplateAnalyticsCopy {
+  return templateAnalyticsCopy[locale] as TemplateAnalyticsCopy;
 }

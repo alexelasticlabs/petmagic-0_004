@@ -29,6 +29,7 @@ import { EconomyPageProviderConfigsSection } from "@/components/economy-page-pro
 import { EconomyPageSubscriptionPlansSection } from "@/components/economy-page-subscription-plans-section";
 import { EconomyPageSubscriptionsSection } from "@/components/economy-page-subscriptions-section";
 import {
+  type EconomyPageText,
   getEconomyText,
   ledgerSourceOptions,
   purchaseStatusOptions,
@@ -134,13 +135,12 @@ function getEconomyActionErrorDetails(error: unknown) {
 }
 
 function WatermarkPreviewPanel({
-  locale,
+  text,
   settings,
 }: {
-  locale: Locale;
+  text: EconomyPageText;
   settings: AdminWatermarkSettings;
 }) {
-  const isRu = locale === "ru";
   const previewStyle = {
     "--watermark-preview-opacity": String(settings.opacity),
   } as CSSProperties;
@@ -151,19 +151,17 @@ function WatermarkPreviewPanel({
   function renderFrame(kind: "image" | "video", sourceUrl: string) {
     const title =
       kind === "image"
-        ? isRu
-          ? "Preview image"
-          : "Preview image"
-        : isRu
-        ? "Preview video frame"
-        : "Preview video frame";
+        ? text.watermarkPreviewImageTitle
+        : text.watermarkPreviewVideoFrameTitle;
     const applies = kind === "image" ? settings.applyToImages : settings.applyToVideos;
 
     return (
       <div className={styles.watermarkPreviewCard}>
         <div className={styles.watermarkPreviewHeader}>
           <strong>{title}</strong>
-          <span>{applies ? (isRu ? "Включён" : "Enabled") : isRu ? "Отключён" : "Disabled"}</span>
+          <span>
+            {applies ? text.watermarkEnabledState : text.watermarkDisabledState}
+          </span>
         </div>
         <div
           className={styles.watermarkPreviewFrame}
@@ -181,12 +179,8 @@ function WatermarkPreviewPanel({
           ) : (
             <div className={styles.watermarkPreviewPlaceholder}>
               {kind === "image"
-                ? isRu
-                  ? "Тестовое изображение"
-                  : "Test image"
-                : isRu
-                ? "Тестовый кадр видео"
-                : "Test video frame"}
+                ? text.watermarkPreviewTestImage
+                : text.watermarkPreviewTestVideoFrame}
             </div>
           )}
           {settings.enabled && applies ? (
@@ -319,7 +313,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "economy",
     source: "economy-admin",
-    title: locale === "ru" ? "Экономика" : "Economy",
+    title: text.title,
     href: `/${locale}/economy`,
   });
 
@@ -380,7 +374,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       assertCanManageEconomy();
       const draft = watermarkDraft ?? watermarkQuery.data;
       if (!draft) {
-        throw new Error(locale === "ru" ? "Настройки watermark не загружены" : "Watermark settings are not loaded");
+        throw new Error(text.watermarkSettingsNotLoaded);
       }
 
       return updateAdminWatermarkSettings(draft);
@@ -388,7 +382,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onSuccess: async (settings) => {
       setFeedback({
         tone: "success",
-        message: locale === "ru" ? "Настройки watermark сохранены" : "Watermark settings saved",
+        message: text.watermarkSaved,
       });
       setWatermarkDraft(settings);
       await Promise.allSettled([
@@ -398,10 +392,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
     onError: (error) => {
       setFeedback({
         tone: "danger",
-        message: getAdminErrorMessage(
-          error,
-          locale === "ru" ? "Не удалось сохранить watermark" : "Could not save watermark settings"
-        ),
+        message: getAdminErrorMessage(error, text.watermarkSaveError),
       });
     },
   });
@@ -829,7 +820,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
               disabled={!canManageEconomy || isFetching}
               onClick={requestEconomyRetry}
             >
-              {locale === "ru" ? "Повторить" : "Retry"}
+              {text.retry}
             </Button>
           }
         />
@@ -917,7 +908,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
               disabled={!canManageEconomy || isFetching}
               onClick={requestEconomyRetry}
             >
-              {locale === "ru" ? "Повторить" : "Retry"}
+              {text.retry}
             </Button>
           }
         />
@@ -1250,30 +1241,22 @@ export function EconomyPage({ locale }: EconomyPageProps) {
       </AdminPageGrid>
 
       <AdminCard
-        title={locale === "ru" ? "Watermark" : "Watermark"}
-        description={
-          locale === "ru"
-            ? "Настройки мягкого продвижения для бесплатных результатов и разового clean unlock."
-            : "Free-result promotion and one-time clean unlock settings."
-        }
+        title={text.watermarkTitle}
+        description={text.watermarkDescription}
         action={
           <Button
             type="submit"
             form={WATERMARK_FORM_ID}
             disabled={isSaveWatermarkDisabled}
           >
-            {saveWatermarkMutation.isPending
-              ? text.savingAction
-              : locale === "ru"
-              ? "Сохранить watermark"
-              : "Save watermark"}
+            {saveWatermarkMutation.isPending ? text.savingAction : text.saveWatermarkAction}
           </Button>
         }
       >
         {watermarkQuery.isLoading || !effectiveWatermarkDraft ? (
           <AdminStateCard
             tone="info"
-            title={locale === "ru" ? "Загружаем watermark" : "Loading watermark settings"}
+            title={text.watermarkLoadingTitle}
           />
         ) : (
           <form
@@ -1288,7 +1271,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                   checked={effectiveWatermarkDraft.enabled}
                   onChange={(event) => updateWatermarkDraft({ enabled: event.target.checked })}
                 />
-                <span>{locale === "ru" ? "Включён" : "Enabled"}</span>
+                <span>{text.watermarkEnabledState}</span>
               </label>
               <label className={styles.checkboxField}>
                 <input
@@ -1298,7 +1281,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                     updateWatermarkDraft({ applyToImages: event.target.checked })
                   }
                 />
-                <span>{locale === "ru" ? "Images" : "Images"}</span>
+                <span>{text.watermarkImagesLabel}</span>
               </label>
               <label className={styles.checkboxField}>
                 <input
@@ -1308,12 +1291,12 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                     updateWatermarkDraft({ applyToVideos: event.target.checked })
                   }
                 />
-                <span>{locale === "ru" ? "Videos" : "Videos"}</span>
+                <span>{text.watermarkVideosLabel}</span>
               </label>
             </div>
             <div className={styles.formRow}>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Текст" : "Text"}</span>
+                <span>{text.watermarkTextLabel}</span>
                 <input
                   className={styles.input}
                   value={effectiveWatermarkDraft.text}
@@ -1326,7 +1309,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 />
               </label>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Cost in credits" : "Cost in credits"}</span>
+                <span>{text.watermarkCostCreditsLabel}</span>
                 <input
                   className={styles.input}
                   type="text"
@@ -1347,7 +1330,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
             </div>
             <div className={styles.formRow}>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Opacity" : "Opacity"}</span>
+                <span>{text.watermarkOpacityLabel}</span>
                 <input
                   className={styles.input}
                   type="text"
@@ -1369,7 +1352,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 />
               </label>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Logo URL" : "Logo URL"}</span>
+                <span>{text.watermarkLogoUrlLabel}</span>
                 <input
                   className={styles.input}
                   value={effectiveWatermarkDraft.logoUrl ?? ""}
@@ -1384,7 +1367,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
             </div>
             <div className={styles.formRow}>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Position" : "Position"}</span>
+                <span>{text.watermarkPositionLabel}</span>
                 <select
                   className={styles.input}
                   value={normalizeWatermarkPosition(effectiveWatermarkDraft.position)}
@@ -1398,7 +1381,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 </select>
               </label>
               <label className={styles.field}>
-                <span>{locale === "ru" ? "Size" : "Size"}</span>
+                <span>{text.watermarkSizeLabel}</span>
                 <select
                   className={styles.input}
                   value={normalizeWatermarkSize(effectiveWatermarkDraft.size)}
@@ -1412,7 +1395,7 @@ export function EconomyPage({ locale }: EconomyPageProps) {
                 </select>
               </label>
             </div>
-            <WatermarkPreviewPanel locale={locale} settings={effectiveWatermarkDraft} />
+            <WatermarkPreviewPanel text={text} settings={effectiveWatermarkDraft} />
           </form>
         )}
       </AdminCard>
@@ -1576,15 +1559,17 @@ function safeText(value: string | null | undefined, maxLength = 120) {
 }
 
 function formatTokens(value: number, locale: Locale) {
-  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US").format(value)} spark`;
+  const intlLocale = getEconomyText(locale).intlLocale;
+  return `${new Intl.NumberFormat(intlLocale).format(value)} spark`;
 }
 
 function formatCurrency(value: number, locale: Locale, currencyCode: string) {
   const amount = Number.isFinite(value) ? value : 0;
   const safeCurrencyCode = safeText(currencyCode.toUpperCase(), 12);
+  const intlLocale = getEconomyText(locale).intlLocale;
   if (/^[A-Z]{3}$/.test(safeCurrencyCode)) {
     try {
-      return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+      return new Intl.NumberFormat(intlLocale, {
         style: "currency",
         currency: safeCurrencyCode,
         maximumFractionDigits: 2,
@@ -1594,7 +1579,7 @@ function formatCurrency(value: number, locale: Locale, currencyCode: string) {
     }
   }
 
-  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return `${new Intl.NumberFormat(intlLocale, {
     maximumFractionDigits: 2,
   }).format(amount)} ${safeCurrencyCode}`;
 }

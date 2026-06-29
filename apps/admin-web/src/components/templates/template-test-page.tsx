@@ -42,6 +42,10 @@ import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+import {
+  getTemplateTestPageText,
+  type TemplateTestPageText,
+} from "@/components/templates/template-test-page.content";
 
 type TemplateTestPageProps = {
   locale: Locale;
@@ -64,8 +68,8 @@ type ArtifactItem = {
   placeholderEyebrow: string;
   placeholderTitle: string;
   placeholderText: string;
-  openLabel?: string;
-  downloadLabel?: string;
+  openLabel: string;
+  downloadLabel: string;
   downloadName?: string;
 };
 
@@ -95,83 +99,8 @@ function isTemplateTestRunInFlight(run: AdminTemplateTestRun | null | undefined)
 }
 
 export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) {
-  const isRu = locale === "ru";
   const text = useMemo(() => getDictionary(locale), [locale]);
-  const pageText = useMemo(
-    () => ({
-      fileFallback: isRu ? "Файл" : "File",
-      noPhotoSelected: isRu ? "Фото не выбрано" : "No photo selected",
-      chooseImageFile: isRu ? "Выберите image/* файл" : "Choose an image/* file",
-      petMagicBilling: isRu ? "Стоимость PetMagic" : "PetMagic billing",
-      falMotionCost: isRu ? "Стоимость Fal" : "Fal motion cost",
-      falImageCost: isRu ? "Стоимость Fal" : "Fal image cost",
-      falInference: isRu ? "Fal inference" : "Fal inference time",
-      falImageInference: isRu ? "Fal inference" : "Fal image inference",
-      waitingToStart: isRu ? "Ожидает запуска" : "Waiting to start",
-      templateFallback: isRu ? "Шаблон" : "Template",
-      stageOne: isRu ? "Этап 01" : "Stage 01",
-      stageTwo: isRu ? "Этап 02" : "Stage 02",
-      preprocessing: isRu ? "Препроцессинг" : "Preprocessing",
-      normalizedPhoto: isRu ? "Нормализованное фото" : "Normalized photo",
-      preprocessingPending: isRu
-        ? "Карточка заполнится сразу после завершения препроцессинга."
-        : "This frame will fill in as soon as preprocessing finishes.",
-      preprocessingEmpty: isRu
-        ? "Загрузите фото питомца, чтобы подготовить кадр для генерации движения."
-        : "Upload a pet photo to prepare the frame for motion generation.",
-      finalVideo: isRu ? "Финальное видео" : "Final video",
-      finalImage: isRu ? "Финальное изображение" : "Final image",
-      result: "Result",
-      readyVideo: isRu ? "Готовый ролик" : "Ready video",
-      readyImage: isRu ? "Готовое изображение" : "Ready image",
-      videoProcessing: isRu
-        ? "Видео собирается. После завершения здесь появятся просмотр и скачивание."
-        : "The video is being assembled. Preview and download will appear here after completion.",
-      imageProcessing: isRu
-        ? "Изображение генерируется. После завершения здесь появятся просмотр и скачивание."
-        : "The image is being generated. Preview and download will appear here after completion.",
-      videoReadyEmpty: isRu
-        ? "После генерации здесь всегда будут доступны просмотр и скачивание финального видео."
-        : "After generation, preview and download for the final video will always appear here.",
-      imageReadyEmpty: isRu
-        ? "После генерации здесь будут доступны просмотр и скачивание итогового изображения."
-        : "After generation, preview and download for the final image will appear here.",
-      open: isRu ? "Открыть" : "Open",
-      download: isRu ? "Скачать" : "Download",
-      loadingWorkspace: isRu ? "Загрузка тестового стенда..." : "Loading test workspace...",
-      templateNotFound: isRu ? "Шаблон не найден." : "Template was not found.",
-      retry: isRu ? "Повторить" : "Retry",
-      videoTemplates: isRu ? "Видео шаблоны" : "Video templates",
-      imageTemplates: isRu ? "Шаблоны изображений" : "Image templates",
-      templateTest: isRu ? "Тест шаблона" : "Template test",
-      backToCatalog: isRu ? "К каталогу" : "Back to catalog",
-      openEditor: isRu ? "Открыть редактор" : "Open editor",
-      generationResult: isRu ? "Результат генерации" : "Generation result",
-      launching: isRu ? "Запуск..." : "Launching...",
-      running: isRu ? "В работе..." : "Running...",
-      generateTest: isRu ? "Сгенерировать тест" : "Generate test",
-      generationTime: isRu ? "Время генерации" : "Generation time",
-      lastUpdate: isRu ? "Последнее обновление" : "Last update",
-      generationEvents: isRu ? "События генерации" : "Generation events",
-      done: isRu ? "Готово" : "Done",
-      runningShort: isRu ? "В работе" : "Running",
-      timelineEmpty: isRu
-        ? "После запуска здесь появятся этапы тестовой генерации."
-        : "Pipeline milestones appear here after the test starts.",
-      runSummary: isRu ? "Сводка запуска" : "Run summary",
-      testHistory: isRu ? "История тестов" : "Test history",
-      attempt: isRu ? "Попытка" : "Attempt",
-      started: isRu ? "Старт" : "Started",
-      completed: isRu ? "Завершён" : "Completed",
-      loadTemplateError: isRu
-        ? "Не удалось загрузить шаблон для теста."
-        : "Failed to load the template for testing.",
-      refreshStatusError: isRu
-        ? "Не удалось обновить статус теста."
-        : "Failed to refresh test status.",
-    }),
-    [isRu]
-  );
+  const pageText = useMemo(() => getTemplateTestPageText(locale), [locale]);
   const router = useRouter();
   const session = useAuthSession();
   const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
@@ -444,8 +373,8 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   }, [history, run, selectedHistoryGenerationId]);
   const isCurrentRunInFlight = isTemplateTestRunInFlight(run);
   const timeline = useMemo(
-    () => buildTimeline(activeRun, locale, isVideoTemplate),
-    [activeRun, isVideoTemplate, locale]
+    () => buildTimeline(activeRun, locale, pageText, isVideoTemplate),
+    [activeRun, isVideoTemplate, locale, pageText]
   );
   const catalogPath = `/${locale}/templates/${templateSlug}`;
   const editorPath = `/${locale}/templates/${templateSlug}/editor?templateId=${encodeURIComponent(templateId)}`;
@@ -469,14 +398,14 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
           64
         )}`
       : pageText.chooseImageFile;
-  const generationDuration = formatGenerationDuration(activeRun, isRu);
+  const generationDuration = formatGenerationDuration(activeRun, pageText);
   const petMagicBillingLabel = pageText.petMagicBilling;
   const falProviderCostLabel = isVideoTemplate ? pageText.falMotionCost : pageText.falImageCost;
   const falInferenceLabel = isVideoTemplate ? pageText.falInference : pageText.falImageInference;
   const internalTokenCost = activeRun?.tokenCost ?? template?.tokenCost ?? 0;
   const internalBillingText = formatTokenCost(internalTokenCost);
-  const providerCostText = formatProviderCost(activeRun, locale);
-  const providerInferenceText = formatProviderInference(activeRun, isRu, isVideoTemplate);
+  const providerCostText = formatProviderCost(activeRun, pageText);
+  const providerInferenceText = formatProviderInference(activeRun, pageText, isVideoTemplate);
   const statusText = formatTemplateTestDisplayText(
     activeRun?.status,
     pageText.waitingToStart,
@@ -497,7 +426,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
   const runDetails = buildRunDetails({
     run: activeRun,
     locale,
-    isRu,
+    pageText,
     isVideoTemplate,
     statusText,
     petMagicBillingLabel,
@@ -602,10 +531,10 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               <StatusPill tone="muted">{template.tokenCost} PawSpark</StatusPill>
               <StatusPill tone="muted">
                 {isVideoTemplate
-                  ? formatReferenceDuration(template.referenceVideoDurationSeconds, isRu)
+                  ? formatReferenceDuration(template.referenceVideoDurationSeconds, pageText)
                   : formatTemplateTestDisplayText(
                       template.imageModel,
-                      isRu ? "Image model" : "Image model",
+                      pageText.imageModelFallback,
                       80
                     )}
               </StatusPill>
@@ -669,7 +598,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
               className={`${styles.mediaGrid} ${isVideoTemplate ? "" : styles.mediaGridImage}`.trim()}
             >
               <SourceUploadCard
-                isRu={isRu}
+                text={pageText}
                 imageUrl={sourceImageUrl}
                 fileName={selectedFileName}
                 fileMeta={selectedFileMeta}
@@ -821,7 +750,7 @@ export function TemplateTestPage({ locale, templateId }: TemplateTestPageProps) 
                           {pageText.attempt}: {item.attemptCount}
                         </span>
                         <span>
-                          {isRu ? "PawSpark" : "PawSpark"}: {item.tokenCost}
+                          PawSpark: {item.tokenCost}
                         </span>
                         <span>
                           {pageText.started}:{" "}
@@ -907,7 +836,7 @@ type DetailItem = {
 function buildRunDetails({
   run,
   locale,
-  isRu,
+  pageText,
   isVideoTemplate,
   statusText,
   petMagicBillingLabel,
@@ -917,7 +846,7 @@ function buildRunDetails({
 }: {
   run: AdminTemplateTestRun | null;
   locale: Locale;
-  isRu: boolean;
+  pageText: TemplateTestPageText;
   isVideoTemplate: boolean;
   statusText: string;
   petMagicBillingLabel: string;
@@ -926,38 +855,38 @@ function buildRunDetails({
   providerCostText: string;
 }): DetailItem[] {
   const common: DetailItem[] = [
-    { label: isRu ? "Попытка" : "Attempt", value: run ? String(run.attemptCount) : "-" },
-    { label: isRu ? "Статус" : "Status", value: statusText },
+    { label: pageText.attempt, value: run ? String(run.attemptCount) : "-" },
+    { label: pageText.status, value: statusText },
     { label: petMagicBillingLabel, value: internalBillingText },
     { label: falProviderCostLabel, value: providerCostText },
     {
-      label: isRu ? "Создан" : "Created",
+      label: pageText.created,
       value: run ? formatDateTime(run.createdAtUtc, locale, true) : "-",
     },
-    { label: isRu ? "Запущен" : "Started", value: formatDateTime(run?.startedAtUtc, locale, true) },
+    { label: pageText.started, value: formatDateTime(run?.startedAtUtc, locale, true) },
   ];
 
   if (!isVideoTemplate) {
     return [
       ...common,
       {
-        label: isRu ? "Генерация изображения завершена" : "Image generation completed",
+        label: pageText.imageGenerationCompleted,
         value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true),
       },
       {
-        label: isRu ? "Fal image request" : "Fal image request",
+        label: pageText.falImageRequest,
         value: formatTemplateTestDisplayText(run?.preprocessingProviderRequestId, "-", 120),
       },
       {
-        label: isRu ? "Fal image inference" : "Fal image inference",
-        value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu),
+        label: pageText.falImageInferenceDetail,
+        value: formatSeconds(run?.preprocessingInferenceTimeSeconds, pageText),
       },
       {
-        label: isRu ? "Импорт медиа" : "Media import",
+        label: pageText.mediaImport,
         value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
       },
       {
-        label: isRu ? "Код ошибки" : "Failure code",
+        label: pageText.failureCode,
         value: formatTemplateTestDisplayText(run?.failureCode, "-", 120),
       },
     ];
@@ -966,39 +895,39 @@ function buildRunDetails({
   return [
     ...common,
     {
-      label: isRu ? "Препроцессинг завершён" : "Preprocessing completed",
+      label: pageText.preprocessingCompleted,
       value: formatDateTime(run?.preprocessingCompletedAtUtc, locale, true),
     },
     {
-      label: isRu ? "Fal preprocess request" : "Fal preprocess request",
+      label: pageText.falPreprocessRequest,
       value: formatTemplateTestDisplayText(run?.preprocessingProviderRequestId, "-", 120),
     },
     {
-      label: isRu ? "Fal preprocess inference" : "Fal preprocess inference",
-      value: formatSeconds(run?.preprocessingInferenceTimeSeconds, isRu),
+      label: pageText.falPreprocessInference,
+      value: formatSeconds(run?.preprocessingInferenceTimeSeconds, pageText),
     },
     {
-      label: isRu ? "Motion завершён" : "Motion completed",
+      label: pageText.motionCompleted,
       value: formatDateTime(run?.motionGenerationCompletedAtUtc, locale, true),
     },
     {
-      label: isRu ? "Fal motion request" : "Fal motion request",
+      label: pageText.falMotionRequest,
       value: formatTemplateTestDisplayText(run?.motionProviderRequestId, "-", 120),
     },
     {
-      label: isRu ? "Fal motion inference" : "Fal motion inference",
-      value: formatSeconds(run?.motionInferenceTimeSeconds, isRu),
+      label: pageText.falMotionInferenceDetail,
+      value: formatSeconds(run?.motionInferenceTimeSeconds, pageText),
     },
     {
-      label: isRu ? "Длительность финального видео" : "Final video duration",
-      value: formatSeconds(run?.outputVideoDurationSeconds, isRu),
+      label: pageText.finalVideoDuration,
+      value: formatSeconds(run?.outputVideoDurationSeconds, pageText),
     },
     {
-      label: isRu ? "Импорт медиа" : "Media import",
+      label: pageText.mediaImport,
       value: formatDateTime(run?.mediaImportCompletedAtUtc, locale, true),
     },
     {
-      label: isRu ? "Код ошибки" : "Failure code",
+      label: pageText.failureCode,
       value: formatTemplateTestDisplayText(run?.failureCode, "-", 120),
     },
   ];
@@ -1108,8 +1037,8 @@ function MediaPreviewCard({
   placeholderEyebrow: string;
   placeholderTitle: string;
   placeholderText: string;
-  openLabel?: string;
-  downloadLabel?: string;
+  openLabel: string;
+  downloadLabel: string;
   downloadName?: string;
   canManageTemplates: boolean;
 }) {
@@ -1290,7 +1219,7 @@ function MediaPreviewCard({
               ) : (
                 <ImageIcon className={styles.inlineIcon} />
               )}
-              <span>{openLabel ?? "Open"}</span>
+              <span>{openLabel}</span>
             </button>
             <button
               type="button"
@@ -1299,7 +1228,7 @@ function MediaPreviewCard({
               className={`${styles.mediaActionLink} ${styles.mediaActionLinkPrimary}`}
             >
               <DownloadIcon className={styles.inlineIcon} />
-              <span>{downloadLabel ?? "Download"}</span>
+              <span>{downloadLabel}</span>
             </button>
           </div>
         ) : null}
@@ -1309,7 +1238,7 @@ function MediaPreviewCard({
 }
 
 function SourceUploadCard({
-  isRu,
+  text,
   imageUrl,
   fileName,
   fileMeta,
@@ -1319,7 +1248,7 @@ function SourceUploadCard({
   onFileSelected,
   onReset,
 }: {
-  isRu: boolean;
+  text: TemplateTestPageText;
   imageUrl?: string;
   fileName: string;
   fileMeta: string;
@@ -1385,9 +1314,9 @@ function SourceUploadCard({
       <div className={styles.mediaCardHeader}>
         <strong className={styles.mediaCardTitle}>
           <ImageIcon className={styles.inlineIcon} />
-          <span>{isRu ? "Исходник" : "Source"}</span>
+          <span>{text.sourceTitle}</span>
         </strong>
-        <span>{isRu ? "Input" : "Input"}</span>
+        <span>{text.sourceInputLabel}</span>
       </div>
 
       <label
@@ -1421,41 +1350,31 @@ function SourceUploadCard({
           <div className={`${styles.mediaAsset} ${styles.mediaPlaceholder}`}>
             <div className={styles.mediaPlaceholderGlow} aria-hidden="true" />
             <div className={styles.mediaPlaceholderBody}>
-              <span>{isRu ? "Dropzone" : "Dropzone"}</span>
-              <strong>{isRu ? "Добавьте фото питомца" : "Add pet photo"}</strong>
-              <p>
-                {isRu
-                  ? "Нажмите на карточку или перетащите сюда изображение."
-                  : "Click the card or drag an image here."}
-              </p>
+              <span>{text.dropzoneTitle}</span>
+              <strong>{text.addPetPhoto}</strong>
+              <p>{text.dropzoneHint}</p>
             </div>
           </div>
         )}
 
         {imageUrl ? (
           <span className={styles.uploadDropzoneBadge}>
-            {isRu ? "Нажмите или перетащите для замены" : "Click or drag to replace"}
+            {text.replaceHint}
           </span>
         ) : null}
       </label>
 
       <div className={styles.sourceUploadFooter}>
         <div className={styles.sourceUploadMeta}>
-          <strong>
-            {imageUrl ? safeFileName : isRu ? "Фото не выбрано" : "No photo selected"}
-          </strong>
+          <strong>{imageUrl ? safeFileName : text.noPhotoSelected}</strong>
           <span>
-            {imageUrl
-              ? safeFileMeta
-              : isRu
-                ? "Поддерживается image/* до 8 MB и drag-and-drop."
-                : "Supports image/* up to 8 MB and drag-and-drop."}
+            {imageUrl ? safeFileMeta : text.uploadSupport}
           </span>
         </div>
         {onReset ? (
           <button type="button" className={styles.sourceUploadReset} onClick={onReset}>
             <RefreshIcon className={styles.inlineIcon} />
-            <span>{isRu ? "Очистить" : "Clear"}</span>
+            <span>{text.clear}</span>
           </button>
         ) : null}
       </div>
@@ -1463,9 +1382,9 @@ function SourceUploadCard({
   );
 }
 
-function formatReferenceDuration(value: number | undefined, isRu: boolean) {
+function formatReferenceDuration(value: number | undefined, text: TemplateTestPageText) {
   if (!value) {
-    return isRu ? "Без референса" : "No reference";
+    return text.noReference;
   }
 
   const rounded = Math.max(0, Math.round(value));
@@ -1473,12 +1392,12 @@ function formatReferenceDuration(value: number | undefined, isRu: boolean) {
     .toString()
     .padStart(2, "0");
   const seconds = (rounded % 60).toString().padStart(2, "0");
-  return rounded >= 60 ? `${minutes}:${seconds}` : isRu ? `${rounded} сек` : `${rounded} sec`;
+  return rounded >= 60 ? `${minutes}:${seconds}` : `${rounded} ${text.secondsSuffix}`;
 }
 
-function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolean) {
+function formatGenerationDuration(run: AdminTemplateTestRun | null, text: TemplateTestPageText) {
   if (!run?.startedAtUtc || !run.completedAtUtc) {
-    return isRu ? "В процессе" : "In progress";
+    return text.inProgress;
   }
 
   const started = new Date(run.startedAtUtc).getTime();
@@ -1488,28 +1407,28 @@ function formatGenerationDuration(run: AdminTemplateTestRun | null, isRu: boolea
   }
 
   const seconds = Math.round((completed - started) / 1000);
-  return formatReferenceDuration(seconds, isRu);
+  return formatReferenceDuration(seconds, text);
 }
 
 function formatTokenCost(value: number) {
   return `${value} PawSpark`;
 }
 
-function formatSeconds(value: number | undefined | null, isRu: boolean) {
+function formatSeconds(value: number | undefined | null, text: TemplateTestPageText) {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
     return "-";
   }
 
-  const formatted = new Intl.NumberFormat(isRu ? "ru-RU" : "en-US", {
+  const formatted = new Intl.NumberFormat(text.intlLocale, {
     minimumFractionDigits: value % 1 === 0 ? 0 : 1,
     maximumFractionDigits: 2,
   }).format(value);
 
-  return `${formatted} ${isRu ? "сек" : "sec"}`;
+  return `${formatted} ${text.secondsSuffix}`;
 }
 
-function formatUsd(value: number, locale: Locale) {
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+function formatUsd(value: number, intlLocale: string) {
+  return new Intl.NumberFormat(intlLocale, {
     style: "currency",
     currency: "USD",
     minimumFractionDigits: 2,
@@ -1517,39 +1436,27 @@ function formatUsd(value: number, locale: Locale) {
   }).format(value);
 }
 
-function formatProviderCost(run: AdminTemplateTestRun | null, locale: Locale) {
+function formatProviderCost(run: AdminTemplateTestRun | null, text: TemplateTestPageText) {
   if (typeof run?.motionProviderCostUsd === "number" && !Number.isNaN(run.motionProviderCostUsd)) {
-    return formatUsd(run.motionProviderCostUsd, locale);
+    return formatUsd(run.motionProviderCostUsd, text.intlLocale);
   }
 
-  return locale === "ru"
-    ? run
-      ? "После завершения"
-      : "После генерации"
-    : run
-      ? "After completion"
-      : "After generation";
+  return run ? text.providerPendingAfterCompletion : text.providerPendingAfterGeneration;
 }
 
 function formatProviderInference(
   run: AdminTemplateTestRun | null,
-  isRu: boolean,
+  text: TemplateTestPageText,
   isVideoTemplate: boolean
 ) {
   const value = isVideoTemplate
     ? run?.motionInferenceTimeSeconds
     : run?.preprocessingInferenceTimeSeconds;
   if (typeof value === "number" && !Number.isNaN(value)) {
-    return formatSeconds(value, isRu);
+    return formatSeconds(value, text);
   }
 
-  return isRu
-    ? run
-      ? "После завершения"
-      : "После генерации"
-    : run
-      ? "After completion"
-      : "After generation";
+  return run ? text.providerPendingAfterCompletion : text.providerPendingAfterGeneration;
 }
 
 function formatDateTime(value: string | undefined | null, locale: Locale, withDate = false) {
@@ -1562,8 +1469,9 @@ function formatDateTime(value: string | undefined | null, locale: Locale, withDa
     return "-";
   }
 
+  const intlLocale = getTemplateTestPageText(locale).intlLocale;
   return new Intl.DateTimeFormat(
-    locale === "ru" ? "ru-RU" : "en-US",
+    intlLocale,
     withDate
       ? {
           day: "2-digit",
@@ -1608,50 +1516,44 @@ function buildGeneratedDownloadName(
   return `${safeTitle || "template-test"}-${safeGenerationId || "run"}${extension}`;
 }
 
-function formatTemplateStatus(status: AdminTemplate["status"], locale: Locale) {
-  if (locale !== "ru") {
-    return formatTemplateTestDisplayText(status, "-", 48);
-  }
+function formatTemplateStatus(
+  status: AdminTemplate["status"],
+  locale: Locale,
+  text = getTemplateTestPageText(locale)
+) {
+  const localizedStatuses: Partial<Record<AdminTemplate["status"], string>> = {
+    Active: text.templateStatusActive,
+    Draft: text.templateStatusDraft,
+    Archived: text.templateStatusArchived,
+  };
 
-  if (status === "Active") {
-    return "Активен";
-  }
-
-  if (status === "Draft") {
-    return "Черновик";
-  }
-
-  return status === "Archived" ? "Архив" : formatTemplateTestDisplayText(status, "Архив", 48);
+  return localizedStatuses[status] ?? formatTemplateTestDisplayText(status, "-", 48);
 }
 
 function buildTimeline(
   run: AdminTemplateTestRun | null,
   locale: Locale,
+  text: TemplateTestPageText,
   isVideoTemplate: boolean
 ): TimelineItem[] {
-  const isRu = locale === "ru";
   if (!run) {
     return [];
   }
 
   const items: TimelineItem[] = [
     {
-      label: isRu ? "Тест поставлен в очередь" : "Test queued",
+      label: text.timelineTestQueued,
       at: formatDateTime(run.createdAtUtc, locale),
-      description: isRu
-        ? "Создана админская тестовая задача без списания PawSpark."
-        : "A non-billed admin test job was created.",
+      description: text.timelineTestQueuedDescription,
       done: true,
     },
   ];
 
   if (run.sourceImageAsset) {
     items.push({
-      label: isRu ? "Фото загружено" : "Photo uploaded",
+      label: text.timelinePhotoUploaded,
       at: formatDateTime(run.createdAtUtc, locale),
-      description: isRu
-        ? "Исходный файл принят системой и закреплён за запуском."
-        : "The source file was accepted and attached to the run.",
+      description: text.timelinePhotoUploadedDescription,
       done: true,
     });
   }
@@ -1659,14 +1561,10 @@ function buildTimeline(
   if (run.startedAtUtc) {
     items.push({
       label: isVideoTemplate
-        ? isRu
-          ? "Препроцессинг запущен"
-          : "Preprocessing started"
-        : isRu
-          ? "Генерация изображения запущена"
-          : "Image generation started",
+        ? text.timelinePreprocessingStarted
+        : text.timelineImageGenerationStarted,
       at: formatDateTime(run.startedAtUtc, locale),
-      description: `${isRu ? "Модель" : "Model"}: ${formatTemplateTestDisplayText(
+      description: `${text.modelLabel}: ${formatTemplateTestDisplayText(
         run.usedPreprocessingModel,
         "-",
         80
@@ -1678,29 +1576,21 @@ function buildTimeline(
   if (run.preprocessingCompletedAtUtc) {
     items.push({
       label: isVideoTemplate
-        ? isRu
-          ? "Препроцессинг завершён"
-          : "Preprocessing completed"
-        : isRu
-          ? "Изображение получено от провайдера"
-          : "Image received from provider",
+        ? text.timelinePreprocessingCompleted
+        : text.timelineImageReceivedFromProvider,
       at: formatDateTime(run.preprocessingCompletedAtUtc, locale),
       description: isVideoTemplate
-        ? isRu
-          ? "Нормализованное изображение готово для генерации движения."
-          : "The normalized image is ready for motion generation."
-        : isRu
-          ? "Итоговое изображение готово к импорту в media storage."
-          : "The generated image is ready for media storage import.",
+        ? text.timelineNormalizedImageReady
+        : text.timelineGeneratedImageReady,
       done: true,
     });
   }
 
   if (isVideoTemplate && (run.preprocessingCompletedAtUtc || run.motionGenerationCompletedAtUtc)) {
     items.push({
-      label: isRu ? "Генерация движения" : "Motion generation",
+      label: text.timelineMotionGeneration,
       at: formatDateTime(run.preprocessingCompletedAtUtc ?? run.startedAtUtc, locale),
-      description: `${isRu ? "Модель" : "Model"}: ${formatTemplateTestDisplayText(
+      description: `${text.modelLabel}: ${formatTemplateTestDisplayText(
         run.usedKlingModel,
         "-",
         80
@@ -1711,11 +1601,9 @@ function buildTimeline(
 
   if (isVideoTemplate && run.motionGenerationCompletedAtUtc) {
     items.push({
-      label: isRu ? "Видео получено от провайдера" : "Video received from provider",
+      label: text.timelineVideoReceivedFromProvider,
       at: formatDateTime(run.motionGenerationCompletedAtUtc, locale),
-      description: isRu
-        ? "Промежуточный результат готов к импорту в media storage."
-        : "The intermediate video is ready for media storage import.",
+      description: text.timelineIntermediateVideoReady,
       done: Boolean(
         run.mediaImportCompletedAtUtc || (run.completedAtUtc && run.status === "Completed")
       ),
@@ -1724,37 +1612,31 @@ function buildTimeline(
 
   if (run.mediaImportCompletedAtUtc) {
     items.push({
-      label: isRu ? "Импорт в media storage" : "Media storage import",
+      label: text.timelineMediaStorageImport,
       at: formatDateTime(run.mediaImportCompletedAtUtc, locale),
       description: isVideoTemplate
-        ? isRu
-          ? "Финальное видео сохранено и доступно для проверки."
-          : "The final video was saved and is available for review."
-        : isRu
-          ? "Финальное изображение сохранено и доступно для проверки."
-          : "The final image was saved and is available for review.",
+        ? text.timelineFinalVideoSaved
+        : text.timelineFinalImageSaved,
       done: run.status === "Completed",
     });
   }
 
   if (run.completedAtUtc && run.status === "Completed") {
     items.push({
-      label: isRu ? "Тест завершён успешно" : "Test completed successfully",
+      label: text.timelineCompletedSuccess,
       at: formatDateTime(run.completedAtUtc, locale),
-      description: isRu
-        ? "Все артефакты доступны на этой странице."
-        : "All generated artifacts are available on this page.",
+      description: text.timelineCompletedSuccessDescription,
       done: true,
     });
   }
 
   if (run.completedAtUtc && run.status === "Failed") {
     items.push({
-      label: isRu ? "Тест завершён с ошибкой" : "Test failed",
+      label: text.timelineFailed,
       at: formatDateTime(run.completedAtUtc, locale),
       description: formatTemplateTestDisplayText(
         run.failureCode,
-        isRu ? "Ошибка генерации" : "Generation failed",
+        text.timelineFailedFallback,
         120
       ),
       done: false,

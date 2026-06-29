@@ -41,6 +41,10 @@ describe("economy-page content", () => {
     expect(enText.partialErrorTitle).toBe("Some data did not refresh");
     expect(ruText.providerRegionPlaceholder).toBe("US или *");
     expect(enText.providerRegionPlaceholder).toBe("US or *");
+    expect(ruText.watermarkSaved).toBe("Настройки watermark сохранены");
+    expect(enText.watermarkSaved).toBe("Watermark settings saved");
+    expect(ruText.intlLocale).toBe("ru-RU");
+    expect(enText.intlLocale).toBe("en-US");
   });
 
   it("keeps Russian economy copy localized and text keys unique", () => {
@@ -55,6 +59,8 @@ describe("economy-page content", () => {
     expect(ruText.storeDisclosureFlag).toBe("Раскрытие условий магазина");
     expect(ruText.warningTitleLabel).toBe("Заголовок предупреждения");
     expect(ruText.warningMessageLabel).toBe("Текст предупреждения");
+    expect(ruText.watermarkDescription).toContain("бесплатных результатов");
+    expect(ruText.watermarkPreviewTestVideoFrame).toBe("Тестовый кадр видео");
 
     const ruValues = Object.values(ruText).join("\n");
     expect(ruValues).not.toMatch(
@@ -228,7 +234,8 @@ describe("economy-page content", () => {
     expect(economySource).not.toContain(
       "onClick={() => {\n                if (!canManageEconomy)"
     );
-    expect(economySource).toContain('{locale === "ru" ? "Повторить" : "Retry"}');
+    expect(economySource).toContain("{text.retry}");
+    expect(economySource).not.toContain('{locale === "ru" ? "Повторить" : "Retry"}');
     expect(controllerSource).not.toContain("await Promise.all([\n      ledgerQuery.refetch()");
   });
 
@@ -741,6 +748,7 @@ describe("economy-page content", () => {
 
   it("renders a visual watermark preview for image and video settings", () => {
     const source = readFileSync(economyPagePath, "utf8");
+    const contentSource = readFileSync(economyContentPath, "utf8");
     const styles = readFileSync(economyStylesPath, "utf8");
 
     expect(source).toContain("function WatermarkPreviewPanel");
@@ -748,9 +756,7 @@ describe("economy-page content", () => {
     expect(source).toContain("const watermarkSizeOptions");
     expect(source).toContain("renderFrame(\"image\", settings.previewImageUrl)");
     expect(source).toContain("renderFrame(\"video\", settings.previewVideoFrameUrl)");
-    expect(source).toContain(
-      "<WatermarkPreviewPanel locale={locale} settings={effectiveWatermarkDraft} />"
-    );
+    expect(source).toContain("<WatermarkPreviewPanel text={text} settings={effectiveWatermarkDraft} />");
     expect(source).toContain(
       'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
     );
@@ -776,6 +782,13 @@ describe("economy-page content", () => {
     expect(source).toContain("onSubmit={handleWatermarkSubmit}");
     expect(source).toContain("if (isSaveWatermarkDisabled) {\n      return;\n    }");
     expect(source).toContain("disabled={isSaveWatermarkDisabled}");
+    expect(source).toContain("text.watermarkPreviewImageTitle");
+    expect(source).toContain("text.watermarkPreviewVideoFrameTitle");
+    expect(source).toContain("text.watermarkLoadingTitle");
+    expect(source).toContain("text.saveWatermarkAction");
+    expect(contentSource).toContain('watermarkTitle: "Watermark"');
+    expect(contentSource).toContain('watermarkLoadingTitle: "Загружаем watermark"');
+    expect(contentSource).toContain('watermarkLoadingTitle: "Loading watermark settings"');
     expect(source).not.toContain("onClick={requestSaveWatermark}");
     expect(source).not.toContain("onClick={() => saveWatermarkMutation.mutate()}");
     expect(styles).toContain(".watermarkPreviewGrid");

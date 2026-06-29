@@ -36,6 +36,11 @@ import {
 } from "@/components/templates/template-admin-shared";
 import { TemplatePreviewCard } from "@/components/templates/template-phone-preview-card";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
+import {
+  getTemplatesCatalogIntlLocale,
+  getTemplatesCatalogViewText,
+  type TemplatesCatalogViewText,
+} from "@/components/templates/templates-catalog-view.content";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { useAdminTemplateCatalog } from "@/components/templates/use-admin-template-catalog";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
@@ -108,9 +113,11 @@ export function TemplatesCatalogView({
   templateType,
   initialCategory,
 }: TemplatesCatalogViewProps) {
-  const isRu = locale === "ru";
   const text = useMemo(() => getDictionary(locale), [locale]);
-  const copy = useMemo(() => getCatalogCopy(locale, templateType), [locale, templateType]);
+  const copy = useMemo(
+    () => getTemplatesCatalogViewText(locale, templateType),
+    [locale, templateType]
+  );
   const router = useRouter();
   const session = useAuthSession();
   const sessionRoles = session?.user.roles ?? [];
@@ -332,23 +339,23 @@ export function TemplatesCatalogView({
       {
         value: "newest",
         label: copy.sortNewest,
-        description: locale === "ru" ? "Сначала свежие шаблоны" : "Most recent templates first",
+        description: copy.sortNewestDescription,
         tone: "recommended",
       },
       {
         value: "title",
         label: copy.sortTitle,
-        description: locale === "ru" ? "Алфавитный порядок" : "Alphabetical order",
+        description: copy.sortTitleDescription,
         tone: "neutral",
       },
       {
         value: "tokens",
         label: copy.sortTokens,
-        description: locale === "ru" ? "По стоимости в PawSpark" : "By PawSpark cost",
+        description: copy.sortTokensDescription,
         tone: "fast",
       },
     ],
-    [copy, locale]
+    [copy]
   );
   const currentPage = page;
   const totalPages = Math.max(1, Math.ceil(totalCount / Math.max(1, pageTake)));
@@ -492,7 +499,7 @@ export function TemplatesCatalogView({
               disabled={!canViewTemplates || isFetching}
               onClick={requestCatalogRetry}
             >
-              {isRu ? "Повторить" : "Retry"}
+              {copy.retry}
             </Button>
           }
         />
@@ -511,7 +518,7 @@ export function TemplatesCatalogView({
               disabled={!canViewTemplates || isFetching}
               onClick={requestCatalogRetry}
             >
-              {isRu ? "Повторить" : "Retry"}
+              {copy.retry}
             </Button>
           }
         />
@@ -642,6 +649,7 @@ export function TemplatesCatalogView({
                 <TemplateCatalogCard
                   key={template.templateId}
                   locale={locale}
+                  copy={copy}
                   template={template}
                   analytics={getAnalyticsRow(template.templateId)}
                   editorBasePath={editorBasePath}
@@ -662,16 +670,16 @@ export function TemplatesCatalogView({
                 <table className={`${adminTableStyles.table} ${styles.listTable}`}>
                   <thead>
                     <tr>
-                      <th>{isRu ? "Шаблон" : "Template"}</th>
-                      <th>{isRu ? "Тип" : "Type"}</th>
+                      <th>{copy.tableTemplate}</th>
+                      <th>{copy.tableType}</th>
                       <th>{text.categoryLabel}</th>
                       <th>{copy.accessLabel}</th>
                       <th>{text.statusLabel}</th>
-                      <th>{isRu ? "Просмотры" : "Views"}</th>
-                      <th>{isRu ? "Запуски" : "Starts"}</th>
-                      <th>{isRu ? "Конверсия" : "Conversion"}</th>
-                      <th>{isRu ? "Успех" : "Success"}</th>
-                      <th>{isRu ? "Средняя стоимость" : "Average cost"}</th>
+                      <th>{copy.tableViews}</th>
+                      <th>{copy.tableStarts}</th>
+                      <th>{copy.tableConversion}</th>
+                      <th>{copy.tableSuccess}</th>
+                      <th>{copy.tableAverageCost}</th>
                       <th>{copy.updatedLabel}</th>
                       <th>{text.actionsLabel}</th>
                     </tr>
@@ -689,7 +697,7 @@ export function TemplatesCatalogView({
 
                       return (
                         <tr key={template.templateId}>
-                          <td data-label={isRu ? "Шаблон" : "Template"}>
+                          <td data-label={copy.tableTemplate}>
                             <div className={styles.listTemplateCell}>
                               <div
                                 className={`${styles.listTemplateThumb} ${template.templateType === "Video" ? styles.listTemplateThumbVideo : ""}`.trim()}
@@ -744,7 +752,7 @@ export function TemplatesCatalogView({
                               </div>
                             </div>
                           </td>
-                          <td data-label={isRu ? "Тип" : "Type"}>
+                          <td data-label={copy.tableType}>
                             <div className={styles.typeCell}>
                               <span className={styles.typeBadge}>
                                 {template.templateType === "Video" ? (
@@ -780,37 +788,22 @@ export function TemplatesCatalogView({
                               {getTemplateStatusLabel(template.status, locale)}
                             </AdminStatusBadge>
                           </td>
-                          <td
-                            data-label={isRu ? "Просмотры" : "Views"}
-                            className={styles.metricValueCell}
-                          >
+                          <td data-label={copy.tableViews} className={styles.metricValueCell}>
                             {formatAnalyticsInteger(analytics?.views, locale)}
                           </td>
-                          <td
-                            data-label={isRu ? "Запуски" : "Starts"}
-                            className={styles.metricValueCell}
-                          >
+                          <td data-label={copy.tableStarts} className={styles.metricValueCell}>
                             {formatAnalyticsInteger(analytics?.generationStarts, locale)}
                           </td>
-                          <td
-                            data-label={isRu ? "Конверсия" : "Conversion"}
-                            className={styles.metricValueCell}
-                          >
+                          <td data-label={copy.tableConversion} className={styles.metricValueCell}>
                             {formatPercentMetric(
                               analytics?.generationStarts ? analytics.conversionPercent : null,
                               locale
                             )}
                           </td>
-                          <td
-                            data-label={isRu ? "Успех" : "Success"}
-                            className={styles.metricValueCell}
-                          >
+                          <td data-label={copy.tableSuccess} className={styles.metricValueCell}>
                             {formatPercentMetric(getSuccessRatePercent(analytics), locale)}
                           </td>
-                          <td
-                            data-label={isRu ? "Средняя стоимость" : "Average cost"}
-                            className={styles.numericCell}
-                          >
+                          <td data-label={copy.tableAverageCost} className={styles.numericCell}>
                             {formatAnalyticsInteger(template.tokenCost, locale)}{" "}
                             <span className={styles.numericSuffix}>{copy.tokensShort}</span>
                           </td>
@@ -930,11 +923,7 @@ export function TemplatesCatalogView({
           )}
           {templates.length || currentPage > 1 ? (
             <div className={styles.paginationBar}>
-              <span>
-                {isRu
-                  ? `Страница ${currentPage}: ${shownStart}-${shownEnd} из ${totalCount}`
-                  : `Page ${currentPage}: showing ${shownStart}-${shownEnd} of ${totalCount}`}
-              </span>
+              <span>{copy.pageSummary(currentPage, shownStart, shownEnd, totalCount)}</span>
               <div className={styles.paginationActions}>
                 <Button
                   type="button"
@@ -980,15 +969,13 @@ export function TemplatesCatalogView({
         title={text.archive}
         description={
           templatePendingArchiveId
-            ? `${formatTemplateActionLabel(templates, templatePendingArchiveId)}: ${
-                isRu
-                  ? "шаблон будет скрыт из активного каталога."
-                  : "the template will be hidden from the active catalog."
-              }`
+            ? copy.archiveConfirmDescription(
+                formatTemplateActionLabel(templates, templatePendingArchiveId)
+              )
             : ""
         }
         confirmLabel={text.archive}
-        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        cancelLabel={copy.cancel}
         tone="danger"
         isSubmitting={Boolean(templatePendingArchiveId && isTemplateActionLocked)}
         onCancel={() => {
@@ -1017,7 +1004,7 @@ export function TemplatesCatalogView({
             : ""
         }
         confirmLabel={text.deleteTemplate}
-        cancelLabel={isRu ? "Отмена" : "Cancel"}
+        cancelLabel={copy.cancel}
         isSubmitting={Boolean(templatePendingDeleteId && isTemplateActionLocked)}
         onCancel={() => {
           if (!isTemplateActionLocked) {
@@ -1051,6 +1038,7 @@ function formatTemplateId(templateId: string, maxLength: number): string {
 
 type TemplateCatalogCardProps = {
   locale: Locale;
+  copy: TemplatesCatalogViewText;
   template: AdminTemplateListItem;
   analytics?: AdminTemplatesAnalyticsTemplateRow;
   editorBasePath: string;
@@ -1064,6 +1052,7 @@ type TemplateCatalogCardProps = {
 
 function TemplateCatalogCard({
   locale,
+  copy,
   template,
   analytics,
   editorBasePath,
@@ -1075,7 +1064,6 @@ function TemplateCatalogCard({
   onDeleteTemplate,
 }: TemplateCatalogCardProps) {
   const text = getDictionary(locale);
-  const copy = getCatalogCopy(locale, template.templateType);
   const isBusy = busyTemplateId !== null;
 
   return (
@@ -1111,7 +1099,7 @@ function TemplateCatalogCard({
           </AdminStatusBadge>
         </div>
         <div className={styles.cardMetrics}>
-          {getTemplateCardMetrics(template, analytics, locale).map((metric) => (
+          {getTemplateCardMetrics(template, analytics, locale, copy).map((metric) => (
             <div
               key={metric.label}
               className={`${styles.cardMetric} ${styles[metric.tone]}`}
@@ -1226,7 +1214,7 @@ function formatDate(value: string, locale: Locale) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return new Intl.DateTimeFormat(getTemplatesCatalogIntlLocale(locale), {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -1251,7 +1239,7 @@ function formatAnalyticsInteger(value: number | null | undefined, locale: Locale
     return "-";
   }
 
-  return new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US").format(value);
+  return new Intl.NumberFormat(getTemplatesCatalogIntlLocale(locale)).format(value);
 }
 
 function formatPercentMetric(value: number | null | undefined, locale: Locale) {
@@ -1259,7 +1247,7 @@ function formatPercentMetric(value: number | null | undefined, locale: Locale) {
     return "-";
   }
 
-  return `${new Intl.NumberFormat(locale === "ru" ? "ru-RU" : "en-US", {
+  return `${new Intl.NumberFormat(getTemplatesCatalogIntlLocale(locale), {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(value)}%`;
@@ -1281,104 +1269,39 @@ function getSuccessRatePercent(analytics?: AdminTemplatesAnalyticsTemplateRow) {
 function getTemplateCardMetrics(
   template: AdminTemplateListItem,
   analytics: AdminTemplatesAnalyticsTemplateRow | undefined,
-  locale: Locale
+  locale: Locale,
+  copy: Pick<
+    TemplatesCatalogViewText,
+    "tokenUnit" | "metricCost" | "metricViews" | "metricGenerations" | "metricErrors"
+  >
 ) {
-  const isRu = locale === "ru";
   const costValue =
     template.estimatedCostUsd !== undefined && template.estimatedCostUsd !== null
       ? `$${template.estimatedCostUsd.toFixed(3)}`
-      : `${formatAnalyticsInteger(template.tokenCost, locale)} ${isRu ? "ток." : "tok."}`;
+      : `${formatAnalyticsInteger(template.tokenCost, locale)} ${copy.tokenUnit}`;
 
   const metrics = [
     {
-      label: isRu ? "Стоимость" : "Template cost",
+      label: copy.metricCost,
       value: costValue,
       tone: "cardMetric_primary",
     },
     {
-      label: isRu ? "Просмотры" : "Views",
+      label: copy.metricViews,
       value: formatAnalyticsInteger(analytics?.views, locale),
       tone: "cardMetric_info",
     },
     {
-      label: isRu ? "Генерации" : "Generations",
+      label: copy.metricGenerations,
       value: formatAnalyticsInteger(analytics?.generationStarts, locale),
       tone: "cardMetric_success",
     },
     {
-      label: isRu ? "Ошибки" : "Errors",
+      label: copy.metricErrors,
       value: formatAnalyticsInteger(analytics?.failedGenerations, locale),
       tone: "cardMetric_danger",
     },
   ];
 
   return metrics;
-}
-
-function getCatalogCopy(locale: Locale, templateType: TemplateType) {
-  const isRu = locale === "ru";
-  const isVideo = templateType === "Video";
-
-  return {
-    title: isVideo
-      ? isRu
-        ? "Видео шаблоны"
-        : "Video Templates"
-      : isRu
-        ? "Шаблоны изображений"
-        : "Image Templates",
-    description: isVideo
-      ? isRu
-        ? "Каталог motion-шаблонов, статусы, категории и параметры доступа."
-        : "Motion template catalog, statuses, categories, and access settings."
-      : isRu
-        ? "Каталог шаблонов изображений, статусы, категории и параметры доступа."
-        : "Image template catalog, statuses, categories, and access settings.",
-    createTemplate: isVideo
-      ? isRu
-        ? "Создать видео шаблон"
-        : "Create video template"
-      : isRu
-        ? "Создать шаблон изображения"
-        : "Create image template",
-    manageCategories: isRu ? "Управление категориями" : "Manage categories",
-    analyticsAction: isRu ? "Аналитика" : "Analytics",
-    templateActionsAdminOnly: isRu
-      ? "Управление шаблонами доступно только Admin."
-      : "Template management actions are available to Admin only.",
-    analyticsUnavailableTitle: isRu
-      ? "Метрики шаблонов временно недоступны"
-      : "Template metrics are temporarily unavailable",
-    analyticsUnavailableDescription: isRu
-      ? "Каталог остается доступным, но просмотры, генерации и ошибки могут быть неполными."
-      : "The catalog is still available, but views, generations, and error metrics may be incomplete.",
-    archiveTabsLabel: isRu ? "Фильтр архива" : "Archive filter",
-    allTemplates: isRu ? "Все шаблоны" : "All templates",
-    archivedTemplates: isRu ? "Архив" : "Archive",
-    searchLabel: isRu ? "Поиск шаблонов" : "Search templates",
-    searchPlaceholder: isRu
-      ? "Поиск по названию, описанию, тегам..."
-      : "Search by title, description, tags...",
-    allCategories: isRu ? "Все категории" : "All categories",
-    accessLabel: isRu ? "Доступ" : "Access",
-    allAccess: isRu ? "Все" : "All",
-    allStatuses: isRu ? "Все статусы" : "All statuses",
-    sortLabel: isRu ? "Сортировка" : "Sort",
-    sortNewest: isRu ? "Новые сначала" : "Newest first",
-    sortTitle: isRu ? "По названию" : "By title",
-    sortTokens: isRu ? "По PawSpark" : "By PawSpark",
-    viewToggleLabel: isRu ? "Переключение вида" : "View mode",
-    cardsView: isRu ? "Карточки" : "Cards",
-    listView: isRu ? "Список" : "List",
-    testAction: isRu ? "Тест" : "Test",
-    tokensShort: "PawSpark",
-    updatedLabel: isRu ? "Обновлен" : "Updated",
-    updatedShort: isRu ? "Обновлен" : "Updated",
-    previousPageLabel: isRu ? "Предыдущая страница шаблонов" : "Previous templates page",
-    nextPageLabel: isRu ? "Следующая страница шаблонов" : "Next templates page",
-    showing: (visible: number, total: number) =>
-      isRu
-        ? `Показано ${visible} из ${total} шаблонов`
-        : `Showing ${visible} of ${total} templates`,
-  };
 }

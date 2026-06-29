@@ -3,20 +3,25 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const detailPagePath = fileURLToPath(new URL("./user-detail-page.tsx", import.meta.url));
+const detailContentPath = fileURLToPath(new URL("./user-detail-page.content.ts", import.meta.url));
 const detailStylesPath = fileURLToPath(new URL("./user-detail-page.module.css", import.meta.url));
 
 describe("user detail pets section", () => {
   it("uses localized copy for the pets workflow instead of hardcoded English text", () => {
     const source = readFileSync(detailPagePath, "utf8");
+    const contentSource = readFileSync(detailContentPath, "utf8");
 
-    expect(source).toContain("function getUserPetsCopy(locale: Locale)");
-    expect(source).toContain('title: isRu ? "Питомцы" : "Pets"');
-    expect(source).toContain('activeStatus: isRu ? "Активен" : "Active"');
-    expect(source).toContain('hiddenStatus: isRu ? "Скрыт" : "Hidden"');
-    expect(source).toContain('hidePetLabel: isRu ? "Скрыть питомца" : "Hide pet"');
     expect(source).toContain(
-      'restorePhotoLabel: isRu ? "Восстановить фото питомца" : "Restore pet photo"'
+      'import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";'
     );
+    expect(source).toContain("const petText = useMemo(() => getUserDetailPetText(locale), [locale]);");
+    expect(source).not.toContain("function getUserPetsCopy(locale: Locale)");
+    expect(source).not.toContain('const isRu = locale === "ru";');
+    expect(contentSource).toContain('title: "Питомцы"');
+    expect(contentSource).toContain('activeStatus: "Активен"');
+    expect(contentSource).toContain('hiddenStatus: "Скрыт"');
+    expect(contentSource).toContain('hidePetLabel: "Скрыть питомца"');
+    expect(contentSource).toContain('restorePhotoLabel: "Восстановить фото питомца"');
     expect(source).toContain("function formatPetStatus(");
     expect(source).toContain('if (status === "active")');
     expect(source).toContain("return text.activeStatus;");

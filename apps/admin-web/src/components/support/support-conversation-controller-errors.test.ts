@@ -6,6 +6,9 @@ const controllerPath = fileURLToPath(
   new URL("./use-support-conversation-controller.ts", import.meta.url)
 );
 const supportPagePath = fileURLToPath(new URL("./support-conversation-page.tsx", import.meta.url));
+const supportContentPath = fileURLToPath(
+  new URL("./support-conversation.content.ts", import.meta.url)
+);
 const supportInboxPagePath = fileURLToPath(new URL("./support-inbox-page.tsx", import.meta.url));
 const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
 const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
@@ -107,6 +110,7 @@ describe("support conversation controller errors", () => {
   it("keeps support queue pagination on backend query params instead of a fixed first page", () => {
     const controllerSource = readFileSync(controllerPath, "utf8");
     const pageSource = readFileSync(supportPagePath, "utf8");
+    const supportContentSource = readFileSync(supportContentPath, "utf8");
     const inboxPageSource = readFileSync(supportInboxPagePath, "utf8");
 
     expect(controllerSource).toContain("const [queuePage, setQueuePage] = useState(1);");
@@ -125,8 +129,11 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain('data-disabled={isQueueControlsLocked ? "true" : undefined}');
     expect(pageSource).toContain("tabIndex={isQueueControlsLocked ? -1 : undefined}");
     expect(pageSource).toContain("if (isQueueControlsLocked) {\n                            event.preventDefault();\n                          }");
-    expect(pageSource).toContain('previousPage: locale === "ru" ? "Предыдущая страница очереди" : "Previous queue page"');
-    expect(pageSource).toContain('nextPage: locale === "ru" ? "Следующая страница очереди" : "Next queue page"');
+    expect(pageSource).toContain("const queueLabels = copy.page.queue;");
+    expect(supportContentSource).toContain('previousPage: "Предыдущая страница очереди"');
+    expect(supportContentSource).toContain('previousPage: "Previous queue page"');
+    expect(supportContentSource).toContain('nextPage: "Следующая страница очереди"');
+    expect(supportContentSource).toContain('nextPage: "Next queue page"');
     expect(pageSource).toContain("aria-label={queueLabels.previousPage}");
     expect(pageSource).toContain("aria-label={queueLabels.nextPage}");
     expect(pageSource).toContain("title={queueLabels.previousPage}");
@@ -329,21 +336,20 @@ describe("support conversation controller errors", () => {
 
   it("uses backend totalCount for support queue pagination footer", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
+    const supportContentSource = readFileSync(supportContentPath, "utf8");
 
     expect(pageSource).toContain(
       "const inboxTotalCount = inboxQuery.data?.totalCount ?? filteredInboxItems.length;"
     );
     expect(pageSource).toContain("const inboxPageSize = inboxQuery.data?.pageSize ?? displayedInboxItems.length;");
     expect(pageSource).toContain("const inboxCurrentPage = inboxQuery.data?.page ?? queuePage;");
-    expect(pageSource).toContain(
+    expect(supportContentSource).toContain(
       "pageCount: (page: number, start: number, end: number, total: number) =>"
     );
-    expect(pageSource).toContain(
-      "? `Страница ${page}: показано ${start}-${end} из ${total}`"
+    expect(supportContentSource).toContain(
+      "`Страница ${page}: показано ${start}-${end} из ${total}`"
     );
-    expect(pageSource).toContain(
-      ": `Page ${page}: showing ${start}-${end} of ${total}`"
-    );
+    expect(supportContentSource).toContain("`Page ${page}: showing ${start}-${end} of ${total}`");
     expect(pageSource).toContain("queueLabels.pageCount(");
     expect(pageSource).toContain("inboxCurrentPage,\n                      queueShownStart,");
     expect(pageSource).not.toContain(
@@ -487,6 +493,7 @@ describe("support conversation controller errors", () => {
 
   it("guards support reply submits against read-only, pending, and empty composer states", () => {
     const pageSource = readFileSync(supportPagePath, "utf8");
+    const supportContentSource = readFileSync(supportContentPath, "utf8");
 
     expect(pageSource).toContain("const submitReply = () => {");
     expect(pageSource).toContain("const isComposerBusy = isSendReplySubmitting;");
@@ -510,13 +517,19 @@ describe("support conversation controller errors", () => {
     expect(pageSource).toContain(
       "className={styles.composerReplyClose}\n                              onClick={() => selectReplyToMessage(null)}\n                              disabled={isComposerDisabled}"
     );
-    expect(pageSource).toContain("const messageLabels = {");
-    expect(pageSource).toContain('openPhoto: locale === "ru" ? "Открыть фото" : "Open photo"');
-    expect(pageSource).toContain('openVideo: locale === "ru" ? "Открыть видео" : "Open video"');
-    expect(pageSource).toContain('reply: locale === "ru" ? "Ответить" : "Reply"');
-    expect(pageSource).toContain('replyTo: locale === "ru" ? "Ответ на" : "Reply to"');
-    expect(pageSource).toContain('cancelReply: locale === "ru" ? "Отменить ответ" : "Cancel reply"');
-    expect(pageSource).toContain('attachFile: locale === "ru" ? "Прикрепить файл" : "Attach file"');
+    expect(pageSource).toContain("const messageLabels = copy.page.message;");
+    expect(supportContentSource).toContain('openPhoto: "Открыть фото"');
+    expect(supportContentSource).toContain('openPhoto: "Open photo"');
+    expect(supportContentSource).toContain('openVideo: "Открыть видео"');
+    expect(supportContentSource).toContain('openVideo: "Open video"');
+    expect(supportContentSource).toContain('reply: "Ответить"');
+    expect(supportContentSource).toContain('reply: "Reply"');
+    expect(supportContentSource).toContain('replyTo: "Ответ на"');
+    expect(supportContentSource).toContain('replyTo: "Reply to"');
+    expect(supportContentSource).toContain('cancelReply: "Отменить ответ"');
+    expect(supportContentSource).toContain('cancelReply: "Cancel reply"');
+    expect(supportContentSource).toContain('attachFile: "Прикрепить файл"');
+    expect(supportContentSource).toContain('attachFile: "Attach file"');
     expect(pageSource).toContain("aria-label={messageLabels.openPhoto}");
     expect(pageSource).toContain("aria-label={messageLabels.openVideo}");
     expect(pageSource).toContain("title={messageLabels.reply}");

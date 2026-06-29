@@ -273,19 +273,33 @@ export function getSession(): AuthSession | null {
 
   try {
     const parsed = validateAuthSession(JSON.parse(raw), "Stored");
-    const parsedUserId = parsed.user?.userId ?? null;
     const hasStoredToken =
       (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) ||
       (typeof parsed.accessToken === "string" && parsed.accessToken.trim().length > 0);
-    if (typeof parsed.refreshToken === "string" && parsed.refreshToken.trim().length > 0) {
-      volatileRefreshToken = parsed.refreshToken;
-    }
-    if (typeof parsed.accessToken === "string" && parsed.accessToken.trim().length > 0) {
-      volatileAccessToken = parsed.accessToken;
-    }
+
     if (hasStoredToken) {
-      volatileTokenUserId = parsedUserId;
-    } else if (volatileTokenUserId && volatileTokenUserId !== parsedUserId) {
+      clientLogger.warn("auth.legacy_session_cleared", {
+        hasAccessToken: Boolean(parsed.accessToken?.trim()),
+        hasRefreshToken: Boolean(parsed.refreshToken?.trim()),
+      });
+      cachedAuthRaw = null;
+      cachedAuthSession = null;
+      volatileAccessToken = null;
+      volatileRefreshToken = null;
+      volatileTokenUserId = null;
+      try {
+        window.sessionStorage.removeItem(AUTH_KEY);
+      } catch (storageError) {
+        clientLogger.warn(
+          "auth.legacy_session_cleanup_failed",
+          getAuthStorageErrorDetails(storageError)
+        );
+      }
+      return null;
+    }
+
+    const parsedUserId = parsed.user?.userId ?? null;
+    if (volatileTokenUserId && volatileTokenUserId !== parsedUserId) {
       volatileAccessToken = null;
       volatileRefreshToken = null;
       volatileTokenUserId = null;
@@ -296,22 +310,6 @@ export function getSession(): AuthSession | null {
       parsed.accessToken = undefined;
     }
     parsed.refreshToken = undefined;
-    if (hasStoredToken) {
-      const legacyAuthRaw = raw;
-      queueMicrotask(() => {
-        try {
-          if (window.sessionStorage.getItem(AUTH_KEY) !== legacyAuthRaw) {
-            return;
-          }
-          window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(sanitizeSessionForStorage(parsed)));
-        } catch (storageError) {
-          clientLogger.warn(
-            "auth.session_token_migration_failed",
-            getAuthStorageErrorDetails(storageError)
-          );
-        }
-      });
-    }
 
     cachedAuthSession = parsed;
     return cachedAuthSession;

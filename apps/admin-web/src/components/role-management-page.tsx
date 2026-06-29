@@ -14,6 +14,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import {
+  getRoleManagementPageText,
+  type RoleManagementPageText,
+} from "@/components/role-management-page.content";
 import styles from "@/components/role-management-page.module.css";
 import { Toast } from "@/components/ui/toast";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -50,72 +54,6 @@ type PendingAction = {
 };
 
 const PAGE_SIZE = 50;
-
-function getCopy(locale: Locale) {
-  const isRu = locale === "ru";
-  return {
-    eyebrow: isRu ? "Контроль доступа" : "Access control",
-    title: isRu ? "Управление ролями" : "Role Management",
-    description: isRu
-      ? "Admin и Moderator управляются из этой панели. Premium не считается ролью."
-      : "Admin and Moderator are managed from this panel. Premium is not a role.",
-    adminOnly: isRu ? "Только Admin" : "Admin only",
-    adminsTitle: isRu ? "Администраторы" : "Admins",
-    adminsDescription: isRu
-      ? "Список пользователей с полным доступом. Последнего Admin нельзя понизить."
-      : "Users with full access. The last Admin cannot be downgraded.",
-    moderatorsTitle: isRu ? "Модераторы" : "Moderators",
-    moderatorsDescription: isRu
-      ? "Пользователи с ограниченным доступом к разрешенным разделам."
-      : "Users with limited access to permitted sections.",
-    searchTitle: isRu ? "Назначить Moderator" : "Assign Moderator",
-    searchDescription: isRu ? "Поиск по email, id или имени." : "Search by email, id, or name.",
-    searchLabel: isRu ? "Пользователь" : "User",
-    searchPlaceholder: isRu ? "email, user id или имя" : "email, user id, or name",
-    searchHint: isRu
-      ? "Введите минимум 2 символа. Поиск обновится автоматически."
-      : "Enter at least 2 characters. Search updates automatically.",
-    loading: isRu ? "Загрузка ролей" : "Loading roles",
-    error: isRu ? "Не удалось загрузить роли" : "Failed to load roles",
-    adminsError: isRu ? "Не удалось загрузить Admin" : "Failed to load admins",
-    moderatorsError: isRu ? "Не удалось загрузить Moderator" : "Failed to load moderators",
-    searchError: isRu ? "Не удалось выполнить поиск пользователей" : "Failed to search users",
-    emptyAdmins: isRu ? "Admin не найдены" : "No admins found",
-    emptyModerators: isRu ? "Moderator не найдены" : "No moderators found",
-    emptySearch: isRu ? "Введите запрос для поиска пользователя" : "Enter a query to search users",
-    noSearchResults: isRu ? "Пользователи не найдены" : "No users found",
-    assign: isRu ? "Назначить" : "Assign",
-    revoke: isRu ? "Снять Moderator" : "Remove Moderator",
-    adminAlreadyPrivileged: isRu ? "Уже Admin" : "Already Admin",
-    moderatorAlreadyPrivileged: isRu ? "Уже Moderator" : "Already Moderator",
-    cancel: isRu ? "Отмена" : "Cancel",
-    confirmAssignTitle: isRu ? "Назначить Moderator?" : "Assign Moderator?",
-    confirmAssignDescription: isRu
-      ? "Пользователь получит доступ к разрешенным moderator разделам."
-      : "The user will get access to permitted moderator sections.",
-    confirmRevokeTitle: isRu ? "Снять Moderator?" : "Remove Moderator?",
-    confirmRevokeDescription: isRu
-      ? "Пользователь потеряет moderator доступ. Действие будет записано в audit log."
-      : "The user will lose moderator access. The action will be written to audit log.",
-    saved: isRu ? "Роль обновлена" : "Role updated",
-    failed: isRu ? "Не удалось обновить роль" : "Failed to update role",
-    roleActionsAdminOnly: isRu
-      ? "Изменять роли может только Admin."
-      : "Only Admin can change roles.",
-    assignModeratorLabel: isRu ? "Назначить Moderator пользователю" : "Assign Moderator to",
-    revokeModeratorLabel: isRu ? "Снять Moderator у пользователя" : "Remove Moderator from",
-    created: isRu ? "Создан" : "Created",
-    retry: isRu ? "Повторить" : "Retry",
-    previous: isRu ? "Назад" : "Previous",
-    next: isRu ? "Вперёд" : "Next",
-    previousPageLabel: isRu ? "Предыдущая страница списка ролей" : "Previous role list page",
-    nextPageLabel: isRu ? "Следующая страница списка ролей" : "Next role list page",
-    page: isRu ? "Страница" : "Page",
-    of: isRu ? "из" : "of",
-    showing: isRu ? "Показано" : "Showing",
-    users: isRu ? "пользователей" : "users",
-  };
-}
 
 function useDebouncedValue(value: string, delayMs: number) {
   const [debounced, setDebounced] = useState(value);
@@ -161,14 +99,14 @@ function UserRoles({ roles }: { roles: readonly string[] }) {
 function UserRow({
   user,
   locale,
+  text,
   action,
 }: {
   user: UserListItem;
   locale: Locale;
+  text: RoleManagementPageText;
   action?: ReactNode;
 }) {
-  const text = getCopy(locale);
-
   return (
     <div className={styles.userRow}>
       <div className={styles.userMain}>
@@ -186,7 +124,7 @@ function UserRow({
 }
 
 function RolePager({
-  locale,
+  text,
   pageIndex,
   pageSize,
   totalCount,
@@ -195,7 +133,7 @@ function RolePager({
   onPrevious,
   onNext,
 }: {
-  locale: Locale;
+  text: RoleManagementPageText;
   pageIndex: number;
   pageSize: number;
   totalCount: number;
@@ -204,7 +142,6 @@ function RolePager({
   onPrevious: () => void;
   onNext: () => void;
 }) {
-  const text = getCopy(locale);
   const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
   const shownStart = totalCount > 0 ? pageIndex * pageSize + 1 : 0;
   const shownEnd = Math.min(totalCount, (pageIndex + 1) * pageSize);
@@ -244,7 +181,7 @@ function RolePager({
 }
 
 export function RoleManagementPage({ locale }: RoleManagementPageProps) {
-  const text = getCopy(locale);
+  const text = getRoleManagementPageText(locale);
   const queryClient = useQueryClient();
   const router = useRouter();
   const session = useAuthSession();
@@ -547,12 +484,12 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                 <AdminStateCard title={text.emptyAdmins} />
               ) : null}
               {admins.map((user) => (
-                <UserRow key={user.userId} user={user} locale={locale} />
+                <UserRow key={user.userId} user={user} locale={locale} text={text} />
               ))}
             </div>
             {adminsPageData && adminsPageData.totalCount > 0 ? (
               <RolePager
-                locale={locale}
+                text={text}
                 pageIndex={adminsPage}
                 pageSize={PAGE_SIZE}
                 totalCount={adminsPageData.totalCount}
@@ -592,6 +529,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                   key={user.userId}
                   user={user}
                   locale={locale}
+                  text={text}
                   action={
                     <button
                       type="button"
@@ -608,7 +546,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
             </div>
             {moderatorsPageData && moderatorsPageData.totalCount > 0 ? (
               <RolePager
-                locale={locale}
+                text={text}
                 pageIndex={moderatorsPage}
                 pageSize={PAGE_SIZE}
                 totalCount={moderatorsPageData.totalCount}
@@ -682,6 +620,7 @@ export function RoleManagementPage({ locale }: RoleManagementPageProps) {
                   key={user.userId}
                   user={user}
                   locale={locale}
+                  text={text}
                   action={
                     <button
                       type="button"

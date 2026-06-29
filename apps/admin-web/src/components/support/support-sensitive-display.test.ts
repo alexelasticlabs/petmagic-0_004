@@ -7,6 +7,9 @@ import { formatSafeSupportDownloadName } from "@/components/support/support-conv
 const supportHelpersPath = fileURLToPath(
   new URL("./support-conversation-helpers.ts", import.meta.url)
 );
+const supportContentPath = fileURLToPath(
+  new URL("./support-conversation.content.ts", import.meta.url)
+);
 const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
 const supportPagePath = fileURLToPath(new URL("./support-conversation-page.tsx", import.meta.url));
 const supportSecureMediaPath = fileURLToPath(new URL("./support-secure-media.tsx", import.meta.url));
@@ -56,14 +59,17 @@ describe("support sensitive display", () => {
 
   it("sanitizes operator tags and keeps tag input bounded", () => {
     const source = readFileSync(supportInfoPanelPath, "utf8");
+    const contentSource = readFileSync(supportContentPath, "utf8");
 
-    expect(source).toContain("tagFallback: isRu ? \"Тег\" : \"Tag\"");
+    expect(source).toContain("const panelText = useMemo(() => getSupportConversationCopy(locale).infoPanel, [locale]);");
     expect(source).toContain("formatSafeSupportDisplay(tag, panelText.tagFallback, 40)");
     expect(source).toContain("aria-label={panelText.addTag}");
     expect(source).toContain("title={panelText.removeTag}");
     expect(source).toContain("setTagInput(event.target.value.slice(0, 40))");
     expect(source).toContain("maxLength={40}");
     expect(source).toContain("disabled={!canManageSupportWorkspace || !tagInput.trim()}");
+    expect(contentSource).toContain('tagFallback: "Тег"');
+    expect(contentSource).toContain('tagFallback: "Tag"');
     expect(source).not.toContain(
       'formatSafeSupportDisplay(tag, locale === "ru" ? "Тег" : "Tag", 40)'
     );
@@ -102,15 +108,16 @@ describe("support sensitive display", () => {
   it("sanitizes support message bodies, reply previews, share filenames, and short ids", () => {
     const helperSource = readFileSync(supportHelpersPath, "utf8");
     const supportPageSource = readFileSync(supportPagePath, "utf8");
+    const contentSource = readFileSync(supportContentPath, "utf8");
 
     expect(helperSource).toContain("const safeValue = formatSafeSupportDisplay(value, \"—\", 32)");
     expect(helperSource).not.toContain("return value.length > 8");
     expect(supportPageSource).toContain(
       "const safeFileName = formatSafeSupportDownloadName(\n        currentFullscreenImage.fileName,\n        defaultFileName\n      )"
     );
-    expect(supportPageSource).toContain(
-      "title: formatSafeSupportDisplay(\n          currentFullscreenImage.fileName,\n          \"Support attachment\",\n          120\n        )"
-    );
+    expect(supportPageSource).toContain("imageViewerLabels.supportAttachmentFallback");
+    expect(contentSource).toContain('supportAttachmentFallback: "Вложение поддержки"');
+    expect(contentSource).toContain('supportAttachmentFallback: "Support attachment"');
     expect(supportPageSource).toMatch(/formatSafeSupportDisplay\(\s*message\.replyToPreview/);
     expect(supportPageSource).toContain(
       "formatSafeSupportDisplay(message.body, \"\", 2000)"

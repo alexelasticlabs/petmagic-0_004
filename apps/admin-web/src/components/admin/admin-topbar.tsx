@@ -4,6 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import {
+  getAdminChromeCopy,
+  type AdminNotificationCategory,
+} from "@/components/admin/admin-chrome.content";
 import { BellIcon, CaretDownIcon, MenuIcon } from "@/components/admin/admin-icons";
 import { AdminLangDropdown } from "@/components/admin/admin-lang-dropdown";
 import {
@@ -58,6 +62,7 @@ export function AdminTopbar({
   onToggleSidebar,
   onToggleTheme,
 }: AdminTopbarProps) {
+  const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);
   const pathname = usePathname();
   const { clearRead, items, markAllAsRead, markAsRead, markCategoryAsRead, unreadCount } =
     useAdminNotifications();
@@ -69,32 +74,10 @@ export function AdminTopbar({
   const previousNotificationPathnameRef = useRef(pathname);
   const notificationPanelId = useId();
   const notificationPanelTitleId = useId();
-  const themeLabel =
-    locale === "ru"
-      ? theme === "dark"
-        ? "Тёмная"
-        : "Светлая"
-      : theme === "dark"
-        ? "Dark"
-        : "Light";
-  const nextThemeAriaLabel =
-    locale === "ru"
-      ? theme === "dark"
-        ? "Включить светлую тему"
-        : "Включить тёмную тему"
-      : theme === "dark"
-        ? "Switch to light theme"
-        : "Switch to dark theme";
-  const sidebarToggleLabel =
-    locale === "ru"
-      ? sidebarOpen
-        ? "Закрыть навигацию"
-        : "Открыть навигацию"
-      : sidebarOpen
-        ? "Close navigation"
-        : "Open navigation";
-  const notificationFiltersLabel =
-    locale === "ru" ? "Фильтры уведомлений" : "Notification filters";
+  const themeLabel = copy.topbar.themeLabel(theme);
+  const nextThemeAriaLabel = copy.topbar.nextThemeAriaLabel(theme);
+  const sidebarToggleLabel = copy.topbar.sidebarToggleLabel(sidebarOpen);
+  const notificationFiltersLabel = copy.topbar.notificationFiltersLabel;
   const unreadSupportNotificationCount = items.filter(
     (item) => item.category === "support" && !item.read
   ).length;
@@ -104,16 +87,16 @@ export function AdminTopbar({
     Math.max(unreadSupportNotificationCount, supportUnreadCount);
   const filterOptions = useMemo(
     () => [
-      { value: "all" as const, label: locale === "ru" ? "Все" : "All" },
-      { value: "unread" as const, label: locale === "ru" ? "Новые" : "Unread" },
-      { value: "support" as const, label: locale === "ru" ? "Поддержка" : "Support" },
-      { value: "users" as const, label: locale === "ru" ? "Пользователи" : "Users" },
-      { value: "templates" as const, label: locale === "ru" ? "Шаблоны" : "Templates" },
-      { value: "economy" as const, label: locale === "ru" ? "Экономика" : "Economy" },
-      { value: "promo" as const, label: locale === "ru" ? "Промокоды" : "Promo" },
-      { value: "system" as const, label: locale === "ru" ? "Система" : "System" },
+      { value: "all" as const, label: copy.topbar.filterLabels.all },
+      { value: "unread" as const, label: copy.topbar.filterLabels.unread },
+      { value: "support" as const, label: copy.topbar.filterLabels.support },
+      { value: "users" as const, label: copy.topbar.filterLabels.users },
+      { value: "templates" as const, label: copy.topbar.filterLabels.templates },
+      { value: "economy" as const, label: copy.topbar.filterLabels.economy },
+      { value: "promo" as const, label: copy.topbar.filterLabels.promo },
+      { value: "system" as const, label: copy.topbar.filterLabels.system },
     ],
-    [locale]
+    [copy]
   );
 
   const filteredNotifications = useMemo(() => {
@@ -150,13 +133,7 @@ export function AdminTopbar({
 
   const isNotificationsOpen = notificationPanelPathname === pathname;
   const notificationTriggerLabel =
-    locale === "ru"
-      ? isNotificationsOpen
-        ? "Закрыть уведомления"
-        : "Открыть уведомления"
-      : isNotificationsOpen
-        ? "Close notifications"
-        : "Open notifications";
+    copy.topbar.notificationTriggerLabel(isNotificationsOpen);
 
   const closeNotificationPanel = useCallback((options?: { restoreFocus?: boolean }) => {
     setNotificationPanelPathname(null);
@@ -280,15 +257,13 @@ export function AdminTopbar({
               <div className={styles.notificationPanelHeader}>
                 <div className={styles.notificationPanelCopy}>
                   <span className={styles.notificationEyebrow}>
-                    {locale === "ru" ? "Центр уведомлений" : "Notification center"}
+                    {copy.topbar.centerEyebrow}
                   </span>
                   <strong id={notificationPanelTitleId} className={styles.notificationTitle}>
-                    {locale === "ru" ? "Важные события админки" : "Important admin events"}
+                    {copy.topbar.centerTitle}
                   </strong>
                   <p className={styles.notificationSummary}>
-                    {locale === "ru"
-                      ? `${unreadCount} новых в ленте${supportUnreadCount > 0 ? `, ${supportUnreadCount} новых сообщений в поддержке` : ""}`
-                      : `${unreadCount} unread in feed${supportUnreadCount > 0 ? `, ${supportUnreadCount} new support messages` : ""}`}
+                    {copy.topbar.summary(unreadCount, supportUnreadCount)}
                   </p>
                 </div>
                 <div className={styles.notificationHeaderActions}>
@@ -298,7 +273,7 @@ export function AdminTopbar({
                     onClick={markAllAsRead}
                     disabled={unreadCount === 0}
                   >
-                    {locale === "ru" ? "Прочитать всё" : "Mark all read"}
+                    {copy.topbar.markAllRead}
                   </button>
                   <button
                     type="button"
@@ -306,7 +281,7 @@ export function AdminTopbar({
                     onClick={clearRead}
                     disabled={items.every((item) => !item.read)}
                   >
-                    {locale === "ru" ? "Очистить прочитанное" : "Clear read"}
+                    {copy.topbar.clearRead}
                   </button>
                 </div>
               </div>
@@ -339,27 +314,23 @@ export function AdminTopbar({
                     <div className={styles.notificationCardMeta}>
                       <div className={styles.notificationCardMetaLead}>
                         <span className={styles.notificationPinnedMark}>
-                          {locale === "ru" ? "Критично" : "Critical"}
+                          {copy.topbar.critical}
                         </span>
                         <span
                           className={`${styles.notificationCategoryPill} ${styles.notificationCategorySupport}`}
                         >
-                          {locale === "ru" ? "Поддержка" : "Support"}
+                          {copy.topbar.categoryLabels.support}
                         </span>
                       </div>
                       <span className={styles.notificationTime}>
-                        {locale === "ru" ? "требует внимания" : "needs attention"}
+                        {copy.topbar.needsAttention}
                       </span>
                     </div>
                     <strong className={styles.notificationCardTitle}>
-                      {locale === "ru"
-                        ? `${supportUnreadCount} новых сообщений в поддержке`
-                        : `${supportUnreadCount} new support messages`}
+                      {copy.topbar.supportSummaryTitle(supportUnreadCount)}
                     </strong>
                     <p className={styles.notificationCardMessage}>
-                      {locale === "ru"
-                        ? "Открой очередь поддержки и разберите новые или непрочитанные диалоги."
-                        : "Open the support queue to process new and unread conversations."}
+                      {copy.topbar.supportSummaryMessage}
                     </p>
                   </Link>
                 ) : null}
@@ -368,7 +339,7 @@ export function AdminTopbar({
                   <section className={styles.notificationGroupSection}>
                     <div className={styles.notificationGroupHeader}>
                       <span className={styles.notificationGroupTitle}>
-                        {locale === "ru" ? "Критично" : "Critical"}
+                        {copy.topbar.critical}
                       </span>
                     </div>
                     <div className={styles.notificationGroupItems}>
@@ -386,34 +357,12 @@ export function AdminTopbar({
                             <div className={styles.notificationCardMeta}>
                               <div className={styles.notificationCardMetaLead}>
                                 <span className={styles.notificationPinnedMark}>
-                                  {locale === "ru" ? "Закреплено" : "Pinned"}
+                                  {copy.topbar.pinned}
                                 </span>
                                 <span
                                   className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
                                 >
-                                  {item.category === "support"
-                                    ? locale === "ru"
-                                      ? "Поддержка"
-                                      : "Support"
-                                    : item.category === "users"
-                                      ? locale === "ru"
-                                        ? "Пользователи"
-                                        : "Users"
-                                      : item.category === "templates"
-                                        ? locale === "ru"
-                                          ? "Шаблоны"
-                                          : "Templates"
-                                        : item.category === "economy"
-                                          ? locale === "ru"
-                                            ? "Экономика"
-                                            : "Economy"
-                                          : item.category === "promo"
-                                            ? locale === "ru"
-                                              ? "Промокоды"
-                                              : "Promo"
-                                            : locale === "ru"
-                                              ? "Система"
-                                              : "System"}
+                                  {getNotificationCategoryLabel(item.category, copy.topbar.categoryLabels)}
                                 </span>
                               </div>
                               <span className={styles.notificationTime}>
@@ -481,29 +430,7 @@ export function AdminTopbar({
                               <span
                                 className={`${styles.notificationCategoryPill} ${item.category === "support" ? styles.notificationCategorySupport : item.category === "users" ? styles.notificationCategoryUsers : item.category === "templates" ? styles.notificationCategoryTemplates : item.category === "economy" ? styles.notificationCategoryEconomy : item.category === "promo" ? styles.notificationCategoryPromo : styles.notificationCategorySystem}`}
                               >
-                                {item.category === "support"
-                                  ? locale === "ru"
-                                    ? "Поддержка"
-                                    : "Support"
-                                  : item.category === "users"
-                                    ? locale === "ru"
-                                      ? "Пользователи"
-                                      : "Users"
-                                    : item.category === "templates"
-                                      ? locale === "ru"
-                                        ? "Шаблоны"
-                                        : "Templates"
-                                      : item.category === "economy"
-                                        ? locale === "ru"
-                                          ? "Экономика"
-                                          : "Economy"
-                                        : item.category === "promo"
-                                          ? locale === "ru"
-                                            ? "Промокоды"
-                                            : "Promo"
-                                          : locale === "ru"
-                                            ? "Система"
-                                            : "System"}
+                                {getNotificationCategoryLabel(item.category, copy.topbar.categoryLabels)}
                               </span>
                               <span className={styles.notificationTime}>
                                 {formatRelativeNotificationTime(item.createdAt, locale)}
@@ -553,12 +480,8 @@ export function AdminTopbar({
                 pinnedNotifications.length === 0 &&
                 groupedNotifications.length === 0 ? (
                   <div className={styles.notificationEmptyState}>
-                    <strong>{locale === "ru" ? "Пока пусто" : "Nothing here yet"}</strong>
-                    <p>
-                      {locale === "ru"
-                        ? "Важные действия из поддержки, пользователей и шаблонов будут появляться здесь."
-                        : "Important events from support, users, and templates will appear here."}
-                    </p>
+                    <strong>{copy.topbar.emptyTitle}</strong>
+                    <p>{copy.topbar.emptyMessage}</p>
                   </div>
                 ) : null}
               </div>
@@ -597,10 +520,20 @@ type NotificationGroup = {
   items: ReturnType<typeof useAdminNotifications>["items"];
 };
 
+function getNotificationCategoryLabel(
+  category: string,
+  labels: Record<AdminNotificationCategory, string>
+) {
+  const normalizedCategory =
+    category in labels ? (category as AdminNotificationCategory) : "system";
+  return labels[normalizedCategory];
+}
+
 function groupNotificationsByDate(
   items: ReturnType<typeof useAdminNotifications>["items"],
   locale: Locale
 ): NotificationGroup[] {
+  const copy = getAdminChromeCopy(locale);
   const today = new Date();
   const todayKey = toDateKey(today);
   const yesterday = new Date(today);
@@ -616,16 +549,10 @@ function groupNotificationsByDate(
       itemKey === todayKey ? "today" : itemKey === yesterdayKey ? "yesterday" : "earlier";
     const groupLabel =
       groupKey === "today"
-        ? locale === "ru"
-          ? "Сегодня"
-          : "Today"
+        ? copy.topbar.groupLabels.today
         : groupKey === "yesterday"
-          ? locale === "ru"
-            ? "Вчера"
-            : "Yesterday"
-          : locale === "ru"
-            ? "Ранее"
-            : "Earlier";
+          ? copy.topbar.groupLabels.yesterday
+          : copy.topbar.groupLabels.earlier;
 
     const group = groups.get(groupKey);
     if (group) {
@@ -650,6 +577,7 @@ function toDateKey(value: Date) {
 }
 
 function formatRelativeNotificationTime(value: string, locale: Locale) {
+  const copy = getAdminChromeCopy(locale);
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) {
     return "";
@@ -658,7 +586,7 @@ function formatRelativeNotificationTime(value: string, locale: Locale) {
   const diffMs = timestamp - Date.now();
   const diffMinutes = Math.round(diffMs / 60_000);
   const absMinutes = Math.abs(diffMinutes);
-  const rtf = new Intl.RelativeTimeFormat(locale === "ru" ? "ru" : "en", {
+  const rtf = new Intl.RelativeTimeFormat(copy.rtfLocale, {
     numeric: "auto",
   });
 

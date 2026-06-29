@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const usersAdminHookPath = fileURLToPath(new URL("./use-users-admin.ts", import.meta.url));
+const usersManagementContentPath = fileURLToPath(
+  new URL("../users-management-page.content.ts", import.meta.url)
+);
 const usersManagementPagePath = fileURLToPath(
   new URL("../users-management-page.tsx", import.meta.url)
 );
@@ -13,7 +16,16 @@ const usersManagementStylesPath = fileURLToPath(
 describe("users admin action hardening", () => {
   it("keeps successful user actions independent from best-effort list refresh failures", () => {
     const source = readFileSync(usersAdminHookPath, "utf8");
+    const contentSource = readFileSync(usersManagementContentPath, "utf8");
 
+    expect(source).toContain(
+      'import { getUsersManagementPageText } from "@/components/users-management-page.content";'
+    );
+    expect(source).toContain("const usersManagementText = getUsersManagementPageText(locale);");
+    expect(source).toContain("title: usersManagementText.notificationTitle,");
+    expect(source).not.toContain('title: locale === "ru" ? "Изменения пользователей" : "User updates"');
+    expect(contentSource).toContain('notificationTitle: "Изменения пользователей"');
+    expect(contentSource).toContain('notificationTitle: "User updates"');
     expect(source).toContain("async function refreshUsersAfterAction(userId: string)");
     expect(source).toContain('clientLogger.warn("users.action_refresh_failed"');
     expect(source).toContain("function getUsersActionErrorDetails(error: unknown)");
@@ -27,6 +39,21 @@ describe("users admin action hardening", () => {
     expect(source).not.toContain("userId,\n          error: refreshedUsers.error");
     expect(source).not.toContain("userId,\n        error");
     expect(source).not.toContain("await refreshUsers();\n\n      await Promise.allSettled([");
+  });
+
+  it("keeps users confirmation copy in the shared content module", () => {
+    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const contentSource = readFileSync(usersManagementContentPath, "utf8");
+
+    expect(pageSource).toContain("description: ui.activeChangeDescription(userLabel)");
+    expect(pageSource).toContain("description: ui.deleteDescription(userLabel, text.usersDeleteConfirm)");
+    expect(pageSource).toContain("description: ui.premiumChangeDescription(userLabel)");
+    expect(pageSource).toContain("description: ui.roleChangeDescription(userLabel, role, hasRole)");
+    expect(pageSource).not.toContain('locale === "ru"');
+    expect(contentSource).toContain("activeChangeDescription: (userLabel) =>");
+    expect(contentSource).toContain("deleteDescription: (userLabel, deleteSummary) =>");
+    expect(contentSource).toContain("premiumChangeDescription: (userLabel) =>");
+    expect(contentSource).toContain("roleChangeDescription: (userLabel, role, hasRole) =>");
   });
 
   it("keeps manual users retry strict so retry errors still surface in the page state", () => {

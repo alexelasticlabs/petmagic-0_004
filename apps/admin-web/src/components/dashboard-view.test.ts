@@ -3,6 +3,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const dashboardViewPath = fileURLToPath(new URL("./dashboard-view.tsx", import.meta.url));
+const dashboardContentPath = fileURLToPath(
+  new URL("./dashboard-view.content.ts", import.meta.url)
+);
 const dashboardChartsPath = fileURLToPath(
   new URL("./dashboard/dashboard-charts.tsx", import.meta.url)
 );
@@ -23,6 +26,7 @@ describe("dashboard production data handling", () => {
 
   it("keeps optional dashboard feeds partial and locally retryable", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
     expect(source).toContain("const optionalFeedPromise = Promise.allSettled([");
@@ -32,14 +36,17 @@ describe("dashboard production data handling", () => {
     expect(source).toContain('purchases: purchasesUnavailable');
     expect(source).toContain('supportConversations: supportConversationsUnavailable');
     expect(source).toContain("viewModel.feedErrors.purchases ? (");
-    expect(source).toContain("Orders temporarily unavailable");
-    expect(source).toContain("Some activity is unavailable");
+    expect(source).toContain("copy.states.ordersUnavailableTitle");
+    expect(source).toContain("copy.states.activityUnavailableTitle");
+    expect(contentSource).toContain('ordersUnavailableTitle: "Orders temporarily unavailable"');
+    expect(contentSource).toContain('activityUnavailableTitle: "Some activity is unavailable"');
     expect(source).toContain("dashboardQuery.refetch().catch(() => undefined)");
     expect(stylesSource).toContain(".feedWarning");
   });
 
   it("exposes retry, busy, and empty states for dashboard failures and empty live sections", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain(
       'const canViewDashboard = session?.user.roles.includes("Admin") ?? false;'
@@ -59,15 +66,27 @@ describe("dashboard production data handling", () => {
     expect(source).toContain(
       "const isShowingStaleDashboard = Boolean(viewModel && dashboardQuery.isError);"
     );
+    expect(source).toContain("const copy = useMemo(() => getDashboardCopy(locale), [locale]);");
     expect(source).toContain("{isShowingStaleDashboard ? (");
-    expect(source).toContain("Data may be stale");
-    expect(source).toContain("Showing the last loaded dashboard because the KPI refresh failed.");
-    expect(source).toContain('"Обновляем..."');
-    expect(source).toContain('"Refreshing..."');
+    expect(source).toContain("copy.states.staleTitle");
+    expect(source).toContain("copy.states.staleDescription");
+    expect(source).toContain("copy.states.refreshing");
+    expect(source).toContain("copy.states.retry");
     expect(source).toContain("{retryLabel}");
-    expect(source).toContain("No payments yet");
-    expect(source).toContain("No recent activity");
-    expect(source).toContain("Recent payments will appear here after the first successful purchase.");
+    expect(source).toContain("copy.states.noPaymentsTitle");
+    expect(source).toContain("copy.states.noActivityTitle");
+    expect(source).toContain("copy.states.noPaymentsDescription");
+    expect(contentSource).toContain('staleTitle: "Data may be stale"');
+    expect(contentSource).toContain(
+      'staleDescription: "Showing the last loaded dashboard because the KPI refresh failed."'
+    );
+    expect(contentSource).toContain('refreshing: "Refreshing..."');
+    expect(contentSource).toContain('retry: "Retry"');
+    expect(contentSource).toContain('noPaymentsTitle: "No payments yet"');
+    expect(contentSource).toContain('noActivityTitle: "No recent activity"');
+    expect(contentSource).toContain(
+      'noPaymentsDescription: "Recent payments will appear here after the first successful purchase."'
+    );
     expect(source).not.toContain("when the backend returns purchases");
     expect(source).not.toContain("Когда backend вернет покупки");
   });
@@ -91,6 +110,7 @@ describe("dashboard production data handling", () => {
 
   it("sources moderation queue KPI from the moderation backend, not support tickets", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("fetchAdminModerationQueue");
     expect(source).toContain("async function fetchPendingModerationQueueCount");
@@ -98,7 +118,7 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("take: 1");
     expect(source).toContain("return Math.max(0, response.totalCount);");
     expect(source).toContain("moderationQueueCount");
-    expect(source).toContain("pending moderation items");
+    expect(contentSource).toContain('moderationQueueSubtext: "pending moderation items"');
     expect(source).not.toContain("const maxPages = 20");
     expect(source).not.toContain("count += response.items.length");
     expect(source).not.toContain(
@@ -135,6 +155,7 @@ describe("dashboard production data handling", () => {
 
   it("builds dashboard role distribution from backend role totals, not sampled users", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("type DashboardUserRoleCounts = {");
     expect(source).toContain("const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts)");
@@ -142,7 +163,10 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("const moderators = Math.max(0, roleCounts.moderators)");
     expect(source).toContain("const regular = Math.max(0, roleCounts.users)");
     expect(source).toContain("const roleTotal = admins + moderators + regular");
-    expect(source).toContain('label: locale === "ru" ? "Модераторы" : "Moderators"');
+    expect(source).toContain("const copy = getDashboardCopy(locale);");
+    expect(source).toContain("copy.roleLabels.moderators");
+    expect(contentSource).toContain('moderators: "Модераторы"');
+    expect(contentSource).toContain('moderators: "Moderators"');
     expect(source).not.toContain("const userDistribution = buildUserDistribution(locale, users)");
     expect(source).not.toContain("const normalizedRoles = item.roles.map");
     expect(source).not.toContain("users.length - admins - managers");
@@ -151,11 +175,15 @@ describe("dashboard production data handling", () => {
   it("keeps dashboard currency formatting non-throwing for backend currency codes", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
     const chartSource = readFileSync(dashboardChartsPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("function isSupportedCurrencyCode(currencyCode: string)");
     expect(source).toContain("return isSupportedCurrencyCode(normalized) ? normalized : \"USD\"");
     expect(source).toContain("const safeCurrencyCode = normalizeCurrencyCode(currencyCode)");
     expect(source).toContain("sanitizeSensitiveText(safeCurrencyCode, 12)");
+    expect(source).toContain("getDashboardIntlLocale(locale)");
+    expect(source).not.toContain('locale === "ru" ? "ru-RU" : "en-US"');
+    expect(contentSource).toContain("export function getDashboardIntlLocale(locale: Locale): string");
     expect(chartSource).toContain("function normalizeChartCurrencyCode(value: string)");
     expect(chartSource).toContain("function formatChartCurrencyAmount(");
     expect(chartSource).toContain("className={styles.chartDataTable}");
@@ -249,13 +277,14 @@ describe("dashboard production data handling", () => {
 
   it("sanitizes dashboard user, support, and identifier labels before rendering", () => {
     const source = readFileSync(dashboardViewPath, "utf8");
+    const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("function formatDashboardUserLabel(");
     expect(source).toContain("return formatDashboardLabel(getAdminUserDisplayName(user), 96);");
     expect(source).toContain("function formatDashboardLabel(");
     expect(source).toContain("return sanitizeSensitiveText(value, maxLength);");
     expect(source).toContain("user ? formatDashboardUserLabel(user) : shortUserId(item.userId)");
-    expect(source).toContain("${formatDashboardUserLabel(item)} registered in the system");
+    expect(source).toContain("activityMessages.registered(formatDashboardUserLabel(item))");
     expect(source).toContain("formatDashboardLabel(item.status, 48)");
     expect(source).toContain("formatDashboardLabel(orderId, 64).replace");
     expect(source).toContain(
@@ -263,6 +292,12 @@ describe("dashboard production data handling", () => {
     );
     expect(source).toContain('return formatDashboardLabel(userId, 32).slice(0, 8) || "unknown";');
     expect(source).toContain('return compact ? `#${compact}` : "#UNKNOWN";');
+    expect(contentSource).toContain(
+      'registered: (userLabel) => `${userLabel} registered in the system`'
+    );
+    expect(contentSource).toContain(
+      'ticketUpdated: (ticketId, status) => `Updated ticket ${ticketId}: ${status}`'
+    );
     expect(source).not.toContain("user ? getAdminUserDisplayName(user) : shortUserId(item.userId)");
     expect(source).not.toContain("${getAdminUserDisplayName(item)} registered in the system");
     expect(source).not.toContain(": ${item.status}`");

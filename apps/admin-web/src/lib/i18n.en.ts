@@ -488,7 +488,7 @@ export const enDictionary: Dictionary = {
   supportSaveStatusAction: "Save status",
   supportStatusSaved: "Status updated",
   supportReplySent: "Reply sent",
-  supportAssignToMe: "Assign to me (legacy)",
+  supportAssignToMe: "Assign to me",
   supportUnassign: "Unassign",
   supportAssignmentSaved: "Assignment updated",
   supportQuickRepliesLabel: "Quick replies",

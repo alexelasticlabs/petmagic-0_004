@@ -5,6 +5,9 @@ import { describe, expect, it } from "vitest";
 const roleManagementPagePath = fileURLToPath(
   new URL("./role-management-page.tsx", import.meta.url)
 );
+const roleManagementContentPath = fileURLToPath(
+  new URL("./role-management-page.content.ts", import.meta.url)
+);
 const roleManagementStylesPath = fileURLToPath(
   new URL("./role-management-page.module.css", import.meta.url)
 );
@@ -25,14 +28,22 @@ const useUsersAdminPath = fileURLToPath(new URL("./users/use-users-admin.ts", im
 const adminShellPath = fileURLToPath(new URL("./admin-shell.tsx", import.meta.url));
 const adminSidebarPath = fileURLToPath(new URL("./admin/admin-sidebar.tsx", import.meta.url));
 const adminTopbarPath = fileURLToPath(new URL("./admin/admin-topbar.tsx", import.meta.url));
+const adminChromeContentPath = fileURLToPath(
+  new URL("./admin/admin-chrome.content.ts", import.meta.url)
+);
 const adminShellStylesPath = fileURLToPath(new URL("./admin/admin-shell.module.css", import.meta.url));
 const localeErrorPagePath = fileURLToPath(new URL("../app/[locale]/error.tsx", import.meta.url));
 
 describe("admin action hardening", () => {
   it("guards role management actions and surfaces sanitized backend errors", () => {
     const source = readFileSync(roleManagementPagePath, "utf8");
+    const contentSource = readFileSync(roleManagementContentPath, "utf8");
     const stylesSource = readFileSync(roleManagementStylesPath, "utf8");
 
+    expect(source).toContain('import {\n  getRoleManagementPageText,\n  type RoleManagementPageText,\n} from "@/components/role-management-page.content";');
+    expect(source).toContain("const text = getRoleManagementPageText(locale);");
+    expect(source).not.toContain("function getCopy(locale: Locale)");
+    expect(source).not.toContain("const isRu = locale === \"ru\";");
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("useAuthSession,");
     expect(source).toContain("const session = useAuthSession();");
@@ -44,22 +55,16 @@ describe("admin action hardening", () => {
     expect(source).toContain("enabled: canManageRoles");
     expect(source).toContain("const normalizedSearch = debouncedSearch.trim();");
     expect(source).toContain("enabled: canManageRoles && normalizedSearch.length >= 2");
-    expect(source).toContain("roleActionsAdminOnly: isRu");
-    expect(source).toContain("assignModeratorLabel: isRu");
-    expect(source).toContain("revokeModeratorLabel: isRu");
-    expect(source).toContain(
-      'searchHint: isRu\n      ? "Введите минимум 2 символа. Поиск обновится автоматически."'
-    );
-    expect(source).toContain(
-      'adminAlreadyPrivileged: isRu ? "Уже Admin" : "Already Admin"'
-    );
-    expect(source).toContain(
-      'moderatorAlreadyPrivileged: isRu ? "Уже Moderator" : "Already Moderator"'
-    );
-    expect(source).toContain('eyebrow: isRu ? "Контроль доступа" : "Access control"');
-    expect(source).toContain('adminOnly: isRu ? "Только Admin" : "Admin only"');
-    expect(source).toContain('adminsTitle: isRu ? "Администраторы" : "Admins"');
-    expect(source).toContain('moderatorsTitle: isRu ? "Модераторы" : "Moderators"');
+    expect(contentSource).toContain('roleActionsAdminOnly: "Изменять роли может только Admin."');
+    expect(contentSource).toContain('assignModeratorLabel: "Назначить Moderator пользователю"');
+    expect(contentSource).toContain('revokeModeratorLabel: "Снять Moderator у пользователя"');
+    expect(contentSource).toContain('searchHint: "Введите минимум 2 символа. Поиск обновится автоматически."');
+    expect(contentSource).toContain('adminAlreadyPrivileged: "Уже Admin"');
+    expect(contentSource).toContain('moderatorAlreadyPrivileged: "Уже Moderator"');
+    expect(contentSource).toContain('eyebrow: "Контроль доступа"');
+    expect(contentSource).toContain('adminOnly: "Только Admin"');
+    expect(contentSource).toContain('adminsTitle: "Администраторы"');
+    expect(contentSource).toContain('moderatorsTitle: "Модераторы"');
     expect(source).toContain("function assertCanManageRoles(): boolean");
     expect(source).toContain('setToast({ type: "error", message: text.roleActionsAdminOnly });');
     expect(source).toContain("useRef,");
@@ -109,12 +114,8 @@ describe("admin action hardening", () => {
     expect(source).toContain("skip: moderatorsPage * PAGE_SIZE");
     expect(source).toContain("queryKey: adminQueryKeys.usersRoot");
     expect(source).toContain("function RolePager(");
-    expect(source).toContain(
-      'previousPageLabel: isRu ? "Предыдущая страница списка ролей" : "Previous role list page"'
-    );
-    expect(source).toContain(
-      'nextPageLabel: isRu ? "Следующая страница списка ролей" : "Next role list page"'
-    );
+    expect(contentSource).toContain('previousPageLabel: "Предыдущая страница списка ролей"');
+    expect(contentSource).toContain('nextPageLabel: "Следующая страница списка ролей"');
     expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
     expect(source).toContain("aria-label={text.previousPageLabel}");
     expect(source).toContain("aria-label={text.nextPageLabel}");
@@ -155,6 +156,9 @@ describe("admin action hardening", () => {
     expect(source).toContain("sanitizeSensitiveText(getAdminUserDisplayName(user), 96)");
     expect(source).toContain("shortIdentifier(user.userId)");
     expect(source).toContain("sanitizeSensitiveText(role, 32)");
+    expect(source).toContain("text: RoleManagementPageText;");
+    expect(source).toContain("<UserRow key={user.userId} user={user} locale={locale} text={text} />");
+    expect(source).toContain("<RolePager\n                text={text}");
     expect(source).toContain(
       "const isRoleDataFetching = isRoleRetryFetching || searchQuery.isFetching;"
     );
@@ -396,6 +400,7 @@ describe("admin action hardening", () => {
     const source = readFileSync(adminShellPath, "utf8");
     const sidebarSource = readFileSync(adminSidebarPath, "utf8");
     const topbarSource = readFileSync(adminTopbarPath, "utf8");
+    const adminChromeContentSource = readFileSync(adminChromeContentPath, "utf8");
     const stylesSource = readFileSync(adminShellStylesPath, "utf8");
 
     expect(source).toContain("import { maskEmail, sanitizeSensitiveText }");
@@ -428,14 +433,18 @@ describe("admin action hardening", () => {
     expect(source).toContain("aria-hidden={isSidebarDrawerMode && sidebarOpen ? \"true\" : undefined}");
     expect(source).toContain("inert={isSidebarDrawerMode && sidebarOpen}");
     expect(topbarSource).toContain("const sidebarToggleLabel =");
-    expect(topbarSource).toContain('? "Закрыть навигацию"');
-    expect(topbarSource).toContain('? "Close navigation"');
+    expect(topbarSource).toContain("const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);");
+    expect(adminChromeContentSource).toContain('sidebarToggleLabel: (sidebarOpen) =>');
+    expect(adminChromeContentSource).toContain('sidebarOpen ? "Закрыть навигацию" : "Открыть навигацию"');
+    expect(adminChromeContentSource).toContain('sidebarOpen ? "Close navigation" : "Open navigation"');
     expect(topbarSource).toContain("aria-label={sidebarToggleLabel}");
     expect(topbarSource).toContain("title={sidebarToggleLabel}");
     expect(source).toContain("isSubmitting={isLoggingOut}");
     expect(source).toContain("if (!isLoggingOut) {\n            setLogoutDialogOpen(false);");
     expect(sidebarSource).toContain("isDrawerMode: boolean;");
-    expect(sidebarSource).toContain("const navigationLabel = locale === \"ru\" ? \"Навигация админ-панели\" : \"Admin navigation\";");
+    expect(sidebarSource).toContain("const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);");
+    expect(adminChromeContentSource).toContain('navigationLabel: "Навигация админ-панели"');
+    expect(adminChromeContentSource).toContain('navigationLabel: "Admin navigation"');
     expect(sidebarSource).toContain("aria-label={navigationLabel}");
     expect(sidebarSource).toContain("aria-hidden={isDrawerMode && !isOpen ? \"true\" : undefined}");
     expect(sidebarSource).toContain("inert={isDrawerMode && !isOpen}");
@@ -458,6 +467,7 @@ describe("admin action hardening", () => {
       "const userName = session?.user?.displayName || maskedSessionEmail;"
     );
     expect(source).not.toContain("session?.user?.displayName ||\n    maskedSessionEmail");
+    expect(sidebarSource).not.toContain('locale === "ru" ? "Навигация админ-панели" : "Admin navigation"');
   });
 
   it("uses generic copy in the route error boundary", () => {

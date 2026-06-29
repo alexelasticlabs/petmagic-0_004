@@ -86,7 +86,7 @@ export function TemplateEditor({ locale, templateType, initialTemplateId }: Temp
           title={initializationError}
           action={
             <Button type="button" variant="secondary" onClick={retryInitialization}>
-              {locale === "ru" ? "Повторить" : "Retry"}
+              {text.adminRetryAction}
             </Button>
           }
         />

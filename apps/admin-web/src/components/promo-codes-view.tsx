@@ -24,6 +24,7 @@ import { PromoCodeActivationsCard } from "@/components/promo-code-activations-ca
 import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
 import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
 import { PromoCodesListCard } from "@/components/promo-codes-list-card";
+import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import {
   buildPromoCodesCsv,
   copyTextToClipboard,
@@ -98,17 +99,15 @@ function getPromoClientErrorDetails(error: unknown) {
 
 export function PromoCodesView({ locale }: { locale: Locale }) {
   const text = useMemo(() => getDictionary(locale), [locale]);
-  const archiveActionLabel = locale === "ru" ? "Архивировать" : "Archive";
+  const promoText = useMemo(() => getPromoCodesViewText(locale), [locale]);
+  const archiveActionLabel = promoText.archiveActionLabel;
   const tokenUnit = "PawSpark";
   const router = useRouter();
   const queryClient = useQueryClient();
   const session = useAuthSession();
   const sessionRoles = session?.user.roles ?? [];
   const canManagePromoCodes = sessionRoles.includes("Admin");
-  const promoCodesAdminOnlyMessage =
-    locale === "ru"
-      ? "Управление промокодами доступно только Admin."
-      : "Promo code management is available to Admin only.";
+  const promoCodesAdminOnlyMessage = promoText.adminOnlyMessage;
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<PromoStatusFilter>("all");
@@ -136,7 +135,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
   useSyncFeedbackToAdminNotifications(feedback, {
     category: "promo",
     source: "promo-codes",
-    title: locale === "ru" ? "Промокоды" : "Promo codes",
+    title: promoText.notificationTitle,
     href: `/${locale}/promo-codes`,
   });
 
@@ -894,42 +893,34 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
       <div className={styles.kpiGrid}>
         <AdminKpiCard
-          label={locale === "ru" ? "Коды" : "Codes"}
+          label={promoText.kpiCodesLabel}
           value={formatNumber(metrics.totalCodes, locale)}
           delta={formatSevenDayDelta(metrics.createdLast7d, locale, text)}
-          hint={locale === "ru" ? "Текущий отфильтрованный список." : "Current filtered list."}
+          hint={promoText.kpiFilteredListHint}
           tone="primary"
           icon={<PromoCodeIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={locale === "ru" ? "Активные" : "Active"}
+          label={promoText.kpiActiveLabel}
           value={formatNumber(metrics.activeCodes, locale)}
           delta={formatSevenDayDelta(metrics.activeTouchedLast7d, locale, text)}
-          hint={locale === "ru" ? "Текущий отфильтрованный список." : "Current filtered list."}
+          hint={promoText.kpiFilteredListHint}
           tone="success"
           icon={<TrendUpIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={locale === "ru" ? "Использования" : "Uses"}
+          label={promoText.kpiUsesLabel}
           value={formatNumber(metrics.totalUses, locale)}
           delta={formatSevenDayDelta(metrics.usesLast7d, locale, text)}
-          hint={
-            locale === "ru"
-              ? "Итоги считаются агрегатом по всем найденным промокодам."
-              : "Totals are aggregated across all matching promo codes."
-          }
+          hint={promoText.kpiUsesHint}
           tone="info"
           icon={<UsersIcon className={styles.kpiIcon} />}
         />
         <AdminKpiCard
-          label={locale === "ru" ? "Выдано" : "Granted"}
+          label={promoText.kpiGrantedLabel}
           value={`${formatNumber(metrics.totalGranted, locale)} ${tokenUnit}`}
           delta={`${formatNumber(metrics.grantedLast7d, locale)} ${tokenUnit} ${text.promoCodesLast7DaysLabel}`}
-          hint={
-            locale === "ru"
-              ? "Экспорт CSV выгружает текущую страницу результатов."
-              : "CSV export includes the current result page."
-          }
+          hint={promoText.kpiGrantedHint}
           tone="warning"
           icon={<CalendarIcon className={styles.kpiIcon} />}
         />
@@ -938,6 +929,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       <div className={styles.workspace}>
         <PromoCodesListCard
           text={text}
+          promoText={promoText}
           locale={locale}
           nowMs={nowMs}
           search={search}
@@ -1082,7 +1074,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
             : ""
         }
         confirmLabel={archiveActionLabel}
-        cancelLabel={locale === "ru" ? "Отмена" : "Cancel"}
+        cancelLabel={promoText.archiveCancelLabel}
         isSubmitting={Boolean(codePendingArchive && busyCodeId === codePendingArchive.redeemCodeId)}
         onCancel={() => {
           if (!isMutating) {
