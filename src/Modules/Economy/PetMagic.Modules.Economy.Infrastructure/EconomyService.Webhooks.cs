@@ -261,7 +261,7 @@ public sealed partial class EconomyService
                                     ? "activated"
                                     : isInvoiceFailed
                                         ? "payment_failed"
-                                        : "cancelled",
+                                        : "canceled",
                                 parsedEvent.ObjectId,
                                 parsedEvent.CustomerId);
                         }
@@ -518,7 +518,7 @@ public sealed partial class EconomyService
             appStoreEventType,
             existingSubscription.UserId,
             subscription.Status,
-            isPremium ? "activated" : "cancelled");
+            isPremium ? "activated" : "canceled");
 
         if (isPremium)
         {
@@ -714,7 +714,7 @@ public sealed partial class EconomyService
             googlePlayEventType,
             existingSubscription.UserId,
             subscription.Status,
-            isPremium ? "activated" : "cancelled");
+            isPremium ? "activated" : "canceled");
 
         if (isPremium)
         {

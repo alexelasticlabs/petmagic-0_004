@@ -368,6 +368,35 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task ListPacksAsync_ShouldBuildStoreProductIdsFromCanonicalPackCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = Guid.NewGuid(),
+            Code = "pack100",
+            DisplayName = "Pack 100",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var result = await service.ListPacksAsync(CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var pack = Assert.Single(result.Value, x => x.Code == "pack100");
+        Assert.Equal("com.petmagic.app.tokens.google.pack100", pack.GooglePlayProductId);
+        Assert.Equal("com.petmagic.app.tokens.apple.pack100", pack.AppStoreProductId);
+    }
+
+    [Fact]
     public async Task StoreTokenPackResponses_ShouldNotExposePurchaseTokenOrTransactionId()
     {
         await using var dbContext = CreateDbContext();
@@ -1462,6 +1491,38 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("android", result.Value.Platform);
         Assert.Equal("US", result.Value.Region);
         Assert.Equal("test", result.Value.Mode);
+    }
+
+    [Fact]
+    public async Task CreatePaymentProviderConfigurationAsync_ShouldFail_WhenLegacyStripeDisclosureTextProvided()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var create = await service.CreatePaymentProviderConfigurationAsync(
+            new CreatePaymentProviderConfigurationCommand(
+                "stripe",
+                "ios",
+                "*",
+                true,
+                true,
+                true,
+                true,
+                true,
+                "0.0.0",
+                true,
+                10,
+                "Stripe Alt Billing",
+                null,
+                null,
+                "Continue to Stripe checkout to finish payment.",
+                "test",
+                "This route uses external checkout." ),
+            CancellationToken.None);
+
+        Assert.True(create.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentProviderDisclosureInvalid.Code, create.Error.Code);
+        Assert.Equal(1, await dbContext.PaymentProviderConfigurations.CountAsync());
     }
 
     [Fact]

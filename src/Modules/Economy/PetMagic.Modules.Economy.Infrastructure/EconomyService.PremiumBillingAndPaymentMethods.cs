@@ -289,7 +289,7 @@ public sealed partial class EconomyService
             {
                 await adminAuditLog.WriteAsync(
                     new AdminAuditEntry(
-                        "admin.subscription.cancelled",
+                        "admin.subscription.canceled",
                         "subscription",
                         subscription.Id.ToString("D"),
                         "active",

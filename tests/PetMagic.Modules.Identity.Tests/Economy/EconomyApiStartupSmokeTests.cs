@@ -88,8 +88,10 @@ public sealed class EconomyApiStartupSmokeTests
     [InlineData("/api/admin/economy/purchases?status=chargeback", "economy.purchase_status_invalid")]
     [InlineData("/api/admin/economy/purchases?provider=paypal", "economy.payment_provider_invalid")]
     [InlineData("/api/admin/economy/subscriptions?status=paused", "economy.subscription_status_invalid")]
+    [InlineData("/api/admin/economy/subscriptions?status=cancelled", "economy.subscription_status_invalid")]
     [InlineData("/api/admin/economy/subscriptions?provider=apple", "economy.payment_provider_invalid")]
     [InlineData("/api/admin/economy/subscription-events?status=ignored", "economy.subscription_event_status_invalid")]
+    [InlineData("/api/admin/economy/subscription-events?status=cancelled", "economy.subscription_event_status_invalid")]
     [InlineData("/api/admin/economy/subscription-events?provider=paypal", "economy.payment_provider_invalid")]
     public async Task AdminEconomyListEndpoints_ShouldRejectInvalidFiltersBeforeServiceResolution(
         string path,
@@ -141,6 +143,7 @@ public sealed class EconomyApiStartupSmokeTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Configuration["AllowedHosts"] = "*";
             builder.Services.AddProblemDetails();
             builder.Services.AddRateLimiter(options =>
             {
@@ -265,8 +268,12 @@ public sealed class EconomyApiStartupSmokeTests
                 .ToArray();
         }
 
-        public Task<HttpResponseMessage> GetAsync(string path) =>
-            app.GetTestClient().GetAsync(path);
+        public Task<HttpResponseMessage> GetAsync(string path)
+        {
+            var client = app.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
+            return client.GetAsync(path);
+        }
 
         public async ValueTask DisposeAsync()
         {

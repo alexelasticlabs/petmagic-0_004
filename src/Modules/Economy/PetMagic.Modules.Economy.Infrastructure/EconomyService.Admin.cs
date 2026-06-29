@@ -421,7 +421,7 @@ public sealed partial class EconomyService
             "trialing" => "Trialing",
             "graceperiod" or "grace_period" or "grace-period" => "GracePeriod",
             "pastdue" or "past_due" or "past-due" => "PastDue",
-            "canceled" or "cancelled" => "Canceled",
+            "canceled" => "Canceled",
             "expired" => "Expired",
             "refunded" => "Refunded",
             "revoked" => "Revoked",

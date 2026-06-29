@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 using Microsoft.AspNetCore.Builder;
@@ -21,6 +22,7 @@ public sealed class GlobalExceptionMiddlewareTests
             ApplicationName = typeof(GlobalExceptionMiddlewareTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
 
         await using var app = builder.Build();
         app.UseMiddleware<CorrelationIdMiddleware>();
@@ -36,8 +38,11 @@ public sealed class GlobalExceptionMiddlewareTests
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/boom");
         request.Headers.Add(CorrelationId.HeaderName, "global-exception-correlation");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        using var response = await app.GetTestClient().SendAsync(request);
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var response = await client.SendAsync(request);
         var rawBody = await response.Content.ReadAsStringAsync();
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
 

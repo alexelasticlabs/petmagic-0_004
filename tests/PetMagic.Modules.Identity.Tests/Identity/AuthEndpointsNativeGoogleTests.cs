@@ -262,6 +262,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Configuration["AllowedHosts"] = "*";
             builder.Services.AddProblemDetails();
             builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
@@ -286,10 +287,7 @@ public sealed class AuthEndpointsNativeGoogleTests
 
             await app.StartAsync();
             var client = app.GetTestClient();
-            if (baseAddress is not null)
-            {
-                client.BaseAddress = baseAddress;
-            }
+            client.BaseAddress = baseAddress ?? new Uri("http://localhost");
 
             return new TestApplication(app, client);
         }

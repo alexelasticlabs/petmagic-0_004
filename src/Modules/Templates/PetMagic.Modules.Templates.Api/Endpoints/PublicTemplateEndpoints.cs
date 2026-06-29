@@ -57,23 +57,16 @@ public static class PublicTemplateEndpoints
             return InvalidTemplateTypeProblem();
         }
 
-        if (page.HasValue || pageSize.HasValue)
-        {
-            var pagedResult = await service.ListPublicCatalogAsync(
-                new PublicTemplatesCatalogQuery(
-                    page,
-                    pageSize,
-                    templateType,
-                    category,
-                    ResolveLocalePreference(httpContext, locale),
-                    tags,
-                    premiumOnly),
-                cancellationToken);
-            SetPublicCatalogCacheHeaders(httpContext);
-            return TypedResults.Ok(pagedResult.Value);
-        }
-
-        var result = await service.ListPublicAsync(templateType, category, tags, premiumOnly, ResolveLocalePreference(httpContext, locale), cancellationToken);
+        var result = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(
+                page,
+                pageSize,
+                templateType,
+                category,
+                ResolveLocalePreference(httpContext, locale),
+                tags,
+                premiumOnly),
+            cancellationToken);
         SetPublicCatalogCacheHeaders(httpContext);
         return TypedResults.Ok(result.Value);
     }

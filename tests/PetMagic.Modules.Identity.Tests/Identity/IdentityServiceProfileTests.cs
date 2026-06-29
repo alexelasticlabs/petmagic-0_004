@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -351,11 +352,12 @@ public sealed partial class IdentityServiceProfileTests
                 WeeklyPremiumSpark = 250,
                 AdRewardSpark = 15,
                 AdRewardDailyLimit = 5,
-                StripeSecretKey = "test_stripe_secret_key",
-                StripeWebhookSecret = "test_webhook_secret",
+                StripeTestSecretKey = "test_stripe_secret_key",
+                StripeTestWebhookSecret = "test_webhook_secret",
                 StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
                 StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
-            }));
+            }),
+            new MemoryCache(new MemoryCacheOptions()));
     }
 
     private sealed class StubEmailTemplateRenderer : IIdentityEmailTemplateRenderer

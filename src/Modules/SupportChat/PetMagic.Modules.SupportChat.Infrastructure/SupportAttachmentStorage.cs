@@ -13,9 +13,9 @@ public sealed class SupportAttachmentStorageOptions
 
     public string LocalMediaRootPath { get; init; } = Path.Combine("wwwroot", "support-attachments");
 
-    public long MaxImageFileSizeBytes { get; init; } = 10 * 1024 * 1024;
+    public long MaxImageFileSizeBytes { get; init; } = UploadedMediaPolicies.SupportImage.MaxFileSizeBytes;
 
-    public long MaxVideoFileSizeBytes { get; init; } = 50 * 1024 * 1024;
+    public long MaxVideoFileSizeBytes { get; init; } = UploadedMediaPolicies.SupportVideoMaxFileSizeBytes;
 
     public int RetentionDays { get; init; } = 30;
 

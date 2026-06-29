@@ -1135,12 +1135,13 @@ internal sealed partial class TemplateGenerationService(
         return rawStatus?.Trim().ToLowerInvariant() switch
         {
             null or "" or "all" => query,
-            "active" or "in_progress" or "processing" => query.Where(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)),
-            "ready" or "succeeded" or "completed" => query.Where(x => x.Status == TemplateGenerationStatus.Completed),
-            "error" or "failed" => query.Where(x => x.Status == TemplateGenerationStatus.Failed),
-            "cancelled" or "canceled" => query.Where(x => x.Status == TemplateGenerationStatus.Cancelled),
+            "active" => query.Where(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)),
+            "pending" => query.Where(x => x.Status == TemplateGenerationStatus.Queued),
+            "running" => query.Where(x => x.Status == TemplateGenerationStatus.Processing),
+            "completed" => query.Where(x => x.Status == TemplateGenerationStatus.Completed),
+            "failed" => query.Where(x => x.Status == TemplateGenerationStatus.Failed),
+            "cancelled" => query.Where(x => x.Status == TemplateGenerationStatus.Cancelled),
             "retrying" => query.Where(x => x.Status == TemplateGenerationStatus.Retrying),
-            "queued" => query.Where(x => x.Status == TemplateGenerationStatus.Queued),
             "preprocessing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
                 && x.StartedAtUtc != null
                 && x.PreprocessingCompletedAtUtc == null),
@@ -1240,9 +1241,7 @@ internal sealed partial class TemplateGenerationService(
 
     internal static string ResolveApiStatus(TemplateGenerationStatus status)
     {
-        return status == TemplateGenerationStatus.Completed
-            ? TemplateGenerationStatus.Succeeded.ToString()
-            : status.ToString();
+        return status.ToString();
     }
 
     internal static string ResolveStage(TemplateGenerationJob job)
@@ -1264,7 +1263,7 @@ internal sealed partial class TemplateGenerationService(
 
         if (job.Status == TemplateGenerationStatus.Completed)
         {
-            return "succeeded";
+            return "completed";
         }
 
         if (job.Status == TemplateGenerationStatus.Queued)
@@ -1301,7 +1300,7 @@ internal sealed partial class TemplateGenerationService(
     {
         return ResolveStage(job) switch
         {
-            "succeeded" => 100,
+            "completed" => 100,
             "failed" => 100,
             "finalizing" => 90,
             "generating" => 65,

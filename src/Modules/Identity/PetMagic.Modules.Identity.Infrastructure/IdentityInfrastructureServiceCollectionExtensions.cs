@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -336,7 +337,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         {
             PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "user-avatars"),
-            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], 8 * 1024 * 1024)
+            MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], UploadedMediaPolicies.Avatar.MaxFileSizeBytes)
         };
     }
 

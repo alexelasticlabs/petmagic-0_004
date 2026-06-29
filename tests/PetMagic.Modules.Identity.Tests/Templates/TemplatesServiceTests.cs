@@ -2,6 +2,7 @@ using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Caching.Memory;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -31,6 +32,7 @@ public sealed partial class TemplatesServiceTests
         return new TemplatesService(
             dbContext,
             options,
+            new MemoryCache(new MemoryCacheOptions()),
             metadataReader,
             mediaStorage ?? new RecordingMediaStorage(),
             lifecycleService,

@@ -32,7 +32,7 @@ public sealed partial class TemplatesApiIntegrationTests
     {
         await using var application = await TestApplication.CreateAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/generations/from-pet")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/templates/generations/from-pet")
         {
             Content = JsonContent.Create(new
             {

@@ -338,7 +338,7 @@ public sealed partial class IdentityService(
             OccurredAtUtc = now
         });
 
-        return Task.CompletedTask;
+        return dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private void LogAuthInformation(string operation, Guid userId, string result)

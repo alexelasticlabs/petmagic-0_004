@@ -20,50 +20,45 @@ public static class EconomyInfrastructureServiceCollectionExtensions
         IConfiguration configuration,
         bool isProduction = false)
     {
-        var section = configuration.GetSection(EconomyOptions.SectionName);
-        var legacyStripeSecretKey = ReadValue(section, "StripeSecretKey", "STRIPE_SECRET_KEY") ?? string.Empty;
-        var legacyStripePublishableKey = ReadValue(section, "StripePublishableKey", "STRIPE_PUBLISHABLE_KEY") ?? string.Empty;
-        var legacyStripeWebhookSecret = ReadValue(section, "StripeWebhookSecret", "STRIPE_WEBHOOK_SECRET") ?? string.Empty;
+        services.AddMemoryCache();
 
+        var section = configuration.GetSection(EconomyOptions.SectionName);
         var economyOptions = new EconomyOptions
         {
             WeeklyFreeSpark = ParseInt(section["WeeklyFreeSpark"], 100),
             WeeklyPremiumSpark = ParseInt(section["WeeklyPremiumSpark"], 40),
             AdRewardSpark = ParseInt(section["AdRewardSpark"], 15),
             AdRewardDailyLimit = ParseInt(section["AdRewardDailyLimit"], 5),
-            StripeSecretKey = legacyStripeSecretKey,
-            StripePublishableKey = legacyStripePublishableKey,
             StripeTestSecretKey = ReadValue(
                 section,
                 "StripeTestSecretKey",
                 "STRIPE_TEST_SECRET_KEY",
-                "STRIPE_SECRET_KEY_TEST") ?? legacyStripeSecretKey,
+                "STRIPE_SECRET_KEY_TEST") ?? string.Empty,
             StripeTestPublishableKey = ReadValue(
                 section,
                 "StripeTestPublishableKey",
                 "STRIPE_TEST_PUBLISHABLE_KEY",
-                "STRIPE_PUBLISHABLE_KEY_TEST") ?? legacyStripePublishableKey,
+                "STRIPE_PUBLISHABLE_KEY_TEST") ?? string.Empty,
             StripeLiveSecretKey = ReadValue(
                 section,
                 "StripeLiveSecretKey",
                 "STRIPE_LIVE_SECRET_KEY",
-                "STRIPE_SECRET_KEY_LIVE") ?? legacyStripeSecretKey,
+                "STRIPE_SECRET_KEY_LIVE") ?? string.Empty,
             StripeLivePublishableKey = ReadValue(
                 section,
                 "StripeLivePublishableKey",
                 "STRIPE_LIVE_PUBLISHABLE_KEY",
-                "STRIPE_PUBLISHABLE_KEY_LIVE") ?? legacyStripePublishableKey,
-            StripeWebhookSecret = legacyStripeWebhookSecret,
+                "STRIPE_PUBLISHABLE_KEY_LIVE") ?? string.Empty,
             StripeTestWebhookSecret = ReadValue(
                 section,
                 "StripeTestWebhookSecret",
                 "STRIPE_TEST_WEBHOOK_SECRET",
-                "STRIPE_WEBHOOK_SECRET_TEST") ?? legacyStripeWebhookSecret,
+                "STRIPE_WEBHOOK_SECRET_TEST") ?? string.Empty,
             StripeLiveWebhookSecret = ReadValue(
                 section,
                 "StripeLiveWebhookSecret",
                 "STRIPE_LIVE_WEBHOOK_SECRET",
-                "STRIPE_WEBHOOK_SECRET_LIVE") ?? legacyStripeWebhookSecret,
+                "STRIPE_WEBHOOK_SECRET_LIVE") ?? string.Empty,
             StripeCheckoutSuccessUrl = ReadValue(
                 section,
                 "StripeCheckoutSuccessUrl",
@@ -196,13 +191,13 @@ public static class EconomyInfrastructureServiceCollectionExtensions
             return;
         }
 
-        var stripeSecretKey = FirstNonEmpty(options.StripeLiveSecretKey, options.StripeSecretKey);
-        var stripePublishableKey = FirstNonEmpty(options.StripeLivePublishableKey, options.StripePublishableKey);
-        var stripeWebhookSecret = FirstNonEmpty(options.StripeLiveWebhookSecret, options.StripeWebhookSecret);
+        var stripeSecretKey = options.StripeLiveSecretKey;
+        var stripePublishableKey = options.StripeLivePublishableKey;
+        var stripeWebhookSecret = options.StripeLiveWebhookSecret;
 
-        RequireProductionSecret(stripeSecretKey, "Stripe live secret key", "STRIPE_LIVE_SECRET_KEY or STRIPE_SECRET_KEY");
-        RequireProductionSecret(stripePublishableKey, "Stripe live publishable key", "STRIPE_LIVE_PUBLISHABLE_KEY or STRIPE_PUBLISHABLE_KEY");
-        RequireProductionSecret(stripeWebhookSecret, "Stripe live webhook secret", "STRIPE_LIVE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET");
+        RequireProductionSecret(stripeSecretKey, "Stripe live secret key", "STRIPE_LIVE_SECRET_KEY");
+        RequireProductionSecret(stripePublishableKey, "Stripe live publishable key", "STRIPE_LIVE_PUBLISHABLE_KEY");
+        RequireProductionSecret(stripeWebhookSecret, "Stripe live webhook secret", "STRIPE_LIVE_WEBHOOK_SECRET");
 
         if (!HasAnyPrefix(stripeSecretKey!, "sk_live_", "rk_live_"))
         {

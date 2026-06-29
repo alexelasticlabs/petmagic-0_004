@@ -207,12 +207,12 @@ internal sealed class FcmEconomyPushNotificationSender(
     {
         return status.ToLowerInvariant() switch
         {
-            "active" or "succeeded" or "success" => isRussian
+            "active" => isRussian
                 ? "Premium активирован. Возможности обновлены."
                 : "Premium is active. Your access has been updated.",
-            "canceled" or "cancelled" => isRussian
-                ? "Premium отменен. Проверить статус можно в профиле."
-                : "Premium was canceled. You can review status in Profile.",
+            "inactive" => isRussian
+                ? "Premium сейчас не активен. Проверить статус можно в профиле."
+                : "Premium is not active right now. You can review status in Profile.",
             "expired" => isRussian
                 ? "Срок Premium завершился."
                 : "Premium subscription has expired.",

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.BuildingBlocks.Images;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -43,7 +44,7 @@ public static class PetEndpoints
         group.MapDelete("/{petId:guid}/photos/{photoId:guid}", DeletePhotoAsync).RequireRateLimiting("templates");
         group.MapGet("/{petId:guid}/generations", ListGenerationsAsync).RequireRateLimiting("generation-status");
 
-        endpoints.MapPost("/api/generations/from-pet", StartFromPetAsync)
+        endpoints.MapPost("/api/templates/generations/from-pet", StartFromPetAsync)
             .WithTags("Template Generations")
             .RequireAuthorization()
             .RequireRateLimiting("generation-create");
@@ -150,11 +151,10 @@ public static class PetEndpoints
         HttpContext context,
         Guid petId,
         [FromForm] IFormFile? photo,
-        [FromServices] ITemplateMediaUploadPolicy uploadPolicy,
         [FromServices] IPetsService petsService,
         CancellationToken cancellationToken)
     {
-        var validation = await ValidatePhotoAsync(photo, uploadPolicy.GetMaxFileSizeBytes(TemplateAssetKind.Preview), cancellationToken);
+        var validation = await ValidatePhotoAsync(photo, UploadedMediaPolicies.PetPhoto.MaxFileSizeBytes, cancellationToken);
         if (validation.Count > 0)
         {
             return TypedResults.ValidationProblem(validation);

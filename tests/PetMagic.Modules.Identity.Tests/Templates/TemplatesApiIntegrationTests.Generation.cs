@@ -63,13 +63,13 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Null(queued.StartedAtUtc);
         Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
 
-        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
         Assert.NotNull(generation);
 
         Assert.Equal(TestUserId, generation!.UserId);
         Assert.Equal(created.TemplateId, generation.TemplateId);
-        Assert.Equal("Succeeded", generation.Status);
-        Assert.Equal("succeeded", generation.Stage);
+        Assert.Equal("Completed", generation.Status);
+        Assert.Equal("completed", generation.Stage);
         Assert.Equal(100, generation.ProgressPercent);
         Assert.Equal(60, generation.TokenCost);
         Assert.False(generation.UserMediaExpired);
@@ -86,7 +86,7 @@ public sealed partial class TemplatesApiIntegrationTests
             $"/api/templates/generations/{generation.GenerationId}");
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
-        Assert.Equal("Succeeded", fetched.Status);
+        Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
     }
 
@@ -130,11 +130,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Queued", queued.Status);
         Assert.Contains(queued.GenerationId, application.Billing.ChargedGenerationIds);
 
-        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
 
         Assert.Equal(TestUserId, generation.UserId);
         Assert.Equal(created.TemplateId, generation.TemplateId);
-        Assert.Equal("Succeeded", generation.Status);
+        Assert.Equal("Completed", generation.Status);
         Assert.Equal(20, generation.TokenCost);
         Assert.NotNull(generation.SourceImageAsset);
         Assert.Equal("pet.jpg", generation.SourceImageAsset!.FileName);
@@ -154,12 +154,12 @@ public sealed partial class TemplatesApiIntegrationTests
             $"/api/templates/generations/{generation.GenerationId}");
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
-        Assert.Equal("Succeeded", fetched.Status);
+        Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
     }
 
     [Fact]
-    public async Task GenerationCanonicalAliases_ShouldReturnResultDownloadShareAndRemoveWatermark()
+    public async Task GenerationCanonicalRoutes_ShouldReturnResultDownloadShareAndRemoveWatermark()
     {
         await using var application = await TestApplication.CreateAsync();
 
@@ -174,28 +174,28 @@ public sealed partial class TemplatesApiIntegrationTests
             "pet.jpg",
             "image/jpeg",
             JpegBytes());
-        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Succeeded");
+        var generation = await WaitForGenerationStatusAsync(application.Client, queued.GenerationId, "Completed");
 
         var fetched = await GetFromJsonAsync<TemplateGenerationResponse>(
             application.Client,
-            $"/api/generations/{generation.GenerationId}");
-        using var fetchedJsonResponse = await application.Client.GetAsync($"/api/generations/{generation.GenerationId}");
+            $"/api/templates/generations/{generation.GenerationId}");
+        using var fetchedJsonResponse = await application.Client.GetAsync($"/api/templates/generations/{generation.GenerationId}");
         fetchedJsonResponse.EnsureSuccessStatusCode();
         using var fetchedJson = JsonDocument.Parse(await fetchedJsonResponse.Content.ReadAsStringAsync());
         var download = await GetFromJsonAsync<GenerationDownloadResponse>(
             application.Client,
-            $"/api/generations/{generation.GenerationId}/download");
+            $"/api/templates/generations/{generation.GenerationId}/download");
         var share = await PostAsJsonAsync<GenerationDownloadResponse>(
             application.Client,
-            $"/api/generations/{generation.GenerationId}/share",
+            $"/api/templates/generations/{generation.GenerationId}/share",
             new { });
         var unlock = await PostAsJsonAsync<RemoveGenerationWatermarkResponse>(
             application.Client,
-            $"/api/generations/{generation.GenerationId}/remove-watermark",
+            $"/api/templates/generations/{generation.GenerationId}/remove-watermark",
             new { paymentMethod = "credit" });
 
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
-        Assert.Equal("Succeeded", fetched.Status);
+        Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
         Assert.Equal(fetched.OutputUrl, fetched.MediaUrl);
         Assert.Equal(fetched.OutputUrl, fetchedJson.RootElement.GetProperty("outputUrl").GetString());
@@ -206,6 +206,22 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.False(share.HasWatermark);
         Assert.True(unlock.WatermarkRemoved);
         Assert.Equal(generation.OutputUrl, unlock.MediaUrl);
+    }
+
+    [Theory]
+    [InlineData("/api/templates/generations?status=ready")]
+    [InlineData("/api/templates/generations?status=queued")]
+    [InlineData("/api/templates/generations?status=processing")]
+    [InlineData("/api/templates/generations?status=canceled")]
+    public async Task ListGenerationsAsync_ShouldRejectLegacyStatusAliases(string path)
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        using var response = await application.Client.GetAsync(path);
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("templates.invalid_status", body, StringComparison.Ordinal);
     }
 
     [Fact]

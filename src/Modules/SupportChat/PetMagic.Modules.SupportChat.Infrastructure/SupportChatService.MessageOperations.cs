@@ -11,13 +11,12 @@ public sealed partial class SupportChatService
 {
     public async Task<Result<SupportMessageResponse>> SendMessageAsync(SendSupportMessageCommand command, CancellationToken cancellationToken)
     {
-        var legacyAttachments = BuildLegacyAttachmentInputs(command);
         return await SendMessageCoreAsync(
             command.ConversationId,
             command.SenderUserId,
             command.Body,
             command.IsAdmin,
-            legacyAttachments,
+            [],
             command.ReplyToMessageId,
             command.Locale,
             cancellationToken);

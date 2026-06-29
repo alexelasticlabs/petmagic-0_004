@@ -29,7 +29,6 @@ internal sealed partial class TemplatesService(
     private const int PublicCatalogDefaultPage = 1;
     private const int PublicCatalogDefaultPageSize = 20;
     private const int PublicCatalogMaxPageSize = 100;
-    private const int PublicLegacyListMaxTake = 100;
     private const int PublicCatalogMaxDeltaChanges = 500;
     private const int PublicCategoryFilterMaxLength = 64;
     private const int PublicSearchFilterMaxLength = 120;

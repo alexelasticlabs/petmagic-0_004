@@ -1,9 +1,15 @@
+using System.Linq;
+
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Options;
+
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace PetMagic.Modules.Identity.Tests.Identity;
 
@@ -34,7 +40,12 @@ public sealed class LocalAvatarStorageTests
             Assert.EndsWith(".jpg", stored.Value.StorageKey, StringComparison.OrdinalIgnoreCase);
             Assert.NotNull(stored.Value.LocalPath);
             var bytes = await File.ReadAllBytesAsync(stored.Value.LocalPath!);
-            Assert.True(bytes.Take(3).SequenceEqual([0xFF, 0xD8, 0xFF]));
+            Assert.Equal((byte)0xFF, bytes[0]);
+            Assert.Equal((byte)0xD8, bytes[1]);
+            Assert.Equal((byte)0xFF, bytes[2]);
+            using var normalized = Image.Load(bytes);
+            Assert.Equal(1200, normalized.Width);
+            Assert.Equal(900, normalized.Height);
         }
         finally
         {
@@ -51,18 +62,21 @@ public sealed class LocalAvatarStorageTests
 
     private static byte[] PngBytes()
     {
-        return
-        [
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-            0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-            0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41,
-            0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-            0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D,
-            0x18, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-            0x44, 0xAE, 0x42, 0x60, 0x82
-        ];
+        using var image = new Image<Rgba32>(2400, 1800);
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                image[x, y] = new Rgba32(
+                    (byte)((x * 31 + y * 17) & 0xFF),
+                    (byte)((x * 13 + y * 29) & 0xFF),
+                    (byte)((x * 7 + y * 19) & 0xFF));
+            }
+        }
+
+        using var buffer = new MemoryStream();
+        image.Save(buffer, new PngEncoder());
+        return buffer.ToArray();
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment

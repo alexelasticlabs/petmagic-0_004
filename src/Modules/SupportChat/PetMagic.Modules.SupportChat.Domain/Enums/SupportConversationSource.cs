@@ -2,11 +2,9 @@ using System.Text.Json.Serialization;
 
 namespace PetMagic.Modules.SupportChat.Domain.Enums;
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(SupportConversationSourceJsonConverter))]
 public enum SupportConversationSource
 {
-    [Obsolete("Use MobileChat.")]
-    Direct = 0,
     MobileAssistant = 1,
     MobileChat = 2,
     AdminCreated = 3,

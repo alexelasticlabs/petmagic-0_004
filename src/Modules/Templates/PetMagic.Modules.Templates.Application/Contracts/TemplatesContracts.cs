@@ -195,24 +195,6 @@ public sealed record StartTemplateGenerationCommand(
     {
     }
 
-    public StartTemplateGenerationCommand(
-        Guid userId,
-        Guid templateId,
-        TemplateAssetCommand sourceImageAsset,
-        string? _legacyPlaceholder,
-        string? idempotencyKey,
-        string? requestHash,
-        int? activeGenerationLimit)
-        : this(
-            userId,
-            templateId,
-            sourceImageAsset,
-            idempotencyKey,
-            requestHash,
-            activeGenerationLimit,
-            null)
-    {
-    }
 }
 
 public sealed record StartTemplateGenerationFromResultCommand(

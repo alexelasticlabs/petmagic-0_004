@@ -72,7 +72,7 @@ public sealed partial class SupportChatService
                     message.MessageId,
                     message.SenderDisplayName,
                     message.Body,
-                    message.Attachments.Count > 0 || message.AttachmentUrl is not null,
+                    message.Attachments.Count > 0 || message.PendingAttachment is not null,
                     await supportChatDbContext.ConversationMessages.CountAsync(
                         x => x.ConversationId == conversation.Id && x.IsFromAdmin && x.ReadAtUtc == null,
                         cancellationToken)),
@@ -186,6 +186,7 @@ public sealed partial class SupportChatService
             users.TryGetValue(message.SenderUserId, out var sender);
             var resolvedSenderType = ResolveSenderDisplayType(message.SenderType, message.IsFromAdmin);
             var messageAttachments = BuildAttachmentResponses(message);
+            var pendingAttachment = BuildPendingAttachmentResponse(message, messageAttachments);
             messages.Add(new SupportMessageResponse(
                 message.Id,
                 message.ConversationId,
@@ -196,12 +197,9 @@ public sealed partial class SupportChatService
                 message.Body,
                 message.ReplyToMessageId,
                 message.ReplyToPreview,
-                message.AttachmentUrl,
-                message.AttachmentFileName,
-                message.AttachmentContentType,
-                message.AttachmentFileSizeBytes,
                 ParseAttachmentUploadStatus(message.AttachmentUploadStatus)?.ToString(),
                 message.AttachmentUploadErrorCode,
+                pendingAttachment,
                 messageAttachments,
                 message.ReadAtUtc.HasValue,
                 message.ReadAtUtc,
@@ -268,6 +266,7 @@ public sealed partial class SupportChatService
     {
         var sender = await identityUserLookupService.GetUserByIdAsync(message.SenderUserId, cancellationToken);
         var messageAttachments = BuildAttachmentResponses(message);
+        var pendingAttachment = BuildPendingAttachmentResponse(message, messageAttachments);
 
         return new SupportMessageResponse(
             message.Id,
@@ -279,12 +278,9 @@ public sealed partial class SupportChatService
             message.Body,
             message.ReplyToMessageId,
             message.ReplyToPreview,
-            message.AttachmentUrl,
-            message.AttachmentFileName,
-            message.AttachmentContentType,
-            message.AttachmentFileSizeBytes,
             ParseAttachmentUploadStatus(message.AttachmentUploadStatus)?.ToString(),
             message.AttachmentUploadErrorCode,
+            pendingAttachment,
             messageAttachments,
             message.ReadAtUtc.HasValue,
             message.ReadAtUtc,

@@ -46,6 +46,7 @@ public sealed class CorrelationIdMiddlewareTests
             ApplicationName = typeof(CorrelationIdMiddlewareTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
 
         var app = builder.Build();
         app.UseMiddleware<CorrelationIdMiddleware>();

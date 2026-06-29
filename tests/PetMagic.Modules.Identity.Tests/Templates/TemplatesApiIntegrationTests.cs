@@ -202,6 +202,7 @@ public sealed partial class TemplatesApiIntegrationTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Configuration["AllowedHosts"] = "*";
 
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
@@ -221,6 +222,7 @@ public sealed partial class TemplatesApiIntegrationTests
             });
 
             builder.Services.AddProblemDetails();
+            builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddFixedWindowLimiter("templates", limiterOptions =>
@@ -316,6 +318,7 @@ public sealed partial class TemplatesApiIntegrationTests
             await app.StartAsync();
 
             var client = app.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
 
             return new TestApplication(app, client, mediaStorage, billing);

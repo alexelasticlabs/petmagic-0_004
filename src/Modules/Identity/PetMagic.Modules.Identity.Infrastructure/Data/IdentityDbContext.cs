@@ -37,7 +37,10 @@ public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> option
             entity.Property(x => x.AvatarUrl).HasMaxLength(2048);
             entity.Property(x => x.AvatarFileName).HasMaxLength(256);
             entity.Property(x => x.AvatarContentType).HasMaxLength(128);
-            entity.Property(x => x.AccountStatus).HasConversion<int>().HasDefaultValue(AccountStatus.PendingEmailVerification);
+            entity.Property(x => x.AccountStatus)
+                .HasConversion<int>()
+                .HasSentinel((AccountStatus)0)
+                .HasDefaultValue(AccountStatus.PendingEmailVerification);
             entity.Property(x => x.AccountStatusUpdatedAtUtc);
             entity.Property(x => x.LastLoginAtUtc);
             entity.HasIndex(x => x.AccountStatus);

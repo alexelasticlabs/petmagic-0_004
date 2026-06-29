@@ -58,40 +58,9 @@ public static class TemplateGenerationEndpoints
             .RequireAuthorization()
             .RequireRateLimiting("generation-create");
 
-        endpoints.MapGet("/api/generation-results/{resultId:guid}/compatible-templates", GetCompatibleTemplatesAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("templates");
-
-        endpoints.MapPost("/api/generations/from-result", StartGenerationFromResultAsync)
-            .WithTags("Template Generations")
+        group.MapPost("/generations/{generationId:guid}/generate-similar", GenerateSimilarAsync)
             .RequireAuthorization()
             .RequireRateLimiting("generation-create");
-
-        endpoints.MapPost("/api/generations/{generationId:guid}/generate-similar", GenerateSimilarAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("generation-create");
-
-        endpoints.MapGet("/api/generations/{generationId:guid}", GetGenerationAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("generation-status");
-
-        endpoints.MapPost("/api/generations/{generationId:guid}/remove-watermark", RemoveWatermarkAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("templates");
-
-        endpoints.MapGet("/api/generations/{generationId:guid}/download", DownloadGenerationAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("templates");
-
-        endpoints.MapPost("/api/generations/{generationId:guid}/share", ShareGenerationAsync)
-            .WithTags("Template Generations")
-            .RequireAuthorization()
-            .RequireRateLimiting("templates");
 
         group.MapGet("/generations", ListGenerationsAsync)
             .RequireAuthorization()
@@ -519,6 +488,12 @@ public static class TemplateGenerationEndpoints
             return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
         }
 
+        var filterProblem = ValidateGenerationFilters(status);
+        if (filterProblem is not null)
+        {
+            return filterProblem;
+        }
+
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.ListAsync(
             userId!.Value,
@@ -574,6 +549,38 @@ public static class TemplateGenerationEndpoints
         }
 
         return TypedResults.NoContent();
+    }
+
+    private static ProblemHttpResult? ValidateGenerationFilters(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return null;
+        }
+
+        var normalized = status.Trim();
+        if (string.Equals(normalized, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return IsOneOf(
+                normalized,
+                "active",
+                "pending",
+                "running",
+                "completed",
+                "failed",
+                "cancelled",
+                "retrying",
+                "preprocessing",
+                "generating",
+                "finalizing")
+            ? null
+            : TypedResults.Problem(
+                title: "templates.invalid_status",
+                detail: "Query parameter status must be one of: active, pending, running, completed, failed, cancelled, retrying, preprocessing, generating, finalizing.",
+                statusCode: StatusCodes.Status400BadRequest);
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteGenerationAsync(
@@ -720,6 +727,11 @@ public static class TemplateGenerationEndpoints
         return string.Equals(contentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
             || string.Equals(contentType, "image/png", StringComparison.OrdinalIgnoreCase)
             || string.Equals(contentType, "image/webp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOneOf(string value, params string[] allowedValues)
+    {
+        return allowedValues.Any(allowed => string.Equals(allowed, value, StringComparison.OrdinalIgnoreCase));
     }
 
     private static int ResolveFailureStatusCode(Error error)

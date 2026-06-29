@@ -23,9 +23,6 @@ public sealed partial class SupportChatService(
     private const int DefaultConversationMessagesTake = 60;
     private const int MaxConversationMessagesTake = 120;
     private static readonly Guid AutomatedAssistantUserId = Guid.Parse("2F1E3B3B-8A2E-4A8E-9EE5-97BF31B33218");
-    private const int LegacyDirectSourceValue = 0;
-    private const int LegacyResolvedStatusValue = 2;
-    private const int LegacyWaitingForSupportStatusValue = 4;
     private static readonly Error ConversationNotFound = new("support.conversation_not_found", "Support conversation was not found.");
     private static readonly Error MessageNotFound = new("support.message_not_found", "Support message was not found.");
     private static readonly Error Forbidden = new("support.forbidden", "You do not have access to this support conversation.");
@@ -65,7 +62,7 @@ public sealed partial class SupportChatService(
             supportChatDbContext.SupportConversations.Add(conversation);
             createdConversation = true;
 
-            if (ToCanonicalSource(command.Source) == SupportConversationSource.MobileChat)
+            if (command.Source == SupportConversationSource.MobileChat)
             {
                 await AppendSystemEventAsync(
                     conversation,
@@ -188,10 +185,10 @@ public sealed partial class SupportChatService(
             var includeClosed = requestedStatuses.Contains(SupportConversationStatus.Closed);
 
             conversationsQuery = conversationsQuery.Where(x =>
-                (includeNew && (x.Status == SupportConversationStatus.New || (int)x.Status == LegacyWaitingForSupportStatusValue))
+                (includeNew && x.Status == SupportConversationStatus.New)
                 || (includeInProgress && x.Status == SupportConversationStatus.InProgress)
                 || (includeWaitingForUser && x.Status == SupportConversationStatus.WaitingForUser)
-                || (includeClosed && (x.Status == SupportConversationStatus.Closed || (int)x.Status == LegacyResolvedStatusValue)));
+                || (includeClosed && x.Status == SupportConversationStatus.Closed));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Source))
@@ -202,9 +199,7 @@ public sealed partial class SupportChatService(
             }
 
             var requestedSource = ToCanonicalSource(source);
-            conversationsQuery = requestedSource == SupportConversationSource.MobileChat
-                ? conversationsQuery.Where(x => x.Source == SupportConversationSource.MobileChat || (int)x.Source == LegacyDirectSourceValue)
-                : conversationsQuery.Where(x => x.Source == requestedSource);
+            conversationsQuery = conversationsQuery.Where(x => x.Source == requestedSource);
         }
 
         if (!string.IsNullOrWhiteSpace(query.Priority))
@@ -405,8 +400,7 @@ public sealed partial class SupportChatService(
             {
                 TotalConversations = group.Count(),
                 ClosedConversations = group.Count(x =>
-                    x.Status == SupportConversationStatus.Closed ||
-                    (int)x.Status == LegacyResolvedStatusValue),
+                    x.Status == SupportConversationStatus.Closed),
                 UnassignedConversations = group.Count(x => x.AssignedAdminId == null),
                 UnreadForAdminConversations = group.Count(x =>
                     x.Messages.Any(message => !message.IsFromAdmin && message.ReadAtUtc == null))

@@ -48,10 +48,6 @@ public sealed record SendSupportMessageCommand(
     Guid SenderUserId,
     string Body,
     bool IsAdmin,
-    string? AttachmentUrl = null,
-    string? AttachmentFileName = null,
-    string? AttachmentContentType = null,
-    long? AttachmentFileSizeBytes = null,
     Guid? ReplyToMessageId = null,
     string? Locale = null);
 
@@ -212,6 +208,11 @@ public sealed record SupportMessageAttachmentResponse(
     DateTime? ExpiresAtUtc = null,
     DateTime? DeletedAtUtc = null);
 
+public sealed record SupportMessagePendingAttachmentResponse(
+    string FileName,
+    string MimeType,
+    long? SizeBytes);
+
 public sealed record SupportMessageResponse(
     Guid MessageId,
     Guid ConversationId,
@@ -222,12 +223,9 @@ public sealed record SupportMessageResponse(
     string Body,
     Guid? ReplyToMessageId,
     string? ReplyToPreview,
-    string? AttachmentUrl,
-    string? AttachmentFileName,
-    string? AttachmentContentType,
-    long? AttachmentFileSizeBytes,
     string? AttachmentUploadStatus,
     string? AttachmentUploadErrorCode,
+    SupportMessagePendingAttachmentResponse? PendingAttachment,
     IReadOnlyList<SupportMessageAttachmentResponse> Attachments,
     bool IsRead,
     DateTime? ReadAtUtc,

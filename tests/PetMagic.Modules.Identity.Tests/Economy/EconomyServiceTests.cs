@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
@@ -78,8 +79,8 @@ public sealed partial class EconomyServiceTests
             AdRewardSpark = 15,
             AdRewardDailyLimit = 5,
             ReferralBonusSpark = 15,
-            StripeSecretKey = "test_stripe_secret_key",
-            StripeWebhookSecret = "test_webhook_secret",
+            StripeTestSecretKey = "test_stripe_secret_key",
+            StripeTestWebhookSecret = "test_webhook_secret",
             StripeCheckoutSuccessUrl = "http://localhost:3000/payments/success?session_id={CHECKOUT_SESSION_ID}",
             StripeCheckoutCancelUrl = "http://localhost:3000/payments/cancel"
         });
@@ -89,6 +90,7 @@ public sealed partial class EconomyServiceTests
             gateway ?? new FakePaymentGateway(),
             storeVerifier ?? new FakeStoreSubscriptionVerifier(),
             options,
+            new MemoryCache(new MemoryCacheOptions()),
             null,
             null,
             identityService,

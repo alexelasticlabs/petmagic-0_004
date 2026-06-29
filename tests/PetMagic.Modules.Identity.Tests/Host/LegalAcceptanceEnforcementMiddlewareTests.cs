@@ -85,6 +85,7 @@ public sealed class LegalAcceptanceEnforcementMiddlewareTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Configuration["AllowedHosts"] = "*";
             builder.Services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase(databaseName, databaseRoot));
             builder.Services
@@ -94,6 +95,7 @@ public sealed class LegalAcceptanceEnforcementMiddlewareTests
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
             builder.Services.AddAuthorization();
+            builder.Services.AddMemoryCache();
             builder.Services.AddSingleton<ILegalDocumentsCatalog>(new FakeLegalDocumentsCatalog());
 
             var app = builder.Build();
@@ -128,6 +130,7 @@ public sealed class LegalAcceptanceEnforcementMiddlewareTests
             }
 
             var client = app.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(TestAuthHandler.SchemeName);
 
             return new TestApplication(app, client);

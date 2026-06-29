@@ -579,18 +579,21 @@ public sealed class SupportChatEndpointsIntegrationTests
         var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
         Assert.False(message.IsFromAdmin);
         Assert.Equal("Screenshot of the payment error", message.Body);
-        Assert.Equal("issue.png", message.AttachmentFileName);
-        Assert.Equal("image/png", message.AttachmentContentType);
-        Assert.NotNull(message.AttachmentUrl);
         Assert.Equal("Uploaded", message.AttachmentUploadStatus);
         Assert.Null(message.AttachmentUploadErrorCode);
+        Assert.Null(message.PendingAttachment);
+        var uploadedAttachment = Assert.Single(message.Attachments);
+        Assert.Equal("issue.png", uploadedAttachment.FileName);
+        Assert.Equal("image/png", uploadedAttachment.MimeType);
+        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
             $"/api/admin/support/tickets/{created.ConversationId}");
 
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
-        Assert.Equal("issue.png", attachmentMessage.AttachmentFileName);
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
+        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
+        Assert.Equal("issue.png", conversationAttachment.FileName);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
     }
 
@@ -620,19 +623,22 @@ public sealed class SupportChatEndpointsIntegrationTests
         var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
         Assert.False(message.IsFromAdmin);
         Assert.Equal("Video of the issue", message.Body);
-        Assert.Equal("issue.mp4", message.AttachmentFileName);
-        Assert.Equal("video/mp4", message.AttachmentContentType);
-        Assert.NotNull(message.AttachmentUrl);
         Assert.Equal("Uploaded", message.AttachmentUploadStatus);
         Assert.Null(message.AttachmentUploadErrorCode);
+        Assert.Null(message.PendingAttachment);
+        var uploadedAttachment = Assert.Single(message.Attachments);
+        Assert.Equal("issue.mp4", uploadedAttachment.FileName);
+        Assert.Equal("video/mp4", uploadedAttachment.MimeType);
+        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
             $"/api/admin/support/tickets/{created.ConversationId}");
 
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
-        Assert.Equal("issue.mp4", attachmentMessage.AttachmentFileName);
-        Assert.Equal("video/mp4", attachmentMessage.AttachmentContentType);
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
+        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
+        Assert.Equal("issue.mp4", conversationAttachment.FileName);
+        Assert.Equal("video/mp4", conversationAttachment.MimeType);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
     }
 
@@ -779,18 +785,21 @@ public sealed class SupportChatEndpointsIntegrationTests
         var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
         Assert.True(message.IsFromAdmin);
         Assert.Equal("Screenshot attached", message.Body);
-        Assert.Equal("admin-screenshot.png", message.AttachmentFileName);
-        Assert.Equal("image/png", message.AttachmentContentType);
-        Assert.NotNull(message.AttachmentUrl);
         Assert.Equal("Uploaded", message.AttachmentUploadStatus);
+        Assert.Null(message.PendingAttachment);
+        var uploadedAttachment = Assert.Single(message.Attachments);
+        Assert.Equal("admin-screenshot.png", uploadedAttachment.FileName);
+        Assert.Equal("image/png", uploadedAttachment.MimeType);
+        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
             "/api/support/conversation");
 
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.AttachmentUrl is not null);
-        Assert.Equal("admin-screenshot.png", attachmentMessage.AttachmentFileName);
-        Assert.Equal("image/png", attachmentMessage.AttachmentContentType);
+        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
+        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
+        Assert.Equal("admin-screenshot.png", conversationAttachment.FileName);
+        Assert.Equal("image/png", conversationAttachment.MimeType);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
     }
 
@@ -819,7 +828,10 @@ public sealed class SupportChatEndpointsIntegrationTests
         var failedMessage = (await failedResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
         Assert.Equal("Failed", failedMessage.AttachmentUploadStatus);
         Assert.Equal("support.attachment_content_type_not_allowed", failedMessage.AttachmentUploadErrorCode);
-        Assert.Null(failedMessage.AttachmentUrl);
+        Assert.Empty(failedMessage.Attachments);
+        Assert.NotNull(failedMessage.PendingAttachment);
+        Assert.Equal("invoice.pdf", failedMessage.PendingAttachment!.FileName);
+        Assert.Equal("application/pdf", failedMessage.PendingAttachment.MimeType);
 
         using var retryForm = new MultipartFormDataContent();
         var retryContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
@@ -835,7 +847,10 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal(failedMessage.MessageId, retriedMessage.MessageId);
         Assert.Equal("Uploaded", retriedMessage.AttachmentUploadStatus);
         Assert.Null(retriedMessage.AttachmentUploadErrorCode);
-        Assert.NotNull(retriedMessage.AttachmentUrl);
+        Assert.Null(retriedMessage.PendingAttachment);
+        var retriedAttachment = Assert.Single(retriedMessage.Attachments);
+        Assert.Equal("fixed.png", retriedAttachment.FileName);
+        Assert.False(string.IsNullOrWhiteSpace(retriedAttachment.FileUrl));
     }
 
     [Theory]
@@ -1034,6 +1049,18 @@ public sealed class SupportChatEndpointsIntegrationTests
             });
 
             builder.WebHost.UseTestServer();
+            builder.Configuration["AllowedHosts"] = "*";
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AdminWeb", policy =>
+                {
+                    policy
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .SetIsOriginAllowed(_ => true)
+                        .AllowCredentials();
+                });
+            });
 
             builder.Services.AddAuthentication(SupportChatTestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, SupportChatTestAuthHandler>(SupportChatTestAuthHandler.SchemeName, _ => { });
@@ -1048,6 +1075,7 @@ public sealed class SupportChatEndpointsIntegrationTests
             });
 
             builder.Services.AddProblemDetails();
+            builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddFixedWindowLimiter("support-chat", limiterOptions =>
@@ -1080,6 +1108,7 @@ public sealed class SupportChatEndpointsIntegrationTests
 
             var app = builder.Build();
             app.UseRateLimiter();
+            app.UseCors();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapSupportChatApiModule();
@@ -1087,12 +1116,16 @@ public sealed class SupportChatEndpointsIntegrationTests
             await SeedUsersAsync(app.Services);
             await app.StartAsync();
 
-            return new SupportChatTestApplication(app, app.GetTestClient());
+            var anonymousClient = app.GetTestClient();
+            anonymousClient.BaseAddress = new Uri("http://localhost");
+
+            return new SupportChatTestApplication(app, anonymousClient);
         }
 
         public HttpClient CreateClient(Guid userId, params string[] roles)
         {
             var client = app.GetTestClient();
+            client.BaseAddress = new Uri("http://localhost");
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(SupportChatTestAuthHandler.SchemeName);
             client.DefaultRequestHeaders.Add(SupportChatTestAuthHandler.UserIdHeaderName, userId.ToString());
             if (roles.Length > 0)

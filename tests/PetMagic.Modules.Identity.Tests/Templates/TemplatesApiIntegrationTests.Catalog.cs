@@ -64,11 +64,11 @@ public sealed partial class TemplatesApiIntegrationTests
         var templateId = persistedDraftItem.TemplateId;
         Assert.Equal("Meme soundtrack", persistedDraftItem.MusicDescription);
 
-        var publicBeforeActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+        var publicBeforeActivation = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
             "/api/templates?type=Video");
 
-        Assert.Empty(publicBeforeActivation);
+        Assert.Empty(publicBeforeActivation.Items);
 
         var updated = await PutAsJsonAsync<AdminTemplateResponse>(
             application.Client,
@@ -118,12 +118,12 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Viral Dance Deluxe", listedAdminItem.Title);
         Assert.Equal("Updated soundtrack", listedAdminItem.MusicDescription);
 
-        var publicAfterActivation = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+        var publicAfterActivation = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
             "/api/templates?type=Video");
 
-        var listedPublicItem = Assert.Single(publicAfterActivation);
-        Assert.Equal(templateId, listedPublicItem.TemplateId);
+        var listedPublicItem = Assert.Single(publicAfterActivation.Items);
+        Assert.Equal(templateId, listedPublicItem.Id);
         Assert.Equal("Viral Dance Deluxe", listedPublicItem.Title);
 
         var publicDetail = await GetFromJsonAsync<PublicTemplateResponse>(
@@ -141,11 +141,11 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Contains(previewAsset.Url, application.MediaStorage.DeletedUrls);
         Assert.Contains(referenceAsset.Url, application.MediaStorage.DeletedUrls);
 
-        var publicAfterDelete = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+        var publicAfterDelete = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
             "/api/templates?type=Video");
 
-        Assert.Empty(publicAfterDelete);
+        Assert.Empty(publicAfterDelete.Items);
     }
 
     [Fact]
@@ -244,12 +244,12 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("Cozy Portrait Plus", listedAdminItem.Title);
         Assert.Null(listedAdminItem.MusicDescription);
 
-        var publicList = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+        var publicList = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
             "/api/templates?type=Image");
 
-        var listedPublicItem = Assert.Single(publicList);
-        Assert.Equal(templateId, listedPublicItem.TemplateId);
+        var listedPublicItem = Assert.Single(publicList.Items);
+        Assert.Equal(templateId, listedPublicItem.Id);
         Assert.Equal("Cozy Portrait Plus", listedPublicItem.Title);
 
         var publicDetail = await GetFromJsonAsync<PublicTemplateResponse>(
@@ -264,6 +264,59 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
         Assert.Single(application.MediaStorage.DeletedUrls);
         Assert.Contains(previewAsset.Url, application.MediaStorage.DeletedUrls);
+    }
+
+    [Fact]
+    public async Task UpdateImageEndpoint_ShouldRejectOversizedFields_InsteadOfSilentlyNormalizing()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "strict-portrait.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "portrait-image-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Strict Portrait",
+                "Validation contract template",
+                "Portrait",
+                ["strict"],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, previewAsset.FileSizeBytes, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Draft.ToString()));
+
+        using var response = await application.Client.PutAsJsonAsync(
+            $"/api/admin/templates/image/{created.TemplateId}",
+            new AdminTemplateEndpoints.UpdateImageTemplateRequest(
+                "Strict Portrait",
+                "Validation contract template",
+                "Portrait",
+                [new string('t', 33)],
+                false,
+                20,
+                TemplatePromoBadgeMode.New.ToString(),
+                new TemplateAssetCommand(previewAsset.Url, previewAsset.FileName, previewAsset.ContentType, 0, previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                new string('p', 1001),
+                TemplateStatus.Draft.ToString(),
+                [new string('r', 161)]));
+
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("ImagePrompt", body);
+        Assert.Contains("PreviewAsset.FileSizeBytes", body);
+        Assert.Contains("Tags[0]", body);
+        Assert.Contains("PetPhotoRequirements[0]", body);
     }
 
     [Fact]
@@ -371,12 +424,12 @@ public sealed partial class TemplatesApiIntegrationTests
 
         application.Client.DefaultRequestHeaders.Authorization = null;
 
-        var catalog = await GetFromJsonAsync<IReadOnlyList<PublicTemplateListItemResponse>>(
+        var catalog = await GetFromJsonAsync<PublicTemplatesCatalogPageResponse>(
             application.Client,
             "/api/templates/?type=Image&category=LegacySlash");
 
-        var item = Assert.Single(catalog);
-        Assert.Equal(created.TemplateId, item.TemplateId);
+        var item = Assert.Single(catalog.Items);
+        Assert.Equal(created.TemplateId, item.Id);
     }
 
     [Fact]

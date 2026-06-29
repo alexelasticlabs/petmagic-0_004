@@ -538,17 +538,6 @@ public sealed partial class EconomyService
         return normalizedCode[..Math.Min(normalizedCode.Length, 4)];
     }
 
-    // Treat legacy/sentinel values as "no window" to avoid false inactive/expired checks.
-    private static DateTime? NormalizeOptionalUtcBoundary(DateTime? value)
-    {
-        if (!value.HasValue)
-        {
-            return null;
-        }
-
-        return value.Value <= DateTime.UnixEpoch ? null : value.Value;
-    }
-
     private async Task<List<PaywallPaymentMethodResponse>> BuildAvailablePaymentMethodsAsync(
         GetPaywallConfigQuery query,
         CancellationToken cancellationToken)
@@ -608,18 +597,13 @@ public sealed partial class EconomyService
         string region,
         string purchaseChannel)
     {
-        var warningTitle = config.WarningTitle;
-        var warningMessage = config.WarningMessage;
-        var notes = config.Notes;
-
         if (string.Equals(config.Provider, "stripe", StringComparison.OrdinalIgnoreCase))
         {
-            (warningTitle, warningMessage, notes) = NormalizeStripeDisclosures(
+            return ToStripePaywallPaymentMethodResponse(
+                config,
                 platform,
                 region,
-                warningTitle,
-                warningMessage,
-                notes);
+                purchaseChannel);
         }
 
         return new PaywallPaymentMethodResponse(
@@ -635,51 +619,57 @@ public sealed partial class EconomyService
             config.BonusTokensPercent,
             config.DisplayLabel,
             config.DisplaySubtitle,
-            warningTitle,
-            warningMessage,
-            notes);
+            config.WarningTitle,
+            config.WarningMessage,
+            config.Notes);
     }
 
-    private static (string? WarningTitle, string? WarningMessage, string? Notes) NormalizeStripeDisclosures(
+    private static PaywallPaymentMethodResponse ToStripePaywallPaymentMethodResponse(
+        PaymentProviderConfiguration config,
         string platform,
         string region,
-        string? warningTitle,
-        string? warningMessage,
-        string? notes)
+        string purchaseChannel)
     {
-        var title = warningTitle;
-        var message = warningMessage;
-        var note = notes;
-
-        var warningText = warningMessage ?? string.Empty;
-        var noteText = notes ?? string.Empty;
-        var hasLegacyRedirectText =
-            warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
-            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase)
-            || noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
-
+        var title = config.WarningTitle;
+        var message = config.WarningMessage;
+        var note = config.Notes;
+        var isEuRegion = string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase)
+            || EconomyPaymentProviderPolicy.IsEuRegion(region);
         if (string.IsNullOrWhiteSpace(title))
         {
             title = "Pay with Stripe";
         }
 
-        var isEuRegion = string.Equals(region, "EU", StringComparison.OrdinalIgnoreCase)
-            || EconomyPaymentProviderPolicy.IsEuRegion(region);
-        if (string.IsNullOrWhiteSpace(message) || hasLegacyRedirectText)
+        if (string.IsNullOrWhiteSpace(message))
         {
             message = isEuRegion
                 ? "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Provider terms and support may differ from App Store or Google Play."
                 : "Stripe billing is completed inside PetMagic with native payment sheet (Card / Apple Pay / Google Pay). Your payment details are processed securely by Stripe.";
         }
 
-        if (string.IsNullOrWhiteSpace(note) || hasLegacyRedirectText)
+        if (string.IsNullOrWhiteSpace(note))
         {
             note = string.Equals(platform, "ios", StringComparison.OrdinalIgnoreCase)
                 ? "Subscription renewal and cancellation are available in PetMagic subscription management."
                 : "You can manage renewal and cancellation in PetMagic subscription management.";
         }
 
-        return (title, message, note);
+        return new PaywallPaymentMethodResponse(
+            config.Provider,
+            purchaseChannel,
+            platform,
+            region,
+            config.IsEnabled,
+            config.IsSelectedByDefault,
+            config.RequiresExternalWarning,
+            config.RequiresStoreDisclosure,
+            config.IsRecommended,
+            config.BonusTokensPercent,
+            config.DisplayLabel,
+            config.DisplaySubtitle,
+            title,
+            message,
+            note);
     }
 
     private static List<PaywallPaymentMethodResponse> SortPaymentMethods(IEnumerable<PaywallPaymentMethodResponse> methods)

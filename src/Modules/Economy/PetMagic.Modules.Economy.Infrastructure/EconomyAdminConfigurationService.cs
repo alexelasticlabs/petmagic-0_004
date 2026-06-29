@@ -82,6 +82,14 @@ internal sealed class EconomyAdminConfigurationService(
         var provider = command.Provider.Trim().ToLowerInvariant();
         var platform = EconomyPaymentProviderPolicy.NormalizePlatform(command.Platform);
         var region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
+        var warningTitle = NullIfWhiteSpace(command.WarningTitle);
+        var warningMessage = NullIfWhiteSpace(command.WarningMessage);
+        var notes = NullIfWhiteSpace(command.Notes);
+
+        if (HasLegacyPaymentProviderDisclosureText(warningMessage, notes))
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderDisclosureInvalid);
+        }
 
         var exists = await dbContext.PaymentProviderConfigurations
             .AsNoTracking()
@@ -113,10 +121,10 @@ internal sealed class EconomyAdminConfigurationService(
             BonusTokensPercent = command.BonusTokensPercent,
             DisplayLabel = NullIfWhiteSpace(command.DisplayLabel),
             DisplaySubtitle = NullIfWhiteSpace(command.DisplaySubtitle),
-            WarningTitle = NullIfWhiteSpace(command.WarningTitle),
-            WarningMessage = NullIfWhiteSpace(command.WarningMessage),
+            WarningTitle = warningTitle,
+            WarningMessage = warningMessage,
             Mode = EconomyPaymentProviderPolicy.NormalizeMode(command.Mode),
-            Notes = NullIfWhiteSpace(command.Notes),
+            Notes = notes,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -351,6 +359,15 @@ internal sealed class EconomyAdminConfigurationService(
             return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderConfigurationNotFound);
         }
 
+        var warningTitle = NullIfWhiteSpace(command.WarningTitle);
+        var warningMessage = NullIfWhiteSpace(command.WarningMessage);
+        var notes = NullIfWhiteSpace(command.Notes);
+
+        if (HasLegacyPaymentProviderDisclosureText(warningMessage, notes))
+        {
+            return Result.Failure<AdminPaymentProviderConfigurationResponse>(EconomyErrors.PaymentProviderDisclosureInvalid);
+        }
+
         configuration.Region = EconomyPaymentProviderPolicy.NormalizeConfigRegion(command.Region);
         configuration.IsEnabled = command.IsEnabled;
         configuration.IsRecommended = command.IsRecommended;
@@ -362,10 +379,10 @@ internal sealed class EconomyAdminConfigurationService(
         configuration.BonusTokensPercent = command.BonusTokensPercent;
         configuration.DisplayLabel = NullIfWhiteSpace(command.DisplayLabel);
         configuration.DisplaySubtitle = NullIfWhiteSpace(command.DisplaySubtitle);
-        configuration.WarningTitle = NullIfWhiteSpace(command.WarningTitle);
-        configuration.WarningMessage = NullIfWhiteSpace(command.WarningMessage);
+        configuration.WarningTitle = warningTitle;
+        configuration.WarningMessage = warningMessage;
         configuration.Mode = command.Mode.Trim().ToLowerInvariant();
-        configuration.Notes = NullIfWhiteSpace(command.Notes);
+        configuration.Notes = notes;
         configuration.UpdatedAtUtc = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -383,9 +400,9 @@ internal sealed class EconomyAdminConfigurationService(
         var normalizedMode = mode is null ? null : EconomyPaymentProviderPolicy.NormalizeMode(mode);
         return normalizedMode switch
         {
-            "live" => FirstNonEmpty(options.Value.StripeLiveSecretKey, options.Value.StripeSecretKey),
-            "test" => FirstNonEmpty(options.Value.StripeTestSecretKey, options.Value.StripeSecretKey),
-            _ => FirstNonEmpty(options.Value.StripeSecretKey, options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
+            "live" => FirstNonEmpty(options.Value.StripeLiveSecretKey),
+            "test" => FirstNonEmpty(options.Value.StripeTestSecretKey),
+            _ => FirstNonEmpty(options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
         };
     }
 
@@ -431,6 +448,16 @@ internal sealed class EconomyAdminConfigurationService(
     private static string? NullIfWhiteSpace(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static bool HasLegacyPaymentProviderDisclosureText(string? warningMessage, string? notes)
+    {
+        var warningText = warningMessage ?? string.Empty;
+        var noteText = notes ?? string.Empty;
+
+        return warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase)
+            || noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? FirstNonEmpty(params string?[] candidates)

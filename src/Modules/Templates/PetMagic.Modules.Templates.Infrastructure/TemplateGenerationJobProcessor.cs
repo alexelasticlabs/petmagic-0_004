@@ -531,7 +531,7 @@ internal sealed class TemplateGenerationJobProcessor(
             TemplateType.Image,
             resultPreview,
             watermarkedPreview);
-        job.Status = TemplateGenerationStatus.Succeeded;
+        job.Status = TemplateGenerationStatus.Completed;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
         if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
@@ -660,7 +660,7 @@ internal sealed class TemplateGenerationJobProcessor(
         job.ResultUrl = storedOutput.Value.StorageKey;
         job.MediaImportCompletedAtUtc = DateTime.UtcNow;
         RegisterGenerationOutputMediaRecord(job, storedOutput.Value, TemplateType.Video, null, null);
-        job.Status = TemplateGenerationStatus.Succeeded;
+        job.Status = TemplateGenerationStatus.Completed;
         job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
         job.CompletedAtUtc = job.UpdatedAtUtc;
         if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
@@ -895,7 +895,7 @@ internal sealed class TemplateGenerationJobProcessor(
     {
         var response = TemplateGenerationService.MapResponse(job);
         await realtimeService.PublishGenerationStatusChangedAsync(response, cancellationToken);
-        if (job.Status is TemplateGenerationStatus.Succeeded or TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
+        if (job.Status is TemplateGenerationStatus.Completed or TemplateGenerationStatus.Failed)
         {
             await pushNotificationSender.NotifyGenerationTerminalAsync(response, cancellationToken);
         }

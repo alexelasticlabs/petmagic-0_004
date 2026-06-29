@@ -535,8 +535,8 @@ public sealed class GamificationService(
 
         var maxEvolutionStage = await dbContext.PetProgresses
             .Where(x => x.UserId == userId)
-            .Select(x => x.Level)
-            .MaxAsync(cancellationToken);
+            .Select(x => (int?)x.Level)
+            .MaxAsync(cancellationToken) ?? 0;
 
         return new UserProgressCounters
         {

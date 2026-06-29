@@ -797,11 +797,6 @@ public sealed class StripePaymentGateway(
             return apiKey;
         }
 
-        if (!string.IsNullOrWhiteSpace(options.StripeSecretKey))
-        {
-            return options.StripeSecretKey;
-        }
-
         if (!string.IsNullOrWhiteSpace(options.StripeLiveSecretKey))
         {
             return options.StripeLiveSecretKey;

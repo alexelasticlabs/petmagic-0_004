@@ -197,6 +197,8 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasIndex("WaitingSinceUtc");
 
+                    b.HasIndex("Status", "UpdatedAtUtc");
+
                     b.HasIndex("AssignedAdminId", "Status", "UpdatedAtUtc")
                         .HasDatabaseName("IX_support_conversations_AssignedAdminId_Status_UpdatedAtUtc");
 
@@ -205,8 +207,6 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
 
                     b.HasIndex("Status", "Priority", "UpdatedAtUtc")
                         .HasDatabaseName("IX_support_conversations_Status_Priority_UpdatedAtUtc");
-
-                    b.HasIndex("Status", "UpdatedAtUtc");
 
                     b.ToTable("support_conversations", (string)null);
                 });

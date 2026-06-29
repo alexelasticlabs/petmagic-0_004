@@ -7,7 +7,7 @@ namespace PetMagic.Modules.Identity.Tests.Templates;
 public sealed class TemplatesValidatorsTests
 {
     [Fact]
-    public void UpdateImageTemplateValidator_ShouldAllowLegacyPromptAndUnknownPreviewFileSize()
+    public void UpdateImageTemplateValidator_ShouldRejectOversizedFields_AndZeroPreviewFileSize()
     {
         var validator = new UpdateImageTemplateCommandValidator();
 
@@ -17,7 +17,7 @@ public sealed class TemplatesValidatorsTests
                 "Portrait",
                 "A portrait template",
                 "Portrait",
-                ["pet"],
+                [new string('t', 33)],
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
@@ -30,10 +30,14 @@ public sealed class TemplatesValidatorsTests
                 "openai/gpt-image-2/edit",
                 new string('x', 20_000),
                 TemplateStatus.Draft.ToString(),
-                ["Clear face"],
+                [new string('r', 161)],
                 false,
                 "Image"));
 
-        Assert.True(result.IsValid);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "PreviewAsset.FileSizeBytes");
+        Assert.Contains(result.Errors, error => error.PropertyName == "ImagePrompt");
+        Assert.Contains(result.Errors, error => error.PropertyName == "PetPhotoRequirements[0]");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Tags[0]");
     }
 }

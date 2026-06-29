@@ -115,7 +115,7 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
-    public async Task SendMessageAsync_WithAttachment_ShouldPersistAttachmentMetadata()
+    public async Task SendMessageWithAttachmentsAsync_WithAttachment_ShouldPersistAttachmentMetadata()
     {
         var store = CreateStore();
 
@@ -134,23 +134,28 @@ public sealed class SupportChatServiceTests
         const string attachmentUrl = "http://localhost:5000/support-attachments/2026/05/test-image.png";
 
         await using var sendScope = await store.CreateScopeAsync();
-        var sendResult = await sendScope.CreateService().SendMessageAsync(
-            new SendSupportMessageCommand(
+        var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+            new SendSupportAttachmentsCommand(
                 conversationId,
                 userId,
                 "Screenshot from the broken screen",
                 false,
-                attachmentUrl,
-                "broken-screen.png",
-                "image/png",
-                2048),
+                [
+                    new SupportMessageAttachmentInput(
+                        attachmentUrl,
+                        "image/png",
+                        "broken-screen.png",
+                        2048)
+                ]),
             CancellationToken.None);
 
         Assert.True(sendResult.IsSuccess);
-        Assert.Equal(attachmentUrl, sendResult.Value.AttachmentUrl);
-        Assert.Equal("broken-screen.png", sendResult.Value.AttachmentFileName);
-        Assert.Equal("image/png", sendResult.Value.AttachmentContentType);
-        Assert.Equal(2048, sendResult.Value.AttachmentFileSizeBytes);
+        Assert.Null(sendResult.Value.PendingAttachment);
+        var attachment = Assert.Single(sendResult.Value.Attachments);
+        Assert.Equal(attachmentUrl, attachment.FileUrl);
+        Assert.Equal("broken-screen.png", attachment.FileName);
+        Assert.Equal("image/png", attachment.MimeType);
+        Assert.Equal(2048, attachment.SizeBytes);
     }
 
     [Fact]
@@ -397,6 +402,56 @@ public sealed class SupportChatServiceTests
         Assert.True(highOnly.IsSuccess);
         var highItem = Assert.Single(highOnly.Value.Items);
         Assert.Equal(highConversationId, highItem.ConversationId);
+    }
+
+    [Fact]
+    public async Task ListAdminInboxAsync_ShouldRejectLegacyStatusAndSourceAliases()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "legacy@petmagic.test", "Legacy User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+
+        Guid conversationId;
+
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var service = openScope.CreateService();
+            conversationId = (await service.OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Legacy alias case", SupportConversationPriority.Normal),
+                CancellationToken.None)).Value.ConversationId;
+        }
+
+        await using (var closeScope = await store.CreateScopeAsync())
+        {
+            var closeResult = await closeScope.CreateService().UpdateConversationStatusAsync(
+                new UpdateSupportConversationStatusCommand(conversationId, adminId, SupportConversationStatus.Closed),
+                CancellationToken.None);
+
+            Assert.True(closeResult.IsSuccess);
+        }
+
+        await using var verificationScope = await store.CreateScopeAsync();
+        var serviceForVerification = verificationScope.CreateService();
+
+        var byLegacyStatus = await serviceForVerification.ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Statuses: ["Resolved"]),
+            CancellationToken.None);
+
+        var byLegacySource = await serviceForVerification.ListAdminInboxAsync(
+            new ListAdminSupportInboxQuery(
+                null,
+                Source: "Direct"),
+            CancellationToken.None);
+
+        Assert.True(byLegacyStatus.IsFailure);
+        Assert.Equal("support.status_invalid", byLegacyStatus.Error.Code);
+        Assert.True(byLegacySource.IsFailure);
+        Assert.Equal("support.source_invalid", byLegacySource.Error.Code);
     }
 
     [Theory]

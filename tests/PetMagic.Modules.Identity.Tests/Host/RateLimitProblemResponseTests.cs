@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Threading.RateLimiting;
 
@@ -25,6 +26,7 @@ public sealed class RateLimitProblemResponseTests
             ApplicationName = typeof(RateLimitProblemResponseTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
         builder.Services.AddRateLimiter(options =>
         {
             options.OnRejected = RateLimitProblemResponse.WriteAsync;
@@ -47,12 +49,15 @@ public sealed class RateLimitProblemResponseTests
 
         using var firstRequest = new HttpRequestMessage(HttpMethod.Get, "/limited");
         firstRequest.Headers.Add(CorrelationId.HeaderName, "warmup-correlation");
-        using var firstResponse = await app.GetTestClient().SendAsync(firstRequest);
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var firstResponse = await client.SendAsync(firstRequest);
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/limited");
         request.Headers.Add(CorrelationId.HeaderName, "rate-limit-correlation");
-        using var response = await app.GetTestClient().SendAsync(request);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        using var response = await client.SendAsync(request);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
@@ -75,6 +80,7 @@ public sealed class RateLimitProblemResponseTests
             ApplicationName = typeof(RateLimitProblemResponseTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
         builder.Services.AddRateLimiter(options =>
         {
             options.OnRejected = RateLimitProblemResponse.WriteAsync;
@@ -90,14 +96,19 @@ public sealed class RateLimitProblemResponseTests
         });
 
         await using var app = builder.Build();
+        app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseRateLimiter();
         app.MapGet("/limited", () => Results.Ok()).RequireRateLimiting("limited");
         await app.StartAsync();
 
-        using var firstResponse = await app.GetTestClient().GetAsync("/limited");
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var firstResponse = await client.GetAsync("/limited");
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
 
-        using var response = await app.GetTestClient().GetAsync("/limited");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/limited");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        using var response = await client.SendAsync(request);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);

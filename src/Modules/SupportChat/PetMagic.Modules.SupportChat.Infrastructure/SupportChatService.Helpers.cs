@@ -9,26 +9,6 @@ namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 public sealed partial class SupportChatService
 {
-    private static IReadOnlyList<SupportMessageAttachmentInput> BuildLegacyAttachmentInputs(SendSupportMessageCommand command)
-    {
-        if (string.IsNullOrWhiteSpace(command.AttachmentUrl)
-            || string.IsNullOrWhiteSpace(command.AttachmentFileName)
-            || string.IsNullOrWhiteSpace(command.AttachmentContentType)
-            || command.AttachmentFileSizeBytes is null or <= 0)
-        {
-            return [];
-        }
-
-        return
-        [
-            new SupportMessageAttachmentInput(
-                command.AttachmentUrl,
-                command.AttachmentContentType,
-                command.AttachmentFileName,
-                command.AttachmentFileSizeBytes.Value)
-        ];
-    }
-
     private static IReadOnlyList<SupportMessageAttachmentInput> NormalizeAttachmentInputs(
         IReadOnlyList<SupportMessageAttachmentInput>? attachments)
     {
@@ -116,6 +96,23 @@ public sealed partial class SupportChatService
         ];
     }
 
+    private static SupportMessagePendingAttachmentResponse? BuildPendingAttachmentResponse(
+        ConversationMessage message,
+        IReadOnlyList<SupportMessageAttachmentResponse> attachments)
+    {
+        if (attachments.Count > 0
+            || string.IsNullOrWhiteSpace(message.AttachmentFileName)
+            || string.IsNullOrWhiteSpace(message.AttachmentContentType))
+        {
+            return null;
+        }
+
+        return new SupportMessagePendingAttachmentResponse(
+            message.AttachmentFileName,
+            message.AttachmentContentType,
+            message.AttachmentFileSizeBytes);
+    }
+
     private static string ResolveAttachmentType(string mimeType)
     {
         if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
@@ -178,11 +175,6 @@ public sealed partial class SupportChatService
     private static bool ShouldReactivateConversationForUserMessage(SupportConversation conversation, DateTime now)
     {
         return ToCanonicalStatus(conversation.Status, conversation.AssignedAdminId) == SupportConversationStatus.Closed;
-    }
-
-    private static void MarkResolved(SupportConversation conversation, DateTime now)
-    {
-        MarkClosed(conversation, now, closedByUserId: null);
     }
 
     private static void MarkClosed(SupportConversation conversation, DateTime now, Guid? closedByUserId)
@@ -309,29 +301,26 @@ public sealed partial class SupportChatService
         SupportConversationStatus status,
         Guid? assignedAdminId = null)
     {
-        return (int)status switch
+        _ = assignedAdminId;
+
+        return status switch
         {
-            LegacyResolvedStatusValue => SupportConversationStatus.Closed,
-            LegacyWaitingForSupportStatusValue => assignedAdminId.HasValue
-                ? SupportConversationStatus.InProgress
-                : SupportConversationStatus.New,
-            (int)SupportConversationStatus.New => SupportConversationStatus.New,
-            (int)SupportConversationStatus.InProgress => SupportConversationStatus.InProgress,
-            (int)SupportConversationStatus.Closed => SupportConversationStatus.Closed,
-            (int)SupportConversationStatus.WaitingForUser => SupportConversationStatus.WaitingForUser,
+            SupportConversationStatus.New => SupportConversationStatus.New,
+            SupportConversationStatus.InProgress => SupportConversationStatus.InProgress,
+            SupportConversationStatus.Closed => SupportConversationStatus.Closed,
+            SupportConversationStatus.WaitingForUser => SupportConversationStatus.WaitingForUser,
             _ => SupportConversationStatus.New
         };
     }
 
     private static SupportConversationSource ToCanonicalSource(SupportConversationSource source)
     {
-        return (int)source switch
+        return source switch
         {
-            LegacyDirectSourceValue => SupportConversationSource.MobileChat,
-            (int)SupportConversationSource.MobileAssistant => SupportConversationSource.MobileAssistant,
-            (int)SupportConversationSource.MobileChat => SupportConversationSource.MobileChat,
-            (int)SupportConversationSource.AdminCreated => SupportConversationSource.AdminCreated,
-            (int)SupportConversationSource.System => SupportConversationSource.System,
+            SupportConversationSource.MobileAssistant => SupportConversationSource.MobileAssistant,
+            SupportConversationSource.MobileChat => SupportConversationSource.MobileChat,
+            SupportConversationSource.AdminCreated => SupportConversationSource.AdminCreated,
+            SupportConversationSource.System => SupportConversationSource.System,
             _ => SupportConversationSource.MobileChat
         };
     }

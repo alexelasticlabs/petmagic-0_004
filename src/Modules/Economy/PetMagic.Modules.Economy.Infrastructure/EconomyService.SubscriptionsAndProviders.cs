@@ -628,9 +628,9 @@ public sealed partial class EconomyService
         var normalizedMode = mode is null ? null : EconomyPaymentProviderPolicy.NormalizeMode(mode);
         return normalizedMode switch
         {
-            "live" => FirstNonEmpty(options.Value.StripeLiveSecretKey, options.Value.StripeSecretKey),
-            "test" => FirstNonEmpty(options.Value.StripeTestSecretKey, options.Value.StripeSecretKey),
-            _ => FirstNonEmpty(options.Value.StripeSecretKey, options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
+            "live" => FirstNonEmpty(options.Value.StripeLiveSecretKey),
+            "test" => FirstNonEmpty(options.Value.StripeTestSecretKey),
+            _ => FirstNonEmpty(options.Value.StripeLiveSecretKey, options.Value.StripeTestSecretKey)
         };
     }
 
@@ -639,9 +639,9 @@ public sealed partial class EconomyService
         var normalizedMode = mode is null ? null : EconomyPaymentProviderPolicy.NormalizeMode(mode);
         return normalizedMode switch
         {
-            "live" => FirstNonEmpty(options.Value.StripeLivePublishableKey, options.Value.StripePublishableKey),
-            "test" => FirstNonEmpty(options.Value.StripeTestPublishableKey, options.Value.StripePublishableKey),
-            _ => FirstNonEmpty(options.Value.StripePublishableKey, options.Value.StripeLivePublishableKey, options.Value.StripeTestPublishableKey)
+            "live" => FirstNonEmpty(options.Value.StripeLivePublishableKey),
+            "test" => FirstNonEmpty(options.Value.StripeTestPublishableKey),
+            _ => FirstNonEmpty(options.Value.StripeLivePublishableKey, options.Value.StripeTestPublishableKey)
         };
     }
 
@@ -653,7 +653,6 @@ public sealed partial class EconomyService
     private IReadOnlyList<string> ResolveStripeWebhookSecrets()
     {
         var secrets = new List<string>();
-        AppendIfNotEmpty(secrets, options.Value.StripeWebhookSecret);
         AppendIfNotEmpty(secrets, options.Value.StripeLiveWebhookSecret);
         AppendIfNotEmpty(secrets, options.Value.StripeTestWebhookSecret);
         return secrets;

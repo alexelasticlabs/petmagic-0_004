@@ -297,6 +297,20 @@ public static class AdminTemplateEndpoints
         return null;
     }
 
+    private static ProblemHttpResult? ValidateGenerationFilters(string? status)
+    {
+        if (IsNeutralFilter(status))
+        {
+            return null;
+        }
+
+        return IsOneOf(status, "pending", "running", "completed", "failed", "cancelled", "retrying")
+            ? null
+            : InvalidCatalogFilterProblem(
+                "templates.invalid_status",
+                "Query parameter status must be one of: pending, running, completed, failed, cancelled, retrying.");
+    }
+
     private static ProblemHttpResult InvalidCatalogFilterProblem(string title, string detail)
     {
         return TypedResults.Problem(
@@ -379,7 +393,7 @@ public static class AdminTemplateEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminTemplateGenerationListPageResponse>> ListGenerationsAsync(
+    private static async Task<Results<Ok<AdminTemplateGenerationListPageResponse>, ProblemHttpResult>> ListGenerationsAsync(
         [FromQuery] string? status,
         [FromQuery] string? provider,
         [FromQuery] string? user,
@@ -389,6 +403,12 @@ public static class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var filterProblem = ValidateGenerationFilters(status);
+        if (filterProblem is not null)
+        {
+            return filterProblem;
+        }
+
         var result = await service.ListAdminGenerationsAsync(
             new AdminTemplateGenerationsQuery(status, provider, user, search, skip, take),
             cancellationToken);

@@ -138,7 +138,7 @@ public sealed partial class EconomyServiceTests
                 PurchaseChannel = "web",
                 Region = "US",
                 PlanId = "monthly",
-                Status = "cancelled",
+                Status = "Canceled",
                 CurrentPeriodStartUtc = now.AddDays(-10),
                 CurrentPeriodEndUtc = now.AddDays(-1),
                 CancelAtPeriodEnd = true,

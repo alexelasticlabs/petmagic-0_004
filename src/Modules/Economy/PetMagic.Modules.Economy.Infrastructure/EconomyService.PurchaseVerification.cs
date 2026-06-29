@@ -629,12 +629,6 @@ public sealed partial class EconomyService
             return string.Empty;
         }
 
-        // Keep backward compatibility: when code already looks like an IAP SKU, use it as-is.
-        if (code.Contains('.', StringComparison.Ordinal))
-        {
-            return code.ToLowerInvariant();
-        }
-
         var bundleId = options.Value.AppStoreBundleId?.Trim();
         if (string.IsNullOrWhiteSpace(bundleId))
         {

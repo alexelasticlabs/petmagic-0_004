@@ -190,4 +190,59 @@ public sealed class EconomyValidatorsTests
 
         Assert.True(result.IsValid);
     }
+
+    [Fact]
+    public void CreatePaymentProviderConfigurationValidator_ShouldFail_WhenLegacyStripeDisclosureTextProvided()
+    {
+        var validator = new CreatePaymentProviderConfigurationCommandValidator();
+        var result = validator.Validate(new CreatePaymentProviderConfigurationCommand(
+            "stripe",
+            "ios",
+            "*",
+            true,
+            true,
+            true,
+            true,
+            true,
+            "0.0.0",
+            true,
+            10,
+            "Stripe Alt Billing",
+            null,
+            null,
+            "Continue to Stripe checkout to finish payment.",
+            "test",
+            "This route uses external checkout."));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "WarningMessage");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Notes");
+    }
+
+    [Fact]
+    public void UpdatePaymentProviderConfigurationValidator_ShouldFail_WhenLegacyStripeDisclosureTextProvided()
+    {
+        var validator = new UpdatePaymentProviderConfigurationCommandValidator();
+        var result = validator.Validate(new UpdatePaymentProviderConfigurationCommand(
+            Guid.NewGuid(),
+            "*",
+            true,
+            true,
+            true,
+            true,
+            true,
+            "0.0.0",
+            true,
+            10,
+            "Stripe Alt Billing",
+            null,
+            null,
+            "Continue to Stripe checkout to finish payment.",
+            "test",
+            "This route uses external checkout."));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "WarningMessage");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Notes");
+    }
 }

@@ -21,13 +21,16 @@ public sealed class RequestMetricsMiddlewareTests
             ApplicationName = typeof(RequestMetricsMiddlewareTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
 
         await using var app = builder.Build();
         app.UseMiddleware<RequestMetricsMiddleware>();
         app.MapGet("/bad-request", () => Results.BadRequest());
         await app.StartAsync();
 
-        using var response = await app.GetTestClient().GetAsync("/bad-request");
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var response = await client.GetAsync("/bad-request");
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains(
@@ -49,13 +52,16 @@ public sealed class RequestMetricsMiddlewareTests
             ApplicationName = typeof(RequestMetricsMiddlewareTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
 
         await using var app = builder.Build();
         app.UseMiddleware<RequestMetricsMiddleware>();
         app.MapGet("/ok", () => Results.Ok());
         await app.StartAsync();
 
-        using var response = await app.GetTestClient().GetAsync("/ok");
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var response = await client.GetAsync("/ok");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains(

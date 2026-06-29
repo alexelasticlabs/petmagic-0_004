@@ -55,12 +55,12 @@ public sealed partial class TemplatesServiceTests
 
         var free = await service.ListAsync(
             userId,
-            new TemplateGenerationHistoryQuery("ready", null, 10),
+            new TemplateGenerationHistoryQuery("completed", null, 10),
             isPremium: false,
             CancellationToken.None);
         var premium = await service.ListAsync(
             userId,
-            new TemplateGenerationHistoryQuery("ready", null, 10),
+            new TemplateGenerationHistoryQuery("completed", null, 10),
             isPremium: true,
             CancellationToken.None);
 

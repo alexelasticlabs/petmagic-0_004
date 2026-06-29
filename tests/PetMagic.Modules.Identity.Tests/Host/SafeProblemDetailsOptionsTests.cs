@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 using Microsoft.AspNetCore.Builder;
@@ -23,6 +24,7 @@ public sealed class SafeProblemDetailsOptionsTests
             ApplicationName = typeof(SafeProblemDetailsOptionsTests).Assembly.FullName,
         });
         builder.WebHost.UseTestServer();
+        builder.Configuration["AllowedHosts"] = "*";
         builder.Services.AddProblemDetails(SafeProblemDetailsOptions.Configure);
 
         await using var app = builder.Build();
@@ -39,8 +41,11 @@ public sealed class SafeProblemDetailsOptionsTests
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/boom");
         request.Headers.Add(CorrelationId.HeaderName, "problem-correlation");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        using var response = await app.GetTestClient().SendAsync(request);
+        using var client = app.GetTestClient();
+        client.BaseAddress = new Uri("http://localhost");
+        using var response = await client.SendAsync(request);
         var rawBody = await response.Content.ReadAsStringAsync();
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object?>>();
 

@@ -27,6 +27,7 @@ public static class UploadedImageNormalizer
         string contentType,
         UploadedImageProfile profile)
     {
+        var policy = UploadedMediaPolicies.ForProfile(profile);
         if (content.Length == 0 || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
             return KeepOriginal(content, contentType, "not_image");
@@ -38,13 +39,12 @@ public static class UploadedImageNormalizer
             image.Mutate(context =>
             {
                 context.AutoOrient();
-                var maxDimension = ResolveMaxDimension(profile);
-                if (Math.Max(image.Width, image.Height) > maxDimension)
+                if (Math.Max(image.Width, image.Height) > policy.MaxDimension)
                 {
                     context.Resize(new ResizeOptions
                     {
                         Mode = ResizeMode.Max,
-                        Size = new Size(maxDimension, maxDimension),
+                        Size = new Size(policy.MaxDimension, policy.MaxDimension),
                         Sampler = KnownResamplers.Bicubic
                     });
                 }
@@ -53,7 +53,7 @@ public static class UploadedImageNormalizer
             using var output = new MemoryStream();
             image.SaveAsJpeg(output, new JpegEncoder
             {
-                Quality = ResolveJpegQuality(profile)
+                Quality = policy.JpegQuality
             });
 
             return new UploadedImageNormalizationResult(
@@ -89,28 +89,6 @@ public static class UploadedImageNormalizer
             0,
             false,
             decisionReason);
-    }
-
-    private static int ResolveMaxDimension(UploadedImageProfile profile)
-    {
-        return profile switch
-        {
-            UploadedImageProfile.Avatar => 1200,
-            UploadedImageProfile.PetPhoto => 2048,
-            UploadedImageProfile.SupportImage => 1800,
-            _ => 1800
-        };
-    }
-
-    private static int ResolveJpegQuality(UploadedImageProfile profile)
-    {
-        return profile switch
-        {
-            UploadedImageProfile.Avatar => 92,
-            UploadedImageProfile.PetPhoto => 88,
-            UploadedImageProfile.SupportImage => 86,
-            _ => 88
-        };
     }
 
     private static string ResolveFileExtension(string contentType)

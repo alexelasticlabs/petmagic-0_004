@@ -11,9 +11,6 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class TemplatesService
 {
-    private const int TemplateTagMaxLength = 32;
-    private const int TemplateRequirementMaxLength = 160;
-    private const int TemplatePromptMaxLength = 1000;
     private const int TemplateAssetFileNameMaxLength = 256;
     private const int TemplateAssetContentTypeMaxLength = 128;
 
@@ -345,7 +342,6 @@ internal sealed partial class TemplatesService
             .SelectMany(tag => tag.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Select(tag => tag.Trim())
             .Where(tag => !string.IsNullOrWhiteSpace(tag))
-            .Select(tag => tag.Length <= TemplateTagMaxLength ? tag : tag[..TemplateTagMaxLength])
             .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
@@ -385,9 +381,7 @@ internal sealed partial class TemplatesService
         return [.. requirements
             .Select(requirement => requirement.Trim())
             .Where(requirement => !string.IsNullOrWhiteSpace(requirement))
-            .Select(requirement => requirement.Length <= TemplateRequirementMaxLength ? requirement : requirement[..TemplateRequirementMaxLength])
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(6)];
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private static string NormalizeCategoryName(string rawCategoryName)
@@ -403,7 +397,7 @@ internal sealed partial class TemplatesService
     private static string ResolvePrompt(string prompt, string fallback)
     {
         var resolved = string.IsNullOrWhiteSpace(prompt) ? fallback : prompt.Trim();
-        return resolved.Length <= TemplatePromptMaxLength ? resolved : resolved[..TemplatePromptMaxLength];
+        return resolved;
     }
 
     private static string NormalizeAssetText(string value, int maxLength, string fallback)

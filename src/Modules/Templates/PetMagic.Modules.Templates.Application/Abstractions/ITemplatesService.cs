@@ -80,8 +80,6 @@ public interface ITemplatesService
 
     Task<Result> DeleteAsync(Guid templateId, CancellationToken cancellationToken);
 
-    Task<Result<IReadOnlyList<PublicTemplateListItemResponse>>> ListPublicAsync(TemplateType? type, string? category, string[]? tags, bool? premiumOnly, string? locale, CancellationToken cancellationToken);
-
     Task<Result<IReadOnlyList<PublicTemplateCategoryResponse>>> ListPublicCategoriesAsync(CancellationToken cancellationToken);
 
     Task<Result<PublicTemplatesCatalogPageResponse>> ListPublicCatalogAsync(PublicTemplatesCatalogQuery query, CancellationToken cancellationToken);

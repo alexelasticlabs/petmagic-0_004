@@ -326,14 +326,14 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAtUtc");
+
                     b.HasIndex("SavedPaymentMethodId");
 
                     b.HasIndex("PaymentProvider", "ExternalPaymentId")
                         .IsUnique()
                         .HasDatabaseName("UX_epo_Provider_ExternalPaymentId")
                         .HasFilter("\"ExternalPaymentId\" IS NOT NULL AND \"ExternalPaymentId\" <> ''");
-
-                    b.HasIndex("CreatedAtUtc");
 
                     b.HasIndex("Status", "CreatedAtUtc");
 
@@ -461,9 +461,9 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RedeemCodeId", "UserId");
-
                     b.HasIndex("RedeemCodeId", "RedeemedAtUtc");
+
+                    b.HasIndex("RedeemCodeId", "UserId");
 
                     b.HasIndex("UserId", "RedeemedAtUtc");
 
@@ -655,16 +655,16 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedAtUtc");
+
                     b.HasIndex("Provider", "ExternalEventId");
 
                     b.HasIndex("Provider", "ExternalSubscriptionId")
                         .HasDatabaseName("IX_esel_Provider_ExternalSubscriptionId");
 
-                    b.HasIndex("CreatedAtUtc");
+                    b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.HasIndex("Provider", "Status", "CreatedAtUtc");
-
-                    b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "Provider", "CreatedAtUtc")
                         .HasDatabaseName("IX_esel_UserId_Provider_CreatedAtUtc");
@@ -755,6 +755,9 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CurrentPeriodStartUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("ExpiredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("ExternalCustomerId")
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
@@ -767,13 +770,10 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasMaxLength(160)
                         .HasColumnType("character varying(160)");
 
-                    b.Property<DateTime?>("ExpiredAtUtc")
+                    b.Property<DateTime?>("LastTokenGrantAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("LastValidatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("LastTokenGrantAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("MonthlyTokenLimit")
@@ -819,6 +819,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("UpdatedAtUtc");
+
                     b.HasIndex("Provider", "ExternalSubscriptionId")
                         .IsUnique();
 
@@ -826,8 +828,6 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_eus_Provider_ExternalTransactionId")
                         .HasFilter("\"ExternalTransactionId\" IS NOT NULL AND \"ExternalTransactionId\" <> ''");
-
-                    b.HasIndex("UpdatedAtUtc");
 
                     b.HasIndex("Provider", "UpdatedAtUtc");
 
@@ -915,12 +915,12 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasDatabaseName("UX_ewl_SourceProvider_SourceTransactionId")
                         .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL");
 
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
                     b.HasIndex("UserId", "Source", "Reason")
                         .IsUnique()
                         .HasDatabaseName("UX_ewl_UserId_Source_Reason_WatermarkUnlock")
                         .HasFilter("\"Source\" = 'watermark_unlock'");
-
-                    b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.ToTable("economy_wallet_ledger", (string)null);
                 });

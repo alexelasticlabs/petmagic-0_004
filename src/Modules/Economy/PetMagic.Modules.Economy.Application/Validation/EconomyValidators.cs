@@ -334,6 +334,8 @@ public sealed class UpdatePaymentProviderConfigurationCommandValidator : Abstrac
             .Must(PaymentProviderConfigurationValidationRules.IsSupportedMode)
             .WithMessage("Mode must be either 'test' or 'live'.");
         RuleFor(x => x.Notes).MaximumLength(240);
+        RuleFor(x => x).Custom((command, context) =>
+            PaymentProviderConfigurationValidationRules.AddLegacyDisclosureFailures(command.WarningMessage, command.Notes, context));
     }
 }
 
@@ -378,6 +380,8 @@ public sealed class CreatePaymentProviderConfigurationCommandValidator : Abstrac
             .WithMessage("Mode must be either 'test' or 'live'.");
 
         RuleFor(x => x.Notes).MaximumLength(240);
+        RuleFor(x => x).Custom((command, context) =>
+            PaymentProviderConfigurationValidationRules.AddLegacyDisclosureFailures(command.WarningMessage, command.Notes, context));
     }
 }
 
@@ -434,6 +438,8 @@ public sealed class TestPaymentProviderConfigurationMatchQueryValidator : Abstra
 
 internal static class PaymentProviderConfigurationValidationRules
 {
+    private const string LegacyDisclosureValidationMessage = "Payment provider disclosures must not reference deprecated external Stripe checkout copy.";
+
     public static bool IsValidRegion(string value)
     {
         var region = value.Trim();
@@ -483,6 +489,35 @@ internal static class PaymentProviderConfigurationValidationRules
         }
 
         return Version.TryParse(normalized, out _);
+    }
+
+    public static void AddLegacyDisclosureFailures<T>(
+        string? warningMessage,
+        string? notes,
+        ValidationContext<T> context)
+    {
+        if (ContainsLegacyWarningMessage(warningMessage))
+        {
+            context.AddFailure("WarningMessage", LegacyDisclosureValidationMessage);
+        }
+
+        if (ContainsLegacyNotes(notes))
+        {
+            context.AddFailure("Notes", LegacyDisclosureValidationMessage);
+        }
+    }
+
+    private static bool ContainsLegacyWarningMessage(string? warningMessage)
+    {
+        var warningText = warningMessage ?? string.Empty;
+        return warningText.Contains("stripe checkout", StringComparison.OrdinalIgnoreCase)
+            || warningText.Contains("continue to stripe", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsLegacyNotes(string? notes)
+    {
+        var noteText = notes ?? string.Empty;
+        return noteText.Contains("external checkout", StringComparison.OrdinalIgnoreCase);
     }
 }
 

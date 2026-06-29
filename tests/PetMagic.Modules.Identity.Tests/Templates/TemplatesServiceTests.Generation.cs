@@ -905,7 +905,7 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
 
         var cancelled = await service.ListAdminGenerationsAsync(
-            new AdminTemplateGenerationsQuery("canceled", null, null, null, 0, 10),
+            new AdminTemplateGenerationsQuery("cancelled", null, null, null, 0, 10),
             CancellationToken.None);
         var retrying = await service.ListAdminGenerationsAsync(
             new AdminTemplateGenerationsQuery("retrying", null, null, null, 0, 10),
@@ -1193,7 +1193,7 @@ public sealed partial class TemplatesServiceTests
             CreateGenerationMediaRecord(secondResultMediaId, userId, secondGenerationId, "generation_result", "https://cdn.example.com/result-2.png", "https://cdn.example.com/result-preview-2.webp", now.AddMinutes(-3)));
         await dbContext.SaveChangesAsync();
 
-        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), isPremium: false, CancellationToken.None);
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("completed", null, 10), isPremium: false, CancellationToken.None);
 
         Assert.True(history.IsSuccess);
         Assert.Equal(2, history.Value.Count);
@@ -1346,7 +1346,7 @@ public sealed partial class TemplatesServiceTests
             Id = Guid.NewGuid(),
             UserId = userId,
             TemplateId = created.Value.TemplateId,
-            Status = TemplateGenerationStatus.Succeeded,
+            Status = TemplateGenerationStatus.Completed,
             TokenCost = 20,
             SourceImageUrl = "https://cdn.example.com/source.jpg",
             SourceImageFileName = "source.jpg",
@@ -1366,13 +1366,13 @@ public sealed partial class TemplatesServiceTests
         dbContext.TemplateGenerationJobs.Add(job);
         await dbContext.SaveChangesAsync();
 
-        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("ready", null, 10), isPremium: false, CancellationToken.None);
+        var history = await generationService.ListAsync(userId, new TemplateGenerationHistoryQuery("completed", null, 10), isPremium: false, CancellationToken.None);
 
         Assert.True(history.IsSuccess);
         var item = Assert.Single(history.Value);
         Assert.Equal(job.Id, item.GenerationId);
-        Assert.Equal("Succeeded", item.Status);
-        Assert.Equal("succeeded", item.Stage);
+        Assert.Equal("Completed", item.Status);
+        Assert.Equal("completed", item.Stage);
         Assert.Equal(100, item.ProgressPercent);
         Assert.True(item.IsUnread);
         Assert.Equal("Feedback Portrait", item.TemplateTitle);

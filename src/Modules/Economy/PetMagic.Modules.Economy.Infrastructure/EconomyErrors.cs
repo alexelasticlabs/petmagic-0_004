@@ -40,6 +40,8 @@ public static class EconomyErrors
 
     public static readonly Error PaymentProviderConfigurationAlreadyExists = new("economy.payment_provider_config_exists", "Payment provider configuration already exists for this provider, platform, and region.");
 
+    public static readonly Error PaymentProviderDisclosureInvalid = new("economy.payment_provider_disclosure_invalid", "Payment provider disclosures must not reference deprecated external Stripe checkout copy.");
+
     public static readonly Error PremiumBillingUnavailable = new("economy.premium_billing_unavailable", "Premium billing is not available right now.");
 
     public static readonly Error StoreVerificationUnavailable = new("economy.store_verification_unavailable", "Store subscription verification is not configured.");

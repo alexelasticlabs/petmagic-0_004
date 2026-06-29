@@ -343,7 +343,7 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task ListPublicAsync_ShouldReturnOnlyActiveTemplates()
+    public async Task ListPublicCatalogAsync_ShouldReturnOnlyActiveTemplates()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
@@ -390,35 +390,40 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(activated.IsSuccess);
 
-        var publicList = await service.ListPublicAsync(null, null, null, null, null, CancellationToken.None);
+        var publicList = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(null, null, null, null, null),
+            CancellationToken.None);
 
         Assert.True(publicList.IsSuccess);
-        Assert.Single(publicList.Value);
-        Assert.Equal(imageTemplate.Value.TemplateId, publicList.Value[0].TemplateId);
+        Assert.Single(publicList.Value.Items);
+        Assert.Equal(imageTemplate.Value.TemplateId, publicList.Value.Items[0].Id);
     }
 
     [Fact]
-    public async Task ListPublicAsync_ShouldCapLegacyResponseForUnpagedClients()
+    public async Task ListPublicCatalogAsync_ShouldUseDefaultPaginationWhenPageParamsAreMissing()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
 
-        for (var index = 0; index < 105; index++)
+        for (var index = 0; index < 25; index++)
         {
             await CreateActiveImageTemplateAsync(
                 service,
-                $"Legacy Template {index:D3}",
-                "Legacy",
-                ["legacy"]);
+                $"Catalog Template {index:D3}",
+                "Catalog",
+                ["catalog"]);
         }
 
-        var publicList = await service.ListPublicAsync(null, null, null, null, null, CancellationToken.None);
+        var publicList = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(null, null, null, null, null),
+            CancellationToken.None);
 
         Assert.True(publicList.IsSuccess);
-        Assert.Equal(100, publicList.Value.Count);
-        Assert.Equal("Legacy Template 000", publicList.Value[0].Title);
-        Assert.Equal("Legacy Template 099", publicList.Value[^1].Title);
-        Assert.DoesNotContain(publicList.Value, item => item.Title == "Legacy Template 100");
+        Assert.Equal(1, publicList.Value.Page);
+        Assert.Equal(20, publicList.Value.PageSize);
+        Assert.Equal(25, publicList.Value.TotalCount);
+        Assert.Equal(20, publicList.Value.Items.Count);
+        Assert.True(publicList.Value.HasMore);
     }
 
     [Fact]
@@ -493,7 +498,9 @@ public sealed partial class TemplatesServiceTests
         Assert.True(created.IsSuccess);
 
         var detail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
-        var legacyList = await service.ListPublicAsync(null, "Capability", ["capability"], null, null, CancellationToken.None);
+        var catalog = await service.ListPublicCatalogAsync(
+            new PublicTemplatesCatalogQuery(1, 10, null, "Capability", null, ["capability"]),
+            CancellationToken.None);
         var feed = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "Capability", ["capability"], null, null, 10, null, null),
             CancellationToken.None);
@@ -502,12 +509,12 @@ public sealed partial class TemplatesServiceTests
             CancellationToken.None);
 
         Assert.True(detail.IsSuccess);
-        Assert.True(legacyList.IsSuccess);
+        Assert.True(catalog.IsSuccess);
         Assert.True(feed.IsSuccess);
         Assert.True(random.IsSuccess);
 
         AssertDetailCapabilities(detail.Value);
-        AssertListCapabilities(Assert.Single(legacyList.Value));
+        Assert.Equal(created.Value.TemplateId, Assert.Single(catalog.Value.Items).Id);
         Assert.Equal(created.Value.TemplateId, Assert.Single(feed.Value.Items).TemplateId);
         Assert.NotNull(random.Value.Template);
         AssertListCapabilities(random.Value.Template!);
@@ -791,22 +798,13 @@ public sealed partial class TemplatesServiceTests
         var feed = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, null, [new string('x', 33)], null, null, 10, null, null),
             CancellationToken.None);
-        var legacyList = await service.ListPublicAsync(
-            null,
-            null,
-            [new string('x', 33)],
-            null,
-            null,
-            CancellationToken.None);
         var catalog = await service.ListPublicCatalogAsync(
             new PublicTemplatesCatalogQuery(1, 10, null, null, null, [.. Enumerable.Range(0, 13).Select(index => $"tag{index}")]),
             CancellationToken.None);
 
         Assert.True(feed.IsSuccess);
-        Assert.True(legacyList.IsSuccess);
         Assert.True(catalog.IsSuccess);
         Assert.Empty(feed.Value.Items);
-        Assert.Empty(legacyList.Value);
         Assert.Empty(catalog.Value.Items);
     }
 
@@ -1133,7 +1131,7 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
-    public async Task UpdateImageAsync_ShouldNormalizeLegacyLongFields_WhenPreviewChanges()
+    public async Task UpdateImageAsync_ShouldPreserveBoundaryLengthFields_WhenPreviewChanges()
     {
         await using var dbContext = CreateDbContext();
         var service = CreateService(dbContext);
@@ -1153,30 +1151,31 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(created.IsSuccess);
 
-        var longPrompt = new string('p', 1500);
-        var longRequirement = new string('r', 180);
-        var longTag = new string('t', 48);
+        var promptAtLimit = new string('p', 1000);
+        var requirementAtLimit = new string('r', 160);
+        var tagAtLimit = new string('t', 32);
         var updated = await service.UpdateImageAsync(
             new UpdateImageTemplateCommand(
                 created.Value.TemplateId,
                 "Portrait",
                 "Cozy portrait",
                 "Portrait",
-                [longTag],
+                [tagAtLimit],
                 false,
                 20,
                 TemplatePromoBadgeMode.Auto.ToString(),
                 CreatePreviewAsset("http://localhost:5000/templates-media/2026/05/new-preview.jpg", "new-preview.jpg", "image/jpeg"),
                 "openai/gpt-image-2/edit",
-                longPrompt,
+                promptAtLimit,
                 TemplateStatus.Draft.ToString(),
-                [longRequirement]),
+                [requirementAtLimit]),
             CancellationToken.None);
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(1000, (await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId)).ImagePrompt!.Length);
-        Assert.Equal(160, updated.Value.PetPhotoRequirements!.Single().Length);
-        Assert.Equal(32, updated.Value.Tags.Single().Length);
+        var persisted = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.Value.TemplateId);
+        Assert.Equal(promptAtLimit, persisted.ImagePrompt);
+        Assert.Equal(requirementAtLimit, updated.Value.PetPhotoRequirements!.Single());
+        Assert.Equal(tagAtLimit, updated.Value.Tags.Single());
     }
 
     [Fact]
@@ -1546,20 +1545,12 @@ public sealed partial class TemplatesServiceTests
         var feed = await service.ListPublicFeedAsync(
             new PublicTemplatesFeedQuery(null, "portrait", ["canonical"], null, null, 10, null, null),
             CancellationToken.None);
-        var legacyList = await service.ListPublicAsync(
-            null,
-            "portrait",
-            ["canonical"],
-            null,
-            null,
-            CancellationToken.None);
         var unknownCategory = await service.ListPublicCatalogAsync(
             new PublicTemplatesCatalogQuery(1, 20, null, "missing", null, ["canonical"]),
             CancellationToken.None);
 
         Assert.True(catalog.IsSuccess);
         Assert.True(feed.IsSuccess);
-        Assert.True(legacyList.IsSuccess);
         Assert.True(unknownCategory.IsSuccess);
 
         var catalogItem = Assert.Single(catalog.Value.Items);
@@ -1570,9 +1561,6 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(portraitTemplateId, feedItem.TemplateId);
         Assert.Equal("Portrait", feedItem.Category);
 
-        var legacyItem = Assert.Single(legacyList.Value);
-        Assert.Equal(portraitTemplateId, legacyItem.TemplateId);
-        Assert.Equal("Portrait", legacyItem.Category);
         Assert.Empty(unknownCategory.Value.Items);
     }
 

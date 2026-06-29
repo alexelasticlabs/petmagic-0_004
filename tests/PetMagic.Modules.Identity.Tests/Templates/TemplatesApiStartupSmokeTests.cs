@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using System.Threading.RateLimiting;
@@ -31,12 +33,15 @@ public sealed class TemplatesApiStartupSmokeTests
 
     [Theory]
     [InlineData("POST", "/api/templates/{templateId:guid}/generations", "generation-create")]
+    [InlineData("GET", "/api/templates/generation-results/{resultId:guid}/compatible-templates", "templates")]
+    [InlineData("POST", "/api/templates/generations/from-pet", "generation-create")]
+    [InlineData("POST", "/api/templates/generations/from-result", "generation-create")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/generate-similar", "generation-create")]
     [InlineData("GET", "/api/templates/generations", "generation-status")]
     [InlineData("GET", "/api/templates/generations/{generationId:guid}", "generation-status")]
-    [InlineData("GET", "/api/generations/{generationId:guid}", "generation-status")]
-    [InlineData("POST", "/api/generations/{generationId:guid}/remove-watermark", "templates")]
-    [InlineData("GET", "/api/generations/{generationId:guid}/download", "templates")]
-    [InlineData("POST", "/api/generations/{generationId:guid}/share", "templates")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/remove-watermark", "templates")]
+    [InlineData("GET", "/api/templates/generations/{generationId:guid}/download", "templates")]
+    [InlineData("POST", "/api/templates/generations/{generationId:guid}/share", "templates")]
     [InlineData("POST", "/api/templates/generations/{generationId:guid}/feedback", "templates")]
     public async Task TemplateGenerationEndpoints_ShouldUseExpectedRateLimitPolicies(
         string method,
@@ -129,14 +134,36 @@ public sealed class TemplatesApiStartupSmokeTests
         Assert.Contains("ModeratorOrAdmin", app.GetAuthorizationPolicies(method, routePattern));
     }
 
+    [Theory]
+    [InlineData("/api/admin/templates/generations?status=queued", "templates.invalid_status")]
+    [InlineData("/api/admin/templates/generations?status=processing", "templates.invalid_status")]
+    [InlineData("/api/admin/templates/generations?status=success", "templates.invalid_status")]
+    [InlineData("/api/admin/templates/generations?status=canceled", "templates.invalid_status")]
+    public async Task TemplatesAdminGenerationsEndpoint_ShouldRejectLegacyStatusAliasesBeforeServiceResolution(
+        string path,
+        string _)
+    {
+        await using var app = await TemplatesApiStartupTestApplication.CreateAsync();
+
+        using var response = await app.Client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     private sealed class TemplatesApiStartupTestApplication : IAsyncDisposable
     {
         private readonly WebApplication app;
+        private readonly HttpClient client;
 
         private TemplatesApiStartupTestApplication(WebApplication app)
         {
             this.app = app;
+            client = app.GetTestClient();
+            client.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
         }
+
+        public HttpClient Client => client;
 
         public static async Task<TemplatesApiStartupTestApplication> CreateAsync()
         {

@@ -441,11 +441,11 @@ internal sealed partial class TemplatesService
         return normalized switch
         {
             "" or "all" => null,
-            "pending" or "queued" => TemplateGenerationStatus.Queued,
-            "running" or "processing" => TemplateGenerationStatus.Processing,
-            "completed" or "succeeded" or "success" => TemplateGenerationStatus.Completed,
+            "pending" => TemplateGenerationStatus.Queued,
+            "running" => TemplateGenerationStatus.Processing,
+            "completed" => TemplateGenerationStatus.Completed,
             "failed" => TemplateGenerationStatus.Failed,
-            "cancelled" or "canceled" => TemplateGenerationStatus.Cancelled,
+            "cancelled" => TemplateGenerationStatus.Cancelled,
             "retrying" => TemplateGenerationStatus.Retrying,
             _ => null
         };

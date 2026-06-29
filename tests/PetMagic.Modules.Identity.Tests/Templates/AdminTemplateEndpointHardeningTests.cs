@@ -224,7 +224,8 @@ public sealed class AdminTemplateEndpointHardeningTests
             "TemplatesService.Public.cs"));
         var method = ExtractMethodBody(source, "ListPublicCatalogAsync");
 
-        Assert.Contains("var totalCount = await baseQuery.LongCountAsync(cancellationToken);", method, StringComparison.Ordinal);
+        Assert.Contains("baseQuery.LongCountAsync(cancellationToken)", method, StringComparison.Ordinal);
+        Assert.Contains("memoryCache.TryGetValue", method, StringComparison.Ordinal);
         Assert.Contains("var offset = ((long)page - 1) * pageSize;", method, StringComparison.Ordinal);
         Assert.Contains("if (offset > int.MaxValue)", method, StringComparison.Ordinal);
         Assert.Contains(".Skip((int)offset)", method, StringComparison.Ordinal);

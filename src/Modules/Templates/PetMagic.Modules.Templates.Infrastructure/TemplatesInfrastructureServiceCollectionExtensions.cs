@@ -21,6 +21,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
 
     public static IServiceCollection AddTemplatesInfrastructure(this IServiceCollection services, IConfiguration configuration, IHostEnvironment? environment = null)
     {
+        services.AddMemoryCache();
+
         var section = configuration.GetSection(TemplatesOptions.SectionName);
         var r2Section = section.GetSection("R2");
         var falSection = section.GetSection("Fal");
@@ -216,25 +218,6 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
 
         await dbContext.Database.MigrateAsync();
-        // Guard against environments where migration history drift left the column missing.
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            ALTER TABLE templates_items
-            ADD COLUMN IF NOT EXISTS "PetPhotoRequirements" character varying(1000);
-            """);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            ALTER TABLE templates_items
-            ADD COLUMN IF NOT EXISTS "LocalizedTextsJson" text;
-            """);
-
-        await dbContext.Database.ExecuteSqlRawAsync(
-            """
-            ALTER TABLE templates_items
-            ALTER COLUMN "LocalizedTextsJson" TYPE text USING "LocalizedTextsJson"::text;
-            """);
-
         await SyncWatermarkSettingsStoreAsync(scope.ServiceProvider, dbContext, options, cancellationToken: default);
         await BackfillTemplateLocalizationsAsync(dbContext, options, httpClientFactory, cancellationToken: default);
 
