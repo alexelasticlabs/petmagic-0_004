@@ -89,7 +89,7 @@ export const enDictionary: Dictionary = {
   walletBalanceLabel: "Balance",
   totalPurchasesLabel: "Purchases",
   successfulPurchasesLabel: "Successful purchases",
-  purchasedSparkLabel: "Purchased spark",
+  purchasedSparkLabel: "Purchased PawSpark",
   totalGenerationsLabel: "Generations",
   completedGenerationsLabel: "Completed generations",
   failedGenerationsLabel: "Failed generations",

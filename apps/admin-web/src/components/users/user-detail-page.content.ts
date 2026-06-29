@@ -31,8 +31,8 @@ const userDetailPetText = {
     avatar: "Аватар",
     favorite: "Избранное",
     photoAlt: "фото питомца",
-    thumbnailReady: "thumbnail готов",
-    originalOnly: "только original",
+    thumbnailReady: "миниатюра готова",
+    originalOnly: "только оригинал",
     fallbackTemplate: "Шаблон",
   },
   en: {

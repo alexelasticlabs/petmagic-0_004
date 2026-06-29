@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
@@ -22,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";
+import { formatLabeledMetric } from "@/components/users/user-monetization-format";
+import { UserSecureMediaImage } from "@/components/users/user-secure-media-image";
 import styles from "@/components/users/user-detail-page.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
@@ -486,7 +487,7 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
             items={analytics.recentPurchases.slice(0, RECENT_ITEMS_LIMIT).map((purchase) => (
               <article key={purchase.orderId} className={styles.dataCard}>
                 <div className={styles.dataHeader}>
-                  <strong>{purchase.sparkToGrant} spark</strong>
+                  <strong>{formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}</strong>
                   <AdminStatusBadge color={getPurchaseStatusColor(purchase.status)}>
                     {sanitizeSensitiveText(purchase.status, 48)}
                   </AdminStatusBadge>
@@ -515,7 +516,8 @@ export function UserDetailPage({ locale, userId }: UserDetailPageProps) {
                   </AdminStatusBadge>
                 </div>
                 <p>
-                  {sanitizeSensitiveText(generation.templateType, 48)} • {generation.tokenCost} PawSpark
+                  {sanitizeSensitiveText(generation.templateType, 48)} •{" "}
+                  {formatLabeledMetric(text.tokenCostLabel, generation.tokenCost)}
                 </p>
                 <span>
                   {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}
@@ -717,11 +719,14 @@ function AdminPetDetails({
         <div className={styles.petMediaGrid}>
           {photos.slice(0, 6).map((photo) => (
             <div key={photo.id} className={styles.petPhoto}>
-              <Image
+              <UserSecureMediaImage
                 src={photo.thumbnailUrl ?? photo.url}
                 alt={`${sanitizeSensitiveText(pet.name, 40)} ${text.photoAlt}`}
-                width={160}
-                height={160}
+                className={styles.petPhotoImage}
+                logEvent="users.pet_photo_fetch_failed"
+                fallback={
+                  <span className={styles.petPhotoPreviewFallback}>{text.noPhotos}</span>
+                }
               />
               <span>
                 {photo.isAvatar ? `${text.avatar} • ` : ""}
@@ -782,7 +787,7 @@ function AdminPetDetails({
               </div>
               <p>
                 {sanitizeSensitiveText(generation.templateType ?? text.fallbackTemplate, 48)} •{" "}
-                {generation.tokenCost} PawSpark
+                {formatLabeledMetric(text.tokenCostLabel, generation.tokenCost)}
               </p>
               <span>{formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}</span>
             </article>

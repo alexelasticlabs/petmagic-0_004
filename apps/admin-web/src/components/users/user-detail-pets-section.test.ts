@@ -22,6 +22,8 @@ describe("user detail pets section", () => {
     expect(contentSource).toContain('hiddenStatus: "Скрыт"');
     expect(contentSource).toContain('hidePetLabel: "Скрыть питомца"');
     expect(contentSource).toContain('restorePhotoLabel: "Восстановить фото питомца"');
+    expect(contentSource).toContain('thumbnailReady: "миниатюра готова"');
+    expect(contentSource).toContain('originalOnly: "только оригинал"');
     expect(source).toContain("function formatPetStatus(");
     expect(source).toContain('if (status === "active")');
     expect(source).toContain("return text.activeStatus;");
@@ -36,6 +38,8 @@ describe("user detail pets section", () => {
     expect(source).not.toContain(">Loading photos...<");
     expect(source).not.toContain(">Hide photo<");
     expect(source).not.toContain(">No pet generations.<");
+    expect(contentSource).not.toContain("thumbnail готов");
+    expect(contentSource).not.toContain("только original");
     expect(source).not.toContain("{sanitizeSensitiveText(pet.status, 32)}");
     expect(source).not.toContain("{sanitizeSensitiveText(photo.status, 32)}");
   });

@@ -10,6 +10,7 @@ import {
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
+import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-inline-analytics.module.css";
@@ -184,7 +185,7 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
             <div className={styles.list}>
               {analytics.recentPurchases.slice(0, 4).map((purchase) => (
                 <article key={purchase.orderId} className={styles.compactCard}>
-                  <strong>{purchase.sparkToGrant} spark</strong>
+                  <strong>{formatLabeledMetric(text.purchasedSparkLabel, purchase.sparkToGrant)}</strong>
                   <span>
                     {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
                   </span>
@@ -207,7 +208,8 @@ export function UserInlineAnalytics({ locale, userId }: UserInlineAnalyticsProps
                 <article key={generation.generationId} className={styles.compactCard}>
                   <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
                   <span>
-                    {sanitizeSensitiveText(generation.status, 48)} • {generation.tokenCost}
+                    {sanitizeSensitiveText(generation.status, 48)} •{" "}
+                    {formatLabeledMetric(text.tokenCostLabel, generation.tokenCost)}
                   </span>
                   <span>
                     {formatDateTime(generation.completedAtUtc ?? generation.createdAtUtc, locale)}

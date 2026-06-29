@@ -3,11 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 
 import styles from "@/components/users/user-avatar.module.css";
-import { getAdminPublicApiBaseUrl } from "@/lib/admin-api-base-url";
 import type { UserAvatar } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
-import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+
+import {
+  getUserMediaFetchErrorDetails,
+  isLocalObjectUrl,
+  resolveUserMediaUrl,
+} from "./user-secure-media";
 
 type UserAvatarProps = {
   avatar?: UserAvatar | null;
@@ -26,48 +30,9 @@ function getInitials(label: string) {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
-function getAvatarFetchErrorDetails(error: unknown) {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorDigest:
-      error && typeof error === "object" && "digest" in error
-        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
-        : undefined,
-  };
-}
-
-function resolveAvatarUrl(rawUrl?: string | null): string | null {
-  const normalizedRaw = rawUrl?.trim();
-  if (!normalizedRaw) {
-    return null;
-  }
-
-  const apiBase = getAdminPublicApiBaseUrl();
-  const apiOrigin = new URL(apiBase).origin;
-
-  if (normalizedRaw.startsWith("/")) {
-    return `${apiOrigin}${normalizedRaw}`;
-  }
-
-  try {
-    const parsed = new URL(normalizedRaw);
-    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      return `${apiOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
-    }
-
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-function isLocalObjectUrl(url: string) {
-  return url.startsWith("blob:") || url.startsWith("data:");
-}
-
 export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: UserAvatarProps) {
   const initials = getInitials(fallbackLabel);
-  const imageUrl = useMemo(() => resolveAvatarUrl(avatar?.url), [avatar?.url]);
+  const imageUrl = useMemo(() => resolveUserMediaUrl(avatar?.url), [avatar?.url]);
   const localObjectUrl = imageUrl && isLocalObjectUrl(imageUrl) ? imageUrl : null;
   const [avatarMedia, setAvatarMedia] = useState<{
     sourceUrl: string;
@@ -117,7 +82,7 @@ export function UserAvatarView({ avatar, label, fallbackLabel, size = "sm" }: Us
           return;
         }
 
-        clientLogger.warn("users.avatar_fetch_failed", getAvatarFetchErrorDetails(error));
+        clientLogger.warn("users.avatar_fetch_failed", getUserMediaFetchErrorDetails(error));
         setAvatarMedia({ sourceUrl: imageUrl, objectUrl: null, failed: true });
       });
 

@@ -91,7 +91,7 @@ export const ruDictionary: Dictionary = {
   walletBalanceLabel: "Баланс",
   totalPurchasesLabel: "Покупки",
   successfulPurchasesLabel: "Успешные покупки",
-  purchasedSparkLabel: "Куплено spark",
+  purchasedSparkLabel: "Куплено PawSpark",
   totalGenerationsLabel: "Генерации",
   completedGenerationsLabel: "Успешные генерации",
   failedGenerationsLabel: "Сбои генераций",
