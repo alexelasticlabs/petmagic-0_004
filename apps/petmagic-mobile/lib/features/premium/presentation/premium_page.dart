@@ -541,6 +541,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
         controller.markCheckoutOpened(
           wasPremiumBeforeCheckout: previous?.isPremium ?? false,
         );
+        _shouldReloadOnResume = true;
       }
 
       controller.consumeExternalUrl();

@@ -247,6 +247,138 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('all transactions loads more ledger when scrolled near bottom', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 760));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final secondPageCompleter = Completer<void>();
+    final pagedLedger = List<WalletLedgerItem>.generate(
+      40,
+      (index) => WalletLedgerItem(
+        entryId: 'entry-$index',
+        userId: 'user-1',
+        delta: index.isEven ? 4 : -2,
+        balanceAfter: 500 + index,
+        source: index.isEven ? 'ad_reward' : 'generation_spend',
+        reason: 'Ledger entry $index',
+        createdAtUtc: DateTime.utc(2026, 1, 1, 9, index % 60),
+      ),
+      growable: false,
+    );
+    final repository = _PagedLedgerWalletRepository(
+      wallet: _walletState,
+      ledger: pagedLedger,
+      packs: _packs,
+      purchases: _purchases,
+      delayedLedgerSkips: {24: secondPageCompleter},
+    );
+
+    await _pumpAllTransactionsPage(tester, repository: repository);
+
+    expect(repository.ledgerSkips, [0]);
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-23')),
+      findsNothing,
+    );
+
+    await tester.drag(find.byType(ListView), const Offset(0, -2400));
+    await tester.pump();
+
+    expect(repository.ledgerSkips, [0, 24]);
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transactions_load_more')),
+      findsOneWidget,
+    );
+
+    secondPageCompleter.complete();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-39')),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transaction_entry-39')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('wallet_transactions_load_more')),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'all transactions keeps load-more failures explicit and manual-retry only',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 760));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final pagedLedger = List<WalletLedgerItem>.generate(
+        40,
+        (index) => WalletLedgerItem(
+          entryId: 'entry-$index',
+          userId: 'user-1',
+          delta: index.isEven ? 4 : -2,
+          balanceAfter: 500 + index,
+          source: index.isEven ? 'ad_reward' : 'generation_spend',
+          reason: 'Ledger entry $index',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 9, index % 60),
+        ),
+        growable: false,
+      );
+      final repository = _RetryPagedLedgerWalletRepository(
+        wallet: _walletState,
+        ledger: pagedLedger,
+        packs: _packs,
+        purchases: _purchases,
+      );
+
+      await _pumpAllTransactionsPage(tester, repository: repository);
+
+      final transactionsContext = tester.element(
+        find.byType(AllTransactionsPage),
+      );
+      final text = AppLocalizations.of(transactionsContext);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -2400));
+      await tester.pump();
+
+      expect(repository.ledgerSkips, [0, 24]);
+      expect(find.text(text.walletPartialActivityUnavailable), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, text.retryAction), findsOneWidget);
+
+      await tester.drag(find.byType(ListView), const Offset(0, -120));
+      await tester.pump();
+
+      expect(
+        repository.ledgerSkips,
+        [0, 24],
+        reason: 'load more should not auto-retry after an explicit failure',
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, text.retryAction));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(repository.ledgerSkips, [0, 24, 24]);
+      expect(find.text(text.walletPartialActivityUnavailable), findsNothing);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey<String>('wallet_transaction_entry-39')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        find.byKey(const ValueKey<String>('wallet_transaction_entry-39')),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('wallet auto refresh does not reschedule after page disposal', (
     tester,
   ) async {
@@ -1122,6 +1254,76 @@ class _RetryLedgerWalletRepository extends _FakeWalletRepository {
       skip: skip,
       take: take,
       hasMore: false,
+    );
+  }
+}
+
+class _PagedLedgerWalletRepository extends _FakeWalletRepository {
+  _PagedLedgerWalletRepository({
+    required super.wallet,
+    required super.ledger,
+    required super.packs,
+    required super.purchases,
+    this.delayedLedgerSkips = const {},
+  });
+
+  final Map<int, Completer<void>> delayedLedgerSkips;
+  final List<int> ledgerSkips = <int>[];
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    ledgerSkips.add(skip);
+    final pending = delayedLedgerSkips[skip];
+    if (pending != null && !pending.isCompleted) {
+      await pending.future;
+    }
+
+    final start = skip.clamp(0, ledger.length);
+    final end = (start + take).clamp(0, ledger.length);
+
+    return OffsetPagedModel(
+      items: ledger.sublist(start, end),
+      skip: skip,
+      take: take,
+      hasMore: end < ledger.length,
+    );
+  }
+}
+
+class _RetryPagedLedgerWalletRepository extends _PagedLedgerWalletRepository {
+  _RetryPagedLedgerWalletRepository({
+    required super.wallet,
+    required super.ledger,
+    required super.packs,
+    required super.purchases,
+  });
+
+  bool _failedSecondPage = false;
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    ledgerSkips.add(skip);
+    if (skip == 24 && !_failedSecondPage) {
+      _failedSecondPage = true;
+      throw const AppException('wallet.ledger_failed');
+    }
+
+    final start = skip.clamp(0, ledger.length);
+    final end = (start + take).clamp(0, ledger.length);
+
+    return OffsetPagedModel(
+      items: ledger.sublist(start, end),
+      skip: skip,
+      take: take,
+      hasMore: end < ledger.length,
     );
   }
 }

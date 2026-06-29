@@ -549,6 +549,7 @@ class _MiniBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -625,6 +626,7 @@ class _ResultInputLoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -647,6 +649,7 @@ class _ResultInputErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -663,7 +666,7 @@ class _ResultInputErrorCard extends StatelessWidget {
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: () => unawaited(onRetry()),
-              child: const Text('Retry'),
+              child: Text(text.retryAction),
             ),
           ],
         ),

@@ -2,13 +2,13 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'template_flow_sheets_test_source.dart';
+
 void main() {
   test(
     'template flow sheet uses app localizations instead of locale branches',
     () async {
-      final sheetSource = await File(
-        'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
-      ).readAsString();
+      final sheetSource = readTemplateFlowSheetsLibrarySource();
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
@@ -25,9 +25,7 @@ void main() {
   test(
     'template flow premium gates use localized copy instead of ru branches',
     () async {
-      final sheetSource = await File(
-        'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
-      ).readAsString();
+      final sheetSource = readTemplateFlowSheetsLibrarySource();
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
@@ -98,6 +96,7 @@ void main() {
     expect(gallerySource, contains('galleryPremiumUpsellSubtitle'));
     expect(resultInputSource, contains('generationResultInputTitle'));
     expect(resultInputSource, contains('generationResultInputCostEstimate'));
+    expect(resultInputSource, contains('text.retryAction'));
     expect(
       petLaunchSource,
       contains("part 'pet_generation_launch_sheet_content.part.dart';"),
@@ -110,6 +109,7 @@ void main() {
     expect(fullPetLaunchSource, isNot(contains('Запуск магии')));
     expect(resultInputSource, isNot(contains('Use result')));
     expect(resultInputSource, isNot(contains('Использовать результат')));
+    expect(resultInputSource, isNot(contains("const Text('Retry')")));
   });
 
   test(

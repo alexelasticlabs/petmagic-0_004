@@ -26,10 +26,14 @@ class AllTransactionsPage extends ConsumerStatefulWidget {
 class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   static const String _kAllTransactionsEmptyAsset =
       'assets/rewards/wallet-pack-chest.png';
+  static const double _ledgerLoadMoreThreshold = 320;
+
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScroll);
     final snapshot = ref.read(walletControllerProvider);
     if (snapshot.wallet == null && snapshot.ledger.isEmpty) {
       Future.microtask(() {
@@ -43,6 +47,25 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   }
 
   @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    if (position.pixels < position.maxScrollExtent - _ledgerLoadMoreThreshold) {
+      return;
+    }
+
+    ref.read(walletControllerProvider.notifier).loadMoreLedger();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
@@ -51,6 +74,10 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
     final router = GoRouter.of(context);
     final errorToShow = state.errorMessage != null && state.ledger.isEmpty
         ? _friendlyTransactionsError(text, state.errorMessage!)
+        : null;
+    final loadMoreErrorToShow =
+        state.ledgerLoadMoreErrorMessage != null && state.ledger.isNotEmpty
+        ? _friendlyTransactionsError(text, state.ledgerLoadMoreErrorMessage!)
         : null;
     final hasShell =
         context.findAncestorWidgetOfExactType<PetMagicShell>() != null;
@@ -70,11 +97,14 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                 color: colors.accent,
                 onRefresh: () => controller.load(refresh: true),
                 child: ListView.builder(
+                  controller: _scrollController,
                   padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset),
                   physics: const AlwaysScrollableScrollPhysics(),
                   itemCount: _transactionListItemCount(
                     itemCount: state.ledger.length,
                     hasError: errorToShow != null,
+                    showLoadMoreIndicator: state.isLoadingMoreLedger,
+                    showLoadMoreError: loadMoreErrorToShow != null,
                   ),
                   itemBuilder: (context, index) {
                     if (index == 0) {
@@ -115,6 +145,26 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                     }
 
                     final ledgerIndex = index - contentStartIndex;
+                    if (ledgerIndex >= state.ledger.length) {
+                      if (loadMoreErrorToShow != null) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 4),
+                          child: _AllTransactionsLoadMoreError(
+                            message: loadMoreErrorToShow,
+                            tone: colors.gold,
+                            onRetry: () => unawaited(
+                              controller.loadMoreLedger(force: true),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 12, bottom: 4),
+                        child: _AllTransactionsLoadMoreIndicator(),
+                      );
+                    }
+
                     return Padding(
                       padding: EdgeInsets.only(top: ledgerIndex == 0 ? 16 : 8),
                       child: ProfileGlassCard(
@@ -185,9 +235,52 @@ class _AllTransactionsErrorState extends StatelessWidget {
 int _transactionListItemCount({
   required int itemCount,
   required bool hasError,
+  required bool showLoadMoreIndicator,
+  required bool showLoadMoreError,
 }) {
   final leadingItems = hasError ? 2 : 1;
-  return leadingItems + (itemCount == 0 ? 1 : itemCount);
+  final contentItems = itemCount == 0 ? 1 : itemCount;
+  final trailingItems = showLoadMoreIndicator || showLoadMoreError ? 1 : 0;
+  return leadingItems + contentItems + trailingItems;
+}
+
+class _AllTransactionsLoadMoreIndicator extends StatelessWidget {
+  const _AllTransactionsLoadMoreIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: CircularProgressIndicator.adaptive(
+          key: ValueKey<String>('wallet_transactions_load_more'),
+          strokeWidth: 2.6,
+        ),
+      ),
+    );
+  }
+}
+
+class _AllTransactionsLoadMoreError extends StatelessWidget {
+  const _AllTransactionsLoadMoreError({
+    required this.message,
+    required this.tone,
+    required this.onRetry,
+  });
+
+  final String message;
+  final Color tone;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return _AllTransactionsErrorState(
+      message: message,
+      tone: tone,
+      onRetry: onRetry,
+    );
+  }
 }
 
 class _AllTransactionsHeader extends StatelessWidget {

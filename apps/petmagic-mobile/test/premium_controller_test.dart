@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+
+import 'premium_controller_test_source.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -169,6 +172,47 @@ void main() {
     expect(state.isBuying, isFalse);
   });
 
+  test(
+    'canStartCheckout is false while a checkout is already in flight',
+    () async {
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(premiumControllerProvider.notifier).load();
+
+      final state = container.read(premiumControllerProvider);
+      expect(state.canStartCheckout, isTrue);
+
+      final stateWithBuying = state.copyWith(isBuying: true);
+      expect(stateWithBuying.canStartCheckout, isFalse);
+    },
+  );
+
   test('load completes safely after provider disposal', () async {
     final repository = _DelayedPremiumRepository(
       config: _paywallConfig(
@@ -207,6 +251,48 @@ void main() {
     repository.completePaywallConfig();
 
     await expectLater(loadFuture, completes);
+  });
+
+  test('concurrent premium loads share one in-flight request', () async {
+    final repository = _DelayedPremiumRepository(
+      config: _paywallConfig(
+        methods: const [
+          PremiumPaymentMethodModel(
+            provider: PremiumPaymentProvider.stripe,
+            purchaseChannel: 'external_checkout',
+            platform: 'android',
+            region: '*',
+            isEnabled: true,
+            isSelectedByDefault: true,
+            requiresExternalWarning: false,
+            requiresStoreDisclosure: false,
+            isRecommended: true,
+            bonusTokensPercent: 0,
+          ),
+        ],
+      ),
+      status: _status(provider: 'stripe', canManageSubscription: false),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        premiumRepositoryProvider.overrideWithValue(repository),
+        premiumRefreshProfileProvider.overrideWithValue(() async {}),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(premiumControllerProvider.notifier);
+    final firstLoad = controller.load();
+    await repository.fetchPaywallStarted.future;
+
+    final secondLoad = controller.load(refresh: true);
+
+    repository.completePaywallConfig();
+    await Future.wait([firstLoad, secondLoad]);
+
+    expect(repository.fetchPaywallConfigCalls, 1);
+    expect(repository.fetchStatusCalls, 1);
   });
 
   test('checkout verification stops safely after provider disposal', () async {
@@ -256,6 +342,169 @@ void main() {
 
     await expectLater(verificationFuture, completes);
   });
+
+  test(
+    'checkout verification refreshes status without reloading paywall',
+    () async {
+      var refreshCalls = 0;
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(
+          provider: 'stripe',
+          canManageSubscription: false,
+          isPremium: false,
+        ),
+        statusSequence: [
+          _status(
+            provider: 'stripe',
+            canManageSubscription: false,
+            isPremium: false,
+          ),
+          _status(
+            provider: 'stripe',
+            canManageSubscription: false,
+            isPremium: false,
+          ),
+          _status(
+            provider: 'stripe',
+            canManageSubscription: true,
+            isPremium: true,
+          ),
+        ],
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {
+            refreshCalls++;
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      await controller.verifyCheckoutStatus();
+
+      final state = container.read(premiumControllerProvider);
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStoreAvailabilityCalls, 0);
+      expect(repository.fetchStatusCalls, 3);
+      expect(refreshCalls, 2);
+      expect(
+        state.checkoutVerificationState,
+        PremiumCheckoutVerificationState.activated,
+      );
+      expect(state.isPremium, isTrue);
+    },
+  );
+
+  test('stripe restore clears restoring state when profile refresh fails', () async {
+    final repository = _FakePremiumRepository(
+      config: _paywallConfig(
+        methods: const [
+          PremiumPaymentMethodModel(
+            provider: PremiumPaymentProvider.stripe,
+            purchaseChannel: 'external_checkout',
+            platform: 'android',
+            region: '*',
+            isEnabled: true,
+            isSelectedByDefault: true,
+            requiresExternalWarning: false,
+            requiresStoreDisclosure: false,
+            isRecommended: true,
+            bonusTokensPercent: 0,
+          ),
+        ],
+      ),
+      status: _status(provider: 'stripe', canManageSubscription: true),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        premiumRepositoryProvider.overrideWithValue(repository),
+        premiumRefreshProfileProvider.overrideWithValue(() async {
+          throw const AppException('templates.network_unavailable');
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(premiumControllerProvider.notifier);
+    await controller.load();
+    await controller.restorePurchases();
+
+    final state = container.read(premiumControllerProvider);
+    expect(state.isRestoring, isFalse);
+    expect(state.errorMessage, 'templates.network_unavailable');
+    expect(state.successMessage, isNull);
+  });
+
+  test('checkout status refresh invalidates cached subscription summary', () {
+    final source = readPremiumControllerLibrarySource();
+    final methodBody = _premiumMethodBody(
+      source,
+      '_refreshPremiumStatusSnapshot',
+    );
+
+    expect(
+      methodBody,
+      contains('ref.invalidate(premiumSubscriptionSummaryProvider);'),
+    );
+  });
+}
+
+String _premiumMethodBody(String source, String methodName) {
+  final methodMatch = RegExp(
+    r'(?:@override\s+)?(?:void|Future<[^>]+>)\s+' +
+        methodName +
+        r'\s*\([^)]*\)\s*(?:async\s*)?\{',
+  ).firstMatch(source);
+  if (methodMatch == null) {
+    fail('Method $methodName was not found.');
+  }
+
+  final openBraceIndex = source.indexOf('{', methodMatch.start);
+  if (openBraceIndex < 0) {
+    fail('Method $methodName has no body.');
+  }
+
+  var depth = 0;
+  for (var index = openBraceIndex; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+      continue;
+    }
+    if (char != '}') {
+      continue;
+    }
+
+    depth--;
+    if (depth == 0) {
+      return source.substring(openBraceIndex, index + 1);
+    }
+  }
+
+  fail('Method $methodName body did not close.');
 }
 
 PremiumPaywallConfigModel _paywallConfig({
@@ -302,9 +551,10 @@ PremiumPaywallConfigModel _paywallConfig({
 PremiumStatusModel _status({
   required String provider,
   required bool canManageSubscription,
+  bool isPremium = false,
 }) {
   return PremiumStatusModel(
-    isPremium: false,
+    isPremium: isPremium,
     canManageBilling: canManageSubscription,
     paymentProvider: provider,
     purchaseChannel: 'web',
@@ -337,6 +587,7 @@ class _FakePremiumRepository extends PremiumRepository {
       publishableKey: null,
     ),
     this.availabilityByProvider = const {},
+    this.statusSequence = const [],
   }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   final PremiumPaywallConfigModel config;
@@ -351,8 +602,12 @@ class _FakePremiumRepository extends PremiumRepository {
     })
   >
   availabilityByProvider;
+  final List<PremiumStatusModel> statusSequence;
 
   final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  int fetchPaywallConfigCalls = 0;
+  int fetchStatusCalls = 0;
+  int fetchStoreAvailabilityCalls = 0;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
@@ -361,11 +616,25 @@ class _FakePremiumRepository extends PremiumRepository {
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
     required Locale locale,
     CancelToken? cancelToken,
-  }) async => config;
+  }) async {
+    fetchPaywallConfigCalls++;
+    return config;
+  }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async =>
-      status;
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+    fetchStatusCalls++;
+    if (statusSequence.isEmpty) {
+      return status;
+    }
+
+    final index = fetchStatusCalls - 1;
+    if (index < statusSequence.length) {
+      return statusSequence[index];
+    }
+
+    return statusSequence.last;
+  }
 
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
@@ -392,6 +661,7 @@ class _FakePremiumRepository extends PremiumRepository {
     List<PremiumPlanModel> plans,
     PremiumPaymentProvider provider,
   ) async {
+    fetchStoreAvailabilityCalls++;
     return availabilityByProvider[provider] ??
         (
           isAvailable: false,
@@ -440,6 +710,7 @@ class _DelayedPremiumRepository extends _FakePremiumRepository {
     required Locale locale,
     CancelToken? cancelToken,
   }) {
+    fetchPaywallConfigCalls++;
     paywallCancelToken = cancelToken;
     fetchPaywallStarted.complete();
     return _paywallConfig.future;

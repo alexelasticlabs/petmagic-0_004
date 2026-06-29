@@ -11,13 +11,13 @@ import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 
+import 'wallet_controller_test_source.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('wallet lifecycle side effects are initialized once outside build', () {
-    final source = File(
-      'lib/features/wallet/presentation/wallet_controller.dart',
-    ).readAsStringSync();
+    final source = readWalletControllerLibrarySource();
     final buildBody = _methodBody(source, 'build');
     final lifecycleBody = _methodBody(source, '_ensureWalletLifecycleStarted');
 
@@ -119,11 +119,91 @@ void main() {
   );
 
   test(
+    'buyPack double-submit guard ignores second call while first is in flight',
+    () async {
+      final repository = _DelayedWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+
+      final firstFuture = controller.buyPack(_pack, _stripeMethod);
+
+      // Second call while isBuying=true must be a no-op.
+      final secondResult = await controller.buyPack(_pack, _stripeMethod);
+      expect(secondResult, isNull);
+
+      await firstFuture;
+    },
+  );
+
+  test('wallet resume sync refreshes ledger pagination snapshot', () async {
+    final repository = _LifecycleSyncWalletRepository();
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+
+    var state = container.read(walletControllerProvider);
+    expect(state.wallet?.balance, 10);
+    expect(state.ledgerHasMore, isFalse);
+
+    controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    await repository.syncCompleted.future;
+    await Future<void>.delayed(Duration.zero);
+
+    state = container.read(walletControllerProvider);
+    expect(state.wallet?.balance, 42);
+    expect(state.ledger, hasLength(1));
+    expect(state.ledger.first.entryId, 'entry-sync');
+    expect(state.ledgerHasMore, isTrue);
+  });
+
+  test('claim ad reward refreshes ledger pagination snapshot', () async {
+    final repository = _MutationLedgerWalletRepository();
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+    await controller.claimAdReward();
+
+    final state = container.read(walletControllerProvider);
+    expect(state.wallet?.balance, 25);
+    expect(state.ledger, hasLength(1));
+    expect(state.ledger.first.entryId, 'entry-claim');
+    expect(state.ledgerHasMore, isTrue);
+  });
+
+  test('redeem code refreshes ledger pagination snapshot', () async {
+    final repository = _MutationLedgerWalletRepository();
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+    await controller.applyRedeemCode('PROMO');
+
+    final state = container.read(walletControllerProvider);
+    expect(state.wallet?.balance, 25);
+    expect(state.ledger, hasLength(1));
+    expect(state.ledger.first.entryId, 'entry-redeem');
+    expect(state.ledgerHasMore, isTrue);
+  });
+
+  test(
     'stripe verification logging does not include raw payment reference',
     () {
-      final source = File(
-        'lib/features/wallet/presentation/wallet_controller.dart',
-      ).readAsStringSync();
+      final source = readWalletControllerLibrarySource();
       final verifyBody = _methodBody(source, 'verifyStripeCheckout');
 
       expect(verifyBody, contains("'reference_type'"));
@@ -140,7 +220,9 @@ void main() {
 
 String _methodBody(String source, String methodName) {
   final methodMatch = RegExp(
-    r'(?:WalletState|void|Future<[^>]+>)\s+' + methodName + r'\s*\(',
+    r'(?:@override\s+)?(?:WalletState|void|Future<[^>]+>)\s+' +
+        methodName +
+        r'\s*\([^)]*\)\s*(?:async\s*)?\{',
   ).firstMatch(source);
   if (methodMatch == null) {
     fail('Method $methodName was not found.');
@@ -293,6 +375,213 @@ class _DelayedWalletRepository extends WalletRepository {
       _verifyStripeCompleter.complete();
     }
   }
+}
+
+class _LifecycleSyncWalletRepository extends WalletRepository {
+  _LifecycleSyncWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> syncCompleted = Completer<void>();
+  int _walletFetchCount = 0;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    _walletFetchCount++;
+    return WalletStateModel(
+      userId: 'user-1',
+      balance: _walletFetchCount == 1 ? 10 : 42,
+      adRewardsRemainingToday: 1,
+      isPremium: false,
+      updatedAtUtc: DateTime.utc(2026, 1, 1, 12, _walletFetchCount),
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final page = _walletFetchCount <= 1
+        ? const OffsetPagedModel<WalletLedgerItem>(
+            items: [],
+            skip: 0,
+            take: 20,
+            hasMore: false,
+          )
+        : OffsetPagedModel(
+            items: [
+              WalletLedgerItem(
+                entryId: 'entry-sync',
+                userId: 'user-1',
+                delta: 32,
+                balanceAfter: 42,
+                source: 'purchase_reward',
+                reason: 'Synced entry',
+                createdAtUtc: DateTime.utc(2026, 1, 1, 12, 2),
+              ),
+            ],
+            skip: skip,
+            take: take,
+            hasMore: true,
+          );
+
+    if (_walletFetchCount > 1 && !syncCompleted.isCompleted) {
+      syncCompleted.complete();
+    }
+    return page;
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _MutationLedgerWalletRepository extends WalletRepository {
+  _MutationLedgerWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  _MutationLedgerPhase _phase = _MutationLedgerPhase.initial;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    final balance = _phase == _MutationLedgerPhase.initial ? 10 : 25;
+    return WalletStateModel(
+      userId: 'user-1',
+      balance: balance,
+      adRewardsRemainingToday: 1,
+      isPremium: false,
+      updatedAtUtc: DateTime.utc(2026, 1, 1, 13, balance),
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return switch (_phase) {
+      _MutationLedgerPhase.initial => const OffsetPagedModel(
+        items: <WalletLedgerItem>[],
+        skip: 0,
+        take: 20,
+        hasMore: false,
+      ),
+      _MutationLedgerPhase.claimed => OffsetPagedModel(
+        items: [
+          WalletLedgerItem(
+            entryId: 'entry-claim',
+            userId: 'user-1',
+            delta: 15,
+            balanceAfter: 25,
+            source: 'ad_reward',
+            reason: 'Ad reward',
+            createdAtUtc: DateTime.utc(2026, 1, 1, 13, 1),
+          ),
+        ],
+        skip: skip,
+        take: take,
+        hasMore: true,
+      ),
+      _MutationLedgerPhase.redeemed => OffsetPagedModel(
+        items: [
+          WalletLedgerItem(
+            entryId: 'entry-redeem',
+            userId: 'user-1',
+            delta: 15,
+            balanceAfter: 25,
+            source: 'redeem_code',
+            reason: 'Promo code',
+            createdAtUtc: DateTime.utc(2026, 1, 1, 13, 2),
+          ),
+        ],
+        skip: skip,
+        take: take,
+        hasMore: true,
+      ),
+    };
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+
+  @override
+  Future<WalletStateModel> claimAdReward() async {
+    _phase = _MutationLedgerPhase.claimed;
+    return fetchWallet();
+  }
+
+  @override
+  Future<WalletStateModel> applyRedeemCode(String code) async {
+    _phase = _MutationLedgerPhase.redeemed;
+    return fetchWallet();
+  }
+}
+
+enum _MutationLedgerPhase { initial, claimed, redeemed }
+
+RewardsSummaryModel _emptyRewards() {
+  return const RewardsSummaryModel(
+    referralCode: '',
+    referralBonusSpark: 0,
+    referralStatus: 'none',
+    totalReferralBonusEarned: 0,
+    referredUsersCount: 0,
+    pendingReferredUsersCount: 0,
+    rewardedReferredUsersCount: 0,
+  );
 }
 
 const _pack = CurrencyPackModel(

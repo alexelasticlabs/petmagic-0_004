@@ -27,6 +27,34 @@ void main() {
     );
     expect(onErrorBody, contains('handler.next(err);\n      return;'));
   });
+
+  test('validation fields logging filters sensitive field names', () {
+    final source = File(
+      'lib/core/network/api_logging_interceptor.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('_isSensitiveFieldName'));
+    expect(source, contains("'password'"));
+    expect(source, contains("'token'"));
+    expect(source, contains("'secret'"));
+    expect(source, contains("'authorization'"));
+    expect(source, contains('.where((key) => !_isSensitiveFieldName(key))'));
+  });
+
+  test(
+    'API logging does not persist raw problem detail from server payloads',
+    () {
+      final source = File(
+        'lib/core/network/api_logging_interceptor.dart',
+      ).readAsStringSync();
+
+      expect(source, isNot(contains("'problem_detail'")));
+      expect(
+        source,
+        isNot(contains("_problemString(response?.data, 'detail')")),
+      );
+    },
+  );
 }
 
 String _methodBody(String source, String methodName) {

@@ -74,7 +74,6 @@ class ApiLoggingInterceptor extends Interceptor {
         'response_cf_ray': _headerValue(response?.headers, 'cf-ray'),
         'response_ngrok': _headerValue(response?.headers, 'ngrok-trace-id'),
         'problem_title': _problemString(response?.data, 'title'),
-        'problem_detail': _problemString(response?.data, 'detail'),
         'validation_fields': _validationFields(response?.data),
         'validation_keys': _validationKeys(response?.data),
       },
@@ -196,8 +195,19 @@ class ApiLoggingInterceptor extends Interceptor {
     return errors.keys
         .map((key) => key.toString().trim())
         .where((key) => key.isNotEmpty)
+        .where((key) => !_isSensitiveFieldName(key))
         .take(12)
         .join(',');
+  }
+
+  static bool _isSensitiveFieldName(String name) {
+    final lower = name.toLowerCase();
+    return lower.contains('password') ||
+        lower.contains('token') ||
+        lower.contains('secret') ||
+        lower.contains('authorization') ||
+        lower.contains('api_key') ||
+        lower.contains('apikey');
   }
 
   String? _validationKeys(Object? data) {
