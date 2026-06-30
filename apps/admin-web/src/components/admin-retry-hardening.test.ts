@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readPromoCodesViewLibrarySource } from "./promo-codes-view.test-source";
 
 const roleManagementPath = fileURLToPath(new URL("./role-management-page.tsx", import.meta.url));
 const roleManagementContentPath = fileURLToPath(
   new URL("./role-management-page.content.ts", import.meta.url)
 );
-const promoCodesPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
 const generationsPath = fileURLToPath(new URL("./generations-page.tsx", import.meta.url));
 
 describe("admin retry hardening", () => {
@@ -17,9 +17,7 @@ describe("admin retry hardening", () => {
       "const isRoleRetryFetching = adminsQuery.isFetching || moderatorsQuery.isFetching"
     );
     expect(source).toContain("function requestRoleListsRetry()");
-    expect(source).toContain(
-      "if (!canManageRoles || isRoleRetryFetching) {\n      return;\n    }"
-    );
+    expect(source).toContain("if (!canManageRoles || isRoleRetryFetching) {\n      return;\n    }");
     expect(source).toContain("disabled={!canManageRoles || isRoleRetryFetching}");
     expect(source).toContain("onClick={requestRoleListsRetry}");
     expect(source).toContain(
@@ -49,12 +47,12 @@ describe("admin retry hardening", () => {
     );
     expect(source).toContain("disabled={!canManageRoles || searchQuery.isFetching}");
     expect(source).toContain("void searchQuery.refetch().catch(() => undefined);");
-    expect(source).toContain(
-      "isSearchActive && (searchQuery.isLoading || isSearchRefreshing)"
-    );
+    expect(source).toContain("isSearchActive && (searchQuery.isLoading || isSearchRefreshing)");
     expect(source).toContain("isSearchActive &&\n            !searchQuery.isLoading");
     expect(source).toContain("!isSearchRefreshing &&");
-    expect(source).toContain("!searchQuery.isError &&\n            visibleSearchResults.length === 0");
+    expect(source).toContain(
+      "!searchQuery.isError &&\n            visibleSearchResults.length === 0"
+    );
     expect(source).toContain("visibleSearchResults.map((user) => {");
     expect(source).toContain("function requestSearchRetry()");
     expect(source).toContain(
@@ -62,9 +60,7 @@ describe("admin retry hardening", () => {
     );
     expect(source).toContain("onClick={requestSearchRetry}");
     expect(source).not.toContain("searchResults.map((user) => {");
-    expect(source).not.toContain(
-      "onClick={() => {\n                      if (!canManageRoles)"
-    );
+    expect(source).not.toContain("onClick={() => {\n                      if (!canManageRoles)");
     expect(source).not.toContain(
       "debouncedSearch.trim().length >= 2 &&\n          !searchQuery.isLoading &&\n          searchResults.length === 0"
     );
@@ -76,14 +72,18 @@ describe("admin retry hardening", () => {
 
     expect(contentSource).toContain('adminsError: "Не удалось загрузить Admin"');
     expect(contentSource).toContain('moderatorsError: "Не удалось загрузить Moderator"');
-    expect(source).toContain("const hasAnyRoleData = Boolean(adminsQuery.data || moderatorsQuery.data);");
+    expect(source).toContain(
+      "const hasAnyRoleData = Boolean(adminsQuery.data || moderatorsQuery.data);"
+    );
     expect(source).toContain("const hasBlockingRoleError = isError && !hasAnyRoleData;");
     expect(source).toContain(") : hasBlockingRoleError ? (");
     expect(source).toContain(
       "description={getAdminErrorMessage(adminsQuery.error ?? moderatorsQuery.error, text.error)}"
     );
     expect(source).toContain("title={text.adminsError}");
-    expect(source).toContain("description={getAdminErrorMessage(adminsQuery.error, text.adminsError)}");
+    expect(source).toContain(
+      "description={getAdminErrorMessage(adminsQuery.error, text.adminsError)}"
+    );
     expect(source).toContain("disabled={!canManageRoles || adminsQuery.isFetching}");
     expect(source).toContain("function requestAdminsRetry()");
     expect(source).toContain(
@@ -143,7 +143,9 @@ describe("admin retry hardening", () => {
     );
     expect(source).toContain("function setAdminsPageContext(nextPage: number)");
     expect(source).toContain("function setModeratorsPageContext(nextPage: number)");
-    expect(source).toContain("resetPendingRoleAction();\n    setAdminsPage(Math.max(0, nextPage));");
+    expect(source).toContain(
+      "resetPendingRoleAction();\n    setAdminsPage(Math.max(0, nextPage));"
+    );
     expect(source).toContain(
       "resetPendingRoleAction();\n    setModeratorsPage(Math.max(0, nextPage));"
     );
@@ -164,7 +166,7 @@ describe("admin retry hardening", () => {
   });
 
   it("swallows safe manual retry failures on promo and generations pages", () => {
-    const promoSource = readFileSync(promoCodesPath, "utf8");
+    const promoSource = readPromoCodesViewLibrarySource();
     const generationsSource = readFileSync(generationsPath, "utf8");
 
     expect(promoSource).toContain("function requestRefreshPromoCodes()");
@@ -177,7 +179,7 @@ describe("admin retry hardening", () => {
       "if (!canManagePromoCodes || isPromoRefreshFetching) {\n      return;\n    }\n\n    void Promise.allSettled([promoCodesQuery.refetch(), promoMetricsQuery.refetch()]);"
     );
     expect(promoSource).toContain("function requestRefreshPromoMetrics()");
-    expect(promoSource).toContain("onClick={requestRefreshPromoMetrics}");
+    expect(promoSource).toContain("onRefreshMetrics={requestRefreshPromoMetrics}");
     expect(promoSource).toContain("onRefresh={requestRefreshPromoCodes}");
     expect(promoSource).not.toContain(
       "void promoCodesQuery.refetch().catch(() => undefined);\n            void promoMetricsQuery.refetch().catch(() => undefined);"

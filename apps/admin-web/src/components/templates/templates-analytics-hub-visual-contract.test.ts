@@ -1,15 +1,15 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readTemplatesAnalyticsHubPageLibrarySource } from "./templates-analytics-hub-page.test-source";
 
-const hubPagePath = fileURLToPath(new URL("./templates-analytics-hub-page.tsx", import.meta.url));
 const hubStylesPath = fileURLToPath(
   new URL("./templates-analytics-hub-page.module.css", import.meta.url)
 );
 
 describe("templates analytics hub visual contract", () => {
   it("keeps chart and funnel colors on semantic theme tokens", () => {
-    const source = readFileSync(hubPagePath, "utf8");
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
     const styles = readFileSync(hubStylesPath, "utf8");
 
     expect(source).toContain('stopColor="var(--success)"');
@@ -26,7 +26,9 @@ describe("templates analytics hub visual contract", () => {
 
     expect(styles).toContain(".chartSummary {");
     expect(styles).toContain("border-radius: var(--radius-sm);");
-    expect(styles).not.toMatch(/border-radius:\s*(?:0\.7rem|0\.8rem|0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/);
+    expect(styles).not.toMatch(
+      /border-radius:\s*(?:0\.7rem|0\.8rem|0\.9rem|1rem|1[2-9]px|[2-9][0-9]px)/
+    );
   });
 
   it("keeps the analytics table usable on narrow screens", () => {
@@ -54,7 +56,7 @@ describe("templates analytics hub visual contract", () => {
   });
 
   it("keeps access filter options unique", () => {
-    const source = readFileSync(hubPagePath, "utf8");
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
     const accessFilterBlock = source.slice(
       source.indexOf("label={text.accessFilter}"),
       source.indexOf("label={text.sortFilter}")
@@ -65,7 +67,7 @@ describe("templates analytics hub visual contract", () => {
   });
 
   it("bounds analytics bar widths so backend outliers cannot overflow panels", () => {
-    const source = readFileSync(hubPagePath, "utf8");
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
 
     expect(source).toContain("function getBoundedBarWidthPercent");
     expect(source).toContain("return Math.min(100, Math.max(minimumVisiblePercent, value));");
@@ -78,23 +80,31 @@ describe("templates analytics hub visual contract", () => {
   });
 
   it("sanitizes backend analytics labels and short identifiers before rendering", () => {
-    const source = readFileSync(hubPagePath, "utf8");
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
 
     expect(source).toContain("function formatAnalyticsDisplayText");
     expect(source).toContain("return sanitizeSensitiveText(value, maxLength);");
-    expect(source.match(/<strong>\{formatAnalyticsDisplayText\(row\.label, 120\)\}<\/strong>/g) ?? []).toHaveLength(2);
+    expect(
+      source.match(/<strong>\{formatAnalyticsDisplayText\(row\.label, 120\)\}<\/strong>/g) ?? []
+    ).toHaveLength(2);
     expect(source).toContain("{formatAnalyticsDisplayText(item.templateTitle, 120)}");
-    expect(source).toContain("return normalized ? formatAnalyticsDisplayText(normalized, 96) : \"-\";");
-    expect(source).toContain("const safeValue = formatAnalyticsDisplayText(value, 32).replace(/\\s/g, \"\");");
-    expect(source).toContain("return \"-\";");
-    expect(source).not.toContain('<strong>{row.label}</strong>\n              <span>{formatTemplateCount');
+    expect(source).toContain(
+      'return normalized ? formatAnalyticsDisplayText(normalized, 96) : "-";'
+    );
+    expect(source).toContain(
+      'const safeValue = formatAnalyticsDisplayText(value, 32).replace(/\\s/g, "");'
+    );
+    expect(source).toContain('return "-";');
+    expect(source).not.toContain(
+      "<strong>{row.label}</strong>\n              <span>{formatTemplateCount"
+    );
     expect(source).not.toContain("{item.templateTitle}");
     expect(source).not.toContain("return `${value.slice(0, 8)}...${value.slice(-4)}`;");
-    expect(source).not.toContain("return normalized ? normalized : \"-\";");
+    expect(source).not.toContain('return normalized ? normalized : "-";');
   });
 
   it("locks analytics hub controls while overview data is refreshing", () => {
-    const source = readFileSync(hubPagePath, "utf8");
+    const source = readTemplatesAnalyticsHubPageLibrarySource();
     const styles = readFileSync(hubStylesPath, "utf8");
 
     expect(source).toContain("const isHubControlsLocked = overviewQuery.isFetching;");

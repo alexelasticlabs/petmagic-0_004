@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readTemplatesCatalogViewLibrarySource } from "./templates-catalog-view.test-source";
 
 const phonePreviewPath = fileURLToPath(
   new URL("./template-phone-preview-card.tsx", import.meta.url)
@@ -9,7 +10,6 @@ const overviewPath = fileURLToPath(
   new URL("./template-analytics-overview-sections.tsx", import.meta.url)
 );
 const analyticsPagePath = fileURLToPath(new URL("./template-analytics-page.tsx", import.meta.url));
-const catalogPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
 
 describe("template sensitive display", () => {
   it("sanitizes template metadata before rendering phone preview copy", () => {
@@ -41,7 +41,7 @@ describe("template sensitive display", () => {
     expect(source).toContain("<p>{safeTemplateDescription}</p>");
     expect(source).not.toContain("<h2>{template.title}</h2>");
     expect(source).not.toContain("<p>{template.shortDescription}</p>");
-    expect(source).not.toContain('value={template.category}');
+    expect(source).not.toContain("value={template.category}");
   });
 
   it("sanitizes template analytics page breadcrumb metadata before display", () => {
@@ -54,11 +54,11 @@ describe("template sensitive display", () => {
   });
 
   it("sanitizes template catalog list metadata and title attributes", () => {
-    const source = readFileSync(catalogPath, "utf8");
+    const source = readTemplatesCatalogViewLibrarySource();
 
     expect(source).toContain("const safeTemplateTitle = sanitizeSensitiveText(template.title, 96)");
     expect(source).toContain(
-      "const safeTemplateDescription = sanitizeSensitiveText(\n                        template.shortDescription,\n                        180"
+      "const safeTemplateDescription = sanitizeSensitiveText(template.shortDescription, 180)"
     );
     expect(source).toContain(
       "const safeTemplateCategory = sanitizeSensitiveText(template.category, 64)"

@@ -1,616 +1,74 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-
-import {
-  CalendarIcon,
-  PencilIcon,
-  RefreshIcon,
-  TemplatesIcon,
-} from "@/components/admin/admin-icons";
+import { RefreshIcon } from "@/components/admin/admin-icons";
 import {
   AdminBadge,
-  AdminCard,
-  AdminIconTile,
   AdminPage,
   AdminPageGrid,
   AdminPageHero,
-  AdminSelectField,
   AdminStateCard,
-  adminTableStyles,
 } from "@/components/admin/admin-primitives";
-import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
-import {
-  getTemplatesDailyFeaturedPageText,
-  type TemplatesDailyFeaturedPageText,
-} from "@/components/templates/templates-daily-featured-page.content";
-import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
+import { safeDisplayText } from "@/components/templates/templates-daily-featured-page.helpers";
 import styles from "@/components/templates/templates-daily-featured-page.module.css";
-import { Button } from "@/components/ui/button";
-import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {
-  autoPickTemplateOfTheDay,
-  createTemplateOfTheDay,
-  deleteTemplateOfTheDay,
-  fetchAdminTemplates,
-  fetchCurrentTemplateOfTheDay,
-  fetchTemplateOfTheDaySchedule,
-  fetchTemplateOfTheDaySettings,
-  updateTemplateOfTheDay,
-  updateTemplateOfTheDaySettings,
-  useAuthSession,
-  type AdminTemplateListItem,
-  type AdminTemplateOfTheDay,
-  type AdminTemplateOfTheDaySettings,
-  type TemplateOfTheDayPayload,
-  type TemplateType,
-} from "@/lib/api-client";
-import { clientLogger } from "@/lib/client-logger";
-import { type Locale } from "@/lib/i18n";
-import { sanitizeSensitiveText } from "@/lib/sensitive-display";
-
-type TemplatesDailyFeaturedPageProps = {
-  locale: Locale;
-};
-
-type AssignmentFormState = {
-  id: string | null;
-  templateId: string;
-  startDate: string;
-  endDate: string;
-  priority: string;
-  isActive: boolean;
-  titleOverride: string;
-  subtitleOverride: string;
-  badgeTextOverride: string;
-};
-
-type AutoPickState = {
-  date: string;
-  autoModeEnabled: boolean;
-  allowedTypes: "both" | "image" | "video";
-  excludeRecentDays: string;
-};
-
-type TemplateAccessFilter = "" | "premium" | "free";
-
-type TemplateOption = Pick<
-  AdminTemplateListItem,
-  "templateId" | "templateType" | "title" | "shortDescription" | "category" | "isPremium" | "previewAsset"
->;
-
-const SEARCH_LIMIT = 80;
-const SEARCH_DEBOUNCE_MS = 300;
-const TEMPLATE_OPTIONS_TAKE = 30;
-
-function useDebouncedValue(value: string, delayMs: number) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedValue(value), delayMs);
-    return () => window.clearTimeout(timeout);
-  }, [delayMs, value]);
-
-  return debouncedValue;
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function emptyForm(date = todayIso()): AssignmentFormState {
-  return {
-    id: null,
-    templateId: "",
-    startDate: date,
-    endDate: "",
-    priority: "0",
-    isActive: true,
-    titleOverride: "",
-    subtitleOverride: "",
-    badgeTextOverride: "",
-  };
-}
-
-function parseExcludeRecentDays(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) {
-    return 7;
-  }
-
-  return Math.min(Math.max(parsed, 0), 365);
-}
-
-function toPayload(form: AssignmentFormState): TemplateOfTheDayPayload {
-  return {
-    templateId: form.templateId,
-    startDate: form.startDate,
-    endDate: form.endDate.trim() || null,
-    isActive: form.isActive,
-    isManual: true,
-    priority: Number.parseInt(form.priority || "0", 10) || 0,
-    titleOverride: form.titleOverride.trim() || null,
-    subtitleOverride: form.subtitleOverride.trim() || null,
-    badgeTextOverride: form.badgeTextOverride.trim() || null,
-  };
-}
-
-function formFromAssignment(assignment: AdminTemplateOfTheDay): AssignmentFormState {
-  return {
-    id: assignment.id,
-    templateId: assignment.templateId,
-    startDate: assignment.startDate,
-    endDate: assignment.endDate ?? "",
-    priority: String(assignment.priority),
-    isActive: assignment.isActive,
-    titleOverride: assignment.titleOverride ?? "",
-    subtitleOverride: assignment.subtitleOverride ?? "",
-    badgeTextOverride: assignment.badgeTextOverride ?? "",
-  };
-}
-
-function isVideoTemplate(type: TemplateType | string) {
-  return type === "Video";
-}
-
-function getPreviewUrl(template?: TemplateOption | AdminTemplateListItem | AdminTemplateOfTheDay | null) {
-  return template?.previewAsset?.url?.trim() || null;
-}
-
-function optionFromTemplate(template: AdminTemplateListItem): TemplateOption {
-  return {
-    templateId: template.templateId,
-    templateType: template.templateType,
-    title: template.title,
-    shortDescription: template.shortDescription,
-    category: template.category,
-    isPremium: template.isPremium,
-    previewAsset: template.previewAsset,
-  };
-}
-
-function optionFromAssignment(assignment: AdminTemplateOfTheDay): TemplateOption {
-  return {
-    templateId: assignment.templateId,
-    templateType: assignment.templateType,
-    title: assignment.templateTitle,
-    shortDescription: assignment.subtitleOverride ?? "",
-    category: assignment.category,
-    isPremium: assignment.isPremium,
-    previewAsset: assignment.previewAsset ?? undefined,
-  };
-}
-
-function statusTone(assignment: AdminTemplateOfTheDay) {
-  if (!assignment.isActive) return "neutral" as const;
-  if (assignment.isManual) return "success" as const;
-  return "info" as const;
-}
-
-function formatDateRange(assignment: AdminTemplateOfTheDay) {
-  return assignment.endDate
-    ? `${assignment.startDate} - ${assignment.endDate}`
-    : assignment.startDate;
-}
-
-function safeDisplayText(value: string | null | undefined, maxLength = 120) {
-  return sanitizeSensitiveText(value, maxLength);
-}
-
-function safeErrorDetails(error: unknown) {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorDigest:
-      error && typeof error === "object" && "digest" in error
-        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
-        : undefined,
-  };
-}
-
-function safeActionContext(input: {
-  assignmentId?: string | null;
-  templateId?: string | null;
-  templateTitle?: string | null;
-}) {
-  return {
-    assignmentId: input.assignmentId ? sanitizeSensitiveText(input.assignmentId, 80) : undefined,
-    templateId: input.templateId ? sanitizeSensitiveText(input.templateId, 80) : undefined,
-    templateTitle: input.templateTitle ? sanitizeSensitiveText(input.templateTitle, 96) : undefined,
-  };
-}
-
-function dateRangesOverlap(startDate: string, endDate: string, assignment: AdminTemplateOfTheDay) {
-  const requestedStart = startDate || todayIso();
-  const requestedEnd = endDate.trim() || "9999-12-31";
-  const assignmentEnd = assignment.endDate ?? "9999-12-31";
-  return assignment.startDate <= requestedEnd && assignmentEnd >= requestedStart;
-}
-
-function hasInvalidDateRange(startDate: string, endDate: string) {
-  return endDate.trim().length > 0 && endDate.trim() < (startDate || todayIso());
-}
+  AutoPickSettingsCard,
+  CurrentAssignmentCard,
+  FeaturedPreviewCard,
+  TemplateAssignmentEditorCard,
+} from "@/components/templates/templates-daily-featured-page.sections";
+import { TemplateScheduleCard } from "@/components/templates/templates-daily-featured-page.schedule";
+import type { TemplatesDailyFeaturedPageProps } from "@/components/templates/templates-daily-featured-page.types";
+import { useTemplatesDailyFeaturedController } from "@/components/templates/use-templates-daily-featured-controller";
+import { Button } from "@/components/ui/button";
 
 export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPageProps) {
-  const text = useMemo(() => getTemplatesDailyFeaturedPageText(locale), [locale]);
-  const router = useRouter();
-  const session = useAuthSession();
-  const canManageTemplates = session?.user.roles.includes("Admin") ?? false;
-  const [schedule, setSchedule] = useState<AdminTemplateOfTheDay[]>([]);
-  const [current, setCurrent] = useState<AdminTemplateOfTheDay | null>(null);
-  const [settings, setSettings] = useState<AdminTemplateOfTheDaySettings | null>(null);
-  const [templates, setTemplates] = useState<AdminTemplateListItem[]>([]);
-  const [search, setSearch] = useState("");
-  const [templateTypeFilter, setTemplateTypeFilter] = useState<"" | TemplateType>("");
-  const [templateAccessFilter, setTemplateAccessFilter] = useState<TemplateAccessFilter>("");
-  const debouncedSearch = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
-  const [form, setForm] = useState<AssignmentFormState>(() => emptyForm());
-  const [selectedTemplateOptionSnapshot, setSelectedTemplateOptionSnapshot] =
-    useState<TemplateOption | null>(null);
-  const [autoPick, setAutoPick] = useState<AutoPickState>({
-    date: todayIso(),
-    autoModeEnabled: true,
-    allowedTypes: "both",
-    excludeRecentDays: "7",
-  });
-  const [isScheduleLoading, setIsScheduleLoading] = useState(true);
-  const [isTemplateOptionsLoading, setIsTemplateOptionsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [templateOptionsError, setTemplateOptionsError] = useState<string | null>(null);
-  const [assignmentPendingDelete, setAssignmentPendingDelete] =
-    useState<AdminTemplateOfTheDay | null>(null);
-
-  const selectedTemplate = templates.find((template) => template.templateId === form.templateId);
-  const selectedAssignment = schedule.find((assignment) => assignment.id === form.id);
-  const selectedTemplateSnapshot = useMemo(() => {
-    if (!form.templateId) {
-      return null;
-    }
-
-    if (selectedTemplate) {
-      return optionFromTemplate(selectedTemplate);
-    }
-
-    if (selectedAssignment?.templateId === form.templateId) {
-      return optionFromAssignment(selectedAssignment);
-    }
-
-    if (selectedTemplateOptionSnapshot?.templateId === form.templateId) {
-      return selectedTemplateOptionSnapshot;
-    }
-
-    return null;
-  }, [form.templateId, selectedAssignment, selectedTemplate, selectedTemplateOptionSnapshot]);
-  const templateOptions = useMemo(() => {
-    const options = templates.map(optionFromTemplate);
-    if (
-      selectedTemplateSnapshot &&
-      selectedTemplateSnapshot.templateId === form.templateId &&
-      !options.some((template) => template.templateId === selectedTemplateSnapshot.templateId)
-    ) {
-      return [selectedTemplateSnapshot, ...options];
-    }
-
-    return options;
-  }, [form.templateId, selectedTemplateSnapshot, templates]);
-  const previewTitle = safeDisplayText(
-    form.titleOverride.trim() || selectedTemplateSnapshot?.title || "",
-    120
-  );
-  const previewSubtitle = safeDisplayText(
-    form.subtitleOverride.trim() || selectedTemplateSnapshot?.shortDescription || "",
-    220
-  );
-  const previewBadge = safeDisplayText(form.badgeTextOverride.trim() || text.heroBadge, 64);
-  const previewType = selectedTemplateSnapshot?.templateType ?? ("Image" as TemplateType);
-  const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot);
-  const isLoading = isScheduleLoading || isTemplateOptionsLoading;
-  const isActionLocked = isSubmitting || isLoading;
-  const isAutoPickSettingsDirty =
-    settings === null ||
-    autoPick.autoModeEnabled !== settings.autoModeEnabled ||
-    autoPick.allowedTypes !== settings.allowedTypes ||
-    parseExcludeRecentDays(autoPick.excludeRecentDays) !== settings.excludeRecentDays;
-  const scheduleAssignmentIds = useMemo(
-    () => new Set(schedule.map((assignment) => assignment.id)),
-    [schedule]
-  );
-  const dateOccupiedWarning = schedule.some(
-    (assignment) =>
-      assignment.isActive &&
-      assignment.isManual &&
-      assignment.id !== form.id &&
-      dateRangesOverlap(form.startDate, form.endDate, assignment)
-  );
-  const invalidDateRangeWarning = hasInvalidDateRange(form.startDate, form.endDate);
-  const isAutoPickDateMissing = autoPick.date.trim().length === 0;
-
-  const loadTemplateOptions = useCallback(
-    async (query: string, signal?: AbortSignal) => {
-      if (!canManageTemplates) {
-        setTemplates([]);
-        setTemplateOptionsError(null);
-        setIsTemplateOptionsLoading(false);
-        return;
-      }
-
-      setIsTemplateOptionsLoading(true);
-      setTemplates([]);
-      setTemplateOptionsError(null);
-      try {
-        const templateResponse = await fetchAdminTemplates(
-          {
-            status: "Active",
-            type: templateTypeFilter || undefined,
-            search: query || undefined,
-            access: templateAccessFilter || undefined,
-            take: TEMPLATE_OPTIONS_TAKE,
-          },
-          signal
-        );
-        setTemplates(templateResponse.items);
-        setTemplateOptionsError(null);
-      } catch (loadError) {
-        if (signal?.aborted) return;
-        clientLogger.warn(
-          "templates.daily_featured_template_options_failed",
-          safeErrorDetails(loadError)
-        );
-        setTemplates([]);
-        setTemplateOptionsError(getAdminErrorMessage(loadError, text.loadError));
-      } finally {
-        if (!signal?.aborted) {
-          setIsTemplateOptionsLoading(false);
-        }
-      }
-    },
-    [canManageTemplates, templateAccessFilter, templateTypeFilter, text.loadError]
-  );
-
-  const loadScheduleData = useCallback(
-    async (signal?: AbortSignal) => {
-      if (!canManageTemplates) {
-        setIsScheduleLoading(false);
-        return;
-      }
-
-      setIsScheduleLoading(true);
-      setError(null);
-      try {
-        const [scheduleResponse, currentResponse, settingsResponse] = await Promise.allSettled([
-          fetchTemplateOfTheDaySchedule(signal),
-          fetchCurrentTemplateOfTheDay(undefined, signal),
-          fetchTemplateOfTheDaySettings(signal),
-        ]);
-
-        if (signal?.aborted) return;
-
-        let loadFailure: unknown = null;
-
-        if (scheduleResponse.status === "fulfilled") {
-          setSchedule(scheduleResponse.value.items);
-        } else {
-          loadFailure ??= scheduleResponse.reason;
-        }
-
-        if (currentResponse.status === "fulfilled") {
-          setCurrent(currentResponse.value);
-        } else {
-          loadFailure ??= currentResponse.reason;
-        }
-
-        if (settingsResponse.status === "fulfilled") {
-          setSettings(settingsResponse.value);
-          setAutoPick((state) => ({
-            ...state,
-            autoModeEnabled: settingsResponse.value.autoModeEnabled,
-            allowedTypes: settingsResponse.value.allowedTypes,
-            excludeRecentDays: String(settingsResponse.value.excludeRecentDays),
-          }));
-        } else {
-          loadFailure ??= settingsResponse.reason;
-        }
-
-        if (loadFailure) {
-          clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadFailure));
-          setError(getAdminErrorMessage(loadFailure, text.loadError));
-        }
-      } catch (loadError) {
-        if (signal?.aborted) return;
-        clientLogger.warn("templates.daily_featured_load_failed", safeErrorDetails(loadError));
-        setError(getAdminErrorMessage(loadError, text.loadError));
-      } finally {
-        if (!signal?.aborted) {
-          setIsScheduleLoading(false);
-        }
-      }
-    },
-    [canManageTemplates, text.loadError]
-  );
-
-  const refreshPageData = useCallback(async () => {
-    if (!canManageTemplates) {
-      return;
-    }
-
-    await Promise.allSettled([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);
-  }, [canManageTemplates, debouncedSearch, loadScheduleData, loadTemplateOptions]);
-
-  useEffect(() => {
-    ensureAdminSession(locale, router, { requiredRole: "Admin" });
-  }, [locale, router, session]);
-
-  useEffect(() => {
-    if (!canManageTemplates) {
-      return;
-    }
-
-    const controller = new AbortController();
-    queueMicrotask(() => void loadScheduleData(controller.signal));
-    return () => controller.abort();
-  }, [canManageTemplates, loadScheduleData]);
-
-  useEffect(() => {
-    if (!canManageTemplates) {
-      return;
-    }
-
-    const controller = new AbortController();
-    queueMicrotask(() => void loadTemplateOptions(debouncedSearch, controller.signal));
-    return () => controller.abort();
-  }, [canManageTemplates, debouncedSearch, loadTemplateOptions]);
-
-  useEffect(() => {
-    if (isScheduleLoading || isActionLocked) {
-      return;
-    }
-
-    const shouldResetPendingDelete =
-      assignmentPendingDelete && !scheduleAssignmentIds.has(assignmentPendingDelete.id);
-    const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);
-
-    if (!shouldResetPendingDelete && !shouldResetForm) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      if (shouldResetPendingDelete) {
-        setAssignmentPendingDelete(null);
-      }
-
-      if (shouldResetForm) {
-        setSelectedTemplateOptionSnapshot(null);
-        setForm(emptyForm(form.startDate));
-      }
-    });
-  }, [
+  const {
     assignmentPendingDelete,
-    form.id,
-    form.startDate,
+    autoPick,
+    canManageTemplates,
+    current,
+    dateOccupiedWarning,
+    debouncedSearch,
+    error,
+    form,
+    handleAutoPick,
+    handleDelete,
+    handleEditAssignment,
+    handleFormChange,
+    handleResetForm,
+    handleSaveSettings,
+    handleSubmit,
+    handleTemplateSelectionChange,
+    invalidDateRangeWarning,
     isActionLocked,
+    isAutoPickDateMissing,
+    isAutoPickSettingsDirty,
     isScheduleLoading,
-    scheduleAssignmentIds,
-  ]);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!canManageTemplates || !form.templateId || isActionLocked || invalidDateRangeWarning) return;
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const payload = toPayload(form);
-      if (form.id) {
-        await updateTemplateOfTheDay(form.id, payload);
-      } else {
-        await createTemplateOfTheDay(payload);
-      }
-      setSelectedTemplateOptionSnapshot(null);
-      setForm(emptyForm(form.startDate));
-      await loadScheduleData();
-    } catch (saveError) {
-      clientLogger.warn("templates.daily_featured_save_failed", {
-        ...safeActionContext({
-          assignmentId: form.id,
-          templateId: form.templateId,
-          templateTitle: selectedTemplateSnapshot?.title,
-        }),
-        ...safeErrorDetails(saveError),
-      });
-      setError(getAdminErrorMessage(saveError, text.saveError));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDelete(assignment: AdminTemplateOfTheDay) {
-    if (!canManageTemplates || isActionLocked) {
-      return false;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await deleteTemplateOfTheDay(assignment.id);
-      if (form.id === assignment.id) {
-        setSelectedTemplateOptionSnapshot(null);
-        setForm(emptyForm(form.startDate));
-      }
-      await loadScheduleData();
-      return true;
-    } catch (deleteError) {
-      clientLogger.warn("templates.daily_featured_delete_failed", {
-        ...safeActionContext({
-          assignmentId: assignment.id,
-          templateId: assignment.templateId,
-          templateTitle: assignment.templateTitle,
-        }),
-        ...safeErrorDetails(deleteError),
-      });
-      setError(getAdminErrorMessage(deleteError, text.saveError));
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleAutoPick() {
-    if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await autoPickTemplateOfTheDay({
-        date: autoPick.date,
-        allowedTypes: autoPick.allowedTypes,
-        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
-      });
-      await loadScheduleData();
-    } catch (autoPickError) {
-      clientLogger.warn("templates.daily_featured_auto_pick_failed", {
-        autoPickDate: sanitizeSensitiveText(autoPick.date, 20),
-        allowedTypes: autoPick.allowedTypes,
-        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
-        ...safeErrorDetails(autoPickError),
-      });
-      setError(getAdminErrorMessage(autoPickError, text.saveError));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleSaveSettings() {
-    if (!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty) return;
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const saved = await updateTemplateOfTheDaySettings({
-        autoModeEnabled: autoPick.autoModeEnabled,
-        allowedTypes: autoPick.allowedTypes,
-        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
-      });
-      setSettings(saved);
-      setAutoPick((state) => ({
-        ...state,
-        autoModeEnabled: saved.autoModeEnabled,
-        allowedTypes: saved.allowedTypes,
-        excludeRecentDays: String(saved.excludeRecentDays),
-      }));
-    } catch (settingsError) {
-      clientLogger.warn("templates.daily_featured_settings_save_failed", {
-        autoModeEnabled: autoPick.autoModeEnabled,
-        allowedTypes: autoPick.allowedTypes,
-        excludeRecentDays: parseExcludeRecentDays(autoPick.excludeRecentDays),
-        ...safeErrorDetails(settingsError),
-      });
-      setError(getAdminErrorMessage(settingsError, text.saveError));
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+    isTemplateOptionsLoading,
+    loadTemplateOptions,
+    previewBadge,
+    previewMediaUrl,
+    previewSubtitle,
+    previewTitle,
+    previewType,
+    refreshPageData,
+    schedule,
+    search,
+    selectedTemplateSnapshot,
+    setAssignmentPendingDelete,
+    setAutoPick,
+    setSearch,
+    setTemplateAccessFilter,
+    setTemplateTypeFilter,
+    settings,
+    templateAccessFilter,
+    templateOptions,
+    templateOptionsError,
+    templateTypeFilter,
+    text,
+    templates,
+  } = useTemplatesDailyFeaturedController({ locale });
 
   return (
     <AdminPage className={styles.page}>
@@ -656,430 +114,72 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
       {isScheduleLoading ? <AdminStateCard title={text.loading} /> : null}
 
       <AdminPageGrid columns="two" className={styles.topGrid}>
-        <AdminCard title={text.current}>
-          {current ? (
-            <AssignmentSummary assignment={current} text={text} />
-          ) : (
-            <AdminStateCard description={text.noCurrent} />
-          )}
-        </AdminCard>
-
-        <AdminCard title={text.autoPick} description={text.autoPickDescription}>
-          <div className={styles.assignmentSummary}>
-            <strong>{text.autoModeStatus}</strong>
-            <span>{autoPick.autoModeEnabled ? text.autoModeEnabled : text.autoModeDisabled}</span>
-          </div>
-          <label className={styles.checkboxField}>
-            <input
-              type="checkbox"
-              checked={autoPick.autoModeEnabled}
-              disabled={!canManageTemplates || isActionLocked}
-              onChange={(event) =>
-                setAutoPick((value) => ({
-                  ...value,
-                  autoModeEnabled: event.target.checked,
-                }))
-              }
-            />
-            <span>{text.autoMode}</span>
-          </label>
-          <div className={styles.compactGrid}>
-            <AdminSelectField
-              label={text.allowedTypes}
-              value={autoPick.allowedTypes}
-              disabled={!canManageTemplates || isActionLocked}
-              onChange={(value) =>
-                setAutoPick((state) => ({
-                  ...state,
-                  allowedTypes: value as AutoPickState["allowedTypes"],
-                }))
-              }
-              options={[
-                { value: "both", label: text.allowedBoth },
-                { value: "image", label: text.image },
-                { value: "video", label: text.video },
-              ]}
-            />
-            <label className={styles.field}>
-              <span>{text.excludeRecent}</span>
-              <input
-                className={styles.control}
-                type="number"
-                min={0}
-                max={365}
-                value={autoPick.excludeRecentDays}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) =>
-                  setAutoPick((value) => ({ ...value, excludeRecentDays: event.target.value }))
-                }
-              />
-            </label>
-          </div>
-          <div className={styles.actionRow}>
-            <Button
-              variant="secondary"
-              onClick={() => void handleSaveSettings()}
-              disabled={!canManageTemplates || isActionLocked || !isAutoPickSettingsDirty}
-            >
-              {text.autoModeSave}
-            </Button>
-          </div>
-          <div className={styles.compactGrid}>
-            <label className={styles.field}>
-              <span>{text.startDate}</span>
-              <input
-                className={styles.control}
-                type="date"
-                required
-                value={autoPick.date}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) =>
-                  setAutoPick((value) => ({ ...value, date: event.target.value }))
-                }
-              />
-            </label>
-          </div>
-          {isAutoPickDateMissing ? (
-            <AdminStateCard tone="warning" description={text.autoPickDateRequired} />
-          ) : null}
-          <div className={styles.actionRow}>
-            <Button
-              variant="primary"
-              onClick={() => void handleAutoPick()}
-              disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}
-            >
-              <CalendarIcon className={styles.buttonIcon} />
-              {text.autoPickRun}
-            </Button>
-          </div>
-        </AdminCard>
+        <CurrentAssignmentCard current={current} text={text} />
+        <AutoPickSettingsCard
+          text={text}
+          autoPick={autoPick}
+          canManageTemplates={canManageTemplates}
+          isActionLocked={isActionLocked}
+          isAutoPickSettingsDirty={isAutoPickSettingsDirty}
+          isAutoPickDateMissing={isAutoPickDateMissing}
+          onAutoModeEnabledChange={(value) =>
+            setAutoPick((state) => ({ ...state, autoModeEnabled: value }))
+          }
+          onAllowedTypesChange={(value) =>
+            setAutoPick((state) => ({ ...state, allowedTypes: value }))
+          }
+          onExcludeRecentDaysChange={(value) =>
+            setAutoPick((state) => ({ ...state, excludeRecentDays: value }))
+          }
+          onDateChange={(value) => setAutoPick((state) => ({ ...state, date: value }))}
+          onSaveSettings={() => void handleSaveSettings()}
+          onRunAutoPick={() => void handleAutoPick()}
+        />
       </AdminPageGrid>
 
       <AdminPageGrid columns="two" className={styles.editorGrid}>
-        <AdminCard
-          title={text.form}
-          description={canManageTemplates ? text.formDescription : text.formAdminOnly}
-        >
-          <form onSubmit={handleSubmit} className={styles.form} aria-busy={isActionLocked}>
-            <label className={styles.field}>
-              <span>{text.templateSearch}</span>
-              <input
-                className={styles.control}
-                value={search}
-                maxLength={SEARCH_LIMIT}
-                placeholder={text.templateSearchPlaceholder}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) => setSearch(event.target.value.slice(0, SEARCH_LIMIT))}
-              />
-            </label>
-            <div className={styles.compactGrid}>
-              <AdminSelectField
-                label={text.templateTypeFilter}
-                value={templateTypeFilter}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(value) => setTemplateTypeFilter(value as "" | TemplateType)}
-                options={[
-                  { value: "", label: text.allTemplateTypes },
-                  { value: "Image", label: text.image },
-                  { value: "Video", label: text.video },
-                ]}
-              />
-              <AdminSelectField
-                label={text.templateAccessFilter}
-                value={templateAccessFilter}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(value) => setTemplateAccessFilter(value as TemplateAccessFilter)}
-                options={[
-                  { value: "", label: text.allAccessLevels },
-                  { value: "free", label: text.free },
-                  { value: "premium", label: text.premium },
-                ]}
-              />
-              <div className={styles.inlineStatus}>{text.activeTemplatesOnly}</div>
-            </div>
-            <label className={styles.field}>
-              <span>{text.template}</span>
-              <select
-                className={styles.control}
-                value={form.templateId}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) => {
-                  const nextTemplateId = event.target.value;
-                  setSelectedTemplateOptionSnapshot(
-                    templateOptions.find((template) => template.templateId === nextTemplateId) ??
-                      null
-                  );
-                  setForm((state) => ({ ...state, templateId: nextTemplateId }));
-                }}
-              >
-                <option value="">
-                  {isTemplateOptionsLoading ? text.loadingTemplates : text.selectTemplate}
-                </option>
-                {templateOptions.map((template) => (
-                  <option key={template.templateId} value={template.templateId}>
-                    {safeDisplayText(template.title, 120)} · {template.templateType} ·{" "}
-                    {safeDisplayText(template.category, 72)} ·{" "}
-                    {template.isPremium ? text.premium : text.free}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {templateOptionsError ? (
-              <AdminStateCard
-                tone="warning"
-                description={templateOptionsError}
-                action={
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={!canManageTemplates || isActionLocked}
-                    onClick={() => void loadTemplateOptions(debouncedSearch)}
-                  >
-                    {text.retry}
-                  </Button>
-                }
-              />
-            ) : null}
-            {!isTemplateOptionsLoading && templates.length === 0 ? (
-              <AdminStateCard tone="info" description={text.noTemplates} />
-            ) : null}
-            {dateOccupiedWarning ? (
-              <AdminStateCard tone="warning" description={text.dateOccupiedWarning} />
-            ) : null}
-            {invalidDateRangeWarning ? (
-              <AdminStateCard tone="danger" description={text.invalidDateRangeWarning} />
-            ) : null}
-            <div className={styles.compactGrid}>
-              <label className={styles.field}>
-                <span>{text.startDate}</span>
-                <input
-                  className={styles.control}
-                  type="date"
-                  required
-                  value={form.startDate}
-                  disabled={!canManageTemplates || isActionLocked}
-                  onChange={(event) =>
-                    setForm((state) => ({ ...state, startDate: event.target.value }))
-                  }
-                />
-              </label>
-              <label className={styles.field}>
-                <span>{text.endDate}</span>
-                <input
-                  className={styles.control}
-                  type="date"
-                  value={form.endDate}
-                  disabled={!canManageTemplates || isActionLocked}
-                  onChange={(event) =>
-                    setForm((state) => ({ ...state, endDate: event.target.value }))
-                  }
-                />
-              </label>
-              <label className={styles.field}>
-                <span>{text.priority}</span>
-                <input
-                  className={styles.control}
-                  type="number"
-                  value={form.priority}
-                  disabled={!canManageTemplates || isActionLocked}
-                  onChange={(event) =>
-                    setForm((state) => ({ ...state, priority: event.target.value }))
-                  }
-                />
-              </label>
-              <label className={styles.checkboxField}>
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  disabled={!canManageTemplates || isActionLocked}
-                  onChange={(event) =>
-                    setForm((state) => ({ ...state, isActive: event.target.checked }))
-                  }
-                />
-                <span>{text.active}</span>
-              </label>
-            </div>
-            <label className={styles.field}>
-              <span>{text.titleOverride}</span>
-              <input
-                className={styles.control}
-                value={form.titleOverride}
-                maxLength={120}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) =>
-                  setForm((state) => ({
-                    ...state,
-                    titleOverride: event.target.value.slice(0, 120),
-                  }))
-                }
-              />
-            </label>
-            <label className={styles.field}>
-              <span>{text.subtitleOverride}</span>
-              <textarea
-                className={`${styles.control} ${styles.textarea}`}
-                value={form.subtitleOverride}
-                maxLength={240}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) =>
-                  setForm((state) => ({
-                    ...state,
-                    subtitleOverride: event.target.value.slice(0, 240),
-                  }))
-                }
-              />
-            </label>
-            <label className={styles.field}>
-              <span>{text.badgeOverride}</span>
-              <input
-                className={styles.control}
-                value={form.badgeTextOverride}
-                maxLength={64}
-                disabled={!canManageTemplates || isActionLocked}
-                onChange={(event) =>
-                  setForm((state) => ({
-                    ...state,
-                    badgeTextOverride: event.target.value.slice(0, 64),
-                  }))
-                }
-              />
-            </label>
-            <div className={styles.actionRow}>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={
-                  !canManageTemplates || isActionLocked || !form.templateId || invalidDateRangeWarning
-                }
-              >
-                <PencilIcon className={styles.buttonIcon} />
-                {form.id ? text.save : text.create}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setSelectedTemplateOptionSnapshot(null);
-                  setForm(emptyForm(form.startDate));
-                }}
-                disabled={!canManageTemplates || isActionLocked}
-              >
-                {text.reset}
-              </Button>
-            </div>
-          </form>
-        </AdminCard>
-
-        <AdminCard title={text.preview}>
-          <div className={styles.previewCard}>
-            {previewMediaUrl ? (
-              <TemplateSecureMedia
-                url={previewMediaUrl}
-                kind={isVideoTemplate(previewType) ? "video" : "image"}
-                alt={previewTitle}
-                muted
-                playsInline
-                controls={isVideoTemplate(previewType)}
-                className={styles.previewMedia}
-                logContext={{
-                  templateId: selectedTemplateSnapshot?.templateId,
-                  contentType: selectedTemplateSnapshot?.previewAsset?.contentType,
-                  surface: "daily-featured-preview",
-                }}
-              />
-            ) : (
-              <div className={styles.previewEmpty}>
-                <AdminIconTile icon={<TemplatesIcon />} tone="info" />
-              </div>
-            )}
-            <div className={styles.previewOverlay}>
-              <span className={styles.previewBadge}>
-                <AdminBadge tone="success">{previewBadge}</AdminBadge>
-              </span>
-              <h3>{previewTitle || text.previewEmptyTitle}</h3>
-              <p>{previewSubtitle || text.previewEmptySubtitle}</p>
-            </div>
-          </div>
-        </AdminCard>
+        <TemplateAssignmentEditorCard
+          text={text}
+          canManageTemplates={canManageTemplates}
+          isActionLocked={isActionLocked}
+          search={search}
+          templateTypeFilter={templateTypeFilter}
+          templateAccessFilter={templateAccessFilter}
+          form={form}
+          templateOptions={templateOptions}
+          isTemplateOptionsLoading={isTemplateOptionsLoading}
+          hasTemplateOptions={templates.length > 0}
+          templateOptionsError={templateOptionsError}
+          dateOccupiedWarning={dateOccupiedWarning}
+          invalidDateRangeWarning={invalidDateRangeWarning}
+          onSearchChange={setSearch}
+          onTemplateTypeFilterChange={setTemplateTypeFilter}
+          onTemplateAccessFilterChange={setTemplateAccessFilter}
+          onTemplateChange={handleTemplateSelectionChange}
+          onRetryTemplateOptions={() => void loadTemplateOptions(debouncedSearch)}
+          onFormChange={handleFormChange}
+          onReset={handleResetForm}
+          onSubmit={handleSubmit}
+        />
+        <FeaturedPreviewCard
+          text={text}
+          selectedTemplateSnapshot={selectedTemplateSnapshot}
+          previewTitle={previewTitle}
+          previewSubtitle={previewSubtitle}
+          previewBadge={previewBadge}
+          previewType={previewType}
+          previewMediaUrl={previewMediaUrl}
+        />
       </AdminPageGrid>
 
-      <AdminCard title={text.schedule}>
-        {schedule.length === 0 ? (
-          <AdminStateCard description={text.noSchedule} />
-        ) : (
-          <div className={adminTableStyles.tableWrap}>
-            <table className={`${adminTableStyles.table} ${styles.scheduleTable}`}>
-              <thead>
-                <tr>
-                  <th>{text.template}</th>
-                  <th>{text.date}</th>
-                  <th>{text.mode}</th>
-                  <th>{text.status}</th>
-                  <th>{text.priority}</th>
-                  <th>{text.actions}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.map((assignment) => (
-                  <tr key={assignment.id}>
-                    <td>
-                      <strong className={styles.templateTitle}>
-                        {safeDisplayText(assignment.templateTitle, 120)}
-                      </strong>
-                      <span className={styles.templateMeta}>
-                        {assignment.templateType} · {safeDisplayText(assignment.category, 72)} ·{" "}
-                        {assignment.isPremium ? text.premium : text.free}
-                      </span>
-                    </td>
-                    <td>{formatDateRange(assignment)}</td>
-                    <td>
-                      <AdminBadge tone={statusTone(assignment)}>
-                        {assignment.isManual ? text.manual : text.auto}
-                      </AdminBadge>
-                    </td>
-                    <td>{assignment.isActive ? text.active : text.inactive}</td>
-                    <td>{assignment.priority}</td>
-                    <td>
-                      <div className={styles.tableActions}>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          disabled={!canManageTemplates || isActionLocked}
-                          aria-label={text.editAssignmentLabel(
-                            safeDisplayText(assignment.templateTitle, 80)
-                          )}
-                          title={text.editAssignmentLabel(
-                            safeDisplayText(assignment.templateTitle, 80)
-                          )}
-                          onClick={() => {
-                            setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));
-                            setForm(formFromAssignment(assignment));
-                          }}
-                        >
-                          {text.edit}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          disabled={!canManageTemplates || isActionLocked}
-                          aria-label={text.deleteAssignmentLabel(
-                            safeDisplayText(assignment.templateTitle, 80)
-                          )}
-                          title={text.deleteAssignmentLabel(
-                            safeDisplayText(assignment.templateTitle, 80)
-                          )}
-                          onClick={() => setAssignmentPendingDelete(assignment)}
-                        >
-                          {text.delete}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </AdminCard>
+      <TemplateScheduleCard
+        text={text}
+        schedule={schedule}
+        canManageTemplates={canManageTemplates}
+        isActionLocked={isActionLocked}
+        onEditAssignment={handleEditAssignment}
+        onRequestDeleteAssignment={setAssignmentPendingDelete}
+      />
 
       <ConfirmationDialog
         open={assignmentPendingDelete !== null}
@@ -1112,44 +212,5 @@ export function TemplatesDailyFeaturedPage({ locale }: TemplatesDailyFeaturedPag
         }}
       />
     </AdminPage>
-  );
-}
-
-function AssignmentSummary({
-  assignment,
-  text,
-}: {
-  assignment: AdminTemplateOfTheDay;
-  text: TemplatesDailyFeaturedPageText;
-}) {
-  return (
-    <div className={styles.assignmentSummary}>
-      <strong>{safeDisplayText(assignment.templateTitle, 120)}</strong>
-      <span>
-        {formatDateRange(assignment)} · {assignment.templateType} ·{" "}
-        {safeDisplayText(assignment.category, 72)}
-      </span>
-      <span>
-        <AdminBadge tone={statusTone(assignment)}>
-          {assignment.isManual ? text.manual : text.auto}
-        </AdminBadge>{" "}
-        {assignment.isPremium ? text.premium : text.free}
-      </span>
-      {assignment.titleOverride ? (
-        <span>
-          {text.titleLabel}: {safeDisplayText(assignment.titleOverride, 120)}
-        </span>
-      ) : null}
-      {assignment.subtitleOverride ? (
-        <span>
-          {text.subtitleLabel}: {safeDisplayText(assignment.subtitleOverride, 220)}
-        </span>
-      ) : null}
-      {assignment.badgeTextOverride ? (
-        <span>
-          {text.badgeLabel}: {safeDisplayText(assignment.badgeTextOverride, 64)}
-        </span>
-      ) : null}
-    </div>
   );
 }

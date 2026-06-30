@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const usersPagePath = fileURLToPath(new URL("./users-management-page.tsx", import.meta.url));
+import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
+
 const usersContentPath = fileURLToPath(
   new URL("./users-management-page.content.ts", import.meta.url)
 );
@@ -19,7 +20,7 @@ const userInlineAnalyticsStylesPath = fileURLToPath(
 
 describe("users management visual contract", () => {
   it("keeps user badges on semantic theme tokens", () => {
-    const usersSource = readFileSync(usersPagePath, "utf8");
+    const usersSource = readUsersManagementPageLibrarySource();
     const detailSource = readFileSync(userDetailPath, "utf8");
 
     expect(usersSource).toContain("const accountStatusColors: Record<AccountStatus, string>");
@@ -32,7 +33,9 @@ describe("users management visual contract", () => {
     expect(usersSource).toContain("premiumStatusColors.premium");
     expect(usersSource).toContain("premiumStatusColors.free");
     expect(detailSource).toContain("function getPurchaseStatusColor(status: string): string");
-    expect(detailSource).toContain('return status === "succeeded" ? "var(--success)" : "var(--warning)"');
+    expect(detailSource).toContain(
+      'return status === "succeeded" ? "var(--success)" : "var(--warning)"'
+    );
     expect(detailSource).toContain("function getGenerationStatusColor(status: string): string");
     expect(detailSource).toContain('return "var(--danger)"');
     expect(detailSource).toContain('return "var(--text-muted)"');
@@ -56,7 +59,7 @@ describe("users management visual contract", () => {
   });
 
   it("keeps users pagination icon-based and accessible", () => {
-    const usersSource = readFileSync(usersPagePath, "utf8");
+    const usersSource = readUsersManagementPageLibrarySource();
     const usersContentSource = readFileSync(usersContentPath, "utf8");
     const stylesSource = readFileSync(usersStylesPath, "utf8");
 
@@ -77,7 +80,7 @@ describe("users management visual contract", () => {
   });
 
   it("keeps users page UI copy outside the client component", () => {
-    const usersSource = readFileSync(usersPagePath, "utf8");
+    const usersSource = readUsersManagementPageLibrarySource();
     const usersContentSource = readFileSync(usersContentPath, "utf8");
 
     expect(usersSource).toContain(
@@ -89,7 +92,9 @@ describe("users management visual contract", () => {
     expect(usersSource).not.toContain('summaryTotal: "Total users"');
     expect(usersSource).not.toContain('summaryTotal: "Всего пользователей"');
     expect(usersContentSource).toContain("export type UsersManagementPageText = {");
-    expect(usersContentSource).toContain("const usersManagementPageText: Record<Locale, UsersManagementPageText>");
+    expect(usersContentSource).toContain(
+      "const usersManagementPageText: Record<Locale, UsersManagementPageText>"
+    );
     expect(usersContentSource).toContain("export function getUsersManagementPageText");
     expect(usersContentSource).toContain('summaryTotal: "Total users"');
     expect(usersContentSource).toContain('summaryTotal: "Всего пользователей"');
@@ -149,11 +154,15 @@ describe("users management visual contract", () => {
     expect(stylesSource).toContain(".walletActions {\n    flex-direction: column;");
     expect(stylesSource).toContain(".sidePanelHeader {\n    display: grid;");
     expect(stylesSource).toContain(".closeBtn {\n    width: 100%;");
-    expect(stylesSource).toContain(".actionsCell {\n    min-width: min(18rem, calc(100vw - 2rem));");
+    expect(stylesSource).toContain(
+      ".actionsCell {\n    min-width: min(18rem, calc(100vw - 2rem));"
+    );
     expect(stylesSource).toContain(".quickActionBtn {\n    flex: 1 1 8rem;");
     expect(stylesSource).toContain("white-space: normal;");
     expect(stylesSource).toContain(".actionMenuPortal {\n    max-width: calc(100vw - 1rem);");
-    expect(stylesSource).toContain(".actionMenuList {\n    min-width: min(15.5rem, calc(100vw - 1rem));");
+    expect(stylesSource).toContain(
+      ".actionMenuList {\n    min-width: min(15.5rem, calc(100vw - 1rem));"
+    );
     expect(stylesSource).not.toContain(".searchInput:focus,\n.filterSelect:focus");
   });
 
@@ -166,10 +175,14 @@ describe("users management visual contract", () => {
 
     expect(usersStylesSource).toContain(".walletDialog {");
     expect(usersStylesSource).toContain(".sidePanel {");
-    expect(usersStylesSource).toContain(".walletInput:focus-visible,\n.walletTextarea:focus-visible");
+    expect(usersStylesSource).toContain(
+      ".walletInput:focus-visible,\n.walletTextarea:focus-visible"
+    );
     expect(usersStylesSource).toContain(".walletInput:disabled,\n.walletTextarea:disabled");
     expect(walletStylesSource).toContain(".input,\n.select,\n.textarea");
-    expect(walletStylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible");
+    expect(walletStylesSource).toContain(
+      ".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible"
+    );
     expect(walletStylesSource).toContain("box-shadow: var(--focus-ring);");
     expect(walletStylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
     expect(usersStylesSource).toContain("border-radius: var(--radius-sm);");
@@ -182,7 +195,7 @@ describe("users management visual contract", () => {
   });
 
   it("keeps users management action menu viewport-safe and theme-tokenized", () => {
-    const pageSource = readFileSync(usersPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
     const stylesSource = readFileSync(usersStylesPath, "utf8");
     const actionMenuPortalLayer = stylesSource.slice(
       stylesSource.indexOf(".actionMenuPortal {"),

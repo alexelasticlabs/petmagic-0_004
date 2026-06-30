@@ -3,6 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { clearAdminListCaches } from "@/lib/api-client.core";
+import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
 import {
   createTemplateOfTheDay,
   decideAdminModerationItem,
@@ -618,7 +619,7 @@ describe("api-client.templates query normalization", () => {
 
   it("aborts template editor/test page manual loads and polling", () => {
     const editorSource = readSource("components/templates/use-template-editor-controller.ts");
-    const testPageSource = readSource("components/templates/template-test-page.tsx");
+    const testPageSource = readTemplateTestPageLibrarySource();
     const analyticsPageSource = readSource("components/templates/template-analytics-page.tsx");
 
     expect(editorSource).toContain("const controller = new AbortController();");

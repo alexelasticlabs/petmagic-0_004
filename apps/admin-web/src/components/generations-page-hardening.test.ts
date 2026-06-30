@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readGenerationsPageLibrarySource } from "./generations-page.test-source";
 
-const generationsPagePath = fileURLToPath(new URL("./generations-page.tsx", import.meta.url));
 const generationsContentPath = fileURLToPath(
   new URL("./generations-page.content.ts", import.meta.url)
 );
@@ -12,11 +12,13 @@ const generationsStylesPath = fileURLToPath(
 
 describe("generations page hardening", () => {
   it("sanitizes generation display strings instead of rendering provider or failure values raw", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain("import { sanitizeSensitiveText }");
     expect(source).toContain("function formatSafeText");
-    expect(source).toContain("const failureText = formatSafeText(item.failureCode, text.noFailure)");
+    expect(source).toContain(
+      "const failureText = formatSafeText(item.failureCode, text.noFailure)"
+    );
     expect(source).toContain("const providerText = formatSafeText(item.provider)");
     expect(source).toContain('const modelText = formatSafeText(item.model, "")');
     expect(source).toContain("const templateTitle = formatSafeText(item.templateTitle)");
@@ -30,12 +32,14 @@ describe("generations page hardening", () => {
   });
 
   it("localizes generation statuses and keeps unsupported retry/cancel actions out of the UI", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
     expect(source).toContain(
-      'import {\n  getGenerationsPageIntlLocale,\n  getGenerationsPageText,\n  type GenerationsPageText,\n} from "./generations-page.content";'
+      'import { getGenerationsPageText } from "./generations-page.content";'
     );
+    expect(source).toContain("getGenerationsPageIntlLocale(");
+    expect(source).toContain("type GenerationsPageText");
     expect(source).toContain("const text = getGenerationsPageText(locale);");
     expect(source).toContain("getGenerationsPageIntlLocale(locale)");
     expect(source).toContain("formatStatus(item.status, text)");
@@ -64,7 +68,9 @@ describe("generations page hardening", () => {
     expect(contentSource).toContain('adminOnly: "Только Admin"');
     expect(contentSource).toContain('total: "Всего заданий"');
     expect(contentSource).toContain('allJobsScope: "Все задания"');
-    expect(contentSource).toContain('emptyDescription: "Измените фильтры или дождитесь новых заданий генерации."');
+    expect(contentSource).toContain(
+      'emptyDescription: "Измените фильтры или дождитесь новых заданий генерации."'
+    );
     expect(contentSource).toContain('job: "Задание"');
     expect(contentSource).toContain('Pending: "Ожидает"');
     expect(contentSource).toContain('Running: "В работе"');
@@ -83,7 +89,7 @@ describe("generations page hardening", () => {
   });
 
   it("keeps generation search server-backed and disables repeated retry clicks", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain("const debouncedProvider = useDebouncedValue(provider, 350)");
     expect(source).toContain("const debouncedUser = useDebouncedValue(user, 350)");
@@ -96,14 +102,18 @@ describe("generations page hardening", () => {
     expect(source).toContain(
       'const canViewGenerations = session?.user.roles.includes("Admin") ?? false;'
     );
-    expect(source).toContain(
-      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
-    );
+    expect(source).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(source).toContain("if (!canViewGenerations) {");
     expect(source).toContain('<AdminStateCard tone="info" title={text.loadingTitle} />');
-    expect(source).toContain("setSearch(event.target.value.slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH));");
-    expect(source).toContain("setProvider(event.target.value.slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH));");
-    expect(source).toContain("setUser(event.target.value.slice(0, GENERATION_USER_FILTER_MAX_LENGTH));");
+    expect(source).toContain(
+      "setSearch(event.target.value.slice(0, GENERATION_SEARCH_FILTER_MAX_LENGTH));"
+    );
+    expect(source).toContain(
+      "setProvider(event.target.value.slice(0, GENERATION_PROVIDER_FILTER_MAX_LENGTH));"
+    );
+    expect(source).toContain(
+      "setUser(event.target.value.slice(0, GENERATION_USER_FILTER_MAX_LENGTH));"
+    );
     expect(source).toContain("maxLength={GENERATION_SEARCH_FILTER_MAX_LENGTH}");
     expect(source).toContain("maxLength={GENERATION_PROVIDER_FILTER_MAX_LENGTH}");
     expect(source).toContain("maxLength={GENERATION_USER_FILTER_MAX_LENGTH}");
@@ -111,19 +121,19 @@ describe("generations page hardening", () => {
     expect(source).toContain("fetchAdminTemplateGenerations(query, signal)");
     expect(source).toContain("enabled: canViewGenerations");
     expect(source).toContain("placeholderData: keepPreviousData");
-    expect(source).toContain("const isGenerationsRefreshing = generationsQuery.isFetching && generationsQuery.isPlaceholderData");
+    expect(source).toContain(
+      "const isGenerationsRefreshing = generationsQuery.isFetching && generationsQuery.isPlaceholderData"
+    );
     expect(source).toContain("const areGenerationFiltersLocked = generationsQuery.isFetching;");
     expect(source).toContain("generationsQuery.isLoading || isGenerationsRefreshing");
     expect(source).toContain("disabled={!canViewGenerations || generationsQuery.isFetching}");
     expect(source.match(/disabled=\{areGenerationFiltersLocked\}/g) ?? []).toHaveLength(4);
     expect(source).toContain("function requestGenerationsRetry()");
     expect(source).toContain(
-      "if (!canViewGenerations || generationsQuery.isFetching) {\n      return;\n    }",
+      "if (!canViewGenerations || generationsQuery.isFetching) {\n      return;\n    }"
     );
     expect(source).toContain("onClick={requestGenerationsRetry}");
-    expect(source).not.toContain(
-      "onClick={() => {\n                if (!canViewGenerations)"
-    );
+    expect(source).not.toContain("onClick={() => {\n                if (!canViewGenerations)");
     expect(source).not.toContain(".filter((item) => item.generationId");
     expect(source).not.toContain(".filter((item) => item.provider");
     expect(source).not.toContain(".filter((item) => item.userId");
@@ -133,23 +143,23 @@ describe("generations page hardening", () => {
   });
 
   it("keeps generation pagination accessible and usable on narrow screens", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
     const stylesSource = readFileSync(generationsStylesPath, "utf8");
 
     expect(contentSource).toContain('previousPageLabel: "Предыдущая страница генераций"');
     expect(contentSource).toContain('nextPageLabel: "Следующая страница генераций"');
     expect(source).toContain('import { CaretDownIcon } from "@/components/admin/admin-icons";');
-    expect(source).toContain('className={`${styles.button} ${styles.pagerButton}`}');
+    expect(source).toContain("className={`${styles.button} ${styles.pagerButton}`}");
     expect(source).toContain("aria-label={text.previousPageLabel}");
     expect(source).toContain("aria-label={text.nextPageLabel}");
     expect(source).toContain("title={text.previousPageLabel}");
     expect(source).toContain("title={text.nextPageLabel}");
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />"
     );
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />"
     );
     expect(source).not.toContain("{text.previous}");
     expect(source).not.toContain("{text.next}");
@@ -164,7 +174,7 @@ describe("generations page hardening", () => {
   });
 
   it("sources status KPI cards from backend aggregate metrics", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain("fetchAdminTemplateGenerationMetrics(signal)");
     expect(source).toContain("adminQueryKeys.templateGenerationMetrics");
@@ -181,7 +191,7 @@ describe("generations page hardening", () => {
   });
 
   it("keeps generation metrics failures local without blocking the history table", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const stylesSource = readFileSync(generationsStylesPath, "utf8");
 
     expect(source).toContain("generationMetricsQuery.isError ? (");
@@ -202,7 +212,7 @@ describe("generations page hardening", () => {
   });
 
   it("uses theme tokens for generation status badge colors", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain('return "var(--success)";');
     expect(source).toContain('return "var(--danger)";');
@@ -219,7 +229,7 @@ describe("generations page hardening", () => {
   });
 
   it("shows watermark unlock actor together with method, credits, and timestamp", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
     expect(contentSource).toContain('watermarkUnlockedBy: "Разблокировал"');
@@ -233,15 +243,17 @@ describe("generations page hardening", () => {
   });
 
   it("guards clean watermark grants while a grant request or generation refresh is pending", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
     expect(contentSource).toContain('grantCleanError: "Не удалось выдать clean download."');
     expect(source).toContain("const [grantCleanError, setGrantCleanError]");
     expect(source).toContain("setGrantCleanError(null);");
-    expect(source).toContain("setGrantCleanError(getAdminErrorMessage(error, text.grantCleanError));");
     expect(source).toContain(
-      '{grantCleanError ? (\n            <AdminStateCard tone="warning" title={grantCleanError} />'
+      "setGrantCleanError(getAdminErrorMessage(error, text.grantCleanError));"
+    );
+    expect(source).toContain(
+      '{grantCleanError ? <AdminStateCard tone="warning" title={grantCleanError} /> : null}'
     );
     expect(source).toContain("const grantingGenerationId = grantCleanMutation.variables ?? null;");
     expect(source).toContain(
@@ -276,19 +288,19 @@ describe("generations page hardening", () => {
   });
 
   it("keeps expanded generation feedback failures local and retryable", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
     const contentSource = readFileSync(generationsContentPath, "utf8");
 
-    expect(contentSource).toContain('feedbackError: "Не удалось загрузить отзывы по этой генерации"');
+    expect(contentSource).toContain(
+      'feedbackError: "Не удалось загрузить отзывы по этой генерации"'
+    );
     expect(source).toContain("feedbackQuery.isError ? (");
     expect(source).toContain("title={text.feedbackError}");
     expect(source).toContain(
       "description={getAdminErrorMessage(feedbackQuery.error, text.feedbackError)}"
     );
     expect(source).toContain("function requestFeedbackRetry()");
-    expect(source).toContain(
-      "if (feedbackQuery.isFetching) {\n      return;\n    }"
-    );
+    expect(source).toContain("if (feedbackQuery.isFetching) {\n      return;\n    }");
     expect(source).toContain("disabled={feedbackQuery.isFetching}");
     expect(source).toContain("onClick={requestFeedbackRetry}");
     expect(source).toContain("void feedbackQuery.refetch().catch(() => undefined);");
@@ -298,7 +310,7 @@ describe("generations page hardening", () => {
   });
 
   it("renders expanded generation previews through the secure media component", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain(
       'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
@@ -314,7 +326,7 @@ describe("generations page hardening", () => {
   });
 
   it("keeps clean watermark grant refresh non-blocking after success", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain(
       "await Promise.allSettled([\n        queryClient.invalidateQueries({ queryKey: adminQueryKeys.templateGenerations(query) }),\n      ]);"
@@ -325,19 +337,21 @@ describe("generations page hardening", () => {
   });
 
   it("does not render stale placeholder rows while generation filters or pages refresh", () => {
-    const source = readFileSync(generationsPagePath, "utf8");
+    const source = readGenerationsPageLibrarySource();
 
     expect(source).toContain(
       "const visiblePage = generationsQuery.isPlaceholderData ? undefined : generationsQuery.data"
     );
-    expect(source).toContain("const visibleItems = useMemo(() => visiblePage?.items ?? [], [visiblePage])");
+    expect(source).toContain(
+      "const visibleItems = useMemo(() => visiblePage?.items ?? [], [visiblePage])"
+    );
     expect(source).toContain("const visibleTotalCount = visiblePage?.totalCount ?? 0");
     expect(source).toContain(
       "const visiblePageCount = Math.max(1, Math.ceil(visibleTotalCount / PAGE_SIZE))"
     );
     expect(source).toContain("visibleItems.length === 0");
     expect(source).toContain("visibleItems.map((item) =>");
-    expect(source).toContain("{visibleTotalCount} {text.tableTotalLabel} /{\" \"}");
+    expect(source).toContain('{visibleTotalCount} {text.tableTotalLabel} /{" "}');
     expect(source).toContain("{text.page} {pageIndex + 1} {text.of} {visiblePageCount}");
     expect(source).toContain("const [expandedGeneration, setExpandedGeneration] = useState<{");
     expect(source).toContain("const queryKey = JSON.stringify(query);");
@@ -358,7 +372,9 @@ describe("generations page hardening", () => {
     expect(source).toContain("resetGenerationListContext(Math.max(0, pageIndex - 1))");
     expect(source).toContain("resetGenerationListContext(pageIndex + 1)");
     expect(source).toContain("setExpandedGeneration((current) =>");
-    expect(source).toContain("current?.queryKey === queryKey && current.generationId === generationId");
+    expect(source).toContain(
+      "current?.queryKey === queryKey && current.generationId === generationId"
+    );
     expect(source).not.toContain("setPageIndex((value) => Math.max(0, value - 1))");
     expect(source).not.toContain("setPageIndex((value) => value + 1)");
     expect(source).not.toContain("const items = page?.items ?? []");
@@ -370,7 +386,9 @@ describe("generations page hardening", () => {
   it("keeps local generation controls accessible in locked and keyboard states", () => {
     const stylesSource = readFileSync(generationsStylesPath, "utf8");
 
-    expect(stylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.button:focus-visible,\n.inlineAction:focus-visible");
+    expect(stylesSource).toContain(
+      ".input:focus-visible,\n.select:focus-visible,\n.button:focus-visible,\n.inlineAction:focus-visible"
+    );
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
     expect(stylesSource).toContain(".input:disabled,\n.select:disabled");
     expect(stylesSource).toContain("cursor: not-allowed;");

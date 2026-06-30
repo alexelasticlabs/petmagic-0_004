@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
 import { getDictionary } from "@/lib/i18n";
+import { readPromoCodesViewLibrarySource } from "./promo-codes-view.test-source";
 
-const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
 const promoCodesViewOptionsPath = fileURLToPath(
   new URL("./promo-codes-view.options.ts", import.meta.url)
 );
@@ -78,7 +78,9 @@ describe("buildPromoCodesViewOptions", () => {
     expect(optionsSource).toContain("const promoText = getPromoCodesViewText(locale);");
     expect(optionsSource).not.toContain('locale === "ru" ? "Все" : "All"');
     expect(optionsSource).not.toContain('locale === "ru" ? "Все награды" : "All rewards"');
-    expect(optionsSource).not.toContain('locale === "ru" ? `${option} на странице` : `${option} per page`');
+    expect(optionsSource).not.toContain(
+      'locale === "ru" ? `${option} на странице` : `${option} per page`'
+    );
     expect(contentSource).toContain('statusTabAll: "All"');
     expect(contentSource).toContain('rewardAllLabel: "All rewards"');
   });
@@ -92,11 +94,13 @@ describe("buildPromoCodesViewOptions", () => {
     expect(getDictionary("ru").promoCodesRewardTypePremiumOption).not.toContain("скоро");
     expect(result.rewardOptions.map((item) => item.value)).not.toContain("premium_days");
     expect(drawerSource).not.toContain('<option value="premium_days" disabled>');
-    expect(drawerSource).toContain('<option value="spark">{text.promoCodesRewardTypeSparkOption}</option>');
+    expect(drawerSource).toContain(
+      '<option value="spark">{text.promoCodesRewardTypeSparkOption}</option>'
+    );
   });
 
   it("bounds promo code search input before filtering the client-side registry", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const listSource = readFileSync(promoCodesListCardPath, "utf8");
 
     expect(viewSource).toContain("const PROMO_CODES_SEARCH_MAX_LENGTH = 120;");

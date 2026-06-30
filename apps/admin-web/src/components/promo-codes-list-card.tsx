@@ -17,6 +17,12 @@ import {
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import {
+  buildPromoCodesAutoRefreshLabel,
+  buildPromoCodesPaginationSummary,
+  buildPromoCodesPageLabel,
+  type PromoCodesViewText,
+} from "@/components/promo-codes-view.content";
+import {
   formatCampaignMeta,
   formatDateTime,
   formatNumber,
@@ -28,12 +34,6 @@ import {
   type PromoSortMode,
   type PromoStatusFilter,
 } from "@/components/promo-codes-view.helpers";
-import {
-  buildPromoCodesAutoRefreshLabel,
-  buildPromoCodesPaginationSummary,
-  buildPromoCodesPageLabel,
-  type PromoCodesViewText,
-} from "@/components/promo-codes-view.content";
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
 import { Select, type SelectOption } from "@/components/ui/select";

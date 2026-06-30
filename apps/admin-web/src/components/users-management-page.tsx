@@ -1,39 +1,44 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
-import {
-  CancelCircleIcon,
-  CaretDownIcon,
-  DollarIcon,
-  MoreHorizontalIcon,
-  UsersIcon,
-} from "@/components/admin/admin-icons";
-import {
-  AdminBadge,
-  AdminCard,
-  AdminKpiCard,
-  AdminPage,
-  AdminPageGrid,
-  AdminPageHero,
-  AdminStateCard,
-  AdminStatusBadge,
-  adminTableStyles,
-  type AdminTone,
-} from "@/components/admin/admin-primitives";
+import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
-import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
-import { Button } from "@/components/ui/button";
+import { useUsersManagementActionsMenu } from "@/components/users-management-actions-menu";
+import {
+  UsersManagementAccessState,
+  UsersManagementHero,
+  UsersManagementLoadingState,
+  UsersManagementSummaryGrid,
+} from "@/components/users-management-page.chrome";
+import {
+  fetchUserRowEnrichment,
+  formatMetricCount,
+  getNewUsersCountForRange,
+  getUsersPageErrorDetails,
+} from "@/components/users-management-page.helpers";
+import {
+  UsersManagementActionsMenu,
+  UsersManagementWalletDialog,
+} from "@/components/users-management-page-overlays";
+import { UsersManagementSidePanel } from "@/components/users-management-side-panel";
+import { getUsersManagementPageText } from "@/components/users-management-page.content";
+import type {
+  ActivityFilter,
+  ConfirmationDialogState,
+  PremiumFilter,
+  RangeDays,
+  RoleFilter,
+  StatusFilter,
+  UsersManagementPageProps,
+  WalletDialogState,
+} from "@/components/users-management-page.types";
+import { UsersManagementUsersCard } from "@/components/users-management-users-card";
 import { Toast } from "@/components/ui/toast";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { useUsersAdmin } from "@/components/users/use-users-admin";
-import { UserAvatarView } from "@/components/users/user-avatar";
-import { getUsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
-import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   adjustAdminUserWallet,
@@ -51,188 +56,13 @@ import {
   USER_WALLET_REASON_MAX_LENGTH,
   type AdminEconomyUserSubscriptionSummary,
   type AdminUserAnalytics,
-  type AdminUserDashboardMetrics,
   type UserListItem,
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
-import { formatDateTime } from "@/lib/format-date-time";
-import { getDictionary, type Dictionary, type Locale } from "@/lib/i18n";
-import {
-  getAdminUserDisplayName,
-  maskEmail,
-  sanitizeSensitiveText,
-  shortIdentifier,
-} from "@/lib/sensitive-display";
-
-type UsersManagementPageProps = {
-  locale: Locale;
-};
-
-type ActionsMenuPosition = {
-  top: number;
-  left: number;
-  minWidth: number;
-  openUpward: boolean;
-};
-
-type AccountStatus = "active" | "blocked" | "unconfirmed";
-
-const ACTIONS_MENU_TARGET_WIDTH_PX = 250;
-const ACTIONS_MENU_VIEWPORT_PADDING_PX = 8;
-
-const accountStatusColors: Record<AccountStatus, string> = {
-  active: "var(--success)",
-  blocked: "var(--danger)",
-  unconfirmed: "var(--warning)",
-};
-
-const premiumStatusColors = {
-  premium: "var(--success)",
-  free: "var(--text-muted)",
-};
-
-type WalletDialogState = {
-  userId: string;
-  operation: "credit" | "debit";
-  amount: string;
-  reason: string;
-  error: string | null;
-};
-
-type ConfirmationDialogState = {
-  userId: string;
-  title: string;
-  description: string;
-  confirmLabel: string;
-  successMessage?: string;
-  errorMessage?: string;
-  tone?: "danger" | "primary";
-  action: () => Promise<void>;
-  afterSuccess?: () => void;
-};
-
-type RangeDays = 7 | 30 | 90;
-
-type RoleFilter = "all" | "Admin" | "Moderator" | "User";
-type PremiumFilter = "all" | "premium" | "free";
-type ActivityFilter = "all" | "active" | "blocked";
-type StatusFilter = "all" | "active" | "blocked" | "unconfirmed";
-
-type UserRoleText = Pick<Dictionary, "userRoleAdmin" | "userRoleModerator" | "userRoleUser">;
+import { getDictionary } from "@/lib/i18n";
+import { getAdminUserDisplayName, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 const PAGE_SIZE = 12;
-const ROW_ENRICHMENT_CONCURRENCY = 4;
-
-function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) {
-    throw new DOMException("Aborted", "AbortError");
-  }
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError";
-}
-
-function getUsersPageErrorDetails(error: unknown) {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorDigest:
-      error && typeof error === "object" && "digest" in error
-        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
-        : undefined,
-  };
-}
-
-async function fetchUserRowEnrichment<TValue>(
-  userIds: readonly string[],
-  signal: AbortSignal | undefined,
-  load: (userId: string, signal?: AbortSignal) => Promise<TValue>
-): Promise<Map<string, TValue>> {
-  const results = new Map<string, TValue>();
-  let nextIndex = 0;
-
-  async function worker() {
-    while (nextIndex < userIds.length) {
-      throwIfAborted(signal);
-      const userId = userIds[nextIndex];
-      nextIndex += 1;
-
-      try {
-        const value = await load(userId, signal);
-        results.set(userId, value);
-      } catch (error) {
-        if (signal?.aborted || isAbortError(error)) {
-          throw error;
-        }
-      }
-    }
-  }
-
-  const workerCount = Math.min(ROW_ENRICHMENT_CONCURRENCY, userIds.length);
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  return results;
-}
-
-function getUserRoleLabel(role: string, text: UserRoleText) {
-  return role === "Admin"
-    ? text.userRoleAdmin
-    : role === "Moderator"
-      ? text.userRoleModerator
-      : role === "User"
-        ? text.userRoleUser
-        : sanitizeSensitiveText(role, 32);
-}
-
-function getUserRoleTone(role: string): AdminTone {
-  if (role === "Admin") {
-    return "danger";
-  }
-
-  if (role === "Moderator") {
-    return "info";
-  }
-
-  return "neutral";
-}
-
-function getUserAvatarLabel(user: Pick<UserListItem, "displayName" | "email" | "userId">): string {
-  return sanitizeSensitiveText(getAdminUserDisplayName(user), 96);
-}
-
-function getAccountStatus(user: UserListItem): AccountStatus {
-  if (!user.isActive) {
-    return "blocked";
-  }
-
-  if (!user.emailConfirmed) {
-    return "unconfirmed";
-  }
-
-  return "active";
-}
-
-function formatMetricCount(value: number | null | undefined): string {
-  return typeof value === "number" && Number.isFinite(value) ? String(Math.max(0, value)) : "—";
-}
-
-function getNewUsersCountForRange(
-  metrics: AdminUserDashboardMetrics | null,
-  rangeDays: RangeDays
-): number | null {
-  if (!metrics) {
-    return null;
-  }
-
-  if (rangeDays === 7) {
-    return metrics.newUsersLast7Days;
-  }
-
-  if (rangeDays === 30) {
-    return metrics.newUsersLast30Days;
-  }
-
-  return metrics.newUsersLast90Days;
-}
 
 export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const text = useMemo(() => getDictionary(locale), [locale]);
@@ -247,8 +77,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const [rangeDays, setRangeDays] = useState<RangeDays>(30);
   const [page, setPage] = useState(1);
 
-  const [openActionsUserId, setOpenActionsUserId] = useState<string | null>(null);
-  const [actionsMenuPosition, setActionsMenuPosition] = useState<ActionsMenuPosition | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [walletDialog, setWalletDialog] = useState<WalletDialogState | null>(null);
   const [walletDialogSubmitting, setWalletDialogSubmitting] = useState(false);
@@ -258,9 +86,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     null
   );
   const [confirmationSubmitting, setConfirmationSubmitting] = useState(false);
-
-  const menuRootRef = useRef<HTMLDivElement | null>(null);
-  const triggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -280,8 +105,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       search: debouncedSearch || undefined,
       role: roleFilter === "all" ? undefined : roleFilter,
       status: usersStatusFilter === "all" ? undefined : usersStatusFilter,
-      isPremium:
-        premiumFilter === "premium" ? true : premiumFilter === "free" ? false : undefined,
+      isPremium: premiumFilter === "premium" ? true : premiumFilter === "free" ? false : undefined,
     }),
     [debouncedSearch, page, premiumFilter, roleFilter, usersStatusFilter]
   );
@@ -311,11 +135,14 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   const userMetrics = userMetricsQuery.data ?? null;
   const totalAdminCount = userMetrics?.adminUsers ?? null;
   const isUserActionLocked = confirmationSubmitting || walletDialogSubmitting;
-
-  const closeActionsMenu = useCallback(() => {
-    setOpenActionsUserId(null);
-    setActionsMenuPosition(null);
-  }, []);
+  const {
+    actionsMenuPosition,
+    closeActionsMenu,
+    handleToggleActionsMenu,
+    menuRootRef,
+    openActionsUserId,
+    triggerRefs,
+  } = useUsersManagementActionsMenu(canManageRoles);
 
   const resetUsersSelection = useCallback(
     (nextPage = 1) => {
@@ -360,8 +187,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         return;
       }
 
-      setOpenActionsUserId(null);
-      setActionsMenuPosition(null);
+      closeActionsMenu();
       setWalletDialog({
         userId,
         operation,
@@ -370,7 +196,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         error: null,
       });
     },
-    [canManageRoles, isUserActionLocked, text.usersBalanceReasonDefault]
+    [canManageRoles, closeActionsMenu, isUserActionLocked, text.usersBalanceReasonDefault]
   );
 
   const closeWalletDialog = useCallback(() => {
@@ -481,8 +307,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       text.deactivate,
       text.errorLoadingUsers,
       ui,
-      ui.confirmBlockTitle,
-      ui.confirmUnblockTitle,
       canManageRoles,
     ]
   );
@@ -513,7 +337,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       text.usersDeleteConfirm,
       text.usersDeletedSuccess,
       ui,
-      ui.confirmDeleteTitle,
       canManageRoles,
     ]
   );
@@ -541,7 +364,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       text.makePremium,
       text.removePremium,
       ui,
-      ui.confirmPremiumTitle,
       canManageRoles,
     ]
   );
@@ -571,8 +393,7 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
               ? text.revokeModerator
               : text.assignModerator,
         errorMessage: text.errorLoadingUsers,
-        action: () =>
-          hasRole ? revokeRole(user.userId, role) : assignRole(user.userId, role),
+        action: () => (hasRole ? revokeRole(user.userId, role) : assignRole(user.userId, role)),
       });
     },
     [
@@ -585,7 +406,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
       text.revokeModerator,
       totalAdminCount,
       ui,
-      ui.confirmRoleTitle,
       canManageRoles,
     ]
   );
@@ -723,104 +543,6 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     [selectedUserId, supportTickets]
   );
 
-  const updateActionsMenuPosition = useCallback(
-    (userId: string) => {
-      const trigger = triggerRefs.current[userId];
-      if (!trigger) {
-        closeActionsMenu();
-        return;
-      }
-
-      const triggerRect = trigger.getBoundingClientRect();
-      const gap = 6;
-      const viewportPadding = ACTIONS_MENU_VIEWPORT_PADDING_PX;
-      const availableWidth = Math.max(0, window.innerWidth - viewportPadding * 2);
-      const minWidth = Math.min(ACTIONS_MENU_TARGET_WIDTH_PX, availableWidth);
-      const estimatedHeight = canManageRoles ? 356 : 252;
-      const availableBelow = window.innerHeight - triggerRect.bottom - gap;
-      const availableAbove = triggerRect.top - gap;
-      const openUpward = availableBelow < estimatedHeight && availableAbove > availableBelow;
-      const top = openUpward ? triggerRect.top - gap : triggerRect.bottom + gap;
-
-      let left = triggerRect.right - minWidth;
-      left = Math.max(viewportPadding, left);
-      left = Math.min(left, window.innerWidth - minWidth - viewportPadding);
-
-      setActionsMenuPosition({ top, left, minWidth, openUpward });
-    },
-    [canManageRoles, closeActionsMenu]
-  );
-
-  const handleToggleActionsMenu = useCallback(
-    (userId: string) => {
-      if (openActionsUserId === userId) {
-        closeActionsMenu();
-        return;
-      }
-
-      setOpenActionsUserId(userId);
-      requestAnimationFrame(() => {
-        updateActionsMenuPosition(userId);
-      });
-    },
-    [closeActionsMenu, openActionsUserId, updateActionsMenuPosition]
-  );
-
-  useEffect(() => {
-    if (!openActionsUserId) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      if (menuRootRef.current?.contains(target)) {
-        return;
-      }
-
-      if (triggerRefs.current[openActionsUserId]?.contains(target)) {
-        return;
-      }
-
-      closeActionsMenu();
-    };
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeActionsMenu();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeActionsMenu, openActionsUserId]);
-
-  useEffect(() => {
-    if (!openActionsUserId) {
-      return;
-    }
-
-    const handleViewportChange = () => {
-      updateActionsMenuPosition(openActionsUserId);
-    };
-
-    window.addEventListener("resize", handleViewportChange);
-    window.addEventListener("scroll", handleViewportChange, true);
-
-    return () => {
-      window.removeEventListener("resize", handleViewportChange);
-      window.removeEventListener("scroll", handleViewportChange, true);
-    };
-  }, [openActionsUserId, updateActionsMenuPosition]);
-
   useEffect(() => {
     if (!selectedUserId) {
       return;
@@ -889,23 +611,11 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     walletDialog,
   ]);
 
-  const hero = (
-    <AdminPageHero
-      eyebrow={text.usersHeroEyebrow}
-      title={text.usersTitle}
-      description={text.usersHeroDescription}
-    />
-  );
-
   if (!canManageRoles) {
     return (
       <AdminPage className={styles.page}>
-        {hero}
-        <AdminStateCard
-          tone="info"
-          title={text.usersTitle}
-          description={text.usersLoadingDescription}
-        />
+        <UsersManagementHero text={text} />
+        <UsersManagementAccessState text={text} />
       </AdminPage>
     );
   }
@@ -913,523 +623,95 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
   if (isLoading) {
     return (
       <AdminPage className={styles.page}>
-        {hero}
-        <AdminStateCard
-          tone="info"
-          title={text.usersTitle}
-          description={text.usersLoadingDescription}
-        >
-          <div className={styles.skeletonStack} aria-busy="true" aria-live="polite">
-            {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className={styles.skeletonLine} />
-            ))}
-          </div>
-        </AdminStateCard>
+        <UsersManagementHero text={text} />
+        <UsersManagementLoadingState text={text} />
       </AdminPage>
     );
   }
 
   return (
     <AdminPage className={styles.page}>
-      {hero}
+      <UsersManagementHero text={text} />
 
-      <AdminPageGrid columns="four" className={styles.summaryGrid}>
-        <AdminKpiCard label={ui.summaryTotal} value={totalUsersValue} tone="primary" />
-        <AdminKpiCard label={ui.summaryActive} value={activeUsersValue} tone="success" />
-        <AdminKpiCard label={ui.summaryPremium} value={premiumUsersValue} tone="warning" />
-        <AdminKpiCard label={ui.summaryBlocked} value={blockedUsersValue} tone="danger" />
-        <AdminKpiCard
-          label={ui.summaryNew}
-          value={newUsersValue}
-          hint={`${ui.periodLabel}: ${rangeDays}`}
-          tone="info"
+      <UsersManagementSummaryGrid
+        activeUsersValue={activeUsersValue}
+        blockedUsersValue={blockedUsersValue}
+        newUsersValue={newUsersValue}
+        openSupportUserCount={openSupportUserCount}
+        premiumUsersValue={premiumUsersValue}
+        rangeDays={rangeDays}
+        totalUsersValue={totalUsersValue}
+        ui={ui}
+      />
+
+      <UsersManagementUsersCard
+        activityFilter={activityFilter}
+        analyticsByUserId={analyticsByUserId}
+        busyUserId={busyUserId}
+        canManageRoles={canManageRoles}
+        closeActionsMenu={closeActionsMenu}
+        currentPage={currentPage}
+        error={error}
+        handleToggleActionsMenu={handleToggleActionsMenu}
+        isUserActionLocked={isUserActionLocked}
+        isUsersFetching={isUsersFetching}
+        isUsersRefreshing={isUsersRefreshing}
+        locale={locale}
+        openActionsUserId={openActionsUserId}
+        openWalletDialog={openWalletDialog}
+        pageSubscriptionsByUserId={pageSubscriptionsByUserId}
+        pageUsers={pageUsers}
+        pagedUsers={pagedUsers}
+        premiumFilter={premiumFilter}
+        rangeDays={rangeDays}
+        refreshUsers={() => refreshUsers().then(() => undefined)}
+        requestActiveChange={requestActiveChange}
+        requestPremiumChange={requestPremiumChange}
+        resetAllFilters={() => {
+          setSearch("");
+          setRoleFilter("all");
+          setPremiumFilter("all");
+          setActivityFilter("all");
+          setStatusFilter("all");
+          resetUsersSelection();
+        }}
+        resetUsersSelection={resetUsersSelection}
+        roleFilter={roleFilter}
+        search={search}
+        setActivityFilter={setActivityFilter}
+        setPremiumFilter={setPremiumFilter}
+        setRangeDays={setRangeDays}
+        setRoleFilter={setRoleFilter}
+        setSearch={setSearch}
+        setSelectedUserId={setSelectedUserId}
+        setStatusFilter={setStatusFilter}
+        statusFilter={statusFilter}
+        text={text}
+        totalPages={totalPages}
+        triggerRefs={triggerRefs}
+        ui={ui}
+        usersPageTotalCount={usersPage.totalCount}
+      />
+
+      {openActionsUser && actionsMenuPosition ? (
+        <UsersManagementActionsMenu
+          actionsMenuPosition={actionsMenuPosition}
+          busyUserId={busyUserId}
+          canManageRoles={canManageRoles}
+          cannotRevokeLastAdmin={cannotRevokeLastAdmin}
+          closeActionsMenu={closeActionsMenu}
+          isUserActionLocked={isUserActionLocked}
+          locale={locale}
+          menuRootRef={menuRootRef}
+          openActionsUser={openActionsUser}
+          openWalletDialog={openWalletDialog}
+          requestDeleteUser={requestDeleteUser}
+          requestRoleChange={requestRoleChange}
+          setSelectedUserId={setSelectedUserId}
+          text={text}
+          ui={ui}
         />
-        <AdminKpiCard
-          label={ui.summaryOpenSupport}
-          value={String(openSupportUserCount)}
-          tone="magenta"
-        />
-      </AdminPageGrid>
-
-      <AdminCard title={text.usersTitle} description={text.usersCardDescription}>
-        <div className={styles.filtersBar}>
-          <input
-            className={styles.searchInput}
-            placeholder={ui.searchPlaceholder}
-            value={search}
-            onChange={(event) => {
-              setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));
-              resetUsersSelection();
-            }}
-            maxLength={USER_SEARCH_MAX_LENGTH}
-          />
-
-          <select
-            className={styles.filterSelect}
-            value={roleFilter}
-            onChange={(event) => {
-              setRoleFilter(event.target.value as RoleFilter);
-              resetUsersSelection();
-            }}
-            aria-label={ui.filterRole}
-          >
-            <option value="all">
-              {ui.filterRole}: {ui.any}
-            </option>
-            <option value="User">{getUserRoleLabel("User", text)}</option>
-            <option value="Moderator">{getUserRoleLabel("Moderator", text)}</option>
-            <option value="Admin">{getUserRoleLabel("Admin", text)}</option>
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={premiumFilter}
-            onChange={(event) => {
-              setPremiumFilter(event.target.value as PremiumFilter);
-              resetUsersSelection();
-            }}
-            aria-label={ui.filterPremium}
-          >
-            <option value="all">
-              {ui.filterPremium}: {ui.any}
-            </option>
-            <option value="premium">{ui.premiumOnly}</option>
-            <option value="free">{ui.freeOnly}</option>
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={activityFilter}
-            onChange={(event) => {
-              setActivityFilter(event.target.value as ActivityFilter);
-              resetUsersSelection();
-            }}
-            aria-label={ui.filterActivity}
-          >
-            <option value="all">
-              {ui.filterActivity}: {ui.any}
-            </option>
-            <option value="active">{ui.activeOnly}</option>
-            <option value="blocked">{ui.blockedOnly}</option>
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value as StatusFilter);
-              resetUsersSelection();
-            }}
-            aria-label={ui.filterStatus}
-          >
-            <option value="all">
-              {ui.filterStatus}: {ui.any}
-            </option>
-            <option value="active">{ui.statusActive}</option>
-            <option value="blocked">{ui.statusBlocked}</option>
-            <option value="unconfirmed">{ui.statusUnconfirmed}</option>
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            value={String(rangeDays)}
-            onChange={(event) => {
-              setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);
-              resetUsersSelection();
-            }}
-            aria-label={ui.periodLabel}
-          >
-            <option value="7">{ui.period7}</option>
-            <option value="30">{ui.period30}</option>
-            <option value="90">{ui.period90}</option>
-          </select>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearch("");
-              setRoleFilter("all");
-              setPremiumFilter("all");
-              setActivityFilter("all");
-              setStatusFilter("all");
-              resetUsersSelection();
-            }}
-          >
-            {ui.resetFilters}
-          </Button>
-        </div>
-
-        {error ? (
-          <AdminStateCard
-            tone="danger"
-            className={styles.message}
-            title={error}
-            action={
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={isUsersFetching}
-                onClick={() => void refreshUsers().catch(() => undefined)}
-              >
-                {text.supportRetryAction}
-              </Button>
-            }
-          />
-        ) : null}
-
-        {isUsersRefreshing ? (
-          <AdminStateCard tone="info" className={styles.emptyState} title={text.loading} />
-        ) : null}
-
-        {!isUsersRefreshing && !pageUsers.length ? (
-          <AdminStateCard
-            tone="info"
-            className={styles.emptyState}
-            title={text.noUsers}
-            description={ui.noSearchResults}
-          />
-        ) : null}
-
-        {!isUsersRefreshing && !!pageUsers.length && (
-          <>
-            <div
-              className={`${adminTableStyles.tableWrap} ${styles.tableWrap}`}
-              aria-busy={isUsersFetching ? "true" : undefined}
-            >
-              <table className={adminTableStyles.table}>
-                <thead>
-                  <tr>
-                    <th>{text.avatarLabel}</th>
-                    <th>{text.emailLabel}</th>
-                    <th>userId</th>
-                    <th>{text.roleLabel}</th>
-                    <th>{ui.accountStatus}</th>
-                    <th>{ui.premiumAndExpiry}</th>
-                    <th>{ui.balance}</th>
-                    <th>{ui.registeredAt}</th>
-                    <th>{ui.lastActivity}</th>
-                    <th>{ui.quickActions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedUsers.map((user) => {
-                    const isBusy = busyUserId === user.userId || isUserActionLocked;
-                    const status = getAccountStatus(user);
-                    const rowAnalytics = analyticsByUserId.get(user.userId);
-                    const rowSubscription = pageSubscriptionsByUserId.get(user.userId);
-
-                    return (
-                      <tr key={user.userId}>
-                        <td data-label={text.avatarLabel}>
-                          <UserAvatarView
-                            avatar={user.avatar}
-                            label={`${text.avatarLabel}: ${getUserAvatarLabel(user)}`}
-                            fallbackLabel={getUserAvatarLabel(user)}
-                          />
-                        </td>
-                        <td data-label={text.emailLabel}>
-                          <div className={styles.emailCell}>
-                            <Link
-                              href={`/${locale}/users/${encodeURIComponent(user.userId)}`}
-                              className={`${styles.userAnchor} ${styles.userAnchorActive}`}
-                            >
-                              <span>{maskEmail(user.email)}</span>
-                            </Link>
-                            <span className={styles.userMeta}>
-                              {sanitizeSensitiveText(user.displayName, 96)}
-                            </span>
-                          </div>
-                        </td>
-                        <td data-label="userId" className={adminTableStyles.mono}>
-                          {shortIdentifier(user.userId)}
-                        </td>
-                        <td data-label={text.roleLabel}>
-                          <div className={styles.roleList}>
-                            {user.roles.map((role) => (
-                              <AdminBadge
-                                key={role}
-                                tone={getUserRoleTone(role)}
-                                className={styles.rolePill}
-                              >
-                                {getUserRoleLabel(role, text)}
-                              </AdminBadge>
-                            ))}
-                          </div>
-                        </td>
-                        <td data-label={ui.accountStatus}>
-                          <AdminStatusBadge color={accountStatusColors[status]}>
-                            {status === "blocked"
-                              ? ui.blockedBadge
-                              : status === "unconfirmed"
-                                ? ui.unconfirmedBadge
-                                : ui.activeBadge}
-                          </AdminStatusBadge>
-                        </td>
-                        <td data-label={ui.premiumAndExpiry}>
-                          <div className={styles.stackCell}>
-                            <AdminStatusBadge
-                              color={
-                                user.isPremium
-                                  ? premiumStatusColors.premium
-                                  : premiumStatusColors.free
-                              }
-                            >
-                              {user.isPremium ? text.yesLabel : text.noLabel}
-                            </AdminStatusBadge>
-                            <span className={styles.userMeta}>
-                              {user.isPremium
-                                ? `${ui.premiumEnd}: ${formatDateTime(
-                                    rowSubscription?.currentPeriodEndUtc ?? null,
-                                    locale
-                                  )}`
-                                : ui.premiumEndUnknown}
-                            </span>
-                          </div>
-                        </td>
-                        <td data-label={ui.balance} className={styles.numericCell}>
-                          {rowAnalytics ? rowAnalytics.summary.walletBalance : "—"}
-                        </td>
-                        <td data-label={ui.registeredAt}>
-                          {formatDateTime(user.createdAtUtc, locale)}
-                        </td>
-                        <td data-label={ui.lastActivity}>
-                          {formatDateTime(rowAnalytics?.summary.lastActivityAtUtc ?? null, locale)}
-                        </td>
-                        <td data-label={ui.quickActions} className={styles.actionsCell}>
-                          <div className={styles.actions}>
-                            <button
-                              type="button"
-                              className={styles.quickActionBtn}
-                              onClick={() => {
-                                closeActionsMenu();
-                                setSelectedUserId(user.userId);
-                              }}
-                            >
-                              {ui.openSideCard}
-                            </button>
-                            {canManageRoles ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className={styles.quickActionBtn}
-                                  disabled={isBusy}
-                                  onClick={() => requestPremiumChange(user)}
-                                >
-                                  {user.isPremium ? text.removePremium : text.makePremium}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.quickActionBtn}
-                                  disabled={isBusy}
-                                  onClick={() => openWalletDialog(user.userId, "credit")}
-                                >
-                                  {ui.quickCredit}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.quickActionBtn}
-                                  disabled={isBusy}
-                                  onClick={() => openWalletDialog(user.userId, "debit")}
-                                >
-                                  {ui.quickDebit}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.quickActionBtn}
-                                  disabled={isBusy}
-                                  onClick={() => requestActiveChange(user)}
-                                >
-                                  {user.isActive ? text.deactivate : text.activate}
-                                </button>
-                              </>
-                            ) : null}
-                            <button
-                              type="button"
-                              className={styles.actionMenuTrigger}
-                              data-menu-open={openActionsUserId === user.userId ? "true" : "false"}
-                              aria-label={ui.menuLabel}
-                              aria-haspopup="menu"
-                              aria-expanded={openActionsUserId === user.userId}
-                              disabled={isUserActionLocked}
-                              ref={(node) => {
-                                triggerRefs.current[user.userId] = node;
-                              }}
-                              onClick={() => handleToggleActionsMenu(user.userId)}
-                            >
-                              <MoreHorizontalIcon className={styles.buttonIcon} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className={styles.pagination}>
-              <div>
-                {ui.usersCount}: {usersPage.totalCount}
-              </div>
-              <div className={styles.paginationControls}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => resetUsersSelection(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1 || isUsersFetching}
-                  aria-label={ui.previousPageLabel}
-                  title={ui.previousPageLabel}
-                >
-                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />
-                </Button>
-                <span className={styles.pageInfo}>
-                  {ui.pageInfo} {currentPage} / {totalPages}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => resetUsersSelection(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages || isUsersFetching}
-                  aria-label={ui.nextPageLabel}
-                  title={ui.nextPageLabel}
-                >
-                  <CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-      </AdminCard>
-
-      {openActionsUser && actionsMenuPosition && typeof window !== "undefined"
-        ? createPortal(
-            <div
-              ref={menuRootRef}
-              className={styles.actionMenuPortal}
-              style={{
-                top: actionsMenuPosition.top,
-                left: actionsMenuPosition.left,
-                minWidth: actionsMenuPosition.minWidth,
-                transform: actionsMenuPosition.openUpward ? "translateY(-100%)" : undefined,
-              }}
-              role="menu"
-              aria-label={ui.menuLabel}
-            >
-              <div
-                className={`${styles.actionMenuList} ${actionsMenuPosition.openUpward ? styles.actionMenuListUpward : ""}`}
-              >
-                <button
-                  type="button"
-                  className={styles.actionMenuItem}
-                  disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                  onClick={() => {
-                    closeActionsMenu();
-                    setSelectedUserId(openActionsUser.userId);
-                  }}
-                >
-                  <UsersIcon className={styles.buttonIcon} />
-                  <span>{ui.openCard}</span>
-                </button>
-                {canManageRoles && (
-                  <>
-                    <button
-                      type="button"
-                      className={styles.actionMenuItem}
-                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                      onClick={() => {
-                        openWalletDialog(openActionsUser.userId, "credit");
-                      }}
-                    >
-                      <DollarIcon className={styles.buttonIcon} />
-                      <span>{text.usersBalanceCredit}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionMenuItem}
-                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                      onClick={() => {
-                        openWalletDialog(openActionsUser.userId, "debit");
-                      }}
-                    >
-                      <DollarIcon className={styles.buttonIcon} />
-                      <span>{text.usersBalanceDebit}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionMenuItem}
-                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                      onClick={() => {
-                        requestRoleChange(openActionsUser, "Moderator");
-                      }}
-                    >
-                      <UsersIcon className={styles.buttonIcon} />
-                      <span>
-                        {openActionsUser.roles.includes("Moderator")
-                          ? text.revokeModerator
-                          : text.assignModerator}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.actionMenuItem}
-                      disabled={
-                        isUserActionLocked ||
-                        busyUserId === openActionsUser.userId ||
-                        cannotRevokeLastAdmin
-                      }
-                      title={cannotRevokeLastAdmin ? ui.lastAdminProtected : undefined}
-                      onClick={() => {
-                        requestRoleChange(openActionsUser, "Admin");
-                      }}
-                    >
-                      <UsersIcon className={styles.buttonIcon} />
-                      <span>
-                        {openActionsUser.roles.includes("Admin")
-                          ? text.revokeAdmin
-                          : text.assignAdmin}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.actionMenuItem} ${styles.actionMenuItemDanger}`}
-                      disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                      onClick={() => {
-                        requestDeleteUser(openActionsUser);
-                      }}
-                    >
-                      <CancelCircleIcon className={styles.buttonIcon} />
-                      <span>{text.usersDeleteAction}</span>
-                    </button>
-                  </>
-                )}
-                <Link
-                  href={`/${locale}/users/${encodeURIComponent(openActionsUser.userId)}`}
-                  className={`${styles.actionMenuLink}${
-                    isUserActionLocked || busyUserId === openActionsUser.userId
-                      ? ` ${styles.actionMenuLinkDisabled}`
-                      : ""
-                  }`}
-                  aria-disabled={isUserActionLocked || busyUserId === openActionsUser.userId}
-                  tabIndex={
-                    isUserActionLocked || busyUserId === openActionsUser.userId ? -1 : undefined
-                  }
-                  onClick={(event) => {
-                    if (isUserActionLocked || busyUserId === openActionsUser.userId) {
-                      event.preventDefault();
-                      return;
-                    }
-
-                    closeActionsMenu();
-                  }}
-                >
-                  <span>{ui.openCard}</span>
-                </Link>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      ) : null}
 
       <ConfirmationDialog
         open={confirmationDialog !== null}
@@ -1445,348 +727,37 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         }}
       />
 
-      {walletDialog && typeof window !== "undefined"
-        ? createPortal(
-            <div className={styles.walletDialogBackdrop} onClick={closeWalletDialog}>
-              <div
-                className={styles.walletDialog}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={walletDialogTitleId}
-                aria-describedby={walletDialog.error ? walletDialogErrorId : undefined}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <h3 id={walletDialogTitleId} className={styles.walletDialogTitle}>
-                  {walletDialog.operation === "credit"
-                    ? ui.walletDialogTitleCredit
-                    : ui.walletDialogTitleDebit}
-                </h3>
-                <label className={styles.walletField}>
-                  <span>{ui.walletAmountLabel}</span>
-                  <input
-                    className={styles.walletInput}
-                    inputMode="numeric"
-                    value={walletDialog.amount}
-                    onChange={(event) =>
-                      setWalletDialog((current) =>
-                        current
-                          ? {
-                              ...current,
-                              amount: event.target.value.replace(/\D+/g, "").slice(0, 8),
-                              error: null,
-                            }
-                          : current
-                      )
-                    }
-                    autoFocus
-                    maxLength={8}
-                    disabled={walletDialogSubmitting}
-                  />
-                </label>
-                <label className={styles.walletField}>
-                  <span>{ui.walletReasonLabel}</span>
-                  <textarea
-                    className={styles.walletTextarea}
-                    value={walletDialog.reason}
-                    onChange={(event) =>
-                      setWalletDialog((current) =>
-                        current
-                          ? {
-                              ...current,
-                              reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH),
-                              error: null,
-                            }
-                          : current
-                      )
-                    }
-                    rows={3}
-                    maxLength={USER_WALLET_REASON_MAX_LENGTH}
-                    disabled={walletDialogSubmitting}
-                  />
-                </label>
-                {walletDialog.error ? (
-                  <p id={walletDialogErrorId} className={styles.walletError} role="alert">
-                    {walletDialog.error}
-                  </p>
-                ) : null}
-                <div className={styles.walletActions}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={closeWalletDialog}
-                    disabled={walletDialogSubmitting}
-                  >
-                    {ui.walletCancel}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      void submitWalletDialog();
-                    }}
-                    disabled={
-                      walletDialogSubmitting ||
-                      !walletDialog.amount.trim() ||
-                      !walletDialog.reason.trim()
-                    }
-                  >
-                    {ui.walletSubmit}
-                  </Button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      {walletDialog ? (
+        <UsersManagementWalletDialog
+          closeWalletDialog={closeWalletDialog}
+          setWalletDialog={setWalletDialog}
+          submitWalletDialog={submitWalletDialog}
+          ui={ui}
+          walletDialog={walletDialog}
+          walletDialogErrorId={walletDialogErrorId}
+          walletDialogSubmitting={walletDialogSubmitting}
+          walletDialogTitleId={walletDialogTitleId}
+        />
+      ) : null}
 
-      {selectedUserId && typeof window !== "undefined"
-        ? createPortal(
-            <div className={styles.sidePanelBackdrop} onClick={() => setSelectedUserId(null)}>
-              <aside
-                className={styles.sidePanel}
-                role="dialog"
-                aria-modal="true"
-                aria-label={ui.sideTitle}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <header className={styles.sidePanelHeader}>
-                  <div>
-                    <h3>{ui.sideTitle}</h3>
-                    <p>{ui.sideDescription}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.closeBtn}
-                    onClick={() => setSelectedUserId(null)}
-                  >
-                    {ui.closePanel}
-                  </button>
-                </header>
-
-                {selectedUserProfile.hasError && !selectedUser ? (
-                  <AdminStateCard
-                    tone="danger"
-                    title={getAdminErrorMessage(selectedUserProfile.error, text.errorLoadingUsers)}
-                    action={
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={selectedUserProfile.isFetching}
-                        onClick={requestSelectedUserProfileRetry}
-                      >
-                        {text.supportRetryAction}
-                      </Button>
-                    }
-                  />
-                ) : !selectedUser ? (
-                  <AdminStateCard tone="info" title={text.loading} />
-                ) : (
-                  <div className={styles.sidePanelContent}>
-                    {selectedUserProfile.hasError ? (
-                      <AdminStateCard
-                        tone="warning"
-                        title={getAdminErrorMessage(
-                          selectedUserProfile.error,
-                          text.errorLoadingUsers
-                        )}
-                        action={
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            disabled={selectedUserProfile.isFetching}
-                            onClick={requestSelectedUserProfileRetry}
-                          >
-                            {text.supportRetryAction}
-                          </Button>
-                        }
-                      />
-                    ) : null}
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionProfile}</h4>
-                      <div className={styles.profileRow}>
-                        <UserAvatarView
-                          avatar={selectedUser.avatar}
-                          label={`${text.avatarLabel}: ${getUserAvatarLabel(selectedUser)}`}
-                          fallbackLabel={getUserAvatarLabel(selectedUser)}
-                          size="lg"
-                        />
-                        <div>
-                          <p className={styles.profileTitle}>
-                            {sanitizeSensitiveText(getAdminUserDisplayName(selectedUser), 96)}
-                          </p>
-                          <p className={styles.profileSub}>{maskEmail(selectedUser.email)}</p>
-                          <p className={styles.profileSub}>{shortIdentifier(selectedUser.userId)}</p>
-                        </div>
-                      </div>
-                      <div className={styles.badgeRow}>
-                        <AdminBadge tone={selectedUser.isActive ? "success" : "danger"}>
-                          {selectedUser.isActive ? ui.activeBadge : ui.blockedBadge}
-                        </AdminBadge>
-                        <AdminBadge tone={selectedUser.isPremium ? "warning" : "neutral"}>
-                          {selectedUser.isPremium ? text.premiumLabel : text.freeLabel}
-                        </AdminBadge>
-                        <AdminBadge tone={selectedUser.emailConfirmed ? "info" : "neutral"}>
-                          {selectedUser.emailConfirmed
-                            ? text.emailConfirmedLabel
-                            : ui.unconfirmedBadge}
-                        </AdminBadge>
-                      </div>
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionPremium}</h4>
-                      <p>
-                        {selectedSubscriptionQuery.data
-                          ? `${sanitizeSensitiveText(
-                              selectedSubscriptionQuery.data.status,
-                              48
-                            )} • ${formatDateTime(
-                              selectedSubscriptionQuery.data.currentPeriodEndUtc,
-                              locale
-                            )}`
-                          : ui.noData}
-                      </p>
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionBalance}</h4>
-                      <p>
-                        {selectedUserAnalytics
-                          ? `${selectedUserAnalytics.summary.walletBalance} • ${text.tokensGrantedLabel}: ${selectedUserAnalytics.summary.totalTokensCredited}`
-                          : ui.noData}
-                      </p>
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionRoles}</h4>
-                      <div className={styles.badgeRow}>
-                        {selectedUser.roles.map((role) => (
-                          <AdminBadge key={role} tone={getUserRoleTone(role)}>
-                            {getUserRoleLabel(role, text)}
-                          </AdminBadge>
-                        ))}
-                      </div>
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionSupport}</h4>
-                      {selectedUserSupportTickets.length ? (
-                        <div className={styles.listBlock}>
-                          {selectedUserSupportTickets.slice(0, 6).map((ticket) => (
-                            <article key={ticket.conversationId} className={styles.listCard}>
-                              <strong>{sanitizeSensitiveText(ticket.status, 48)}</strong>
-                              <span>{formatDateTime(ticket.updatedAtUtc, locale)}</span>
-                              <span>{formatSupportMessagePreview(ticket.lastMessagePreview, "—")}</span>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p>{ui.noData}</p>
-                      )}
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionPurchases}</h4>
-                      {selectedUserAnalytics?.recentPurchases.length ? (
-                        <div className={styles.listBlock}>
-                          {selectedUserAnalytics.recentPurchases.slice(0, 5).map((purchase) => (
-                            <article key={purchase.orderId} className={styles.listCard}>
-                              <strong>{purchase.sparkToGrant} spark</strong>
-                              <span>
-                                {purchase.priceAmount} {sanitizeSensitiveText(purchase.currencyCode, 12)}
-                              </span>
-                              <span>
-                                {formatDateTime(
-                                  purchase.confirmedAtUtc ?? purchase.createdAtUtc,
-                                  locale
-                                )}
-                              </span>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p>{ui.noData}</p>
-                      )}
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionGenerations}</h4>
-                      {selectedUserAnalytics?.recentGenerations.length ? (
-                        <div className={styles.listBlock}>
-                          {selectedUserAnalytics.recentGenerations.slice(0, 5).map((generation) => (
-                            <article key={generation.generationId} className={styles.listCard}>
-                              <strong>{sanitizeSensitiveText(generation.templateTitle, 120)}</strong>
-                              <span>{sanitizeSensitiveText(generation.status, 48)}</span>
-                              <span>
-                                {formatDateTime(
-                                  generation.completedAtUtc ?? generation.createdAtUtc,
-                                  locale
-                                )}
-                              </span>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p>{ui.noData}</p>
-                      )}
-                    </section>
-
-                    <section className={styles.panelSection}>
-                      <h4>{ui.sectionAudit}</h4>
-                      {selectedUserAnalytics?.recentAuditEvents.length ? (
-                        <div className={styles.listBlock}>
-                          {selectedUserAnalytics.recentAuditEvents.slice(0, 6).map((event) => (
-                            <article key={event.auditEventId} className={styles.listCard}>
-                              <strong>{sanitizeSensitiveText(event.action, 120)}</strong>
-                              <span>{formatDateTime(event.occurredAtUtc, locale)}</span>
-                              <span>{sanitizeSensitiveText(event.details, 180)}</span>
-                            </article>
-                          ))}
-                        </div>
-                      ) : (
-                        <p>{ui.noData}</p>
-                      )}
-                    </section>
-
-                    {canManageRoles ? (
-                      <section className={`${styles.panelSection} ${styles.dangerZone}`}>
-                        <h4>{ui.sectionDanger}</h4>
-                        <div className={styles.dangerActions}>
-                          <button
-                            type="button"
-                            className={styles.dangerBtn}
-                            disabled={isUserActionLocked || busyUserId === selectedUser.userId}
-                            onClick={() => requestActiveChange(selectedUser)}
-                          >
-                            {selectedUser.isActive ? text.deactivate : text.activate}
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.dangerBtn}
-                            disabled={isUserActionLocked || busyUserId === selectedUser.userId}
-                            onClick={() =>
-                              requestDeleteUser(selectedUser, () => setSelectedUserId(null))
-                            }
-                          >
-                            {text.usersDeleteAction}
-                          </button>
-                          <Link
-                            href={`/${locale}/users/${encodeURIComponent(selectedUser.userId)}`}
-                            className={styles.profileLinkBtn}
-                          >
-                            {ui.sideOpenFullProfile}
-                          </Link>
-                        </div>
-                      </section>
-                    ) : null}
-                  </div>
-                )}
-              </aside>
-            </div>,
-            document.body
-          )
-        : null}
+      <UsersManagementSidePanel
+        busyUserId={busyUserId}
+        canManageRoles={canManageRoles}
+        closePanel={() => setSelectedUserId(null)}
+        isUserActionLocked={isUserActionLocked}
+        locale={locale}
+        requestActiveChange={requestActiveChange}
+        requestDeleteUser={requestDeleteUser}
+        requestSelectedUserProfileRetry={requestSelectedUserProfileRetry}
+        selectedSubscription={selectedSubscriptionQuery.data ?? null}
+        selectedUser={selectedUser}
+        selectedUserAnalytics={selectedUserAnalytics}
+        selectedUserId={selectedUserId}
+        selectedUserProfile={selectedUserProfile}
+        selectedUserSupportTickets={selectedUserSupportTickets}
+        text={text}
+        ui={ui}
+      />
 
       {toast ? <Toast message={toast.message} type={toast.type} /> : null}
     </AdminPage>

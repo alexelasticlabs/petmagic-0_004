@@ -15,8 +15,8 @@ import {
 } from "@/components/promo-codes-view.helpers";
 import type { AdminRedeemCode } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
+import { readPromoCodesViewLibrarySource } from "./promo-codes-view.test-source";
 
-const promoCodesViewPath = fileURLToPath(new URL("./promo-codes-view.tsx", import.meta.url));
 const promoCodesHelpersPath = fileURLToPath(
   new URL("./promo-codes-view.helpers.ts", import.meta.url)
 );
@@ -131,10 +131,12 @@ describe("promo code CSV export", () => {
 
 describe("promo codes editor drawer hardening", () => {
   it("does not close the editor with Escape or close actions while a mutation is running", () => {
-    const source = readFileSync(promoCodesViewPath, "utf8");
+    const source = readPromoCodesViewLibrarySource();
 
-    expect(source).toContain("if (event.key !== \"Escape\")");
-    expect(source).toContain("if (isMutating) {\n        event.preventDefault();\n        return;\n      }");
+    expect(source).toContain('if (event.key !== "Escape")');
+    expect(source).toContain(
+      "if (isMutating) {\n        event.preventDefault();\n        return;\n      }"
+    );
     expect(source).toContain("}, [isEditorOpen, isMutating]);");
     expect(source).toContain("function handleCloseEditor() {");
     expect(source).toContain("if (isMutating) {\n      return;\n    }");
@@ -225,7 +227,7 @@ describe("promo code numeric form validation", () => {
 
 describe("promo code dangerous action hardening", () => {
   it("keeps archive confirmation open until the backend action succeeds", () => {
-    const source = readFileSync(promoCodesViewPath, "utf8");
+    const source = readPromoCodesViewLibrarySource();
     const contentSource = readFileSync(promoCodesContentPath, "utf8");
 
     expect(source).toContain("const sessionRoles = session?.user.roles ?? [];");
@@ -233,12 +235,16 @@ describe("promo code dangerous action hardening", () => {
     expect(source).toContain(
       'import { getPromoCodesViewText } from "@/components/promo-codes-view.content";'
     );
-    expect(source).toContain("const promoText = useMemo(() => getPromoCodesViewText(locale), [locale]);");
+    expect(source).toContain(
+      "const promoText = useMemo(() => getPromoCodesViewText(locale), [locale]);"
+    );
     expect(source).toContain("const archiveActionLabel = promoText.archiveActionLabel;");
     expect(source).toContain("const promoCodesAdminOnlyMessage = promoText.adminOnlyMessage;");
     expect(source).toContain("title: promoText.notificationTitle,");
     expect(contentSource).toContain('archiveActionLabel: "Архивировать"');
-    expect(contentSource).toContain('adminOnlyMessage: "Управление промокодами доступно только Admin."');
+    expect(contentSource).toContain(
+      'adminOnlyMessage: "Управление промокодами доступно только Admin."'
+    );
     expect(contentSource).toContain('notificationTitle: "Промокоды"');
     expect(source).toContain("if (!canManagePromoCodes || promoCodesQuery.isLoading)");
     expect(source).not.toContain(
@@ -263,11 +269,10 @@ describe("promo code dangerous action hardening", () => {
     );
     expect(source).toContain("if (promoCodesQuery.isError)");
     expect(source).not.toContain("if (promoCodesQuery.isError || promoMetricsQuery.isError)");
-    expect(source).toContain("promoMetricsQuery.isError ? (");
-    expect(source).toContain("title={text.promoCodesMetricsErrorDescription}");
     expect(source).toContain(
-      "description={getAdminErrorMessage(\n            promoMetricsQuery.error,\n            text.promoCodesMetricsErrorDescription\n          )}"
+      "metricsError={promoMetricsQuery.isError ? promoMetricsQuery.error : null}"
     );
+    expect(source).toContain("metricsErrorTitle={text.promoCodesMetricsErrorDescription}");
     expect(source).toContain("disabled={!canManagePromoCodes || isPromoRefreshFetching}");
     expect(source).toContain("promoCodesQueryIsFetching={isPromoRefreshFetching}");
     expect(source).toContain("function requestRefreshPromoCodes()");
@@ -275,13 +280,15 @@ describe("promo code dangerous action hardening", () => {
       "if (!canManagePromoCodes || isPromoRefreshFetching) {\n      return;\n    }\n\n    void Promise.allSettled([promoCodesQuery.refetch(), promoMetricsQuery.refetch()]);"
     );
     expect(source).toContain("function requestRefreshPromoMetrics()");
-    expect(source).toContain("onClick={requestRefreshPromoMetrics}");
-    expect(source).toContain("onClick={requestRefreshPromoCodes}");
+    expect(source).toContain("onRefreshMetrics={requestRefreshPromoMetrics}");
+    expect(source).toContain("onRefresh={requestRefreshPromoCodes}");
     expect(source).toContain("onRefresh={requestRefreshPromoCodes}");
     expect(source).toContain("promoCodesQuery.refetch()");
     expect(source).toContain("promoMetricsQuery.refetch().catch(() => undefined)");
     expect(source).not.toContain('locale === "ru" ? "Архивировать" : "Archive"');
-    expect(source).not.toContain('locale === "ru"\n      ? "Управление промокодами доступно только Admin."');
+    expect(source).not.toContain(
+      'locale === "ru"\n      ? "Управление промокодами доступно только Admin."'
+    );
     expect(source).not.toContain('title: locale === "ru" ? "Промокоды" : "Promo codes"');
     expect(source).not.toContain(
       "void promoCodesQuery.refetch().catch(() => undefined);\n            void promoMetricsQuery.refetch().catch(() => undefined);"
@@ -292,7 +299,7 @@ describe("promo code dangerous action hardening", () => {
   });
 
   it("clears stale promo dangerous actions after real list refreshes", () => {
-    const source = readFileSync(promoCodesViewPath, "utf8");
+    const source = readPromoCodesViewLibrarySource();
 
     expect(source).toContain(
       "const visiblePromoCodeIds = useMemo(\n    () => new Set(promoCodes.map((code) => code.redeemCodeId))"
@@ -312,7 +319,7 @@ describe("promo code dangerous action hardening", () => {
   });
 
   it("gates promo code export and copy actions behind Admin role checks", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const listCardSource = readFileSync(promoCodesListCardPath, "utf8");
     const helpersSource = readFileSync(promoCodesHelpersPath, "utf8");
 
@@ -335,7 +342,9 @@ describe("promo code dangerous action hardening", () => {
     );
     expect(viewSource).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(viewSource).not.toContain('clientLogger.warn("promo.copy_failed", { error });');
-    expect(viewSource).toContain('setFeedback({ tone: "danger", message: text.promoCodesUpdateError });');
+    expect(viewSource).toContain(
+      'setFeedback({ tone: "danger", message: text.promoCodesUpdateError });'
+    );
     expect(viewSource).toContain(
       "function handleExport() {\n    if (!assertCanManagePromoCodes())"
     );
@@ -350,10 +359,10 @@ describe("promo code dangerous action hardening", () => {
     expect(listCardSource).toContain(
       "disabled={!hasFilteredCodes || !canManagePromoCodes || promoCodesQueryIsFetching}"
     );
-    expect(listCardSource).toContain("disabled={!canManagePromoCodes || promoCodesQueryIsFetching}");
     expect(listCardSource).toContain(
-      "disabled={!canManagePromoCodes || promoCodesActionLocked}"
+      "disabled={!canManagePromoCodes || promoCodesQueryIsFetching}"
     );
+    expect(listCardSource).toContain("disabled={!canManagePromoCodes || promoCodesActionLocked}");
     expect(listCardSource).toContain("disabled={promoCodesQueryIsFetching}");
     expect(listCardSource.match(/disabled=\{promoCodesQueryIsFetching\}/g) ?? []).toHaveLength(7);
     expect(viewSource).toContain("function handleOpenCreatePanel()");
@@ -375,7 +384,7 @@ describe("promo code dangerous action hardening", () => {
     );
     expect(actionButtons.every((button) => button.includes("isActionsMenuBusy"))).toBe(true);
     expect(actionsMenuSource).toContain(
-      'const actionCodeLabel = actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`;'
+      "const actionCodeLabel = actionsMenuCode.code || `${actionsMenuCode.codePrefix}...`;"
     );
     expect(actionsMenuSource).toContain("aria-label={copyActionLabel}");
     expect(actionsMenuSource).toContain("aria-label={editActionLabel}");
@@ -389,7 +398,7 @@ describe("promo code dangerous action hardening", () => {
 
 describe("promo code activation data sourcing", () => {
   it("clears the selected promo code when list filters or pages change", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
 
     expect(viewSource).toContain("function resetSelectedPromoCode(nextPage = 1) {");
     expect(viewSource).toContain(
@@ -402,13 +411,17 @@ describe("promo code activation data sourcing", () => {
     expect(viewSource).toContain("onSortModeChange={(value) => {");
     expect(viewSource).toContain("onPageSizeChange={(value) => {");
     expect(viewSource).toContain("onResetFilters={() => {");
-    expect(viewSource).toContain("onPreviousPage={() => resetSelectedPromoCode(Math.max(1, currentPage - 1))}");
-    expect(viewSource).toContain("onNextPage={() => resetSelectedPromoCode(Math.min(totalPages, currentPage + 1))}");
+    expect(viewSource).toContain(
+      "onPreviousPage={() => resetSelectedPromoCode(Math.max(1, currentPage - 1))}"
+    );
+    expect(viewSource).toContain(
+      "onNextPage={() => resetSelectedPromoCode(Math.min(totalPages, currentPage + 1))}"
+    );
     expect(viewSource).toContain("onSelectPage={resetSelectedPromoCode}");
   });
 
   it("keeps the selected promo code context stable across filtered page refetches", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
 
     expect(viewSource).toContain(
       "const [selectedCodeSnapshot, setSelectedCodeSnapshot] = useState<AdminRedeemCode | null>(null);"
@@ -422,19 +435,20 @@ describe("promo code activation data sourcing", () => {
   });
 
   it("does not substitute embedded redemption history when backend activations fail", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const cardSource = readFileSync(
       fileURLToPath(new URL("./promo-code-activations-card.tsx", import.meta.url)),
       "utf8"
     );
 
-    expect(viewSource).toContain(
-      "const activationsPageData = activationsQuery.isPlaceholderData ? undefined : activationsQuery.data;"
-    );
+    expect(viewSource).toContain("const activationsPageData = activationsQuery.isPlaceholderData");
+    expect(viewSource).toContain(": activationsQuery.data;");
     expect(viewSource).toContain(
       "const redemptionsForView = activationsQuery.isError ? EMPTY_REDEMPTIONS : visibleRedemptions;"
     );
-    expect(viewSource).toContain("const hasMoreRedemptions = Boolean(activationsPageData?.hasMore);");
+    expect(viewSource).toContain(
+      "const hasMoreRedemptions = Boolean(activationsPageData?.hasMore);"
+    );
     expect(viewSource).toContain(
       "const isActivationsRefreshing = activationsQuery.isFetching && activationsQuery.isPlaceholderData;"
     );
@@ -455,7 +469,7 @@ describe("promo code activation data sourcing", () => {
   });
 
   it("uses backend pagination, search, filters, and query invalidation for promo code lists", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const listSource = readFileSync(promoCodesListCardPath, "utf8");
     const queryKeysSource = readFileSync(
       fileURLToPath(new URL("../lib/admin-query-keys.ts", import.meta.url)),
@@ -512,7 +526,9 @@ describe("promo code activation data sourcing", () => {
     );
     expect(listSource).toContain("disabled={actionBusy || promoCodesQueryIsFetching}");
     expect(listSource).toContain("disabled={currentPage <= 1 || promoCodesQueryIsFetching}");
-    expect(listSource).toContain("disabled={currentPage >= totalPages || promoCodesQueryIsFetching}");
+    expect(listSource).toContain(
+      "disabled={currentPage >= totalPages || promoCodesQueryIsFetching}"
+    );
     expect(listSource).toContain("disabled={promoCodesQueryIsFetching}");
     expect(listSource.match(/disabled=\{promoCodesQueryIsFetching\}/g) ?? []).toHaveLength(7);
     expect(queryKeysSource).toContain("economyRedeemCodesRoot");
@@ -520,10 +536,11 @@ describe("promo code activation data sourcing", () => {
   });
 
   it("keeps promo code mutation cache refreshes non-blocking after success", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
-    const rootRefreshes = viewSource.match(
-      /Promise\.allSettled\(\[\n\s+queryClient\.invalidateQueries\(\{ queryKey: adminQueryKeys\.economyRedeemCodesRoot \}\),\n\s+\]\)/g
-    ) ?? [];
+    const viewSource = readPromoCodesViewLibrarySource();
+    const rootRefreshes =
+      viewSource.match(
+        /Promise\.allSettled\(\[\n\s+queryClient\.invalidateQueries\(\{ queryKey: adminQueryKeys\.economyRedeemCodesRoot \}\),\n\s+\]\)/g
+      ) ?? [];
 
     expect(rootRefreshes).toHaveLength(4);
     expect(viewSource).not.toContain(
@@ -532,7 +549,7 @@ describe("promo code activation data sourcing", () => {
   });
 
   it("sources promo code KPI cards from backend aggregate metrics", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const contentSource = readFileSync(promoCodesContentPath, "utf8");
     const queryKeysSource = readFileSync(
       fileURLToPath(new URL("../lib/admin-query-keys.ts", import.meta.url)),
@@ -560,7 +577,9 @@ describe("promo code activation data sourcing", () => {
     expect(viewSource).toContain("hint={promoText.kpiUsesHint}");
     expect(viewSource).toContain("hint={promoText.kpiGrantedHint}");
     expect(contentSource).toContain('kpiCodesLabel: "Codes"');
-    expect(contentSource).toContain('kpiGrantedHint: "CSV export includes the current result page."');
+    expect(contentSource).toContain(
+      'kpiGrantedHint: "CSV export includes the current result page."'
+    );
     expect(viewSource).not.toContain("pageCodes: promoCodes.length");
     expect(viewSource).not.toContain("activeCodes: promoCodes.filter");
     expect(viewSource).not.toContain("totalUses: promoCodes.reduce");
@@ -642,7 +661,9 @@ describe("promo code sensitive display", () => {
     expect(listSource).toContain("buildPromoCodesPaginationSummary(");
     expect(listSource).toContain("buildPromoCodesPageLabel(");
     expect(listSource).toContain("ariaLabel={promoText.pageSizeAriaLabel}");
-    expect(listSource).toContain("buildPromoCodesAutoRefreshLabel(locale, secondsUntilAutoRefresh)");
+    expect(listSource).toContain(
+      "buildPromoCodesAutoRefreshLabel(locale, secondsUntilAutoRefresh)"
+    );
     expect(listSource).not.toContain("`Page ${formatNumber(pageNumber, locale)}`");
     expect(listSource).not.toContain("`Страница ${formatNumber(pageNumber, locale)}`");
     expect(contentSource).toContain("export function buildPromoCodesPageLabel");
@@ -656,7 +677,9 @@ describe("promo code sensitive display", () => {
       "className={`${styles.pageIcon} ${styles.pageIconPrevious}`}"
     );
     expect(activationsSource).toContain("className={`${styles.pageIcon} ${styles.pageIconNext}`}");
-    expect(activationsSource).not.toContain(">\n                  {text.promoCodesPreviousAction}\n");
+    expect(activationsSource).not.toContain(
+      ">\n                  {text.promoCodesPreviousAction}\n"
+    );
     expect(activationsSource).not.toContain(">\n                  {text.promoCodesNextAction}\n");
     expect(stylesSource).toContain(".tableTopBar {\n  display: flex;\n  flex-wrap: wrap;");
     expect(stylesSource).toContain(".statusTabs {\n  min-width: 0;\n  max-width: 100%;");
@@ -697,9 +720,7 @@ describe("promo code sensitive display", () => {
     expect(errorStateIndex).toBeLessThan(emptyStateIndex);
     expect(activationsSource).toContain("disabled={activationsIsFetching}");
     expect(activationsSource).toContain("function requestActivationsRetry()");
-    expect(activationsSource).toContain(
-      "if (activationsIsFetching) {\n      return;\n    }"
-    );
+    expect(activationsSource).toContain("if (activationsIsFetching) {\n      return;\n    }");
     expect(activationsSource).toContain("void onRefetchActivations();");
     expect(activationsSource).toContain("onClick={requestActivationsRetry}");
   });
@@ -739,11 +760,13 @@ describe("promo code sensitive display", () => {
     expect(stylesSource).toContain("max-width: inherit;");
     expect(stylesSource).toContain("max-height: inherit;");
     expect(stylesSource).toContain("overflow-y: auto;");
-    expect(stylesSource).toContain(".actionsMenuItem {\n  appearance: none;\n  width: 100%;\n  min-width: 0;");
+    expect(stylesSource).toContain(
+      ".actionsMenuItem {\n  appearance: none;\n  width: 100%;\n  min-width: 0;"
+    );
     expect(stylesSource).toContain("white-space: normal;");
     expect(stylesSource).toContain("overflow-wrap: anywhere;");
     expect(stylesSource).not.toContain("rgba(");
-    expect(actionsMenuSource).toContain('minWidth: `min(${minWidthPx}px, calc(100vw - 1rem))`');
+    expect(actionsMenuSource).toContain("minWidth: `min(${minWidthPx}px, calc(100vw - 1rem))`");
     expect(actionsMenuSource).not.toContain("minWidth: minWidthPx");
     expect(actionsMenuHookSource).toContain("const menuWidth = Math.min(");
     expect(actionsMenuHookSource).toContain(
@@ -751,7 +774,9 @@ describe("promo code sensitive display", () => {
     );
     expect(actionsMenuHookSource).toContain("rect.right - menuWidth");
     expect(actionsMenuHookSource).not.toContain("rect.right - ACTIONS_MENU_WIDTH_PX");
-    expect(stylesSource).not.toContain("outline: 1px solid color-mix(in srgb, var(--success) 42%, transparent);");
+    expect(stylesSource).not.toContain(
+      "outline: 1px solid color-mix(in srgb, var(--success) 42%, transparent);"
+    );
     expect(stylesSource).not.toContain("radial-gradient");
     expect(stylesSource).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(stylesSource).not.toMatch(/font-size:\s*[^;]*vw/);
@@ -761,11 +786,12 @@ describe("promo code sensitive display", () => {
   });
 
   it("sanitizes selected promo code labels and disables repeated activation retries", () => {
-    const viewSource = readFileSync(promoCodesViewPath, "utf8");
+    const viewSource = readPromoCodesViewLibrarySource();
     const activationsSource = readFileSync(promoCodeActivationsCardPath, "utf8");
 
+    expect(viewSource).toContain("formatPromoDisplayText(");
     expect(viewSource).toContain(
-      "formatPromoDisplayText(\n                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,\n                80"
+      "codePendingArchive.code || `${codePendingArchive.codePrefix}...`"
     );
     expect(viewSource).toContain("enabled: canManagePromoCodes && Boolean(selectedCodeId)");
     expect(viewSource).toContain("selectedUsersQueries = useQueries({");
@@ -778,10 +804,10 @@ describe("promo code sensitive display", () => {
     );
     expect(activationsSource).toContain("disabled={activationsIsFetching}");
     expect(activationsSource).toContain(
-      "<Button\n                variant=\"secondary\"\n                size=\"sm\"\n                onClick={onShowAllActivations}\n                disabled={activationsIsFetching}"
+      '<Button\n                variant="secondary"\n                size="sm"\n                onClick={onShowAllActivations}\n                disabled={activationsIsFetching}'
     );
     expect(activationsSource).toContain(
-      "<Button\n                variant=\"ghost\"\n                size=\"sm\"\n                onClick={onShowLatestActivations}\n                disabled={activationsIsFetching}"
+      '<Button\n                variant="ghost"\n                size="sm"\n                onClick={onShowLatestActivations}\n                disabled={activationsIsFetching}'
     );
     expect(activationsSource).not.toContain(
       '`${selectedCode.code || `${selectedCode.codePrefix}...`} · ${selectedStatusLabel ?? ""}`'

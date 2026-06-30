@@ -1,10 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const pageSource = readFileSync(
-  new URL("./templates-daily-featured-page.tsx", import.meta.url),
-  "utf8"
-);
+import { readTemplatesDailyFeaturedPageLibrarySource } from "./templates-daily-featured-page.test-source";
+
+const pageSource = readTemplatesDailyFeaturedPageLibrarySource();
 const contentSource = readFileSync(
   new URL("./templates-daily-featured-page.content.ts", import.meta.url),
   "utf8"
@@ -43,11 +42,11 @@ describe("templates daily featured page", () => {
   it("keeps the storefront preview overlay theme-aware", () => {
     expect(stylesSource).toContain(".previewOverlay {");
     expect(stylesSource).toContain(".previewEmpty {");
-    expect(stylesSource).toContain(
-      "color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))"
-    );
+    expect(stylesSource).toContain("color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))");
     expect(stylesSource).not.toContain("radial-gradient");
-    expect(stylesSource).toContain("border-top: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);");
+    expect(stylesSource).toContain(
+      "border-top: 1px solid color-mix(in srgb, var(--border-soft) 58%, transparent);"
+    );
     expect(stylesSource).toContain("color-mix(in srgb, var(--surface-0) 86%, transparent)");
     expect(stylesSource).toContain("color: var(--text-strong);");
     expect(stylesSource).toContain(".previewOverlay p");
@@ -126,7 +125,10 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("{templateOptionsError ? (");
     expect(pageSource).toContain("description={templateOptionsError}");
     expect(pageSource).toContain("disabled={!canManageTemplates || isActionLocked}");
-    expect(pageSource).toContain("onClick={() => void loadTemplateOptions(debouncedSearch)}");
+    expect(pageSource).toContain(
+      "onRetryTemplateOptions={() => void loadTemplateOptions(debouncedSearch)}"
+    );
+    expect(pageSource).toContain("onClick={onRetryTemplateOptions}");
     expect(pageSource).not.toContain(
       "await Promise.all([loadScheduleData(), loadTemplateOptions(debouncedSearch)]);"
     );
@@ -136,7 +138,7 @@ describe("templates daily featured page", () => {
   });
 
   it("keeps daily featured logs and backend labels sanitized", () => {
-    expect(pageSource).toContain('import { sanitizeSensitiveText }');
+    expect(pageSource).toContain("import { sanitizeSensitiveText }");
     expect(pageSource).toContain("function safeDisplayText");
     expect(pageSource).toContain("function safeErrorDetails");
     expect(pageSource).toContain("function safeActionContext");
@@ -149,21 +151,41 @@ describe("templates daily featured page", () => {
     );
     expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_save_failed", {');
     expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_delete_failed", {');
-    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_auto_pick_failed", {');
-    expect(pageSource).toContain('clientLogger.warn("templates.daily_featured_settings_save_failed", {');
-    expect(pageSource).toContain("assignmentId: input.assignmentId ? sanitizeSensitiveText(input.assignmentId, 80) : undefined");
-    expect(pageSource).toContain("templateId: input.templateId ? sanitizeSensitiveText(input.templateId, 80) : undefined");
-    expect(pageSource).toContain("templateTitle: input.templateTitle ? sanitizeSensitiveText(input.templateTitle, 96) : undefined");
+    expect(pageSource).toContain(
+      'clientLogger.warn("templates.daily_featured_auto_pick_failed", {'
+    );
+    expect(pageSource).toContain(
+      'clientLogger.warn("templates.daily_featured_settings_save_failed", {'
+    );
+    expect(pageSource).toContain(
+      "assignmentId: input.assignmentId ? sanitizeSensitiveText(input.assignmentId, 80) : undefined"
+    );
+    expect(pageSource).toContain(
+      "templateId: input.templateId ? sanitizeSensitiveText(input.templateId, 80) : undefined"
+    );
+    expect(pageSource).toContain(
+      "templateTitle: input.templateTitle ? sanitizeSensitiveText(input.templateTitle, 96) : undefined"
+    );
     expect(pageSource).toContain("safeDisplayText(template.title, 120)");
+    expect(pageSource).toContain("safeDisplayText(template.templateType, 32)");
     expect(pageSource).toContain("safeDisplayText(template.category, 72)");
     expect(pageSource).toContain("safeDisplayText(assignment.templateTitle, 120)");
+    expect(pageSource).toContain("safeDisplayText(assignment.templateType, 32)");
     expect(pageSource).toContain("safeDisplayText(assignment.subtitleOverride, 220)");
     expect(pageSource).not.toContain("{ error: loadError }");
     expect(pageSource).not.toContain("{ error: loadFailure }");
-    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_save_failed", { error: saveError });');
-    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_delete_failed", { error: deleteError });');
-    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_auto_pick_failed", { error: autoPickError });');
-    expect(pageSource).not.toContain('clientLogger.warn("templates.daily_featured_settings_save_failed", { error: settingsError });');
+    expect(pageSource).not.toContain(
+      'clientLogger.warn("templates.daily_featured_save_failed", { error: saveError });'
+    );
+    expect(pageSource).not.toContain(
+      'clientLogger.warn("templates.daily_featured_delete_failed", { error: deleteError });'
+    );
+    expect(pageSource).not.toContain(
+      'clientLogger.warn("templates.daily_featured_auto_pick_failed", { error: autoPickError });'
+    );
+    expect(pageSource).not.toContain(
+      'clientLogger.warn("templates.daily_featured_settings_save_failed", { error: settingsError });'
+    );
   });
 
   it("warns on occupied manual dates and sends manual assignment payloads", () => {
@@ -185,8 +207,8 @@ describe("templates daily featured page", () => {
 
   it("locks daily featured mutations and form edits while data is loading or submitting", () => {
     expect(pageSource).toContain("const isActionLocked = isSubmitting || isLoading;");
-    expect(pageSource).toContain(
-      "if (!canManageTemplates || !form.templateId || isActionLocked || invalidDateRangeWarning) return;"
+    expect(pageSource).toMatch(
+      /if \(!canManageTemplates \|\| !form\.templateId \|\| isActionLocked \|\| invalidDateRangeWarning\)\s+return;/
     );
     expect(pageSource).toContain("if (!canManageTemplates || isActionLocked) {");
     expect(pageSource).toContain(
@@ -202,10 +224,18 @@ describe("templates daily featured page", () => {
   });
 
   it("blocks auto-pick runs until a date is selected", () => {
-    expect(contentSource).toContain("autoPickDateRequired: \"Выберите дату для ручного автовыбора.\"");
-    expect(contentSource).toContain("autoPickDateRequired: \"Select a date before running auto-pick.\"");
-    expect(pageSource).toContain("const isAutoPickDateMissing = autoPick.date.trim().length === 0;");
-    expect(pageSource).toContain("if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;");
+    expect(contentSource).toContain(
+      'autoPickDateRequired: "Выберите дату для ручного автовыбора."'
+    );
+    expect(contentSource).toContain(
+      'autoPickDateRequired: "Select a date before running auto-pick."'
+    );
+    expect(pageSource).toContain(
+      "const isAutoPickDateMissing = autoPick.date.trim().length === 0;"
+    );
+    expect(pageSource).toContain(
+      "if (!canManageTemplates || isActionLocked || isAutoPickDateMissing) return;"
+    );
     expect(pageSource).toContain(
       "disabled={!canManageTemplates || isActionLocked || isAutoPickDateMissing}"
     );
@@ -253,13 +283,22 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("if (!form.templateId) {\n      return null;");
     expect(pageSource).toContain("function optionFromTemplate");
     expect(pageSource).toContain("function optionFromAssignment");
-    expect(pageSource).toContain("if (selectedTemplateOptionSnapshot?.templateId === form.templateId)");
+    expect(pageSource).toContain(
+      "if (selectedTemplateOptionSnapshot?.templateId === form.templateId)"
+    );
     expect(pageSource).toContain("const templateOptions = useMemo(() => {");
     expect(pageSource).toContain("return [selectedTemplateSnapshot, ...options];");
-    expect(pageSource).toContain("if (selectedTemplate) {\n      return optionFromTemplate(selectedTemplate);");
+    expect(pageSource).toContain(
+      "if (selectedTemplate) {\n      return optionFromTemplate(selectedTemplate);"
+    );
     expect(pageSource).toContain("if (selectedAssignment?.templateId === form.templateId)");
-    expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(\n                    templateOptions.find");
-    expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));");
+    expect(pageSource).toContain("const handleTemplateSelectionChange = useCallback(");
+    expect(pageSource).toContain(
+      "templateOptions.find((template) => template.templateId === nextTemplateId) ?? null"
+    );
+    expect(pageSource).toContain(
+      "setSelectedTemplateOptionSnapshot(optionFromAssignment(assignment));"
+    );
     expect(pageSource).toContain("setSelectedTemplateOptionSnapshot(null);");
     expect(pageSource).toContain("templateOptions.map((template) =>");
   });
@@ -268,9 +307,7 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain(
       'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
     );
-    expect(pageSource).toContain(
-      "const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot)"
-    );
+    expect(pageSource).toContain("const previewMediaUrl = getPreviewUrl(selectedTemplateSnapshot)");
     expect(pageSource).toContain(
       'const previewType = selectedTemplateSnapshot?.templateType ?? ("Image" as TemplateType);'
     );
@@ -293,11 +330,15 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("const [assignmentPendingDelete, setAssignmentPendingDelete]");
     expect(pageSource).toContain("const scheduleAssignmentIds = useMemo(");
     expect(pageSource).toContain("new Set(schedule.map((assignment) => assignment.id))");
-    expect(pageSource).toContain("if (isScheduleLoading || isActionLocked) {\n      return;\n    }");
+    expect(pageSource).toContain(
+      "if (isScheduleLoading || isActionLocked) {\n      return;\n    }"
+    );
     expect(pageSource).toContain(
       "const shouldResetPendingDelete =\n      assignmentPendingDelete && !scheduleAssignmentIds.has(assignmentPendingDelete.id);"
     );
-    expect(pageSource).toContain("const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);");
+    expect(pageSource).toContain(
+      "const shouldResetForm = form.id && !scheduleAssignmentIds.has(form.id);"
+    );
     expect(pageSource).toContain("queueMicrotask(() => {");
     expect(pageSource).toContain(
       "if (shouldResetPendingDelete) {\n        setAssignmentPendingDelete(null);\n      }"
@@ -311,7 +352,8 @@ describe("templates daily featured page", () => {
     expect(pageSource).toContain("deleteAssignmentLabel");
     expect(pageSource).toContain("aria-label={text.editAssignmentLabel");
     expect(pageSource).toContain("aria-label={text.deleteAssignmentLabel");
-    expect(pageSource).toContain("setAssignmentPendingDelete(assignment)");
+    expect(pageSource).toContain("onRequestDeleteAssignment={setAssignmentPendingDelete}");
+    expect(pageSource).toContain("onClick={() => onRequestDeleteAssignment(assignment)}");
     expect(pageSource).toContain("<ConfirmationDialog");
     expect(pageSource).toContain("void handleDelete(assignmentPendingDelete).then((succeeded) =>");
     expect(pageSource).not.toContain("window.confirm");

@@ -4,9 +4,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import { AdminLoginScreen } from "@/components/admin/admin-login-screen";
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
-import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import styles from "@/components/admin/admin-shell.module.css";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";

@@ -1,17 +1,15 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readTemplatesCatalogViewLibrarySource } from "./templates-catalog-view.test-source";
+import { readTemplatesCategoriesViewLibrarySource } from "./templates-categories-view.test-source";
 
-const catalogViewPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
 const catalogCssPath = fileURLToPath(new URL("./templates-catalog.module.css", import.meta.url));
-const categoriesViewPath = fileURLToPath(
-  new URL("./templates-categories-view.tsx", import.meta.url)
-);
 
 describe("templates catalog visual contract", () => {
   it("keeps template status colors on semantic theme tokens", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
-    const categoriesSource = readFileSync(categoriesViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
+    const categoriesSource = readTemplatesCategoriesViewLibrarySource();
 
     expect(catalogSource).toContain('Draft: "var(--warning)"');
     expect(catalogSource).toContain('Active: "var(--success)"');
@@ -24,12 +22,10 @@ describe("templates catalog visual contract", () => {
   });
 
   it("does not depend on generated CSS module names for composed table styling", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
-    expect(catalogSource).toContain(
-      'className={`${adminTableStyles.table} ${styles.listTable}`}'
-    );
+    expect(catalogSource).toContain("className={`${adminTableStyles.table} ${styles.listTable}`}");
     expect(catalogSource).toContain("className={styles.listStatusBadge}");
     expect(catalogSource).toContain("className={styles.cardStatusBadge}");
     expect(cssSource).toContain(".listTable {");
@@ -40,7 +36,7 @@ describe("templates catalog visual contract", () => {
   });
 
   it("keeps compact catalog text stable and pagers icon-based", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
     const letterSpacingRules = cssSource.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
@@ -60,7 +56,7 @@ describe("templates catalog visual contract", () => {
   });
 
   it("keeps active catalog tabs and view toggles non-interactive", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
     expect(catalogSource).toContain(
@@ -69,7 +65,9 @@ describe("templates catalog visual contract", () => {
     expect(catalogSource).toContain(
       'disabled={archiveFilter === "archived" || isCatalogInteractionLocked}'
     );
-    expect(catalogSource).toContain('disabled={viewMode === "cards" || isCatalogInteractionLocked}');
+    expect(catalogSource).toContain(
+      'disabled={viewMode === "cards" || isCatalogInteractionLocked}'
+    );
     expect(catalogSource).toContain('disabled={viewMode === "list" || isCatalogInteractionLocked}');
     expect(cssSource).toContain(".tab:not(:disabled):hover");
     expect(cssSource).toContain(".viewButton:not(:disabled):hover,");
@@ -82,7 +80,7 @@ describe("templates catalog visual contract", () => {
   });
 
   it("keeps card metric icon layout in the catalog stylesheet", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
     expect(catalogSource).toContain("DollarIcon");
@@ -91,7 +89,7 @@ describe("templates catalog visual contract", () => {
     expect(catalogSource).toContain("CancelCircleIcon");
     expect(catalogSource).toContain("className={styles.cardMetricIcon}");
     expect(catalogSource).not.toContain("<svg");
-    expect(catalogSource).not.toContain("strokeWidth=\"1.7\"");
+    expect(catalogSource).not.toContain('strokeWidth="1.7"');
     expect(catalogSource).not.toContain("M12 2l2.4 7.4H22");
     expect(catalogSource).not.toContain(
       'style={{ width: "0.85rem", height: "0.85rem", opacity: 0.7, flexShrink: 0 }}'
@@ -104,18 +102,22 @@ describe("templates catalog visual contract", () => {
   });
 
   it("keeps list action controls stable in the sticky catalog table column", () => {
-    const catalogSource = readFileSync(catalogViewPath, "utf8");
+    const catalogSource = readTemplatesCatalogViewLibrarySource();
     const cssSource = readFileSync(catalogCssPath, "utf8");
 
     expect(catalogSource).toContain("className={styles.tableActionsCell}");
     expect(catalogSource).toContain("className={styles.tableActions}");
     expect(cssSource).toContain(".tableActionsCell {\n  min-width: 13.25rem;");
-    expect(cssSource).toContain(".tableActions {\n  justify-content: flex-end;\n  flex-wrap: nowrap;");
+    expect(cssSource).toContain(
+      ".tableActions {\n  justify-content: flex-end;\n  flex-wrap: nowrap;"
+    );
     expect(cssSource).toContain(".tableActions .cardActionIconButton {\n  flex: 0 0 1.9rem;");
     expect(cssSource).toContain(
       "@media (max-width: 760px) {\n  .catalogHero {\n    grid-template-columns: 1fr;"
     );
-    expect(cssSource).toContain(".tableActions {\n    justify-content: flex-start;\n    flex-wrap: wrap;");
+    expect(cssSource).toContain(
+      ".tableActions {\n    justify-content: flex-start;\n    flex-wrap: wrap;"
+    );
     expect(cssSource).toContain(".tableActions .cardActionIconButton {\n    flex: 1 1 2.1rem;");
     expect(cssSource).toContain(".tableActionsCell {\n    min-width: 14rem;");
   });

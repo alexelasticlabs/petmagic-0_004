@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
 
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import { getTemplateEditorRuntimeText } from "@/components/templates/template-editor.content";
 import { buildTemplateEditorModel } from "@/components/templates/template-editor-model";
+import { getTemplateEditorRuntimeText } from "@/components/templates/template-editor.content";
 import {
   createFormFromTemplate,
   createInitialTemplateForm,

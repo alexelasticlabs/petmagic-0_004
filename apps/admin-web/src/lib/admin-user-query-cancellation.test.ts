@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
+
 function readSource(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), "src", relativePath), "utf8");
 }
@@ -10,8 +12,12 @@ describe("admin user query cancellation", () => {
   it("propagates AbortSignal through user detail and analytics helpers", () => {
     const source = readSource("lib/api-client.admin-users.ts");
 
-    expect(source).toContain("export async function fetchAdminUser(\n  userId: string,\n  signal?: AbortSignal");
-    expect(source).toContain("export async function fetchAdminUserAnalytics(\n  userId: string,\n  signal?: AbortSignal");
+    expect(source).toContain(
+      "export async function fetchAdminUser(\n  userId: string,\n  signal?: AbortSignal"
+    );
+    expect(source).toContain(
+      "export async function fetchAdminUserAnalytics(\n  userId: string,\n  signal?: AbortSignal"
+    );
     expect(source).toContain("const encodedUserId = encodePathSegment(userId);");
     expect(source).toContain("apiRequest<AdminUserDetail>(`/api/admin/users/${encodedUserId}`,");
     expect(source).toContain(
@@ -22,7 +28,7 @@ describe("admin user query cancellation", () => {
 
   it("uses React Query AbortSignal in user profile, users table, promo, and support panels", () => {
     const profileSource = readSource("components/users/use-admin-user-profile.ts");
-    const usersPageSource = readSource("components/users-management-page.tsx");
+    const usersPageSource = readUsersManagementPageLibrarySource();
     const promoCodesSource = readSource("components/promo-codes-view.tsx");
     const supportSource = readSource("components/support/use-support-conversation-controller.ts");
 
@@ -41,6 +47,8 @@ describe("admin user query cancellation", () => {
     expect(supportSource).toContain("fetchAdminUser(subjectUserId!, signal)");
     expect(supportSource).toContain("fetchAdminUserAnalytics(subjectUserId!, signal)");
     expect(supportSource).toContain("fetchAdminEconomyPurchases(");
-    expect(supportSource).toContain("fetchAdminEconomyUserSubscriptionSummary(subjectUserId!, signal)");
+    expect(supportSource).toContain(
+      "fetchAdminEconomyUserSubscriptionSummary(subjectUserId!, signal)"
+    );
   });
 });

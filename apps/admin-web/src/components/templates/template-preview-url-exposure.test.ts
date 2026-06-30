@@ -2,7 +2,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const catalogPath = fileURLToPath(new URL("./templates-catalog-view.tsx", import.meta.url));
+import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
+import { readTemplatesAnalyticsHubPageLibrarySource } from "@/components/templates/templates-analytics-hub-page.test-source";
+import { readTemplatesCatalogViewLibrarySource } from "@/components/templates/templates-catalog-view.test-source";
 const phonePreviewPath = fileURLToPath(
   new URL("./template-phone-preview-card.tsx", import.meta.url)
 );
@@ -12,29 +14,25 @@ const analyticsOverviewPath = fileURLToPath(
 const analyticsDetailSectionsPath = fileURLToPath(
   new URL("./template-analytics-detail-sections.tsx", import.meta.url)
 );
-const analyticsHubPath = fileURLToPath(
-  new URL("./templates-analytics-hub-page.tsx", import.meta.url)
-);
 const previewAssetSectionPath = fileURLToPath(
   new URL("./template-preview-asset-section.tsx", import.meta.url)
 );
 const editorSectionsPath = fileURLToPath(
   new URL("./template-editor-sections.tsx", import.meta.url)
 );
-const templateTestPath = fileURLToPath(new URL("./template-test-page.tsx", import.meta.url));
 const secureMediaPath = fileURLToPath(new URL("./template-secure-media.tsx", import.meta.url));
 
 describe("template preview media URL exposure", () => {
   it("does not render backend template media URLs directly in image or video src attributes", () => {
     const sources = [
-      readFileSync(catalogPath, "utf8"),
+      readTemplatesCatalogViewLibrarySource(),
       readFileSync(phonePreviewPath, "utf8"),
       readFileSync(analyticsOverviewPath, "utf8"),
       readFileSync(analyticsDetailSectionsPath, "utf8"),
-      readFileSync(analyticsHubPath, "utf8"),
+      readTemplatesAnalyticsHubPageLibrarySource(),
       readFileSync(previewAssetSectionPath, "utf8"),
       readFileSync(editorSectionsPath, "utf8"),
-      readFileSync(templateTestPath, "utf8"),
+      readTemplateTestPageLibrarySource(),
     ].join("\n");
     const secureMediaSource = readFileSync(secureMediaPath, "utf8");
 
@@ -55,9 +53,15 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
     expect(secureMediaSource).toContain("function getMediaFetchErrorName(error: unknown)");
     expect(secureMediaSource).toContain("function formatTemplateMediaLogText(");
-    expect(secureMediaSource).toContain("templateId: formatTemplateMediaLogText(logContext?.templateId)");
-    expect(secureMediaSource).toContain("contentType: formatTemplateMediaLogText(logContext?.contentType)");
-    expect(secureMediaSource).toContain("surface: formatTemplateMediaLogText(logContext?.surface, 48)");
+    expect(secureMediaSource).toContain(
+      "templateId: formatTemplateMediaLogText(logContext?.templateId)"
+    );
+    expect(secureMediaSource).toContain(
+      "contentType: formatTemplateMediaLogText(logContext?.contentType)"
+    );
+    expect(secureMediaSource).toContain(
+      "surface: formatTemplateMediaLogText(logContext?.surface, 48)"
+    );
     expect(secureMediaSource).toContain("errorName: getMediaFetchErrorName(error)");
     expect(secureMediaSource).not.toContain("templateId: logContext?.templateId");
     expect(secureMediaSource).not.toContain("contentType: logContext?.contentType");
@@ -68,7 +72,7 @@ describe("template preview media URL exposure", () => {
   it("sanitizes visible template media file names before rendering them", () => {
     const previewAssetSource = readFileSync(previewAssetSectionPath, "utf8");
     const editorSectionsSource = readFileSync(editorSectionsPath, "utf8");
-    const templateTestSource = readFileSync(templateTestPath, "utf8");
+    const templateTestSource = readTemplateTestPageLibrarySource();
 
     expect(previewAssetSource).toContain("sanitizeSensitiveText(");
     expect(editorSectionsSource).toContain("sanitizeSensitiveText(");

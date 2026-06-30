@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 
+import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import {
   BrandMark,
   CaretDownIcon,
@@ -15,7 +16,6 @@ import {
   UsersIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
-import { getAdminChromeCopy } from "@/components/admin/admin-chrome.content";
 import styles from "@/components/admin/admin-shell.module.css";
 import {
   getAdminNavItems,

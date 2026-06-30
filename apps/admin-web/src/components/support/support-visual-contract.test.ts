@@ -2,11 +2,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { readSupportConversationPageLibrarySource } from "./support-conversation-page.test-source";
+import { readSupportInfoPanelLibrarySource } from "./support-info-panel.test-source";
+
 const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
-const supportConversationPagePath = fileURLToPath(
-  new URL("./support-conversation-page.tsx", import.meta.url)
-);
-const supportInfoPanelPath = fileURLToPath(new URL("./support-info-panel.tsx", import.meta.url));
+
 const adminIconsPath = fileURLToPath(new URL("../admin/admin-icons.tsx", import.meta.url));
 
 function readSupportStyles(): string {
@@ -25,7 +25,7 @@ function sliceBetween(source: string, startMarker: string, endMarker: string): s
 
 describe("support visual contract", () => {
   it("uses shared admin icons for support controls and attachment affordances", () => {
-    const pageSource = readFileSync(supportConversationPagePath, "utf8");
+    const pageSource = readSupportConversationPageLibrarySource();
     const iconsSource = readFileSync(adminIconsPath, "utf8");
     const stylesSource = readSupportStyles();
 
@@ -73,7 +73,7 @@ describe("support visual contract", () => {
   });
 
   it("uses shared file icons for support info-panel attachment placeholders", () => {
-    const infoPanelSource = readFileSync(supportInfoPanelPath, "utf8");
+    const infoPanelSource = readSupportInfoPanelLibrarySource();
     const stylesSource = readSupportStyles();
 
     expect(infoPanelSource).toContain("FileIcon");
@@ -144,11 +144,7 @@ describe("support visual contract", () => {
 
   it("keeps reply previews and composer reply state theme-aware", () => {
     const source = readSupportStyles();
-    const replyComposerLayer = sliceBetween(
-      source,
-      ".messageTick",
-      ".attachmentPreviewCard"
-    );
+    const replyComposerLayer = sliceBetween(source, ".messageTick", ".attachmentPreviewCard");
 
     expect(replyComposerLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(replyComposerLayer).not.toContain("rgba(");
@@ -174,7 +170,11 @@ describe("support visual contract", () => {
 
   it("keeps support inbox rows on compact admin radii", () => {
     const source = readSupportStyles();
-    const conversationRowLayer = sliceBetween(source, ".conversationRow {", ".conversationRowButton");
+    const conversationRowLayer = sliceBetween(
+      source,
+      ".conversationRow {",
+      ".conversationRowButton"
+    );
 
     expect(conversationRowLayer).toContain("border-radius: var(--radius-sm);");
     expect(conversationRowLayer).not.toContain("border-radius: 0.9rem;");
@@ -209,7 +209,11 @@ describe("support visual contract", () => {
 
   it("keeps support template and attachment side-panel lists theme-aware", () => {
     const source = readSupportStyles();
-    const sidePanelListsLayer = sliceBetween(source, ".templateListItem", "@media (max-width: 1320px)");
+    const sidePanelListsLayer = sliceBetween(
+      source,
+      ".templateListItem",
+      "@media (max-width: 1320px)"
+    );
 
     expect(sidePanelListsLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(sidePanelListsLayer).not.toContain("rgba(");
@@ -304,9 +308,13 @@ describe("support visual contract", () => {
     const queueToolLayer = sliceBetween(source, ".queueToolField select", ".list");
     const infoPanelFieldLayer = sliceBetween(source, ".infoPanelSelect", ".infoPanelTagsWrap");
 
-    expect(inboxFieldLayer).toContain(".searchInput:focus-visible,\n.input:focus-visible,\n.textarea:focus-visible");
+    expect(inboxFieldLayer).toContain(
+      ".searchInput:focus-visible,\n.input:focus-visible,\n.textarea:focus-visible"
+    );
     expect(inboxFieldLayer).toContain("box-shadow: var(--focus-ring);");
-    expect(inboxFieldLayer).toContain(".searchInput:disabled,\n.input:disabled,\n.textarea:disabled");
+    expect(inboxFieldLayer).toContain(
+      ".searchInput:disabled,\n.input:disabled,\n.textarea:disabled"
+    );
     expect(inboxFieldLayer).toContain("cursor: not-allowed;");
     expect(inboxFieldLayer).not.toMatch(/\.(?:searchInput|input|textarea):focus(?!-visible)/);
 
@@ -320,7 +328,9 @@ describe("support visual contract", () => {
     expect(infoPanelFieldLayer).toContain(".infoPanelTagInput:disabled");
     expect(infoPanelFieldLayer).toContain("box-shadow: var(--focus-ring);");
     expect(infoPanelFieldLayer).toContain("opacity: 0.62;");
-    expect(infoPanelFieldLayer).not.toMatch(/\.(?:infoPanelSelect|infoPanelTagInput):focus(?!-visible)/);
+    expect(infoPanelFieldLayer).not.toMatch(
+      /\.(?:infoPanelSelect|infoPanelTagInput):focus(?!-visible)/
+    );
   });
 
   it("keeps support media viewer, keyboard focus, and local scrollbars theme-aware", () => {
@@ -366,9 +376,7 @@ describe("support visual contract", () => {
     expect(listScrollbarLayer).toContain(
       "scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;"
     );
-    expect(lightShellLayer).toContain(
-      "color-mix(in srgb, var(--surface-1) 98%, transparent)"
-    );
+    expect(lightShellLayer).toContain("color-mix(in srgb, var(--surface-1) 98%, transparent)");
   });
 
   it("keeps redesigned support queue identity and danger actions theme-aware", () => {
@@ -541,9 +549,7 @@ describe("support visual contract", () => {
     expect(avatarVariantLayer).toContain(
       "color-mix(in srgb, var(--warning) 82%, var(--surface-2))"
     );
-    expect(avatarVariantLayer).toContain(
-      "color-mix(in srgb, var(--info) 82%, var(--surface-2))"
-    );
+    expect(avatarVariantLayer).toContain("color-mix(in srgb, var(--info) 82%, var(--surface-2))");
     expect(avatarVariantLayer).toContain(
       "border-color: color-mix(in srgb, var(--neutral) 30%, var(--border-soft));"
     );
@@ -590,9 +596,7 @@ describe("support visual contract", () => {
     expect(queueRefreshLayer).not.toContain("rgba(");
     expect(queueRefreshLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(queueRefreshLayer).toContain(
-      "color-mix(in srgb, var(--success) 18%, var(--surface-2))"
-    );
+    expect(queueRefreshLayer).toContain("color-mix(in srgb, var(--success) 18%, var(--surface-2))");
     expect(queueRefreshLayer).toContain(
       "border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));"
     );

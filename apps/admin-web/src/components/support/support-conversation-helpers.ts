@@ -114,8 +114,7 @@ export function getConversationSla(
   return {
     level,
     waitLabel,
-    primaryLabel:
-      unreadCount > 0 ? copy.helpers.newUserReply : waitLabel,
+    primaryLabel: unreadCount > 0 ? copy.helpers.newUserReply : waitLabel,
   };
 }
 
@@ -169,9 +168,7 @@ export function formatAccountAgeFact(value: string | null | undefined, locale: L
 
 export function formatCountFact(value: number, locale: Locale, kind: "messages" | "purchases") {
   const copy = getSupportConversationCopy(locale);
-  return kind === "messages"
-    ? copy.helpers.messageCount(value)
-    : copy.helpers.purchaseCount(value);
+  return kind === "messages" ? copy.helpers.messageCount(value) : copy.helpers.purchaseCount(value);
 }
 
 export function formatMoney(amount: number, currencyCode: string, locale: Locale) {
@@ -198,7 +195,11 @@ export function formatMoney(amount: number, currencyCode: string, locale: Locale
 export function hasAttachment(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+    | "attachments"
+    | "attachmentUrl"
+    | "attachmentContentType"
+    | "attachmentFileName"
+    | "attachmentFileSizeBytes"
   >
 ) {
   return getMessageAttachments(message).length > 0;
@@ -207,7 +208,11 @@ export function hasAttachment(
 export function hasImageAttachment(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+    | "attachments"
+    | "attachmentUrl"
+    | "attachmentContentType"
+    | "attachmentFileName"
+    | "attachmentFileSizeBytes"
   >
 ) {
   const attachments = getMessageAttachments(message);
@@ -217,7 +222,11 @@ export function hasImageAttachment(
 export function hasVideoAttachment(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+    | "attachments"
+    | "attachmentUrl"
+    | "attachmentContentType"
+    | "attachmentFileName"
+    | "attachmentFileSizeBytes"
   >
 ) {
   const attachments = getMessageAttachments(message);
@@ -227,7 +236,11 @@ export function hasVideoAttachment(
 export function getMessageAttachments(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "attachments" | "attachmentUrl" | "attachmentContentType" | "attachmentFileName" | "attachmentFileSizeBytes"
+    | "attachments"
+    | "attachmentUrl"
+    | "attachmentContentType"
+    | "attachmentFileName"
+    | "attachmentFileSizeBytes"
   >
 ) {
   const parsedAttachments =
@@ -235,8 +248,8 @@ export function getMessageAttachments(
       ?.filter((attachment) => attachment.isDeleted || Boolean(attachment.fileUrl?.trim()))
       .map((attachment) => ({
         fileUrl: attachment.fileUrl,
-        fileName: attachment.fileName,
-        mimeType: attachment.mimeType,
+        fileName: attachment.fileName?.trim() || "attachment",
+        mimeType: attachment.mimeType?.trim() || "application/octet-stream",
         sizeBytes: attachment.sizeBytes,
         durationSeconds: attachment.durationSeconds ?? null,
         isDeleted: attachment.isDeleted ?? false,
@@ -252,23 +265,28 @@ export function getMessageAttachments(
   }
 
   return [
-      {
-        fileUrl: message.attachmentUrl,
-        fileName: message.attachmentFileName ?? "attachment",
-        mimeType: message.attachmentContentType,
-        sizeBytes: message.attachmentFileSizeBytes ?? 0,
-        durationSeconds: null,
-        isDeleted: false,
-        expiresAtUtc: null,
-        deletedAtUtc: null,
-      },
-    ];
+    {
+      fileUrl: message.attachmentUrl,
+      fileName: message.attachmentFileName?.trim() || "attachment",
+      mimeType: message.attachmentContentType?.trim() || "application/octet-stream",
+      sizeBytes: message.attachmentFileSizeBytes ?? 0,
+      durationSeconds: null,
+      isDeleted: false,
+      expiresAtUtc: null,
+      deletedAtUtc: null,
+    },
+  ];
 }
 
 export function shouldRenderMessageBody(
   message: Pick<
     AdminSupportConversation["messages"][number],
-    "body" | "attachments" | "attachmentFileName" | "attachmentUrl" | "attachmentContentType" | "attachmentFileSizeBytes"
+    | "body"
+    | "attachments"
+    | "attachmentFileName"
+    | "attachmentUrl"
+    | "attachmentContentType"
+    | "attachmentFileSizeBytes"
   >
 ) {
   const normalizedBody = message.body.trim();
@@ -291,11 +309,13 @@ export function shouldRenderMessageBody(
     .split(/[\n,]/)
     .map((part) => part.trim())
     .filter(Boolean);
-  const isAttachmentNameList = bodyParts.length > 1 && bodyParts.every((part) => attachmentNames.has(part));
+  const isAttachmentNameList =
+    bodyParts.length > 1 && bodyParts.every((part) => attachmentNames.has(part));
   const isMimeTypeOnly = /^[a-z0-9.+-]+\/[a-z0-9.+-]+(?:\s*;.*)?$/i.test(normalizedBody);
-  const isTechnicalPrefix = /^(file name|filename|mime|content[- ]type|upload status|upload state|debug)\s*[:=-]/i.test(
-    normalizedBodyLower.replace(/\s+/g, " ")
-  );
+  const isTechnicalPrefix =
+    /^(file name|filename|mime|content[- ]type|upload status|upload state|debug)\s*[:=-]/i.test(
+      normalizedBodyLower.replace(/\s+/g, " ")
+    );
   const isUploadStatusOnly =
     /^(uploaded|uploading|upload failed|retry|attachment uploaded|file uploaded)$/i.test(
       normalizedBodyLower
@@ -421,7 +441,14 @@ export type SupportConversationFeedGroup = {
 export function groupSupportConversationFeed(
   conversation: Pick<
     AdminSupportConversation,
-    "messages" | "createdAtUtc" | "resolvedAtUtc" | "closedAtUtc" | "reopenUntilUtc" | "status" | "closedByUserId" | "initiatorUserId"
+    | "messages"
+    | "createdAtUtc"
+    | "resolvedAtUtc"
+    | "closedAtUtc"
+    | "reopenUntilUtc"
+    | "status"
+    | "closedByUserId"
+    | "initiatorUserId"
   >,
   labels: {
     today: string;

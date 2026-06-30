@@ -2,12 +2,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
+
 const usersAdminHookPath = fileURLToPath(new URL("./use-users-admin.ts", import.meta.url));
 const usersManagementContentPath = fileURLToPath(
   new URL("../users-management-page.content.ts", import.meta.url)
-);
-const usersManagementPagePath = fileURLToPath(
-  new URL("../users-management-page.tsx", import.meta.url)
 );
 const usersManagementStylesPath = fileURLToPath(
   new URL("../users-management-page.module.css", import.meta.url)
@@ -23,7 +22,9 @@ describe("users admin action hardening", () => {
     );
     expect(source).toContain("const usersManagementText = getUsersManagementPageText(locale);");
     expect(source).toContain("title: usersManagementText.notificationTitle,");
-    expect(source).not.toContain('title: locale === "ru" ? "Изменения пользователей" : "User updates"');
+    expect(source).not.toContain(
+      'title: locale === "ru" ? "Изменения пользователей" : "User updates"'
+    );
     expect(contentSource).toContain('notificationTitle: "Изменения пользователей"');
     expect(contentSource).toContain('notificationTitle: "User updates"');
     expect(source).toContain("async function refreshUsersAfterAction(userId: string)");
@@ -42,11 +43,13 @@ describe("users admin action hardening", () => {
   });
 
   it("keeps users confirmation copy in the shared content module", () => {
-    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
     const contentSource = readFileSync(usersManagementContentPath, "utf8");
 
     expect(pageSource).toContain("description: ui.activeChangeDescription(userLabel)");
-    expect(pageSource).toContain("description: ui.deleteDescription(userLabel, text.usersDeleteConfirm)");
+    expect(pageSource).toContain(
+      "description: ui.deleteDescription(userLabel, text.usersDeleteConfirm)"
+    );
     expect(pageSource).toContain("description: ui.premiumChangeDescription(userLabel)");
     expect(pageSource).toContain("description: ui.roleChangeDescription(userLabel, role, hasRole)");
     expect(pageSource).not.toContain('locale === "ru"');
@@ -68,7 +71,7 @@ describe("users admin action hardening", () => {
 
   it("does not expose stale placeholder users while filters or pages refresh", () => {
     const source = readFileSync(usersAdminHookPath, "utf8");
-    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
 
     expect(source).toContain(
       "const isRefreshing = usersQuery.isFetching && usersQuery.isPlaceholderData;"
@@ -92,7 +95,7 @@ describe("users admin action hardening", () => {
   });
 
   it("clears the selected user side panel when filters or pages change", () => {
-    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
 
     expect(pageSource).toContain("const resetUsersSelection = useCallback(");
     expect(pageSource).toContain("(nextPage = 1) => {");
@@ -104,26 +107,42 @@ describe("users admin action hardening", () => {
     expect(pageSource.match(/resetUsersSelection\(\);/g) ?? []).toHaveLength(7);
     expect(pageSource).toContain("resetUsersSelection(Math.max(1, currentPage - 1))");
     expect(pageSource).toContain("resetUsersSelection(Math.min(totalPages, currentPage + 1))");
-    expect(pageSource).not.toContain("setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));\n              setPage(1);");
-    expect(pageSource).not.toContain("setRoleFilter(event.target.value as RoleFilter);\n              setPage(1);");
-    expect(pageSource).not.toContain("setPremiumFilter(event.target.value as PremiumFilter);\n              setPage(1);");
-    expect(pageSource).not.toContain("setActivityFilter(event.target.value as ActivityFilter);\n              setPage(1);");
-    expect(pageSource).not.toContain("setStatusFilter(event.target.value as StatusFilter);\n              setPage(1);");
-    expect(pageSource).not.toContain("setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);\n              setPage(1);");
+    expect(pageSource).not.toContain(
+      "setSearch(event.target.value.slice(0, USER_SEARCH_MAX_LENGTH));\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setRoleFilter(event.target.value as RoleFilter);\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setPremiumFilter(event.target.value as PremiumFilter);\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setActivityFilter(event.target.value as ActivityFilter);\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setStatusFilter(event.target.value as StatusFilter);\n              setPage(1);"
+    );
+    expect(pageSource).not.toContain(
+      "setRangeDays(Number.parseInt(event.target.value, 10) as RangeDays);\n              setPage(1);"
+    );
   });
 
   it("clears stale users action dialogs and side panel after real page refreshes", () => {
-    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
 
-    expect(pageSource).toContain("const pageUserIdSet = useMemo(() => new Set(pageUserIds), [pageUserIds]);");
-    expect(pageSource).toContain("if (isUsersRefreshing || isUserActionLocked) {\n      return;\n    }");
+    expect(pageSource).toContain(
+      "const pageUserIdSet = useMemo(() => new Set(pageUserIds), [pageUserIds]);"
+    );
+    expect(pageSource).toContain(
+      "if (isUsersRefreshing || isUserActionLocked) {\n      return;\n    }"
+    );
     expect(pageSource).toContain(
       "openActionsUserId !== null && !pageUserIdSet.has(openActionsUserId)"
     );
+    expect(pageSource).toContain("selectedUserId !== null && !pageUserIdSet.has(selectedUserId)");
     expect(pageSource).toContain(
-      "selectedUserId !== null && !pageUserIdSet.has(selectedUserId)"
+      "walletDialog !== null && !pageUserIdSet.has(walletDialog.userId)"
     );
-    expect(pageSource).toContain("walletDialog !== null && !pageUserIdSet.has(walletDialog.userId)");
     expect(pageSource).toContain("function getUsersPageErrorDetails(error: unknown)");
     expect(pageSource).toContain("userId: sanitizeSensitiveText(userId, 80)");
     expect(pageSource).toContain("...getUsersPageErrorDetails(refreshResult.reason)");

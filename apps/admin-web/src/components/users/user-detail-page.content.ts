@@ -34,6 +34,7 @@ const userDetailPetText = {
     thumbnailReady: "миниатюра готова",
     originalOnly: "только оригинал",
     fallbackTemplate: "Шаблон",
+    tokenCostLabel: "Стоимость",
   },
   en: {
     title: "Pets",
@@ -68,6 +69,7 @@ const userDetailPetText = {
     thumbnailReady: "thumbnail ready",
     originalOnly: "original only",
     fallbackTemplate: "Template",
+    tokenCostLabel: "Cost",
   },
 } as const;
 

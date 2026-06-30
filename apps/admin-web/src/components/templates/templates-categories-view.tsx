@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { ImageIcon, VideoIcon } from "@/components/admin/admin-icons";
 import { useSyncToastToAdminNotifications } from "@/components/admin/admin-notifications";
 import {
   AdminCard,
@@ -13,13 +11,12 @@ import {
   AdminPageGrid,
   AdminPageHero,
   AdminStateCard,
-  AdminStatusBadge,
-  adminTableStyles,
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import styles from "@/components/templates/templates-catalog.module.css";
 import { getTemplatesCategoriesViewText } from "@/components/templates/templates-categories-view.content";
+import { TemplatesCategoriesTable } from "@/components/templates/templates-categories-view.table";
 import { useAdminTemplateCategories } from "@/components/templates/use-admin-template-categories";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
@@ -68,12 +65,6 @@ type ToastState = {
   message: string;
 };
 
-const typeColors = {
-  Video: "var(--success)",
-  Image: "var(--info)",
-  Archived: "var(--text-muted)",
-};
-
 const CATEGORY_NAME_MAX_LENGTH = 64;
 
 export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps) {
@@ -81,8 +72,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const router = useRouter();
   const session = useAuthSession();
   const sessionRoles = session?.user.roles ?? [];
-  const canViewCategories =
-    sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
+  const canViewCategories = sessionRoles.includes("Admin") || sessionRoles.includes("Moderator");
   const canManageCategories = session?.user.roles.includes("Admin") ?? false;
   const { categories, hasError, isFetching, isLoading, refresh } = useAdminTemplateCategories({
     enabled: canViewCategories,
@@ -98,8 +88,9 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categoryPendingArchive, setCategoryPendingArchive] =
     useState<AdminTemplateCategory | null>(null);
-  const [categoryPendingDelete, setCategoryPendingDelete] =
-    useState<AdminTemplateCategory | null>(null);
+  const [categoryPendingDelete, setCategoryPendingDelete] = useState<AdminTemplateCategory | null>(
+    null
+  );
   const isCategoryActionLocked = isSubmitting || busyCategoryId !== null || isFetching;
   const categoryText = useMemo(() => getTemplatesCategoriesViewText(locale), [locale]);
   const categoryActionsAdminOnly = categoryText.actionsAdminOnly;
@@ -140,8 +131,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
       categoryPendingArchive !== null && !categoryIds.has(categoryPendingArchive.categoryId);
     const shouldResetDelete =
       categoryPendingDelete !== null && !categoryIds.has(categoryPendingDelete.categoryId);
-    const shouldResetEditing =
-      editingCategoryId !== null && !categoryIds.has(editingCategoryId);
+    const shouldResetEditing = editingCategoryId !== null && !categoryIds.has(editingCategoryId);
 
     if (!shouldResetArchive && !shouldResetDelete && !shouldResetEditing) {
       return;
@@ -548,238 +538,43 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
         </AdminCard>
       ) : null}
 
-      <AdminCard
-        title={categoryText.categoriesTitle}
+      <TemplatesCategoriesTable
+        locale={locale}
+        canManageCategories={canManageCategories}
+        visibleCategories={visibleCategories}
         description={
           archiveFilter === "archived"
             ? categoryText.archivedDescription
             : categoryText.activeDescription
         }
-      >
-        {!visibleCategories.length ? (
-          <AdminStateCard
-            tone="info"
-            className={styles.empty}
-            title={categoryText.empty}
-          />
-        ) : (
-          <div className={adminTableStyles.tableWrap} aria-busy={isFetching ? "true" : undefined}>
-            <table className={adminTableStyles.table}>
-              <thead>
-                <tr>
-                  <th>{text.categoryLabel}</th>
-                  <th>{categoryText.state}</th>
-                  <th>{categoryText.total}</th>
-                  <th>{text.templateKindVideoBadge}</th>
-                  <th>{text.templateKindImageBadge}</th>
-                  <th>{text.statusLabel}</th>
-                  <th>{text.premiumLabel}</th>
-                  <th>{text.actionsLabel}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleCategories.map((category) => (
-                  <tr key={category.categoryId}>
-                    <td data-label={text.categoryLabel}>
-                      {canManageCategories && editingCategoryId === category.categoryId ? (
-                        <input
-                          className={styles.categoryInput}
-                          value={editingName}
-                          onChange={(event) => setEditingName(limitCategoryNameInput(event.target.value))}
-                          maxLength={CATEGORY_NAME_MAX_LENGTH}
-                          disabled={isCategoryActionLocked}
-                        />
-                      ) : (
-                        <div className={styles.titleCell}>
-                          <strong>{sanitizeSensitiveText(category.name, 96)}</strong>
-                          <span>
-                            {category.tags
-                              .slice(0, 4)
-                              .map((tag) => `#${sanitizeSensitiveText(tag, 40)}`)
-                              .join(" ") || "-"}
-                          </span>
-                        </div>
-                      )}
-                    </td>
-                    <td data-label={categoryText.state}>
-                      <AdminStatusBadge
-                        color={category.isArchived ? typeColors.Archived : typeColors.Video}
-                      >
-                        {category.isArchived
-                          ? categoryText.archivedStatus
-                          : categoryText.activeStatus}
-                      </AdminStatusBadge>
-                    </td>
-                    <td data-label={categoryText.total}>{category.totalTemplates}</td>
-                    <td data-label={text.templateKindVideoBadge}>
-                      <AdminStatusBadge color={typeColors.Video}>
-                        {category.videoTemplates}
-                      </AdminStatusBadge>
-                    </td>
-                    <td data-label={text.templateKindImageBadge}>
-                      <AdminStatusBadge color={typeColors.Image}>
-                        {category.imageTemplates}
-                      </AdminStatusBadge>
-                    </td>
-                    <td data-label={text.statusLabel}>
-                      {category.activeTemplates} / {category.draftTemplates} /{" "}
-                      {category.archivedTemplates}
-                    </td>
-                    <td data-label={text.premiumLabel}>{category.premiumTemplates}</td>
-                    <td data-label={text.actionsLabel}>
-                      <div className={`${styles.tableActions} ${styles.categoryTableActions}`}>
-                        {canManageCategories && editingCategoryId === category.categoryId ? (
-                          <>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="primary"
-                              disabled={
-                                isCategoryActionLocked || !editingName.trim()
-                              }
-                              onClick={() => void handleUpdateCategory(category.categoryId)}
-                            >
-                              {categoryText.save}
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={isCategoryActionLocked}
-                              onClick={() => {
-                                setEditingCategoryId(null);
-                                setEditingName("");
-                              }}
-                            >
-                              {categoryText.cancel}
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <Link
-                              className={`${styles.compactLink}${
-                                isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : ""
-                              }`}
-                              href={`/${locale}/templates/video?category=${encodeURIComponent(category.name)}`}
-                              aria-disabled={isCategoryActionLocked}
-                              aria-label={categoryText.videoCategoryLabel(
-                                formatCategoryActionName(category)
-                              )}
-                              title={categoryText.videoCategoryLabel(
-                                formatCategoryActionName(category)
-                              )}
-                              tabIndex={isCategoryActionLocked ? -1 : undefined}
-                              onClick={(event) => {
-                                if (isCategoryActionLocked) {
-                                  event.preventDefault();
-                                }
-                              }}
-                            >
-                              <VideoIcon className={styles.linkIcon} />
-                              <span>{text.templateKindVideoBadge}</span>
-                            </Link>
-                            <Link
-                              className={`${styles.compactLink}${
-                                isCategoryActionLocked ? ` ${styles.compactLinkDisabled}` : ""
-                              }`}
-                              href={`/${locale}/templates/image?category=${encodeURIComponent(category.name)}`}
-                              aria-disabled={isCategoryActionLocked}
-                              aria-label={categoryText.imageCategoryLabel(
-                                formatCategoryActionName(category)
-                              )}
-                              title={categoryText.imageCategoryLabel(
-                                formatCategoryActionName(category)
-                              )}
-                              tabIndex={isCategoryActionLocked ? -1 : undefined}
-                              onClick={(event) => {
-                                if (isCategoryActionLocked) {
-                                  event.preventDefault();
-                                }
-                              }}
-                            >
-                              <ImageIcon className={styles.linkIcon} />
-                              <span>{text.templateKindImageBadge}</span>
-                            </Link>
-                            {canManageCategories ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={isCategoryActionLocked}
-                                  aria-label={categoryText.editCategoryLabel(
-                                    formatCategoryActionName(category)
-                                  )}
-                                  title={categoryText.editCategoryLabel(
-                                    formatCategoryActionName(category)
-                                  )}
-                                  onClick={() => {
-                                    setEditingCategoryId(category.categoryId);
-                                    setEditingName(normalizeCategoryName(category.name));
-                                  }}
-                                >
-                                  {text.editTemplate}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={isCategoryActionLocked}
-                                  aria-label={
-                                    category.isArchived
-                                      ? categoryText.restoreCategoryLabel(
-                                          formatCategoryActionName(category)
-                                        )
-                                      : categoryText.archiveCategoryLabel(
-                                          formatCategoryActionName(category)
-                                        )
-                                  }
-                                  title={
-                                    category.isArchived
-                                      ? categoryText.restoreCategoryLabel(
-                                          formatCategoryActionName(category)
-                                        )
-                                      : categoryText.archiveCategoryLabel(
-                                          formatCategoryActionName(category)
-                                        )
-                                  }
-                                  onClick={() => requestArchiveToggle(category)}
-                                >
-                                  {category.isArchived
-                                    ? categoryText.restore
-                                    : text.archive}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="danger"
-                                  disabled={
-                                    isCategoryActionLocked ||
-                                    category.totalTemplates > 0
-                                  }
-                                  aria-label={categoryText.deleteCategoryLabel(
-                                    formatCategoryActionName(category)
-                                  )}
-                                  title={categoryText.deleteCategoryLabel(
-                                    formatCategoryActionName(category)
-                                  )}
-                                  onClick={() => requestDeleteCategory(category)}
-                                >
-                                  {text.deleteTemplate}
-                                </Button>
-                              </>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </AdminCard>
+        editingCategoryId={editingCategoryId}
+        editingName={editingName}
+        isCategoryActionLocked={isCategoryActionLocked}
+        categoryText={categoryText}
+        categoryNameLabel={text.categoryLabel}
+        videoBadgeLabel={text.templateKindVideoBadge}
+        imageBadgeLabel={text.templateKindImageBadge}
+        statusLabel={text.statusLabel}
+        premiumLabel={text.premiumLabel}
+        actionsLabel={text.actionsLabel}
+        editTemplateLabel={text.editTemplate}
+        archiveLabel={text.archive}
+        deleteTemplateLabel={text.deleteTemplate}
+        formatCategoryActionName={formatCategoryActionName}
+        onEditingNameChange={(value) => setEditingName(limitCategoryNameInput(value))}
+        onStartEdit={(category) => {
+          setEditingCategoryId(category.categoryId);
+          setEditingName(normalizeCategoryName(category.name));
+        }}
+        onSaveEdit={(categoryId) => void handleUpdateCategory(categoryId)}
+        onCancelEdit={() => {
+          setEditingCategoryId(null);
+          setEditingName("");
+        }}
+        onArchiveToggle={requestArchiveToggle}
+        onDeleteCategory={requestDeleteCategory}
+        categoryNameMaxLength={CATEGORY_NAME_MAX_LENGTH}
+      />
 
       <ConfirmationDialog
         open={categoryPendingArchive !== null}
@@ -799,9 +594,7 @@ export function TemplatesCategoriesView({ locale }: TemplatesCategoriesViewProps
                 )
             : ""
         }
-        confirmLabel={
-          categoryPendingArchive?.isArchived ? categoryText.restore : text.archive
-        }
+        confirmLabel={categoryPendingArchive?.isArchived ? categoryText.restore : text.archive}
         cancelLabel={categoryText.cancel}
         isSubmitting={Boolean(categoryPendingArchive && isCategoryActionLocked)}
         tone="primary"

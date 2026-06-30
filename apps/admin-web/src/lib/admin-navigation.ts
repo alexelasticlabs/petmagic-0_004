@@ -1,5 +1,5 @@
-import { canAccessAdminSection } from "@/lib/admin-rbac";
 import { getAdminPageMetaCopy } from "@/lib/admin-navigation.content";
+import { canAccessAdminSection } from "@/lib/admin-rbac";
 import { type Locale, getDictionary } from "@/lib/i18n";
 
 export type AdminSectionKey =

@@ -2,13 +2,16 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const feedbackPagePath = fileURLToPath(new URL("./feedback-page.tsx", import.meta.url));
-const feedbackPageContentPath = fileURLToPath(new URL("./feedback-page.content.ts", import.meta.url));
+import { readFeedbackPageLibrarySource } from "@/components/feedback-page.test-source";
+
+const feedbackPageContentPath = fileURLToPath(
+  new URL("./feedback-page.content.ts", import.meta.url)
+);
 const feedbackStylesPath = fileURLToPath(new URL("./feedback-page.module.css", import.meta.url));
 
 describe("feedback page hardening", () => {
   it("uses the shared admin session guard for Admin and Moderator feedback access", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain('import { useRouter } from "next/navigation";');
     expect(source).toContain(
@@ -25,7 +28,7 @@ describe("feedback page hardening", () => {
   });
 
   it("debounces free-text filters before changing the backend query", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain("ADMIN_FEEDBACK_FILTER_MAX_LENGTH,");
     expect(source).toContain("function useDebouncedValue(value: string, delayMs: number)");
@@ -44,7 +47,7 @@ describe("feedback page hardening", () => {
   });
 
   it("treats the To date filter as the end of the selected day", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain("function dateInputToUtcStart(value: string)");
     expect(source).toContain("function dateInputToUtcEnd(value: string)");
@@ -55,7 +58,7 @@ describe("feedback page hardening", () => {
   });
 
   it("guards manual retry and pagination while feedback data is fetching", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain("const isFeedbackFetching = feedbackQuery.isFetching;");
     expect(source).toContain("const areFeedbackFiltersLocked = isFeedbackFetching;");
@@ -100,21 +103,23 @@ describe("feedback page hardening", () => {
     expect(source).toContain("title={text.previousPageLabel}");
     expect(source).toContain("title={text.nextPageLabel}");
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />"
     );
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />"
     );
     expect(source).not.toContain("{text.previous}\n          </button>");
     expect(source).not.toContain("{text.next}\n          </button>");
   });
 
   it("clears selected feedback details when filters change", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source.match(/resetFeedbackSelection\(\);/g) ?? []).toHaveLength(9);
     expect(source).not.toContain("setStatus(value as typeof status);\n              setPage(0);");
-    expect(source).not.toContain("setPriority(value as typeof priority);\n              setPage(0);");
+    expect(source).not.toContain(
+      "setPriority(value as typeof priority);\n              setPage(0);"
+    );
     expect(source).not.toContain("setType(value as typeof type);\n              setPage(0);");
     expect(source).not.toContain("setCategory(value);\n              setPage(0);");
     expect(source).not.toContain("setPlatform(value);\n              setPage(0);");
@@ -125,7 +130,7 @@ describe("feedback page hardening", () => {
   });
 
   it("clears selected feedback details when refreshed results no longer contain it", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain(
       "const visibleFeedbackIds = useMemo(\n    () => new Set(visibleFeedbackItems.map((item) => item.id)),"
@@ -139,7 +144,7 @@ describe("feedback page hardening", () => {
   });
 
   it("shows loading and retry states for selected feedback details", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
     const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
     expect(contentSource).toContain("detailsLoading:");
@@ -160,7 +165,7 @@ describe("feedback page hardening", () => {
   });
 
   it("shows mutation errors and prevents overlapping feedback detail actions", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
     const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
     expect(source).toContain("ADMIN_FEEDBACK_ADMIN_NOTE_MAX_LENGTH,");
@@ -181,8 +186,10 @@ describe("feedback page hardening", () => {
     expect(source).toContain("const isFeedbackDraftDirty =");
     expect(source).toContain('status !== ((details.status as FeedbackStatus) || "New")');
     expect(source).toContain('priority !== ((details.priority as FeedbackPriority) || "Low")');
-    expect(source).toContain("adminNote !== (details.adminNote ?? \"\")");
-    expect(source).toContain("const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;");
+    expect(source).toContain('adminNote !== (details.adminNote ?? "")');
+    expect(source).toContain(
+      "const isSaveFeedbackDisabled = !isFeedbackDraftDirty || isFeedbackActionLocked;"
+    );
     expect(source).toContain(
       "const isRefundFeedbackDisabled = !details.canRefund || isFeedbackActionLocked;"
     );
@@ -202,7 +209,7 @@ describe("feedback page hardening", () => {
   });
 
   it("keeps feedback localization in a dedicated content module and localizes enum labels", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
     const contentSource = readFileSync(feedbackPageContentPath, "utf8");
 
     expect(source).toContain(
@@ -231,10 +238,10 @@ describe("feedback page hardening", () => {
     expect(contentSource).toContain('title: "Feedback"');
     expect(contentSource).toContain('empty: "Отзывы не найдены"');
     expect(contentSource).toContain('loading: "Загрузка отзывов"');
-    expect(contentSource).toContain('statusOptions: {');
+    expect(contentSource).toContain("statusOptions: {");
     expect(contentSource).toContain('InReview: "На проверке"');
     expect(contentSource).toContain('GenerationFailure: "Сбой генерации"');
-    expect(contentSource).toContain('ratingLabels: {');
+    expect(contentSource).toContain("ratingLabels: {");
     expect(contentSource).toContain('positive: "Хорошо"');
     expect(contentSource).toContain('userPlanPremium: "Премиум"');
     expect(contentSource).toContain('userPlanFree: "Бесплатный"');
@@ -243,26 +250,28 @@ describe("feedback page hardening", () => {
   });
 
   it("keeps feedback detail form drafts synced with refreshed backend details", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain("key={[\n            detailsQuery.data.id,");
     expect(source).toContain("detailsQuery.data.status,");
     expect(source).toContain("detailsQuery.data.priority,");
-    expect(source).toContain("detailsQuery.data.reviewedAtUtc ?? \"\",");
-    expect(source).toContain("detailsQuery.data.adminNote ?? \"\",");
-    expect(source).toContain("].join(\":\")}");
+    expect(source).toContain('detailsQuery.data.reviewedAtUtc ?? "",');
+    expect(source).toContain('detailsQuery.data.adminNote ?? "",');
+    expect(source).toContain('].join(":")}');
     expect(source).not.toContain("setState synchronously within an effect");
     expect(source).toContain(
-      "const [status, setStatus] = useState((details.status as FeedbackStatus) || \"New\");"
+      'const [status, setStatus] = useState((details.status as FeedbackStatus) || "New");'
     );
     expect(source).toContain(
-      "const [priority, setPriority] = useState((details.priority as FeedbackPriority) || \"Low\");"
+      'const [priority, setPriority] = useState((details.priority as FeedbackPriority) || "Low");'
     );
-    expect(source).toContain("const [adminNote, setAdminNote] = useState(details.adminNote ?? \"\");");
+    expect(source).toContain(
+      'const [adminNote, setAdminNote] = useState(details.adminNote ?? "");'
+    );
   });
 
   it("keeps feedback action cache refreshes partial after successful backend mutations", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source.match(/await Promise\.allSettled\(\[/g) ?? []).toHaveLength(2);
     expect(source.match(/void Promise\.allSettled\(\[/g) ?? []).toHaveLength(1);
@@ -271,12 +280,12 @@ describe("feedback page hardening", () => {
     );
     expect(source).toContain('queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] })');
     expect(source).not.toContain(
-      "await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });\n      await queryClient.invalidateQueries({ queryKey: [\"admin\", \"feedback\"] });"
+      'await queryClient.invalidateQueries({ queryKey: adminQueryKeys.feedbackDetails(details.id) });\n      await queryClient.invalidateQueries({ queryKey: ["admin", "feedback"] });'
     );
   });
 
   it("does not show a free user plan before user context finishes loading", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain("userQuery.isLoading");
     expect(source).toContain("userAnalyticsQuery.isLoading");
@@ -287,14 +296,15 @@ describe("feedback page hardening", () => {
   });
 
   it("keeps feedback user context failures local and retryable", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
     const contentSource = readFileSync(feedbackPageContentPath, "utf8");
     const stylesSource = readFileSync(feedbackStylesPath, "utf8");
 
     expect(contentSource).toContain("userContextErrorTitle:");
     expect(contentSource).toContain("userContextErrorDescription:");
+    expect(source).toContain("const hasUserContextError =");
     expect(source).toContain(
-      "const hasUserContextError = Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError);"
+      "Boolean(details.userId) && (userQuery.isError || userAnalyticsQuery.isError)"
     );
     expect(source).toContain(
       "const isUserContextFetching = userQuery.isFetching || userAnalyticsQuery.isFetching;"
@@ -308,11 +318,13 @@ describe("feedback page hardening", () => {
     expect(source).not.toContain("void Promise.all([\n                      userQuery.refetch()");
     expect(source).toContain("className={styles.detailsMain}");
     expect(stylesSource).toContain(".detailsMain");
-    expect(source).not.toContain("userQuery.isError ? (\n        <AdminStateCard title={text.detailsError}");
+    expect(source).not.toContain(
+      "userQuery.isError ? (\n        <AdminStateCard title={text.detailsError}"
+    );
   });
 
   it("renders feedback media previews through the secure media component", () => {
-    const source = readFileSync(feedbackPagePath, "utf8");
+    const source = readFeedbackPageLibrarySource();
 
     expect(source).toContain(
       'import { TemplateSecureMedia } from "@/components/templates/template-secure-media";'
@@ -346,7 +358,9 @@ describe("feedback page hardening", () => {
   it("keeps local feedback form controls accessible in locked and keyboard states", () => {
     const stylesSource = readFileSync(feedbackStylesPath, "utf8");
 
-    expect(stylesSource).toContain(".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible,\n.button:focus-visible");
+    expect(stylesSource).toContain(
+      ".input:focus-visible,\n.select:focus-visible,\n.textarea:focus-visible,\n.button:focus-visible"
+    );
     expect(stylesSource).toContain("box-shadow: var(--focus-ring);");
     expect(stylesSource).toContain(".input:disabled,\n.select:disabled,\n.textarea:disabled");
     expect(stylesSource).toContain("cursor: not-allowed;");

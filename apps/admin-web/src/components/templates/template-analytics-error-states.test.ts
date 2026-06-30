@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readTemplatesAnalyticsHubPageLibrarySource } from "./templates-analytics-hub-page.test-source";
 
 const templateAnalyticsPagePath = fileURLToPath(
   new URL("./template-analytics-page.tsx", import.meta.url)
@@ -10,9 +11,6 @@ const templateAnalyticsStylesPath = fileURLToPath(
 );
 const templateAnalyticsCopyPath = fileURLToPath(
   new URL("./template-analytics-copy.ts", import.meta.url)
-);
-const templatesAnalyticsHubPagePath = fileURLToPath(
-  new URL("./templates-analytics-hub-page.tsx", import.meta.url)
 );
 const overviewHookPath = fileURLToPath(
   new URL("./use-admin-template-analytics-overview.ts", import.meta.url)
@@ -25,7 +23,9 @@ const optionsHookPath = fileURLToPath(new URL("./use-admin-template-options.ts",
 const detailSectionsPath = fileURLToPath(
   new URL("./template-analytics-detail-sections.tsx", import.meta.url)
 );
-const feedbackHookPath = fileURLToPath(new URL("./use-admin-template-feedback.ts", import.meta.url));
+const feedbackHookPath = fileURLToPath(
+  new URL("./use-admin-template-feedback.ts", import.meta.url)
+);
 const analyticsUtilsPath = fileURLToPath(new URL("./template-analytics-utils.ts", import.meta.url));
 
 describe("template analytics error states", () => {
@@ -45,15 +45,19 @@ describe("template analytics error states", () => {
   it("keeps template analytics detail and hub failures retryable", () => {
     const detailSource = readFileSync(templateAnalyticsPagePath, "utf8");
     const copySource = readFileSync(templateAnalyticsCopyPath, "utf8");
-    const hubSource = readFileSync(templatesAnalyticsHubPagePath, "utf8");
+    const hubSource = readTemplatesAnalyticsHubPageLibrarySource();
     const overviewHookSource = readFileSync(overviewHookPath, "utf8");
 
-    expect(overviewHookSource).toContain("isFetching: primaryQuery.isFetching || secondaryQuery.isFetching");
+    expect(overviewHookSource).toContain(
+      "isFetching: primaryQuery.isFetching || secondaryQuery.isFetching"
+    );
 
     expect(detailSource).toContain(
       'import { getTemplateAnalyticsCopy } from "@/components/templates/template-analytics-copy";'
     );
-    expect(detailSource).toContain("const text = useMemo(() => getTemplateAnalyticsCopy(locale), [locale]);");
+    expect(detailSource).toContain(
+      "const text = useMemo(() => getTemplateAnalyticsCopy(locale), [locale]);"
+    );
     expect(copySource).toContain("const templateAnalyticsCopy = {");
     expect(copySource).toContain('pageTitle: "Аналитика"');
     expect(copySource).toContain('pageTitle: "Analytics"');
@@ -78,9 +82,13 @@ describe("template analytics error states", () => {
       "onClick={() => {\n                if (!canViewTemplateAnalytics)"
     );
     expect(detailSource).toContain("{text.retryAction}");
-    expect(detailSource).toContain('clientLogger.warn("templates.analytics_recent_runs_load_failed"');
+    expect(detailSource).toContain(
+      'clientLogger.warn("templates.analytics_recent_runs_load_failed"'
+    );
     expect(detailSource).toContain("templateId: sanitizeSensitiveText(templateId, 80)");
-    expect(detailSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(detailSource).toContain(
+      'errorName: error instanceof Error ? error.name : "UnknownError"'
+    );
     expect(detailSource).not.toContain("error,");
 
     expect(hubSource).toContain(
@@ -93,16 +101,20 @@ describe("template analytics error states", () => {
       "const isLoading = (overviewQuery.isPending && !overview) || isOverviewRefreshing;"
     );
     expect(hubSource).toContain("const hasBlockingError = overviewQuery.isError && !overview;");
-    expect(hubSource).toContain("const hasPartialError = overviewQuery.isError && Boolean(overview);");
+    expect(hubSource).toContain(
+      "const hasPartialError = overviewQuery.isError && Boolean(overview);"
+    );
     expect(hubSource).toContain('clientLogger.error("templates.analytics_hub_load_failed"');
     expect(hubSource).toContain("query: sanitizeTemplatesAnalyticsQueryForExport(query)");
     expect(hubSource).toContain(
       'errorName: overviewQuery.error instanceof Error ? overviewQuery.error.name : "UnknownError"'
     );
     expect(hubSource).toContain('"digest" in overviewQuery.error');
+    expect(hubSource).toContain("sanitizeSensitiveText(");
     expect(hubSource).toContain(
-      'sanitizeSensitiveText(String((overviewQuery.error as { digest?: unknown }).digest ?? ""), 80)'
+      'String((overviewQuery.error as { digest?: unknown }).digest ?? "")'
     );
+    expect(hubSource).toContain("80");
     expect(hubSource).not.toContain("error: overviewQuery.error");
     expect(hubSource).not.toContain("message: overviewQuery.error");
     expect(hubSource).toContain("if (hasBlockingError || !overview)");
@@ -133,8 +145,10 @@ describe("template analytics error states", () => {
     const copySource = readFileSync(templateAnalyticsCopyPath, "utf8");
     const utilsSource = readFileSync(analyticsUtilsPath, "utf8");
 
-    expect(utilsSource).toContain("const safeValue = sanitizeSensitiveText(value, 48).replace(/\\s/g, \"\");");
-    expect(utilsSource).toContain("return \"-\";");
+    expect(utilsSource).toContain(
+      'const safeValue = sanitizeSensitiveText(value, 48).replace(/\\s/g, "");'
+    );
+    expect(utilsSource).toContain('return "-";');
     expect(utilsSource).toContain(
       "return safeValue.length > 13 ? `${safeValue.slice(0, 8)}...${safeValue.slice(-4)}` : safeValue;"
     );
@@ -157,7 +171,7 @@ describe("template analytics error states", () => {
 
   it("keeps template analytics JSON exports stable after download clicks", () => {
     const detailSource = readFileSync(templateAnalyticsPagePath, "utf8");
-    const hubSource = readFileSync(templatesAnalyticsHubPagePath, "utf8");
+    const hubSource = readTemplatesAnalyticsHubPageLibrarySource();
 
     for (const source of [detailSource, hubSource]) {
       expect(source).toContain("document.body.append(link);");
@@ -231,14 +245,16 @@ describe("template analytics error states", () => {
     const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
 
     expect(overviewHookSource).toContain("const results = await Promise.allSettled([");
-    expect(overviewHookSource).toContain(
-      "hasPartialSecondaryFailure: hasRejectedResult(results),"
-    );
+    expect(overviewHookSource).toContain("hasPartialSecondaryFailure: hasRejectedResult(results),");
     expect(overviewHookSource).toContain(
       "eventAnalytics: readSettledValue(eventAnalytics, EMPTY_EVENT_ANALYTICS),"
     );
-    expect(overviewHookSource).toContain("failureBreakdown: readSettledValue(failureBreakdown, []),");
-    expect(overviewHookSource).toContain("recentRunsPreview: readSettledValue(recentRunsPreview, []),");
+    expect(overviewHookSource).toContain(
+      "failureBreakdown: readSettledValue(failureBreakdown, []),"
+    );
+    expect(overviewHookSource).toContain(
+      "recentRunsPreview: readSettledValue(recentRunsPreview, []),"
+    );
     expect(overviewHookSource).toContain("trendPoints: readSettledValue(trendPoints, []),");
     expect(overviewHookSource).toContain(
       "hasSecondaryPartialError: secondaryQuery.data?.hasPartialSecondaryFailure ?? false,"
@@ -257,7 +273,9 @@ describe("template analytics error states", () => {
   it("locks detail analytics toolbar controls during overview refreshes", () => {
     const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
 
-    expect(pageSource).toContain("const isAnalyticsToolbarLocked = isFetching || isSecondaryLoading;");
+    expect(pageSource).toContain(
+      "const isAnalyticsToolbarLocked = isFetching || isSecondaryLoading;"
+    );
     expect(pageSource).toContain("disabled={isAnalyticsToolbarLocked}");
     expect(pageSource).not.toContain("disabled={isSecondaryLoading}");
   });
@@ -300,7 +318,7 @@ describe("template analytics error states", () => {
 
     expect(pageSource).toContain("canLoadRecentRuns={canViewTemplateAnalytics}");
     expect(pageSource).toContain(
-      "if (!canViewTemplateAnalytics) {\n      recentRunsAbortControllerRef.current?.abort();\n      setIsRecentRunsLoading(false);\n      setRecentRunsMode(\"latest\");\n      return;\n    }"
+      'if (!canViewTemplateAnalytics) {\n      recentRunsAbortControllerRef.current?.abort();\n      setIsRecentRunsLoading(false);\n      setRecentRunsMode("latest");\n      return;\n    }'
     );
     expect(detailSectionsSource).toContain("canLoadRecentRuns: boolean;");
     expect(detailSectionsSource).toContain(
@@ -322,7 +340,7 @@ describe("template analytics error states", () => {
     const pageSource = readFileSync(templateAnalyticsPagePath, "utf8");
 
     expect(pageSource).toContain(
-      "const recentRunsPreviewSignature = useMemo(\n    () => recentRunsPreview.map((run) => run.generationId).join(\"|\")"
+      'const recentRunsPreviewSignature = useMemo(\n    () => recentRunsPreview.map((run) => run.generationId).join("|")'
     );
     expect(pageSource).toContain("recentRunsAbortControllerRef.current?.abort();");
     expect(pageSource).toContain("recentRunsAbortControllerRef.current = null;");
@@ -331,7 +349,7 @@ describe("template analytics error states", () => {
     expect(pageSource).toContain("setAllRecentRuns(null);");
     expect(pageSource).toContain("setRecentRunsError(null);");
     expect(pageSource).toContain(
-      "setRecentRunsMode((current) => (current === \"latest\" ? current : \"latest\"));"
+      'setRecentRunsMode((current) => (current === "latest" ? current : "latest"));'
     );
     expect(pageSource).toContain("}, [recentRunsPreviewSignature]);");
   });

@@ -10,18 +10,17 @@ import {
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-import {
-  CalendarIcon,
-  PromoCodeIcon,
-  TrendUpIcon,
-  UsersIcon,
-} from "@/components/admin/admin-icons";
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
-import { AdminKpiCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
+import { AdminPage } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
 import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
+import {
+  PromoCodesArchiveDialog,
+  PromoCodesErrorState,
+  PromoCodesLoadingState,
+  PromoCodesViewChrome,
+} from "@/components/promo-codes-view.chrome";
 import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
 import { PromoCodesListCard } from "@/components/promo-codes-list-card";
 import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
@@ -30,9 +29,7 @@ import {
   copyTextToClipboard,
   createDefaultPromoForm,
   createGeneratedPromoCode,
-  formatPromoDisplayText,
   formatNumber,
-  formatSevenDayDelta,
   getPromoStatus,
   toCreatePayload,
   toPromoForm,
@@ -238,7 +235,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     staleTime: 20_000,
   });
 
-  const activationsPageData = activationsQuery.isPlaceholderData ? undefined : activationsQuery.data;
+  const activationsPageData = activationsQuery.isPlaceholderData
+    ? undefined
+    : activationsQuery.data;
   const visibleRedemptions = useMemo(
     () => activationsPageData?.items ?? EMPTY_REDEMPTIONS,
     [activationsPageData?.items]
@@ -818,34 +817,22 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
   if (!canManagePromoCodes || promoCodesQuery.isLoading) {
     return (
-      <AdminPage className={styles.page}>
-        <AdminStateCard
-          tone="info"
-          title={text.navPromoCodes}
-          description={text.promoCodesLoadingDescription}
-        />
-      </AdminPage>
+      <PromoCodesLoadingState
+        title={text.navPromoCodes}
+        description={text.promoCodesLoadingDescription}
+      />
     );
   }
 
   if (promoCodesQuery.isError) {
     return (
-      <AdminPage className={styles.page}>
-        <AdminStateCard
-          tone="danger"
-          title={text.navPromoCodes}
-          description={getAdminErrorMessage(promoCodesQuery.error, text.promoCodesErrorDescription)}
-          action={
-            <Button
-              variant="secondary"
-              disabled={!canManagePromoCodes || isPromoRefreshFetching}
-              onClick={requestRefreshPromoCodes}
-            >
-              {text.promoCodesRefreshAction}
-            </Button>
-          }
-        />
-      </AdminPage>
+      <PromoCodesErrorState
+        title={text.navPromoCodes}
+        description={getAdminErrorMessage(promoCodesQuery.error, text.promoCodesErrorDescription)}
+        refreshLabel={text.promoCodesRefreshAction}
+        disabled={!canManagePromoCodes || isPromoRefreshFetching}
+        onRefresh={requestRefreshPromoCodes}
+      />
     );
   }
 
@@ -858,73 +845,22 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
 
   return (
     <AdminPage className={styles.page}>
-      {feedback ? (
-        <div
-          className={`${styles.feedback} ${feedback.tone === "success" ? styles.feedbackSuccess : feedback.tone === "danger" ? styles.feedbackDanger : styles.feedbackInfo}`}
-        >
-          {feedback.message}
-        </div>
-      ) : null}
-
-      <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>{text.navPromoCodes}</h1>
-        <p className={styles.pageSubtitle}>{text.promoCodesHeroDescription}</p>
-      </header>
-
-      {promoMetricsQuery.isError ? (
-        <AdminStateCard
-          tone="warning"
-          title={text.promoCodesMetricsErrorDescription}
-          description={getAdminErrorMessage(
-            promoMetricsQuery.error,
-            text.promoCodesMetricsErrorDescription
-          )}
-          action={
-            <Button
-              variant="secondary"
-              disabled={!canManagePromoCodes || isPromoRefreshFetching}
-              onClick={requestRefreshPromoMetrics}
-            >
-              {text.promoCodesRefreshAction}
-            </Button>
-          }
-        />
-      ) : null}
-
-      <div className={styles.kpiGrid}>
-        <AdminKpiCard
-          label={promoText.kpiCodesLabel}
-          value={formatNumber(metrics.totalCodes, locale)}
-          delta={formatSevenDayDelta(metrics.createdLast7d, locale, text)}
-          hint={promoText.kpiFilteredListHint}
-          tone="primary"
-          icon={<PromoCodeIcon className={styles.kpiIcon} />}
-        />
-        <AdminKpiCard
-          label={promoText.kpiActiveLabel}
-          value={formatNumber(metrics.activeCodes, locale)}
-          delta={formatSevenDayDelta(metrics.activeTouchedLast7d, locale, text)}
-          hint={promoText.kpiFilteredListHint}
-          tone="success"
-          icon={<TrendUpIcon className={styles.kpiIcon} />}
-        />
-        <AdminKpiCard
-          label={promoText.kpiUsesLabel}
-          value={formatNumber(metrics.totalUses, locale)}
-          delta={formatSevenDayDelta(metrics.usesLast7d, locale, text)}
-          hint={promoText.kpiUsesHint}
-          tone="info"
-          icon={<UsersIcon className={styles.kpiIcon} />}
-        />
-        <AdminKpiCard
-          label={promoText.kpiGrantedLabel}
-          value={`${formatNumber(metrics.totalGranted, locale)} ${tokenUnit}`}
-          delta={`${formatNumber(metrics.grantedLast7d, locale)} ${tokenUnit} ${text.promoCodesLast7DaysLabel}`}
-          hint={promoText.kpiGrantedHint}
-          tone="warning"
-          icon={<CalendarIcon className={styles.kpiIcon} />}
-        />
-      </div>
+      <PromoCodesViewChrome
+        feedback={feedback}
+        locale={locale}
+        metrics={metrics}
+        promoText={promoText}
+        title={text.navPromoCodes}
+        subtitle={text.promoCodesHeroDescription}
+        tokenUnit={tokenUnit}
+        metricsError={promoMetricsQuery.isError ? promoMetricsQuery.error : null}
+        canManagePromoCodes={canManagePromoCodes}
+        isPromoRefreshFetching={isPromoRefreshFetching}
+        refreshLabel={text.promoCodesRefreshAction}
+        metricsErrorTitle={text.promoCodesMetricsErrorDescription}
+        lastSevenDaysLabel={text.promoCodesLast7DaysLabel}
+        onRefreshMetrics={requestRefreshPromoMetrics}
+      />
 
       <div className={styles.workspace}>
         <PromoCodesListCard
@@ -1062,25 +998,14 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         onToggleCodeState={handleToggleCodeState}
       />
 
-      <ConfirmationDialog
-        open={codePendingArchive !== null}
-        title={archiveActionLabel}
-        description={
-          codePendingArchive
-            ? `${formatPromoDisplayText(
-                codePendingArchive.code || `${codePendingArchive.codePrefix}...`,
-                80
-              )}: ${text.promoCodesArchiveConfirm}`
-            : ""
-        }
-        confirmLabel={archiveActionLabel}
+      <PromoCodesArchiveDialog
+        archiveActionLabel={archiveActionLabel}
         cancelLabel={promoText.archiveCancelLabel}
-        isSubmitting={Boolean(codePendingArchive && busyCodeId === codePendingArchive.redeemCodeId)}
-        onCancel={() => {
-          if (!isMutating) {
-            setCodePendingArchive(null);
-          }
-        }}
+        archiveConfirmText={text.promoCodesArchiveConfirm}
+        codePendingArchive={codePendingArchive}
+        busyCodeId={busyCodeId}
+        isMutating={isMutating}
+        onCancel={() => setCodePendingArchive(null)}
         onConfirm={() => {
           if (!codePendingArchive) {
             return;

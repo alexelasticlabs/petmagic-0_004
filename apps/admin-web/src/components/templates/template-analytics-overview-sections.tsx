@@ -144,7 +144,7 @@ export function TemplateAnalyticsVisualSection({
           </h2>
           <p>{text.statusBreakdownHint}</p>
         </div>
-        <StatusRing statistics={statistics} text={text} locale={locale} />
+        <StatusRing statistics={statistics} text={text} />
       </section>
     </div>
   );
@@ -635,11 +635,9 @@ function TrendChart({
 function StatusRing({
   statistics,
   text,
-  locale,
 }: {
   statistics: AdminTemplateStatistics;
   text: AnalyticsText;
-  locale: Locale;
 }) {
   const total = Math.max(statistics.totalRuns, 1);
   const segments = [

@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
+
 const roleManagementPagePath = fileURLToPath(
   new URL("./role-management-page.tsx", import.meta.url)
 );
@@ -10,9 +12,6 @@ const roleManagementContentPath = fileURLToPath(
 );
 const roleManagementStylesPath = fileURLToPath(
   new URL("./role-management-page.module.css", import.meta.url)
-);
-const usersManagementPagePath = fileURLToPath(
-  new URL("./users-management-page.tsx", import.meta.url)
 );
 const usersManagementStylesPath = fileURLToPath(
   new URL("./users-management-page.module.css", import.meta.url)
@@ -31,7 +30,9 @@ const adminTopbarPath = fileURLToPath(new URL("./admin/admin-topbar.tsx", import
 const adminChromeContentPath = fileURLToPath(
   new URL("./admin/admin-chrome.content.ts", import.meta.url)
 );
-const adminShellStylesPath = fileURLToPath(new URL("./admin/admin-shell.module.css", import.meta.url));
+const adminShellStylesPath = fileURLToPath(
+  new URL("./admin/admin-shell.module.css", import.meta.url)
+);
 const localeErrorPagePath = fileURLToPath(new URL("../app/[locale]/error.tsx", import.meta.url));
 
 describe("admin action hardening", () => {
@@ -40,10 +41,12 @@ describe("admin action hardening", () => {
     const contentSource = readFileSync(roleManagementContentPath, "utf8");
     const stylesSource = readFileSync(roleManagementStylesPath, "utf8");
 
-    expect(source).toContain('import {\n  getRoleManagementPageText,\n  type RoleManagementPageText,\n} from "@/components/role-management-page.content";');
+    expect(source).toContain(
+      'import {\n  getRoleManagementPageText,\n  type RoleManagementPageText,\n} from "@/components/role-management-page.content";'
+    );
     expect(source).toContain("const text = getRoleManagementPageText(locale);");
     expect(source).not.toContain("function getCopy(locale: Locale)");
-    expect(source).not.toContain("const isRu = locale === \"ru\";");
+    expect(source).not.toContain('const isRu = locale === "ru";');
     expect(source).toContain("import { getAdminErrorMessage }");
     expect(source).toContain("useAuthSession,");
     expect(source).toContain("const session = useAuthSession();");
@@ -58,7 +61,9 @@ describe("admin action hardening", () => {
     expect(contentSource).toContain('roleActionsAdminOnly: "Изменять роли может только Admin."');
     expect(contentSource).toContain('assignModeratorLabel: "Назначить Moderator пользователю"');
     expect(contentSource).toContain('revokeModeratorLabel: "Снять Moderator у пользователя"');
-    expect(contentSource).toContain('searchHint: "Введите минимум 2 символа. Поиск обновится автоматически."');
+    expect(contentSource).toContain(
+      'searchHint: "Введите минимум 2 символа. Поиск обновится автоматически."'
+    );
     expect(contentSource).toContain('adminAlreadyPrivileged: "Уже Admin"');
     expect(contentSource).toContain('moderatorAlreadyPrivileged: "Уже Moderator"');
     expect(contentSource).toContain('eyebrow: "Контроль доступа"');
@@ -91,7 +96,9 @@ describe("admin action hardening", () => {
     );
     expect(source).toContain("getAdminErrorMessage(error, text.failed)");
     expect(source).toContain('import { clientLogger } from "@/lib/client-logger";');
-    expect(source).toContain("function getRoleActionErrorDetails(error: unknown, targetUserId: string)");
+    expect(source).toContain(
+      "function getRoleActionErrorDetails(error: unknown, targetUserId: string)"
+    );
     expect(source).toContain("targetUserId: shortIdentifier(targetUserId)");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain('"digest" in error');
@@ -122,10 +129,10 @@ describe("admin action hardening", () => {
     expect(source).toContain("title={text.previousPageLabel}");
     expect(source).toContain("title={text.nextPageLabel}");
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconPrevious}`} />"
     );
     expect(source).toContain(
-      '<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />'
+      "<CaretDownIcon className={`${styles.pageIcon} ${styles.pageIconNext}`} />"
     );
     expect(source).not.toContain("{text.previous}\n        </button>");
     expect(source).not.toContain("{text.next}\n        </button>");
@@ -157,7 +164,9 @@ describe("admin action hardening", () => {
     expect(source).toContain("shortIdentifier(user.userId)");
     expect(source).toContain("sanitizeSensitiveText(role, 32)");
     expect(source).toContain("text: RoleManagementPageText;");
-    expect(source).toContain("<UserRow key={user.userId} user={user} locale={locale} text={text} />");
+    expect(source).toContain(
+      "<UserRow key={user.userId} user={user} locale={locale} text={text} />"
+    );
     expect(source).toContain("<RolePager\n                text={text}");
     expect(source).toContain(
       "const isRoleDataFetching = isRoleRetryFetching || searchQuery.isFetching;"
@@ -191,7 +200,7 @@ describe("admin action hardening", () => {
   });
 
   it("guards users confirmation actions against repeated submit", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
     const stylesSource = readFileSync(usersManagementStylesPath, "utf8");
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
 
@@ -244,24 +253,27 @@ describe("admin action hardening", () => {
   });
 
   it("keeps users financial and destructive controls admin-only in the UI layer", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
 
     expect(source).toContain("if (!canManageRoles) {\n        return;");
     expect(source).toContain("if (!canManageRoles || isUserActionLocked) {\n        return;");
     expect(source).toContain("if (!canManageRoles || !walletDialog || walletDialogSubmitting) {");
-    expect(source).toContain("{canManageRoles ? (\n                              <>");
-    expect(source).toContain("{canManageRoles && (\n                  <>");
-    expect(source).toContain("{canManageRoles ? (\n                      <section");
+    expect(source).toContain("{canManageRoles ? (");
+    expect(source).toContain("{canManageRoles && (");
+    expect(source).toContain("section className={`${styles.panelSection} ${styles.dangerZone}`}");
     expect(source).toContain("requestPremiumChange(user)");
     expect(source).toContain('openWalletDialog(user.userId, "credit")');
-    expect(source).toContain("requestDeleteUser(selectedUser, () => setSelectedUserId(null))");
+    expect(source).toContain("requestDeleteUser(selectedUser, closePanel)");
   });
 
   it("keeps wallet adjustment dialog recoverable after backend failures", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
 
     expect(source).toContain("USER_WALLET_REASON_MAX_LENGTH,");
-    expect(source).toContain("useCallback, useEffect, useId, useMemo, useRef, useState");
+    expect(source).toContain(
+      'import { useCallback, useEffect, useId, useMemo, useState } from "react";'
+    );
+    expect(source).toContain('import { useCallback, useEffect, useRef, useState } from "react";');
     expect(source).toContain("const walletDialogTitleId = useId();");
     expect(source).toContain("const walletDialogErrorId = useId();");
     expect(source).toContain("if (!canManageRoles || !walletDialog || walletDialogSubmitting) {");
@@ -273,8 +285,10 @@ describe("admin action hardening", () => {
     expect(source).toContain("reason: event.target.value.slice(0, USER_WALLET_REASON_MAX_LENGTH)");
     expect(source).toContain("maxLength={USER_WALLET_REASON_MAX_LENGTH}");
     expect(source).toContain("aria-labelledby={walletDialogTitleId}");
-    expect(source).toContain("aria-describedby={walletDialog.error ? walletDialogErrorId : undefined}");
-    expect(source).toContain('<h3 id={walletDialogTitleId} className={styles.walletDialogTitle}>');
+    expect(source).toContain(
+      "aria-describedby={walletDialog.error ? walletDialogErrorId : undefined}"
+    );
+    expect(source).toContain("<h3 id={walletDialogTitleId} className={styles.walletDialogTitle}>");
     expect(source).toContain(
       '<p id={walletDialogErrorId} className={styles.walletError} role="alert">'
     );
@@ -292,12 +306,14 @@ describe("admin action hardening", () => {
     expect(source).toContain("} finally {\n      setWalletDialogSubmitting(false);");
     expect(source).not.toContain("reason: event.target.value,");
     expect(source).not.toContain("const reason = walletDialog.reason.trim();");
-    expect(source).not.toContain("aria-label={\n                  walletDialog.operation === \"credit\"");
-    expect(source).not.toContain('<p className={styles.walletError}>{walletDialog.error}</p>');
+    expect(source).not.toContain(
+      'aria-label={\n                  walletDialog.operation === "credit"'
+    );
+    expect(source).not.toContain("<p className={styles.walletError}>{walletDialog.error}</p>");
   });
 
   it("keeps previous users page visible during background refetches", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
 
     expect(source).toContain("USER_SEARCH_MAX_LENGTH,");
@@ -318,7 +334,8 @@ describe("admin action hardening", () => {
       "const isLoading = usersQuery.isLoading || usersQuery.isFetching;"
     );
     expect(source).toContain("if (!canManageRoles) {");
-    expect(source).toContain('<AdminStateCard\n          tone="info"\n          title={text.usersTitle}');
+    expect(source).toContain("<UsersManagementAccessState text={text} />");
+    expect(source).toContain("<UsersManagementLoadingState text={text} />");
     expect(source).toContain("isFetching: isUsersFetching,");
     expect(source).toContain("refreshUsers,");
     expect(source).toContain("onClick={() => void refreshUsers().catch(() => undefined)}");
@@ -330,7 +347,7 @@ describe("admin action hardening", () => {
   });
 
   it("does not expose browser-only sorting on the paged users table", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
 
     expect(source).toContain("const ROW_ENRICHMENT_CONCURRENCY = 4;");
     expect(source).toContain("function fetchUserRowEnrichment<TValue>(");
@@ -351,10 +368,10 @@ describe("admin action hardening", () => {
   });
 
   it("sources users page summary cards from backend aggregate metrics", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
 
     expect(source).toContain("fetchAdminUserDashboardMetrics(signal)");
-    expect(source).toContain("type AdminUserDashboardMetrics,");
+    expect(source).toContain("AdminUserDashboardMetrics");
     expect(source).toContain("userMetrics?.totalUsers");
     expect(source).toContain("userMetrics?.activeUsers");
     expect(source).toContain("userMetrics?.premiumUsers");
@@ -370,7 +387,7 @@ describe("admin action hardening", () => {
   });
 
   it("blocks obvious last-admin demotion in the frontend while preserving backend source of truth", () => {
-    const pageSource = readFileSync(usersManagementPagePath, "utf8");
+    const pageSource = readUsersManagementPageLibrarySource();
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
 
     expect(pageSource).toContain("queryKey: adminQueryKeys.userDashboardMetrics");
@@ -389,7 +406,9 @@ describe("admin action hardening", () => {
     expect(hookSource).toContain(
       "queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDashboardMetrics })"
     );
-    expect(hookSource).not.toContain("await Promise.all([\n        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) })");
+    expect(hookSource).not.toContain(
+      "await Promise.all([\n        queryClient.invalidateQueries({ queryKey: adminQueryKeys.userDetail(userId) })"
+    );
     expect(hookSource).toContain(
       "getAdminErrorMessage(error, options?.errorMessage ?? text.errorLoadingUsers)"
     );
@@ -409,7 +428,9 @@ describe("admin action hardening", () => {
     expect(source).toContain("const userName = safeSessionDisplayName || maskedSessionEmail;");
     expect(source).toContain('const userInitial = (userName || "A")[0].toUpperCase();');
     expect(source).toContain("const [isLoggingOut, setIsLoggingOut] = useState(false);");
-    expect(source).toContain("const [isSidebarDrawerMode, setIsSidebarDrawerMode] = useState(false);");
+    expect(source).toContain(
+      "const [isSidebarDrawerMode, setIsSidebarDrawerMode] = useState(false);"
+    );
     expect(source).toContain("const previousPathnameRef = useRef(pathname);");
     expect(source).toContain(
       "if (previousPathnameRef.current === pathname) {\n      return;\n    }\n\n    previousPathnameRef.current = pathname;\n    setSidebarOpen(false);"
@@ -418,10 +439,10 @@ describe("admin action hardening", () => {
     expect(source).toContain('const media = window.matchMedia("(max-width: 860px)");');
     expect(source).toContain("setIsSidebarDrawerMode(isDrawerMode);");
     expect(source).toContain("if (!isDrawerMode) {\n        setSidebarOpen(false);\n      }");
-    expect(source).toContain("media.addEventListener(\"change\", syncSidebarMode);");
-    expect(source).toContain("media.removeEventListener(\"change\", syncSidebarMode);");
+    expect(source).toContain('media.addEventListener("change", syncSidebarMode);');
+    expect(source).toContain('media.removeEventListener("change", syncSidebarMode);');
     expect(source).toContain(
-      "if (!sidebarOpen || !isSidebarDrawerMode || typeof document === \"undefined\")"
+      'if (!sidebarOpen || !isSidebarDrawerMode || typeof document === "undefined")'
     );
     expect(source).toContain("const previousOverflow = document.body.style.overflow;");
     expect(source).toContain('document.body.style.overflow = "hidden";');
@@ -430,25 +451,35 @@ describe("admin action hardening", () => {
     expect(source).toContain("if (isLoggingOut) {\n      return;");
     expect(source).toContain("logoutDisabled={isLoggingOut}");
     expect(source).toContain("isDrawerMode={isSidebarDrawerMode}");
-    expect(source).toContain("aria-hidden={isSidebarDrawerMode && sidebarOpen ? \"true\" : undefined}");
+    expect(source).toContain(
+      'aria-hidden={isSidebarDrawerMode && sidebarOpen ? "true" : undefined}'
+    );
     expect(source).toContain("inert={isSidebarDrawerMode && sidebarOpen}");
     expect(topbarSource).toContain("const sidebarToggleLabel =");
-    expect(topbarSource).toContain("const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);");
-    expect(adminChromeContentSource).toContain('sidebarToggleLabel: (sidebarOpen) =>');
-    expect(adminChromeContentSource).toContain('sidebarOpen ? "Закрыть навигацию" : "Открыть навигацию"');
-    expect(adminChromeContentSource).toContain('sidebarOpen ? "Close navigation" : "Open navigation"');
+    expect(topbarSource).toContain(
+      "const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);"
+    );
+    expect(adminChromeContentSource).toContain("sidebarToggleLabel: (sidebarOpen) =>");
+    expect(adminChromeContentSource).toContain(
+      'sidebarOpen ? "Закрыть навигацию" : "Открыть навигацию"'
+    );
+    expect(adminChromeContentSource).toContain(
+      'sidebarOpen ? "Close navigation" : "Open navigation"'
+    );
     expect(topbarSource).toContain("aria-label={sidebarToggleLabel}");
     expect(topbarSource).toContain("title={sidebarToggleLabel}");
     expect(source).toContain("isSubmitting={isLoggingOut}");
     expect(source).toContain("if (!isLoggingOut) {\n            setLogoutDialogOpen(false);");
     expect(sidebarSource).toContain("isDrawerMode: boolean;");
-    expect(sidebarSource).toContain("const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);");
+    expect(sidebarSource).toContain(
+      "const copy = useMemo(() => getAdminChromeCopy(locale), [locale]);"
+    );
     expect(adminChromeContentSource).toContain('navigationLabel: "Навигация админ-панели"');
     expect(adminChromeContentSource).toContain('navigationLabel: "Admin navigation"');
     expect(sidebarSource).toContain("aria-label={navigationLabel}");
-    expect(sidebarSource).toContain("aria-hidden={isDrawerMode && !isOpen ? \"true\" : undefined}");
+    expect(sidebarSource).toContain('aria-hidden={isDrawerMode && !isOpen ? "true" : undefined}');
     expect(sidebarSource).toContain("inert={isDrawerMode && !isOpen}");
-    expect(sidebarSource).toContain('<nav className={styles.nav} aria-label={navigationLabel}>');
+    expect(sidebarSource).toContain("<nav className={styles.nav} aria-label={navigationLabel}>");
     expect(sidebarSource).toContain("logoutDisabled?: boolean;");
     expect(sidebarSource).toContain("logoutDisabled = false,");
     expect(sidebarSource).toContain("disabled={logoutDisabled}");
@@ -467,7 +498,9 @@ describe("admin action hardening", () => {
       "const userName = session?.user?.displayName || maskedSessionEmail;"
     );
     expect(source).not.toContain("session?.user?.displayName ||\n    maskedSessionEmail");
-    expect(sidebarSource).not.toContain('locale === "ru" ? "Навигация админ-панели" : "Admin navigation"');
+    expect(sidebarSource).not.toContain(
+      'locale === "ru" ? "Навигация админ-панели" : "Admin navigation"'
+    );
   });
 
   it("uses generic copy in the route error boundary", () => {
@@ -481,7 +514,7 @@ describe("admin action hardening", () => {
   });
 
   it("guards users page private detail queries behind a restored session", () => {
-    const source = readFileSync(usersManagementPagePath, "utf8");
+    const source = readUsersManagementPageLibrarySource();
     const hookSource = readFileSync(useUsersAdminPath, "utf8");
     const profileHookSource = readFileSync(useAdminUserProfilePath, "utf8");
     const detailSource = readFileSync(userDetailPagePath, "utf8");

@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { readDashboardViewLibrarySource } from "./dashboard-view.test-source";
 
-const dashboardViewPath = fileURLToPath(new URL("./dashboard-view.tsx", import.meta.url));
-const dashboardContentPath = fileURLToPath(
-  new URL("./dashboard-view.content.ts", import.meta.url)
-);
+const dashboardContentPath = fileURLToPath(new URL("./dashboard-view.content.ts", import.meta.url));
 const dashboardChartsPath = fileURLToPath(
   new URL("./dashboard/dashboard-charts.tsx", import.meta.url)
 );
@@ -13,7 +11,7 @@ const dashboardStylesPath = fileURLToPath(new URL("./dashboard-view.module.css",
 
 describe("dashboard production data handling", () => {
   it("fails required KPI data instead of silently substituting zero metrics", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
 
     expect(source).toContain("const requiredDataPromise = Promise.all([");
     expect(source).toContain("fetchDashboardUsers(signal)");
@@ -25,16 +23,16 @@ describe("dashboard production data handling", () => {
   });
 
   it("keeps optional dashboard feeds partial and locally retryable", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
     expect(source).toContain("const optionalFeedPromise = Promise.allSettled([");
     expect(source).toContain("fetchDashboardPurchases(signal)");
     expect(source).toContain("fetchDashboardSupportConversations(signal)");
-    expect(source).toContain('feedErrors: {');
-    expect(source).toContain('purchases: purchasesUnavailable');
-    expect(source).toContain('supportConversations: supportConversationsUnavailable');
+    expect(source).toContain("feedErrors: {");
+    expect(source).toContain("purchases: purchasesUnavailable");
+    expect(source).toContain("supportConversations: supportConversationsUnavailable");
     expect(source).toContain("viewModel.feedErrors.purchases ? (");
     expect(source).toContain("copy.states.ordersUnavailableTitle");
     expect(source).toContain("copy.states.activityUnavailableTitle");
@@ -45,16 +43,14 @@ describe("dashboard production data handling", () => {
   });
 
   it("exposes retry, busy, and empty states for dashboard failures and empty live sections", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain(
       'const canViewDashboard = session?.user.roles.includes("Admin") ?? false;'
     );
     expect(source).toContain("enabled: canViewDashboard");
-    expect(source).toContain(
-      'ensureAdminSession(locale, router, { requiredRole: "Admin" });'
-    );
+    expect(source).toContain('ensureAdminSession(locale, router, { requiredRole: "Admin" });');
     expect(source).toContain('import { adminQueryKeys } from "@/lib/admin-query-keys";');
     expect(source).toContain("queryKey: adminQueryKeys.dashboard(locale)");
     expect(source).toContain(
@@ -92,7 +88,7 @@ describe("dashboard production data handling", () => {
   });
 
   it("sources economy dashboard KPI values from backend aggregate metrics", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
 
     expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
     expect(source).toContain("economyMetrics: AdminEconomyDashboardMetrics");
@@ -109,7 +105,7 @@ describe("dashboard production data handling", () => {
   });
 
   it("sources moderation queue KPI from the moderation backend, not support tickets", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("fetchAdminModerationQueue");
@@ -122,13 +118,13 @@ describe("dashboard production data handling", () => {
     expect(source).not.toContain("const maxPages = 20");
     expect(source).not.toContain("count += response.items.length");
     expect(source).not.toContain(
-      "const moderationQueue = supportConversations.filter((item) => item.status !== \"Closed\").length;"
+      'const moderationQueue = supportConversations.filter((item) => item.status !== "Closed").length;'
     );
     expect(source).not.toContain("open support tickets");
   });
 
   it("uses backend total counts for dashboard KPI-only queries", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
 
     expect(source).toContain("fetchAdminUserDashboardMetrics(signal)");
     expect(source).toContain("metrics: AdminUserDashboardMetrics");
@@ -138,7 +134,7 @@ describe("dashboard production data handling", () => {
     expect(source).toContain("userMetrics.usersPreviousWeek");
     expect(source).toContain("fetchUsers({ skip: 0, take: 100 }, signal)");
     expect(source).toContain("return Math.max(0, response.totalCount);");
-    expect(source).not.toContain('fetchUsers({ skip: 0, take: 1, isPremium: true }, signal)');
+    expect(source).not.toContain("fetchUsers({ skip: 0, take: 1, isPremium: true }, signal)");
     expect(source).not.toContain('fetchUsers({ role: "Admin", skip: 0, take: 1 }, signal)');
     expect(source).not.toContain('fetchUsers({ role: "Moderator", skip: 0, take: 1 }, signal)');
     expect(source).not.toContain('fetchUsers({ role: "User", skip: 0, take: 1 }, signal)');
@@ -154,11 +150,13 @@ describe("dashboard production data handling", () => {
   });
 
   it("builds dashboard role distribution from backend role totals, not sampled users", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("type DashboardUserRoleCounts = {");
-    expect(source).toContain("const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts)");
+    expect(source).toContain(
+      "const userDistribution = buildUserDistribution(locale, totalUserCount, roleCounts)"
+    );
     expect(source).toContain("const admins = Math.max(0, roleCounts.admins)");
     expect(source).toContain("const moderators = Math.max(0, roleCounts.moderators)");
     expect(source).toContain("const regular = Math.max(0, roleCounts.users)");
@@ -173,22 +171,24 @@ describe("dashboard production data handling", () => {
   });
 
   it("keeps dashboard currency formatting non-throwing for backend currency codes", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const chartSource = readFileSync(dashboardChartsPath, "utf8");
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("function isSupportedCurrencyCode(currencyCode: string)");
-    expect(source).toContain("return isSupportedCurrencyCode(normalized) ? normalized : \"USD\"");
+    expect(source).toContain('return isSupportedCurrencyCode(normalized) ? normalized : "USD"');
     expect(source).toContain("const safeCurrencyCode = normalizeCurrencyCode(currencyCode)");
     expect(source).toContain("sanitizeSensitiveText(safeCurrencyCode, 12)");
     expect(source).toContain("getDashboardIntlLocale(locale)");
     expect(source).not.toContain('locale === "ru" ? "ru-RU" : "en-US"');
-    expect(contentSource).toContain("export function getDashboardIntlLocale(locale: Locale): string");
+    expect(contentSource).toContain(
+      "export function getDashboardIntlLocale(locale: Locale): string"
+    );
     expect(chartSource).toContain("function normalizeChartCurrencyCode(value: string)");
     expect(chartSource).toContain("function formatChartCurrencyAmount(");
     expect(chartSource).toContain("className={styles.chartDataTable}");
-    expect(chartSource).toContain("<th scope=\"col\">Date</th>");
-    expect(chartSource).toContain("<th scope=\"col\">Revenue</th>");
+    expect(chartSource).toContain('<th scope="col">Date</th>');
+    expect(chartSource).toContain('<th scope="col">Revenue</th>');
     expect(chartSource).toContain(
       'formatChartCurrencyAmount(value, normalizeChartCurrencyCode(currencyCode), "standard", 2)'
     );
@@ -197,7 +197,7 @@ describe("dashboard production data handling", () => {
   });
 
   it("keeps dashboard chart and status colors theme-token based", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const chartSource = readFileSync(dashboardChartsPath, "utf8");
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
     const visualSource = [source, chartSource, stylesSource].join("\n");
@@ -228,7 +228,7 @@ describe("dashboard production data handling", () => {
   });
 
   it("keeps dashboard icons and tone colors in shared components and CSS module classes", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
     expect(source).toContain("CaretDownIcon");
@@ -256,7 +256,9 @@ describe("dashboard production data handling", () => {
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
     expect(stylesSource).toContain("@media (max-width: 640px)");
-    expect(stylesSource).toContain(".legendItem {\n    grid-template-columns: auto minmax(0, 1fr);");
+    expect(stylesSource).toContain(
+      ".legendItem {\n    grid-template-columns: auto minmax(0, 1fr);"
+    );
     expect(stylesSource).toContain(".legendLabel {\n    overflow: visible;");
     expect(stylesSource).toContain("text-overflow: clip;");
     expect(stylesSource).toContain("white-space: normal;");
@@ -268,7 +270,9 @@ describe("dashboard production data handling", () => {
     const stylesSource = readFileSync(dashboardStylesPath, "utf8");
 
     expect(stylesSource).toContain(".cardTitleWithIcon,\n.cardActionLink {\n  min-width: 0;");
-    expect(stylesSource).toContain(".cardTitleWithIcon span,\n.cardActionLink span {\n  min-width: 0;");
+    expect(stylesSource).toContain(
+      ".cardTitleWithIcon span,\n.cardActionLink span {\n  min-width: 0;"
+    );
     expect(stylesSource).toContain("overflow-wrap: anywhere;");
     expect(stylesSource).toContain("text-align: right;");
     expect(stylesSource).toContain("@media (max-width: 640px)");
@@ -276,7 +280,7 @@ describe("dashboard production data handling", () => {
   });
 
   it("sanitizes dashboard user, support, and identifier labels before rendering", () => {
-    const source = readFileSync(dashboardViewPath, "utf8");
+    const source = readDashboardViewLibrarySource();
     const contentSource = readFileSync(dashboardContentPath, "utf8");
 
     expect(source).toContain("function formatDashboardUserLabel(");
@@ -293,10 +297,10 @@ describe("dashboard production data handling", () => {
     expect(source).toContain('return formatDashboardLabel(userId, 32).slice(0, 8) || "unknown";');
     expect(source).toContain('return compact ? `#${compact}` : "#UNKNOWN";');
     expect(contentSource).toContain(
-      'registered: (userLabel) => `${userLabel} registered in the system`'
+      "registered: (userLabel) => `${userLabel} registered in the system`"
     );
     expect(contentSource).toContain(
-      'ticketUpdated: (ticketId, status) => `Updated ticket ${ticketId}: ${status}`'
+      "ticketUpdated: (ticketId, status) => `Updated ticket ${ticketId}: ${status}`"
     );
     expect(source).not.toContain("user ? getAdminUserDisplayName(user) : shortUserId(item.userId)");
     expect(source).not.toContain("${getAdminUserDisplayName(item)} registered in the system");

@@ -1,9 +1,9 @@
+import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import {
   type AdminRedeemCode,
   type AdminRedeemRewardKind,
   type AdminUserDetail,
 } from "@/lib/api-client";
-import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
 
