@@ -31,6 +31,7 @@ public static partial class SupportChatEndpoints
         HttpContext httpContext,
         [FromBody] OpenConversationRequest? request,
         [FromServices] IValidator<OpenSupportConversationCommand> validator,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -60,7 +61,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> GetUserConversationAsync(
@@ -68,6 +69,7 @@ public static partial class SupportChatEndpoints
         [FromQuery] int? take,
         [FromQuery] DateTime? beforeMessageCreatedAtUtc,
         [FromQuery] Guid? beforeMessageId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -88,7 +90,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
 
@@ -100,6 +102,7 @@ public static partial class SupportChatEndpoints
         [FromForm] string? replyToMessageId,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -185,7 +188,7 @@ public static partial class SupportChatEndpoints
                 return ToProblem(failedStatusResult.Error);
             }
 
-            return TypedResults.Ok(failedStatusResult.Value);
+            return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
         }
 
         var completeStatusResult = await service.UpdateAttachmentMessageAsync(
@@ -221,10 +224,10 @@ public static partial class SupportChatEndpoints
                 return ToProblem(completeStatusResult.Error);
             }
 
-            return TypedResults.Ok(failedStatusResult.Value);
+            return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
         }
 
-        return TypedResults.Ok(completeStatusResult.Value);
+        return TypedResults.Ok(SignAttachmentUrls(completeStatusResult.Value, attachmentReadUrlSigner));
     }
 
     private static Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminAttachmentsAsync(
@@ -232,6 +235,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromServices] IValidator<SendSupportAttachmentsCommand> validator,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -241,6 +245,7 @@ public static partial class SupportChatEndpoints
             isAdmin: true,
             validator,
             attachmentStorage,
+            attachmentReadUrlSigner,
             service,
             cancellationToken);
     }
@@ -252,6 +257,7 @@ public static partial class SupportChatEndpoints
         bool isAdmin,
         IValidator<SendSupportAttachmentsCommand> validator,
         ISupportAttachmentStorage attachmentStorage,
+        ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -359,7 +365,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(sendResult.Error);
         }
 
-        return TypedResults.Ok(sendResult.Value);
+        return TypedResults.Ok(SignAttachmentUrls(sendResult.Value, attachmentReadUrlSigner));
     }
 
     private static Dictionary<string, string[]> ValidateSingleAttachmentFormFields(
@@ -413,6 +419,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid messageId,
         [FromForm] IFormFile? file,
         [FromServices] ISupportAttachmentStorage attachmentStorage,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -489,7 +496,7 @@ public static partial class SupportChatEndpoints
                 return ToProblem(failedStatusResult.Error);
             }
 
-            return TypedResults.Ok(failedStatusResult.Value);
+            return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
         }
 
         var completeStatusResult = await service.UpdateAttachmentMessageAsync(
@@ -512,7 +519,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(completeStatusResult.Error);
         }
 
-        return TypedResults.Ok(completeStatusResult.Value);
+        return TypedResults.Ok(SignAttachmentUrls(completeStatusResult.Value, attachmentReadUrlSigner));
     }
 
 
@@ -602,6 +609,7 @@ public static partial class SupportChatEndpoints
         [FromQuery] int? take,
         [FromQuery] DateTime? beforeMessageCreatedAtUtc,
         [FromQuery] Guid? beforeMessageId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -617,7 +625,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<SupportMessageResponse>, ValidationProblem, ProblemHttpResult>> SendAdminMessageAsync(
@@ -625,6 +633,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromBody] SendSupportMessageRequest request,
         [FromServices] IValidator<SendSupportMessageCommand> validator,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -651,7 +660,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> MarkAdminReadAsync(
@@ -687,6 +696,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromBody] UpdateSupportConversationStatusRequest request,
         [FromServices] IValidator<UpdateSupportConversationStatusCommand> validator,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -716,7 +726,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> AssignConversationAsync(
@@ -724,6 +734,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromBody] AssignSupportConversationRequest request,
         [FromServices] IValidator<AssignSupportConversationCommand> validator,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -745,7 +756,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ValidationProblem, ProblemHttpResult>> UpdateConversationMetadataAsync(
@@ -753,6 +764,7 @@ public static partial class SupportChatEndpoints
         [FromRoute] Guid conversationId,
         [FromBody] UpdateSupportConversationMetadataRequest request,
         [FromServices] IValidator<UpdateSupportConversationMetadataCommand> validator,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -787,7 +799,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static bool TryParseNamedEnum<TEnum>(string? raw, out TEnum value)

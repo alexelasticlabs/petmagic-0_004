@@ -22,6 +22,7 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
 
         var attachmentStorageOptions = BuildSupportAttachmentStorageOptions(
             configuration.GetSection("SupportChat:AttachmentStorage"));
+        var attachmentReadUrlSigningOptions = BuildSupportAttachmentReadUrlSigningOptions(configuration);
         var pushOptions = BuildSupportChatPushOptions(configuration);
         ValidateProductionPushConfiguration(pushOptions, isProduction);
 
@@ -31,8 +32,10 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
         });
 
         services.AddSingleton(attachmentStorageOptions);
+        services.AddSingleton(attachmentReadUrlSigningOptions);
         services.AddSingleton(pushOptions);
         services.AddSingleton<ISupportAttachmentStorage, LocalSupportAttachmentStorage>();
+        services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
         services.AddScoped<SupportAttachmentCleanupProcessor>();
         services.AddScoped<ISupportPushTokenService, SupportPushTokenService>();
         services.AddScoped<NoopSupportChatPushNotificationSender>();
@@ -116,6 +119,16 @@ public static class SupportChatInfrastructureServiceCollectionExtensions
             CleanupPollIntervalMilliseconds = ParsePositiveInt(section["CleanupPollIntervalMilliseconds"], 86_400_000),
             CleanupBatchSize = ParsePositiveInt(section["CleanupBatchSize"], 100),
             CleanupRetryDelayMilliseconds = ParseNonNegativeInt(section["CleanupRetryDelayMilliseconds"], 30_000),
+        };
+    }
+
+    private static SupportAttachmentReadUrlSigningOptions BuildSupportAttachmentReadUrlSigningOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection("SupportChat:AttachmentStorage");
+        return new SupportAttachmentReadUrlSigningOptions
+        {
+            SigningKey = configuration["Jwt:SigningKey"] ?? string.Empty,
+            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 720),
         };
     }
 

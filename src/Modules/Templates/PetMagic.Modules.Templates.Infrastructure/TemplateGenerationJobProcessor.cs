@@ -817,6 +817,12 @@ internal sealed class TemplateGenerationJobProcessor(
         job.LastErrorMessage = error.Message;
         job.UpdatedAtUtc = DateTime.UtcNow;
         job.CompletedAtUtc = job.UpdatedAtUtc;
+
+        if (job.ChargedAtUtc is not null && job.RefundedAtUtc is null)
+        {
+            await TryRefundAsync(job, cancellationToken);
+        }
+
         if (!await SaveJobChangesAsync(job, cancellationToken, releaseLock: true))
         {
             return false;
@@ -827,12 +833,6 @@ internal sealed class TemplateGenerationJobProcessor(
             "Template generation job failed. ErrorCode={ErrorCode} ElapsedMs={ElapsedMs}",
             error.Code,
             ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
-
-        if (job.ChargedAtUtc is not null && job.RefundedAtUtc is null)
-        {
-            await TryRefundAsync(job, cancellationToken);
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
 
         AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationFailed);
         if (job.GenerationMode == TemplateGenerationMode.Similar)

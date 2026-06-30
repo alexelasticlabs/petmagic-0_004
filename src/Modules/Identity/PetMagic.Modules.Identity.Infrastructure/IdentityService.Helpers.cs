@@ -49,7 +49,7 @@ public sealed partial class IdentityService
         return Convert.ToHexString(bytes);
     }
 
-    private static UserAvatarResponse? ToAvatarResponse(AppUser user)
+    private UserAvatarResponse? ToAvatarResponse(AppUser user)
     {
         if (string.IsNullOrWhiteSpace(user.AvatarUrl)
             || string.IsNullOrWhiteSpace(user.AvatarFileName)
@@ -59,7 +59,7 @@ public sealed partial class IdentityService
         }
 
         return new UserAvatarResponse(
-            user.AvatarUrl,
+            avatarReadUrlSigner.CreateReadUrl(user.AvatarUrl),
             user.AvatarFileName,
             user.AvatarContentType,
             user.AvatarFileSizeBytes,

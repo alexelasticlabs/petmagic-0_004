@@ -20,6 +20,7 @@ using PetMagic.Host.Api.Security;
 using PetMagic.Modules.Identity.Api;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.SupportChat.Api;
+using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure;
 using PetMagic.Modules.Templates.Api;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -329,6 +330,40 @@ try
             await next();
         });
     }
+
+    app.Use(async (context, next) =>
+    {
+        var requestPath = context.Request.Path.Value ?? string.Empty;
+        if (requestPath.Contains("/support-attachments", StringComparison.OrdinalIgnoreCase))
+        {
+            var signer = context.RequestServices.GetRequiredService<ISupportAttachmentReadUrlSigner>();
+            var query = context.Request.Query.ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value.ToString(),
+                StringComparer.OrdinalIgnoreCase);
+            if (!signer.IsAuthorizedRequest(requestPath, query))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+        }
+
+        if (requestPath.Contains("/user-avatars", StringComparison.OrdinalIgnoreCase))
+        {
+            var signer = context.RequestServices.GetRequiredService<IAvatarReadUrlSigner>();
+            var query = context.Request.Query.ToDictionary(
+                pair => pair.Key,
+                pair => (string?)pair.Value.ToString(),
+                StringComparer.OrdinalIgnoreCase);
+            if (!signer.IsAuthorizedRequest(requestPath, query))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+        }
+
+        await next();
+    });
 
     app.UseStaticFiles(new StaticFileOptions
     {

@@ -123,6 +123,13 @@ public sealed partial class IdentityServiceProfileTests
             new FakeLegalDocumentsCatalog(),
             new StubEmailTemplateRenderer(),
             avatarStorage,
+            new AvatarReadUrlSigner(
+                new AvatarStorageOptions(),
+                new AvatarReadUrlSigningOptions
+                {
+                    SigningKey = new string('t', 64),
+                    ReadUrlTtlMinutes = 60
+                }),
             new EmailOptions
             {
                 DispatchWorkerEnabled = false,

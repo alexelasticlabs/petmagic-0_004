@@ -58,7 +58,11 @@ internal sealed class ImagePreviewGenerator(
         }
         catch (Exception exception)
         {
-            logger.LogDebug(exception, "Could not create image preview for {AssetUrl}", original.Url);
+            logger.LogDebug(
+                exception,
+                "Could not create image preview. FileName={FileName} ContentType={ContentType}",
+                original.FileName,
+                original.ContentType);
             return null;
         }
         finally

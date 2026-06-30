@@ -18,6 +18,7 @@ public static partial class SupportChatEndpoints
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> AssignConversationToMeAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -34,12 +35,13 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> UnassignConversationAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -56,12 +58,13 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> MarkConversationWaitingForUserAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -69,6 +72,7 @@ public static partial class SupportChatEndpoints
             httpContext,
             conversationId,
             SupportConversationStatus.WaitingForUser,
+            attachmentReadUrlSigner,
             service,
             cancellationToken);
     }
@@ -76,6 +80,7 @@ public static partial class SupportChatEndpoints
     private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> MarkConversationInProgressAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -83,6 +88,7 @@ public static partial class SupportChatEndpoints
             httpContext,
             conversationId,
             SupportConversationStatus.InProgress,
+            attachmentReadUrlSigner,
             service,
             cancellationToken);
     }
@@ -90,6 +96,7 @@ public static partial class SupportChatEndpoints
     private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> CloseAdminConversationAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -97,6 +104,7 @@ public static partial class SupportChatEndpoints
             httpContext,
             conversationId,
             SupportConversationStatus.Closed,
+            attachmentReadUrlSigner,
             service,
             cancellationToken);
     }
@@ -104,6 +112,7 @@ public static partial class SupportChatEndpoints
     private static Task<Results<Ok<SupportConversationDetailResponse>, ProblemHttpResult>> ReopenAdminConversationAsync(
         HttpContext httpContext,
         [FromRoute] Guid conversationId,
+        [FromServices] ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -111,6 +120,7 @@ public static partial class SupportChatEndpoints
             httpContext,
             conversationId,
             SupportConversationStatus.InProgress,
+            attachmentReadUrlSigner,
             service,
             cancellationToken);
     }
@@ -119,6 +129,7 @@ public static partial class SupportChatEndpoints
         HttpContext httpContext,
         Guid conversationId,
         SupportConversationStatus status,
+        ISupportAttachmentReadUrlSigner attachmentReadUrlSigner,
         ISupportChatService service,
         CancellationToken cancellationToken)
     {
@@ -135,7 +146,7 @@ public static partial class SupportChatEndpoints
             return ToProblem(result.Error);
         }
 
-        return TypedResults.Ok(result.Value);
+        return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
     private static async Task<Results<Ok<IReadOnlyList<SupportReplyTemplateResponse>>, ProblemHttpResult>> ListReplyTemplatesAsync(

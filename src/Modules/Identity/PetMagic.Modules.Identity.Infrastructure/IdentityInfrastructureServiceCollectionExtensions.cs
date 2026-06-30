@@ -37,6 +37,7 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
         var emailOptions = BuildEmailOptions(configuration.GetSection(EmailOptions.SectionName));
         var avatarStorageOptions = BuildAvatarStorageOptions(configuration.GetSection(AvatarStorageOptions.SectionName));
+        var avatarReadUrlSigningOptions = BuildAvatarReadUrlSigningOptions(configuration);
 
         ValidateExternalAuthConfiguration(externalAuth);
         ValidateJwtConfiguration(jwtOptions, environment);
@@ -130,10 +131,12 @@ public static class IdentityInfrastructureServiceCollectionExtensions
         services.AddSingleton(externalAuth);
         services.AddSingleton(emailOptions);
         services.AddSingleton(avatarStorageOptions);
+        services.AddSingleton(avatarReadUrlSigningOptions);
         services.AddHttpContextAccessor();
         services.AddSingleton<ILegalDocumentsCatalog, LegalDocumentsCatalog>();
         services.AddSingleton<IIdentityEmailTemplateRenderer, IdentityEmailTemplateRenderer>();
         services.AddSingleton<IAvatarStorage, LocalAvatarStorage>();
+        services.AddSingleton<IAvatarReadUrlSigner, AvatarReadUrlSigner>();
         services.AddScoped<IGoogleIdentityTokenVerifier, GoogleIdentityTokenVerifier>();
         services.AddScoped<IAppleIdentityTokenVerifier, AppleIdentityTokenVerifier>();
         services.AddScoped<IIdentityUserLookupService, IdentityUserLookupService>();
@@ -338,6 +341,16 @@ public static class IdentityInfrastructureServiceCollectionExtensions
             PublicBaseUrl = section["PublicBaseUrl"] ?? "http://localhost:5000",
             LocalMediaRootPath = section["LocalMediaRootPath"] ?? Path.Combine("wwwroot", "user-avatars"),
             MaxFileSizeBytes = ParsePositiveLong(section["MaxFileSizeBytes"], UploadedMediaPolicies.Avatar.MaxFileSizeBytes)
+        };
+    }
+
+    private static AvatarReadUrlSigningOptions BuildAvatarReadUrlSigningOptions(IConfiguration configuration)
+    {
+        var section = configuration.GetSection(AvatarStorageOptions.SectionName);
+        return new AvatarReadUrlSigningOptions
+        {
+            SigningKey = configuration["Jwt:SigningKey"] ?? string.Empty,
+            ReadUrlTtlMinutes = ParsePositiveInt(section["ReadUrlTtlMinutes"], 720)
         };
     }
 

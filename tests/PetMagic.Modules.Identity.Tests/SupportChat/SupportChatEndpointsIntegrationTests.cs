@@ -586,6 +586,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("issue.png", uploadedAttachment.FileName);
         Assert.Equal("image/png", uploadedAttachment.MimeType);
         Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
+        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
@@ -595,6 +596,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
         Assert.Equal("issue.png", conversationAttachment.FileName);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
+        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
     }
 
     [Fact]
@@ -630,6 +632,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("issue.mp4", uploadedAttachment.FileName);
         Assert.Equal("video/mp4", uploadedAttachment.MimeType);
         Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
+        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(AdminId, "Admin"),
@@ -640,6 +643,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("issue.mp4", conversationAttachment.FileName);
         Assert.Equal("video/mp4", conversationAttachment.MimeType);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
+        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
     }
 
     [Fact]
@@ -791,6 +795,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("admin-screenshot.png", uploadedAttachment.FileName);
         Assert.Equal("image/png", uploadedAttachment.MimeType);
         Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
+        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
 
         var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
             application.CreateClient(UserId, "User"),
@@ -801,6 +806,7 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("admin-screenshot.png", conversationAttachment.FileName);
         Assert.Equal("image/png", conversationAttachment.MimeType);
         Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
+        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
     }
 
     [Fact]
@@ -1018,6 +1024,18 @@ public sealed class SupportChatEndpointsIntegrationTests
         throw new Xunit.Sdk.XunitException($"Expected success status code but got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
     }
 
+    private static void AssertSignedSupportAttachmentUrl(string fileUrl)
+    {
+        var uri = new Uri(fileUrl);
+        Assert.StartsWith("/support-attachments/", uri.AbsolutePath, StringComparison.OrdinalIgnoreCase);
+
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        Assert.True(query.TryGetValue("pmexp", out var expiresAt));
+        Assert.True(query.TryGetValue("pmsig", out var signature));
+        Assert.False(string.IsNullOrWhiteSpace(expiresAt.ToString()));
+        Assert.False(string.IsNullOrWhiteSpace(signature.ToString()));
+    }
+
     private sealed class SupportChatTestApplication : IAsyncDisposable
     {
         private readonly WebApplication app;
@@ -1100,6 +1118,12 @@ public sealed class SupportChatEndpointsIntegrationTests
 
             builder.Services.AddScoped<IIdentityUserLookupService, TestIdentityUserLookupService>();
             builder.Services.AddSingleton<ISupportAttachmentStorage, FakeSupportAttachmentStorage>();
+            builder.Services.AddSingleton(new SupportAttachmentReadUrlSigningOptions
+            {
+                SigningKey = new string('t', 64),
+                ReadUrlTtlMinutes = 60,
+            });
+            builder.Services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
             builder.Services.AddSingleton<ISupportChatPushNotificationSender, NoopSupportChatPushNotificationSender>();
             builder.Services.AddSingleton(new SupportAttachmentStorageOptions());
             builder.Services.AddScoped<ISupportChatService, SupportChatService>();

@@ -36,6 +36,7 @@ public sealed partial class IdentityService(
     ILegalDocumentsCatalog legalDocumentsCatalog,
     IIdentityEmailTemplateRenderer emailTemplateRenderer,
     IAvatarStorage avatarStorage,
+    IAvatarReadUrlSigner avatarReadUrlSigner,
     EmailOptions emailOptions,
     AvatarStorageOptions avatarStorageOptions,
     IOptions<JwtOptions> jwtOptions,

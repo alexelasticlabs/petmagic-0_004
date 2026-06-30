@@ -125,6 +125,11 @@ public sealed partial class LoggingPolicyTests
             {
                 yield return $"{RelativeRepositoryPath(path)}:{lineNumber} logs a sensitive transport field";
             }
+
+            if (SensitiveUrlPlaceholderRegex().IsMatch(line))
+            {
+                yield return $"{RelativeRepositoryPath(path)}:{lineNumber} logs a URL or URI placeholder";
+            }
         }
     }
 
@@ -150,4 +155,7 @@ public sealed partial class LoggingPolicyTests
 
     [GeneratedRegex(@"\bLog(?:Trace|Debug|Information|Warning|Error|Critical)\s*\(.*\b(Payload|RequestBody|ResponseBody|Authorization|AccessToken|RefreshToken|Password|Secret|WebhookPayload|SignedUrl)\b", RegexOptions.CultureInvariant)]
     private static partial Regex SensitiveLogTemplateRegex();
+
+    [GeneratedRegex(@"\bLog(?:Trace|Debug|Information|Warning|Error|Critical)\s*\(.*\{[A-Za-z0-9_]*(Url|Uri)\}", RegexOptions.CultureInvariant)]
+    private static partial Regex SensitiveUrlPlaceholderRegex();
 }

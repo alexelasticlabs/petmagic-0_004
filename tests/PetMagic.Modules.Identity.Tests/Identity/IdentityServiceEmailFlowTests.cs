@@ -632,6 +632,13 @@ public sealed class IdentityServiceEmailFlowTests
             new FakeLegalDocumentsCatalog(),
             emailTemplateRenderer ?? new StubEmailTemplateRenderer(),
             new InMemoryAvatarStorage(),
+            new AvatarReadUrlSigner(
+                new AvatarStorageOptions(),
+                new AvatarReadUrlSigningOptions
+                {
+                    SigningKey = new string('t', 64),
+                    ReadUrlTtlMinutes = 60
+                }),
             new EmailOptions
             {
                 DispatchWorkerEnabled = false,
