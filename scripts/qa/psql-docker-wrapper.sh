@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-container="${WATERMARK_QA_POSTGRES_CONTAINER:-petmagic-0_004-postgres-1}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd)"
+service="${WATERMARK_QA_POSTGRES_SERVICE:-postgres}"
+container="${WATERMARK_QA_POSTGRES_CONTAINER:-}"
 db_user="${WATERMARK_QA_POSTGRES_USER:-petmagic_user}"
 db_name="${WATERMARK_QA_POSTGRES_DB:-petmagic_db}"
 
@@ -25,8 +28,19 @@ while [[ $index -lt ${#args[@]} ]]; do
   index=$((index + 1))
 done
 
+if [[ -n "$container" ]]; then
+  if [[ -n "$file" ]]; then
+    docker exec -i "$container" psql -U "$db_user" -d "$db_name" "${forwarded[@]}" < "$file"
+  else
+    docker exec -i "$container" psql -U "$db_user" -d "$db_name" "${forwarded[@]}"
+  fi
+  exit 0
+fi
+
 if [[ -n "$file" ]]; then
-  docker exec -i "$container" psql -U "$db_user" -d "$db_name" "${forwarded[@]}" < "$file"
+  docker compose -f "$repo_root/docker-compose.yml" exec -T "$service" \
+    psql -U "$db_user" -d "$db_name" "${forwarded[@]}" < "$file"
 else
-  docker exec -i "$container" psql -U "$db_user" -d "$db_name" "${forwarded[@]}"
+  docker compose -f "$repo_root/docker-compose.yml" exec -T "$service" \
+    psql -U "$db_user" -d "$db_name" "${forwarded[@]}"
 fi

@@ -5,18 +5,19 @@ This checklist verifies the free, premium, and paid-unlock watermark flows on mo
 ## Prerequisites
 
 - Backend API is running and reachable from devices.
-  - iOS simulator: `API_BASE_URL=http://localhost:5000`
-  - Android emulator: `API_BASE_URL=http://10.0.2.2:5000`
+  Use the host port configured by `BACKEND_HOST_PORT` in the repo root `.env`.
+- iOS simulator base URL: `API_BASE_URL=http://localhost:<BACKEND_HOST_PORT>`
+- Android emulator base URL: `API_BASE_URL=http://10.0.2.2:<BACKEND_HOST_PORT>`
 - Generation worker is running with watermark rendering enabled.
 - Test accounts:
-  - Free user with at least 1 credit.
-  - Free user with 0 credits.
-  - Premium user.
-  - Admin user.
+  - Free user with at least 1 credit
+  - Free user with 0 credits
+  - Premium user
+  - Admin user
 - Test results:
-  - Completed image generation with original and watermarked copy.
-  - Completed video generation with original and watermarked copy.
-  - Completed free result where original exists but watermarked copy is temporarily missing.
+  - Completed image generation with original and watermarked copy
+  - Completed video generation with original and watermarked copy
+  - Completed free result where original exists but watermarked copy is temporarily missing
 - Admin watermark settings are configured:
   - enabled
   - text `Made with PetMagic` or `PetMagic`
@@ -37,7 +38,7 @@ For local manual QA, first create or identify three existing Identity users:
 To create local QA users and tokens automatically against a running backend:
 
 ```bash
-API_BASE_URL=http://localhost:5000 \
+API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
 DATABASE_URL="$DATABASE_URL" \
 scripts/qa/prepare-watermark-qa-users.mjs
 ```
@@ -47,7 +48,7 @@ If Docker maps Postgres to a host port that conflicts with a local Postgres, use
 ```bash
 PATH="$PWD/scripts/qa:$PATH" \
 DATABASE_URL=postgresql://petmagic_user:unused@docker/petmagic_db \
-API_BASE_URL=http://localhost:5001 \
+API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
 scripts/qa/prepare-watermark-qa-users.mjs
 ```
 
@@ -80,14 +81,14 @@ psql "$DATABASE_URL" \
   -v free_user_id="'$FREE_USER_ID'" \
   -v no_credit_user_id="'$NO_CREDIT_USER_ID'" \
   -v premium_user_id="'$PREMIUM_USER_ID'" \
-  -v public_base_url="'http://localhost:5000'" \
+  -v public_base_url="'http://localhost:<BACKEND_HOST_PORT>'" \
   -f scripts/qa/seed-watermark-manual-qa.sql
 ```
 
 If you already have access tokens for the same three users, run the backend smoke check before the mobile walkthrough:
 
 ```bash
-API_BASE_URL=http://localhost:5000 \
+API_BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
 DATABASE_URL="$DATABASE_URL" \
 FREE_USER_ID="$FREE_USER_ID" \
 NO_CREDIT_USER_ID="$NO_CREDIT_USER_ID" \
@@ -142,8 +143,8 @@ If Flutter device discovery or a device run hangs, use explicit device IDs and a
 
 Use a `public_base_url` that the tested device can open:
 
-- iOS simulator: `http://localhost:5000`
-- Android emulator: `http://10.0.2.2:5000`
+- iOS simulator: `http://localhost:<BACKEND_HOST_PORT>`
+- Android emulator: `http://10.0.2.2:<BACKEND_HOST_PORT>`
 - Both platforms in one seed: a LAN host/IP URL reachable from both devices
 
 The script seeds wallet balances, watermark settings, and deterministic generation rows:
@@ -175,9 +176,10 @@ Run on both iOS and Android.
    - Upgrade to Premium.
 9. Choose Use 1 credit.
 10. Verify success state:
-   - Watermark removed message.
-   - Clean media is shown.
-   - Download without watermark is available.
+    - Watermark removed message.
+    - Clean media is shown.
+    - Download without watermark is available.
+
 11. Repeat the remove/unlock request if reachable through refresh or retry.
 12. Verify credits are not charged a second time.
 13. Open the same result after app restart.
@@ -291,17 +293,17 @@ Verify events are recorded with `generationId`, `templateId`, `mediaType`, `user
 
 ## Evidence Template
 
-| Area | iOS result | Android result | Evidence |
-| --- | --- | --- | --- |
-| Free watermarked result |  |  |  |
-| Remove watermark bottom sheet |  |  |  |
-| Credit unlock, no double spend |  |  |  |
-| No-credit path |  |  |  |
-| Premium clean result |  |  |  |
-| Preparing state |  |  |  |
-| Image watermark visual |  |  |  |
-| Video watermark visual |  |  |  |
-| Download/share version routing |  |  |  |
-| Admin settings and preview |  |  |  |
-| Admin grant clean |  |  |  |
-| Analytics events |  |  |  |
+| Area                           | iOS result | Android result | Evidence |
+| ------------------------------ | ---------- | -------------- | -------- |
+| Free watermarked result        |            |                |          |
+| Remove watermark bottom sheet  |            |                |          |
+| Credit unlock, no double spend |            |                |          |
+| No-credit path                 |            |                |          |
+| Premium clean result           |            |                |          |
+| Preparing state                |            |                |          |
+| Image watermark visual         |            |                |          |
+| Video watermark visual         |            |                |          |
+| Download/share version routing |            |                |          |
+| Admin settings and preview     |            |                |          |
+| Admin grant clean              |            |                |          |
+| Analytics events               |            |                |          |

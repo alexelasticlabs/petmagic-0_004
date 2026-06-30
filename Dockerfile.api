@@ -2,6 +2,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS builder
 ARG TARGETARCH
 WORKDIR /src
+COPY ["Directory.Build.props", "./"]
+COPY ["Directory.Packages.props", "./"]
 COPY ["src/", "src/"]
 RUN --mount=type=cache,id=nuget-api,sharing=locked,target=/root/.nuget/packages \
     case "$TARGETARCH" in \

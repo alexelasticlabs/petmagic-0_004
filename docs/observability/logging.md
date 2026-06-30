@@ -164,11 +164,11 @@ Mask values:
 
 Environment levels:
 
-| Environment | App logs | Microsoft/System |
-| --- | --- | --- |
-| Development | Debug | Warning |
-| Staging | Information | Warning |
-| Production | Information | Warning |
+| Environment | App logs    | Microsoft/System |
+| ----------- | ----------- | ---------------- |
+| Development | Debug       | Warning          |
+| Staging     | Information | Warning          |
+| Production  | Information | Warning          |
 
 Development sets app logs to `Debug` and Microsoft/System logs to `Warning`. To enable more local logging, edit `src/Host/PetMagic.Host.Api/appsettings.Development.json`, `src/Host/PetMagic.Host.GenerationWorker/appsettings.Development.json`, or use environment variables such as:
 

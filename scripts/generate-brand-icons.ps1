@@ -2,91 +2,6 @@ Add-Type -AssemblyName System.Drawing
 
 $ErrorActionPreference = 'Stop'
 
-function New-RoundedRectanglePath {
-    param(
-        [float]$X,
-        [float]$Y,
-        [float]$Width,
-        [float]$Height,
-        [float]$Radius
-    )
-
-    $diameter = $Radius * 2
-    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-    $path.AddArc($X, $Y, $diameter, $diameter, 180, 90)
-    $path.AddArc($X + $Width - $diameter, $Y, $diameter, $diameter, 270, 90)
-    $path.AddArc($X + $Width - $diameter, $Y + $Height - $diameter, $diameter, $diameter, 0, 90)
-    $path.AddArc($X, $Y + $Height - $diameter, $diameter, $diameter, 90, 90)
-    $path.CloseFigure()
-    return $path
-}
-
-function Add-Sparkle {
-    param(
-        [System.Drawing.Graphics]$Graphics,
-        [float]$CenterX,
-        [float]$CenterY,
-        [float]$OuterRadius,
-        [System.Drawing.Brush]$Brush
-    )
-
-    $innerRadius = $OuterRadius * 0.42
-    $points = New-Object 'System.Collections.Generic.List[System.Drawing.PointF]'
-
-    for ($index = 0; $index -lt 8; $index++) {
-        $angle = (-90 + ($index * 45)) * [Math]::PI / 180
-        $radius = if ($index % 2 -eq 0) { $OuterRadius } else { $innerRadius }
-        $points.Add([System.Drawing.PointF]::new(
-                $CenterX + [Math]::Cos($angle) * $radius,
-                $CenterY + [Math]::Sin($angle) * $radius
-            ))
-    }
-
-    $Graphics.FillPolygon($Brush, $points.ToArray())
-}
-
-function New-IconBitmap {
-    param([int]$Size)
-
-    $bitmap = [System.Drawing.Bitmap]::new($Size, $Size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-    $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-    $graphics.Clear([System.Drawing.Color]::Transparent)
-
-    $backgroundPath = New-RoundedRectanglePath 24 24 ($Size - 48) ($Size - 48) 220
-    $gradientBrush = [System.Drawing.Drawing2D.LinearGradientBrush]::new(
-        [System.Drawing.RectangleF]::new(0, 0, $Size, $Size),
-        [System.Drawing.ColorTranslator]::FromHtml('#FF8A4C'),
-        [System.Drawing.ColorTranslator]::FromHtml('#2F67F6'),
-        45
-    )
-    $graphics.FillPath($gradientBrush, $backgroundPath)
-
-    $glowBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(76, 255, 255, 255))
-    $graphics.FillEllipse($glowBrush, $Size * 0.16, $Size * 0.12, $Size * 0.56, $Size * 0.56)
-    $graphics.FillEllipse($glowBrush, $Size * 0.44, $Size * 0.30, $Size * 0.34, $Size * 0.34)
-
-    $pawBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(245, 255, 255, 255))
-    $graphics.FillEllipse($pawBrush, $Size * 0.30, $Size * 0.44, $Size * 0.40, $Size * 0.30)
-    $graphics.FillEllipse($pawBrush, $Size * 0.24, $Size * 0.34, $Size * 0.15, $Size * 0.15)
-    $graphics.FillEllipse($pawBrush, $Size * 0.38, $Size * 0.28, $Size * 0.12, $Size * 0.12)
-    $graphics.FillEllipse($pawBrush, $Size * 0.50, $Size * 0.28, $Size * 0.12, $Size * 0.12)
-    $graphics.FillEllipse($pawBrush, $Size * 0.62, $Size * 0.34, $Size * 0.15, $Size * 0.15)
-
-    Add-Sparkle -Graphics $graphics -CenterX ($Size * 0.24) -CenterY ($Size * 0.33) -OuterRadius ($Size * 0.045) -Brush $pawBrush
-    Add-Sparkle -Graphics $graphics -CenterX ($Size * 0.77) -CenterY ($Size * 0.31) -OuterRadius ($Size * 0.075) -Brush $pawBrush
-
-    $gradientBrush.Dispose()
-    $glowBrush.Dispose()
-    $pawBrush.Dispose()
-    $backgroundPath.Dispose()
-    $graphics.Dispose()
-
-    return $bitmap
-}
-
 function Save-Png {
     param(
         [System.Drawing.Bitmap]$Bitmap,
@@ -157,10 +72,17 @@ function Save-Ico {
 }
 
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
-$sourceIconPath = Join-Path $root '1 (2).png'
+$sourceIconCandidates = @(
+    (Join-Path $root 'apps/petmagic-mobile/assets/branding/petmagic-app-icon-1024.png'),
+    (Join-Path $root 'apps/petmagic-mobile/assets/icons/app_icon.png'),
+    (Join-Path $root 'apps/admin-web/src/app/icon.png')
+)
+$sourceIconPath = $sourceIconCandidates |
+    Where-Object { Test-Path $_ } |
+    Select-Object -First 1
 
-if (-not (Test-Path $sourceIconPath)) {
-    throw "Source icon not found: $sourceIconPath"
+if ([string]::IsNullOrWhiteSpace($sourceIconPath)) {
+    throw "Source icon not found. Checked: $($sourceIconCandidates -join ', ')"
 }
 
 $sourceImage = [System.Drawing.Image]::FromFile($sourceIconPath)

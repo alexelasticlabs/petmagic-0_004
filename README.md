@@ -4,13 +4,13 @@ PetMagic is a modular ASP.NET Core backend with a Next.js admin panel and a Flut
 
 ## Services
 
-| Service | Port | Role |
-| --- | --- | --- |
-| `postgres` | `5432` | PostgreSQL 16 data store |
-| `mailpit` | `8025` web UI, `1025` SMTP | Local email inbox for confirmation and password reset codes |
-| `backend` | `5001` on host, `5000` in Docker network | REST API, auth, economy, template queue API |
-| `generation-worker` | none | Claims and processes queued template generation jobs |
-| `admin-web` | `3000` | Admin UI |
+| Service             | Port                                                  | Role                                                        |
+| ------------------- | ----------------------------------------------------- | ----------------------------------------------------------- |
+| `postgres`          | `5432`                                                | PostgreSQL 16 data store                                    |
+| `mailpit`           | `8025` web UI, `1025` SMTP                            | Local email inbox for confirmation and password reset codes |
+| `backend`           | `BACKEND_HOST_PORT` on host, `5000` in Docker network | REST API, auth, economy, template queue API                 |
+| `generation-worker` | none                                                  | Claims and processes queued template generation jobs        |
+| `admin-web`         | `3000`                                                | Admin UI                                                    |
 
 The backend API does not run template generation work in Docker Compose. It enqueues rows in `templates_generation_jobs` with `Templates__GenerationWorkerEnabled=false`. The `generation-worker` service runs the processing loops with `Templates__GenerationWorkerEnabled=true`.
 
@@ -30,10 +30,12 @@ docker compose up --build --scale generation-worker=3
 
 Expected local endpoints:
 
-- Backend health: `http://localhost:5001/health`
+- Backend health: `http://localhost:<BACKEND_HOST_PORT>/health`
 - Admin web: `http://localhost:3000`
 - Local email inbox: `http://localhost:8025`
 - PostgreSQL: `localhost:5432`
+
+`BACKEND_HOST_PORT` defaults to `5001` in Compose. If your local `.env` overrides it to `5000`, use `http://localhost:5000`.
 
 If you change `BACKEND_HOST_PORT`, update frontend and mobile API base URLs accordingly.
 
@@ -109,7 +111,7 @@ Run the mobile app:
 cd apps/petmagic-mobile
 flutter pub get
 flutter gen-l10n
-flutter run --dart-define=API_BASE_URL=http://localhost:5001
+flutter run --dart-define=API_BASE_URL=http://localhost:<BACKEND_HOST_PORT>
 ```
 
 Format mobile Dart code:
@@ -135,7 +137,7 @@ The queue supports:
 The k6 script is in `scripts/k6/template-generation-load-test.js`. Runtime outputs are written under ignored `artifacts/load/`.
 
 ```bash
-k6 run -e BASE_URL=http://localhost:5001 \
+k6 run -e BASE_URL=http://localhost:<BACKEND_HOST_PORT> \
   -e MODE=admin-test \
   -e TEMPLATE_ID=<template-id> \
   -e PROFILE=generation \

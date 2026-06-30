@@ -5,10 +5,12 @@ This file records client-facing contract invariants that must stay compatible wi
 ## Error Responses
 
 Consumers:
+
 - Flutter mobile app.
 - Next.js admin panel.
 
 Compatibility rules:
+
 - Client-visible API errors must use `application/problem+json` where the endpoint can return structured failures.
 - ProblemDetails responses must include a stable machine-readable `title`/`code` value where available, a safe `detail` message, and diagnostic `correlationId` plus `traceId` fields for support/debugging.
 - HTTP 429 rate-limit responses use title/code `RATE_LIMIT_EXCEEDED`, include `Retry-After` when the limiter provides it, and must include `correlationId` and `traceId`.
@@ -19,9 +21,11 @@ Compatibility rules:
 Endpoint: `GET /api/templates/feed`
 
 Consumers:
+
 - Flutter mobile templates feed.
 
 Query parameters:
+
 - `type`: optional `Image`, `Video`, or `all`. `all` is equivalent to omitting the type filter.
 - `category`: optional trimmed category name, backend-bounded to the public category filter limit.
 - `tags`: optional repeated or comma-separated tag query parameter.
@@ -32,12 +36,14 @@ Query parameters:
 - `locale`: optional localization code.
 
 Response shape:
+
 - `items`: array of lightweight template feed items.
 - `nextCursor`: nullable cursor string. Clients must treat it as opaque.
 - `hasMore`: boolean.
 - `generatedAtUtc`: UTC timestamp.
 
 Item fields required by mobile:
+
 - `templateId`: GUID string.
 - `templateType`: `Image` or `Video`.
 - `title`, `shortDescription`, `category`.
@@ -59,6 +65,7 @@ Item fields required by mobile:
 - `updatedAtUtc`: nullable UTC timestamp for item ordering/cache freshness.
 
 Compatibility rules:
+
 - Do not rename or remove any listed field without updating `apps/petmagic-mobile` DTOs/tests.
 - Feed items must stay bounded for card rendering and generation entry decisions. They may expose public generation capability metadata and version stamps, but must not expose admin/detail-only or provider fields such as model names, prompts, reference motion assets, status/promo internals, provider cost estimates, raw assets collections, deleted timestamps, or create timestamps. Fetch template detail separately when heavier media/detail metadata is needed.
 - Invalid non-empty `type` values must return HTTP 400 problem details with `templates.invalid_type`; unknown or numeric values must not fall back to the full feed. `type=all` must remain accepted.
@@ -72,18 +79,22 @@ Compatibility rules:
 Endpoint: `GET /api/templates/random`
 
 Consumers:
+
 - Flutter mobile random template action.
 
 Query parameters:
+
 - `type`: optional `Image`, `Video`, or `all`. `all` is equivalent to omitting the type filter.
 - `category`: optional trimmed category name, backend-bounded to the public category filter limit.
 - `includePremium`: optional boolean. When `false`, premium templates must be excluded.
 - `locale`: optional localization code.
 
 Response shape:
+
 - `template`: nullable public template list item. Unlike the feed item, this includes generation-flow fields needed to open a template directly.
 
 Compatibility rules:
+
 - Random selection must be evaluated on the backend from active, non-deleted templates with usable preview media; mobile must not need a synced local catalog to choose a random template.
 - Category, type, premium availability, and active/deleted status filters must be applied before random selection.
 - Category filter normalization must stay aligned with public feed/catalog semantics.
@@ -95,9 +106,11 @@ Compatibility rules:
 Endpoint: `GET /api/templates?page={page}&pageSize={pageSize}`
 
 Consumers:
+
 - Flutter mobile catalog bootstrap and legacy paged clients.
 
 Query parameters:
+
 - `page`: optional one-based page number, backend bounded to at least `1`.
 - `pageSize`: optional page size, backend bounded.
 - `type`: optional `Image`, `Video`, or `all`. `all` is equivalent to omitting the type filter.
@@ -107,6 +120,7 @@ Query parameters:
 - `locale`: optional localization code.
 
 Response shape:
+
 - `items`: array of versioned template catalog metadata.
 - `page`: normalized one-based page number.
 - `pageSize`: normalized page size.
@@ -115,6 +129,7 @@ Response shape:
 - `generatedAtUtc`: UTC timestamp.
 
 Compatibility rules:
+
 - Paged catalog filters must stay aligned with accepted HTTP query parameters; do not accept a query parameter and silently ignore it.
 - Invalid non-empty `type` values must return HTTP 400 problem details with `templates.invalid_type`; unknown or numeric values must not fall back to the full catalog. `type=all` must remain accepted.
 - Search/category/tag normalization must match public feed semantics; out-of-bounds tag filters must not broaden catalog results.
@@ -127,16 +142,20 @@ Compatibility rules:
 Endpoint: `GET /api/templates/template-of-the-day`
 
 Consumers:
+
 - Flutter mobile templates page featured slot.
 
 Query parameters:
+
 - `date`: optional `yyyy-MM-dd` business date. Missing date resolves on the backend using the configured Template of the Day timezone.
 - `locale`: optional localization code.
 
 Response shape:
+
 - `template`: nullable featured template object.
 
 Template fields required by mobile:
+
 - `templateId`: GUID string.
 - `title`, `subtitle`, `badgeText`.
 - `type`: `Image` or `Video`.
@@ -148,6 +167,7 @@ Template fields required by mobile:
 - `source`: `manual` or `auto`.
 
 Compatibility rules:
+
 - Empty schedules must return HTTP 200 with `template: null`.
 - The response must stay lightweight; mobile loads full template detail separately before opening the generation flow when needed.
 - `date` must remain a date-only value. Do not switch it to a timestamp without updating mobile parsing/tests.
@@ -157,9 +177,11 @@ Compatibility rules:
 Endpoint family: `/api/admin/templates`
 
 Consumers:
+
 - Next.js admin panel.
 
 Compatibility rules:
+
 - Admin list endpoints must support backend pagination with `skip`, `take`, `totalCount`, and `hasMore`.
 - Invalid non-empty catalog filters must fail fast with HTTP 400 ProblemDetails: `templates.invalid_type`, `templates.invalid_status`, `templates.invalid_access`, or `templates.invalid_sort`. Numeric enum values must not fall back to the full catalog.
 - Recent generation history defaults must stay bounded when `take` is omitted.
@@ -169,14 +191,17 @@ Compatibility rules:
 ## Template Generation History
 
 Endpoint family:
+
 - `GET /api/templates/generations`
 - `GET /api/templates/generations/{generationId}`
 - `GET /api/generations/{generationId}`
 
 Consumers:
+
 - Flutter mobile generation history, generation status, gallery, and before/after compare flows.
 
 Compatibility rules:
+
 - History query parameters `status`, `skip`, and `take` must remain optional and backend-bounded. `take` must never allow unbounded history loads.
 - List ordering must stay stable by `createdAtUtc desc, generationId desc`.
 - Response items must keep `generationId`, `userId`, `templateId`, `status`, `tokenCost`, `sourceImageAsset`, `outputUrl`, `mediaUrl`, `templateTitle`, `templateType`, `stage`, `progressPercent`, `queuePosition`, `estimatedWaitSeconds`, `hasWatermark`, `canRemoveWatermark`, `isWatermarkRemoved`, `supportsGenerateSimilar`, `inputSourceType`, `inputMediaAssetId`, `resultMediaAssetId`, `inputPreviewUrl`, `resultPreviewUrl`, and `canCompareBeforeAfter`.
@@ -189,9 +214,11 @@ Compatibility rules:
 Endpoint: `POST /api/feedback`
 
 Consumers:
+
 - Flutter mobile generation result, bug report, feature request, payment issue, and general feedback flows.
 
 Request body:
+
 - `type`: required string. Supported values are `GenerationResult`, `GenerationFailure`, `BugReport`, `FeatureRequest`, `PaymentIssue`, and `General`; unsupported values are normalized to `General`.
 - `category`: required non-empty string, backend-bounded.
 - `rating`: optional integer normalized to `-1..1`.
@@ -200,10 +227,12 @@ Request body:
 - `sourceScreen`, `appVersion`, `platform`, `deviceModel`, `locale`: optional client diagnostics strings, backend-bounded.
 
 Response shape:
+
 - `feedbackId`: GUID string.
 - `status`: feedback workflow status, initially `New`.
 
 Compatibility rules:
+
 - Mobile sends JSON field names in camelCase; backend must keep accepting the current field names.
 - Validation/ownership failures must return ProblemDetails, not successful no-op responses.
 - Known failure titles include `templates.invalid_subject`, `GENERATION_JOB_NOT_FOUND`, `feedback.forbidden`, and `feedback.rate_limited`.
@@ -212,6 +241,7 @@ Compatibility rules:
 ## Admin Feedback
 
 Endpoint family:
+
 - `GET /api/admin/feedback`
 - `GET /api/admin/feedback/{feedbackId}`
 - `PUT /api/admin/feedback/{feedbackId}`
@@ -219,9 +249,11 @@ Endpoint family:
 - `GET /api/admin/templates/{templateId}/feedback-summary`
 
 Consumers:
+
 - Next.js admin feedback page and template analytics surfaces.
 
 Compatibility rules:
+
 - Admin feedback endpoints must require `ModeratorOrAdmin`; credit refunds must require `AdminOnly`.
 - List responses keep `items`, `totalCount`, `skip`, `take`, `hasMore`, and `generatedAtUtc`.
 - Status values are `New`, `InReview`, `Resolved`, and `Dismissed`.
@@ -235,9 +267,11 @@ Compatibility rules:
 Endpoint family: `/api/pets`
 
 Consumers:
+
 - Flutter mobile pet profiles, pet photos, and pet-based generation flows.
 
 Compatibility rules:
+
 - `GET /api/pets` returns the existing array contract. Items must keep `id`, `userId`, `name`, `type`, `breed`, `avatarMediaAssetId`, `avatarUrl`, `photosCount`, `generationsCount`, `status`, `createdAtUtc`, `updatedAtUtc`, and `isDeleted`.
 - `POST /api/pets` and `PUT /api/pets/{petId}` require `name` and `type`; missing, null, or unsupported `type` must return HTTP 400 validation problem instead of HTTP 500.
 - Pet photo and pet generation list endpoints must stay bounded and must not expose deleted user media to non-admin mobile clients.
@@ -248,9 +282,11 @@ Compatibility rules:
 Endpoint family: `/api/admin/users`
 
 Consumers:
+
 - Next.js admin users page and user detail page.
 
 Compatibility rules:
+
 - List endpoints must support backend pagination with `skip`, `take`, `items`, `totalCount`, and `hasMore`; `take` must remain backend-bounded.
 - Role filters accept `Admin`, `Moderator`, and `User`; backend and admin-web canonicalize casing before querying.
 - Status filters accept `active`, `blocked`, and `unconfirmed`; backend and admin-web canonicalize casing before querying.
@@ -265,9 +301,11 @@ Compatibility rules:
 Endpoint family: `/api/admin/users/{userId}/pets`
 
 Consumers:
+
 - Next.js admin user detail page.
 
 Compatibility rules:
+
 - Admin pet endpoints must require `ModeratorOrAdmin`.
 - `GET /api/admin/users/{userId}/pets` keeps the current array response for client compatibility, but backend service failures must return ProblemDetails instead of a successful empty array.
 - Admin pet/photo status values are `active`, `hidden`, `flagged`, or `deleted`; invalid values must return ProblemDetails with the backend error code.
@@ -275,15 +313,18 @@ Compatibility rules:
 ## Admin Economy
 
 Endpoint family:
+
 - `/api/admin/economy/ledger`
 - `/api/admin/economy/purchases`
 - `/api/admin/economy/subscriptions`
 - `/api/admin/economy/subscription-events`
 
 Consumers:
+
 - Next.js admin economy page.
 
 Compatibility rules:
+
 - List endpoints must support backend pagination with `skip`, `take`, `items`, and `hasMore`; `take` must remain backend-bounded.
 - Admin-web sends purchase status filters in lowercase: `pending`, `succeeded`, `failed`, and `refunded`.
 - Admin-web sends subscription and subscription-event status filters in lowercase/snake-case: `active`, `trialing`, `past_due`, `canceled`, `expired`, `processed`, and `failed`.
@@ -300,9 +341,11 @@ Compatibility rules:
 Endpoint family: `/api/admin/economy/redeem-codes`
 
 Consumers:
+
 - Next.js admin promo codes page.
 
 Compatibility rules:
+
 - List and metrics endpoints must apply search, reward kind, status, sorting, and pagination on the backend.
 - Status filters must be SQL-prefiltered before materialization and then validated with shared status semantics.
 - Invalid non-empty filters must fail fast with HTTP 400 ProblemDetails: `economy.redeem_code_status_invalid`, `economy.redeem_code_reward_kind_invalid`, or `economy.redeem_code_sort_invalid`.
@@ -314,9 +357,11 @@ Compatibility rules:
 Endpoint: `GET /api/admin/support/tickets`
 
 Consumers:
+
 - Next.js admin support workspace.
 
 Query parameters:
+
 - `status`: optional, repeatable. Single-status clients may keep sending one `status`; multi-status clients may send `status=New&status=WaitingForUser`.
 - `assignment`: optional `all`, `mine`, or `unassigned`.
 - `assignedTo`: optional admin user GUID for direct assignment filtering.
@@ -328,6 +373,7 @@ Query parameters:
 - `pageSize`: optional page size. Missing or non-positive values normalize to `50`; positive values are backend-bounded to `1..100`.
 
 Response shape:
+
 - `items`: array of support conversation summaries.
 - `page`: normalized one-based page number.
 - `pageSize`: normalized page size.
@@ -335,6 +381,7 @@ Response shape:
 - `hasMore`: boolean.
 
 Compatibility rules:
+
 - Preserve the current paged response object so admin pagination and queue counters stay authoritative.
 - Repeatable `status` support must remain backward compatible with single `status`.
 - Invalid filter values must return problem details with field-specific titles: `support.status_invalid`, `support.assignment_invalid`, `support.source_invalid`, `support.priority_invalid`, or `support.sort_invalid`.
@@ -345,25 +392,30 @@ Compatibility rules:
 ## Support Conversation Messages
 
 Endpoint family:
+
 - `GET /api/support/conversation`
 - `GET /api/admin/support/tickets/{conversationId}`
 
 Consumers:
+
 - Flutter mobile support chat.
 - Next.js admin support workspace.
 
 Query parameters:
+
 - `take`: optional message page size, backend bounded.
 - `beforeMessageCreatedAtUtc`: optional UTC timestamp cursor from `oldestLoadedMessageCreatedAtUtc`.
 - `beforeMessageId`: optional GUID tie-break cursor from the oldest loaded message id. New clients should send it with `beforeMessageCreatedAtUtc`; old clients that send only the timestamp remain supported.
 
 Response shape:
+
 - Existing `SupportConversationDetailResponse` fields must remain stable.
 - `messages`: bounded array ordered oldest-to-newest for display.
 - `hasOlderMessages`: boolean.
 - `oldestLoadedMessageCreatedAtUtc`: nullable UTC timestamp for the oldest returned message.
 
 Compatibility rules:
+
 - Do not remove timestamp-only pagination support without updating mobile and admin clients.
 - `beforeMessageId` is additive and optional; adding it must not change responses for clients that omit it.
 - Message pagination must remain stable by `createdAtUtc` plus message id tie-break and must avoid unbounded message loads.
@@ -371,16 +423,19 @@ Compatibility rules:
 ## Support Attachment Messages
 
 Endpoint family:
+
 - `POST /api/support/conversation/{conversationId}/attachments`
 - `POST /api/admin/support/tickets/{conversationId}/attachments`
 - `POST /api/support/conversation/{conversationId}/messages/attachments`
 - `POST /api/admin/support/tickets/{conversationId}/messages/attachments`
 
 Consumers:
+
 - Flutter mobile support chat.
 - Next.js admin support workspace.
 
 Compatibility rules:
+
 - Legacy single-file endpoints use multipart field `file`; batch endpoints use multipart field `files`.
 - Multipart field `files` is required and bounded to 1..5 files per message.
 - Multipart field `body` is optional but must be at most 4000 characters.
@@ -391,6 +446,7 @@ Compatibility rules:
 ## Secrets And Configuration
 
 Rules:
+
 - Real Stripe, FAL, Cloudflare R2, JWT, SMTP, Apple, Google, Firebase, database, and signing credentials must stay out of tracked frontend/mobile/admin files.
 - Client Firebase config files in this repository are placeholders only.
 - Tracked mobile client config must use placeholders for Google OAuth client ids and reversed iOS URL schemes; real per-environment values are injected outside the repository.

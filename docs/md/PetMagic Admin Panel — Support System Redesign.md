@@ -4,14 +4,14 @@
 
 Redesign the current support module in the admin panel to achieve:
 
-* a professional and scalable support workflow;
-* clear operator interaction logic;
-* predictable ticket lifecycle behavior;
-* modern and clean UI/UX;
-* proper responsiveness for different screen sizes;
-* reduced operator cognitive load;
-* improved ticket processing speed;
-* centralized access to user, payment, and generation context.
+- a professional and scalable support workflow;
+- clear operator interaction logic;
+- predictable ticket lifecycle behavior;
+- modern and clean UI/UX;
+- proper responsiveness for different screen sizes;
+- reduced operator cognitive load;
+- improved ticket processing speed;
+- centralized access to user, payment, and generation context.
 
 The current implementation visually and functionally resembles a technical prototype rather than a production-grade support environment.
 
@@ -25,13 +25,13 @@ The redesign should transform the module into a structured support workspace com
 
 Current layout behavior is unstable on large monitors and wide screens:
 
-* the chat area stretches excessively;
-* content loses visual hierarchy;
-* large unused empty areas appear;
-* side panels visually disconnect from the main content;
-* some elements overflow containers;
-* tabs and controls collide with each other;
-* there is no consistent max-width strategy.
+- the chat area stretches excessively;
+- content loses visual hierarchy;
+- large unused empty areas appear;
+- side panels visually disconnect from the main content;
+- some elements overflow containers;
+- tabs and controls collide with each other;
+- there is no consistent max-width strategy.
 
 The interface currently scales proportionally instead of adaptively.
 
@@ -43,12 +43,12 @@ Current ticket states and transitions are not understandable for operators.
 
 Problems:
 
-* unclear difference between “Open”, “Resolved”, and “Closed”;
-* unclear ownership state;
-* no explicit waiting logic;
-* closing a ticket produces almost no visible workflow changes;
-* the operator does not understand whether the ticket is still active;
-* users can continue interacting with closed tickets without clear state transitions.
+- unclear difference between “Open”, “Resolved”, and “Closed”;
+- unclear ownership state;
+- no explicit waiting logic;
+- closing a ticket produces almost no visible workflow changes;
+- the operator does not understand whether the ticket is still active;
+- users can continue interacting with closed tickets without clear state transitions.
 
 The system currently displays data but does not guide support workflow.
 
@@ -60,14 +60,14 @@ The current interface lacks a unified design system.
 
 Problems:
 
-* inconsistent spacing;
-* oversized empty areas;
-* overloaded right panel;
-* weak prioritization of important information;
-* inconsistent buttons and badges;
-* chat messages look visually unfinished;
-* controls compete for attention;
-* support queue resembles random cards instead of a structured workflow list.
+- inconsistent spacing;
+- oversized empty areas;
+- overloaded right panel;
+- weak prioritization of important information;
+- inconsistent buttons and badges;
+- chat messages look visually unfinished;
+- controls compete for attention;
+- support queue resembles random cards instead of a structured workflow list.
 
 The module currently feels visually fragmented and unpolished.
 
@@ -79,13 +79,13 @@ Support operators must manually search for context across different sections of 
 
 Missing operational context:
 
-* recent AI generations;
-* failed generations;
-* payment history;
-* subscription status;
-* token balance;
-* recent errors;
-* generation activity.
+- recent AI generations;
+- failed generations;
+- payment history;
+- subscription status;
+- token balance;
+- recent errors;
+- generation activity.
 
 This increases response time and operator fatigue.
 
@@ -103,9 +103,9 @@ Newly created ticket.
 
 Characteristics:
 
-* created by user;
-* not assigned;
-* awaiting first response.
+- created by user;
+- not assigned;
+- awaiting first response.
 
 ---
 
@@ -115,9 +115,9 @@ Ticket is actively being processed.
 
 Characteristics:
 
-* assigned to operator;
-* active communication;
-* issue under investigation.
+- assigned to operator;
+- active communication;
+- issue under investigation.
 
 ---
 
@@ -127,10 +127,10 @@ Support has responded and is waiting for user action.
 
 Examples:
 
-* waiting for confirmation;
-* waiting for screenshot;
-* waiting for retry result;
-* waiting for additional information.
+- waiting for confirmation;
+- waiting for screenshot;
+- waiting for retry result;
+- waiting for additional information.
 
 This state is critical for queue clarity.
 
@@ -142,10 +142,10 @@ Issue resolved.
 
 Characteristics:
 
-* ticket archived;
-* input disabled;
-* read-only mode enabled;
-* removed from active queue.
+- ticket archived;
+- input disabled;
+- read-only mode enabled;
+- removed from active queue.
 
 ---
 
@@ -155,8 +155,8 @@ Characteristics:
 
 Transition:
 
-* New → In Progress
-* Waiting For Customer → In Progress
+- New → In Progress
+- Waiting For Customer → In Progress
 
 ---
 
@@ -164,8 +164,8 @@ Transition:
 
 Transition:
 
-* Waiting For Customer → In Progress
-* Closed → In Progress (automatic reopen)
+- Waiting For Customer → In Progress
+- Closed → In Progress (automatic reopen)
 
 ---
 
@@ -173,14 +173,14 @@ Transition:
 
 Transition:
 
-* Any active state → Closed
+- Any active state → Closed
 
 Effects:
 
-* reply field disabled;
-* reply button removed;
-* visible “Ticket Closed” state displayed;
-* ticket removed from active queue.
+- reply field disabled;
+- reply button removed;
+- visible “Ticket Closed” state displayed;
+- ticket removed from active queue.
 
 ---
 
@@ -192,12 +192,12 @@ The left column must become a professional support queue instead of a collection
 
 Operators must immediately understand:
 
-* who requires response;
-* ticket priority;
-* waiting duration;
-* last activity;
-* ownership;
-* SLA urgency.
+- who requires response;
+- ticket priority;
+- waiting duration;
+- last activity;
+- ownership;
+- SLA urgency.
 
 ---
 
@@ -205,15 +205,15 @@ Operators must immediately understand:
 
 Each queue row should contain:
 
-* user name;
-* user avatar;
-* last message preview;
-* current ticket state;
-* assigned operator;
-* waiting duration;
-* SLA indicator;
-* unread state;
-* ticket priority.
+- user name;
+- user avatar;
+- last message preview;
+- current ticket state;
+- assigned operator;
+- waiting duration;
+- SLA indicator;
+- unread state;
+- ticket priority.
 
 ---
 
@@ -230,13 +230,13 @@ Default sorting:
 
 ## Required Filters
 
-* All;
-* New;
-* In Progress;
-* Waiting For Customer;
-* Closed;
-* Assigned To Me;
-* Unassigned.
+- All;
+- New;
+- In Progress;
+- Waiting For Customer;
+- Closed;
+- Assigned To Me;
+- Unassigned.
 
 ---
 
@@ -278,11 +278,11 @@ Fixed width:
 
 ## Additional Requirements
 
-* add max-width constraints for ultra-wide monitors;
-* prevent excessive chat stretching;
-* improve spacing consistency;
-* preserve visual hierarchy on large screens;
-* support adaptive collapsing behavior.
+- add max-width constraints for ultra-wide monitors;
+- prevent excessive chat stretching;
+- improve spacing consistency;
+- preserve visual hierarchy on large screens;
+- support adaptive collapsing behavior.
 
 ---
 
@@ -298,12 +298,12 @@ The redesign must separate information into structured blocks.
 
 Contains:
 
-* current state;
-* priority;
-* assigned operator;
-* created date;
-* last activity;
-* SLA timer.
+- current state;
+- priority;
+- assigned operator;
+- created date;
+- last activity;
+- SLA timer.
 
 ---
 
@@ -311,12 +311,12 @@ Contains:
 
 Contains:
 
-* avatar;
-* name;
-* email;
-* registration date;
-* account age;
-* subscription plan.
+- avatar;
+- name;
+- email;
+- registration date;
+- account age;
+- subscription plan.
 
 ---
 
@@ -326,13 +326,13 @@ Critical for fast support resolution.
 
 Contains:
 
-* token balance;
-* recent purchases;
-* recent AI generations;
-* failed generations;
-* latest generation errors;
-* subscription information;
-* payment status.
+- token balance;
+- recent purchases;
+- recent AI generations;
+- failed generations;
+- latest generation errors;
+- subscription information;
+- payment status.
 
 Operators must not navigate through multiple admin sections to gather context.
 
@@ -344,11 +344,11 @@ Separate visually isolated section.
 
 Contains:
 
-* block user;
-* force logout;
-* revoke subscription;
-* refund actions;
-* internal moderation actions.
+- block user;
+- force logout;
+- revoke subscription;
+- refund actions;
+- internal moderation actions.
 
 ---
 
@@ -362,9 +362,9 @@ The central workspace should resemble a modern professional messaging environmen
 
 Messages should be grouped by:
 
-* Today;
-* Yesterday;
-* Earlier.
+- Today;
+- Yesterday;
+- Earlier.
 
 ---
 
@@ -388,12 +388,12 @@ Neutral system cards.
 
 Examples:
 
-* ticket assigned;
-* ticket reopened;
-* subscription purchased;
-* generation completed;
-* payment failed;
-* operator changed.
+- ticket assigned;
+- ticket reopened;
+- subscription purchased;
+- generation completed;
+- payment failed;
+- operator changed.
 
 ---
 
@@ -403,14 +403,14 @@ Current attachment handling is weak and disconnected from conversation flow.
 
 ## Required Improvements
 
-* large preview support;
-* image modal viewer;
-* video preview support;
-* direct download;
-* navigation to related message;
-* clear file metadata;
-* drag-and-drop upload;
-* upload progress state.
+- large preview support;
+- image modal viewer;
+- video preview support;
+- direct download;
+- navigation to related message;
+- clear file metadata;
+- drag-and-drop upload;
+- upload progress state.
 
 ---
 
@@ -422,11 +422,11 @@ Closed tickets must visually and functionally behave differently.
 
 When ticket is closed:
 
-* input field disabled;
-* reply button hidden;
-* read-only mode enabled;
-* visible closed state banner displayed;
-* main CTA becomes “Reopen Ticket”.
+- input field disabled;
+- reply button hidden;
+- read-only mode enabled;
+- visible closed state banner displayed;
+- main CTA becomes “Reopen Ticket”.
 
 The operator must immediately understand that the conversation is archived.
 
@@ -438,20 +438,20 @@ Support workflows require reusable response templates.
 
 ## Required Features
 
-* categorized templates;
-* quick insertion;
-* keyboard navigation;
-* editable before send;
-* multilingual support.
+- categorized templates;
+- quick insertion;
+- keyboard navigation;
+- editable before send;
+- multilingual support.
 
 Example categories:
 
-* payments;
-* refunds;
-* generation failures;
-* subscription issues;
-* moderation;
-* onboarding.
+- payments;
+- refunds;
+- generation failures;
+- subscription issues;
+- moderation;
+- onboarding.
 
 ---
 
@@ -483,9 +483,9 @@ Requires immediate attention.
 
 SLA state must be visible:
 
-* in queue;
-* inside ticket;
-* in notification counters.
+- in queue;
+- inside ticket;
+- in notification counters.
 
 ---
 
@@ -495,14 +495,14 @@ The support module should follow a unified design system.
 
 ## Design Direction
 
-* clean enterprise UI;
-* modern spacing system;
-* compact but readable density;
-* consistent component styling;
-* visually calm interface;
-* clear information hierarchy;
-* modern typography;
-* reduced visual noise.
+- clean enterprise UI;
+- modern spacing system;
+- compact but readable density;
+- consistent component styling;
+- visually calm interface;
+- clear information hierarchy;
+- modern typography;
+- reduced visual noise.
 
 ---
 
@@ -510,11 +510,11 @@ The support module should follow a unified design system.
 
 The interface should feel:
 
-* professional;
-* stable;
-* operationally efficient;
-* trustworthy;
-* scalable.
+- professional;
+- stable;
+- operationally efficient;
+- trustworthy;
+- scalable.
 
 The current visual prototype quality is insufficient for production usage.
 
@@ -530,11 +530,11 @@ To reduce risk and simplify testing, implementation should be split into indepen
 
 Scope:
 
-* new ticket states;
-* automatic state transitions;
-* SLA logic;
-* closed ticket behavior;
-* reopen logic.
+- new ticket states;
+- automatic state transitions;
+- SLA logic;
+- closed ticket behavior;
+- reopen logic.
 
 ---
 
@@ -542,11 +542,11 @@ Scope:
 
 Scope:
 
-* new queue layout;
-* sorting;
-* filtering;
-* unread logic;
-* SLA indicators.
+- new queue layout;
+- sorting;
+- filtering;
+- unread logic;
+- SLA indicators.
 
 ---
 
@@ -554,11 +554,11 @@ Scope:
 
 Scope:
 
-* new message UI;
-* attachment viewer;
-* system events;
-* upload improvements;
-* closed ticket mode.
+- new message UI;
+- attachment viewer;
+- system events;
+- upload improvements;
+- closed ticket mode.
 
 ---
 
@@ -566,11 +566,11 @@ Scope:
 
 Scope:
 
-* user context;
-* payment context;
-* generation context;
-* token information;
-* moderation actions.
+- user context;
+- payment context;
+- generation context;
+- token information;
+- moderation actions.
 
 ---
 
@@ -578,12 +578,12 @@ Scope:
 
 Scope:
 
-* responsiveness;
-* animations;
-* dark mode;
-* accessibility;
-* keyboard shortcuts;
-* final visual refinement.
+- responsiveness;
+- animations;
+- dark mode;
+- accessibility;
+- keyboard shortcuts;
+- final visual refinement.
 
 ---
 
@@ -593,16 +593,16 @@ The final result should not resemble a basic admin page.
 
 The support module must become:
 
-* a professional operator workspace;
-* a scalable support environment;
-* a context-driven support system;
-* a fast operational dashboard for resolving user problems.
+- a professional operator workspace;
+- a scalable support environment;
+- a context-driven support system;
+- a fast operational dashboard for resolving user problems.
 
 The redesign should significantly improve:
 
-* support speed;
-* operator clarity;
-* maintainability;
-* scalability;
-* user communication quality;
-* overall perceived product quality.
+- support speed;
+- operator clarity;
+- maintainability;
+- scalability;
+- user communication quality;
+- overall perceived product quality.

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Observability;
