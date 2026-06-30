@@ -419,6 +419,7 @@ class _SupportPromptButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final actionTone = _supportSecondaryGreen(context);
+    final textTheme = Theme.of(context).textTheme;
 
     return TextButton.icon(
       style: TextButton.styleFrom(
@@ -426,7 +427,10 @@ class _SupportPromptButton extends StatelessWidget {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         foregroundColor: actionTone,
-        textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+        textStyle: textTheme.labelLarge?.copyWith(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w800,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         backgroundColor: colors.surfaceStrong.withValues(alpha: 0.72),
       ),
@@ -451,6 +455,7 @@ class _SupportClosedConversationBanner extends StatelessWidget {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final actionTone = _supportComposerSendGreen(context);
+    final textTheme = Theme.of(context).textTheme;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -485,7 +490,7 @@ class _SupportClosedConversationBanner extends StatelessWidget {
                   vertical: 6,
                 ),
                 foregroundColor: actionTone,
-                textStyle: const TextStyle(
+                textStyle: textTheme.labelLarge?.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),

@@ -62,8 +62,9 @@ class _PremiumShimmerButtonState extends State<PremiumShimmerButton>
 
   @override
   Widget build(BuildContext context) {
-    final useStaticShimmer =
-        PerformanceGuard.shouldUseStaticPlaceholders(context);
+    final useStaticShimmer = PerformanceGuard.shouldUseStaticPlaceholders(
+      context,
+    );
 
     return SizedBox(
       width: double.infinity,

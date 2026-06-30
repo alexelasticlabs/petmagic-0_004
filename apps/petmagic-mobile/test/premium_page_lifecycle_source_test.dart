@@ -17,6 +17,9 @@ void main() {
         'if (appState == AppLifecycleState.resumed && _shouldReloadOnResume)',
       ),
     );
-    expect(pageSource, contains('unawaited(controller.verifyCheckoutStatus());'));
+    expect(
+      pageSource,
+      contains('unawaited(controller.verifyCheckoutStatus());'),
+    );
   });
 }

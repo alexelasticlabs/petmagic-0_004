@@ -225,7 +225,12 @@ class _SelectedPetHomeButton extends StatelessWidget {
 const int _petShortcutAvatarCacheWidth = 64;
 
 class PetShortcutAvatar extends StatelessWidget {
-  const PetShortcutAvatar({super.key, this.avatarUrl, this.icon, this.size = 26});
+  const PetShortcutAvatar({
+    super.key,
+    this.avatarUrl,
+    this.icon,
+    this.size = 26,
+  });
 
   final String? avatarUrl;
   final IconData? icon;

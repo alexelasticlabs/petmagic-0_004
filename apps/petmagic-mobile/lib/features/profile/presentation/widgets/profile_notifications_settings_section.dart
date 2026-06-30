@@ -192,7 +192,7 @@ class _ProfileNotificationsSettingsSectionState
       setState(() {
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
-      await _registerPushTokenIfAllowed(settings.authorizationStatus);
+      await _reconcilePushTokenRegistration(settings.authorizationStatus);
     } catch (error, stackTrace) {
       _logNotificationsFailure('refresh_push_permission', error, stackTrace);
       if (!mounted) {
@@ -229,7 +229,7 @@ class _ProfileNotificationsSettingsSectionState
         _isRequestingPermission = false;
         _pushAuthorizationStatus = settings.authorizationStatus;
       });
-      await _registerPushTokenIfAllowed(settings.authorizationStatus);
+      await _reconcilePushTokenRegistration(settings.authorizationStatus);
     } catch (error, stackTrace) {
       _logNotificationsFailure('request_push_permission', error, stackTrace);
       if (!mounted) {
@@ -266,6 +266,34 @@ class _ProfileNotificationsSettingsSectionState
         stackTrace,
       );
     }
+  }
+
+  Future<void> _reconcilePushTokenRegistration(
+    AuthorizationStatus status,
+  ) async {
+    if (_isPushPermissionAllowed(status)) {
+      await _registerPushTokenIfAllowed(status);
+      return;
+    }
+
+    final token =
+        await _pushTokenRegistrar.readRegisteredToken() ??
+        await FirebaseMessaging.instance.getToken();
+    if (token == null || token.isEmpty || !mounted) {
+      return;
+    }
+
+    await _pushTokenRegistrar.unregisterToken(
+      token: token,
+      canContinue: () => mounted,
+      onFailure: (stage, error, stackTrace) {
+        _logNotificationsFailure(
+          'unregister_${stage}_token_after_permission_change',
+          error,
+          stackTrace,
+        );
+      },
+    );
   }
 
   bool _isPushPermissionAllowed(AuthorizationStatus status) {
@@ -331,8 +359,7 @@ class _ProfileNotificationsSettingsSectionState
       AppPermissionType.notifications =>
         text.profileNotificationsDeviceNotifications,
       AppPermissionType.camera => text.profileNotificationsDeviceCamera,
-      AppPermissionType.microphone =>
-        text.profileNotificationsDeviceMicrophone,
+      AppPermissionType.microphone => text.profileNotificationsDeviceMicrophone,
       AppPermissionType.photos => text.profileNotificationsDevicePhotos,
       AppPermissionType.videos => text.videoLabel,
     };

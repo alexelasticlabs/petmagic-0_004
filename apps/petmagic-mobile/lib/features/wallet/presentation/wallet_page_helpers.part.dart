@@ -14,7 +14,7 @@ String _walletProviderLabel(
     'stripe' => text.premiumPaymentStripe,
     'google_play' => text.premiumPaymentGooglePlay,
     'app_store' => text.premiumPaymentApple,
-    _ => method.provider,
+    _ => text.premiumPaymentOther,
   };
 }
 
@@ -40,10 +40,7 @@ String? _walletStoreUnavailableSubtitle(
   };
 }
 
-String _valuePerCurrencyLabel(
-  AppLocalizations text,
-  CurrencyPackModel pack,
-) {
+String _valuePerCurrencyLabel(AppLocalizations text, CurrencyPackModel pack) {
   if (pack.priceAmount <= 0) {
     return '-';
   }
@@ -97,7 +94,7 @@ String _sourceLabel(AppLocalizations text, String source) {
     'promo_redeem' || 'redeem_code' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
     'admin_debit' => text.walletSourceAdminDebit,
-    _ => source,
+    _ => text.walletSourceOther,
   };
 }
 

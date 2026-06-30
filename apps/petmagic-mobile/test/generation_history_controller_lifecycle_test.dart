@@ -72,6 +72,10 @@ void main() {
     expect(realtimeBody, contains('if (!ref.mounted || !_isScreenVisible)'));
     expect(realtimeBody, contains('if (!ref.mounted)'));
     expect(eventBody, contains('if (!ref.mounted || !_isScreenVisible)'));
+    expect(eventBody, contains("AppLogger.warn("));
+    expect(eventBody, contains("feature: 'Templates.GenerationHistory'"));
+    expect(eventBody, contains("operation: 'realtime_event_parse'"));
+    expect(eventBody, isNot(contains('} catch (_) {}')));
   });
 }
 

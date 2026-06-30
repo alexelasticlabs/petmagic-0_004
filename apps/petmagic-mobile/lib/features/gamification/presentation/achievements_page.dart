@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page_state.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_text_mapper.dart';
@@ -14,6 +17,9 @@ import 'package:petmagic_mobile/features/gamification/presentation/widgets/achie
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_overview_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/achievements_weekly_focus_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
+import 'package:petmagic_mobile/shared/widgets/android_loopback_backend_hint.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_unavailable_view.dart';
 
 class AchievementsPage extends ConsumerStatefulWidget {
@@ -34,7 +40,11 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(_reloadAll);
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    _reloadAll();
   }
 
   @override
@@ -45,6 +55,10 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
     if (state != AppLifecycleState.resumed) {
       return;
     }
@@ -66,6 +80,36 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
     final text = AppLocalizations.of(context);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
+    if (!isAuthenticated) {
+      return Scaffold(
+        appBar: AppBar(title: Text(text.gamificationAchievementsTitle)),
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [colors.backgroundTop, colors.backgroundBottom],
+            ),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ProtectedAuthGate(
+                subtitle: text.authRequiredMessage,
+                onSignIn: () => showAuthRequiredSheet(
+                  context,
+                  redirectPath: AchievementsPage.routePath,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final achievementsAsync = ref.watch(achievementsProvider);
     final summaryAsync = ref.watch(gamificationSummaryProvider);
     final hasInternet = ref.watch(
@@ -76,6 +120,9 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
       error: achievementsAsync.asError?.error,
       hasInternet: hasInternet,
     );
+    final loopbackHintConfig = unavailableKind == null
+        ? null
+        : AppConfig.androidLoopbackBackendHintConfig();
 
     ref.listen<NetworkStatusState>(networkStatusControllerProvider, (
       previous,
@@ -114,6 +161,9 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
               ? PetMagicUnavailableView(
                   kind: unavailableKind,
                   onRetry: _reloadAll,
+                  footer: loopbackHintConfig == null
+                      ? null
+                      : AndroidLoopbackBackendHint(config: loopbackHintConfig),
                 )
               : Center(
                   child: Padding(
@@ -266,7 +316,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
   }
 
   void _reloadAll() {
-    if (!mounted) {
+    if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
       return;
     }
 
@@ -275,12 +325,23 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
   }
 
   Future<void> _refreshAll() async {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
     _reloadAll();
     await ref.read(achievementsProvider.future);
     try {
       await ref.read(gamificationSummaryProvider.future);
-    } catch (_) {
-      // Partial summary failure should not block the achievements refresh flow.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Gamification.Achievements',
+        operation: 'refresh_summary',
+        message: 'Achievements summary refresh failed',
+        context: {'filter': _filter.name},
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 }

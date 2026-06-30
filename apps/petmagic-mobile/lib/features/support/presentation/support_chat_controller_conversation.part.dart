@@ -5,17 +5,18 @@ mixin _SupportChatControllerConversationMixin
   StreamSubscription<SupportChatRealtimeUpdate>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
   CancelToken? _activeUploadCancelToken;
+  Future<void>? _conversationLoadInFlight;
+  Future<void>? _realtimeConnectInFlight;
   bool _hasPendingRealtimeRefresh = false;
   bool _started = false;
   bool _isScreenVisible = true;
+  bool _isRealtimeConnected = false;
 
   void stop() {
     _cancelActiveUpload();
     _realtimeRefreshTimer?.cancel();
     _realtimeRefreshTimer = null;
-    unawaited(_realtimeSubscription?.cancel());
-    _realtimeSubscription = null;
-    unawaited(_realtimeClient.disconnect());
+    _pauseRealtime();
     _started = false;
     _hasPendingRealtimeRefresh = false;
     _isScreenVisible = false;
@@ -49,16 +50,23 @@ mixin _SupportChatControllerConversationMixin
 
     _isScreenVisible = visible;
     if (_isScreenVisible) {
+      if (_started) {
+        unawaited(_resumeRealtimeIfNeeded());
+      }
       _resumePendingRealtimeRefreshIfNeeded();
       return;
     }
 
     _realtimeRefreshTimer?.cancel();
     _realtimeRefreshTimer = null;
+    _pauseRealtime();
   }
 
   Future<void> start() async {
     if (_started) {
+      if (_isScreenVisible) {
+        await _resumeRealtimeIfNeeded();
+      }
       return;
     }
 
@@ -68,65 +76,33 @@ mixin _SupportChatControllerConversationMixin
       return;
     }
 
-    _realtimeSubscription ??= _realtimeClient.events.listen(
-      _handleRealtimeUpdate,
-    );
-    try {
-      await _realtimeClient.connect();
-    } on Object {
-      // Realtime is best-effort; keep the chat usable over REST even if the hub is unavailable.
-    }
+    await _resumeRealtimeIfNeeded();
   }
 
   Future<void> initialize() async {
-    state = state.copyWith(isLoading: true, clearError: true);
+    await _loadConversation(refresh: false);
+  }
 
+  Future<void> _loadConversation({required bool refresh}) async {
+    final inFlight = _conversationLoadInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = _performConversationLoad(refresh: refresh);
+    _conversationLoadInFlight = operation;
     try {
-      final conversation = await _repository.getConversation();
-      if (!ref.mounted) {
-        return;
+      await operation;
+    } finally {
+      if (identical(_conversationLoadInFlight, operation)) {
+        _conversationLoadInFlight = null;
       }
-      _updateStateIfMounted(
-        (state) => state.copyWith(
-          isLoading: false,
-          conversation: conversation,
-          clearError: true,
-        ),
-      );
-      _updateStateIfMounted((state) => state.copyWith(isLoadingOlder: false));
-      await _markReadIfNeeded(conversation);
-      if (!ref.mounted) {
-        return;
-      }
-      _resumePendingRealtimeRefreshIfNeeded();
-    } on AppException catch (error) {
-      if (_isConversationNotFound(error.message)) {
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            isLoading: false,
-            clearConversation: true,
-            clearError: true,
-          ),
-        );
-        _resumePendingRealtimeRefreshIfNeeded();
-      } else {
-        _updateStateIfMounted(
-          (state) =>
-              state.copyWith(isLoading: false, errorMessage: error.message),
-        );
-      }
-    } on Object {
-      _updateStateIfMounted(
-        (state) => state.copyWith(
-          isLoading: false,
-          errorMessage: 'support.unavailable',
-        ),
-      );
     }
   }
 
   Future<void> refresh() async {
-    await _refreshConversation();
+    await _loadConversation(refresh: true);
   }
 
   Future<void> resolveConversation() async {
@@ -199,8 +175,12 @@ mixin _SupportChatControllerConversationMixin
     }
   }
 
-  Future<void> _refreshConversation() async {
-    state = state.copyWith(isRefreshing: true, clearError: true);
+  Future<void> _performConversationLoad({required bool refresh}) async {
+    state = state.copyWith(
+      isLoading: !refresh,
+      isRefreshing: refresh,
+      clearError: true,
+    );
 
     try {
       final conversation = await _repository.getConversation();
@@ -340,7 +320,7 @@ mixin _SupportChatControllerConversationMixin
     }
 
     _hasPendingRealtimeRefresh = false;
-    unawaited(_refreshConversation());
+    unawaited(_loadConversation(refresh: true));
   }
 
   void _resumePendingRealtimeRefreshIfNeeded() {
@@ -351,6 +331,51 @@ mixin _SupportChatControllerConversationMixin
     if (_isScreenVisible && _hasPendingRealtimeRefresh) {
       _scheduleRealtimeRefresh();
     }
+  }
+
+  Future<void> _resumeRealtimeIfNeeded() async {
+    if (!_started || !ref.mounted || !_isScreenVisible) {
+      return;
+    }
+
+    _realtimeSubscription ??= _realtimeClient.events.listen(
+      _handleRealtimeUpdate,
+    );
+    if (_isRealtimeConnected) {
+      return;
+    }
+
+    final connectInFlight = _realtimeConnectInFlight;
+    if (connectInFlight != null) {
+      await connectInFlight;
+      return;
+    }
+
+    try {
+      final nextConnect = _realtimeClient.connect();
+      _realtimeConnectInFlight = nextConnect;
+      await nextConnect;
+      if (!ref.mounted || !_started || !_isScreenVisible) {
+        _pauseRealtime();
+        return;
+      }
+
+      _isRealtimeConnected = true;
+    } on Object {
+      // Realtime is best-effort; keep the chat usable over REST even if the hub is unavailable.
+    } finally {
+      _realtimeConnectInFlight = null;
+    }
+  }
+
+  void _pauseRealtime() {
+    unawaited(_realtimeSubscription?.cancel());
+    _realtimeSubscription = null;
+    if (_isRealtimeConnected) {
+      unawaited(_realtimeClient.disconnect());
+    }
+    _isRealtimeConnected = false;
+    _realtimeConnectInFlight = null;
   }
 
   Future<void> _markReadIfNeeded(SupportChatConversation conversation) async {

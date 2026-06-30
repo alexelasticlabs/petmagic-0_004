@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_cache_data_source.dart';
 import 'package:petmagic_mobile/features/templates/data/templates_dto.dart';
@@ -247,8 +248,9 @@ class DefaultTemplatesRepository implements TemplatesRepository {
         (await _cacheDataSource.readCatalogItems()).isNotEmpty;
     final remoteVersion = knownRemoteVersion ?? await fetchCatalogVersion();
 
-    // Self-heal scenarios when metadata version exists but local catalog payload
-    // is missing/corrupted (e.g. interrupted writes or legacy cache drift).
+    // Self-heal scenarios when metadata version exists but the local catalog
+    // payload is missing/corrupted (for example after interrupted writes or
+    // stale cache drift).
     if (!hasLocalCatalogItems) {
       return _performFullResync(knownRemoteVersion: remoteVersion);
     }
@@ -355,8 +357,15 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     for (final url in urls.toSet()) {
       try {
         await _mediaCleanup(url);
-      } catch (_) {
-        // Best-effort cleanup only.
+      } catch (error, stackTrace) {
+        AppLogger.warn(
+          feature: 'Templates.Repository',
+          operation: 'cleanup_deleted_media_url',
+          message: 'Deleted template media cleanup failed',
+          context: {'media_kind': _mediaKindLabel(url)},
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   }
@@ -364,14 +373,28 @@ class DefaultTemplatesRepository implements TemplatesRepository {
   static Future<void> _removeTemplateMediaFromCache(String url) async {
     try {
       await TemplateMediaCache.removeThumbnailFile(url);
-    } catch (_) {
-      // Best-effort cleanup only.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'remove_thumbnail_from_cache',
+        message: 'Template thumbnail cache cleanup failed',
+        context: {'media_kind': _mediaKindLabel(url)},
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
 
     try {
       await TemplateMediaCache.removePreviewFile(url);
-    } catch (_) {
-      // Best-effort cleanup only.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Repository',
+        operation: 'remove_preview_from_cache',
+        message: 'Template preview cache cleanup failed',
+        context: {'media_kind': _mediaKindLabel(url)},
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -385,6 +408,23 @@ class DefaultTemplatesRepository implements TemplatesRepository {
     if (previewUrl != null && previewUrl.isNotEmpty) {
       yield previewUrl;
     }
+  }
+
+  static String _mediaKindLabel(String url) {
+    final normalized = url.trim().toLowerCase();
+    if (normalized.endsWith('.mp4') || normalized.endsWith('.mov')) {
+      return 'video';
+    }
+
+    if (normalized.endsWith('.jpg') ||
+        normalized.endsWith('.jpeg') ||
+        normalized.endsWith('.png') ||
+        normalized.endsWith('.webp') ||
+        normalized.endsWith('.gif')) {
+      return 'image';
+    }
+
+    return 'unknown';
   }
 }
 

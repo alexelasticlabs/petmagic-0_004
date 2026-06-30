@@ -17,7 +17,7 @@ final supportChatRealtimeClientProvider = Provider<SupportChatRealtimeClient>((
     apiBaseUrlResolver: ref.watch(apiBaseUrlResolverProvider),
   );
   ref.onDispose(() {
-    unawaited(client.disconnect());
+    unawaited(client.dispose());
   });
   return client;
 });
@@ -32,6 +32,7 @@ abstract interface class SupportChatRealtimeClient {
   Stream<SupportChatRealtimeUpdate> get events;
   Future<void> connect();
   Future<void> disconnect();
+  Future<void> dispose();
 }
 
 class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
@@ -51,12 +52,17 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   HubConnection? _connection;
   String? _connectionBaseUrl;
   bool _isConnecting = false;
+  bool _isDisposed = false;
 
   @override
   Stream<SupportChatRealtimeUpdate> get events => _eventsController.stream;
 
   @override
   Future<void> connect() async {
+    if (_isDisposed) {
+      return;
+    }
+
     if (_isConnecting) {
       return;
     }
@@ -114,7 +120,16 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
         connection.state != HubConnectionState.Disconnected) {
       await connection.stop();
     }
+  }
 
+  @override
+  Future<void> dispose() async {
+    if (_isDisposed) {
+      return;
+    }
+
+    _isDisposed = true;
+    await disconnect();
     if (!_eventsController.isClosed) {
       await _eventsController.close();
     }
@@ -170,6 +185,10 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   }
 
   void _handleConversationUpdated(List<Object?>? arguments) {
+    if (_eventsController.isClosed) {
+      return;
+    }
+
     if (arguments == null || arguments.isEmpty) {
       return;
     }

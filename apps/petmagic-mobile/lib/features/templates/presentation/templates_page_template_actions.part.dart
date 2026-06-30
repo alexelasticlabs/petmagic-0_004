@@ -84,7 +84,16 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
         template,
         fetchLatestDetails: false,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateOfTheDay',
+        operation: 'load_detail_for_selection',
+        message:
+            'Template of the Day detail fetch failed; using fallback template',
+        context: {'templateId': featured.templateId},
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) {
         return;
       }
@@ -165,8 +174,6 @@ extension _TemplatesPageTemplateActions on _TemplatesPageState {
       }
 
       return template;
-    } catch (_) {
-      rethrow;
     } finally {
       if (identical(_activeRandomTemplateRepository, randomRepository)) {
         _activeRandomTemplateRepository = null;

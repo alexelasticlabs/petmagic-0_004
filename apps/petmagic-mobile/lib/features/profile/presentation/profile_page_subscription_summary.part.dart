@@ -22,7 +22,7 @@ class _SubscriptionSummaryCard extends StatelessWidget {
       PremiumSubscriptionProviderView.googlePlay =>
         text.premiumPaymentGooglePlay,
       PremiumSubscriptionProviderView.stripe => text.premiumPaymentStripe,
-      PremiumSubscriptionProviderView.unknown => text.premiumPaymentStripe,
+      PremiumSubscriptionProviderView.unknown => text.premiumPaymentOther,
     };
     final subtitle = summary.planName?.trim().isNotEmpty == true
         ? summary.planName!

@@ -7,6 +7,8 @@ import 'package:petmagic_mobile/features/support/data/support_chat_realtime_clie
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 
+import 'support_chat_test_support.dart';
+
 void main() {
   test(
     'refresh clears loading after unexpected failure and allows retry',
@@ -43,6 +45,43 @@ void main() {
       expect(state.conversation?.conversationId, 'conversation-1');
     },
   );
+
+  test(
+    'screen visibility pauses support realtime without reloading conversation',
+    () async {
+      final repository = FakeSupportChatRepository();
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+
+      expect(realtimeClient.connectCalls, 1);
+
+      controller.setScreenVisible(false);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+      expect(repository.openConversationCalls, 0);
+
+      controller.setScreenVisible(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.connectCalls, 2);
+      expect(realtimeClient.disconnectCalls, 1);
+      expect(repository.openConversationCalls, 0);
+    },
+  );
 }
 
 class _FlakyRefreshSupportChatRepository extends SupportChatRepository {
@@ -75,6 +114,9 @@ class _NoopSupportChatRealtimeClient implements SupportChatRealtimeClient {
 
   @override
   Future<void> disconnect() async {}
+
+  @override
+  Future<void> dispose() async {}
 
   @override
   Stream<SupportChatRealtimeUpdate> get events => const Stream.empty();

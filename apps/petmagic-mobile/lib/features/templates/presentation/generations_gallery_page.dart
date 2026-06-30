@@ -18,6 +18,8 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart'
+    show statusTitle;
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
@@ -54,13 +56,7 @@ String _templatesLocationForGeneration(TemplateGenerationResult generation) {
   }
 
   final petPhotoId = generation.petPhotoId?.trim();
-  return Uri(
-    path: TemplatesPage.routePath,
-    queryParameters: {
-      'petId': petId,
-      if (petPhotoId != null && petPhotoId.isNotEmpty) 'petPhotoId': petPhotoId,
-    },
-  ).toString();
+  return TemplatesPage.location(petId: petId, petPhotoId: petPhotoId);
 }
 
 class _GalleryPageViewState {
@@ -150,11 +146,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
         return;
       }
 
-      final launch = ref.read(appLaunchControllerProvider);
-      final hasWallet = ref.read(walletControllerProvider).wallet != null;
-      if (launch.isAuthenticated && !hasWallet) {
-        unawaited(_walletController.load());
-      }
+      _maybeLoadWalletForAuthenticatedUser();
     });
   }
 
@@ -623,6 +615,7 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     }
 
     _historyController.setScreenVisible(true);
+    _maybeLoadWalletForAuthenticatedUser();
     if (!_hasLoadedInitially) {
       _hasLoadedInitially = true;
       unawaited(_historyController.load());
@@ -632,6 +625,19 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     if (fromAppResume) {
       unawaited(_historyController.load(refresh: true));
     }
+  }
+
+  void _maybeLoadWalletForAuthenticatedUser() {
+    final launchState = ref.read(appLaunchControllerProvider);
+    final walletState = ref.read(walletControllerProvider);
+    if (!launchState.isAuthenticated ||
+        walletState.wallet != null ||
+        walletState.isLoading ||
+        walletState.isRefreshing) {
+      return;
+    }
+
+    unawaited(_walletController.load());
   }
 
   Widget _sectionHeaderSliver(String title, int count) {

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,13 +8,34 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
+  testWidgets(
+    'achievements page shows auth gate for guests without loading providers',
+    (tester) async {
+      final repository = _ControlledAchievementsRepository(failUntilCall: 0);
+
+      await _pumpPage(tester, repository, authenticated: false);
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(AchievementsPage));
+      final text = AppLocalizations.of(context);
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(find.text(text.authSignInRequired), findsOneWidget);
+      expect(find.text(text.authRequiredMessage), findsOneWidget);
+      expect(repository.fetchCalls, 0);
+      expect(repository.summaryFetchCalls, 0);
+    },
+  );
+
   testWidgets('achievements page reloads on open after a transient failure', (
     tester,
   ) async {
@@ -101,6 +124,30 @@ void main() {
     },
   );
 
+  testWidgets(
+    'achievements page treats online connection failures as server unavailable',
+    (tester) async {
+      final repository = _ControlledAchievementsRepository(
+        failUntilCall: 20,
+        failureMessage: 'gamification.network_unavailable',
+      );
+      final networkController = _TestNetworkStatusController(true);
+
+      await _pumpPage(tester, repository, networkOverride: networkController);
+      await tester.pumpAndSettle();
+
+      final context = tester.element(find.byType(AchievementsPage));
+      final text = AppLocalizations.of(context);
+
+      expect(find.text(text.appUnavailableServerTitle), findsOneWidget);
+      expect(find.text(text.appUnavailableOfflineTitle), findsNothing);
+      expect(
+        find.widgetWithText(FilledButton, text.retryAction),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('achievements page filters unlocked achievements', (
     tester,
   ) async {
@@ -168,6 +215,20 @@ void main() {
     expect(find.text(text.gamificationChallengeGenerateImages), findsOneWidget);
     expect(find.text(text.gamificationStreakTitle), findsWidgets);
   });
+
+  test(
+    'achievements page logs partial summary refresh failures instead of swallowing them',
+    () async {
+      final pageSource = await File(
+        'lib/features/gamification/presentation/achievements_page.dart',
+      ).readAsString();
+
+      expect(pageSource, contains('AppLogger.warn('));
+      expect(pageSource, contains("feature: 'Gamification.Achievements'"));
+      expect(pageSource, contains("operation: 'refresh_summary'"));
+      expect(pageSource, isNot(contains('} catch (_) {')));
+    },
+  );
 }
 
 Future<void> _pumpPage(
@@ -175,10 +236,16 @@ Future<void> _pumpPage(
   _ControlledAchievementsRepository repository, {
   _TestNetworkStatusController? networkOverride,
   GamificationSummaryModel? summaryOverride,
+  bool authenticated = true,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          authenticated
+              ? _AuthenticatedAppLaunchController.new
+              : _GuestAppLaunchController.new,
+        ),
         gamificationRepositoryProvider.overrideWithValue(repository),
         if (summaryOverride != null)
           gamificationSummaryProvider.overrideWith(
@@ -205,10 +272,10 @@ class _ControlledAchievementsRepository extends GamificationRepository {
   _ControlledAchievementsRepository({
     required this.failUntilCall,
     this.failureMessage = 'gamification.request_failed',
-  })
-    : super(dio: Dio(), sessionStorage: _NoopAuthSessionStorage());
+  }) : super(dio: Dio(), sessionStorage: _NoopAuthSessionStorage());
 
   int fetchCalls = 0;
+  int summaryFetchCalls = 0;
   int failUntilCall;
   final String failureMessage;
 
@@ -255,11 +322,38 @@ class _ControlledAchievementsRepository extends GamificationRepository {
   Future<GamificationSummaryModel> fetchSummary({
     CancelToken? cancelToken,
   }) async {
+    summaryFetchCalls += 1;
     return const GamificationSummaryModel();
   }
 }
 
 class _NoopAuthSessionStorage extends AuthSessionStorage {}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _GuestAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
 
 class _TestNetworkStatusController extends NetworkStatusController {
   _TestNetworkStatusController(bool hasInternet)

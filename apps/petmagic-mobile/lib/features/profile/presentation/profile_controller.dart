@@ -110,6 +110,7 @@ class ProfileController extends Notifier<ProfileState> {
 
   final ImagePicker _imagePicker = ImagePicker();
   CancelToken? _activeAvatarUploadCancelToken;
+  Future<void>? _initializeInFlight;
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
@@ -154,109 +155,127 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> initialize({String initialEmail = ''}) async {
-    state = state.copyWith(
-      isLoading: true,
-      clearError: true,
-      clearSuccess: true,
-    );
+    final inFlight = _initializeInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
 
     final repository = _repository;
-    try {
-      final session = await repository.readSession();
-      if (!ref.mounted) {
-        return;
-      }
-      if (session == null) {
+    final operation = () async {
+      state = state.copyWith(
+        isLoading: true,
+        clearError: true,
+        clearSuccess: true,
+      );
+
+      try {
+        final session = await repository.readSession();
+        if (!ref.mounted) {
+          return;
+        }
+        if (session == null) {
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isLoading: false,
+              email: initialEmail,
+              clearSession: true,
+              clearProfile: true,
+            ),
+          );
+          return;
+        }
+
+        final profile = await repository.fetchProfile();
+        if (!ref.mounted) {
+          return;
+        }
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoading: false,
+            profile: profile,
+            email: profile.email,
+            clearError: true,
+          ),
+        );
+        if (!ref.mounted) {
+          return;
+        }
+        ref
+            .read(appLaunchControllerProvider.notifier)
+            .markSignedInWithLegalStatus(
+              requiresLegalAcceptance:
+                  profile.legalAcceptance.requiresAcceptance,
+            );
+      } on AppException catch (error) {
+        final storedSession = await repository.readSession();
+        if (!ref.mounted) {
+          return;
+        }
+        if (storedSession != null && error.statusCode != 401) {
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isLoading: false,
+              profile: storedSession.user,
+              email: storedSession.user.email,
+              errorMessage: error.message,
+              clearSuccess: true,
+            ),
+          );
+          return;
+        }
+
+        if (error.statusCode == 401) {
+          if (!ref.mounted) {
+            return;
+          }
+          ref.read(appLaunchControllerProvider.notifier).markSignedOut();
+        }
+
         _updateStateIfMounted(
           (state) => state.copyWith(
             isLoading: false,
             email: initialEmail,
+            errorMessage: error.message,
             clearSession: true,
             clearProfile: true,
           ),
         );
-        return;
-      }
-
-      final profile = await repository.fetchProfile();
-      if (!ref.mounted) {
-        return;
-      }
-      _updateStateIfMounted(
-        (state) => state.copyWith(
-          isLoading: false,
-          profile: profile,
-          email: profile.email,
-          clearError: true,
-        ),
-      );
-      if (!ref.mounted) {
-        return;
-      }
-      ref
-          .read(appLaunchControllerProvider.notifier)
-          .markSignedInWithLegalStatus(
-            requiresLegalAcceptance: profile.legalAcceptance.requiresAcceptance,
-          );
-    } on AppException catch (error) {
-      final storedSession = await repository.readSession();
-      if (!ref.mounted) {
-        return;
-      }
-      if (storedSession != null && error.statusCode != 401) {
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            isLoading: false,
-            profile: storedSession.user,
-            email: storedSession.user.email,
-            errorMessage: error.message,
-            clearSuccess: true,
-          ),
-        );
-        return;
-      }
-
-      if (error.statusCode == 401) {
+      } catch (error, stackTrace) {
+        _logProfileFailure('initialize_unknown', error, stackTrace);
+        final storedSession = await repository.readSession();
         if (!ref.mounted) {
           return;
         }
-        ref.read(appLaunchControllerProvider.notifier).markSignedOut();
-      }
+        if (storedSession != null) {
+          _updateStateIfMounted(
+            (state) => state.copyWith(
+              isLoading: false,
+              profile: storedSession.user,
+              email: storedSession.user.email,
+              errorMessage: _genericActionError,
+              clearSuccess: true,
+            ),
+          );
+          return;
+        }
 
-      _updateStateIfMounted(
-        (state) => state.copyWith(
-          isLoading: false,
+        _setFailure(
+          message: _genericActionError,
           email: initialEmail,
-          errorMessage: error.message,
           clearSession: true,
           clearProfile: true,
-        ),
-      );
-    } catch (error, stackTrace) {
-      _logProfileFailure('initialize_unknown', error, stackTrace);
-      final storedSession = await repository.readSession();
-      if (!ref.mounted) {
-        return;
-      }
-      if (storedSession != null) {
-        _updateStateIfMounted(
-          (state) => state.copyWith(
-            isLoading: false,
-            profile: storedSession.user,
-            email: storedSession.user.email,
-            errorMessage: _genericActionError,
-            clearSuccess: true,
-          ),
         );
-        return;
       }
+    }();
 
-      _setFailure(
-        message: _genericActionError,
-        email: initialEmail,
-        clearSession: true,
-        clearProfile: true,
-      );
+    _initializeInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_initializeInFlight, operation)) {
+        _initializeInFlight = null;
+      }
     }
   }
 

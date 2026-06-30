@@ -34,10 +34,12 @@ import 'package:url_launcher/url_launcher.dart';
 part 'widgets/wallet_page_activity_widgets.dart';
 part 'widgets/wallet_page_ledger_widgets.part.dart';
 part 'widgets/wallet_page_overview_chrome.part.dart';
-part 'widgets/wallet_page_overview_rewards.part.dart';
 part 'widgets/wallet_page_purchase_widgets.part.dart';
 part 'wallet_page_checkout.part.dart';
 part 'wallet_page_helpers.part.dart';
+
+const int _kWalletApproxPhotoCostSpark = 6;
+const int _kWalletApproxVideoCostSpark = 33;
 
 class WalletPage extends ConsumerStatefulWidget {
   const WalletPage({super.key});
@@ -63,6 +65,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   void initState() {
     super.initState();
     _walletController = ref.read(walletControllerProvider.notifier);
+    _walletController.setWalletPageVisible(true);
     WidgetsBinding.instance.addObserver(this);
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
       _startAutoRefresh();
@@ -80,6 +83,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   void dispose() {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = null;
+    _walletController.setWalletPageVisible(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -88,6 +92,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   void deactivate() {
     _autoRefreshTimer?.cancel();
     _autoRefreshTimer = null;
+    _walletController.setWalletPageVisible(false);
     super.deactivate();
   }
 
@@ -100,6 +105,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
   @override
   void activate() {
     super.activate();
+    _walletController.setWalletPageVisible(true);
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
       _autoRefreshTimer?.cancel();
       _autoRefreshTimer = null;
@@ -480,12 +486,6 @@ class _WalletPageState extends ConsumerState<WalletPage>
                             return _handleCheckout(checkout);
                           },
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      _RewardsOverviewCard(
-                        wallet: state.wallet,
-                        isClaimingAd: state.isClaimingAd,
-                        onClaimAd: controller.claimAdReward,
                       ),
                       const SizedBox(height: 16),
                       _LedgerSection(

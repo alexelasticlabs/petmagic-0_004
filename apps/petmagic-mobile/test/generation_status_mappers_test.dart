@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 
@@ -57,6 +59,20 @@ void main() {
         );
       },
     );
+
+    test('generation date formatting respects the active locale', () async {
+      await initializeDateFormatting();
+      final value = DateTime.utc(2026, 1, 5, 9, 7);
+
+      final english = formatGenerationDateTime(value, const Locale('en'));
+      final russian = formatGenerationDateTime(value, const Locale('ru'));
+
+      expect(english, isNot('05.01.2026, 09:07'));
+      expect(russian, isNot('05.01.2026, 09:07'));
+      expect(english, isNot(russian));
+      expect(english, contains('2026'));
+      expect(russian, contains('2026'));
+    });
   });
 }
 

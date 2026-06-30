@@ -225,10 +225,9 @@ class SupportChatMessage {
       attachments: parsedAttachments,
       attachmentUploadStatus: json['attachmentUploadStatus'] as String?,
       attachmentUploadErrorCode: json['attachmentUploadErrorCode'] as String?,
-      pendingAttachment:
-          pendingAttachmentJson is Map<String, dynamic>
-              ? SupportChatPendingAttachment.fromJson(pendingAttachmentJson)
-              : null,
+      pendingAttachment: pendingAttachmentJson is Map<String, dynamic>
+          ? SupportChatPendingAttachment.fromJson(pendingAttachmentJson)
+          : null,
       createdAtUtc:
           DateTime.tryParse(json['createdAtUtc'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),

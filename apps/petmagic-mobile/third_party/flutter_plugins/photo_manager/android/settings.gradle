@@ -1,7 +1,9 @@
-rootProject.name = 'photo_manager'
-
 pluginManagement {
     repositories {
+        google()
+        mavenCentral()
         gradlePluginPortal()
     }
 }
+
+rootProject.name = 'photo_manager'

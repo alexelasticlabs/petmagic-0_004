@@ -236,10 +236,8 @@ Future<bool?> showTemplateGenerationConfirmSheet({
                 label: Text(text.templateFlowCreateMagicAction),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  textStyle: Theme.of(sheetContext).textTheme.labelLarge
+                      ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 10),

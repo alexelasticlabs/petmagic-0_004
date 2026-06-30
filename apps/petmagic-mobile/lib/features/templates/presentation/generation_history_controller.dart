@@ -1,10 +1,9 @@
-// ignore_for_file: cancel_subscriptions
-
 import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -114,7 +113,6 @@ abstract class _GenerationHistoryControllerBase
   GenerationGalleryStore get _galleryStore =>
       ref.read(generationGalleryStoreProvider);
   RealtimeClient? _activeRealtimeClient;
-  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
   Future<void>? _realtimeConnectFuture;
   Timer? _offlineBannerTimer;
   Timer? _autoRefreshTimer;

@@ -4,6 +4,7 @@ class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
     this.repliedMessage,
+    this.onOpenAttachment,
     this.onOpenImage,
     this.onOpenVideo,
     this.onRetryAttachment,
@@ -14,6 +15,7 @@ class _MessageBubble extends StatelessWidget {
 
   final SupportChatMessage message;
   final SupportChatMessage? repliedMessage;
+  final Future<void> Function(String value)? onOpenAttachment;
   final Future<void> Function({required String imageUrl, String? fileName})?
   onOpenImage;
   final Future<void> Function({required String videoUrl, String? fileName})?
@@ -356,8 +358,11 @@ class _MessageBubble extends StatelessWidget {
                           )
                         else
                           InkWell(
-                            onTap: () =>
-                                _openAttachment(primaryAttachment?.fileUrl),
+                            onTap: onOpenAttachment == null
+                                ? null
+                                : () => onOpenAttachment!(
+                                    primaryAttachment!.fileUrl,
+                                  ),
                             borderRadius: BorderRadius.circular(14),
                             child: Container(
                               width: double.infinity,
@@ -455,15 +460,6 @@ class _MessageBubble extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _openAttachment(String? value) async {
-    final uri = parseSafeSupportExternalUri(value);
-    if (uri == null) {
-      return;
-    }
-
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   String _resolveAdminSenderLabel(AppLocalizations text) {

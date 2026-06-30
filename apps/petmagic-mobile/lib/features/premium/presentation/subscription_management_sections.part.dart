@@ -544,7 +544,7 @@ class _ActionsSection extends StatelessWidget {
             foregroundColor: const Color(0xFF261903),
             disabledBackgroundColor: colors.surfaceStrong,
             disabledForegroundColor: colors.textMuted,
-            textStyle: const TextStyle(
+            textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
               fontSize: 13.5,
               fontWeight: FontWeight.w900,
             ),

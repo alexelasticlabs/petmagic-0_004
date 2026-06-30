@@ -9,7 +9,10 @@ void main() {
     ).readAsString();
 
     expect(source, contains('text.profileNotificationsDeviceMicrophone'));
-    expect(source, isNot(contains("AppPermissionType.microphone => 'Microphone'")));
+    expect(
+      source,
+      isNot(contains("AppPermissionType.microphone => 'Microphone'")),
+    );
   });
 
   test(

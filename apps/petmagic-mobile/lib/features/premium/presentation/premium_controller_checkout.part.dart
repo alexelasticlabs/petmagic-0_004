@@ -1,6 +1,7 @@
 part of 'premium_controller.dart';
 
-mixin _PremiumControllerCheckout on _PremiumControllerBase {
+mixin _PremiumControllerCheckout
+    on _PremiumControllerBase, _PremiumControllerLifecycle {
   Future<void> _refreshPremiumStatusSnapshot() async {
     try {
       final status = await _repository.fetchStatus();
@@ -228,10 +229,7 @@ mixin _PremiumControllerCheckout on _PremiumControllerBase {
       _updateStateIfMounted(
         (state) => state.copyWith(
           isRestoring: false,
-          errorMessage: _premiumErrorMessage(
-            error,
-            'premium.checkout_failed',
-          ),
+          errorMessage: _premiumErrorMessage(error, 'premium.checkout_failed'),
         ),
       );
     }
@@ -351,7 +349,6 @@ mixin _PremiumControllerCheckout on _PremiumControllerBase {
     );
   }
 
-  @override
   PremiumPaymentProvider? _platformStoreProvider() {
     if (Platform.isAndroid) {
       return PremiumPaymentProvider.googlePlay;
@@ -416,7 +413,6 @@ mixin _PremiumControllerCheckout on _PremiumControllerBase {
     }
   }
 
-  @override
   Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
     final wasPremiumBeforeCheckout = state.isPremium;
     final provider = _platformStoreProvider();

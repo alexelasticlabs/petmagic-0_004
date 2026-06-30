@@ -4,11 +4,15 @@ import 'package:flutter/painting.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registrar.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -44,6 +48,15 @@ final sessionScopeResetProvider = Provider<void>((ref) {
       ref.invalidate(linkedAccountsProvider);
       ref.invalidate(profileControllerProvider);
       ref.invalidate(supportChatControllerProvider);
+      ref.invalidate(supportChatRealtimeClientProvider);
+      ref.invalidate(petsProvider);
+      ref.invalidate(petPhotosProvider);
+      ref.invalidate(petGenerationsProvider);
+      ref.invalidate(gamificationSummaryProvider);
+      ref.invalidate(petProgressProvider);
+      ref.invalidate(achievementsProvider);
+      ref.invalidate(dailyStreakProvider);
+      ref.invalidate(weeklyChallengesProvider);
     });
 
     if (!next.isAuthenticated) {
@@ -57,6 +70,10 @@ final sessionScopeResetProvider = Provider<void>((ref) {
           templateGenerationRepository.clearLocalCache(),
           generationGalleryStore.cancelActiveDownloads(),
           generationGalleryStore.purgeAllScopes(),
+          _runBestEffortCleanup(
+            'push_token_registration_state',
+            PushTokenRegistrar.clearRegistrationState,
+          ),
           clearMediaCaches(),
         ]),
       );

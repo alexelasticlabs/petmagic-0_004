@@ -7,7 +7,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -81,6 +83,19 @@ void main() {
     expect(sectionsSource, contains('class _ComparisonCard'));
     expect(sectionsSource, contains('class _BenefitsSection'));
     expect(sectionsSource, contains('class _BenefitItem'));
+  });
+
+  test('premium provider fallback labels use shared localizations', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains('text.premiumPaymentStripe'));
+    expect(pageSource, contains('text.premiumPaymentGooglePlay'));
+    expect(pageSource, contains('text.premiumPaymentApple'));
+    expect(pageSource, isNot(contains("=> 'Stripe'")));
+    expect(pageSource, isNot(contains("=> 'Google Play'")));
+    expect(pageSource, isNot(contains("=> 'App Store'")));
   });
 
   test('premium CTA and footer stay in dedicated part files', () {
@@ -184,6 +199,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           premiumRefreshProfileProvider.overrideWithValue(() async {}),
         ],
@@ -210,6 +228,120 @@ void main() {
     expect(find.text('Yearly'), findsOneWidget);
     expect(find.text('Restore purchases'), findsWidgets);
   });
+
+  testWidgets(
+    'premium page keeps guest paywall public and gates checkout with auth sheet',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final repository = _FakePremiumRepository(
+        config: const PremiumPaywallConfigModel(
+          plans: [
+            PremiumPlanModel(
+              planCode: 'monthly',
+              billingInterval: 'month',
+              priceAmount: 14.99,
+              currencyCode: 'USD',
+              tokenAllowance: 500,
+              isPopular: false,
+              sortOrder: 1,
+              stripeCheckoutEnabled: true,
+              googlePlayProductId: 'com.petmagic.app.premium.monthly',
+              appStoreProductId: 'com.petmagic.app.premium.monthly',
+            ),
+          ],
+          paymentMethods: [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+          legalTexts: PremiumLegalTextsModel(
+            storeNotice: 'store',
+            externalCheckoutNotice: 'external',
+            stripeNotice: 'stripe',
+          ),
+          externalPaymentWarningRequired: false,
+          recommendedPlanCode: 'monthly',
+        ),
+        status: const PremiumStatusModel(
+          isPremium: false,
+          canManageBilling: false,
+          status: 'None',
+          cancelAtPeriodEnd: false,
+          monthlyTokenLimit: 0,
+          tokensAvailable: 0,
+          canManageSubscription: false,
+          manageSubscriptionAction: '',
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _GuestAppLaunchController.new,
+            ),
+            premiumRepositoryProvider.overrideWithValue(repository),
+            premiumRefreshProfileProvider.overrideWithValue(() async {}),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => const PremiumPage(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 800));
+
+      final context = tester.element(find.byType(PremiumPage));
+      final text = AppLocalizations.of(context);
+      final ctaLabel = text.paymentContinueViaProviderAction(
+        text.premiumPaymentStripe,
+      );
+      final ctaButton = find.widgetWithText(ElevatedButton, ctaLabel);
+
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStatusCalls, 0);
+      expect(find.text('Monthly'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        ctaButton,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(ctaButton);
+      await tester.pump();
+      await tester.tap(ctaButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.text(text.authRequiredTitle), findsWidgets);
+      expect(find.text(text.authRequiredMessage), findsWidgets);
+      expect(repository.createStripeCheckoutCalls, 0);
+    },
+  );
 }
 
 class _FakePremiumRepository extends PremiumRepository {
@@ -220,6 +352,9 @@ class _FakePremiumRepository extends PremiumRepository {
   final PremiumStatusModel status;
 
   final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
+  int fetchPaywallConfigCalls = 0;
+  int fetchStatusCalls = 0;
+  int createStripeCheckoutCalls = 0;
 
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => _streamController.stream;
@@ -228,17 +363,23 @@ class _FakePremiumRepository extends PremiumRepository {
   Future<PremiumPaywallConfigModel> fetchPaywallConfig({
     required Locale locale,
     CancelToken? cancelToken,
-  }) async => config;
+  }) async {
+    fetchPaywallConfigCalls++;
+    return config;
+  }
 
   @override
-  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async =>
-      status;
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+    fetchStatusCalls++;
+    return status;
+  }
 
   @override
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
     Locale locale,
   ) async {
+    createStripeCheckoutCalls++;
     return const PremiumCheckoutModel(
       paymentProvider: 'stripe',
       checkoutUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
@@ -267,6 +408,32 @@ class _FakePremiumRepository extends PremiumRepository {
       isAvailable: false,
       productIds: <String>{},
       productPrices: <String, String>{},
+    );
+  }
+}
+
+class _GuestAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
     );
   }
 }

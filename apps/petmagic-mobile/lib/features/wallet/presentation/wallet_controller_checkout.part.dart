@@ -1,6 +1,7 @@
 part of 'wallet_controller.dart';
 
-mixin _WalletControllerCheckout on _WalletControllerBase {
+mixin _WalletControllerCheckout
+    on _WalletControllerBase, _WalletControllerLifecycle {
   @override
   Future<PurchaseCheckoutModel?> buyPack(
     CurrencyPackModel pack,
@@ -509,7 +510,6 @@ mixin _WalletControllerCheckout on _WalletControllerBase {
     }
   }
 
-  @override
   Future<void> _verifyStorePurchase(PurchaseDetails purchase) async {
     final pendingOrderId = state.pendingCheckoutOrderId;
     final provider = state.pendingStoreProvider;

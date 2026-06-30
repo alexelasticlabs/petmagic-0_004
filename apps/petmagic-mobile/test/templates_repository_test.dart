@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -16,6 +17,22 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'templates repository logs cleanup failures instead of swallowing them',
+    () async {
+      final source = await File(
+        'lib/features/templates/data/templates_repository.dart',
+      ).readAsString();
+
+      expect(source, contains('AppLogger.warn('));
+      expect(source, contains("feature: 'Templates.Repository'"));
+      expect(source, contains("operation: 'cleanup_deleted_media_url'"));
+      expect(source, contains("operation: 'remove_thumbnail_from_cache'"));
+      expect(source, contains("operation: 'remove_preview_from_cache'"));
+      expect(source, isNot(contains('} catch (_) {')));
+    },
+  );
 
   late SharedPreferencesAsyncPlatform? previousPreferencesPlatform;
 

@@ -100,6 +100,41 @@ void main() {
 
     await expectLater(initializeFuture, completes);
   });
+
+  test(
+    'concurrent initialize calls share a single conversation request',
+    () async {
+      final repository = _DelayedInitialLoadSupportChatRepository();
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(
+            const _NoopSupportChatRealtimeClient(),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+      final first = controller.initialize();
+      final second = controller.initialize();
+
+      await repository.loadStarted.future;
+      expect(repository.getConversationCalls, 1);
+
+      repository.completeLoad();
+
+      await expectLater(Future.wait([first, second]), completes);
+      expect(repository.getConversationCalls, 1);
+      expect(
+        container
+            .read(supportChatControllerProvider)
+            .conversation
+            ?.conversationId,
+        'conversation-1',
+      );
+    },
+  );
 }
 
 class _CancellableSupportChatRepository extends SupportChatRepository {
@@ -145,6 +180,7 @@ class _DelayedInitialLoadSupportChatRepository extends SupportChatRepository {
   final Completer<void> loadStarted = Completer<void>();
   final Completer<SupportChatConversation> _loadCompleter =
       Completer<SupportChatConversation>();
+  int getConversationCalls = 0;
 
   @override
   Future<SupportChatConversation> getConversation({
@@ -153,6 +189,7 @@ class _DelayedInitialLoadSupportChatRepository extends SupportChatRepository {
     String? beforeMessageId,
     CancelToken? cancelToken,
   }) {
+    getConversationCalls += 1;
     if (!loadStarted.isCompleted) {
       loadStarted.complete();
     }
@@ -174,6 +211,9 @@ class _NoopSupportChatRealtimeClient implements SupportChatRealtimeClient {
 
   @override
   Future<void> disconnect() async {}
+
+  @override
+  Future<void> dispose() async {}
 
   @override
   Stream<SupportChatRealtimeUpdate> get events => const Stream.empty();

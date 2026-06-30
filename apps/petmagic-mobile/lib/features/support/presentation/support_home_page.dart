@@ -1,15 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
 import 'support_assistant_page.dart';
@@ -28,18 +33,74 @@ class SupportHomePage extends ConsumerStatefulWidget {
 
 class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   _SupportHomeTab _tab = _SupportHomeTab.active;
-  bool _isLoadingConversation = true;
+  bool _isLoadingConversation = false;
   String? _conversationError;
   SupportChatConversation? _conversation;
   CancelToken? _conversationLoadCancelToken;
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
+  bool _hasRequestedInitialConversationLoad = false;
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
-    _loadConversation();
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
+  }
+
+  void _scheduleInitialConversationLoad() {
+    if (_hasRequestedInitialConversationLoad) {
+      return;
+    }
+
+    _hasRequestedInitialConversationLoad = true;
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+
+      unawaited(_loadConversation());
+    });
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      _scheduleInitialConversationLoad();
+      return;
+    }
+
+    if (!launchState.isAuthenticated && _wasAuthenticated) {
+      _wasAuthenticated = false;
+      _resetConversationState();
+      return;
+    }
+
+    _wasAuthenticated = launchState.isAuthenticated;
+  }
+
+  void _resetConversationState() {
+    _cancelConversationLoad();
+    _hasRequestedInitialConversationLoad = false;
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingConversation = false;
+      _conversationError = null;
+      _conversation = null;
+    });
   }
 
   Future<void> _loadConversation() async {
+    if (_isLoadingConversation && _conversationLoadCancelToken != null) {
+      return;
+    }
+
     _cancelConversationLoad();
     final loadCancelToken = CancelToken();
     _conversationLoadCancelToken = loadCancelToken;
@@ -107,6 +168,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
   @override
   void dispose() {
+    _launchSubscription?.close();
     _cancelConversationLoad();
     super.dispose();
   }
@@ -137,8 +199,28 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+
+    if (!isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: SupportHomePage.routePath,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     final topics = _buildTopics(text);
     final hasConversation = _conversation != null;

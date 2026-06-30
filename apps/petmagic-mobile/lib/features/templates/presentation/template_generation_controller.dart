@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
@@ -488,9 +489,14 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     try {
       await ref.read(walletControllerProvider.notifier).load(refresh: true);
-    } catch (_) {
-      // Wallet sync is recovery context; do not convert a completed or failed
-      // generation into a generation error because balance refresh failed.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationController',
+        operation: 'refresh_wallet_after_generation',
+        message: 'Wallet refresh failed after generation state change.',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 

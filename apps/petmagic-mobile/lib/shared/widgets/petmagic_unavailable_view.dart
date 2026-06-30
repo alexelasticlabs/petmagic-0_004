@@ -7,12 +7,14 @@ class PetMagicUnavailableView extends StatelessWidget {
   const PetMagicUnavailableView({
     required this.kind,
     required this.onRetry,
+    this.footer,
     this.padding,
     super.key,
   });
 
   final AppUnavailableKind kind;
   final VoidCallback onRetry;
+  final Widget? footer;
   final EdgeInsetsGeometry? padding;
 
   @override
@@ -31,6 +33,7 @@ class PetMagicUnavailableView extends StatelessWidget {
           : text.appUnavailableServerMessage,
       actionLabel: text.retryAction,
       onAction: onRetry,
+      footer: footer,
       padding: padding,
     );
   }

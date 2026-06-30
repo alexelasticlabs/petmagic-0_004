@@ -6,10 +6,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_preview
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 
 class TemplatePreviewLoaderPage extends ConsumerStatefulWidget {
-  const TemplatePreviewLoaderPage({
-    required this.templateId,
-    super.key,
-  });
+  const TemplatePreviewLoaderPage({required this.templateId, super.key});
 
   static const routePath = '/templates/preview';
 
@@ -50,10 +47,6 @@ class _TemplatePreviewLoaderPageState
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }

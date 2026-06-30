@@ -551,8 +551,18 @@ class TemplatesController extends Notifier<TemplatesState> {
         }
         state = state.copyWith(categories: categories);
       });
-    } catch (_) {
-      // Categories are secondary for first paint.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Controller',
+        operation: 'refresh_categories',
+        message: 'Template categories refresh failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'screenVisible': _isScreenVisible,
+          'requestVersion': requestVersion,
+        },
+      );
     }
   }
 
@@ -826,8 +836,15 @@ class TemplatesController extends Notifier<TemplatesState> {
   Future<void> _warmupSingleUrl(String url) async {
     try {
       await ref.read(templateThumbnailWarmupProvider)(url);
-    } catch (_) {
-      // Warmup is best-effort only.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.Controller',
+        operation: 'warmup_single_url',
+        message: 'Template preview warmup failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'screenVisible': _isScreenVisible},
+      );
     }
   }
 

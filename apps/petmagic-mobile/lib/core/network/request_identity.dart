@@ -1,7 +1,9 @@
+import 'dart:developer' as developer;
 import 'dart:math';
 
 abstract final class RequestIdentity {
   static final Random _defaultRandom = _createDefaultRandom();
+  static bool _reportedInsecureRandomFallback = false;
 
   static String createRequestId({Random? random}) {
     final now = DateTime.now().toUtc().microsecondsSinceEpoch;
@@ -24,8 +26,24 @@ abstract final class RequestIdentity {
   static Random _createDefaultRandom() {
     try {
       return Random.secure();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      _reportSecureRandomFallback(error, stackTrace);
       return Random();
     }
+  }
+
+  static void _reportSecureRandomFallback(Object error, StackTrace stackTrace) {
+    if (_reportedInsecureRandomFallback) {
+      return;
+    }
+
+    _reportedInsecureRandomFallback = true;
+    developer.log(
+      'Secure random unavailable; falling back to Random.',
+      name: 'PetMagic.RequestIdentity',
+      level: 900,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }

@@ -56,26 +56,42 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
 
   Future<void> _showHistorySheet(List<WalletLedgerItem> items) =>
       _showRewardsHistorySheet(context, items);
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _launchSubscription?.close();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
       Future.microtask(() {
-        if (!mounted) {
+        if (!mounted ||
+            !ref.read(appLaunchControllerProvider).isAuthenticated) {
           return;
         }
 
         ref.read(walletControllerProvider.notifier).load();
       });
+      return;
     }
-  }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
+    _wasAuthenticated = launchState.isAuthenticated;
   }
 
   @override
@@ -251,6 +267,12 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
                     _RewardsHero(
                       balance: state.wallet?.balance,
                       onHistoryTap: () => _showHistorySheet(state.ledger),
+                    ),
+                    const SizedBox(height: 16),
+                    _AdRewardCard(
+                      wallet: state.wallet,
+                      isClaimingAd: state.isClaimingAd,
+                      onClaimAd: controller.claimAdReward,
                     ),
                     if (warningMessage != null) ...[
                       const SizedBox(height: 16),

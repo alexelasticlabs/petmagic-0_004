@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 
 class TempMediaCleanup {
   TempMediaCleanup._();
@@ -16,7 +17,17 @@ class TempMediaCleanup {
     _isSweepScheduled = true;
     Future<void>(() async {
       try {
-        await sweepExpiredFiles();
+        try {
+          await sweepExpiredFiles();
+        } catch (error, stackTrace) {
+          AppLogger.warn(
+            feature: 'Shared.TempMediaCleanup',
+            operation: 'schedule_ttl_sweep',
+            message: 'Scheduled temp media cleanup failed',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
       } finally {
         _isSweepScheduled = false;
       }
@@ -57,8 +68,15 @@ class TempMediaCleanup {
         }
 
         await entity.delete();
-      } catch (_) {
-        // Best effort cleanup: skip inaccessible files.
+      } catch (error, stackTrace) {
+        AppLogger.warn(
+          feature: 'Shared.TempMediaCleanup',
+          operation: 'delete_expired_file',
+          message: 'Temp media cleanup skipped inaccessible file',
+          context: {'name': name},
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   }
@@ -68,8 +86,20 @@ class TempMediaCleanup {
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (_) {
-      // Best effort cleanup.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Shared.TempMediaCleanup',
+        operation: 'delete_if_exists',
+        message: 'Temp media file deletion failed',
+        context: {'name': _safeFileName(file)},
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
+  }
+
+  static String _safeFileName(File file) {
+    final segments = file.uri.pathSegments;
+    return segments.isEmpty ? file.path : segments.last;
   }
 }

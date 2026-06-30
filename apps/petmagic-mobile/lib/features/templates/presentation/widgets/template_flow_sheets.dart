@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';

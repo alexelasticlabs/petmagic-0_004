@@ -2,6 +2,17 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+@immutable
+class AndroidLoopbackBackendHintConfig {
+  const AndroidLoopbackBackendHintConfig({
+    required this.baseUrl,
+    required this.port,
+  });
+
+  final String baseUrl;
+  final int port;
+}
+
 class AppConfig {
   const AppConfig._();
 
@@ -42,6 +53,10 @@ class AppConfig {
     'PETMAGIC_MEDIA_TEMP_FILE_TTL_HOURS',
     defaultValue: 24,
   );
+  static const generationCacheTtlHours = int.fromEnvironment(
+    'PETMAGIC_GENERATION_CACHE_TTL_HOURS',
+    defaultValue: 24,
+  );
   static const decodedImageCacheMaxObjects = int.fromEnvironment(
     'PETMAGIC_DECODED_IMAGE_CACHE_MAX_OBJECTS',
     defaultValue: 200,
@@ -63,6 +78,13 @@ class AppConfig {
 
   static Duration get mediaTempFileTtl {
     final safeHours = mediaTempFileTtlHours <= 0 ? 24 : mediaTempFileTtlHours;
+    return Duration(hours: safeHours);
+  }
+
+  static Duration get generationCacheTtl {
+    final safeHours = generationCacheTtlHours <= 0
+        ? 24
+        : generationCacheTtlHours;
     return Duration(hours: safeHours);
   }
 
@@ -145,10 +167,7 @@ class AppConfig {
     }
 
     if (kDebugMode) {
-      return const [
-        'http://localhost:5000',
-        'http://127.0.0.1:5000',
-      ];
+      return const ['http://localhost:5000', 'http://127.0.0.1:5000'];
     }
 
     return const [productionApiBaseUrl];
@@ -170,6 +189,40 @@ class AppConfig {
 
   static bool isProductionSafeBaseUrl(String rawUrl) {
     return normalizeProductionBaseUrl(rawUrl) != null;
+  }
+
+  static AndroidLoopbackBackendHintConfig? androidLoopbackBackendHintConfig({
+    String configuredBaseUrl = configuredApiBaseUrl,
+    bool isDebugBuild = kDebugMode,
+    bool isWeb = kIsWeb,
+    bool? isAndroidDevice,
+  }) {
+    if (!isDebugBuild || isWeb) {
+      return null;
+    }
+
+    final android = isAndroidDevice ?? (!kIsWeb && Platform.isAndroid);
+    if (!android) {
+      return null;
+    }
+
+    final trimmed = configuredBaseUrl.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.host.isEmpty) {
+      return null;
+    }
+
+    final host = uri.host.toLowerCase();
+    if (host != 'localhost' && host != '127.0.0.1') {
+      return null;
+    }
+
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    return AndroidLoopbackBackendHintConfig(baseUrl: trimmed, port: port);
   }
 
   static String? normalizeProductionBaseUrl(String rawUrl) {

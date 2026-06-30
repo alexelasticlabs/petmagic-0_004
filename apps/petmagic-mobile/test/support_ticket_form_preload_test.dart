@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -21,6 +22,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'test_permission_fakes.dart';
 
 late _SupportPreloadTracker _preloadTracker;
@@ -30,12 +32,26 @@ void main() {
     _preloadTracker = _SupportPreloadTracker();
   });
 
+  test('support ticket route preserves scenario query', () {
+    expect(
+      SupportTicketFormPage.location('generation_failed'),
+      '/profile/support/ticket?scenario=generation_failed',
+    );
+    expect(
+      SupportTicketFormPage.location('  '),
+      SupportTicketFormPage.routePath,
+    );
+  });
+
   testWidgets(
     'support ticket context preload starts independent loads together',
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
             generationHistoryControllerProvider.overrideWith(
               _TrackedGenerationHistoryController.new,
             ),
@@ -66,6 +82,81 @@ void main() {
     },
   );
 
+  testWidgets('support ticket context preload is skipped for guests', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _UnauthenticatedAppLaunchController.new,
+          ),
+          generationHistoryControllerProvider.overrideWith(
+            _TrackedGenerationHistoryController.new,
+          ),
+          walletControllerProvider.overrideWith(_TrackedWalletController.new),
+          premiumControllerProvider.overrideWith(_TrackedPremiumController.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const SupportTicketFormPage(scenario: 'generation_failed'),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(_preloadTracker.started, isEmpty);
+  });
+
+  testWidgets(
+    'support ticket context preload starts after guest signs in on the same route',
+    (tester) async {
+      final launchController = _MutableAppLaunchController(false);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(() => launchController),
+            generationHistoryControllerProvider.overrideWith(
+              _TrackedGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(_TrackedWalletController.new),
+            premiumControllerProvider.overrideWith(
+              _TrackedPremiumController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(_preloadTracker.started, isEmpty);
+
+      launchController.setAuthenticated(true);
+      await tester.pump();
+
+      expect(
+        _preloadTracker.started,
+        containsAll(['generation', 'wallet', 'premium']),
+      );
+
+      _preloadTracker.completeAll();
+      await tester.pump();
+    },
+  );
+
   testWidgets(
     'support ticket context preload skips domains that already have snapshots',
     (tester) async {
@@ -76,6 +167,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
             generationHistoryControllerProvider.overrideWith(
               () => generationController,
             ),
@@ -109,6 +203,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           supportChatRepositoryProvider.overrideWithValue(repository),
           generationHistoryControllerProvider.overrideWith(
             _IdleGenerationHistoryController.new,
@@ -154,6 +251,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
             generationHistoryControllerProvider.overrideWith(
               _IdleGenerationHistoryController.new,
             ),
@@ -251,6 +351,60 @@ String _methodBody(String source, String signature) {
   }
 
   fail('$signature body did not close.');
+}
+
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _MutableAppLaunchController extends AppLaunchController {
+  _MutableAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+
+  void setAuthenticated(bool value) {
+    _isAuthenticated = value;
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: value,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
 }
 
 class _TrackedGenerationHistoryController extends GenerationHistoryController {
@@ -351,7 +505,10 @@ class _CountingLoadedGenerationHistoryController
   }
 
   @override
-  Future<void> load({GenerationHistoryFilter? filter, bool refresh = false}) async {
+  Future<void> load({
+    GenerationHistoryFilter? filter,
+    bool refresh = false,
+  }) async {
     loadCalls++;
   }
 }

@@ -25,8 +25,12 @@ AppUnavailableKind? classifyAppUnavailable({
     return null;
   }
 
-  if (!hasInternet || _looksOffline(value)) {
+  if (!hasInternet) {
     return AppUnavailableKind.offline;
+  }
+
+  if (_looksOffline(value)) {
+    return AppUnavailableKind.serverUnavailable;
   }
 
   if (_looksServerUnavailable(value)) {

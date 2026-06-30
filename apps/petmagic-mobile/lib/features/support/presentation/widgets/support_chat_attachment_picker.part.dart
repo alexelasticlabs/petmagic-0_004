@@ -623,4 +623,3 @@ class _SupportAttachmentPickerSheetState
     );
   }
 }
-

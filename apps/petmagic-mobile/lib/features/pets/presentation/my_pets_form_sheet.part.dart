@@ -35,6 +35,7 @@ class _PetFormSheetState extends ConsumerState<_PetFormSheet> {
   }
 
   Future<void> _save() async {
+    final text = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     if (_isSaving || name.isEmpty || name.length > 40) {
       setState(() => _showNameError = true);
@@ -90,8 +91,21 @@ class _PetFormSheetState extends ConsumerState<_PetFormSheet> {
       }
 
       Navigator.of(context).pop();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Pets.Form',
+        operation: 'save_pet',
+        message: 'Pet form submission failed',
+        context: {'isEditing': _isEditing, 'hasPhoto': _photo != null},
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (mounted) {
+        PetMagicToast.show(
+          context,
+          message: text.profileActionFailed,
+          tone: PetMagicToastTone.warning,
+        );
         setState(() => _isSaving = false);
       }
     }

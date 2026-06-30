@@ -3,22 +3,36 @@ part of 'package:petmagic_mobile/features/support/presentation/support_chat_page
 const _supportMediaDownloadTimeout = Duration(seconds: 20);
 
 extension _SupportChatPageExternalMediaActions on _SupportChatPageState {
-  Future<void> _openAttachmentExternallyImpl(String value) async {
-    final uri = parseSafeSupportExternalUri(value);
-    if (uri == null) {
-      if (!mounted) {
-        return;
-      }
-
-      final text = AppLocalizations.of(context);
-      _showSupportToast(
-        text.supportChatUnavailableError,
-        tone: PetMagicToastTone.warning,
-      );
+  void _showExternalAttachmentUnavailableWarning() {
+    if (!mounted) {
       return;
     }
 
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final text = AppLocalizations.of(context);
+    _showSupportToast(
+      text.supportChatUnavailableError,
+      tone: PetMagicToastTone.warning,
+    );
+  }
+
+  Future<void> _openAttachmentExternallyImpl(String value) async {
+    final uri = parseSafeSupportExternalUri(value);
+    if (uri == null) {
+      _showExternalAttachmentUnavailableWarning();
+      return;
+    }
+
+    try {
+      final didLaunch = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!didLaunch) {
+        _showExternalAttachmentUnavailableWarning();
+      }
+    } on Object {
+      _showExternalAttachmentUnavailableWarning();
+    }
   }
 
   Future<void> _saveImageToDeviceImpl({

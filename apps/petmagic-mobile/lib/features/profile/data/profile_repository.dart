@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/core/network/authenticated_request_options.dart'
 import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
@@ -527,28 +528,8 @@ class ProfileRepository {
 
   Future<MediaType?> _detectAvatarMediaType(String path) async {
     final header = await _avatarHeader(path);
-    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
-      return MediaType('image', 'jpeg');
-    }
-    if (_startsWith(header, const [
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,
-    ])) {
-      return MediaType('image', 'png');
-    }
-    if (header.length >= 12 &&
-        _asciiEquals(header, 0, 'RIFF') &&
-        _asciiEquals(header, 8, 'WEBP')) {
-      return MediaType('image', 'webp');
-    }
-
-    return null;
+    final contentType = detectAvatarUploadContentType(header);
+    return contentType == null ? null : MediaType.parse(contentType);
   }
 
   Future<List<int>> _avatarHeader(String path) async {
@@ -562,29 +543,5 @@ class ProfileRepository {
         cause: error,
       );
     }
-  }
-
-  bool _startsWith(List<int> bytes, List<int> prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (var index = 0; index < prefix.length; index++) {
-      if (bytes[index] != prefix[index]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _asciiEquals(List<int> bytes, int offset, String value) {
-    if (bytes.length < offset + value.length) {
-      return false;
-    }
-    for (var index = 0; index < value.length; index++) {
-      if (bytes[offset + index] != value.codeUnitAt(index)) {
-        return false;
-      }
-    }
-    return true;
   }
 }

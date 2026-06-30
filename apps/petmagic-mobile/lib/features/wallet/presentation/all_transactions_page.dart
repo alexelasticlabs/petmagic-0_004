@@ -6,11 +6,14 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 class AllTransactionsPage extends ConsumerStatefulWidget {
   const AllTransactionsPage({super.key});
@@ -29,27 +32,55 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   static const double _ledgerLoadMoreThreshold = 320;
 
   final ScrollController _scrollController = ScrollController();
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScroll);
-    final snapshot = ref.read(walletControllerProvider);
-    if (snapshot.wallet == null && snapshot.ledger.isEmpty) {
-      Future.microtask(() {
-        if (!mounted) {
-          return;
-        }
-
-        ref.read(walletControllerProvider.notifier).load();
-      });
-    }
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
   }
 
   @override
   void dispose() {
+    _launchSubscription?.close();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      _scheduleInitialLoadIfNeeded();
+      return;
+    }
+
+    _wasAuthenticated = launchState.isAuthenticated;
+  }
+
+  void _scheduleInitialLoadIfNeeded() {
+    final snapshot = ref.read(walletControllerProvider);
+    if (snapshot.wallet != null || snapshot.ledger.isNotEmpty) {
+      return;
+    }
+
+    Future.microtask(() {
+      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      final current = ref.read(walletControllerProvider);
+      if (current.wallet != null || current.ledger.isNotEmpty) {
+        return;
+      }
+
+      ref.read(walletControllerProvider.notifier).load();
+    });
   }
 
   void _handleScroll() {
@@ -69,6 +100,9 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final state = ref.watch(walletControllerProvider);
     final controller = ref.read(walletControllerProvider.notifier);
     final router = GoRouter.of(context);
@@ -88,6 +122,23 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
           )
         : MediaQuery.viewPaddingOf(context).bottom +
               kPetMagicBottomContentInsetCompact;
+
+    if (!isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: AllTransactionsPage.routePath,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return ProfileScreenBackground(
       child: SafeArea(
@@ -239,7 +290,7 @@ int _transactionListItemCount({
   required bool showLoadMoreError,
 }) {
   final leadingItems = hasError ? 2 : 1;
-  final contentItems = itemCount == 0 ? 1 : itemCount;
+  final contentItems = itemCount == 0 ? (hasError ? 0 : 1) : itemCount;
   final trailingItems = showLoadMoreIndicator || showLoadMoreError ? 1 : 0;
   return leadingItems + contentItems + trailingItems;
 }
@@ -448,7 +499,7 @@ String _sourceLabel(AppLocalizations text, String source) {
     'promo_redeem' || 'redeem_code' => text.walletSourcePromoCode,
     'admin_grant' => text.walletSourceAdminGrant,
     'admin_debit' => text.walletSourceAdminDebit,
-    _ => source,
+    _ => text.walletSourceOther,
   };
 }
 

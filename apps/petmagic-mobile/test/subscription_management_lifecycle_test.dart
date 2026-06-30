@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
   test('subscription management dynamic copy uses localizations', () async {
@@ -23,7 +25,8 @@ void main() {
     final progressSource = await File(
       'lib/features/premium/presentation/subscription_management_progress.part.dart',
     ).readAsString();
-    final source = '$pageSource\n$contentSource\n$sectionsSource\n$progressSource';
+    final source =
+        '$pageSource\n$contentSource\n$sectionsSource\n$progressSource';
 
     const expectedGetters = <String>[
       'subscriptionTokensWeeklyGrantPeriodSuffix',
@@ -75,7 +78,10 @@ void main() {
     expect(contentSource, isNot(contains('class _PaymentCard')));
     expect(contentSource, isNot(contains('class _ActionsSection')));
     expect(contentSource, isNot(contains('class _TokenGrantProgressBar')));
-    expect(sectionsSource, contains("part of 'subscription_management_page.dart';"));
+    expect(
+      sectionsSource,
+      contains("part of 'subscription_management_page.dart';"),
+    );
     expect(sectionsSource, contains('class _PremiumHeroCard'));
     expect(sectionsSource, contains('class _TokensCard'));
     expect(sectionsSource, contains('class _BenefitsCard'));
@@ -83,7 +89,10 @@ void main() {
     expect(sectionsSource, contains('class _ActionsSection'));
     expect(sectionsSource, contains('String _resolveStatusLabel'));
     expect(sectionsSource, contains('Color _resolveStatusColor'));
-    expect(progressSource, contains("part of 'subscription_management_page.dart';"));
+    expect(
+      progressSource,
+      contains("part of 'subscription_management_page.dart';"),
+    );
     expect(progressSource, contains('class _TokenGrantProgressBar'));
   });
 
@@ -122,6 +131,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'subscription management shows auth gate for guests without loading summary',
+    (tester) async {
+      var summaryReads = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _UnauthenticatedAppLaunchController.new,
+            ),
+            premiumSubscriptionSummaryProvider.overrideWith((ref) async {
+              summaryReads++;
+              return const PremiumSubscriptionSummaryView(
+                isPremium: true,
+                canManageSubscription: true,
+                status: 'active',
+                manageSubscriptionAction: 'StripeCustomerPortal',
+                provider: PremiumSubscriptionProviderView.stripe,
+              );
+            }),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            home: const SubscriptionManagementPage(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(summaryReads, 0);
+    },
+  );
+
   testWidgets('subscription summary failure shows retry and reloads safely', (
     tester,
   ) async {
@@ -133,6 +180,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumSubscriptionSummaryProvider.overrideWith((ref) async {
             loadAttempts++;
             if (loadAttempts == 1) {
@@ -188,6 +238,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
             premiumControllerProvider.overrideWith(() => premiumController),
             premiumSubscriptionSummaryProvider.overrideWith(
               (ref) async => const PremiumSubscriptionSummaryView(
@@ -243,6 +296,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumControllerProvider.overrideWith(
             () => _FailingRestorePremiumController(),
           ),
@@ -295,6 +351,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
             premiumSubscriptionSummaryProvider.overrideWith(
               (ref) async => const PremiumSubscriptionSummaryView(
                 isPremium: true,
@@ -350,6 +409,32 @@ class _DelayedRestorePremiumController extends PremiumController {
     if (!_restoreCompleter.isCompleted) {
       _restoreCompleter.complete();
     }
+  }
+}
+
+class _UnauthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
   }
 }
 

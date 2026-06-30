@@ -36,8 +36,7 @@ class WalletCheckoutState {
     bool clearHighlightedPurchaseOrderId = false,
   }) {
     return WalletCheckoutState(
-      checkoutUrl:
-          clearCheckoutUrl ? null : checkoutUrl ?? this.checkoutUrl,
+      checkoutUrl: clearCheckoutUrl ? null : checkoutUrl ?? this.checkoutUrl,
       pendingOrderId: clearPendingOrderId
           ? null
           : pendingOrderId ?? this.pendingOrderId,
@@ -46,8 +45,9 @@ class WalletCheckoutState {
           : pendingStoreProvider ?? this.pendingStoreProvider,
       storeProductPrices: storeProductPrices ?? this.storeProductPrices,
       verificationState: verificationState ?? this.verificationState,
-      grantedSpark:
-          clearGrantedSpark ? null : grantedSpark ?? this.grantedSpark,
+      grantedSpark: clearGrantedSpark
+          ? null
+          : grantedSpark ?? this.grantedSpark,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       highlightedPurchaseOrderId: clearHighlightedPurchaseOrderId
           ? null

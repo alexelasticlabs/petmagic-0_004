@@ -56,6 +56,10 @@ class AppLocalizationsFr extends AppLocalizations {
       'Ouvrez votre profil pour vérifier la dernière mise à jour Premium.';
 
   @override
+  String get appUnexpectedErrorFallback =>
+      'Une erreur s\'est produite. Veuillez réessayer.';
+
+  @override
   String get comingSoonMessage =>
       'Cette section est prete pour la prochaine etape produit.';
 
@@ -855,20 +859,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les annonces sont temporairement indisponibles. Veuillez réessayer plus tard.';
 
   @override
-  String get walletPromoTitle => 'Vous avez un code promo ?';
-
-  @override
-  String get walletPromoSubtitle =>
-      'Entrez un code de PetMagic et ajoutez PawSpark à votre solde.';
-
-  @override
-  String get walletPromoInputPlaceholder => 'Entrez le code promotionnel';
-
-  @override
-  String get walletPromoSuccessMessage =>
-      'Code promotionnel activé avec succès !';
-
-  @override
   String get walletBestValueBadge => 'Meilleur rapport qualité-prix';
 
   @override
@@ -1200,11 +1190,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get walletPaymentStoreUnavailableGooglePlay =>
-      'Google Play est temporairement indisponible sur cet appareil. Utilisez Stripe pour le moment.';
+      'Les achats via Google Play sont temporairement indisponibles sur cet appareil. Choisissez un autre moyen de paiement disponible.';
 
   @override
   String get walletPaymentStoreUnavailableAppStore =>
-      'L\'App Store est temporairement indisponible sur cet appareil. Utilisez Stripe pour le moment.';
+      'Les achats via l\'App Store sont temporairement indisponibles sur cet appareil. Choisissez un autre moyen de paiement disponible.';
 
   @override
   String get walletCheckoutOrderSectionTitle => 'Récapitulatif de la commande';
@@ -1278,6 +1268,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get walletSourceAdminDebit => 'Ajustement du support';
+
+  @override
+  String get walletSourceOther => 'Autre activité';
 
   @override
   String get walletPurchaseCompleted => 'Complété';
@@ -1503,6 +1496,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay/App Store';
 
   @override
+  String get premiumPaymentOther => 'Autre moyen de paiement';
+
+  @override
   String get premiumPaymentRecommendedBadge => 'Recommandé';
 
   @override
@@ -1632,7 +1628,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumStoreUnavailable =>
-      'Les abonnements store attendent la configuration des produits App Store / Google Play. Utilisez Stripe Checkout pour le moment.';
+      'Les abonnements App Store / Google Play sont temporairement indisponibles pour le moment. Réessayez plus tard ou utilisez un autre moyen de paiement disponible.';
 
   @override
   String get premiumStoreProductUnavailable =>
@@ -2026,18 +2022,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Les premiers articles d\'aide et guides de dépannage apparaîtront ici au fur et à mesure de la publication du contenu de l\'assistance mobile.';
 
   @override
-  String get profileDetailsSupportBody =>
-      'Les demandes d\'assistance seront traitées ici sans vous forcer à quitter la zone de profil.';
-
-  @override
-  String get profileDetailsSupportStatus =>
-      'Le contact direct dans l\'application n\'est pas encore câblé. Pour l’instant, conservez cet écran comme point d’entrée du support pour la tranche suivante.';
-
-  @override
-  String get profileDetailsSupportNext =>
-      'La prochaine étape sera un formulaire d\'assistance complet ou un transfert par e-mail.';
-
-  @override
   String get profileDetailsTermsBody =>
       'Vérifiez comment PetMagic s\'attend à ce que l\'application et le compte soient utilisés.';
 
@@ -2051,7 +2035,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileDetailsTermsNext =>
-      'Une vue plus complète du document juridique peut être jointe ici ultérieurement. Pour l\'instant, cet écran confirme l\'état d\'acceptation actuel.';
+      'Consultez ci-dessous les Conditions d\'utilisation en vigueur et acceptez la dernière version si ce compte en a encore besoin.';
 
   @override
   String get profileDetailsPrivacyBody =>
@@ -2059,11 +2043,11 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Les détails de confidentialité sont actuellement représentés sous la forme d\'un écran de résumé dans l\'application pendant que le flux complet des documents juridiques est préparé.';
+      'Cet écran affiche la Politique de confidentialité en vigueur, sa version publiée et l\'état d\'acceptation de ce compte.';
 
   @override
   String get profileDetailsPrivacyNext =>
-      'La tranche suivante peut joindre un document de politique complet ou une page juridique hébergée à cette route.';
+      'Consultez ci-dessous la Politique de confidentialité en vigueur et acceptez la dernière version si ce compte en a encore besoin.';
 
   @override
   String get profileLegalAcceptanceCurrent =>
@@ -4155,6 +4139,14 @@ class AppLocalizationsFr extends AppLocalizations {
   @override
   String get appUnavailableServerMessage =>
       'PetMagic ne peut pas joindre le backend pour le moment. Reessayez dans un instant.';
+
+  @override
+  String get localBackendAndroidHintTitle => 'Backend local sur Android';
+
+  @override
+  String localBackendAndroidHintMessage(Object baseUrl, Object port) {
+    return 'Cette build de debug utilise $baseUrl. Sur un vrai telephone Android, localhost et 127.0.0.1 pointent vers le telephone lui-meme. Lancez adb reverse tcp:$port tcp:$port ou definissez API_BASE_URL avec l\'IP LAN de votre ordinateur.';
+  }
 
   @override
   String get generationStatusCompareAction => 'Comparer';

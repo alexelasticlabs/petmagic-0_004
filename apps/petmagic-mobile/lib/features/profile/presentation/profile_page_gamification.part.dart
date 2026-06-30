@@ -23,6 +23,9 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
       error: rawError,
       hasInternet: hasInternet,
     );
+    final loopbackHintConfig = unavailableKind == null
+        ? null
+        : AppConfig.androidLoopbackBackendHintConfig();
     final statusMessage = switch (unavailableKind) {
       AppUnavailableKind.offline => text.appUnavailableOfflineTitle,
       AppUnavailableKind.serverUnavailable => text.appUnavailableServerTitle,
@@ -30,11 +33,17 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
       null => null,
     };
 
-    void openAchievements() => context.push(AchievementsPage.routePath);
-    void retry() {
+    void reloadPreview() {
       ref.invalidate(gamificationSummaryProvider);
       ref.invalidate(achievementsProvider);
     }
+
+    void openAchievements() {
+      reloadPreview();
+      context.push(AchievementsPage.routePath);
+    }
+
+    void retry() => reloadPreview();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -45,32 +54,43 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
               ?.where((achievement) => achievement.isUnlocked)
               .length,
           totalAchievementsCount: achievements?.length,
-          onStreakTap: openAchievements,
-          onAchievementsTap: openAchievements,
+          onOpenHub: openAchievements,
           onPetTap: () => context.push(MyPetsPage.routePath),
         ),
         if (statusMessage != null) ...[
           const SizedBox(height: 10),
           ProfileGlassCard(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    statusMessage,
-                    style: TextStyle(
-                      color: colors.textSoft,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        statusMessage,
+                        style: TextStyle(
+                          color: colors.textSoft,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: retry,
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: Text(text.retryAction),
+                    ),
+                  ],
+                ),
+                if (loopbackHintConfig != null) ...[
+                  const SizedBox(height: 10),
+                  AndroidLoopbackBackendHint(
+                    config: loopbackHintConfig,
+                    compact: true,
                   ),
-                ),
-                const SizedBox(width: 12),
-                TextButton.icon(
-                  onPressed: retry,
-                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                  label: Text(text.retryAction),
-                ),
+                ],
               ],
             ),
           ),

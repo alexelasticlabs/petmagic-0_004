@@ -9,10 +9,12 @@ extension _WalletPageCheckoutStateX on _WalletPageState {
       final checkoutUrl = checkout.checkoutUrl.trim();
       final uri = parseSafePremiumExternalUri(checkoutUrl);
       if (uri != null) {
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
+        var launched = false;
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } on Object {
+          launched = false;
+        }
         if (launched) {
           _shouldReloadOnResume = true;
           return StripePaymentSheetResult.success;

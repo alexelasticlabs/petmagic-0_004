@@ -46,7 +46,11 @@ void main() {
       final cardPresentationSource = await File(
         'lib/features/templates/presentation/widgets/template_card_presentation.part.dart',
       ).readAsString();
-      final fullCardSource = '$cardSource\n$cardPresentationSource';
+      final cardBadgesSource = await File(
+        'lib/features/templates/presentation/widgets/template_card_badges.part.dart',
+      ).readAsString();
+      final fullCardSource =
+          '$cardSource\n$cardPresentationSource\n$cardBadgesSource';
 
       expect(
         sheetSource,
@@ -77,13 +81,21 @@ void main() {
         generationSource,
         contains('class _TemplateGenerationProgressContent'),
       );
-      expect(generationSource, contains('templateFlowCompletedPremiumHeadline'));
+      expect(
+        generationSource,
+        contains('templateFlowCompletedPremiumHeadline'),
+      );
       expect(generationSource, contains('templateFlowCompletedPremiumMessage'));
+      expect(cardSource, contains("part 'template_card_badges.part.dart';"));
       expect(
         cardSource,
         contains("part 'template_card_presentation.part.dart';"),
       );
       expect(cardSource, isNot(contains('class _TemplateShadeOverlay')));
+      expect(cardPresentationSource, isNot(contains('class _PromoBadge')));
+      expect(cardBadgesSource, contains("part of 'template_card.dart';"));
+      expect(cardBadgesSource, contains('class _PromoBadge'));
+      expect(cardBadgesSource, contains('class _AccessTag'));
       expect(fullCardSource, contains('templateFlowPreviewUnavailable'));
       expect(fullCardSource, contains('supportChatTodayLabel'));
       expect(fullCardSource, isNot(contains('Preview unavailable')));
@@ -106,7 +118,11 @@ void main() {
     final petLaunchContentSource = await File(
       'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_content.part.dart',
     ).readAsString();
-    final fullPetLaunchSource = '$petLaunchSource\n$petLaunchContentSource';
+    final petLaunchMediaSource = await File(
+      'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_media.part.dart',
+    ).readAsString();
+    final fullPetLaunchSource =
+        '$petLaunchSource\n$petLaunchContentSource\n$petLaunchMediaSource';
     final templateOfDayMainSource = await File(
       'lib/features/templates/presentation/widgets/template_of_the_day_card.dart',
     ).readAsString();
@@ -127,6 +143,17 @@ void main() {
     final galleryCardsSource = await File(
       'lib/features/templates/presentation/generations_gallery_page_cards.dart',
     ).readAsString();
+    final randomTemplateSheetSource = await File(
+      'lib/features/templates/presentation/widgets/random_template_sheet.dart',
+    ).readAsString();
+    final randomTemplateContentSource = await File(
+      'lib/features/templates/presentation/widgets/random_template_sheet_content.part.dart',
+    ).readAsString();
+    final randomTemplateComponentsSource = await File(
+      'lib/features/templates/presentation/widgets/random_template_sheet_components.part.dart',
+    ).readAsString();
+    final fullRandomTemplateSource =
+        '$randomTemplateSheetSource\n$randomTemplateContentSource\n$randomTemplateComponentsSource';
 
     expect(
       gallerySource,
@@ -134,6 +161,18 @@ void main() {
     );
     expect(resultInputSource, isNot(contains("localeName.startsWith('ru')")));
     expect(petLaunchSource, isNot(contains("localeName.startsWith('ru')")));
+    expect(
+      randomTemplateSheetSource,
+      contains("part 'random_template_sheet_components.part.dart';"),
+    );
+    expect(
+      randomTemplateSheetSource,
+      contains("part 'random_template_sheet_content.part.dart';"),
+    );
+    expect(
+      petLaunchSource,
+      contains("part 'pet_generation_launch_sheet_media.part.dart';"),
+    );
     expect(
       templateOfDayMainSource,
       contains("part 'template_of_the_day_card_chrome.part.dart';"),
@@ -170,11 +209,56 @@ void main() {
       petLaunchSource,
       contains("part 'pet_generation_launch_sheet_content.part.dart';"),
     );
+    expect(
+      petLaunchContentSource,
+      isNot(contains('class _PetLaunchSelectedPhotoPreview')),
+    );
+    expect(
+      petLaunchMediaSource,
+      contains("part of 'pet_generation_launch_sheet.dart';"),
+    );
+    expect(
+      petLaunchMediaSource,
+      contains('class _PetLaunchSelectedPhotoPreview'),
+    );
+    expect(
+      randomTemplateSheetSource,
+      isNot(contains('class _RandomTemplateSection')),
+    );
+    expect(
+      randomTemplateSheetSource,
+      isNot(contains('class _RandomTemplateStatusMessage')),
+    );
+    expect(
+      randomTemplateContentSource,
+      contains("part of 'random_template_sheet.dart';"),
+    );
+    expect(
+      randomTemplateComponentsSource,
+      contains("part of 'random_template_sheet.dart';"),
+    );
+    expect(
+      randomTemplateContentSource,
+      contains('class _RandomTemplateSheetContent'),
+    );
+    expect(
+      randomTemplateComponentsSource,
+      contains('class _RandomTemplateSection'),
+    );
     expect(petLaunchSource, isNot(contains('class _PetLaunchHeader')));
     expect(fullPetLaunchSource, contains('petGenerationLaunchTitleWithName'));
     expect(fullPetLaunchSource, contains('text.walletBalanceUnit'));
     expect(fullPetLaunchSource, contains('text.videoLabel'));
     expect(fullPetLaunchSource, contains('text.imageLabel'));
+    expect(
+      fullRandomTemplateSource,
+      contains('randomTemplateSheetDescription'),
+    );
+    expect(fullRandomTemplateSource, contains('randomTemplateAccessPremium'));
+    expect(
+      fullRandomTemplateSource,
+      isNot(contains("languageCode.toLowerCase() == 'ru'")),
+    );
     expect(templateOfDaySource, contains('templateOfTheDayLoadFailed'));
     expect(templateOfDaySource, contains('walletBalanceUnit'));
     expect(statusSource, contains('walletBalanceUnit'));
@@ -188,10 +272,11 @@ void main() {
     expect(resultInputSource, isNot(contains("const Text('Retry')")));
     expect(fullPetLaunchSource, isNot(contains("'Video'")));
     expect(fullPetLaunchSource, isNot(contains("'Image'")));
+    expect(fullRandomTemplateSource, isNot(contains("'Retry'")));
   });
 
   test(
-    'mobile localizations do not keep removed coming soon legacy keys',
+    'mobile localizations do not keep removed legacy placeholder keys',
     () async {
       const arbFiles = <String>[
         'lib/l10n/app_en.arb',
@@ -208,6 +293,10 @@ void main() {
         'templateActionComingSoon',
         'tokensActionComingSoon',
         'rewardsActionComingSoon',
+        'comingSoonMessage',
+        'profileDetailsSupportBody',
+        'profileDetailsSupportStatus',
+        'profileDetailsSupportNext',
       ];
 
       for (final path in arbFiles) {

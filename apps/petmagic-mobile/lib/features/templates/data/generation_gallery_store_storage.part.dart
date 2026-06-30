@@ -365,9 +365,7 @@ Future<bool> _galleryHasUsableFile(File file) async {
       return false;
     }
     final header = await file.openRead(0, 16).toList();
-    return _galleryHasSupportedMediaSignature([
-      for (final chunk in header) ...chunk,
-    ]);
+    return hasSupportedMediaSignature([for (final chunk in header) ...chunk]);
   } on Object {
     return false;
   }
@@ -386,7 +384,7 @@ bool _galleryIsValidLocalFile(String? path, {bool allowMissing = false}) {
     final handle = file.openSync();
     try {
       final header = handle.readSync(16);
-      return _galleryHasSupportedMediaSignature(header);
+      return hasSupportedMediaSignature(header);
     } finally {
       handle.closeSync();
     }
@@ -411,60 +409,6 @@ bool _gallerySafeNullableMediaUriEquals(String? left, String? right) {
     return false;
   }
   return _gallerySafeMediaUriEquals(left, right);
-}
-
-bool _galleryHasSupportedMediaSignature(List<int> header) {
-  if (_galleryStartsWith(header, const [0xFF, 0xD8, 0xFF])) {
-    return true;
-  }
-  if (_galleryStartsWith(header, const [
-    0x89,
-    0x50,
-    0x4E,
-    0x47,
-    0x0D,
-    0x0A,
-    0x1A,
-    0x0A,
-  ])) {
-    return true;
-  }
-  if (header.length >= 12 &&
-      _galleryAsciiEquals(header, 0, 'RIFF') &&
-      _galleryAsciiEquals(header, 8, 'WEBP')) {
-    return true;
-  }
-  if (_galleryAsciiEquals(header, 0, 'GIF8')) {
-    return true;
-  }
-  if (header.length >= 12 && _galleryAsciiEquals(header, 4, 'ftyp')) {
-    return true;
-  }
-  return false;
-}
-
-bool _galleryStartsWith(List<int> bytes, List<int> prefix) {
-  if (bytes.length < prefix.length) {
-    return false;
-  }
-  for (var index = 0; index < prefix.length; index++) {
-    if (bytes[index] != prefix[index]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool _galleryAsciiEquals(List<int> bytes, int offset, String value) {
-  if (bytes.length < offset + value.length) {
-    return false;
-  }
-  for (var index = 0; index < value.length; index++) {
-    if (bytes[offset + index] != value.codeUnitAt(index)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 Future<Directory> _galleryEnsureGenerationDirectory(

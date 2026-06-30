@@ -66,10 +66,7 @@ void main() {
       text.authRequiredMessage,
     );
     expect(
-      mapCommonAuthFeedbackMessage(
-        text,
-        'AppException: auth.session_expired',
-      ),
+      mapCommonAuthFeedbackMessage(text, 'AppException: auth.session_expired'),
       text.authSessionExpired,
     );
   });

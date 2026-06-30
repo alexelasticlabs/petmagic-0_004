@@ -9,7 +9,9 @@ import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_assistant_scenarios.dart';
@@ -18,6 +20,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_histo
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 part 'support_ticket_form_content.part.dart';
 
@@ -29,9 +32,19 @@ class SupportTicketFormPage extends ConsumerStatefulWidget {
   });
 
   static const routePath = '/profile/support/ticket';
+  static const scenarioQueryParam = 'scenario';
 
   final String scenario;
   final List<XFile> initialAttachments;
+
+  static String location(String scenario) {
+    final trimmedScenario = scenario.trim();
+    if (trimmedScenario.isEmpty) {
+      return routePath;
+    }
+
+    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(trimmedScenario)}';
+  }
 
   @override
   ConsumerState<SupportTicketFormPage> createState() =>
@@ -55,6 +68,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   bool _isSubmitting = false;
   bool _isPickingAttachment = false;
   CancelToken? _submitCancelToken;
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
+  bool _wasAuthenticated = false;
+  bool _hasScheduledSupportContextPreload = false;
 
   void _logSupportTicketFailure(
     String stage,
@@ -84,27 +100,79 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
   void initState() {
     super.initState();
     _attachments = List<XFile>.unmodifiable(widget.initialAttachments);
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _launchSubscription?.close();
+    _cancelSubmit();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      _scheduleSupportContextPreload();
+      return;
+    }
+
+    if (!launchState.isAuthenticated && _wasAuthenticated) {
+      _wasAuthenticated = false;
+      _hasScheduledSupportContextPreload = false;
+      _cancelSubmit();
+      return;
+    }
+
+    _wasAuthenticated = launchState.isAuthenticated;
+  }
+
+  void _scheduleSupportContextPreload() {
+    if (_hasScheduledSupportContextPreload) {
+      return;
+    }
+
+    _hasScheduledSupportContextPreload = true;
     unawaited(
       Future.microtask(() async {
-        if (!mounted) {
+        if (!mounted ||
+            !ref.read(appLaunchControllerProvider).isAuthenticated) {
           return;
         }
+
         await _preloadSupportContext();
       }),
     );
   }
 
   @override
-  void dispose() {
-    _cancelSubmit();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
     final scenarioData = buildSupportAssistantScenario(widget.scenario, text);
+    if (!isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: SupportTicketFormPage.location(widget.scenario),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     final generationId = ref.watch(
       generationHistoryControllerProvider.select(
@@ -531,6 +599,10 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
 
   Future<void> _preloadSupportContext() async {
     if (!mounted) {
+      return;
+    }
+
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
       return;
     }
 

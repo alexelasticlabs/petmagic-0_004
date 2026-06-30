@@ -1,66 +1,26 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show Platform;
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:go_router/go_router.dart';
-import 'package:petmagic_mobile/app/app.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
-import 'package:petmagic_mobile/app/preferences/app_preferences_controller.dart';
-import 'package:petmagic_mobile/app/router/app_router.dart';
-import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
-import 'package:petmagic_mobile/core/network/dio_provider.dart';
-import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
-import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
-import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
-import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
-import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
-import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
-import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
-import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
-import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generations_gallery_page.dart';
-import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
-import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
-import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
-import 'package:visibility_detector/visibility_detector.dart';
-part 'widget_test_support.part.dart';
+import 'widget_test_support.dart';
 
 void main() {
-  setUpAll(() {
-    VisibilityDetectorController.instance.updateInterval = Duration.zero;
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-  });
-
-  tearDown(() {
-    PetMagicNotificationCenter.instance.clearQueue();
-  });
+  configureWidgetTestHarness();
 
   testWidgets('shows welcome screen for first-time guest', (tester) async {
-    await _pumpApp(tester);
+    await pumpTestApp(tester);
 
     final text = AppLocalizations.of(
       tester.element(find.byType(Scaffold).first),
@@ -73,13 +33,13 @@ void main() {
   testWidgets('compact welcome keeps primary actions in first viewport', (
     tester,
   ) async {
-    await _pumpApp(tester, surfaceSize: const Size(320, 568));
+    await pumpTestApp(tester, surfaceSize: const Size(320, 568));
 
     final text = AppLocalizations.of(
       tester.element(find.byType(Scaffold).first),
     );
 
-    await _pumpFrames(tester, count: 6);
+    await pumpTestFrames(tester, count: 6);
 
     expect(tester.takeException(), isNull);
     _expectFullyVisible(
@@ -93,9 +53,9 @@ void main() {
   });
 
   testWidgets('compact sign-in inline actions do not overflow', (tester) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
+      sharedPrefs: const {onboardingSeenKey: true},
       surfaceSize: const Size(375, 667),
     );
 
@@ -122,9 +82,9 @@ void main() {
   testWidgets('onboarding guest action resets after startup failure', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      appLaunchController: _ThrowingGuestLaunchController.new,
+      appLaunchController: ThrowingGuestLaunchController.new,
     );
 
     final guestButton = find.widgetWithText(
@@ -145,7 +105,7 @@ void main() {
   });
 
   testWidgets('shows short welcome for returning guest', (tester) async {
-    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
+    await pumpTestApp(tester, sharedPrefs: const {onboardingSeenKey: true});
 
     final text = AppLocalizations.of(
       tester.element(find.byType(Scaffold).first),
@@ -157,7 +117,7 @@ void main() {
   });
 
   testWidgets('guest can open auth and registration pages', (tester) async {
-    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
+    await pumpTestApp(tester, sharedPrefs: const {onboardingSeenKey: true});
 
     await tester.tap(find.text('Sign in'));
     await tester.pump();
@@ -203,7 +163,7 @@ void main() {
   });
 
   testWidgets('registration legal links open their documents', (tester) async {
-    await _pumpApp(tester, sharedPrefs: const {_onboardingSeenKey: true});
+    await pumpTestApp(tester, sharedPrefs: const {onboardingSeenKey: true});
 
     await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
@@ -217,15 +177,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('auth_terms_link')));
-    await _pumpFrames(tester, count: 16);
+    await pumpTestFrames(tester, count: 16);
     expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
     expect(find.text('Terms paragraph'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
-    await _pumpFrames(tester);
+    await pumpTestFrames(tester);
 
     await tester.tap(find.byKey(const ValueKey('auth_privacy_link')));
-    await _pumpFrames(tester);
+    await pumpTestFrames(tester);
     expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
     expect(find.text('Privacy paragraph'), findsOneWidget);
   });
@@ -233,9 +193,9 @@ void main() {
   testWidgets('compact sign in keeps submit button visible without overflow', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
+      sharedPrefs: const {onboardingSeenKey: true},
       surfaceSize: const Size(320, 568),
     );
 
@@ -255,10 +215,10 @@ void main() {
   });
 
   testWidgets('registration requires accepting terms', (tester) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      profileRepository: _FakeProfileRepository(),
+      sharedPrefs: const {onboardingSeenKey: true},
+      profileRepository: FakeProfileRepository(),
     );
 
     await tester.tap(find.text('Sign in'));
@@ -295,11 +255,11 @@ void main() {
   testWidgets('sign up can continue when legal documents are unavailable', (
     tester,
   ) async {
-    final profileRepository = _UnavailableLegalDocumentsProfileRepository();
+    final profileRepository = UnavailableLegalDocumentsProfileRepository();
 
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
+      sharedPrefs: const {onboardingSeenKey: true},
       profileRepository: profileRepository,
       surfaceSize: const Size(393, 852),
     );
@@ -321,12 +281,12 @@ void main() {
     expect(find.text(text.authLegalUnavailable), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('auth_terms_link')));
-    await _pumpFrames(tester, count: 16);
+    await pumpTestFrames(tester, count: 16);
     expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
     expect(find.text(text.profileLegalLoading), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
-    await _pumpFrames(tester);
+    await pumpTestFrames(tester);
 
     await tester.enterText(find.byType(TextField).at(1), 'pet@example.com');
     await tester.enterText(find.byType(TextField).at(2), 'Password123');
@@ -353,10 +313,10 @@ void main() {
   testWidgets('guest can open password reset and request a code', (
     tester,
   ) async {
-    final profileRepository = _FakeProfileRepository();
-    await _pumpApp(
+    final profileRepository = FakeProfileRepository();
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
+      sharedPrefs: const {onboardingSeenKey: true},
       profileRepository: profileRepository,
     );
 
@@ -381,10 +341,10 @@ void main() {
   testWidgets('password reset returns to sign in with prefilled email', (
     tester,
   ) async {
-    final profileRepository = _FakeProfileRepository();
-    await _pumpApp(
+    final profileRepository = FakeProfileRepository();
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
+      sharedPrefs: const {onboardingSeenKey: true},
       profileRepository: profileRepository,
     );
 
@@ -415,11 +375,11 @@ void main() {
   testWidgets('registers a new user and opens email verification', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
-      profileRepository: _FakeProfileRepository(),
+      sharedPrefs: const {onboardingSeenKey: true},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
+      profileRepository: FakeProfileRepository(),
     );
 
     await tester.tap(find.text('Sign in'));
@@ -456,12 +416,12 @@ void main() {
   testWidgets('registration forwards consent and marketing flags', (
     tester,
   ) async {
-    final profileRepository = _FakeProfileRepository();
+    final profileRepository = FakeProfileRepository();
 
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      sharedPrefs: const {onboardingSeenKey: true},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
       profileRepository: profileRepository,
     );
 
@@ -499,12 +459,12 @@ void main() {
   testWidgets('registration blocks weak password before api call', (
     tester,
   ) async {
-    final profileRepository = _FakeProfileRepository();
+    final profileRepository = FakeProfileRepository();
 
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      sharedPrefs: const {onboardingSeenKey: true},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
       profileRepository: profileRepository,
     );
 
@@ -540,10 +500,10 @@ void main() {
   testWidgets('shows validation error when passwords do not match', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      profileRepository: _FakeProfileRepository(),
+      sharedPrefs: const {onboardingSeenKey: true},
+      profileRepository: FakeProfileRepository(),
     );
 
     await tester.tap(find.text('Sign in'));
@@ -576,11 +536,11 @@ void main() {
   });
 
   testWidgets('continues with Google and opens templates', (tester) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
-      externalAuthRepository: _FakeExternalAuthRepository(),
+      sharedPrefs: const {onboardingSeenKey: true},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
+      externalAuthRepository: FakeExternalAuthRepository(),
     );
 
     await tester.tap(find.text('Sign in'));
@@ -590,7 +550,7 @@ void main() {
       find.widgetWithText(OutlinedButton, 'Continue with Google'),
     );
     await tester.pump();
-    await _pumpFrames(tester);
+    await pumpTestFrames(tester);
 
     expect(find.text('Magic Studio'), findsOneWidget);
   });
@@ -598,10 +558,10 @@ void main() {
   testWidgets('shows localized message when external sign-in is cancelled', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      externalAuthRepository: _FailingExternalAuthRepository(
+      sharedPrefs: const {onboardingSeenKey: true},
+      externalAuthRepository: FailingExternalAuthRepository(
         const AppException('auth.external_cancelled'),
       ),
     );
@@ -612,7 +572,7 @@ void main() {
     await tester.tap(
       find.widgetWithText(OutlinedButton, 'Continue with Google'),
     );
-    await _pumpFrames(tester);
+    await pumpTestFrames(tester);
 
     expect(find.text('Sign-in was cancelled.'), findsOneWidget);
     await PetMagicNotificationCenter.instance.clearQueue();
@@ -621,18 +581,18 @@ void main() {
   test(
     'failed external sign-in does not block retrying regular auth',
     () async {
-      SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
+      SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
 
       final container = ProviderContainer(
         overrides: [
           profileRepositoryProvider.overrideWith(
-            (ref) => _FakeProfileRepository(),
+            (ref) => FakeProfileRepository(),
           ),
           externalAuthRepositoryProvider.overrideWith(
-            (ref) => _ThrowingExternalAuthRepository(),
+            (ref) => ThrowingExternalAuthRepository(),
           ),
           authSessionStorageProvider.overrideWith(
-            (ref) => _TestAuthSessionStorage(),
+            (ref) => TestAuthSessionStorage(),
           ),
         ],
       );
@@ -664,10 +624,10 @@ void main() {
   );
 
   test('logout clears cached google session', () async {
-    SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
+    SharedPreferences.setMockInitialValues(const {onboardingSeenKey: true});
 
-    final profileRepository = _FakeProfileRepository();
-    final externalAuthRepository = _TrackingExternalAuthRepository();
+    final profileRepository = FakeProfileRepository();
+    final externalAuthRepository = TrackingExternalAuthRepository();
     final container = ProviderContainer(
       overrides: [
         profileRepositoryProvider.overrideWith((ref) => profileRepository),
@@ -675,7 +635,7 @@ void main() {
           (ref) => externalAuthRepository,
         ),
         authSessionStorageProvider.overrideWith(
-          (ref) => _TestAuthSessionStorage(),
+          (ref) => TestAuthSessionStorage(),
         ),
       ],
     );
@@ -707,10 +667,10 @@ void main() {
   testWidgets('opens templates directly for authenticated user', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: {_onboardingSeenKey: true, _sessionKey: _buildSessionJson()},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      sharedPrefs: {onboardingSeenKey: true, sessionKey: buildSessionJson()},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
     );
 
     expect(find.text('Magic Studio'), findsOneWidget);
@@ -719,10 +679,10 @@ void main() {
   testWidgets('guest can continue from welcome into template browsing', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      repository: _FakeTemplatesRepository(items: const [_sampleTemplate]),
+      sharedPrefs: const {onboardingSeenKey: true},
+      repository: FakeTemplatesRepository(items: const [sampleTemplate]),
     );
 
     await tester.tap(find.text('Continue as guest'));
@@ -744,10 +704,10 @@ void main() {
   testWidgets('welcome guest action resets after startup failure', (
     tester,
   ) async {
-    await _pumpApp(
+    await pumpTestApp(
       tester,
-      sharedPrefs: const {_onboardingSeenKey: true},
-      appLaunchController: _ThrowingGuestLaunchController.new,
+      sharedPrefs: const {onboardingSeenKey: true},
+      appLaunchController: ThrowingGuestLaunchController.new,
     );
 
     final guestButton = find.widgetWithText(
@@ -766,1048 +726,6 @@ void main() {
 
     await PetMagicNotificationCenter.instance.clearQueue();
     await tester.pump();
-  });
-
-  testWidgets('profile tab shows sign-in gate for guest', (tester) async {
-    SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
-
-    final authStorage = _TestAuthSessionStorage();
-    final container = ProviderContainer(
-      overrides: [
-        dioProvider.overrideWith(
-          (ref) => Dio(BaseOptions(baseUrl: 'https://petmagic.test')),
-        ),
-        authSessionStorageProvider.overrideWith((ref) => authStorage),
-        templatesRepositoryProvider.overrideWith(
-          (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
-        ),
-        templateGenerationControllerProvider.overrideWith(
-          _IdleTemplateGenerationController.new,
-        ),
-        generationHistoryControllerProvider.overrideWith(
-          _IdleGenerationHistoryController.new,
-        ),
-        walletControllerProvider.overrideWith(_IdleWalletController.new),
-        profileRepositoryProvider.overrideWith(
-          (ref) => _FakeProfileRepository(),
-        ),
-        externalAuthRepositoryProvider.overrideWith(
-          (ref) => _FakeExternalAuthRepository(),
-        ),
-        realtimeClientProvider.overrideWith(
-          (ref) => const NoopRealtimeClient(),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await container
-        .read(appLaunchControllerProvider.notifier)
-        .continueAsGuest();
-    final router = container.read(appRouterProvider);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [Locale('en')],
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          routerConfig: router,
-        ),
-      ),
-    );
-    await _pumpFrames(tester);
-
-    router.go('/profile');
-    await _pumpFrames(tester);
-
-    final text = AppLocalizations.of(
-      tester.element(find.byType(Scaffold).first),
-    );
-
-    expect(find.text(text.authSignInRequired), findsOneWidget);
-    expect(find.text(text.authRequiredMessage), findsOneWidget);
-    expect(
-      find.widgetWithText(FilledButton, text.profileSignInAction),
-      findsOneWidget,
-    );
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    container.dispose();
-    await tester.pump(const Duration(milliseconds: 500));
-  });
-
-  testWidgets(
-    'app router shows auth gates for guest gallery routes without fetching',
-    (tester) async {
-      SharedPreferences.setMockInitialValues(const {_onboardingSeenKey: true});
-
-      final authStorage = _TestAuthSessionStorage();
-      final generationRepository = _RouterTemplateGenerationRepository();
-      final historyController = _TrackingGenerationHistoryController();
-      final container = ProviderContainer(
-        overrides: [
-          dioProvider.overrideWith(
-            (ref) => Dio(BaseOptions(baseUrl: 'https://petmagic.test')),
-          ),
-          authSessionStorageProvider.overrideWith((ref) => authStorage),
-          templateGenerationRepositoryProvider.overrideWithValue(
-            generationRepository,
-          ),
-          templatesRepositoryProvider.overrideWith(
-            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
-          ),
-          templateGenerationControllerProvider.overrideWith(
-            _IdleTemplateGenerationController.new,
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            () => historyController,
-          ),
-          walletControllerProvider.overrideWith(_IdleWalletController.new),
-          profileRepositoryProvider.overrideWith(
-            (ref) => _FakeProfileRepository(),
-          ),
-          externalAuthRepositoryProvider.overrideWith(
-            (ref) => _FakeExternalAuthRepository(),
-          ),
-          realtimeClientProvider.overrideWith(
-            (ref) => const NoopRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container
-          .read(appLaunchControllerProvider.notifier)
-          .continueAsGuest();
-      final router = container.read(appRouterProvider);
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const [Locale('en')],
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            routerConfig: router,
-          ),
-        ),
-      );
-      await _pumpFrames(tester);
-      final initialFetchPetsCalls = generationRepository.fetchPetsCalls;
-
-      final text = AppLocalizations.of(
-        tester.element(find.byType(Scaffold).first),
-      );
-
-      router.go(GenerationsGalleryPage.routePath);
-      await _pumpFrames(tester);
-      await tester.pumpAndSettle();
-      expect(find.byType(GenerationsGalleryPage), findsOneWidget);
-      expect(find.text(text.authSignInRequired), findsAtLeastNWidgets(1));
-      expect(
-        find.text(text.generationStatusEmptyMessage),
-        findsAtLeastNWidgets(1),
-      );
-      expect(historyController.loadCalls, isEmpty);
-      expect(historyController.screenVisibilityCalls, contains(false));
-
-      router.go(MyPetsPage.routePath);
-      await _pumpFrames(tester);
-      expect(find.byType(MyPetsPage), findsOneWidget);
-      expect(find.text(text.petsAuthRequiredTitle), findsAtLeastNWidgets(1));
-      expect(find.text(text.petsAuthRequiredMessage), findsAtLeastNWidgets(1));
-      expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
-
-      router.go(PetDetailsPage.location('pet-router'));
-      await _pumpFrames(tester);
-      expect(find.byType(PetDetailsPage), findsOneWidget);
-      expect(find.text(text.petsAuthRequiredTitle), findsAtLeastNWidgets(1));
-      expect(find.text(text.petsAuthRequiredMessage), findsAtLeastNWidgets(1));
-      expect(generationRepository.fetchPetsCalls, initialFetchPetsCalls);
-      expect(generationRepository.fetchPetPhotosCalls, 0);
-      expect(generationRepository.fetchPetGenerationsCalls, 0);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      container.dispose();
-      await tester.pump(const Duration(milliseconds: 500));
-    },
-  );
-
-  testWidgets(
-    'app router registers pet details creations and generation status routes',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({
-        _onboardingSeenKey: true,
-        _sessionKey: _buildSessionJson(),
-      });
-
-      final generationRepository = _RouterTemplateGenerationRepository();
-      final container = ProviderContainer(
-        overrides: [
-          dioProvider.overrideWith(
-            (ref) => Dio(BaseOptions(baseUrl: 'https://petmagic.test')),
-          ),
-          authSessionStorageProvider.overrideWith(
-            (ref) =>
-                _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
-          ),
-          templateGenerationRepositoryProvider.overrideWithValue(
-            generationRepository,
-          ),
-          templatesRepositoryProvider.overrideWith(
-            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
-          ),
-          templateGenerationControllerProvider.overrideWith(
-            _IdleTemplateGenerationController.new,
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            _IdleGenerationHistoryController.new,
-          ),
-          walletControllerProvider.overrideWith(_IdleWalletController.new),
-          profileRepositoryProvider.overrideWith(
-            (ref) => _FakeProfileRepository(),
-          ),
-          externalAuthRepositoryProvider.overrideWith(
-            (ref) => _FakeExternalAuthRepository(),
-          ),
-          realtimeClientProvider.overrideWith(
-            (ref) => const NoopRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      container.read(appLaunchControllerProvider.notifier).markSignedIn();
-      final router = container.read(appRouterProvider);
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const [Locale('en')],
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            routerConfig: router,
-          ),
-        ),
-      );
-      await _pumpFrames(tester);
-
-      router.go(MyPetsPage.routePath);
-      await _pumpFrames(tester);
-      expect(find.byType(MyPetsPage), findsOneWidget);
-
-      router.go(PetDetailsPage.location('pet-router'));
-      await _pumpFrames(tester);
-      expect(find.byType(PetDetailsPage), findsOneWidget);
-      expect(
-        tester.widget<PetDetailsPage>(find.byType(PetDetailsPage)).petId,
-        'pet-router',
-      );
-
-      const encodedPetId = 'pet/router #1?x=2';
-      router.go(PetDetailsPage.location(encodedPetId));
-      await _pumpFrames(tester);
-      expect(find.byType(PetDetailsPage), findsOneWidget);
-      expect(
-        tester.widget<PetDetailsPage>(find.byType(PetDetailsPage)).petId,
-        encodedPetId,
-      );
-
-      router.go(GenerationsGalleryPage.routePath);
-      await _pumpFrames(tester);
-      expect(find.byType(GenerationsGalleryPage), findsOneWidget);
-
-      router.go(GenerationStatusPage.routeFor('generation-router'));
-      await _pumpFrames(tester);
-      expect(find.byType(GenerationStatusPage), findsOneWidget);
-      expect(
-        tester
-            .widget<GenerationStatusPage>(find.byType(GenerationStatusPage))
-            .generationId,
-        'generation-router',
-      );
-
-      const encodedGenerationId = 'generation/router #1?x=2';
-      router.go(GenerationStatusPage.routeFor(encodedGenerationId));
-      await _pumpFrames(tester);
-      expect(find.byType(GenerationStatusPage), findsOneWidget);
-      expect(
-        tester
-            .widget<GenerationStatusPage>(find.byType(GenerationStatusPage))
-            .generationId,
-        encodedGenerationId,
-      );
-
-      final resultInputUri = Uri.parse(
-        GenerationResultInputPage.routeFor(encodedGenerationId),
-      );
-      expect(resultInputUri.pathSegments, [
-        'generation-results',
-        encodedGenerationId,
-        'use-input',
-      ]);
-      expect(resultInputUri.query, isEmpty);
-      expect(resultInputUri.fragment, isEmpty);
-
-      final supportUri = Uri.parse(
-        SupportChatPage.routeFor(
-          initialMessage: 'Report\n$encodedGenerationId',
-          relatedGenerationId: encodedGenerationId,
-        ),
-      );
-      expect(supportUri.path, SupportChatPage.routePath);
-      expect(
-        supportUri.queryParameters[SupportChatPage.initialMessageQueryParam],
-        'Report\n$encodedGenerationId',
-      );
-      expect(
-        supportUri.queryParameters[SupportChatPage
-            .relatedGenerationIdQueryParam],
-        encodedGenerationId,
-      );
-
-      generationRepository.fetchGenerationCalls.clear();
-      generationRepository.fetchCompatibleTemplateCalls.clear();
-      router.go(GenerationResultInputPage.routeFor(encodedGenerationId));
-      await _pumpFrames(tester);
-      expect(find.byType(GenerationResultInputPage), findsOneWidget);
-      expect(
-        tester
-            .widget<GenerationResultInputPage>(
-              find.byType(GenerationResultInputPage),
-            )
-            .generationId,
-        encodedGenerationId,
-      );
-      expect(generationRepository.fetchGenerationCalls, [encodedGenerationId]);
-      expect(generationRepository.fetchCompatibleTemplateCalls, [
-        encodedGenerationId,
-      ]);
-
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump(const Duration(minutes: 1, milliseconds: 1));
-    },
-  );
-
-  testWidgets(
-    'authenticated user can open legal detail pages from profile settings',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({
-        _onboardingSeenKey: true,
-        _sessionKey: _buildSessionJson(),
-      });
-
-      final container = ProviderContainer(
-        overrides: [
-          profileRepositoryProvider.overrideWith(
-            (ref) => _FakeProfileRepository(),
-          ),
-          authSessionStorageProvider.overrideWith(
-            (ref) =>
-                _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
-          ),
-          templatesRepositoryProvider.overrideWith(
-            (ref) => _FakeTemplatesRepository(items: const [_sampleTemplate]),
-          ),
-          templateGenerationControllerProvider.overrideWith(
-            _IdleTemplateGenerationController.new,
-          ),
-          generationHistoryControllerProvider.overrideWith(
-            _IdleGenerationHistoryController.new,
-          ),
-          walletControllerProvider.overrideWith(_IdleWalletController.new),
-          realtimeClientProvider.overrideWith(
-            (ref) => const NoopRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container.read(profileControllerProvider.notifier).initialize();
-      container.read(appLaunchControllerProvider.notifier).markSignedIn();
-
-      final router = container.read(appRouterProvider);
-
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp.router(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: const [Locale('en')],
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            routerConfig: router,
-          ),
-        ),
-      );
-      await _pumpFrames(tester);
-
-      router.go(
-        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.terms),
-      );
-      await _pumpFrames(tester);
-
-      expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
-      expect(
-        tester
-            .widget<ProfileSettingsDetailPage>(
-              find.byType(ProfileSettingsDetailPage),
-            )
-            .kind,
-        ProfileSettingsDetailKind.terms,
-      );
-
-      router.go(
-        ProfileSettingsDetailPage.location(ProfileSettingsDetailKind.privacy),
-      );
-      await _pumpFrames(tester);
-
-      expect(find.byType(ProfileSettingsDetailPage), findsOneWidget);
-      expect(
-        tester
-            .widget<ProfileSettingsDetailPage>(
-              find.byType(ProfileSettingsDetailPage),
-            )
-            .kind,
-        ProfileSettingsDetailKind.privacy,
-      );
-    },
-  );
-
-  testWidgets('settings screen renders account and preferences sections', (
-    tester,
-  ) async {
-    final container = ProviderContainer(
-      overrides: [
-        profileRepositoryProvider.overrideWith(
-          (ref) => _FakeProfileRepository(),
-        ),
-        authSessionStorageProvider.overrideWith(
-          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await container.read(profileControllerProvider.notifier).initialize();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [Locale('en')],
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          routerConfig: _testRouter(const ProfileSettingsPage()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Account information'), findsOneWidget);
-    expect(find.text('App language'), findsOneWidget);
-    expect(find.text('App theme'), findsOneWidget);
-  });
-
-  testWidgets('account details screen renders stored profile fields', (
-    tester,
-  ) async {
-    final profileRepository = _FakeProfileRepository()
-      ..storedSession = AuthSession.fromJson(
-        jsonDecode(_buildSessionJson()) as Map<String, dynamic>,
-      );
-
-    final container = ProviderContainer(
-      overrides: [
-        profileRepositoryProvider.overrideWith((ref) => profileRepository),
-        authSessionStorageProvider.overrideWith(
-          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await container.read(profileControllerProvider.notifier).initialize();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [Locale('en')],
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          routerConfig: _testRouter(const ProfileAccountInfoPage()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    final text = AppLocalizations.of(
-      tester.element(find.byType(ProfileAccountInfoPage)),
-    );
-
-    expect(find.text(text.profileSettingsAccountInfoTitle), findsOneWidget);
-    expect(find.text('Pet Parent'), findsWidgets);
-    expect(find.text('pet@example.com'), findsWidgets);
-    expect(find.text(text.profileAccountDetailsSubtitle), findsOneWidget);
-    expect(find.text('User ID'), findsNothing);
-  });
-
-  testWidgets('delete account detail screen reflects destructive live flow', (
-    tester,
-  ) async {
-    final profileRepository = _FakeProfileRepository()
-      ..storedSession = AuthSession.fromJson(
-        jsonDecode(_buildSessionJson()) as Map<String, dynamic>,
-      );
-
-    final container = ProviderContainer(
-      overrides: [
-        profileRepositoryProvider.overrideWith((ref) => profileRepository),
-        authSessionStorageProvider.overrideWith(
-          (ref) => _TestAuthSessionStorage(rawSessionJson: _buildSessionJson()),
-        ),
-        templateGenerationControllerProvider.overrideWith(
-          _IdleTemplateGenerationController.new,
-        ),
-        generationHistoryControllerProvider.overrideWith(
-          _IdleGenerationHistoryController.new,
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await container.read(profileControllerProvider.notifier).initialize();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp.router(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [Locale('en')],
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          routerConfig: _testRouter(
-            const ProfileSettingsDetailPage(
-              kind: ProfileSettingsDetailKind.deleteAccount,
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(
-        of: find.byType(FilledButton),
-        matching: find.text('Delete account'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Delete account'), findsWidgets);
-    expect(find.text('CURRENT STATUS'), findsOneWidget);
-    expect(
-      find.textContaining('Deletion is available from this screen'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('review the warning, and confirm deletion'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('Deletion is not available as a one-tap action'),
-      findsNothing,
-    );
-  });
-
-  test('support chat controller loads existing messages', () async {
-    final supportRepository = _FakeSupportChatRepository();
-    final container = ProviderContainer(
-      overrides: [
-        supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
-        supportChatRealtimeClientProvider.overrideWith(
-          (ref) => const _FakeSupportChatRealtimeClient(),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    await container.read(supportChatControllerProvider.notifier).initialize();
-
-    final state = container.read(supportChatControllerProvider);
-    expect(state.conversation, isNotNull);
-    expect(state.conversation?.assignedAdminDisplayName, 'PetMagic Support');
-    expect(state.conversation?.messages.first.body, 'How can we help today?');
-    expect(state.conversation?.userUnreadCount, 0);
-  });
-
-  test('support chat controller sends a new message', () async {
-    final supportRepository = _FakeSupportChatRepository();
-    final container = ProviderContainer(
-      overrides: [
-        supportChatRepositoryProvider.overrideWith((ref) => supportRepository),
-        supportChatRealtimeClientProvider.overrideWith(
-          (ref) => const _FakeSupportChatRealtimeClient(),
-        ),
-      ],
-    );
-    addTearDown(container.dispose);
-
-    final controller = container.read(supportChatControllerProvider.notifier);
-    await controller.initialize();
-    await controller.sendMessage('I need billing help', localeTag: 'en');
-
-    final state = container.read(supportChatControllerProvider);
-    expect(supportRepository.lastSentBody, 'I need billing help');
-    expect(
-      state.conversation?.messages.any(
-        (message) => message.body == 'I need billing help',
-      ),
-      isTrue,
-    );
-  });
-
-  test(
-    'support chat controller creates conversation on first message',
-    () async {
-      final supportRepository = _FakeSupportChatRepository(
-        hasConversation: false,
-      );
-      final container = ProviderContainer(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      final controller = container.read(supportChatControllerProvider.notifier);
-      await controller.initialize();
-      expect(
-        container.read(supportChatControllerProvider).conversation,
-        isNull,
-      );
-
-      await controller.sendMessage('Need help with tokens', localeTag: 'en');
-
-      final state = container.read(supportChatControllerProvider);
-      expect(supportRepository.openConversationCalls, 1);
-      expect(
-        supportRepository.lastOpenedInitialMessage,
-        'Need help with tokens',
-      );
-      expect(supportRepository.lastOpenedRelatedGenerationId, isNull);
-      expect(state.conversation, isNotNull);
-      expect(
-        state.conversation?.messages.any(
-          (message) => message.body == 'Need help with tokens',
-        ),
-        isTrue,
-      );
-    },
-  );
-
-  test(
-    'support chat controller attaches related generation to first message',
-    () async {
-      final supportRepository = _FakeSupportChatRepository(
-        hasConversation: false,
-      );
-      final container = ProviderContainer(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      final controller = container.read(supportChatControllerProvider.notifier);
-      await controller.initialize();
-      await controller.sendMessage(
-        'Generation issue',
-        localeTag: 'en',
-        relatedGenerationId: 'generation-router',
-      );
-
-      expect(supportRepository.openConversationCalls, 1);
-      expect(
-        supportRepository.lastOpenedRelatedGenerationId,
-        'generation-router',
-      );
-    },
-  );
-
-  test(
-    'support chat controller clears loading state on unexpected error',
-    () async {
-      final supportRepository = _ThrowingSupportChatRepository();
-      final container = ProviderContainer(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-      );
-      addTearDown(container.dispose);
-
-      await container.read(supportChatControllerProvider.notifier).initialize();
-
-      final state = container.read(supportChatControllerProvider);
-      expect(state.isLoading, isFalse);
-      expect(state.conversation, isNull);
-      expect(state.errorMessage, 'support.unavailable');
-    },
-  );
-
-  testWidgets(
-    'support chat page shows retry fallback when initial load takes too long',
-    (tester) async {
-      final supportRepository = _DelayedSupportChatRepository();
-
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      });
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            supportChatRepositoryProvider.overrideWith(
-              (ref) => supportRepository,
-            ),
-            supportChatRealtimeClientProvider.overrideWith(
-              (ref) => const _FakeSupportChatRealtimeClient(),
-            ),
-          ],
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            locale: const Locale('en'),
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            home: const SupportChatPage(),
-          ),
-        ),
-      );
-
-      await tester.pump();
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-      await tester.pump(const Duration(seconds: 9));
-
-      expect(find.text('Start the conversation'), findsOneWidget);
-      expect(
-        find.text(
-          'Unable to reach support right now. Please try again in a moment.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.widgetWithText(FilledButton, 'Retry'), findsOneWidget);
-    },
-  );
-
-  testWidgets('support chat page renders support header and security card', (
-    tester,
-  ) async {
-    final supportRepository = _FakeSupportChatRepository();
-
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: const SupportChatPage(),
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Your conversation is protected. We use it only for support.'),
-      findsOneWidget,
-    );
-    expect(find.byIcon(Icons.shield_rounded), findsOneWidget);
-    expect(find.text('PetMagic Support'), findsWidgets);
-    expect(find.text('We usually reply within 24 hours'), findsWidgets);
-    expect(find.byIcon(Icons.attach_file_rounded), findsOneWidget);
-  });
-
-  testWidgets('support chat page preloads generation report context', (
-    tester,
-  ) async {
-    final supportRepository = _FakeSupportChatRepository(
-      hasConversation: false,
-    );
-
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: const SupportChatPage(
-            initialMessage: 'Report a problem\nRelated generation: g-ready-1',
-            relatedGenerationId: 'g-ready-1',
-          ),
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    final composer = tester.widget<TextField>(find.byType(TextField).last);
-    expect(
-      composer.controller?.text,
-      'Report a problem\nRelated generation: g-ready-1',
-    );
-  });
-
-  testWidgets('support chat page shows welcome actions for empty chat', (
-    tester,
-  ) async {
-    final supportRepository = _FakeSupportChatRepository(
-      emptyConversation: true,
-    );
-
-    addTearDown(() async {
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          supportChatRepositoryProvider.overrideWith(
-            (ref) => supportRepository,
-          ),
-          supportChatRealtimeClientProvider.overrideWith(
-            (ref) => const _FakeSupportChatRealtimeClient(),
-          ),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: const SupportChatPage(),
-        ),
-      ),
-    );
-
-    await tester.pump();
-    await tester.pumpAndSettle();
-
-    final text = AppLocalizations.of(
-      tester.element(find.byType(SupportChatPage)),
-    );
-
-    expect(find.text(text.supportChatWelcomeBody), findsOneWidget);
-    expect(find.text(text.supportHomeTopicGenerationIssue), findsOneWidget);
-    expect(find.text(text.supportHomeTopicPaymentRefund), findsOneWidget);
-    expect(find.text(text.supportHomeTopicTokensNotArrived), findsOneWidget);
-  });
-
-  testWidgets(
-    'support chat attachment bubble does not overflow on narrow screens',
-    (tester) async {
-      final view = tester.view;
-      view.physicalSize = const Size(320, 720);
-      view.devicePixelRatio = 1.0;
-      addTearDown(() {
-        view.resetPhysicalSize();
-        view.resetDevicePixelRatio();
-      });
-
-      const longFileName =
-          'ultra-super-mega-long-support-attachment-file-name-for-mobile-overflow-regression-check-2026-final-version.pdf';
-
-      final supportRepository = _FakeSupportChatRepository();
-      supportRepository._conversation = SupportChatConversation(
-        conversationId: 'conversation-overflow-1',
-        initiatorUserId: 'user-1',
-        userEmail: 'pet@example.com',
-        userDisplayName: 'Pet Parent',
-        assignedAdminId: 'admin-1',
-        assignedAdminDisplayName: 'PetMagic Support',
-        status: 'Open',
-        priority: 'Normal',
-        source: 'Direct',
-        userUnreadCount: 0,
-        adminUnreadCount: 0,
-        createdAtUtc: DateTime.utc(2026, 1, 1, 10),
-        updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
-        lastMessageAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
-        messages: [
-          SupportChatMessage(
-            messageId: 'message-replied',
-            conversationId: 'conversation-overflow-1',
-            senderUserId: 'admin-1',
-            senderDisplayName: 'PetMagic Support',
-            isFromAdmin: true,
-            senderType: 'Admin',
-            body: 'Please attach the file so we can investigate this issue.',
-            isRead: true,
-            attachments: const [],
-            createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-          ),
-          SupportChatMessage(
-            messageId: 'message-attachment',
-            conversationId: 'conversation-overflow-1',
-            senderUserId: 'user-1',
-            senderDisplayName: 'Pet Parent',
-            isFromAdmin: false,
-            senderType: 'User',
-            body: '',
-            replyToMessageId: 'message-replied',
-            replyToPreview: 'Please attach the file so we can investigate.',
-            isRead: false,
-            attachments: const [
-              SupportChatAttachment(
-                fileUrl: 'https://example.com/files/attachment.pdf',
-                type: 'file',
-                mimeType: 'application/pdf',
-                fileName: longFileName,
-                sizeBytes: 245760,
-              ),
-            ],
-            createdAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
-          ),
-        ],
-      );
-
-      addTearDown(() async {
-        await tester.pumpWidget(const SizedBox.shrink());
-        await tester.pump();
-      });
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            supportChatRepositoryProvider.overrideWith(
-              (ref) => supportRepository,
-            ),
-            supportChatRealtimeClientProvider.overrideWith(
-              (ref) => const _FakeSupportChatRealtimeClient(),
-            ),
-          ],
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            locale: const Locale('en'),
-            theme: AppTheme.light(),
-            darkTheme: AppTheme.dark(),
-            home: const SupportChatPage(),
-          ),
-        ),
-      );
-
-      await tester.pump();
-      await tester.pumpAndSettle();
-
-      expect(find.byIcon(Icons.insert_drive_file_outlined), findsOneWidget);
-      expect(find.textContaining('Please attach the file'), findsWidgets);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  test('app preferences controller persists theme and locale', () async {
-    SharedPreferences.setMockInitialValues(const {});
-
-    final firstContainer = ProviderContainer();
-    addTearDown(firstContainer.dispose);
-
-    firstContainer.read(appPreferencesControllerProvider);
-    await Future<void>.delayed(Duration.zero);
-
-    final firstController = firstContainer.read(
-      appPreferencesControllerProvider.notifier,
-    );
-
-    await firstController.updateThemeMode(ThemeMode.dark);
-    await firstController.updateLocale(const Locale('en'));
-
-    final secondContainer = ProviderContainer();
-    addTearDown(secondContainer.dispose);
-
-    secondContainer.read(appPreferencesControllerProvider);
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
-
-    final loadedState = secondContainer.read(appPreferencesControllerProvider);
-    expect(loadedState.themeMode, ThemeMode.dark);
-    expect(loadedState.locale, const Locale('en'));
-  });
-
-  test('app preferences controller preserves stored country-specific locale', () async {
-    SharedPreferences.setMockInitialValues(const {
-      'petmagic_mobile_locale': 'en_US',
-    });
-
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-
-    container.read(appPreferencesControllerProvider);
-    await Future<void>.delayed(Duration.zero);
-    await Future<void>.delayed(Duration.zero);
-
-    final state = container.read(appPreferencesControllerProvider);
-    expect(state.locale, const Locale('en', 'US'));
   });
 }
 

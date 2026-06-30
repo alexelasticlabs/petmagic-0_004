@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
@@ -8,14 +9,10 @@ String typeLabel(AppLocalizations text, TemplateGenerationResult generation) {
   return isVideoGeneration(generation) ? text.videoLabel : text.imageLabel;
 }
 
-String formatGenerationDateTime(DateTime value) {
-  final local = value.toLocal();
-  final day = local.day.toString().padLeft(2, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final year = local.year;
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '$day.$month.$year, $hour:$minute';
+String formatGenerationDateTime(DateTime value, Locale locale) {
+  return DateFormat.yMMMd(
+    locale.toLanguageTag(),
+  ).add_Hm().format(value.toLocal());
 }
 
 String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {

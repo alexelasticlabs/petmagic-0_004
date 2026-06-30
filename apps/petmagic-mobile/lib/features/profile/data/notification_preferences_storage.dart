@@ -101,13 +101,13 @@ class NotificationPreferences {
 
 class NotificationPreferencesStorage {
   static const _keyPrefix = 'petmagic_mobile_notification_preferences_v1_';
+  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   Future<NotificationPreferences> read({
     required String scope,
     required bool fallbackMarketingEmails,
   }) async {
-    final preferences = await SharedPreferences.getInstance();
-    final rawValue = preferences.getString('$_keyPrefix$scope');
+    final rawValue = await _preferences.getString('$_keyPrefix$scope');
 
     if (rawValue == null || rawValue.isEmpty) {
       return NotificationPreferences.defaults().copyWith(
@@ -146,8 +146,7 @@ class NotificationPreferencesStorage {
     required String scope,
     required NotificationPreferences preferences,
   }) async {
-    final sharedPreferences = await SharedPreferences.getInstance();
-    await sharedPreferences.setString(
+    await _preferences.setString(
       '$_keyPrefix$scope',
       jsonEncode(preferences.toJson()),
     );

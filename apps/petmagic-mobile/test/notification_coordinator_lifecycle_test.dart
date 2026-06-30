@@ -16,23 +16,54 @@ void main() {
     expect(source, contains('bool _canContinueRegistration(int epoch)'));
     expect(
       source,
-      contains('return !_isDisposed && epoch == _registrationEpoch;'),
+      contains(
+        'return !_isDisposed && _authSessionActive && epoch == _registrationEpoch;',
+      ),
     );
     expect(source, contains('if (!_canContinueRegistration(epoch))'));
+    expect(source, contains('unregisterCurrentTokenOnSignOut() async {'));
+    expect(
+      source,
+      contains('await _unregisterCurrentToken(markSessionInactive: true);'),
+    );
+    expect(source, contains('Future<void> _unregisterCurrentToken({'));
+    expect(source, contains('final epoch = ++_registrationEpoch;'));
     expect(
       source,
       contains(
-        'unregisterCurrentTokenOnSignOut() async {\n    _registrationEpoch++;',
+        'dispose() async {\n    _isDisposed = true;\n    _authSessionActive = false;\n    _registrationEpoch++;',
       ),
     );
-    expect(
-      source,
-      contains(
-        'dispose() async {\n    _isDisposed = true;\n    _registrationEpoch++;',
-      ),
-    );
-    expect(source, contains('PushTokenRegistrar.invalidateToken(token)'));
+    expect(source, contains('_pushTokenRegistrar.readRegisteredToken()'));
+    expect(source, contains('_pushTokenRegistrar.unregisterToken('));
+    expect(source, contains("onFailure: (stage, error, stackTrace) {"));
+    expect(source, contains('if (allUnregistered) {'));
+    expect(source, contains("unregister_\${stage}_token"));
   });
+
+  test(
+    'notification coordinator stops token re-registration and clears dedupe state after sign-out',
+    () {
+      final source = File(
+        'lib/core/notifications/notification_coordinator.dart',
+      ).readAsStringSync();
+      final initBody = _methodBody(source, 'initializeForAuthenticatedUser');
+      final registerBody = _methodBody(source, 'registerCurrentToken');
+      final unregisterBody = _methodBody(source, '_unregisterCurrentToken');
+      final refreshedBody = _methodBody(source, '_registerRefreshedToken');
+      final ensureInitializedBody = _methodBody(source, '_ensureInitialized');
+      final canContinueBody = _methodBody(source, '_canContinueRegistration');
+
+      expect(source, contains('bool _authSessionActive = false;'));
+      expect(initBody, contains('_authSessionActive = true;'));
+      expect(registerBody, contains('|| !_authSessionActive'));
+      expect(unregisterBody, contains('_authSessionActive = false;'));
+      expect(unregisterBody, contains('_handledInteractions.clear();'));
+      expect(refreshedBody, contains('!_authSessionActive'));
+      expect(ensureInitializedBody, contains('if (!_authSessionActive) {'));
+      expect(canContinueBody, contains('_authSessionActive'));
+    },
+  );
 
   test('notification failure logs do not include push token context', () {
     final source = File(
@@ -180,7 +211,7 @@ void main() {
     final deepLinkBody = _methodBody(source, '_openDeepLink');
     final initialLinkBody = _methodBody(source, '_handleInitialLinkOnce');
     final flushPendingBody = _methodBody(source, '_flushPendingRouteIfReady');
-    final canOpenRouteBody = _methodBody(source, '_canOpenRouteNow');
+    final resolvedRouteBody = _methodBody(source, '_resolvedRouteDestination');
     final buildBody = _methodBody(source, 'build');
 
     expect(initStateBody, contains('ref.listenManual<AppLaunchState>'));
@@ -191,15 +222,26 @@ void main() {
     expect(launchStateBody, contains('if (!mounted)'));
     expect(launchStateBody, contains('_flushPendingRouteIfReady(launchState)'));
     expect(routeBody, contains('if (!mounted)'));
+    expect(routeBody, contains('if (!_isSupportedRoute(route))'));
+    expect(
+      routeBody,
+      contains('final destination = _resolvedRouteDestination'),
+    );
     expect(routeBody, contains('_pendingRoute = route'));
-    expect(routeBody, contains('_canOpenRouteNow(launchState)'));
     expect(deepLinkBody, contains('if (!mounted)'));
     expect(deepLinkBody, contains('_openRoute('));
     expect(initialLinkBody, isNot(contains('Firebase.apps')));
-    expect(flushPendingBody, contains('widget.router.go(route)'));
-    expect(canOpenRouteBody, contains('launchState.isLoading'));
-    expect(canOpenRouteBody, contains('launchState.isAuthenticated'));
-    expect(canOpenRouteBody, contains('launchState.guestSessionReady'));
+    expect(
+      flushPendingBody,
+      contains('final destination = _resolvedRouteDestination'),
+    );
+    expect(flushPendingBody, contains('widget.router.go(destination)'));
+    expect(resolvedRouteBody, contains('launchState.isLoading'));
+    expect(resolvedRouteBody, contains('launchState.isAuthenticated'));
+    expect(resolvedRouteBody, contains('launchState.guestSessionReady'));
+    expect(resolvedRouteBody, contains('_isAuthOnlyRoute(route)'));
+    expect(resolvedRouteBody, contains('_authRedirectRoute(route)'));
+    expect(source, contains('AuthEntryPage.routePath'));
     expect(buildBody, contains('return widget.child;'));
     expect(
       buildBody,
@@ -210,6 +252,33 @@ void main() {
     expect(buildBody, isNot(contains('initializeForAuthenticatedUser')));
     expect(buildBody, isNot(contains('unregisterCurrentTokenOnSignOut')));
   });
+
+  test(
+    'notification settings reconcile push token registration on permission changes',
+    () {
+      final source = File(
+        'lib/features/profile/presentation/widgets/profile_notifications_settings_section.dart',
+      ).readAsStringSync();
+      final reconcileBody = _methodBody(
+        source,
+        '_reconcilePushTokenRegistration',
+      );
+
+      expect(source, contains('await _reconcilePushTokenRegistration('));
+      expect(reconcileBody, contains('if (_isPushPermissionAllowed(status))'));
+      expect(reconcileBody, contains('_registerPushTokenIfAllowed(status)'));
+      expect(
+        reconcileBody,
+        contains('_pushTokenRegistrar.readRegisteredToken()'),
+      );
+      expect(reconcileBody, contains('FirebaseMessaging.instance.getToken()'));
+      expect(reconcileBody, contains('_pushTokenRegistrar.unregisterToken('));
+      expect(
+        reconcileBody,
+        contains("unregister_\${stage}_token_after_permission_change"),
+      );
+    },
+  );
 
   test('firebase background message handler is registered before runApp', () {
     final source = File('lib/main.dart').readAsStringSync();
@@ -225,6 +294,60 @@ void main() {
     );
     expect(source, contains('FirebaseMessaging.onBackgroundMessage'));
   });
+
+  test(
+    'push token registrar persists successful registrations for cross-launch dedupe',
+    () {
+      final registrarSource = File(
+        'lib/core/notifications/push_token_registrar.dart',
+      ).readAsStringSync();
+      final cacheSource = File(
+        'lib/core/notifications/push_token_registration_cache.dart',
+      ).readAsStringSync();
+
+      expect(
+        registrarSource,
+        contains('PushTokenRegistrationCache? registrationCache'),
+      );
+      expect(
+        registrarSource,
+        contains('SharedPreferencesPushTokenRegistrationCache()'),
+      );
+      expect(
+        registrarSource,
+        contains('await _readLastCompletedRegistrationKey()'),
+      );
+      expect(
+        registrarSource,
+        contains(
+          'await _registrationCache.writeLastCompletedRegistrationKey(registrationKey)',
+        ),
+      );
+      expect(
+        registrarSource,
+        contains('Future<String?> readRegisteredToken()'),
+      );
+      expect(
+        registrarSource,
+        contains('Future<void> invalidatePersistedToken(String token) async'),
+      );
+      expect(registrarSource, contains('Future<bool> unregisterToken({'));
+      expect(
+        registrarSource,
+        contains(
+          'static final Map<String, Future<bool>> _inFlightUnregistrations',
+        ),
+      );
+      expect(
+        cacheSource,
+        contains('petmagic_mobile_push_token_last_registration_key_v1'),
+      );
+      expect(
+        cacheSource,
+        contains('clearLastCompletedRegistrationKeyForToken'),
+      );
+    },
+  );
 }
 
 String _methodBody(String source, String methodName) {

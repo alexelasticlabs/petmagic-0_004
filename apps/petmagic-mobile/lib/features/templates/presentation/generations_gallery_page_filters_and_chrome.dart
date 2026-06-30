@@ -433,7 +433,10 @@ class _GalleryGoldShimmerButtonState extends State<_GalleryGoldShimmerButton>
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         backgroundColor: const Color(0xFFF5BD3E),
         foregroundColor: const Color(0xFF241403),
-        textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+        textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+        ),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
       ),
       child: FittedBox(

@@ -16,34 +16,37 @@ void main() {
     expect(source, isNot(contains("Thanks for the feedback")));
   });
 
-  test('premium paywall feedback keys exist in every supported locale', () async {
-    const arbFiles = <String>[
-      'lib/l10n/app_en.arb',
-      'lib/l10n/app_ru.arb',
-      'lib/l10n/app_de.arb',
-      'lib/l10n/app_es.arb',
-      'lib/l10n/app_fr.arb',
-      'lib/l10n/app_it.arb',
-      'lib/l10n/app_pl.arb',
-    ];
-    const requiredKeys = <String>[
-      'premiumPaywallFeedbackTitle',
-      'premiumPaywallFeedbackCommentLabel',
-      'premiumPaywallFeedbackCommentHint',
-      'premiumPaywallFeedbackSubmitAction',
-      'premiumPaywallFeedbackThanksMessage',
-      'premiumPaywallFeedbackOptionExpensive',
-      'premiumPaywallFeedbackOptionLowValue',
-      'premiumPaywallFeedbackOptionPaymentProblem',
-      'premiumPaywallFeedbackOptionJustBrowsing',
-      'premiumPaywallFeedbackOptionOther',
-    ];
+  test(
+    'premium paywall feedback keys exist in every supported locale',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+      const requiredKeys = <String>[
+        'premiumPaywallFeedbackTitle',
+        'premiumPaywallFeedbackCommentLabel',
+        'premiumPaywallFeedbackCommentHint',
+        'premiumPaywallFeedbackSubmitAction',
+        'premiumPaywallFeedbackThanksMessage',
+        'premiumPaywallFeedbackOptionExpensive',
+        'premiumPaywallFeedbackOptionLowValue',
+        'premiumPaywallFeedbackOptionPaymentProblem',
+        'premiumPaywallFeedbackOptionJustBrowsing',
+        'premiumPaywallFeedbackOptionOther',
+      ];
 
-    for (final path in arbFiles) {
-      final source = await File(path).readAsString();
-      for (final key in requiredKeys) {
-        expect(source, contains('"$key"'), reason: '$path is missing $key');
+      for (final path in arbFiles) {
+        final source = await File(path).readAsString();
+        for (final key in requiredKeys) {
+          expect(source, contains('"$key"'), reason: '$path is missing $key');
+        }
       }
-    }
-  });
+    },
+  );
 }

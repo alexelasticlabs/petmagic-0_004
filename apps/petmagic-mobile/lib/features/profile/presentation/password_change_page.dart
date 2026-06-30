@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_flow_widgets.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 class PasswordChangePage extends ConsumerStatefulWidget {
   const PasswordChangePage({super.key, required this.email});
@@ -24,14 +27,59 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
   final _codeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _wasAuthenticated = false;
+  bool _hasInitializedController = false;
 
   @override
   void initState() {
     super.initState();
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant PasswordChangePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.email.trim() == oldWidget.email.trim()) {
+      return;
+    }
+
+    _hasInitializedController = false;
+    if (_wasAuthenticated) {
+      _scheduleControllerReset();
+    }
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    if (launchState.isAuthenticated && !_wasAuthenticated) {
+      _wasAuthenticated = true;
+      _scheduleControllerReset();
+      return;
+    }
+
+    if (!launchState.isAuthenticated && _wasAuthenticated) {
+      _wasAuthenticated = false;
+      _hasInitializedController = false;
+      return;
+    }
+
+    _wasAuthenticated = launchState.isAuthenticated;
+  }
+
+  void _scheduleControllerReset() {
+    if (_hasInitializedController) {
+      return;
+    }
+
+    _hasInitializedController = true;
     Future.microtask(() {
-      if (!mounted) {
+      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 
@@ -43,6 +91,7 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
 
   @override
   void dispose() {
+    _launchSubscription?.close();
     _codeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -51,9 +100,31 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
 
   @override
   Widget build(BuildContext context) {
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
+    final text = AppLocalizations.of(context);
+    if (!isAuthenticated) {
+      final redirectPath = widget.email.trim().isEmpty
+          ? PasswordChangePage.routePath
+          : '${PasswordChangePage.routePath}?email=${Uri.encodeQueryComponent(widget.email.trim())}';
+
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 20),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () =>
+                  showAuthRequiredSheet(context, redirectPath: redirectPath),
+            ),
+          ),
+        ),
+      );
+    }
+
     final state = ref.watch(passwordChangeControllerProvider);
     final controller = ref.read(passwordChangeControllerProvider.notifier);
-    final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
 
     ref.listen(passwordChangeControllerProvider, (previous, next) {

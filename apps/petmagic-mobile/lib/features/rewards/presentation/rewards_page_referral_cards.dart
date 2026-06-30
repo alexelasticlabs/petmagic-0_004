@@ -71,12 +71,17 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final textTheme = Theme.of(context).textTheme;
     final promoForeground = Theme.of(context).colorScheme.onPrimary;
     final promoHeaderGradient = LinearGradient(
       colors: [
         colors.gold.withValues(alpha: 0.7),
         colors.accent.withValues(alpha: 0.9),
       ],
+    );
+    final promoButtonTextStyle = textTheme.labelLarge?.copyWith(
+      fontSize: 13,
+      fontWeight: FontWeight.w900,
     );
 
     return _RewardsGlassPanel(
@@ -142,10 +147,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(13),
                         ),
-                        textStyle: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                        ),
+                        textStyle: promoButtonTextStyle,
                       ),
                       child: widget.isSubmitting
                           ? SizedBox(
@@ -207,10 +209,7 @@ class _PromoCodeCardState extends State<_PromoCodeCard> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(13),
                             ),
-                            textStyle: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
+                            textStyle: promoButtonTextStyle,
                           ),
                           child: widget.isSubmitting
                               ? SizedBox(

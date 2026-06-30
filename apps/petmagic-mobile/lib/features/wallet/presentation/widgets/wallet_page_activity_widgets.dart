@@ -83,8 +83,10 @@ class _FeaturedPackTile extends StatelessWidget {
     final colors = context.petMagicColors;
     final price = displayPrice ?? _formatPrice(pack);
     final valueLabel = _valuePerCurrencyLabel(text, pack);
-    final photosApprox = (pack.totalSpark / _kPhotoCostSpark).floor();
-    final videosApprox = (pack.totalSpark / _kVideoCostSpark).floor();
+    final photosApprox = (pack.totalSpark / _kWalletApproxPhotoCostSpark)
+        .floor();
+    final videosApprox = (pack.totalSpark / _kWalletApproxVideoCostSpark)
+        .floor();
     final photosApproxLabel = text.walletApproxPhotos(photosApprox);
     final usageLabel = videosApprox > 0
         ? text.walletApproxPhotosOrVideos(
@@ -243,7 +245,7 @@ class _FeaturedPackTile extends StatelessWidget {
                     ),
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     disabledForegroundColor: colors.textMuted,
-                    textStyle: const TextStyle(
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontSize: 14,
                       fontWeight: FontWeight.w900,
                     ),
@@ -286,7 +288,7 @@ class _FeaturedPackTile extends StatelessWidget {
                   minimumSize: const Size(0, 30),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   foregroundColor: colors.textSoft,
-                  textStyle: const TextStyle(
+                  textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -350,7 +352,7 @@ class _LedgerSection extends StatelessWidget {
                   style: TextButton.styleFrom(
                     foregroundColor: colors.accent,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    textStyle: const TextStyle(
+                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
                     ),

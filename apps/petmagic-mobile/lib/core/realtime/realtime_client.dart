@@ -50,7 +50,7 @@ class PollingRealtimeClient implements RealtimeClient {
 
   StreamController<RealtimeEvent>? _controller;
   Timer? _timer;
-  bool _isConnected = false;
+  int _connectionHolders = 0;
 
   @override
   Stream<RealtimeEvent> get events =>
@@ -58,11 +58,11 @@ class PollingRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> connect() async {
-    if (_isConnected) {
+    _connectionHolders++;
+    if (_timer != null) {
       return;
     }
 
-    _isConnected = true;
     final controller = _controller ??=
         StreamController<RealtimeEvent>.broadcast();
     _timer = Timer.periodic(interval, (_) {
@@ -78,9 +78,17 @@ class PollingRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> disconnect() async {
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    _connectionHolders--;
+    if (_connectionHolders > 0) {
+      return;
+    }
+
     _timer?.cancel();
     _timer = null;
-    _isConnected = false;
 
     final controller = _controller;
     _controller = null;
@@ -103,6 +111,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
   StreamController<RealtimeEvent>? _controller;
   Future<void>? _connectionLoop;
   Completer<void>? _stopSignal;
+  int _connectionHolders = 0;
 
   @override
   Stream<RealtimeEvent> get events =>
@@ -110,6 +119,7 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> connect() async {
+    _connectionHolders++;
     if (_connectionLoop != null) {
       return;
     }
@@ -120,6 +130,15 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> disconnect() async {
+    if (_connectionHolders == 0) {
+      return;
+    }
+
+    _connectionHolders--;
+    if (_connectionHolders > 0) {
+      return;
+    }
+
     final stopSignal = _stopSignal;
     if (stopSignal != null && !stopSignal.isCompleted) {
       stopSignal.complete();
@@ -131,13 +150,13 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
     final connectionLoop = _connectionLoop;
     _connectionLoop = null;
     _stopSignal = null;
+    final controller = _controller;
+    _controller = null;
 
     if (connectionLoop != null) {
       await connectionLoop;
     }
 
-    final controller = _controller;
-    _controller = null;
     await controller?.close();
   }
 

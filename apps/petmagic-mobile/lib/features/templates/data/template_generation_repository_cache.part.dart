@@ -5,9 +5,13 @@ Future<List<TemplateGenerationResult>?> _readCachedGenerations(
   String? status,
 }) async {
   try {
-    final raw = await repository._preferences.getString(
-      repository._cacheKeyForStatus(status),
-    );
+    final cacheKey = repository._cacheKeyForStatus(status);
+    if (await _isGenerationCacheKeyExpired(repository, cacheKey)) {
+      await _clearGenerationCacheKey(repository, cacheKey);
+      return null;
+    }
+
+    final raw = await repository._preferences.getString(cacheKey);
     if (raw == null || raw.isEmpty) {
       return null;
     }
@@ -58,6 +62,17 @@ Future<int?> _readCachedUnreadGenerationCount(
   TemplateGenerationRepository repository,
 ) async {
   try {
+    if (await _isGenerationCacheKeyExpired(
+      repository,
+      TemplateGenerationRepository._unreadCountCacheKey,
+    )) {
+      await _clearGenerationCacheKey(
+        repository,
+        TemplateGenerationRepository._unreadCountCacheKey,
+      );
+      return null;
+    }
+
     return await repository._preferences.getInt(
       TemplateGenerationRepository._unreadCountCacheKey,
     );
@@ -156,20 +171,13 @@ Future<void> _clearLocalCache(TemplateGenerationRepository repository) async {
     final key = repository._cacheKeyForStatus(
       status == TemplateGenerationRepository._cacheAllStatusKey ? null : status,
     );
-    try {
-      await repository._preferences.remove(key);
-    } on Object {
-      // Keep best-effort semantics for logout cleanup.
-    }
+    await _clearGenerationCacheKey(repository, key);
   }
 
-  try {
-    await repository._preferences.remove(
-      TemplateGenerationRepository._unreadCountCacheKey,
-    );
-  } on Object {
-    // Keep best-effort semantics for logout cleanup.
-  }
+  await _clearGenerationCacheKey(
+    repository,
+    TemplateGenerationRepository._unreadCountCacheKey,
+  );
 
   try {
     await repository._preferences.remove(
@@ -324,6 +332,7 @@ Future<void> _upsertCachedGeneration(
 
       final bounded = updated.take(50).toList(growable: false);
       await repository._preferences.setString(key, jsonEncode(bounded));
+      await _touchGenerationCacheKey(repository, key);
     } on Object {
       // Persistent cache updates are best-effort; realtime remains in memory.
     }
@@ -336,10 +345,9 @@ Future<void> _writeCachedGenerationsImpl(
   required List<Map<String, Object?>> items,
 }) async {
   try {
-    await repository._preferences.setString(
-      repository._cacheKeyForStatus(status),
-      jsonEncode(items),
-    );
+    final cacheKey = repository._cacheKeyForStatus(status);
+    await repository._preferences.setString(cacheKey, jsonEncode(items));
+    await _touchGenerationCacheKey(repository, cacheKey);
   } on Object {
     // Ignore local cache write errors to keep network flow stable.
   }
@@ -353,6 +361,10 @@ Future<void> _writeCachedUnreadGenerationCountImpl(
     await repository._preferences.setInt(
       TemplateGenerationRepository._unreadCountCacheKey,
       count,
+    );
+    await _touchGenerationCacheKey(
+      repository,
+      TemplateGenerationRepository._unreadCountCacheKey,
     );
   } on Object {
     // Ignore local cache write errors to keep network flow stable.
@@ -500,6 +512,7 @@ Future<void> _markCachedGenerationReadImpl(
 
       if (changed) {
         await repository._preferences.setString(key, jsonEncode(updated));
+        await _touchGenerationCacheKey(repository, key);
       }
     } on Object {
       // Keep mark-read cache mutation best-effort per bucket.
@@ -551,6 +564,7 @@ Future<void> _removeCachedGenerationImpl(
 
       if (changed) {
         await repository._preferences.setString(key, jsonEncode(updated));
+        await _touchGenerationCacheKey(repository, key);
       }
     } on Object {
       // Keep delete cache mutation best-effort per bucket.
@@ -562,5 +576,70 @@ Future<void> _removeCachedGenerationImpl(
     if (unread != null && unread > 0) {
       await repository._writeCachedUnreadGenerationCount(unread - 1);
     }
+  }
+}
+
+String _generationCacheUpdatedAtKeyForDataKey(String dataKey) {
+  if (dataKey == TemplateGenerationRepository._unreadCountCacheKey) {
+    return TemplateGenerationRepository._unreadCountCacheUpdatedAtKey;
+  }
+
+  if (dataKey.startsWith(
+    TemplateGenerationRepository._generationsCachePrefix,
+  )) {
+    final suffix = dataKey.substring(
+      TemplateGenerationRepository._generationsCachePrefix.length,
+    );
+    return '${TemplateGenerationRepository._generationsCacheUpdatedAtPrefix}$suffix';
+  }
+
+  return '${dataKey}_updated_at_v1';
+}
+
+Future<void> _touchGenerationCacheKey(
+  TemplateGenerationRepository repository,
+  String dataKey,
+) async {
+  await repository._preferences.setString(
+    _generationCacheUpdatedAtKeyForDataKey(dataKey),
+    DateTime.now().toUtc().toIso8601String(),
+  );
+}
+
+Future<bool> _isGenerationCacheKeyExpired(
+  TemplateGenerationRepository repository,
+  String dataKey,
+) async {
+  try {
+    final timestampRaw = await repository._preferences.getString(
+      _generationCacheUpdatedAtKeyForDataKey(dataKey),
+    );
+    if (timestampRaw == null || timestampRaw.isEmpty) {
+      return false;
+    }
+
+    final updatedAtUtc = DateTime.tryParse(timestampRaw)?.toUtc();
+    if (updatedAtUtc == null) {
+      return true;
+    }
+
+    return DateTime.now().toUtc().difference(updatedAtUtc) >
+        AppConfig.generationCacheTtl;
+  } on Object {
+    return false;
+  }
+}
+
+Future<void> _clearGenerationCacheKey(
+  TemplateGenerationRepository repository,
+  String dataKey,
+) async {
+  try {
+    await repository._preferences.remove(dataKey);
+    await repository._preferences.remove(
+      _generationCacheUpdatedAtKeyForDataKey(dataKey),
+    );
+  } on Object {
+    // Keep best-effort semantics for cache cleanup.
   }
 }

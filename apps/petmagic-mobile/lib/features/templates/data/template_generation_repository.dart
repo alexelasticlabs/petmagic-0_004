@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/network_error_mapper.dart';
 import 'package:petmagic_mobile/core/network/authenticated_request_options.dart';
@@ -17,6 +18,7 @@ import 'package:petmagic_mobile/features/templates/data/template_generation_dtos
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
+import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -56,7 +58,11 @@ class TemplateGenerationRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage);
 
   static const _generationsCachePrefix = 'templates_generations_v1:';
+  static const _generationsCacheUpdatedAtPrefix =
+      'templates_generations_updated_at_v1:';
   static const _unreadCountCacheKey = 'templates_generations_unread_v1';
+  static const _unreadCountCacheUpdatedAtKey =
+      'templates_generations_unread_updated_at_v1';
   static const _activeGenerationIdKey = 'templates_active_generation_id_v1';
   static const _activeGenerationCorrelationIdKey =
       'templates_active_generation_correlation_id_v1';
@@ -588,7 +594,7 @@ class TemplateGenerationRepository {
       'type': type,
       'category': category,
       'sourceScreen': sourceScreen,
-      'appVersion': '1.0.0',
+      'appVersion': AppConfig.appVersion,
       'platform': Platform.operatingSystem,
       'deviceModel': Platform.operatingSystemVersion,
       'locale': Platform.localeName,
@@ -781,12 +787,6 @@ class TemplateGenerationRepository {
     path,
     unavailableMessage: unavailableMessage,
   );
-
-  bool _startsWith(List<int> bytes, List<int> prefix) =>
-      _startsWithImpl(this, bytes, prefix);
-
-  bool _asciiEquals(List<int> bytes, int offset, String value) =>
-      _asciiEqualsImpl(this, bytes, offset, value);
 
   Future<int> _uploadImageSizeBytes(
     String path, {

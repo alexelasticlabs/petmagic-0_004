@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/config/app_config.dart';
+import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/template_media_cache.dart';
 import 'package:petmagic_mobile/core/performance/template_preview_video_controller.dart';
@@ -18,6 +20,7 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 
+part 'template_card_badges.part.dart';
 part 'template_card_presentation.part.dart';
 
 const int _minTemplateCardImageCacheWidth = 320;
@@ -85,8 +88,7 @@ class TemplateCard extends StatefulWidget {
   State<TemplateCard> createState() => _TemplateCardState();
 }
 
-class _TemplateCardState extends State<TemplateCard>
-    with WidgetsBindingObserver {
+class _TemplateCardState extends State<TemplateCard> {
   static const Duration _disposeDelay = Duration(milliseconds: 900);
   static const double _prewarmVisibilityFraction = 0.28;
   static const double _playVisibilityFraction = 0.58;
@@ -102,11 +104,12 @@ class _TemplateCardState extends State<TemplateCard>
   double _lastVisibleFraction = 0;
   int _previewRetryToken = 0;
   int _videoControllerRequestVersion = 0;
+  late final VoidCallback _appLifecycleListener = _handleAppLifecycleChanged;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
+    AppLifecycleSignal.instance.addListener(_appLifecycleListener);
     _syncFeaturedCountdownTicker();
   }
 
@@ -135,7 +138,7 @@ class _TemplateCardState extends State<TemplateCard>
   void dispose() {
     _disposeTimer?.cancel();
     _featuredCountdownTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
+    AppLifecycleSignal.instance.removeListener(_appLifecycleListener);
     _videoControllerRequestVersion++;
     _videoControllerInitInFlight = false;
     final controller = _videoController;
@@ -148,12 +151,12 @@ class _TemplateCardState extends State<TemplateCard>
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
+  void _handleAppLifecycleChanged() {
     if (!mounted) {
       return;
     }
 
+    final state = AppLifecycleSignal.instance.state;
     if (state == AppLifecycleState.resumed) {
       _resumeVisiblePreviewAfterAppResume();
       return;
@@ -448,8 +451,15 @@ class _TemplateCardState extends State<TemplateCard>
       } else {
         await controller.pause();
       }
-    } catch (_) {
-      // Controller might be disposed during async lifecycle transitions.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateCard',
+        operation: 'sync_playback_state',
+        message: 'Template card preview playback sync failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'isPreviewActive': _isPreviewActive},
+      );
     }
   }
 
@@ -480,8 +490,15 @@ class _TemplateCardState extends State<TemplateCard>
     _videoController = null;
     try {
       await controller.dispose();
-    } catch (_) {
-      // Native video disposal can race with platform lifecycle changes.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateCard',
+        operation: 'dispose_video_controller',
+        message: 'Template card preview controller disposal failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'hadPreviewSlot': _hasPreviewSlot},
+      );
     }
     if (mounted) {
       setState(() {});
@@ -558,7 +575,19 @@ class _TemplateCardState extends State<TemplateCard>
       setState(() {});
       _videoLoadFailed = false;
       await _syncPlaybackState();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.TemplateCard',
+        operation: 'ensure_video_controller',
+        message: 'Template card preview controller failed to initialize.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'hasPreviewControllerFactory':
+              widget.previewControllerFactory != null,
+          'isVideoTemplate': widget.template.isVideo,
+        },
+      );
       await controller?.dispose();
       if (_isCurrentVideoControllerRequest(
         requestVersion: requestVersion,

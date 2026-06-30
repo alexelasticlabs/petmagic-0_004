@@ -184,6 +184,43 @@ void main() {
       expect(await file.readAsBytes(), const [0xFF, 0xD8, 0xFF, 0xD9]);
     });
 
+    test('accepts supported mp4 container brands', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          return ResponseBody.fromBytes(const [
+            0x00,
+            0x00,
+            0x00,
+            0x18,
+            0x66,
+            0x74,
+            0x79,
+            0x70,
+            0x6D,
+            0x70,
+            0x34,
+            0x32,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+          ], 200);
+        });
+
+      final file = await cacheRemoteMediaFile(
+        mediaUrl: 'https://cdn.petmagic.test/result.mp4?signature=secret',
+        fileName: 'remote-valid.mp4',
+        client: dio,
+      );
+      addTearDown(() async {
+        if (await file.exists()) {
+          await file.delete();
+        }
+      });
+
+      expect(await file.exists(), isTrue);
+    });
+
     test(
       'rejects unsupported remote payloads before writing temp files',
       () async {
@@ -210,6 +247,42 @@ void main() {
           throwsA(isA<StateError>()),
         );
         expect(target.existsSync(), isFalse);
+      },
+    );
+
+    test(
+      'rejects unsupported iso bmff brands before writing temp files',
+      () async {
+        final dio = Dio()
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            return ResponseBody.fromBytes(const [
+              0x00,
+              0x00,
+              0x00,
+              0x18,
+              0x66,
+              0x74,
+              0x79,
+              0x70,
+              0x68,
+              0x65,
+              0x69,
+              0x63,
+              0x00,
+              0x00,
+              0x00,
+              0x00,
+            ], 200);
+          });
+
+        await expectLater(
+          cacheRemoteMediaFile(
+            mediaUrl: 'https://cdn.petmagic.test/result.bin?signature=secret',
+            fileName: 'remote-invalid.bin',
+            client: dio,
+          ),
+          throwsA(isA<StateError>()),
+        );
       },
     );
   });
@@ -259,6 +332,22 @@ void main() {
       expect(extractFileExtension('.hiddenfile'), isNull);
     });
   });
+
+  test(
+    'media share and save utilities log failures without exposing raw paths or URLs',
+    () async {
+      final source = await File(
+        'lib/shared/files/media_share_save.dart',
+      ).readAsString();
+
+      expect(source, contains('AppLogger.warn('));
+      expect(source, contains("feature: 'Shared.MediaShareSave'"));
+      expect(source, contains("operation: 'save_remote_to_gallery'"));
+      expect(source, contains("operation: 'save_local_to_gallery'"));
+      expect(source, contains("operation: 'validate_local_media_path'"));
+      expect(source, isNot(contains('} catch (_) {')));
+    },
+  );
 }
 
 class _FakeHttpClientAdapter implements HttpClientAdapter {

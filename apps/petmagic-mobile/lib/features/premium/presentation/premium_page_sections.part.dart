@@ -155,7 +155,10 @@ class _HeroBlock extends StatelessWidget {
                     ),
                     children: [
                       TextSpan(text: '${text.premiumHeroTitle}\n'),
-                      TextSpan(text: ' ✦', style: TextStyle(color: accent)),
+                      TextSpan(
+                        text: ' ✦',
+                        style: TextStyle(color: accent),
+                      ),
                     ],
                   ),
                 ),

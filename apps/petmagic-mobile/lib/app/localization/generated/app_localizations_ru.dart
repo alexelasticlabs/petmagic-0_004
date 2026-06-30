@@ -54,6 +54,10 @@ class AppLocalizationsRu extends AppLocalizations {
       'Откройте профиль, чтобы проверить последнее изменение Premium.';
 
   @override
+  String get appUnexpectedErrorFallback =>
+      'Что-то пошло не так. Попробуйте еще раз.';
+
+  @override
   String get comingSoonMessage =>
       'Раздел подготовлен для следующей продуктовой волны.';
 
@@ -844,19 +848,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Реклама сейчас недоступна. Попробуйте у нас позже.';
 
   @override
-  String get walletPromoTitle => 'Есть промокод?';
-
-  @override
-  String get walletPromoSubtitle =>
-      'Введите код от команды PetMagic и сразу получите PawSpark на баланс.';
-
-  @override
-  String get walletPromoInputPlaceholder => 'Введите промокод';
-
-  @override
-  String get walletPromoSuccessMessage => 'Промокод успешно активирован!';
-
-  @override
   String get walletBestValueBadge => 'Лучшая выгода';
 
   @override
@@ -1184,11 +1175,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletPaymentStoreUnavailableGooglePlay =>
-      'Google Play временно недоступен на этом устройстве. Пока используйте Stripe.';
+      'Покупки через Google Play временно недоступны на этом устройстве. Выберите другой доступный способ оплаты.';
 
   @override
   String get walletPaymentStoreUnavailableAppStore =>
-      'App Store временно недоступен на этом устройстве. Пока используйте Stripe.';
+      'Покупки через App Store временно недоступны на этом устройстве. Выберите другой доступный способ оплаты.';
 
   @override
   String get walletCheckoutOrderSectionTitle => 'Ваше пополнение';
@@ -1260,6 +1251,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get walletSourceAdminDebit => 'Корректировка поддержки';
+
+  @override
+  String get walletSourceOther => 'Другая операция';
 
   @override
   String get walletPurchaseCompleted => 'Завершено';
@@ -1485,6 +1479,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
+  String get premiumPaymentOther => 'Другой способ оплаты';
+
+  @override
   String get premiumPaymentRecommendedBadge => 'Рекомендуем';
 
   @override
@@ -1613,7 +1610,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumStoreUnavailable =>
-      'Подписки через App Store / Google Play ждут настройки продуктов. Пока используйте оплату через Stripe.';
+      'Подписки через App Store / Google Play сейчас временно недоступны. Попробуйте позже или используйте другой доступный способ оплаты.';
 
   @override
   String get premiumStoreProductUnavailable =>
@@ -2004,18 +2001,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Первые статьи помощи и инструкции по устранению проблем появятся здесь после публикации материалов для мобильной поддержки.';
 
   @override
-  String get profileDetailsSupportBody =>
-      'Здесь будут обрабатываться обращения в поддержку без выхода из раздела профиля.';
-
-  @override
-  String get profileDetailsSupportStatus =>
-      'Прямое обращение в поддержку внутри приложения пока недоступно. Сейчас этот экран служит стартовой точкой для связи с поддержкой.';
-
-  @override
-  String get profileDetailsSupportNext =>
-      'Далее здесь появится полноценная форма обращения или передача обращения по email с обработкой в системе поддержки.';
-
-  @override
   String get profileDetailsTermsBody =>
       'Проверьте, на каких правилах строится использование приложения и аккаунта PetMagic.';
 
@@ -2029,7 +2014,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsTermsNext =>
-      'Позже к этому экрану можно подключить полный юридический документ. Сейчас он подтверждает текущее состояние согласия.';
+      'Ниже можно просмотреть актуальное Пользовательское соглашение и принять последнюю версию, если для аккаунта это еще требуется.';
 
   @override
   String get profileDetailsPrivacyBody =>
@@ -2037,11 +2022,11 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Сейчас здесь показана краткая информация о приватности. Полная юридическая версия документа готовится.';
+      'На этом экране показаны актуальная Политика конфиденциальности, версия публикации и статус принятия для этого аккаунта.';
 
   @override
   String get profileDetailsPrivacyNext =>
-      'В следующем обновлении здесь будет доступен полный текст политики конфиденциальности.';
+      'Ниже можно просмотреть актуальную Политику конфиденциальности и принять последнюю версию, если для аккаунта это еще требуется.';
 
   @override
   String get profileLegalAcceptanceCurrent =>
@@ -4088,6 +4073,14 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get appUnavailableServerMessage =>
       'PetMagic сейчас не может связаться с бекендом. Попробуйте ещё раз через минуту.';
+
+  @override
+  String get localBackendAndroidHintTitle => 'Локальный бекенд на Android';
+
+  @override
+  String localBackendAndroidHintMessage(Object baseUrl, Object port) {
+    return 'Эта debug-сборка использует $baseUrl. На реальном Android адреса localhost и 127.0.0.1 указывают на сам телефон. Выполните adb reverse tcp:$port tcp:$port или укажите LAN IP компьютера в API_BASE_URL.';
+  }
 
   @override
   String get generationStatusCompareAction => 'Сравнить';

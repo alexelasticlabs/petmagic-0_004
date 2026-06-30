@@ -18,19 +18,13 @@ class NotificationCoordinator {
     required SupportChatRepository supportRepository,
     required WalletRepository walletRepository,
     required void Function(String route) onRouteRequested,
-  }) : _templateRepository = templateRepository,
-       _supportRepository = supportRepository,
-       _walletRepository = walletRepository,
-       _pushTokenRegistrar = PushTokenRegistrar(
+  }) : _pushTokenRegistrar = PushTokenRegistrar(
          templateRepository: templateRepository,
          supportRepository: supportRepository,
          walletRepository: walletRepository,
        ),
        _onRouteRequested = onRouteRequested;
 
-  final TemplateGenerationRepository _templateRepository;
-  final SupportChatRepository _supportRepository;
-  final WalletRepository _walletRepository;
   final PushTokenRegistrar _pushTokenRegistrar;
   final void Function(String route) _onRouteRequested;
   static const _allowedNotificationRoutes = <String>{
@@ -58,6 +52,7 @@ class NotificationCoordinator {
   bool _initialized = false;
   bool _initializing = false;
   bool _authenticatedReady = false;
+  bool _authSessionActive = false;
   int _registrationEpoch = 0;
 
   Future<void> initializeForAuthenticatedUser() async {
@@ -68,12 +63,13 @@ class NotificationCoordinator {
       return;
     }
 
+    _authSessionActive = true;
     _initializing = true;
     try {
       await _ensureInitialized();
       final permissionAllowed = await _ensureNotificationPermissionAllowed();
       if (!permissionAllowed) {
-        await unregisterCurrentTokenOnSignOut();
+        await _unregisterCurrentToken(markSessionInactive: false);
         _authenticatedReady = true;
         return;
       }
@@ -96,15 +92,16 @@ class NotificationCoordinator {
   }
 
   Future<void> registerCurrentToken() async {
-    if (_isDisposed || !_firebaseReady) {
+    if (_isDisposed || !_firebaseReady || !_authSessionActive) {
       return;
     }
 
     try {
       final permissionAllowed = await _notificationsAllowed();
       if (!permissionAllowed) {
-        if (_lastRegisteredToken != null) {
-          await unregisterCurrentTokenOnSignOut();
+        final persistedToken = await _pushTokenRegistrar.readRegisteredToken();
+        if (_lastRegisteredToken != null || persistedToken != null) {
+          await _unregisterCurrentToken(markSessionInactive: false);
         }
         return;
       }
@@ -126,50 +123,38 @@ class NotificationCoordinator {
   }
 
   Future<void> unregisterCurrentTokenOnSignOut() async {
-    _registrationEpoch++;
-    final token = _lastRegisteredToken;
-    _authenticatedReady = false;
+    await _unregisterCurrentToken(markSessionInactive: true);
+  }
+
+  Future<void> _unregisterCurrentToken({
+    required bool markSessionInactive,
+  }) async {
+    final epoch = ++_registrationEpoch;
+    if (markSessionInactive) {
+      _authSessionActive = false;
+      _authenticatedReady = false;
+      _handledInteractions.clear();
+    }
+
+    final token =
+        _lastRegisteredToken ?? await _pushTokenRegistrar.readRegisteredToken();
     if (token == null || token.isEmpty) {
       return;
     }
 
-    try {
-      await Future.wait<void>([
-        _templateRepository.unregisterPushToken(token).catchError((
-          Object error,
-          StackTrace stackTrace,
-        ) {
-          _logNotificationFailure(
-            'unregister_template_token',
-            error,
-            stackTrace,
-          );
-        }),
-        _supportRepository.unregisterPushToken(token).catchError((
-          Object error,
-          StackTrace stackTrace,
-        ) {
-          _logNotificationFailure(
-            'unregister_support_token',
-            error,
-            stackTrace,
-          );
-        }),
-        _walletRepository.unregisterPushToken(token).catchError((
-          Object error,
-          StackTrace stackTrace,
-        ) {
-          _logNotificationFailure(
-            'unregister_economy_token',
-            error,
-            stackTrace,
-          );
-        }),
-      ]);
-    } finally {
-      PushTokenRegistrar.invalidateToken(token);
+    final allUnregistered = await _pushTokenRegistrar.unregisterToken(
+      token: token,
+      canContinue: () => !_isDisposed && epoch == _registrationEpoch,
+      onFailure: (stage, error, stackTrace) {
+        _logNotificationFailure('unregister_${stage}_token', error, stackTrace);
+      },
+    );
+
+    if (allUnregistered) {
+      _lastRegisteredToken = null;
+    } else {
+      _lastRegisteredToken = token;
     }
-    _lastRegisteredToken = null;
   }
 
   void handleForegroundMessage(RemoteMessage message) {
@@ -210,6 +195,7 @@ class NotificationCoordinator {
 
   Future<void> dispose() async {
     _isDisposed = true;
+    _authSessionActive = false;
     _registrationEpoch++;
     await _tokenRefreshSubscription?.cancel();
     await _messageOpenedSubscription?.cancel();
@@ -236,8 +222,11 @@ class NotificationCoordinator {
       if (token.isEmpty) {
         return;
       }
-      final epoch = _registrationEpoch;
       _lastRegisteredToken = token;
+      if (!_authSessionActive) {
+        return;
+      }
+      final epoch = _registrationEpoch;
       unawaited(_registerRefreshedToken(token, epoch: epoch));
     });
 
@@ -283,6 +272,9 @@ class NotificationCoordinator {
     required int epoch,
   }) async {
     try {
+      if (_isDisposed || !_firebaseReady || !_authSessionActive) {
+        return;
+      }
       if (!await _notificationsAllowed()) {
         return;
       }
@@ -334,7 +326,7 @@ class NotificationCoordinator {
   }
 
   bool _canContinueRegistration(int epoch) {
-    return !_isDisposed && epoch == _registrationEpoch;
+    return !_isDisposed && _authSessionActive && epoch == _registrationEpoch;
   }
 
   void _handleRemoteMessageRoute(RemoteMessage message) {

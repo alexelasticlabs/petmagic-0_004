@@ -224,7 +224,6 @@ class TemplateOfTheDayCard extends StatelessWidget {
   }
 }
 
-
 String templateOfTheDayLoadErrorLabel(BuildContext context) {
   return AppLocalizations.of(context).templateOfTheDayLoadFailed;
 }

@@ -11,16 +11,14 @@ class GamificationHighlightsCard extends StatelessWidget {
     this.summary,
     this.unlockedAchievementsCount,
     this.totalAchievementsCount,
-    this.onStreakTap,
-    this.onAchievementsTap,
+    this.onOpenHub,
     this.onPetTap,
   });
 
   final GamificationSummaryModel? summary;
   final int? unlockedAchievementsCount;
   final int? totalAchievementsCount;
-  final VoidCallback? onStreakTap;
-  final VoidCallback? onAchievementsTap;
+  final VoidCallback? onOpenHub;
   final VoidCallback? onPetTap;
 
   @override
@@ -34,7 +32,8 @@ class GamificationHighlightsCard extends StatelessWidget {
     final achievementsValue =
         unlockedAchievementsCount != null && totalAchievementsCount != null
         ? '${unlockedAchievementsCount!}/${totalAchievementsCount!}'
-        : '...';
+        : '—';
+    final weeklyGoalsValue = '${summary?.activeChallenges.length ?? 0}';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -53,40 +52,96 @@ class GamificationHighlightsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            text.gamificationYourProgress,
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: colors.textStrong,
+          PressableScale(
+            key: const ValueKey('profile_gamification_hub'),
+            onTap: onOpenHub,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                color: colors.surfaceStrong.withValues(alpha: 0.28),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD86B), Color(0xFFFF934D)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('🏆', style: TextStyle(fontSize: 20)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          text.gamificationYourProgress,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: colors.textStrong,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          text.gamificationHubEntrySubtitle,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: colors.textSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: colors.textSoft,
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: PressableScale(
-                  onTap: onStreakTap,
-                  child: _MiniStat(
-                    emoji: '🔥',
-                    label: text.gamificationStreakTitle,
-                    value: streak != null
-                        ? '${streak.currentStreak} ${text.gamificationDayStreak}'
-                        : '0 ${text.gamificationDayStreak}',
-                    color: const Color(0xFFFF6D00),
-                  ),
+                child: _MiniStat(
+                  emoji: '🔥',
+                  label: text.gamificationStreakTitle,
+                  value: streak != null
+                      ? '${streak.currentStreak} ${text.gamificationDayStreak}'
+                      : '0 ${text.gamificationDayStreak}',
+                  color: const Color(0xFFFF6D00),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: PressableScale(
-                  onTap: onAchievementsTap,
-                  child: _MiniStat(
-                    emoji: '🏆',
-                    label: text.gamificationAchievementsTitle,
-                    value: achievementsValue,
-                    color: const Color(0xFFFFD700),
-                  ),
+                child: _MiniStat(
+                  key: const ValueKey('profile_gamification_achievements_stat'),
+                  emoji: '🏅',
+                  label: text.gamificationAchievementsTitle,
+                  value: achievementsValue,
+                  color: const Color(0xFFFFD700),
+                  onTap: onOpenHub,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _MiniStat(
+                  emoji: '🎯',
+                  label: text.gamificationWeekFocusTitle,
+                  value: weeklyGoalsValue,
+                  color: const Color(0xFF53C3A6),
                 ),
               ),
             ],
@@ -149,22 +204,25 @@ class GamificationHighlightsCard extends StatelessWidget {
 
 class _MiniStat extends StatelessWidget {
   const _MiniStat({
+    super.key,
     required this.emoji,
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   final String emoji;
   final String label;
   final String value;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.petMagicColors;
 
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -178,7 +236,7 @@ class _MiniStat extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -187,5 +245,11 @@ class _MiniStat extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap == null) {
+      return content;
+    }
+
+    return PressableScale(onTap: onTap, child: content);
   }
 }

@@ -204,8 +204,10 @@ String _typeLabel(String value, AppLocalizations text) {
   };
 }
 
-String _formatDate(DateTime value) {
-  return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _formatDate(BuildContext context, DateTime value) {
+  return DateFormat.yMMMd(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(value.toLocal());
 }
 
 Future<void> _refreshPets(WidgetRef ref) {

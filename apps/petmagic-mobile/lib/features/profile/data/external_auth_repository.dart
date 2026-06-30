@@ -89,12 +89,14 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
            AuthSessionCoordinator(dio: dio, sessionStorage: sessionStorage),
        _launchUrl =
            launchUrlDelegate ?? ((uri, mode) => launchUrl(uri, mode: mode)),
-         _googleSignIn =
-           googleSignInDelegate ?? ((googleSignIn) => googleSignIn.authenticate()),
-         _initializeGoogleSignInDelegate =
+       _googleSignIn =
+           googleSignInDelegate ??
+           ((googleSignIn) => googleSignIn.authenticate()),
+       _initializeGoogleSignInDelegate =
            googleSignInInitializeDelegate ??
-           ((serverClientId) =>
-             GoogleSignIn.instance.initialize(serverClientId: serverClientId)),
+           ((serverClientId) => GoogleSignIn.instance.initialize(
+             serverClientId: serverClientId,
+           )),
        _appleSignIn =
            appleSignInDelegate ??
            (() => SignInWithApple.getAppleIDCredential(
@@ -159,7 +161,9 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         },
       );
 
-      final googleSignIn = await _getGoogleSignIn(serverClientId: serverClientId);
+      final googleSignIn = await _getGoogleSignIn(
+        serverClientId: serverClientId,
+      );
 
       final account = await _googleSignIn(googleSignIn);
       if (account == null) {
@@ -254,9 +258,7 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     required String? serverClientId,
   }) async {
     final googleSignIn = GoogleSignIn.instance;
-    final initialization =
-        _googleSignInInitialization ??= _initializeGoogleSignIn(serverClientId);
-    await initialization;
+    await _ensureGoogleSignInInitialized(serverClientId);
     if (_initializedGoogleServerClientId != serverClientId) {
       AppLogger.info(
         feature: 'Profile.ExternalAuth',
@@ -274,9 +276,35 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     return googleSignIn;
   }
 
+  Future<void> _ensureGoogleSignInInitialized(String? serverClientId) async {
+    if (_googleSignInInitialization != null &&
+        _initializedGoogleServerClientId != serverClientId) {
+      await _resetGoogleSession(clearInitializationState: true);
+    }
+
+    final initialization = _googleSignInInitialization ??=
+        _initializeGoogleSignIn(serverClientId);
+    await initialization;
+  }
+
   Future<void> _initializeGoogleSignIn(String? serverClientId) async {
-    await _initializeGoogleSignInDelegate(serverClientId);
-    _initializedGoogleServerClientId = serverClientId;
+    try {
+      await _initializeGoogleSignInDelegate(serverClientId);
+      _initializedGoogleServerClientId = serverClientId;
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Auth.External',
+        operation: 'initialize_google_sign_in',
+        message: 'Google sign-in initialization failed',
+        context: {
+          'hasServerClientId': serverClientId?.trim().isNotEmpty ?? false,
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _clearGoogleInitializationState();
+      rethrow;
+    }
   }
 
   Future<String?> _resolveGoogleServerClientId() async {
@@ -387,9 +415,14 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
     }
   }
 
-  Future<void> _resetGoogleSession() async {
+  Future<void> _resetGoogleSession({
+    bool clearInitializationState = true,
+  }) async {
     final initialization = _googleSignInInitialization;
     if (initialization == null) {
+      if (clearInitializationState) {
+        _clearGoogleInitializationState();
+      }
       return;
     }
 
@@ -412,6 +445,14 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
         // Best-effort cleanup only.
       }
     }
+    if (clearInitializationState) {
+      _clearGoogleInitializationState();
+    }
+  }
+
+  void _clearGoogleInitializationState() {
+    _googleSignInInitialization = null;
+    _initializedGoogleServerClientId = null;
   }
 
   Future<List<MobileLinkedAccount>> _linkWithBrowserFlow(
@@ -534,15 +575,21 @@ class MobileExternalAuthRepository implements ExternalAuthRepository {
   }
 
   Future<bool> _launchAuthUri(Uri authUri) async {
-    final launchedInApp = await _launchUrl(
-      authUri,
-      LaunchMode.inAppBrowserView,
-    );
+    bool launchedInApp = false;
+    try {
+      launchedInApp = await _launchUrl(authUri, LaunchMode.inAppBrowserView);
+    } on Object {
+      launchedInApp = false;
+    }
     if (launchedInApp) {
       return true;
     }
 
-    return _launchUrl(authUri, LaunchMode.externalApplication);
+    try {
+      return await _launchUrl(authUri, LaunchMode.externalApplication);
+    } on Object {
+      return false;
+    }
   }
 
   Future<AuthSession> _readAuthorizedSession() async {

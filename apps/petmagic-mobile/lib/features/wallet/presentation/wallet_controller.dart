@@ -1,5 +1,3 @@
-// ignore_for_file: cancel_subscriptions, unused_element
-
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -7,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -189,61 +188,26 @@ class WalletState {
   }
 }
 
-abstract class _WalletControllerBase extends Notifier<WalletState>
-    with WidgetsBindingObserver {
+abstract class _WalletControllerBase extends Notifier<WalletState> {
   static const int walletLedgerPageSize = 24;
 
   late final WalletRepository _repository;
   bool _repositoryInitialized = false;
   Future<void>? _loadInFlight;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeWalletSyncCancelToken;
   bool _isWalletSyncInFlight = false;
   bool _walletLifecycleStarted = false;
-
-  void _ensureWalletLifecycleStarted();
-
-  CancelToken _startLoadCancelToken();
-
-  void _cancelActiveLoad();
-
-  void _clearActiveLoad(CancelToken cancelToken);
-
-  CancelToken _startWalletSyncCancelToken();
-
-  void _cancelActiveWalletSync();
-
-  void _clearActiveWalletSync(CancelToken cancelToken);
-
-  void _updateStateIfMounted(WalletState Function(WalletState current) update);
+  bool _isWalletPageVisible = false;
+  VoidCallback? _appLifecycleListener;
 
   Future<void> load({bool refresh = false});
-
-  Future<void> _performLoad({
-    required bool refresh,
-    required CancelToken cancelToken,
-  });
-
-  Future<
-    ({
-      List<WalletPaymentMethodModel> paymentMethods,
-      Map<String, String> productPrices,
-    })
-  >
-  _resolvePaymentMethodsAvailability({
-    required List<CurrencyPackModel> packs,
-    required List<WalletPaymentMethodModel> paymentMethods,
-  });
-
-  WalletPaymentMethodModel _copyPaymentMethodWithEnabled(
-    WalletPaymentMethodModel method,
-    bool isEnabled,
-  );
 
   Future<void> loadMoreLedger({bool force = false});
 
   Future<void> _syncWalletSnapshot({bool forceRefresh = false});
+
+  void setWalletPageVisible(bool visible);
 
   Future<PurchaseCheckoutModel?> buyPack(
     CurrencyPackModel pack,
@@ -265,8 +229,6 @@ abstract class _WalletControllerBase extends Notifier<WalletState>
   Future<void> verifyStripeCheckout(String? stripeReferenceId);
 
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases);
-
-  Future<void> _verifyStorePurchase(PurchaseDetails purchase);
 }
 
 class WalletController extends _WalletControllerBase

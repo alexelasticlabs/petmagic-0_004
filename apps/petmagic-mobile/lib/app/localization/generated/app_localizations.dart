@@ -192,6 +192,12 @@ abstract class AppLocalizations {
   /// **'Open your profile to review the latest Premium update.'**
   String get notificationPremiumBody;
 
+  /// No description provided for @appUnexpectedErrorFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get appUnexpectedErrorFallback;
+
   /// No description provided for @comingSoonMessage.
   ///
   /// In en, this message translates to:
@@ -1662,30 +1668,6 @@ abstract class AppLocalizations {
   /// **'Ads are temporarily unavailable. Please try again later.'**
   String get walletAdDailyLimitReached;
 
-  /// No description provided for @walletPromoTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Have a promo code?'**
-  String get walletPromoTitle;
-
-  /// No description provided for @walletPromoSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a code from PetMagic and add PawSpark to your balance.'**
-  String get walletPromoSubtitle;
-
-  /// No description provided for @walletPromoInputPlaceholder.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter promo code'**
-  String get walletPromoInputPlaceholder;
-
-  /// No description provided for @walletPromoSuccessMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Promo code activated successfully!'**
-  String get walletPromoSuccessMessage;
-
   /// No description provided for @walletBestValueBadge.
   ///
   /// In en, this message translates to:
@@ -2229,13 +2211,13 @@ abstract class AppLocalizations {
   /// No description provided for @walletPaymentStoreUnavailableGooglePlay.
   ///
   /// In en, this message translates to:
-  /// **'Google Play is temporarily unavailable on this device. Use Stripe for now.'**
+  /// **'Google Play purchases are temporarily unavailable on this device. Choose another available payment method.'**
   String get walletPaymentStoreUnavailableGooglePlay;
 
   /// No description provided for @walletPaymentStoreUnavailableAppStore.
   ///
   /// In en, this message translates to:
-  /// **'App Store is temporarily unavailable on this device. Use Stripe for now.'**
+  /// **'App Store purchases are temporarily unavailable on this device. Choose another available payment method.'**
   String get walletPaymentStoreUnavailableAppStore;
 
   /// No description provided for @walletCheckoutOrderSectionTitle.
@@ -2363,6 +2345,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Support adjustment'**
   String get walletSourceAdminDebit;
+
+  /// No description provided for @walletSourceOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other activity'**
+  String get walletSourceOther;
 
   /// No description provided for @walletPurchaseCompleted.
   ///
@@ -2754,6 +2742,12 @@ abstract class AppLocalizations {
   /// **'Apple Pay / App Store'**
   String get premiumPaymentApple;
 
+  /// No description provided for @premiumPaymentOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other payment method'**
+  String get premiumPaymentOther;
+
   /// No description provided for @premiumPaymentRecommendedBadge.
   ///
   /// In en, this message translates to:
@@ -2979,7 +2973,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumStoreUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Store subscriptions are waiting for App Store / Google Play product setup. Use Stripe checkout for now.'**
+  /// **'App Store / Google Play subscriptions are temporarily unavailable right now. Try again later or use another available payment method.'**
   String get premiumStoreUnavailable;
 
   /// No description provided for @premiumStoreProductUnavailable.
@@ -3660,24 +3654,6 @@ abstract class AppLocalizations {
   /// **'The first help articles and troubleshooting guides will appear here as the mobile support content is published.'**
   String get profileDetailsHelpNext;
 
-  /// No description provided for @profileDetailsSupportBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Support requests will be handled here without forcing you out of the profile area.'**
-  String get profileDetailsSupportBody;
-
-  /// No description provided for @profileDetailsSupportStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Direct in-app contact is not wired yet. For now, keep this screen as the support entry point for the next slice.'**
-  String get profileDetailsSupportStatus;
-
-  /// No description provided for @profileDetailsSupportNext.
-  ///
-  /// In en, this message translates to:
-  /// **'The next step is a real support form or email handoff connected to the backend support flow.'**
-  String get profileDetailsSupportNext;
-
   /// No description provided for @profileDetailsTermsBody.
   ///
   /// In en, this message translates to:
@@ -3699,7 +3675,7 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsTermsNext.
   ///
   /// In en, this message translates to:
-  /// **'A fuller legal document view can be attached here later. For now, this screen confirms the current acceptance state.'**
+  /// **'Review the current Terms of Use below and accept the latest version if this account still requires it.'**
   String get profileDetailsTermsNext;
 
   /// No description provided for @profileDetailsPrivacyBody.
@@ -3711,13 +3687,13 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsPrivacyStatus.
   ///
   /// In en, this message translates to:
-  /// **'Privacy details are currently represented as an in-app summary screen while the full legal document flow is prepared.'**
+  /// **'This screen shows the current Privacy Policy, published version, and this account\'s acceptance status.'**
   String get profileDetailsPrivacyStatus;
 
   /// No description provided for @profileDetailsPrivacyNext.
   ///
   /// In en, this message translates to:
-  /// **'The next slice can attach a complete policy document or hosted legal page to this route.'**
+  /// **'Review the current Privacy Policy below and accept the latest version if this account still requires it.'**
   String get profileDetailsPrivacyNext;
 
   /// No description provided for @profileLegalAcceptanceCurrent.
@@ -7322,6 +7298,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PetMagic could not reach the backend right now. Please try again in a moment.'**
   String get appUnavailableServerMessage;
+
+  /// No description provided for @localBackendAndroidHintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local backend on Android'**
+  String get localBackendAndroidHintTitle;
+
+  /// No description provided for @localBackendAndroidHintMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This debug build points to {baseUrl}. On a real Android phone, localhost and 127.0.0.1 point to the phone itself. Run adb reverse tcp:{port} tcp:{port} or set API_BASE_URL to your computer\'s LAN IP.'**
+  String localBackendAndroidHintMessage(Object baseUrl, Object port);
 
   /// No description provided for @generationStatusCompareAction.
   ///

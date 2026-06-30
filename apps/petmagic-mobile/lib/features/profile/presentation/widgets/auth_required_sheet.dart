@@ -18,6 +18,7 @@ Future<void> showAuthRequiredSheet(
   final text = AppLocalizations.of(context);
   final colors = context.petMagicColors;
   final router = GoRouter.of(context);
+  final redirectQuery = _buildAuthRedirectQuery(redirectPath);
 
   return showPetMagicModalBottomSheet<void>(
     context: context,
@@ -91,12 +92,6 @@ Future<void> showAuthRequiredSheet(
                 child: FilledButton(
                   onPressed: () {
                     Navigator.of(sheetContext).pop();
-                    final redirectQuery =
-                        redirectPath != null &&
-                            redirectPath.isNotEmpty &&
-                            redirectPath.startsWith('/')
-                        ? '?redirect=${Uri.encodeQueryComponent(redirectPath)}'
-                        : '';
                     router.go('${AuthEntryPage.routePath}$redirectQuery');
                   },
                   child: Text(text.profileSignInAction),
@@ -109,7 +104,7 @@ Future<void> showAuthRequiredSheet(
                   child: OutlinedButton(
                     onPressed: () {
                       Navigator.of(sheetContext).pop();
-                      router.go(RegisterEntryPage.routePath);
+                      router.go('${RegisterEntryPage.routePath}$redirectQuery');
                     },
                     child: Text(text.authSignUpAction),
                   ),
@@ -142,4 +137,14 @@ Future<void> showAuthRequiredSheet(
       );
     },
   );
+}
+
+String _buildAuthRedirectQuery(String? redirectPath) {
+  if (redirectPath == null ||
+      redirectPath.isEmpty ||
+      !redirectPath.startsWith('/')) {
+    return '';
+  }
+
+  return '?redirect=${Uri.encodeQueryComponent(redirectPath)}';
 }

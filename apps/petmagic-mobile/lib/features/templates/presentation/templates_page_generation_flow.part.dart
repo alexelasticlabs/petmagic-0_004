@@ -19,7 +19,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
 
     while (mounted) {
       if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
-        await showAuthRequiredSheet(context);
+        await showAuthRequiredSheet(
+          context,
+          redirectPath: _templatesPageLocation(context),
+        );
         return;
       }
 
@@ -109,7 +112,10 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
             .read(templateGenerationControllerProvider)
             .errorMessage;
         if (_isAuthRequiredError(errorMessage)) {
-          await showAuthRequiredSheet(context);
+          await showAuthRequiredSheet(
+            context,
+            redirectPath: _templatesPageLocation(context),
+          );
           return;
         }
 
@@ -168,6 +174,11 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
     if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
       await showAuthRequiredSheet(
         context,
+        redirectPath: _templatesPageLocation(
+          context,
+          petId: petId,
+          petPhotoId: petPhotoId,
+        ),
         title: text.petsAuthRequiredTitle,
         message: text.petsAuthRequiredMessage,
         showSignUp: true,
@@ -303,7 +314,14 @@ extension _TemplatesPageGenerationFlow on _TemplatesPageState {
         showChangeAction: pets.length == 1,
         templateOfTheDay: templateOfTheDay,
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationFlow',
+        operation: 'load_my_pets_before_generation',
+        message: 'Could not load pets before starting template generation flow',
+        error: error,
+        stackTrace: stackTrace,
+      );
       if (!mounted) {
         return;
       }
@@ -481,7 +499,29 @@ String? _routeQueryParameter(BuildContext context, String key) {
       return null;
     }
     return value;
-  } catch (_) {
+  } catch (error, stackTrace) {
+    AppLogger.warn(
+      feature: 'Templates.GenerationFlow',
+      operation: 'read_route_query_parameter',
+      message: 'Could not read templates route query parameter',
+      context: {'key': key},
+      error: error,
+      stackTrace: stackTrace,
+    );
     return null;
   }
+}
+
+String _templatesPageLocation(
+  BuildContext context, {
+  String? petId,
+  String? petPhotoId,
+}) {
+  return TemplatesPage.location(
+    petId:
+        petId ?? _routeQueryParameter(context, TemplatesPage.petIdQueryParam),
+    petPhotoId:
+        petPhotoId ??
+        _routeQueryParameter(context, TemplatesPage.petPhotoIdQueryParam),
+  );
 }

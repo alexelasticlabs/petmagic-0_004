@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:petmagic_mobile/core/logging/app_logger.dart';
 
 import 'device_file_saver.dart';
 import 'file_name_sanitizer.dart';
+import 'media_signature.dart';
 import 'temp_media_cleanup.dart';
 
 Future<File> cacheRemoteMediaFile({
@@ -23,7 +25,7 @@ Future<File> cacheRemoteMediaFile({
     cancelToken: cancelToken,
     maxBytes: maxBytes,
   );
-  if (!_hasSupportedMediaSignature(bytes)) {
+  if (!hasSupportedMediaSignature(bytes)) {
     throw StateError('Downloaded media file is not usable.');
   }
   final safeFileName = sanitizeFileName(
@@ -129,7 +131,19 @@ Future<bool> saveRemoteMediaToGallery({
     }
     await TempMediaCleanup.deleteIfExists(tempFile);
     return true;
-  } catch (_) {
+  } catch (error, stackTrace) {
+    AppLogger.warn(
+      feature: 'Shared.MediaShareSave',
+      operation: 'save_remote_to_gallery',
+      message: 'Remote media save to gallery failed',
+      context: {
+        'isVideo': isVideo,
+        'hasAlbumName': albumName?.trim().isNotEmpty ?? false,
+        'extension': extractFileExtension(fileName) ?? '',
+      },
+      error: error,
+      stackTrace: stackTrace,
+    );
     TempMediaCleanup.scheduleTtlSweep();
     return false;
   }
@@ -174,8 +188,32 @@ Future<bool> saveLocalMediaToGallery({
     if (CancelToken.isCancel(error)) {
       rethrow;
     }
+    AppLogger.warn(
+      feature: 'Shared.MediaShareSave',
+      operation: 'save_local_to_gallery',
+      message: 'Local media save to gallery failed',
+      context: {
+        'isVideo': isVideo,
+        'hasAlbumName': albumName?.trim().isNotEmpty ?? false,
+        'extension': extractFileExtension(fileName) ?? '',
+      },
+      error: error,
+      stackTrace: error.stackTrace,
+    );
     return false;
-  } catch (_) {
+  } catch (error, stackTrace) {
+    AppLogger.warn(
+      feature: 'Shared.MediaShareSave',
+      operation: 'save_local_to_gallery',
+      message: 'Local media save to gallery failed',
+      context: {
+        'isVideo': isVideo,
+        'hasAlbumName': albumName?.trim().isNotEmpty ?? false,
+        'extension': extractFileExtension(fileName) ?? '',
+      },
+      error: error,
+      stackTrace: stackTrace,
+    );
     return false;
   }
 }
@@ -202,14 +240,22 @@ String? usableLocalMediaPathSync(String? localPath) {
     final handle = file.openSync();
     try {
       final header = handle.readSync(16);
-      if (!_hasSupportedMediaSignature(header)) {
+      if (!hasSupportedMediaSignature(header)) {
         return null;
       }
     } finally {
       handle.closeSync();
     }
     return file.path;
-  } on Object {
+  } catch (error, stackTrace) {
+    AppLogger.warn(
+      feature: 'Shared.MediaShareSave',
+      operation: 'validate_local_media_path',
+      message: 'Local media path validation failed',
+      context: {'name': _safePathLabel(path)},
+      error: error,
+      stackTrace: stackTrace,
+    );
     return null;
   }
 }
@@ -225,56 +271,7 @@ void _throwIfCancelled(CancelToken? cancelToken, String path) {
   );
 }
 
-bool _hasSupportedMediaSignature(List<int> header) {
-  if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
-    return true;
-  }
-  if (_startsWith(header, const [
-    0x89,
-    0x50,
-    0x4E,
-    0x47,
-    0x0D,
-    0x0A,
-    0x1A,
-    0x0A,
-  ])) {
-    return true;
-  }
-  if (header.length >= 12 &&
-      _asciiEquals(header, 0, 'RIFF') &&
-      _asciiEquals(header, 8, 'WEBP')) {
-    return true;
-  }
-  if (_asciiEquals(header, 0, 'GIF8')) {
-    return true;
-  }
-  if (header.length >= 12 && _asciiEquals(header, 4, 'ftyp')) {
-    return true;
-  }
-  return false;
-}
-
-bool _startsWith(List<int> bytes, List<int> prefix) {
-  if (bytes.length < prefix.length) {
-    return false;
-  }
-  for (var index = 0; index < prefix.length; index++) {
-    if (bytes[index] != prefix[index]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool _asciiEquals(List<int> bytes, int offset, String value) {
-  if (bytes.length < offset + value.length) {
-    return false;
-  }
-  for (var index = 0; index < value.length; index++) {
-    if (bytes[offset + index] != value.codeUnitAt(index)) {
-      return false;
-    }
-  }
-  return true;
+String _safePathLabel(String path) {
+  final segments = Uri.file(path).pathSegments;
+  return segments.isEmpty ? path : segments.last;
 }

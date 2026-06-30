@@ -306,6 +306,7 @@ class AppLogger {
     return normalizedKey.contains('authorization') ||
         normalizedKey.contains('token') ||
         normalizedKey.contains('secret') ||
+        normalizedKey.contains('verificationdata') ||
         normalizedKey.contains('password') ||
         normalizedKey.contains('receipt') ||
         normalizedKey.contains('card') ||
@@ -319,7 +320,16 @@ class AppLogger {
         normalizedKey == 'externalauthticket' ||
         normalizedKey == 'sessionid' ||
         normalizedKey == 'checkoutsessionid' ||
-        normalizedKey == 'stripesessionid';
+        normalizedKey == 'stripesessionid' ||
+        normalizedKey == 'purchasetoken' ||
+        normalizedKey == 'purchaseid' ||
+        normalizedKey == 'paymentintentid' ||
+        normalizedKey == 'setupintentid' ||
+        normalizedKey == 'customerid' ||
+        normalizedKey == 'subscriptionid' ||
+        normalizedKey == 'externalpaymentid' ||
+        normalizedKey == 'externalsubscriptionid' ||
+        normalizedKey == 'signedtransactioninfo';
   }
 
   static bool _isEmailKey(String key) {
@@ -396,7 +406,13 @@ class AppLogger {
         normalizedKey == 'apipayload' ||
         normalizedKey == 'providerpayload' ||
         normalizedKey == 'webhookpayload' ||
+        normalizedKey == 'verificationdata' ||
+        normalizedKey == 'serververificationdata' ||
+        normalizedKey == 'localverificationdata' ||
+        normalizedKey == 'signedtransactioninfo' ||
+        normalizedKey == 'signedpayload' ||
         normalizedKey == 'body' ||
+        normalizedKey == 'rawbody' ||
         normalizedKey == 'requestbody' ||
         normalizedKey == 'responsebody' ||
         normalizedKey == 'requestdata' ||
@@ -466,7 +482,7 @@ class AppLogger {
 
     masked = masked.replaceAllMapped(
       RegExp(
-        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|api[_-]?key|payment[_-]?intent[_-]?client[_-]?secret|client[_-]?secret|secret|password|receipt|signed[_-]?url|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?id|checkout[_-]?session[_-]?id|stripe[_-]?session[_-]?id)\1(\s*[:=]\s*)(["']?)[^,}\]\s"']+\4''',
+        r'''(["']?)(access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|api[_-]?key|payment[_-]?intent[_-]?client[_-]?secret|payment[_-]?intent[_-]?id|setup[_-]?intent[_-]?id|client[_-]?secret|secret|password|receipt|signed[_-]?url|card[_-]?number|cvc|cvv|auth[_-]?ticket|external[_-]?auth[_-]?ticket|ticket|session[_-]?id|checkout[_-]?session[_-]?id|stripe[_-]?session[_-]?id|purchase[_-]?token|purchase[_-]?id|server[_-]?verification[_-]?data|local[_-]?verification[_-]?data|verification[_-]?data|signed[_-]?transaction[_-]?info|external[_-]?payment[_-]?id|external[_-]?subscription[_-]?id|subscription[_-]?id|customer[_-]?id)\1(\s*[:=]\s*)(["']?)[^,}\]\s"']+\4''',
         caseSensitive: false,
       ),
       (match) {

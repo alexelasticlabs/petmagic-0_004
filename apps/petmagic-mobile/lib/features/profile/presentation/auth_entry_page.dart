@@ -21,6 +21,7 @@ import 'package:petmagic_mobile/shared/widgets/motion.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_animated_button_child.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
+part 'auth_entry_consent.part.dart';
 part 'auth_entry_content.part.dart';
 
 class AuthEntryPage extends StatelessWidget {
@@ -42,13 +43,14 @@ class AuthEntryPage extends StatelessWidget {
 }
 
 class RegisterEntryPage extends StatelessWidget {
-  const RegisterEntryPage({super.key});
+  const RegisterEntryPage({super.key, this.redirectPath});
 
   static const routePath = '/register';
+  final String? redirectPath;
 
   @override
   Widget build(BuildContext context) {
-    return const _AuthFlowPage(mode: _AuthMode.signUp);
+    return _AuthFlowPage(mode: _AuthMode.signUp, redirectPath: redirectPath);
   }
 }
 
@@ -443,6 +445,17 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     }
 
     return redirectPath;
+  }
+
+  String _redirectQuery() {
+    final redirectPath = widget.redirectPath?.trim();
+    if (redirectPath == null ||
+        redirectPath.isEmpty ||
+        !redirectPath.startsWith('/')) {
+      return '';
+    }
+
+    return '?redirect=${Uri.encodeQueryComponent(redirectPath)}';
   }
 
   String _mapErrorMessage(String raw, AppLocalizations text) {

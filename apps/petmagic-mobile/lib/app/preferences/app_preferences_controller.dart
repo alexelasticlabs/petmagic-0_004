@@ -67,11 +67,7 @@ class AppPreferencesController extends Notifier<AppPreferencesState> {
   }
 
   Future<void> updateLocale(Locale? locale) async {
-    state = state.copyWith(
-      locale: locale,
-      localeWasSet: true,
-      hasLoaded: true,
-    );
+    state = state.copyWith(locale: locale, localeWasSet: true, hasLoaded: true);
     await _storage.saveLocale(locale);
   }
 }

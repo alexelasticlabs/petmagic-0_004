@@ -1,23 +1,57 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'support_assistant_scenarios.dart';
 import 'support_ticket_form_page.dart';
 
-class SupportAssistantPage extends StatelessWidget {
+class SupportAssistantPage extends ConsumerWidget {
   const SupportAssistantPage({required this.scenario, super.key});
 
   static const routePath = '/profile/support/assistant';
+  static const scenarioQueryParam = 'scenario';
 
   final String scenario;
 
+  static String location(String scenario) {
+    final trimmedScenario = scenario.trim();
+    if (trimmedScenario.isEmpty) {
+      return routePath;
+    }
+
+    return '$routePath?$scenarioQueryParam=${Uri.encodeQueryComponent(trimmedScenario)}';
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final scenarioData = buildSupportAssistantScenario(scenario, text);
+
+    if (!isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: SupportAssistantPage.location(scenario),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return ProfileScreenBackground(
       child: Scaffold(
@@ -71,7 +105,7 @@ class SupportAssistantPage extends StatelessWidget {
                   children: [
                     FilledButton.icon(
                       onPressed: () => context.push(
-                        '${SupportTicketFormPage.routePath}?scenario=${Uri.encodeComponent(scenarioData.key)}',
+                        SupportTicketFormPage.location(scenarioData.key),
                       ),
                       icon: const Icon(Icons.headset_mic_rounded, size: 18),
                       label: Text(text.supportAssistantCreateTicketAction),

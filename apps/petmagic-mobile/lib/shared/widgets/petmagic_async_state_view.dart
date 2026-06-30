@@ -10,6 +10,7 @@ class PetMagicAsyncStateView extends StatelessWidget {
     required this.message,
     this.actionLabel,
     this.onAction,
+    this.footer,
     this.padding,
     this.iconColor,
     super.key,
@@ -20,6 +21,7 @@ class PetMagicAsyncStateView extends StatelessWidget {
   final String message;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final Widget? footer;
   final EdgeInsetsGeometry? padding;
   final Color? iconColor;
 
@@ -66,6 +68,7 @@ class PetMagicAsyncStateView extends StatelessWidget {
                 child: PetMagicAnimatedButtonChild(label: actionLabel!),
               ),
             ],
+            if (footer != null) ...[const SizedBox(height: 14), footer!],
           ],
         ),
       ),

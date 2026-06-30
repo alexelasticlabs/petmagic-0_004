@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
@@ -82,6 +83,34 @@ void main() {
 
       await expectLater(loginFuture, completes);
       expect(repository.fetchProfileCalls, 0);
+    },
+  );
+
+  test(
+    'concurrent initialize calls share one in-flight profile request',
+    () async {
+      final repository = _DelayedInitializeProfileRepository();
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedProfileAppLaunchController.new,
+          ),
+          profileRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(profileControllerProvider.notifier);
+      final firstInitialize = controller.initialize();
+      await repository.fetchProfileStarted.future;
+
+      final secondInitialize = controller.initialize();
+
+      repository.completeFetchProfile();
+      await Future.wait([firstInitialize, secondInitialize]);
+
+      expect(repository.readSessionCalls, 1);
+      expect(repository.fetchProfileCalls, 1);
     },
   );
 }
@@ -165,6 +194,56 @@ class _DelayedLoginProfileRepository extends ProfileRepository {
         ),
       );
     }
+  }
+}
+
+class _DelayedInitializeProfileRepository extends ProfileRepository {
+  _DelayedInitializeProfileRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> fetchProfileStarted = Completer<void>();
+  final Completer<MobileUserProfile> _fetchProfileCompleter =
+      Completer<MobileUserProfile>();
+  int readSessionCalls = 0;
+  int fetchProfileCalls = 0;
+
+  @override
+  Future<AuthSession?> readSession() async {
+    readSessionCalls++;
+    return AuthSession(
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAtUtc: DateTime.utc(2026, 1, 1),
+      user: _profile(),
+    );
+  }
+
+  @override
+  Future<MobileUserProfile> fetchProfile() {
+    fetchProfileCalls++;
+    if (!fetchProfileStarted.isCompleted) {
+      fetchProfileStarted.complete();
+    }
+    return _fetchProfileCompleter.future;
+  }
+
+  void completeFetchProfile() {
+    if (!_fetchProfileCompleter.isCompleted) {
+      _fetchProfileCompleter.complete(_profile());
+    }
+  }
+}
+
+class _AuthenticatedProfileAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
   }
 }
 

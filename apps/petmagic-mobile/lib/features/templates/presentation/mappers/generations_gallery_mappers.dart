@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
@@ -74,25 +75,21 @@ String failureReasonMessage(
   return text.generationStatusFailureTechnicalHint;
 }
 
-String formattedDate(AppLocalizations text, DateTime value) {
+String formattedDate(AppLocalizations text, DateTime value, Locale locale) {
   final local = value.toLocal();
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final date = DateTime(local.year, local.month, local.day);
   final dayDiff = today.difference(date).inDays;
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
+  final time = DateFormat.Hm(locale.toLanguageTag()).format(local);
 
   if (dayDiff == 0) {
-    return text.generationStatusDateToday('$hour:$minute');
+    return text.generationStatusDateToday(time);
   }
   if (dayDiff == 1) {
-    return text.generationStatusDateYesterday('$hour:$minute');
+    return text.generationStatusDateYesterday(time);
   }
-  final day = local.day.toString().padLeft(2, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final year = local.year;
-  return '$day.$month.$year, $hour:$minute';
+  return DateFormat.yMMMd(locale.toLanguageTag()).add_Hm().format(local);
 }
 
 IconData statusIcon(TemplateGenerationResult generation) {

@@ -56,7 +56,10 @@ void main() {
       pageSource,
       contains("part 'widgets/support_chat_messages_reply.part.dart';"),
     );
-    expect(messagesSource, isNot(contains('memCacheWidth: _supportReplyThumbnailCacheWidth')));
+    expect(
+      messagesSource,
+      isNot(contains('memCacheWidth: _supportReplyThumbnailCacheWidth')),
+    );
     for (final source in [composerSource, replySource]) {
       expect(
         source,
@@ -191,29 +194,35 @@ void main() {
     expect(composerSource, contains('filterQuality: FilterQuality.medium'));
   });
 
-  test(
-    'recent media picker thumbnails decode to bounded thumbnail size',
-    () async {
-      final pageSource = await File(
-        'lib/features/support/presentation/support_chat_page.dart',
-      ).readAsString();
-      final pickerSource = await File(
-        'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
-      ).readAsString();
-      final assetTileSource = await File(
-        'lib/features/support/presentation/widgets/support_chat_attachment_picker_asset_tile.part.dart',
-      ).readAsString();
+  test('recent media picker thumbnails decode to bounded thumbnail size', () async {
+    final pageSource = await File(
+      'lib/features/support/presentation/support_chat_page.dart',
+    ).readAsString();
+    final pickerSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
+    ).readAsString();
+    final assetTileSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_attachment_picker_asset_tile.part.dart',
+    ).readAsString();
 
-      expect(
-        pageSource,
-        contains('const int _supportRecentMediaThumbnailCacheExtent = 300;'),
-      );
-      expect(pickerSource, isNot(contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent')));
-      expect(assetTileSource, contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent'));
-      expect(assetTileSource, contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'));
-      expect(assetTileSource, contains('filterQuality: FilterQuality.medium'));
-    },
-  );
+    expect(
+      pageSource,
+      contains('const int _supportRecentMediaThumbnailCacheExtent = 300;'),
+    );
+    expect(
+      pickerSource,
+      isNot(contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent')),
+    );
+    expect(
+      assetTileSource,
+      contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent'),
+    );
+    expect(
+      assetTileSource,
+      contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'),
+    );
+    expect(assetTileSource, contains('filterQuality: FilterQuality.medium'));
+  });
 
   test('support chat empty states use sliver scroll surfaces', () async {
     final pageSource = await File(

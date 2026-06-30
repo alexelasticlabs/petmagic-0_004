@@ -9,6 +9,10 @@ void main() {
       'phone': 15551234567,
       'cardNumber': 4242424242424242,
       'paymentIntentClientSecret': 'pi_secret_123',
+      'paymentIntentId': 'pi_3Nabc123',
+      'customerId': 'cus_123456789',
+      'externalSubscriptionId': 'sub_123456789',
+      'purchaseToken': 'gp-token-123456789',
       'receipt': 'store-receipt',
       'authTicket': 'external-auth-ticket',
       'sessionId': 'checkout-session',
@@ -21,6 +25,10 @@ void main() {
     expect(sanitized['phone'], '***');
     expect(sanitized['cardNumber'], '***');
     expect(sanitized['paymentIntentClientSecret'], '***');
+    expect(sanitized['paymentIntentId'], '***');
+    expect(sanitized['customerId'], '***');
+    expect(sanitized['externalSubscriptionId'], '***');
+    expect(sanitized['purchaseToken'], '***');
     expect(sanitized['receipt'], '***');
     expect(sanitized['authTicket'], '***');
     expect(sanitized['sessionId'], '***');
@@ -31,6 +39,10 @@ void main() {
     expect(sanitized.toString(), isNot(contains('external-auth-ticket')));
     expect(sanitized.toString(), isNot(contains('checkout-session')));
     expect(sanitized.toString(), isNot(contains('cs_test_checkoutSession123')));
+    expect(sanitized.toString(), isNot(contains('pi_3Nabc123')));
+    expect(sanitized.toString(), isNot(contains('cus_123456789')));
+    expect(sanitized.toString(), isNot(contains('sub_123456789')));
+    expect(sanitized.toString(), isNot(contains('gp-token-123456789')));
   });
 
   test('masks email context fields without leaking raw addresses', () {
@@ -232,6 +244,10 @@ void main() {
         'prompt': 'make my pet fly',
         'signedUrl': 'https://cdn.petmagic.ai/file.jpg?signature=secret',
       },
+      'serverVerificationData': 'store-receipt-or-token',
+      'localVerificationData': '{"signedData":"raw-jws"}',
+      'signedTransactionInfo': 'eyJhbGciOiJIUzI1NiJ9.payload.signature',
+      'rawBody': '{"customerId":"cus_raw","paymentIntentId":"pi_raw"}',
       'requestBody': '{"password":"hunter2","email":"pet.parent@example.com"}',
       'responseBody': '{"token":"raw-token","status":"failed"}',
       'providerPayload': '{"apiKey":"fal-secret","prompt":"raw user prompt"}',
@@ -241,6 +257,10 @@ void main() {
     });
 
     expect(sanitized['payload'], '***');
+    expect(sanitized['serverVerificationData'], '***');
+    expect(sanitized['localVerificationData'], '***');
+    expect(sanitized['signedTransactionInfo'], '***');
+    expect(sanitized['rawBody'], '***');
     expect(sanitized['requestBody'], '***');
     expect(sanitized['responseBody'], '***');
     expect(sanitized['providerPayload'], '***');
@@ -255,7 +275,46 @@ void main() {
     expect(text, isNot(contains('pet.parent@example.com')));
     expect(text, isNot(contains('raw-token')));
     expect(text, isNot(contains('raw-key')));
+    expect(text, isNot(contains('store-receipt-or-token')));
+    expect(text, isNot(contains('raw-jws')));
+    expect(text, isNot(contains('cus_raw')));
+    expect(text, isNot(contains('pi_raw')));
     expect(text, isNot(contains('signature=secret')));
+  });
+
+  test('masks store verification and external billing identifiers in text', () {
+    final message = AppLogger.sanitizeMessageForTesting(
+      'serverVerificationData=store-token-123 '
+      'localVerificationData=signed-payload-456 '
+      'signedTransactionInfo=jws-payload-789 '
+      'purchaseToken=gp-token-123 '
+      'purchaseId=order-123 '
+      'customerId=cus_123456789 '
+      'paymentIntentId=pi_123456789 '
+      'subscriptionId=sub_123456789 '
+      'externalPaymentId=cs_test_checkoutSession123 '
+      'externalSubscriptionId=sub_external_123',
+    );
+
+    expect(message, contains('serverVerificationData=***'));
+    expect(message, contains('localVerificationData=***'));
+    expect(message, contains('signedTransactionInfo=***'));
+    expect(message, contains('purchaseToken=***'));
+    expect(message, contains('purchaseId=***'));
+    expect(message, contains('customerId=***'));
+    expect(message, contains('paymentIntentId=***'));
+    expect(message, contains('subscriptionId=***'));
+    expect(message, contains('externalPaymentId=***'));
+    expect(message, contains('externalSubscriptionId=***'));
+    expect(message, isNot(contains('store-token-123')));
+    expect(message, isNot(contains('signed-payload-456')));
+    expect(message, isNot(contains('jws-payload-789')));
+    expect(message, isNot(contains('gp-token-123')));
+    expect(message, isNot(contains('cus_123456789')));
+    expect(message, isNot(contains('pi_123456789')));
+    expect(message, isNot(contains('sub_123456789')));
+    expect(message, isNot(contains('cs_test_checkoutSession123')));
+    expect(message, isNot(contains('sub_external_123')));
   });
 
   test('masks standalone checkout session ids embedded in text', () {

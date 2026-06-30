@@ -96,7 +96,8 @@ class _ActiveGenerationCard extends StatelessWidget {
                                 ),
                                 _MetaPill(
                                   icon: Icons.bolt_rounded,
-                                  label: '${generation.tokenCost} ${text.walletBalanceUnit}',
+                                  label:
+                                      '${generation.tokenCost} ${text.walletBalanceUnit}',
                                   color: colors.gold,
                                 ),
                               ],

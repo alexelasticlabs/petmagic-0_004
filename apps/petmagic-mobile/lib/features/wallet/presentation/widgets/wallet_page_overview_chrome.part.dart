@@ -418,7 +418,11 @@ class _PremiumUpsellCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     SizedBox(
-                      width: veryCompact ? 164 : compact ? 178 : 196,
+                      width: veryCompact
+                          ? 164
+                          : compact
+                          ? 178
+                          : 196,
                       child: PremiumShimmerButton(
                         label: text.profilePremiumOpenAction,
                         onTap: onOpenPremium,

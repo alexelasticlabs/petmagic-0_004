@@ -2,6 +2,8 @@ part of 'generation_history_controller.dart';
 
 mixin _GenerationHistoryControllerLifecycle
     on _GenerationHistoryControllerBase {
+  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+
   @override
   void _setScreenVisible(bool visible, {bool clearLoadingState = true}) {
     if (_isScreenVisible == visible) {
@@ -286,7 +288,19 @@ mixin _GenerationHistoryControllerLifecycle
           requireScreenVisible: true,
         ),
       );
-    } catch (_) {}
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationHistory',
+        operation: 'realtime_event_parse',
+        message: 'Generation history realtime payload parsing failed',
+        context: {
+          'topic': event.topic,
+          'payload_keys': event.payload.keys.take(8).toList(growable: false),
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override

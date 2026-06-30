@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/core/network/network_status_controller.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -28,6 +30,7 @@ import 'package:petmagic_mobile/features/gamification/presentation/gamification_
 import 'package:petmagic_mobile/features/gamification/presentation/widgets/gamification_summary_card.dart';
 import 'package:petmagic_mobile/features/gamification/presentation/achievements_page.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/android_loopback_backend_hint.dart';
 import 'package:petmagic_mobile/shared/widgets/motion_entrance.dart';
 import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
@@ -54,24 +57,22 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage>
     with WidgetsBindingObserver {
   bool _isOpeningSubscription = false;
+  ProviderSubscription<AppLaunchState>? _launchSubscription;
+  bool _hasHandledLaunchState = false;
+  bool _wasAuthenticated = false;
+  bool _isProfileReloadScheduled = false;
+  bool _shouldInvalidatePremiumSummaryAfterReload = false;
+  Future<void>? _profileReloadInFlight;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Future.microtask(() async {
-      if (!mounted) {
-        return;
-      }
-
-      ref.invalidate(premiumSubscriptionSummaryProvider);
-      await ref.read(profileControllerProvider.notifier).initialize();
-      if (!mounted) {
-        return;
-      }
-
-      _preloadWalletIfNeeded();
-    });
+    _launchSubscription = ref.listenManual<AppLaunchState>(
+      appLaunchControllerProvider,
+      (_, next) => _handleLaunchState(next),
+      fireImmediately: true,
+    );
   }
 
   void _preloadWalletIfNeeded() {
@@ -92,8 +93,79 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
 
   @override
   void dispose() {
+    _launchSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _handleLaunchState(AppLaunchState launchState) {
+    final shouldReload =
+        !_hasHandledLaunchState ||
+        _wasAuthenticated != launchState.isAuthenticated;
+    _hasHandledLaunchState = true;
+    _wasAuthenticated = launchState.isAuthenticated;
+    if (!shouldReload) {
+      return;
+    }
+
+    _scheduleProfileReload();
+  }
+
+  void _scheduleProfileReload() {
+    if (_isProfileReloadScheduled) {
+      return;
+    }
+
+    _isProfileReloadScheduled = true;
+    Future.microtask(() async {
+      _isProfileReloadScheduled = false;
+      if (!mounted) {
+        return;
+      }
+
+      await _reloadProfile(invalidatePremiumSummary: true);
+    });
+  }
+
+  Future<void> _reloadProfile({bool invalidatePremiumSummary = false}) async {
+    if (invalidatePremiumSummary) {
+      _shouldInvalidatePremiumSummaryAfterReload = true;
+    }
+
+    final inFlight = _profileReloadInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final operation = () async {
+      try {
+        await ref.read(profileControllerProvider.notifier).initialize();
+        if (!mounted) {
+          return;
+        }
+
+        final profileState = ref.read(profileControllerProvider);
+        if (_shouldInvalidatePremiumSummaryAfterReload &&
+            profileState.isAuthenticated &&
+            profileState.profile != null) {
+          ref.invalidate(premiumSubscriptionSummaryProvider);
+        }
+
+        _preloadWalletIfNeeded();
+      } finally {
+        _shouldInvalidatePremiumSummaryAfterReload = false;
+      }
+    }();
+
+    _profileReloadInFlight = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_profileReloadInFlight, operation)) {
+        _profileReloadInFlight = null;
+      }
+    }
   }
 
   @override
@@ -115,7 +187,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       return;
     }
 
-    unawaited(ref.read(profileControllerProvider.notifier).initialize());
+    unawaited(_reloadProfile(invalidatePremiumSummary: true));
   }
 
   @override
@@ -137,9 +209,6 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       walletControllerProvider.select((walletState) => walletState.isLoading),
     );
     final controller = ref.read(profileControllerProvider.notifier);
-    final subscriptionSummary = ref.watch(
-      premiumSubscriptionSummaryProvider.select((summary) => summary.value),
-    );
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final bottomNavInset = petMagicScrollableBottomInset(context);
@@ -152,6 +221,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
               profileControllerProvider.select((state) => state.errorMessage),
             ),
             hasInternet: hasInternet,
+          )
+        : null;
+    final subscriptionSummary = state.isAuthenticated && state.profile != null
+        ? ref.watch(
+            premiumSubscriptionSummaryProvider.select(
+              (summary) => summary.value,
+            ),
           )
         : null;
 
@@ -175,7 +251,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         return;
       }
 
-      unawaited(controller.initialize());
+      unawaited(_reloadProfile(invalidatePremiumSummary: true));
     });
 
     if (!state.isLoading && !state.isAuthenticated && unavailableKind == null) {
@@ -200,7 +276,8 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
         child: SafeArea(
           child: PetMagicUnavailableView(
             kind: unavailableKind,
-            onRetry: () => unawaited(controller.initialize()),
+            onRetry: () =>
+                unawaited(_reloadProfile(invalidatePremiumSummary: true)),
             padding: EdgeInsets.fromLTRB(28, 36, 28, bottomNavInset),
           ),
         ),
@@ -251,8 +328,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
             ? const Center(child: CircularProgressIndicator.adaptive())
             : RefreshIndicator.adaptive(
                 onRefresh: () async {
-                  ref.invalidate(premiumSubscriptionSummaryProvider);
-                  await controller.initialize();
+                  await _reloadProfile(invalidatePremiumSummary: true);
                 },
                 child: ListView(
                   padding: EdgeInsets.fromLTRB(18, 16, 18, bottomNavInset),
@@ -343,6 +419,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
                                 onTap: () => context.push(MyPetsPage.routePath),
                               ),
                               ProfileSettingsRow(
+                                key: const ValueKey('profile_legal_shortcut'),
                                 icon: Icons.privacy_tip_outlined,
                                 title: text.profileLegalShortcutTitle,
                                 subtitle: legalStatus,
@@ -434,8 +511,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       return;
     }
 
-    ref.invalidate(premiumSubscriptionSummaryProvider);
-    await ref.read(profileControllerProvider.notifier).initialize();
+    await _reloadProfile(invalidatePremiumSummary: true);
     if (mounted) {
       setState(() => _isOpeningSubscription = false);
     }

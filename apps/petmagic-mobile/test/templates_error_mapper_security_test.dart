@@ -35,6 +35,33 @@ void main() {
       contains('text.templateFlowStartFailedError'),
     );
   });
+
+  test(
+    'template presentation logs fallback failures instead of swallowing them',
+    () {
+      final templatesPage = _readTemplatesPageLibrarySource();
+
+      expect(templatesPage, contains('AppLogger.warn('));
+      expect(
+        _methodBodyBySignature(
+          templatesPage,
+          'Future<void> _handleTemplateOfTheDaySelected(',
+        ),
+        contains("operation: 'load_detail_for_selection'"),
+      );
+      expect(
+        _methodBodyBySignature(
+          templatesPage,
+          'Future<void> _startFromMyPetsChoice(',
+        ),
+        contains("operation: 'load_my_pets_before_generation'"),
+      );
+      expect(
+        templatesPage,
+        contains("operation: 'read_route_query_parameter'"),
+      );
+    },
+  );
 }
 
 String _functionBody(String source, String functionName) {
@@ -70,4 +97,30 @@ String _readTemplatesPageLibrarySource() {
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');
+}
+
+String _methodBodyBySignature(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative, reason: '$signature not found');
+
+  final asyncBodyStart = source.indexOf('async {', start);
+  final bodyStart = asyncBodyStart >= 0
+      ? source.indexOf('{', asyncBodyStart)
+      : source.indexOf('{', start);
+  expect(bodyStart, isNonNegative, reason: '$signature body not found');
+
+  var depth = 0;
+  for (var index = bodyStart; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(bodyStart, index + 1);
+      }
+    }
+  }
+
+  fail('$signature body did not close');
 }

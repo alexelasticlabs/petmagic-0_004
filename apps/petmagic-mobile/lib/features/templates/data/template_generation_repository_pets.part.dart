@@ -194,39 +194,7 @@ Future<String?> _detectSourceImageContentTypeImpl(
     path,
     unavailableMessage: unavailableMessage,
   );
-  if (repository._startsWith(header, const [0xFF, 0xD8, 0xFF])) {
-    return 'image/jpeg';
-  }
-  if (repository._startsWith(header, const [
-    0x89,
-    0x50,
-    0x4E,
-    0x47,
-    0x0D,
-    0x0A,
-    0x1A,
-    0x0A,
-  ])) {
-    return 'image/png';
-  }
-  if (header.length >= 12 &&
-      repository._asciiEquals(header, 0, 'RIFF') &&
-      repository._asciiEquals(header, 8, 'WEBP')) {
-    return 'image/webp';
-  }
-  if (header.length >= 12 && repository._asciiEquals(header, 4, 'ftyp')) {
-    final brand = String.fromCharCodes(header.skip(8).take(4)).toLowerCase();
-    const heicBrands = {'heic', 'heix', 'hevc', 'hevx', 'heis', 'heim'};
-    const heifBrands = {'mif1', 'msf1'};
-    if (heicBrands.contains(brand)) {
-      return 'image/heic';
-    }
-    if (heifBrands.contains(brand)) {
-      return 'image/heif';
-    }
-  }
-
-  return null;
+  return detectTemplateSourceImageContentType(header);
 }
 
 Future<List<int>> _sourceImageHeaderImpl(
@@ -240,39 +208,6 @@ Future<List<int>> _sourceImageHeaderImpl(
   } on FileSystemException catch (error) {
     throw AppException(unavailableMessage, cause: error);
   }
-}
-
-bool _startsWithImpl(
-  TemplateGenerationRepository repository,
-  List<int> bytes,
-  List<int> prefix,
-) {
-  if (bytes.length < prefix.length) {
-    return false;
-  }
-  for (var index = 0; index < prefix.length; index++) {
-    if (bytes[index] != prefix[index]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool _asciiEqualsImpl(
-  TemplateGenerationRepository repository,
-  List<int> bytes,
-  int offset,
-  String value,
-) {
-  if (bytes.length < offset + value.length) {
-    return false;
-  }
-  for (var index = 0; index < value.length; index++) {
-    if (bytes[offset + index] != value.codeUnitAt(index)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 Future<int> _uploadImageSizeBytesImpl(

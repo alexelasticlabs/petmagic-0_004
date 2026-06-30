@@ -7,14 +7,13 @@ final guestLaunchStorageProvider = Provider<GuestLaunchStorage>((ref) {
 
 class GuestLaunchStorage {
   static const _onboardingSeenKey = 'petmagic_mobile_guest_onboarding_seen';
+  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   Future<bool> readOnboardingSeen() async {
-    final preferences = await SharedPreferences.getInstance();
-    return preferences.getBool(_onboardingSeenKey) ?? false;
+    return await _preferences.getBool(_onboardingSeenKey) ?? false;
   }
 
   Future<void> saveOnboardingSeen(bool value) async {
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setBool(_onboardingSeenKey, value);
+    await _preferences.setBool(_onboardingSeenKey, value);
   }
 }

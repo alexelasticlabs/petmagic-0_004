@@ -1,5 +1,3 @@
-// ignore_for_file: cancel_subscriptions, unused_element
-
 import 'dart:async';
 import 'dart:io';
 
@@ -9,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -28,6 +27,11 @@ final premiumRefreshProfileProvider = Provider<PremiumRefreshProfile>((ref) {
   return () => ref.read(profileControllerProvider.notifier).initialize();
 });
 
+final premiumPurchaseUpdatesProvider =
+    StreamProvider.autoDispose<List<PurchaseDetails>>((ref) {
+      return ref.watch(premiumRepositoryProvider).purchaseUpdates;
+    });
+
 enum PremiumCheckoutVerificationState {
   idle,
   checking,
@@ -37,6 +41,17 @@ enum PremiumCheckoutVerificationState {
 }
 
 enum PremiumSubscriptionProviderView { stripe, googlePlay, appStore, unknown }
+
+const PremiumStatusModel _guestPremiumStatus = PremiumStatusModel(
+  isPremium: false,
+  canManageBilling: false,
+  status: 'None',
+  cancelAtPeriodEnd: false,
+  monthlyTokenLimit: 0,
+  tokensAvailable: 0,
+  canManageSubscription: false,
+  manageSubscriptionAction: '',
+);
 
 class PremiumSubscriptionSummaryView {
   const PremiumSubscriptionSummaryView({
@@ -403,23 +418,9 @@ class PremiumState {
 abstract class _PremiumControllerBase extends Notifier<PremiumState> {
   late PremiumRepository _repository;
   late PremiumRefreshProfile _refreshProfile;
-  PremiumRepository? _purchaseSubscriptionRepository;
-  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
   Future<void>? _loadInFlight;
   CancelToken? _activeLoadCancelToken;
   bool _premiumLifecycleStarted = false;
-
-  void _ensurePremiumLifecycleStarted();
-
-  CancelToken _startLoadCancelToken();
-
-  void _cancelActiveLoad();
-
-  void _clearActiveLoad(CancelToken cancelToken);
-
-  void _updateStateIfMounted(
-    PremiumState Function(PremiumState current) update,
-  );
 
   Future<void> load({bool refresh = false});
 
@@ -442,55 +443,7 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
     String? stripeExternalSubscriptionId,
   });
 
-  PremiumPaymentProvider? _platformStoreProvider();
-
   Future<void> _handlePurchaseUpdates(List<PurchaseDetails> purchases);
-
-  Future<void> _verifyStorePurchase(PurchaseDetails purchase);
-
-  List<PremiumPlanModel> _normalizePlans(List<PremiumPlanModel> plans);
-
-  List<PremiumPaymentProvider> _extractProviders(
-    List<PremiumPaymentMethodModel> methods,
-  );
-
-  Future<
-    ({
-      bool isAvailable,
-      Set<String> productIds,
-      Map<String, String> productPrices,
-    })
-  >
-  _resolveStoreAvailability(
-    List<PremiumPlanModel> plans,
-    List<PremiumPaymentProvider> providers,
-  );
-
-  String _selectPlanCode(
-    List<PremiumPlanModel> plans, {
-    required String? preferredPlanCode,
-    required String currentPlanCode,
-  });
-
-  PremiumPaymentProvider _selectProvider({
-    required List<PremiumPaymentMethodModel> enabledMethods,
-    required List<PremiumPaymentProvider> configuredProviders,
-    required PremiumPaymentProvider currentProvider,
-    required bool storeAvailable,
-    required Set<String> availableStoreProductIds,
-    required List<PremiumPlanModel> plans,
-    required String selectedPlanCode,
-  });
-
-  bool _providerIsCheckoutReady(
-    PremiumPaymentProvider provider,
-    List<PremiumPlanModel> plans,
-    String selectedPlanCode,
-    bool storeAvailable,
-    Set<String> availableStoreProductIds,
-  );
-
-  _BillingPeriod _billingPeriodKey(PremiumPlanModel plan);
 }
 
 class PremiumController extends _PremiumControllerBase

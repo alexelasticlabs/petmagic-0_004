@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/config/app_config.dart';
 
 void main() {
   test(
@@ -46,9 +47,7 @@ void main() {
 
   test('global rebuild hot paths use scoped subscriptions', () {
     final app = File('lib/app/app.dart').readAsStringSync();
-    final shell = File(
-      'lib/shared/navigation/petmagic_shell.dart',
-    ).readAsStringSync();
+    final shell = _readShellLibrarySource();
     final templatesPage = _readTemplatesPageLibrarySource();
 
     expect(app, isNot(contains('ref.watch(networkStatusControllerProvider);')));
@@ -89,20 +88,69 @@ void main() {
     );
   });
 
-  test('Android app Gradle config uses Flutter built-in Kotlin support', () {
-    final properties = File('android/gradle.properties').readAsStringSync();
-    final settings = File('android/settings.gradle.kts').readAsStringSync();
-    final gradle = File('android/app/build.gradle.kts').readAsStringSync();
+  test(
+    'Android app Gradle config follows the current Flutter Kotlin DSL path',
+    () {
+      final properties = File('android/gradle.properties').readAsStringSync();
+      final settings = File('android/settings.gradle.kts').readAsStringSync();
+      final gradle = File('android/app/build.gradle.kts').readAsStringSync();
 
-    expect(properties, contains('android.builtInKotlin=true'));
-    expect(settings, contains('id("org.jetbrains.kotlin.android") version '));
-    expect(gradle, isNot(contains('id("kotlin-android")')));
-    expect(gradle, isNot(contains('id("org.jetbrains.kotlin.android")')));
-    expect(gradle, isNot(contains('kotlinOptions')));
-    expect(gradle, contains('kotlin {'));
-    expect(gradle, contains('sourceCompatibility = JavaVersion.VERSION_17'));
-    expect(gradle, contains('targetCompatibility = JavaVersion.VERSION_17'));
-  });
+      expect(properties, contains('android.newDsl=false'));
+      expect(properties, contains('android.builtInKotlin=false'));
+      expect(settings, contains('id("org.jetbrains.kotlin.android") version '));
+      expect(gradle, isNot(contains('id("kotlin-android")')));
+      expect(gradle, isNot(contains('id("org.jetbrains.kotlin.android")')));
+      expect(gradle, isNot(contains('kotlinOptions')));
+      expect(gradle, contains('kotlin {'));
+      expect(gradle, contains('sourceCompatibility = JavaVersion.VERSION_17'));
+      expect(gradle, contains('targetCompatibility = JavaVersion.VERSION_17'));
+    },
+  );
+
+  test(
+    'Android debug loopback hint is only exposed for localhost-style URLs',
+    () {
+      final loopback = AppConfig.androidLoopbackBackendHintConfig(
+        configuredBaseUrl: 'http://127.0.0.1:5000',
+        isDebugBuild: true,
+        isWeb: false,
+        isAndroidDevice: true,
+      );
+      final lan = AppConfig.androidLoopbackBackendHintConfig(
+        configuredBaseUrl: 'http://192.168.1.50:5000',
+        isDebugBuild: true,
+        isWeb: false,
+        isAndroidDevice: true,
+      );
+      final achievementsPage = File(
+        'lib/features/gamification/presentation/achievements_page.dart',
+      ).readAsStringSync();
+      final profileGamification = File(
+        'lib/features/profile/presentation/profile_page_gamification.part.dart',
+      ).readAsStringSync();
+
+      expect(loopback?.baseUrl, 'http://127.0.0.1:5000');
+      expect(loopback?.port, 5000);
+      expect(lan, isNull);
+      expect(
+        achievementsPage,
+        contains('AndroidLoopbackBackendHint(config: loopbackHintConfig)'),
+      );
+      expect(profileGamification, contains('AndroidLoopbackBackendHint('));
+    },
+  );
+}
+
+String _readShellLibrarySource() {
+  const files = [
+    'lib/shared/navigation/petmagic_shell.dart',
+    'lib/shared/navigation/petmagic_shell_active_generation.part.dart',
+    'lib/shared/navigation/petmagic_shell_backdrop.part.dart',
+    'lib/shared/navigation/petmagic_shell_navigation.part.dart',
+    'lib/shared/navigation/petmagic_shell_transition.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }
 
 String _readTemplatesPageLibrarySource() {

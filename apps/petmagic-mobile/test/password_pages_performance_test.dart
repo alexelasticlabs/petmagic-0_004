@@ -118,11 +118,20 @@ void main() {
     final contentSource = File(
       'lib/features/profile/presentation/auth_entry_content.part.dart',
     ).readAsStringSync();
-    final source = '$pageSource\n$contentSource';
+    final consentSource = File(
+      'lib/features/profile/presentation/auth_entry_consent.part.dart',
+    ).readAsStringSync();
+    final source = '$pageSource\n$contentSource\n$consentSource';
 
+    expect(pageSource, contains("part 'auth_entry_consent.part.dart';"));
     expect(pageSource, contains("part 'auth_entry_content.part.dart';"));
     expect(pageSource, isNot(contains('class _SocialProviderButton')));
+    expect(pageSource, isNot(contains('class _TermsConsentOption')));
     expect(contentSource, contains('class _SocialProviderButton'));
+    expect(contentSource, isNot(contains('class _TermsConsentOption')));
+    expect(consentSource, contains("part of 'auth_entry_page.dart';"));
+    expect(consentSource, contains('class _TermsConsentOption'));
+    expect(consentSource, contains('class _ConsentLabelSplit'));
     expect(source, contains('authTermsLinkText'));
     expect(source, contains('authPrivacyLinkText'));
     expect(source, isNot(contains('class _LegalConsentPhrases')));

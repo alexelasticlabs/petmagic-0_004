@@ -222,4 +222,3 @@ class _TemplateOfTheDayAction extends StatelessWidget {
     );
   }
 }
-

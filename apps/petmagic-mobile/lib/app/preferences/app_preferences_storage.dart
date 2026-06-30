@@ -4,10 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 class AppPreferencesStorage {
   static const _themeModeKey = 'petmagic_mobile_theme_mode';
   static const _localeKey = 'petmagic_mobile_locale';
+  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
   Future<ThemeMode?> readThemeMode() async {
-    final preferences = await SharedPreferences.getInstance();
-    final rawValue = preferences.getString(_themeModeKey);
+    final rawValue = await _preferences.getString(_themeModeKey);
 
     return switch (rawValue) {
       'light' => ThemeMode.light,
@@ -18,19 +18,17 @@ class AppPreferencesStorage {
   }
 
   Future<void> saveThemeMode(ThemeMode mode) async {
-    final preferences = await SharedPreferences.getInstance();
     final value = switch (mode) {
       ThemeMode.light => 'light',
       ThemeMode.dark => 'dark',
       ThemeMode.system => 'system',
     };
 
-    await preferences.setString(_themeModeKey, value);
+    await _preferences.setString(_themeModeKey, value);
   }
 
   Future<Locale?> readLocale() async {
-    final preferences = await SharedPreferences.getInstance();
-    final rawValue = preferences.getString(_localeKey);
+    final rawValue = await _preferences.getString(_localeKey);
     if (rawValue == null || rawValue.isEmpty) {
       return null;
     }
@@ -44,10 +42,8 @@ class AppPreferencesStorage {
   }
 
   Future<void> saveLocale(Locale? locale) async {
-    final preferences = await SharedPreferences.getInstance();
-
     if (locale == null) {
-      await preferences.remove(_localeKey);
+      await _preferences.remove(_localeKey);
       return;
     }
 
@@ -55,6 +51,6 @@ class AppPreferencesStorage {
         ? locale.languageCode
         : '${locale.languageCode}_${locale.countryCode}';
 
-    await preferences.setString(_localeKey, value);
+    await _preferences.setString(_localeKey, value);
   }
 }

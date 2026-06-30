@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
@@ -272,6 +273,27 @@ void main() {
           isTrue,
         );
         expect(canRenderImagePreview('   '), isFalse);
+      },
+    );
+
+    test(
+      'formattedDate uses locale-aware full dates outside today/yesterday',
+      () async {
+        await initializeDateFormatting();
+        final value = DateTime.utc(2020, 1, 5, 9, 7);
+
+        final english = formattedDate(text, value, const Locale('en'));
+        final russian = formattedDate(
+          lookupAppLocalizations(const Locale('ru')),
+          value,
+          const Locale('ru'),
+        );
+
+        expect(english, isNot('05.01.2020, 09:07'));
+        expect(russian, isNot('05.01.2020, 09:07'));
+        expect(english, isNot(russian));
+        expect(english, contains('2020'));
+        expect(russian, contains('2020'));
       },
     );
   });

@@ -1,26 +1,38 @@
 part of 'wallet_controller.dart';
 
 mixin _WalletControllerLifecycle on _WalletControllerBase {
-  @override
   void _ensureWalletLifecycleStarted() {
     if (_walletLifecycleStarted) {
       return;
     }
 
     _walletLifecycleStarted = true;
-    WidgetsBinding.instance.addObserver(this);
-    _purchaseSubscription = _repository.purchaseUpdates.listen(
+    _appLifecycleListener = _handleAppLifecycleSignal;
+    AppLifecycleSignal.instance.addListener(_appLifecycleListener!);
+    final purchaseSubscription = _repository.purchaseUpdates.listen(
       _handlePurchaseUpdates,
     );
     ref.onDispose(() {
-      WidgetsBinding.instance.removeObserver(this);
+      final lifecycleListener = _appLifecycleListener;
+      if (lifecycleListener != null) {
+        AppLifecycleSignal.instance.removeListener(lifecycleListener);
+        _appLifecycleListener = null;
+      }
       _cancelActiveLoad();
       _cancelActiveWalletSync();
-      unawaited(_purchaseSubscription?.cancel());
+      unawaited(purchaseSubscription.cancel());
     });
   }
 
+  void _handleAppLifecycleSignal() {
+    didChangeAppLifecycleState(AppLifecycleSignal.instance.state);
+  }
+
   @override
+  void setWalletPageVisible(bool visible) {
+    _isWalletPageVisible = visible;
+  }
+
   CancelToken _startLoadCancelToken() {
     _cancelActiveLoad();
     final cancelToken = CancelToken();
@@ -28,7 +40,6 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     return cancelToken;
   }
 
-  @override
   void _cancelActiveLoad() {
     final cancelToken = _activeLoadCancelToken;
     if (cancelToken != null && !cancelToken.isCancelled) {
@@ -37,14 +48,12 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     _activeLoadCancelToken = null;
   }
 
-  @override
   void _clearActiveLoad(CancelToken cancelToken) {
     if (identical(_activeLoadCancelToken, cancelToken)) {
       _activeLoadCancelToken = null;
     }
   }
 
-  @override
   CancelToken _startWalletSyncCancelToken() {
     _cancelActiveWalletSync();
     final cancelToken = CancelToken();
@@ -52,7 +61,6 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     return cancelToken;
   }
 
-  @override
   void _cancelActiveWalletSync() {
     final cancelToken = _activeWalletSyncCancelToken;
     if (cancelToken != null && !cancelToken.isCancelled) {
@@ -61,14 +69,12 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     _activeWalletSyncCancelToken = null;
   }
 
-  @override
   void _clearActiveWalletSync(CancelToken cancelToken) {
     if (identical(_activeWalletSyncCancelToken, cancelToken)) {
       _activeWalletSyncCancelToken = null;
     }
   }
 
-  @override
   void _updateStateIfMounted(WalletState Function(WalletState current) update) {
     if (!ref.mounted) {
       return;
@@ -77,9 +83,8 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
     state = update(state);
   }
 
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !_isWalletPageVisible) {
       unawaited(_syncWalletSnapshot(forceRefresh: true));
     }
   }

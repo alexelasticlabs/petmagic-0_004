@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/domain/support_attachment_validation.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
+import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 
 final supportChatRepositoryProvider = Provider<SupportChatRepository>((ref) {
@@ -480,46 +481,7 @@ class SupportChatRepository {
 
   Future<String?> _detectAttachmentContentType(String path) async {
     final header = await _attachmentHeader(path);
-    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
-      return 'image/jpeg';
-    }
-    if (_startsWith(header, const [
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,
-    ])) {
-      return 'image/png';
-    }
-    if (header.length >= 12 &&
-        _asciiEquals(header, 0, 'RIFF') &&
-        _asciiEquals(header, 8, 'WEBP')) {
-      return 'image/webp';
-    }
-    if (header.length >= 12 && _asciiEquals(header, 4, 'ftyp')) {
-      final brand = String.fromCharCodes(header.skip(8).take(4)).toLowerCase();
-      const mp4Brands = {
-        'mp41',
-        'mp42',
-        'isom',
-        'iso2',
-        'avc1',
-        'm4v ',
-        'm4a ',
-      };
-      if (brand == 'qt  ') {
-        return 'video/quicktime';
-      }
-      if (mp4Brands.contains(brand)) {
-        return 'video/mp4';
-      }
-    }
-
-    return null;
+    return detectSupportAttachmentContentType(header);
   }
 
   Future<List<int>> _attachmentHeader(String path) async {
@@ -532,30 +494,6 @@ class SupportChatRepository {
         statusCode: 400,
       );
     }
-  }
-
-  bool _startsWith(List<int> bytes, List<int> prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (var index = 0; index < prefix.length; index++) {
-      if (bytes[index] != prefix[index]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  bool _asciiEquals(List<int> bytes, int offset, String value) {
-    if (bytes.length < offset + value.length) {
-      return false;
-    }
-    for (var index = 0; index < value.length; index++) {
-      if (bytes[offset + index] != value.codeUnitAt(index)) {
-        return false;
-      }
-    }
-    return true;
   }
 
   String _safeMultipartFileName({

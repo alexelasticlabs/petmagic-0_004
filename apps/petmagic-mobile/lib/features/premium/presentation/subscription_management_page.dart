@@ -7,11 +7,14 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -36,19 +39,30 @@ class _SubscriptionManagementPageState
   bool _isProcessing = false;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final summaryAsync = ref.watch(premiumSubscriptionSummaryProvider);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
     final text = AppLocalizations.of(context);
+    if (!isAuthenticated) {
+      return Scaffold(
+        appBar: AppBar(title: Text(text.profileSubscriptionTitle)),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: SubscriptionManagementPage.routePath,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final summaryAsync = ref.watch(premiumSubscriptionSummaryProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(text.profileSubscriptionTitle)),
@@ -116,7 +130,13 @@ class _SubscriptionManagementPageState
       var launched = false;
       try {
         launched = await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
-      } catch (_) {
+      } catch (error, stackTrace) {
+        _logSubscriptionLaunchFailure(
+          mode: LaunchMode.inAppBrowserView.name,
+          uri: uri,
+          error: error,
+          stackTrace: stackTrace,
+        );
         launched = false;
       }
       if (!mounted) {
@@ -124,7 +144,17 @@ class _SubscriptionManagementPageState
       }
 
       if (!launched) {
-        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (error, stackTrace) {
+          _logSubscriptionLaunchFailure(
+            mode: LaunchMode.externalApplication.name,
+            uri: uri,
+            error: error,
+            stackTrace: stackTrace,
+          );
+          launched = false;
+        }
       }
       if (!launched && mounted) {
         PetMagicToast.show(
@@ -250,6 +280,27 @@ class _SubscriptionManagementPageState
       operation: action,
       message: 'Subscription management action failed',
       context: {'action': action},
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+
+  void _logSubscriptionLaunchFailure({
+    required String mode,
+    required Uri uri,
+    required Object error,
+    required StackTrace stackTrace,
+  }) {
+    AppLogger.warn(
+      feature: 'Premium.SubscriptionManagement',
+      operation: 'launch_manage_target',
+      message: 'Subscription management launch mode failed',
+      context: {
+        'mode': mode,
+        'scheme': uri.scheme,
+        'host': uri.host,
+        'port': uri.hasPort ? uri.port : null,
+      },
       error: error,
       stackTrace: stackTrace,
     );

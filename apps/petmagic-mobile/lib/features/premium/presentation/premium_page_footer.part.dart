@@ -94,10 +94,12 @@ class _Link extends StatelessWidget {
       return;
     }
 
-    final launched = await launchUrl(
-      safeUri,
-      mode: LaunchMode.externalApplication,
-    );
+    var launched = false;
+    try {
+      launched = await launchUrl(safeUri, mode: LaunchMode.externalApplication);
+    } on Object {
+      launched = false;
+    }
     if (!context.mounted) {
       return;
     }

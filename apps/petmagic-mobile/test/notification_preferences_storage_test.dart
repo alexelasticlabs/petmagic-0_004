@@ -1,13 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/features/profile/data/notification_preferences_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('NotificationPreferencesStorage', () {
     setUp(() {
-      SharedPreferences.setMockInitialValues(const <String, Object>{});
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
     });
 
     test(

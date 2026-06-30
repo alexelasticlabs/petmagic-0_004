@@ -776,7 +776,15 @@ class _InlineVideoPreviewState extends State<_InlineVideoPreview> {
         return;
       }
       setState(() {});
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationStatusResultSections',
+        operation: 'initialize_video_preview',
+        message: 'Result section video preview failed to initialize.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'usesLocalFile': widget.localFilePath != null},
+      );
       await controller.dispose();
       if (_isCurrentVideoRequest(requestVersion, url, controller)) {
         _releasePreviewSlot();

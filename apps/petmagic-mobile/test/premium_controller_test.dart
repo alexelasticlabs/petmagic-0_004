@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
@@ -54,6 +55,9 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           premiumRefreshProfileProvider.overrideWithValue(() async {}),
         ],
@@ -104,6 +108,9 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         premiumRepositoryProvider.overrideWithValue(repository),
         premiumRefreshProfileProvider.overrideWithValue(() async {}),
       ],
@@ -154,6 +161,9 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         premiumRepositoryProvider.overrideWithValue(repository),
         premiumRefreshProfileProvider.overrideWithValue(() async {}),
       ],
@@ -197,6 +207,9 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           premiumRefreshProfileProvider.overrideWithValue(() async {}),
         ],
@@ -236,6 +249,9 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         premiumRepositoryProvider.overrideWithValue(repository),
         premiumRefreshProfileProvider.overrideWithValue(() async {}),
       ],
@@ -276,6 +292,9 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         premiumRepositoryProvider.overrideWithValue(repository),
         premiumRefreshProfileProvider.overrideWithValue(() async {}),
       ],
@@ -294,6 +313,51 @@ void main() {
     expect(repository.fetchPaywallConfigCalls, 1);
     expect(repository.fetchStatusCalls, 1);
   });
+
+  test(
+    'guest premium load keeps paywall usable without subscription status request',
+    () async {
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _GuestAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(premiumControllerProvider.notifier).load();
+
+      final state = container.read(premiumControllerProvider);
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStatusCalls, 0);
+      expect(state.plans, isNotEmpty);
+      expect(state.isPremium, isFalse);
+      expect(state.canStartCheckout, isTrue);
+    },
+  );
 
   test('checkout verification stops safely after provider disposal', () async {
     final repository = _FakePremiumRepository(
@@ -320,6 +384,9 @@ void main() {
 
     final container = ProviderContainer(
       overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
         premiumRepositoryProvider.overrideWithValue(repository),
         premiumRefreshProfileProvider.overrideWithValue(() {
           if (!refreshStarted.isCompleted) {
@@ -390,6 +457,9 @@ void main() {
 
       final container = ProviderContainer(
         overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
           premiumRepositoryProvider.overrideWithValue(repository),
           premiumRefreshProfileProvider.overrideWithValue(() async {
             refreshCalls++;
@@ -417,46 +487,52 @@ void main() {
     },
   );
 
-  test('stripe restore clears restoring state when profile refresh fails', () async {
-    final repository = _FakePremiumRepository(
-      config: _paywallConfig(
-        methods: const [
-          PremiumPaymentMethodModel(
-            provider: PremiumPaymentProvider.stripe,
-            purchaseChannel: 'external_checkout',
-            platform: 'android',
-            region: '*',
-            isEnabled: true,
-            isSelectedByDefault: true,
-            requiresExternalWarning: false,
-            requiresStoreDisclosure: false,
-            isRecommended: true,
-            bonusTokensPercent: 0,
+  test(
+    'stripe restore clears restoring state when profile refresh fails',
+    () async {
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: true),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
           ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {
+            throw const AppException('templates.network_unavailable');
+          }),
         ],
-      ),
-      status: _status(provider: 'stripe', canManageSubscription: true),
-    );
+      );
+      addTearDown(container.dispose);
 
-    final container = ProviderContainer(
-      overrides: [
-        premiumRepositoryProvider.overrideWithValue(repository),
-        premiumRefreshProfileProvider.overrideWithValue(() async {
-          throw const AppException('templates.network_unavailable');
-        }),
-      ],
-    );
-    addTearDown(container.dispose);
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      await controller.restorePurchases();
 
-    final controller = container.read(premiumControllerProvider.notifier);
-    await controller.load();
-    await controller.restorePurchases();
-
-    final state = container.read(premiumControllerProvider);
-    expect(state.isRestoring, isFalse);
-    expect(state.errorMessage, 'templates.network_unavailable');
-    expect(state.successMessage, isNull);
-  });
+      final state = container.read(premiumControllerProvider);
+      expect(state.isRestoring, isFalse);
+      expect(state.errorMessage, 'templates.network_unavailable');
+      expect(state.successMessage, isNull);
+    },
+  );
 
   test('checkout status refresh invalidates cached subscription summary', () {
     final source = readPremiumControllerLibrarySource();
@@ -718,5 +794,31 @@ class _DelayedPremiumRepository extends _FakePremiumRepository {
 
   void completePaywallConfig() {
     _paywallConfig.complete(config);
+  }
+}
+
+class _GuestAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: false,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class _AuthenticatedAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
   }
 }

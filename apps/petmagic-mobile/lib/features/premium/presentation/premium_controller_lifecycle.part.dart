@@ -1,29 +1,35 @@
 part of 'premium_controller.dart';
 
 mixin _PremiumControllerLifecycle on _PremiumControllerBase {
-  @override
+  bool _purchaseUpdatesListenerRegistered = false;
+
   void _ensurePremiumLifecycleStarted() {
     if (!_premiumLifecycleStarted) {
       _premiumLifecycleStarted = true;
       ref.onDispose(() {
         _cancelActiveLoad();
-        unawaited(_purchaseSubscription?.cancel());
       });
     }
 
-    if (identical(_purchaseSubscriptionRepository, _repository) &&
-        _purchaseSubscription != null) {
+    if (_purchaseUpdatesListenerRegistered) {
       return;
     }
 
-    unawaited(_purchaseSubscription?.cancel());
-    _purchaseSubscriptionRepository = _repository;
-    _purchaseSubscription = _repository.purchaseUpdates.listen(
-      _handlePurchaseUpdates,
+    _purchaseUpdatesListenerRegistered = true;
+    ref.listen<AsyncValue<List<PurchaseDetails>>>(
+      premiumPurchaseUpdatesProvider,
+      (previous, next) {
+        final purchases = next.asData?.value;
+        if (purchases == null ||
+            identical(previous?.asData?.value, purchases)) {
+          return;
+        }
+
+        unawaited(_handlePurchaseUpdates(purchases));
+      },
     );
   }
 
-  @override
   CancelToken _startLoadCancelToken() {
     _cancelActiveLoad();
     final cancelToken = CancelToken();
@@ -31,7 +37,6 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
     return cancelToken;
   }
 
-  @override
   void _cancelActiveLoad() {
     final cancelToken = _activeLoadCancelToken;
     if (cancelToken != null && !cancelToken.isCancelled) {
@@ -40,14 +45,12 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
     _activeLoadCancelToken = null;
   }
 
-  @override
   void _clearActiveLoad(CancelToken cancelToken) {
     if (identical(_activeLoadCancelToken, cancelToken)) {
       _activeLoadCancelToken = null;
     }
   }
 
-  @override
   void _updateStateIfMounted(
     PremiumState Function(PremiumState current) update,
   ) {

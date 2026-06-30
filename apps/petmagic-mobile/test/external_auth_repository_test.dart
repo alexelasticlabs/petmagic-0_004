@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:app_links/app_links.dart';
@@ -141,6 +142,90 @@ void main() {
   );
 
   test(
+    'google auth reinitializes native sdk when server client id changes',
+    () async {
+      final initializeCalls = <String?>[];
+
+      Dio createDio(String serverClientId) {
+        return Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+          ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+            if (options.path == '/api/auth/external/google/mobile-config') {
+              return ResponseBody.fromString(
+                jsonEncode({'serverClientId': serverClientId}),
+                200,
+                headers: {
+                  Headers.contentTypeHeader: [Headers.jsonContentType],
+                },
+              );
+            }
+
+            throw StateError('Unexpected path: ${options.path}');
+          });
+      }
+
+      final firstRepository = MobileExternalAuthRepository(
+        dio: createDio('server-client-a'),
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInInitializeDelegate: (serverClientId) async {
+          initializeCalls.add(serverClientId);
+        },
+        googleSignInDelegate: (googleSignIn) async => null,
+      );
+      await firstRepository.clearSession(ExternalAuthProvider.google);
+
+      await expectLater(
+        firstRepository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_cancelled',
+          ),
+        ),
+      );
+
+      final secondRepository = MobileExternalAuthRepository(
+        dio: createDio('server-client-b'),
+        sessionStorage: _InMemoryAuthSessionStorage(),
+        appLinks: AppLinks(),
+        googleSignInInitializeDelegate: (serverClientId) async {
+          initializeCalls.add(serverClientId);
+        },
+        googleSignInDelegate: (googleSignIn) async => null,
+      );
+
+      await expectLater(
+        secondRepository.authenticate(ExternalAuthProvider.google),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_cancelled',
+          ),
+        ),
+      );
+
+      expect(initializeCalls, ['server-client-a', 'server-client-b']);
+    },
+  );
+
+  test(
+    'external auth logs google initialization failures instead of swallowing them',
+    () async {
+      final source = await File(
+        'lib/features/profile/data/external_auth_repository.dart',
+      ).readAsString();
+
+      expect(source, contains('AppLogger.warn('));
+      expect(source, contains("feature: 'Auth.External'"));
+      expect(source, contains("operation: 'initialize_google_sign_in'"));
+      expect(source, contains('hasServerClientId'));
+      expect(source, isNot(contains('} catch (_) {')));
+    },
+  );
+
+  test(
     'browser callback error is allowlisted before reaching app state',
     () async {
       final callbacks = StreamController<Uri>();
@@ -201,6 +286,49 @@ void main() {
                 'signed url',
                 isNot(contains('signature=secret')),
               ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'browser link flow maps launcher exceptions to launch failure copy',
+    () async {
+      final storage = _InMemoryAuthSessionStorage();
+      await storage.save(_authSession());
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          if (options.path == '/api/auth/me/linked-accounts/Apple/prepare') {
+            return ResponseBody.fromString(
+              jsonEncode(const {'ticket': 'link-ticket'}),
+              200,
+              headers: {
+                Headers.contentTypeHeader: [Headers.jsonContentType],
+              },
+            );
+          }
+
+          throw StateError('Unexpected path: ${options.path}');
+        });
+
+      final repository = MobileExternalAuthRepository(
+        dio: dio,
+        sessionStorage: storage,
+        appLinks: AppLinks(),
+        launchUrlDelegate: (Uri uri, LaunchMode mode) async {
+          throw StateError('launcher unavailable');
+        },
+      );
+
+      await expectLater(
+        repository.link(ExternalAuthProvider.apple),
+        throwsA(
+          isA<AppException>().having(
+            (error) => error.message,
+            'message',
+            'auth.external_launch_failed',
+          ),
         ),
       );
     },

@@ -473,8 +473,20 @@ extension _GenerationStatusPageResultActions on _GenerationStatusPageState {
             generationId: generation.generationId,
             metadata: metadata,
           );
-    } catch (_) {
-      // Analytics is best-effort and must not block result actions.
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationStatusResultActions',
+        operation: 'record_result_analytics_event',
+        message: 'Analytics event recording failed for generation result.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'eventType': eventType,
+          'hasUnlockMethod': unlockMethod != null,
+          'hasCreditsSpent': creditsSpent != null,
+          'isVideoGeneration': isVideoGeneration(generation),
+        },
+      );
     }
   }
 }

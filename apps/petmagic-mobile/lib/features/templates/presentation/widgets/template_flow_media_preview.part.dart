@@ -255,7 +255,18 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
       setState(() {
         _failedToLoad = false;
       });
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.FlowMediaPreview',
+        operation: 'initialize_video_preview',
+        message: 'Template flow media preview failed to initialize.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'useSharedPreviewCache': widget.useSharedPreviewCache,
+          'shouldAutoplay': _shouldPlay,
+        },
+      );
       await controller?.dispose();
       if (_isCurrentVideoRequest(requestVersion, url, controller)) {
         _releasePreviewSlot();
@@ -294,8 +305,15 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
     if (controller != null) {
       try {
         await controller.pause();
-      } catch (_) {
-        // Disposal remains best-effort if the platform controller is already gone.
+      } catch (error, stackTrace) {
+        AppLogger.warn(
+          feature: 'Templates.FlowMediaPreview',
+          operation: 'pause_before_dispose',
+          message: 'Template flow preview pause failed before disposal.',
+          error: error,
+          stackTrace: stackTrace,
+          context: {'useSharedPreviewCache': widget.useSharedPreviewCache},
+        );
       }
       await controller.dispose();
     }
@@ -327,7 +345,19 @@ class _NetworkVideoPreviewState extends State<_NetworkVideoPreview>
       } else if (!shouldPlay && controller.value.isPlaying) {
         await controller.pause();
       }
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.FlowMediaPreview',
+        operation: 'sync_playback_state',
+        message: 'Template flow preview playback sync failed.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {
+          'shouldPlay': shouldPlay,
+          'manualPaused': _manualPaused,
+          'useSharedPreviewCache': widget.useSharedPreviewCache,
+        },
+      );
       return;
     }
 

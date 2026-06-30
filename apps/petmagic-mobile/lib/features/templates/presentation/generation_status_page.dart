@@ -354,6 +354,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                           formatGenerationDateTime(
                             generation.completedAtUtc ??
                                 generation.updatedAtUtc,
+                            Localizations.localeOf(context),
                           ),
                         ),
                         (
@@ -436,7 +437,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                         ),
                         (
                           text.generationStatusStartedLabel,
-                          formatGenerationDateTime(generation.createdAtUtc),
+                          formatGenerationDateTime(
+                            generation.createdAtUtc,
+                            Localizations.localeOf(context),
+                          ),
                         ),
                         (
                           text.generationStatusTypeLabel,

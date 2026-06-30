@@ -4,10 +4,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('profile avatar rendering checks URLs before network image use', () {
-    final source = File(
+    final hostSource = File(
       'lib/features/profile/presentation/profile_surface_widgets.dart',
     ).readAsStringSync();
+    final cardsSource = File(
+      'lib/features/profile/presentation/profile_surface_cards.part.dart',
+    ).readAsStringSync();
+    final identitySource = File(
+      'lib/features/profile/presentation/profile_surface_identity.part.dart',
+    ).readAsStringSync();
+    final metaSource = File(
+      'lib/features/profile/presentation/profile_surface_meta.part.dart',
+    ).readAsStringSync();
+    final source = '$hostSource\n$cardsSource\n$identitySource\n$metaSource';
 
+    expect(hostSource, contains("part 'profile_surface_cards.part.dart';"));
+    expect(hostSource, contains("part 'profile_surface_identity.part.dart';"));
+    expect(hostSource, contains("part 'profile_surface_meta.part.dart';"));
+    expect(
+      hostSource,
+      isNot(contains('class ProfileAvatarBadge extends StatelessWidget')),
+    );
+    expect(identitySource, contains("part of 'profile_surface_widgets.dart';"));
+    expect(identitySource, contains('class ProfileAvatarBadge'));
     expect(source, contains('parseSafeProfileAvatarUri(imageUrl)'));
     expect(source, contains('imageUrl: safeImageUrl'));
     expect(source, isNot(contains('imageUrl: imageUrl!')));

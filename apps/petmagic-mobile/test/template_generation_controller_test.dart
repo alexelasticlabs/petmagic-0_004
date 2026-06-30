@@ -346,15 +346,17 @@ void main() {
   test(
     'restores active generation with repository-provided correlation id',
     () async {
-      final repository = _FakeTemplateGenerationRepository(
-        fetchError: const AppException(
-          'templates.server_unavailable',
-          statusCode: 503,
-        ),
-      )..activeGeneration = (
-        generationId: 'generation-1',
-        correlationId: 'generation-restored-1',
-      );
+      final repository =
+          _FakeTemplateGenerationRepository(
+              fetchError: const AppException(
+                'templates.server_unavailable',
+                statusCode: 503,
+              ),
+            )
+            ..activeGeneration = (
+              generationId: 'generation-1',
+              correlationId: 'generation-restored-1',
+            );
       final container = ProviderContainer(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
@@ -380,12 +382,14 @@ void main() {
     'stale active generation restore does not override newly selected photo',
     () async {
       final restoreReadCompleter = Completer<void>();
-      final repository = _FakeTemplateGenerationRepository(
-        readActiveCompleter: restoreReadCompleter,
-      )..activeGeneration = (
-        generationId: 'generation-1',
-        correlationId: 'generation-restored-1',
-      );
+      final repository =
+          _FakeTemplateGenerationRepository(
+              readActiveCompleter: restoreReadCompleter,
+            )
+            ..activeGeneration = (
+              generationId: 'generation-1',
+              correlationId: 'generation-restored-1',
+            );
       final container = ProviderContainer(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),

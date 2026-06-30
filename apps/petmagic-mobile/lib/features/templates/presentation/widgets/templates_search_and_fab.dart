@@ -7,7 +7,11 @@ import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/shared/widgets/pressable_scale.dart';
 
 class TemplatesSearchField extends StatelessWidget {
-  const TemplatesSearchField({super.key, required this.controller, required this.onChanged});
+  const TemplatesSearchField({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+  });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;

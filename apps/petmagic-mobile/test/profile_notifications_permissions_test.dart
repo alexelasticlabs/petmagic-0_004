@@ -142,8 +142,14 @@ void main() {
     final refreshPushBody = _methodBody(source, '_refreshPushPermissionStatus');
     final registerBody = _methodBody(source, '_registerPushTokenIfAllowed');
 
-    expect(requestPushBody, contains('_registerPushTokenIfAllowed'));
-    expect(refreshPushBody, contains('_registerPushTokenIfAllowed'));
+    expect(
+      requestPushBody,
+      contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
+    );
+    expect(
+      refreshPushBody,
+      contains('_reconcilePushTokenRegistration(settings.authorizationStatus)'),
+    );
     expect(registerBody, contains('FirebaseMessaging.instance.getToken()'));
     expect(source, contains('PushTokenRegistrar'));
     expect(source, contains('templateGenerationRepositoryProvider'));

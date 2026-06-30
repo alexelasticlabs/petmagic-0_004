@@ -1,6 +1,7 @@
 part of 'premium_controller.dart';
 
-mixin _PremiumControllerLoading on _PremiumControllerBase {
+mixin _PremiumControllerLoading
+    on _PremiumControllerBase, _PremiumControllerLifecycle {
   @override
   Future<void> load({bool refresh = false}) async {
     final inFlight = _loadInFlight;
@@ -10,6 +11,9 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     }
 
     final loadCancelToken = _startLoadCancelToken();
+    final isAuthenticated = ref
+        .read(appLaunchControllerProvider)
+        .isAuthenticated;
     final operation = () async {
       _updateStateIfMounted(
         (state) => state.copyWith(
@@ -26,7 +30,10 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
             locale: WidgetsBinding.instance.platformDispatcher.locale,
             cancelToken: loadCancelToken,
           ),
-          _repository.fetchStatus(cancelToken: loadCancelToken),
+          if (isAuthenticated)
+            _repository.fetchStatus(cancelToken: loadCancelToken)
+          else
+            Future<PremiumStatusModel>.value(_guestPremiumStatus),
         ]);
         if (!ref.mounted) {
           return;
@@ -133,7 +140,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     );
   }
 
-  @override
   List<PremiumPlanModel> _normalizePlans(List<PremiumPlanModel> plans) {
     final filtered = <PremiumPlanModel>[];
     for (final plan in plans) {
@@ -155,7 +161,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     return filtered;
   }
 
-  @override
   List<PremiumPaymentProvider> _extractProviders(
     List<PremiumPaymentMethodModel> methods,
   ) {
@@ -169,7 +174,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     return providers;
   }
 
-  @override
   Future<
     ({
       bool isAvailable,
@@ -216,7 +220,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     );
   }
 
-  @override
   String _selectPlanCode(
     List<PremiumPlanModel> plans, {
     required String? preferredPlanCode,
@@ -243,7 +246,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     return plans.first.planCode;
   }
 
-  @override
   PremiumPaymentProvider _selectProvider({
     required List<PremiumPaymentMethodModel> enabledMethods,
     required List<PremiumPaymentProvider> configuredProviders,
@@ -299,7 +301,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
     return configuredProviders.first;
   }
 
-  @override
   bool _providerIsCheckoutReady(
     PremiumPaymentProvider provider,
     List<PremiumPlanModel> plans,
@@ -330,7 +331,6 @@ mixin _PremiumControllerLoading on _PremiumControllerBase {
         availableStoreProductIds.contains(productId);
   }
 
-  @override
   _BillingPeriod _billingPeriodKey(PremiumPlanModel plan) {
     final value = '${plan.billingInterval}:${plan.planCode}'.toLowerCase();
     if (value.contains('year') || value.contains('annual')) {

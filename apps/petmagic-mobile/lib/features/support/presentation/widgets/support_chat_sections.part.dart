@@ -13,6 +13,7 @@ class _SupportConversationViewport extends StatelessWidget {
     required this.onLoadOlderMessages,
     required this.onRetryInitialize,
     required this.onQuickActionSelected,
+    required this.onOpenAttachment,
     required this.onOpenImage,
     required this.onOpenVideo,
     required this.onRetryAttachment,
@@ -35,6 +36,7 @@ class _SupportConversationViewport extends StatelessWidget {
   final Future<void> Function() onLoadOlderMessages;
   final VoidCallback onRetryInitialize;
   final ValueChanged<String> onQuickActionSelected;
+  final Future<void> Function(String value) onOpenAttachment;
   final Future<void> Function({required String imageUrl, String? fileName})
   onOpenImage;
   final Future<void> Function({required String videoUrl, String? fileName})
@@ -128,7 +130,10 @@ class _SupportConversationViewport extends StatelessWidget {
                     description: state.errorMessage != null
                         ? _mapSupportError(text, state.errorMessage!)
                         : (showLoadingFallback
-                              ? _mapSupportError(text, loadingFallbackMessageCode)
+                              ? _mapSupportError(
+                                  text,
+                                  loadingFallbackMessageCode,
+                                )
                               : text.supportChatEmptyMessage),
                     actionLabel: legalAcceptanceRequired
                         ? text.profileLegalAcceptAction
@@ -252,6 +257,7 @@ class _SupportConversationViewport extends StatelessWidget {
                             message.replyToMessageId?.trim().isNotEmpty == true
                             ? messageById[message.replyToMessageId!.trim()]
                             : null,
+                        onOpenAttachment: onOpenAttachment,
                         onOpenImage: onOpenImage,
                         onOpenVideo: onOpenVideo,
                         onRetryAttachment: () => onRetryAttachment(message),

@@ -27,4 +27,31 @@ void main() {
     expect(supportSource, contains('RequestIdentity.createRequestId()'));
     expect(supportSource, contains('RequestIdentity.createCorrelationId()'));
   });
+
+  test(
+    'request identity reports secure-random fallback instead of swallowing it',
+    () async {
+      final requestIdentitySource = await File(
+        'lib/core/network/request_identity.dart',
+      ).readAsString();
+
+      expect(requestIdentitySource, contains('developer.log('));
+      expect(
+        requestIdentitySource,
+        contains('Secure random unavailable; falling back to Random.'),
+      );
+      expect(requestIdentitySource, isNot(contains('} catch (_) {')));
+    },
+  );
+
+  test('haptics report unsupported devices only once', () async {
+    final hapticsSource = await File(
+      'lib/shared/widgets/petmagic_haptics.dart',
+    ).readAsString();
+
+    expect(hapticsSource, contains('AppLogger.warn('));
+    expect(hapticsSource, contains("feature: 'Shared.Haptics'"));
+    expect(hapticsSource, contains('static bool _loggedUnavailable = false;'));
+    expect(hapticsSource, isNot(contains('} catch (_) {')));
+  });
 }

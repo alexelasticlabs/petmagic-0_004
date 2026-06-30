@@ -51,6 +51,12 @@ void main() {
       expect(cropHelperBody, contains('img.copyCrop'));
       expect(cropHelperBody, contains('img.copyResize'));
       expect(cropHelperBody, contains('img.encodeJpg'));
+
+      expect(cropperSource, contains('AppLogger.warn('));
+      expect(cropperSource, contains("feature: 'Profile.AvatarCropper'"));
+      expect(cropperSource, contains("operation: 'load_source_image'"));
+      expect(cropperSource, contains("operation: 'save_cropped_avatar'"));
+      expect(cropperSource, isNot(contains('} catch (_) {')));
     },
   );
 }

@@ -119,7 +119,7 @@ class _ReferralCardState extends State<_ReferralCard> {
                     _ReferralCodeBox(
                       code: hasRewards && rewards.referralCode.isNotEmpty
                           ? rewards.referralCode
-                          : '...',
+                          : text.profileLoadingAction,
                       canCopy: hasRewards,
                       onCopy: _copyCode,
                     ),
@@ -220,6 +220,8 @@ class _ReferralCodeBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
+    final copyActionTextStyle = Theme.of(context).textTheme.labelLarge
+        ?.copyWith(fontSize: 12.5, fontWeight: FontWeight.w700);
 
     return Container(
       width: double.infinity,
@@ -272,10 +274,7 @@ class _ReferralCodeBox extends StatelessWidget {
             style: TextButton.styleFrom(
               minimumSize: const Size(0, 32),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              textStyle: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-              ),
+              textStyle: copyActionTextStyle,
             ),
             icon: const Icon(Icons.copy_rounded, size: 16),
             label: Text(text.rewardsCopyReferralCodeAction),

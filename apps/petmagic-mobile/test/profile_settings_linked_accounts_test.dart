@@ -8,6 +8,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 
 void main() {
   testWidgets(
@@ -82,6 +83,48 @@ void main() {
     );
     expect(find.widgetWithText(TextButton, 'Retry'), findsOneWidget);
   });
+
+  testWidgets(
+    'linked accounts detail shows auth gate for guests without loading provider',
+    (tester) async {
+      var linkedAccountsReads = 0;
+      final container = ProviderContainer(
+        retry: (attempt, error) => null,
+        overrides: [
+          profileControllerProvider.overrideWith(_GuestProfileController.new),
+          linkedAccountsProvider.overrideWith((ref) async {
+            linkedAccountsReads++;
+            return const <MobileLinkedAccount>[];
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            darkTheme: AppTheme.dark(),
+            routerConfig: _testRouter(
+              const ProfileSettingsDetailPage(
+                kind: ProfileSettingsDetailKind.linkedAccounts,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(linkedAccountsReads, 0);
+    },
+  );
 }
 
 Future<void> _pumpLinkedAccountsPage(
@@ -205,4 +248,18 @@ class _FakeProfileController extends ProfileController {
 
   @override
   Future<void> logout() async {}
+}
+
+class _GuestProfileController extends ProfileController {
+  @override
+  ProfileState build() {
+    return const ProfileState(
+      isLoading: false,
+      isSaving: false,
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    );
+  }
 }

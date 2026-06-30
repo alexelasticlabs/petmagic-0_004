@@ -130,7 +130,7 @@ class _RewardsHero extends StatelessWidget {
     final colors = context.petMagicColors;
     final localeTag = Localizations.localeOf(context).toLanguageTag();
     final balanceValue = balance == null
-        ? '...'
+        ? text.profileLoadingAction
         : NumberFormat.decimalPattern(localeTag).format(balance);
 
     return LayoutBuilder(

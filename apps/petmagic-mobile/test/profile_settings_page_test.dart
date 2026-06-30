@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +12,10 @@ import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart'
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/password_change_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_settings_detail_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_settings_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -148,11 +152,74 @@ void main() {
     expect(repository.submittedSourceScreen, 'settings');
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('settings page shows auth gate for guests', (tester) async {
+    await _pumpSettingsPage(tester, guest: true);
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+    expect(find.text('Account information'), findsNothing);
+  });
+
+  testWidgets('account details page shows auth gate for guests', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileControllerProvider.overrideWith(_GuestProfileController.new),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: ProfileAccountInfoPage()),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byType(ProtectedAuthGate), findsOneWidget);
+  });
+
+  test('profile settings page keeps content and feedback flows split', () async {
+    final pageSource = await File(
+      'lib/features/profile/presentation/profile_settings_page.dart',
+    ).readAsString();
+    final contentSource = await File(
+      'lib/features/profile/presentation/profile_settings_page_content.part.dart',
+    ).readAsString();
+    final feedbackSource = await File(
+      'lib/features/profile/presentation/profile_settings_feedback.part.dart',
+    ).readAsString();
+
+    expect(
+      pageSource,
+      contains("part 'profile_settings_page_content.part.dart';"),
+    );
+    expect(pageSource, contains("part 'profile_settings_feedback.part.dart';"));
+    expect(pageSource, isNot(contains('class _SettingsFeedbackSheet')));
+    expect(pageSource, isNot(contains('ProfileGlassCard(')));
+    expect(contentSource, contains("part of 'profile_settings_page.dart';"));
+    expect(feedbackSource, contains("part of 'profile_settings_page.dart';"));
+    expect(contentSource, contains('class _ProfileSettingsPageContent'));
+    expect(feedbackSource, contains('class _SettingsFeedbackSheet'));
+    expect(feedbackSource, contains('sourceScreen: \'settings\''));
+    expect(feedbackSource, contains('AppLogger.warn('));
+    expect(feedbackSource, contains("feature: 'Profile.SettingsFeedback'"));
+    expect(feedbackSource, isNot(contains('} catch (_) {')));
+  });
 }
 
 Future<void> _pumpSettingsPage(
   WidgetTester tester, {
   TemplateGenerationRepository? templateRepository,
+  bool guest = false,
 }) async {
   _FakeProfileController.deleteAccountCalls = 0;
   await tester.binding.setSurfaceSize(const Size(390, 900));
@@ -161,7 +228,9 @@ Future<void> _pumpSettingsPage(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        profileControllerProvider.overrideWith(_FakeProfileController.new),
+        profileControllerProvider.overrideWith(
+          guest ? _GuestProfileController.new : _FakeProfileController.new,
+        ),
         appPreferencesControllerProvider.overrideWith(
           _FakePreferencesController.new,
         ),
@@ -253,6 +322,20 @@ class _FakeProfileController extends ProfileController {
   @override
   Future<void> deleteAccount() async {
     deleteAccountCalls += 1;
+  }
+}
+
+class _GuestProfileController extends ProfileController {
+  @override
+  ProfileState build() {
+    return const ProfileState(
+      isLoading: false,
+      isSaving: false,
+      displayName: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+    );
   }
 }
 

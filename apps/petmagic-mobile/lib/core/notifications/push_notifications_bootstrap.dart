@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/notifications/notification_coordinator.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/presentation/auth_entry_page.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -190,23 +191,27 @@ class _PushNotificationsBootstrapState
       return;
     }
 
-    if (_isGenerationRoute(route) ||
-        _isSupportRoute(route) ||
-        _isWalletRoute(route) ||
-        _isProfileRoute(route)) {
-      final launchState = ref.read(appLaunchControllerProvider);
-      if (_canOpenRouteNow(launchState)) {
-        widget.router.go(route);
-      } else {
-        _pendingRoute = route;
-      }
+    if (!_isSupportedRoute(route)) {
       return;
+    }
+
+    final launchState = ref.read(appLaunchControllerProvider);
+    final destination = _resolvedRouteDestination(route, launchState);
+    if (destination != null) {
+      widget.router.go(destination);
+    } else {
+      _pendingRoute = route;
     }
   }
 
   void _flushPendingRouteIfReady(AppLaunchState launchState) {
     final route = _pendingRoute;
-    if (route == null || !_canOpenRouteNow(launchState)) {
+    if (route == null) {
+      return;
+    }
+
+    final destination = _resolvedRouteDestination(route, launchState);
+    if (destination == null) {
       return;
     }
 
@@ -215,20 +220,24 @@ class _PushNotificationsBootstrapState
       if (!mounted) {
         return;
       }
-      widget.router.go(route);
+      widget.router.go(destination);
     });
   }
 
-  bool _canOpenRouteNow(AppLaunchState launchState) {
+  String? _resolvedRouteDestination(String route, AppLaunchState launchState) {
     if (launchState.isLoading) {
-      return false;
+      return null;
     }
 
     if (launchState.isAuthenticated) {
-      return !launchState.requiresLegalAcceptance;
+      return launchState.requiresLegalAcceptance ? null : route;
     }
 
-    return launchState.hasSeenOnboarding && launchState.guestSessionReady;
+    if (!launchState.hasSeenOnboarding || !launchState.guestSessionReady) {
+      return null;
+    }
+
+    return _isAuthOnlyRoute(route) ? _authRedirectRoute(route) : route;
   }
 
   void _openDeepLink(Uri uri) {
@@ -292,6 +301,23 @@ class _PushNotificationsBootstrapState
 
   bool _isGenerationRoute(String route) {
     return route.startsWith('${GenerationStatusPage.routePrefix}/');
+  }
+
+  bool _isSupportedRoute(String route) {
+    return _isGenerationRoute(route) ||
+        _isSupportRoute(route) ||
+        _isWalletRoute(route) ||
+        _isProfileRoute(route);
+  }
+
+  bool _isAuthOnlyRoute(String route) {
+    return _isSupportRoute(route) ||
+        _isWalletRoute(route) ||
+        _isProfileRoute(route);
+  }
+
+  String _authRedirectRoute(String route) {
+    return '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(route)}';
   }
 
   bool _isSupportRoute(String route) {

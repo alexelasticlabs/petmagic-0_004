@@ -10,6 +10,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/decoded_image_cache_budget.dart';
 import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
@@ -110,6 +111,17 @@ Widget _buildSafeErrorWidget(FlutterErrorDetails details) {
   return const _ProductionErrorFallback();
 }
 
+AppLocalizations _resolveErrorFallbackLocalizations() {
+  final locale = PlatformDispatcher.instance.locale;
+  for (final supportedLocale in AppLocalizations.supportedLocales) {
+    if (supportedLocale.languageCode == locale.languageCode) {
+      return lookupAppLocalizations(supportedLocale);
+    }
+  }
+
+  return lookupAppLocalizations(const Locale('en'));
+}
+
 Future<bool> _initializeFirebase() async {
   if (_skipFirebase) {
     return false;
@@ -139,25 +151,35 @@ class _ProductionErrorFallback extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Directionality(
+    return Directionality(
       textDirection: TextDirection.ltr,
-      child: ColoredBox(
+      child: const ColoredBox(
         color: Color(0xFFF8F5F0),
         child: Center(
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Text(
-              'Something went wrong. Please try again.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF302A25),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                height: 1.35,
-              ),
-            ),
+            child: _ProductionErrorFallbackMessage(),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProductionErrorFallbackMessage extends StatelessWidget {
+  const _ProductionErrorFallbackMessage();
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = _resolveErrorFallbackLocalizations();
+    return Text(
+      localizations.appUnexpectedErrorFallback,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        color: Color(0xFF302A25),
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        height: 1.35,
       ),
     );
   }

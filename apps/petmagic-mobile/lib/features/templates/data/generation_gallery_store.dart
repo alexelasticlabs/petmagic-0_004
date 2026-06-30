@@ -11,6 +11,7 @@ import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
+import 'package:petmagic_mobile/shared/files/media_signature.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

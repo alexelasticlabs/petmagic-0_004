@@ -1,12 +1,52 @@
-part of 'widget_test.dart';
+import 'dart:convert';
 
-GoRouter _testRouter(Widget home) {
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:petmagic_mobile/app/app.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/network/dio_provider.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/data/external_auth_repository.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/data/templates_query.dart';
+import 'package:petmagic_mobile/features/templates/data/templates_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/templates/presentation/template_generation_controller.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:visibility_detector/visibility_detector.dart';
+
+void configureWidgetTestHarness() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() {
+    VisibilityDetectorController.instance.updateInterval = Duration.zero;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
+  tearDown(() {
+    PetMagicNotificationCenter.instance.clearQueue();
+  });
+}
+
+GoRouter testRouter(Widget home) {
   return GoRouter(
     routes: [GoRoute(path: '/', builder: (context, state) => home)],
   );
 }
 
-Future<void> _pumpApp(
+Future<void> pumpTestApp(
   WidgetTester tester, {
   Map<String, Object> sharedPrefs = const {},
   TemplatesRepository? repository,
@@ -20,12 +60,12 @@ Future<void> _pumpApp(
   view.devicePixelRatio = 1.0;
 
   final sharedPrefsWithoutSession = Map<String, Object>.from(sharedPrefs)
-    ..remove(_sessionKey);
+    ..remove(sessionKey);
   SharedPreferences.setMockInitialValues(sharedPrefsWithoutSession);
 
-  final authStorage = _TestAuthSessionStorage(
-    rawSessionJson: sharedPrefs[_sessionKey] is String
-        ? sharedPrefs[_sessionKey] as String
+  final authStorage = TestAuthSessionStorage(
+    rawSessionJson: sharedPrefs[sessionKey] is String
+        ? sharedPrefs[sessionKey] as String
         : null,
   );
 
@@ -37,20 +77,20 @@ Future<void> _pumpApp(
         ),
         authSessionStorageProvider.overrideWith((ref) => authStorage),
         templatesRepositoryProvider.overrideWith(
-          (ref) => repository ?? _FakeTemplatesRepository(),
+          (ref) => repository ?? FakeTemplatesRepository(),
         ),
         templateGenerationControllerProvider.overrideWith(
-          _IdleTemplateGenerationController.new,
+          IdleTemplateGenerationController.new,
         ),
         generationHistoryControllerProvider.overrideWith(
-          _IdleGenerationHistoryController.new,
+          IdleGenerationHistoryController.new,
         ),
-        walletControllerProvider.overrideWith(_IdleWalletController.new),
+        walletControllerProvider.overrideWith(IdleWidgetWalletController.new),
         profileRepositoryProvider.overrideWith(
-          (ref) => profileRepository ?? _FakeProfileRepository(),
+          (ref) => profileRepository ?? FakeProfileRepository(),
         ),
         externalAuthRepositoryProvider.overrideWith(
-          (ref) => externalAuthRepository ?? _FakeExternalAuthRepository(),
+          (ref) => externalAuthRepository ?? FakeExternalAuthRepository(),
         ),
         if (appLaunchController != null)
           appLaunchControllerProvider.overrideWith(appLaunchController),
@@ -73,7 +113,7 @@ Future<void> _pumpApp(
   });
 }
 
-Future<void> _pumpFrames(
+Future<void> pumpTestFrames(
   WidgetTester tester, {
   int count = 8,
   Duration step = const Duration(milliseconds: 100),
@@ -83,14 +123,14 @@ Future<void> _pumpFrames(
   }
 }
 
-class _IdleTemplateGenerationController extends TemplateGenerationController {
+class IdleTemplateGenerationController extends TemplateGenerationController {
   @override
   TemplateGenerationState build() {
     return const TemplateGenerationState();
   }
 }
 
-class _IdleGenerationHistoryController extends GenerationHistoryController {
+class IdleGenerationHistoryController extends GenerationHistoryController {
   @override
   GenerationHistoryState build() {
     return const GenerationHistoryState();
@@ -109,8 +149,8 @@ class _IdleGenerationHistoryController extends GenerationHistoryController {
   Future<void> markRead(String generationId) async {}
 }
 
-class _TrackingGenerationHistoryController
-    extends _IdleGenerationHistoryController {
+class TrackingGenerationHistoryController
+    extends IdleGenerationHistoryController {
   final List<bool> screenVisibilityCalls = [];
   final List<({GenerationHistoryFilter? filter, bool refresh})> loadCalls = [];
 
@@ -128,7 +168,7 @@ class _TrackingGenerationHistoryController
   }
 }
 
-class _ThrowingGuestLaunchController extends AppLaunchController {
+class ThrowingGuestLaunchController extends AppLaunchController {
   @override
   AppLaunchState build() {
     return const AppLaunchState(
@@ -151,7 +191,20 @@ class _ThrowingGuestLaunchController extends AppLaunchController {
   }
 }
 
-class _IdleWalletController extends WalletController {
+class AuthenticatedWidgetAppLaunchController extends AppLaunchController {
+  @override
+  AppLaunchState build() {
+    return const AppLaunchState(
+      isLoading: false,
+      isAuthenticated: true,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+}
+
+class IdleWidgetWalletController extends WalletController {
   @override
   WalletState build() {
     return const WalletState();
@@ -161,7 +214,7 @@ class _IdleWalletController extends WalletController {
   Future<void> load({bool refresh = false}) async {}
 }
 
-String _buildSessionJson() {
+String buildSessionJson() {
   return jsonEncode(
     AuthSession(
       accessToken: 'access-token',
@@ -176,7 +229,7 @@ String _buildSessionJson() {
         termsOfUseAccepted: true,
         privacyPolicyAccepted: true,
         marketingEmailsEnabled: false,
-        legalAcceptance: _sampleLegalAcceptance,
+        legalAcceptance: sampleLegalAcceptance,
         roles: ['user'],
         avatar: null,
       ),
@@ -184,8 +237,8 @@ String _buildSessionJson() {
   );
 }
 
-class _TestAuthSessionStorage extends AuthSessionStorage {
-  _TestAuthSessionStorage({String? rawSessionJson})
+class TestAuthSessionStorage extends AuthSessionStorage {
+  TestAuthSessionStorage({String? rawSessionJson})
     : _session = _deserialize(rawSessionJson);
 
   AuthSession? _session;
@@ -218,7 +271,7 @@ class _TestAuthSessionStorage extends AuthSessionStorage {
   }
 }
 
-const _sampleLegalAcceptance = MobileLegalAcceptanceStatus(
+const sampleLegalAcceptance = MobileLegalAcceptanceStatus(
   termsOfUseAccepted: true,
   termsOfUseAcceptedVersion: '2026-05-20',
   termsOfUseAcceptedAtUtc: null,
@@ -230,7 +283,7 @@ const _sampleLegalAcceptance = MobileLegalAcceptanceStatus(
   requiresAcceptance: false,
 );
 
-const _sampleLegalDocuments = MobileLegalDocuments(
+const sampleLegalDocuments = MobileLegalDocuments(
   termsOfUse: MobileLegalDocument(
     kind: 'terms-of-use',
     title: 'Terms',
@@ -259,10 +312,10 @@ const _sampleLegalDocuments = MobileLegalDocuments(
   ),
 );
 
-const _sessionKey = AuthSessionStorage.sessionKey;
-const _onboardingSeenKey = 'petmagic_mobile_guest_onboarding_seen';
+const sessionKey = AuthSessionStorage.sessionKey;
+const onboardingSeenKey = 'petmagic_mobile_guest_onboarding_seen';
 
-const _sampleTemplate = TemplateItem(
+const sampleTemplate = TemplateItem(
   templateId: 'template-1',
   templateType: TemplateType.image,
   title: 'Magic Studio',
@@ -274,8 +327,8 @@ const _sampleTemplate = TemplateItem(
   tokenCost: 12,
 );
 
-class _FakeTemplatesRepository implements TemplatesRepository {
-  const _FakeTemplatesRepository({this.items = const []});
+class FakeTemplatesRepository implements TemplatesRepository {
+  const FakeTemplatesRepository({this.items = const []});
 
   final List<TemplateItem> items;
 
@@ -352,8 +405,8 @@ class _FakeTemplatesRepository implements TemplatesRepository {
   }
 }
 
-class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
-  _RouterTemplateGenerationRepository()
+class RouterTemplateGenerationRepository extends TemplateGenerationRepository {
+  RouterTemplateGenerationRepository()
     : super(
         dio: Dio(),
         sessionStorage: AuthSessionStorage(),
@@ -451,8 +504,8 @@ class _RouterTemplateGenerationRepository extends TemplateGenerationRepository {
   }) async {}
 }
 
-class _FakeProfileRepository extends ProfileRepository {
-  _FakeProfileRepository()
+class FakeProfileRepository extends ProfileRepository {
+  FakeProfileRepository()
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   AuthSession? storedSession;
@@ -472,7 +525,7 @@ class _FakeProfileRepository extends ProfileRepository {
     termsOfUseAccepted: true,
     privacyPolicyAccepted: true,
     marketingEmailsEnabled: false,
-    legalAcceptance: _sampleLegalAcceptance,
+    legalAcceptance: sampleLegalAcceptance,
     roles: ['user'],
     avatar: null,
   );
@@ -583,7 +636,7 @@ class _FakeProfileRepository extends ProfileRepository {
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
   }) async {
-    return _sampleLegalDocuments;
+    return sampleLegalDocuments;
   }
 
   @override
@@ -649,8 +702,7 @@ class _FakeProfileRepository extends ProfileRepository {
   }
 }
 
-class _UnavailableLegalDocumentsProfileRepository
-    extends _FakeProfileRepository {
+class UnavailableLegalDocumentsProfileRepository extends FakeProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
@@ -659,7 +711,7 @@ class _UnavailableLegalDocumentsProfileRepository
   }
 }
 
-class _FakeExternalAuthRepository implements ExternalAuthRepository {
+class FakeExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     return AuthSession(
@@ -679,7 +731,7 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
         termsOfUseAccepted: true,
         privacyPolicyAccepted: true,
         marketingEmailsEnabled: false,
-        legalAcceptance: _sampleLegalAcceptance,
+        legalAcceptance: sampleLegalAcceptance,
         roles: const ['user'],
         avatar: null,
       ),
@@ -695,7 +747,7 @@ class _FakeExternalAuthRepository implements ExternalAuthRepository {
   Future<void> clearSession(ExternalAuthProvider provider) async {}
 }
 
-class _TrackingExternalAuthRepository extends _FakeExternalAuthRepository {
+class TrackingExternalAuthRepository extends FakeExternalAuthRepository {
   final List<ExternalAuthProvider> clearedProviders = [];
 
   @override
@@ -704,8 +756,8 @@ class _TrackingExternalAuthRepository extends _FakeExternalAuthRepository {
   }
 }
 
-class _FailingExternalAuthRepository implements ExternalAuthRepository {
-  const _FailingExternalAuthRepository(this.error);
+class FailingExternalAuthRepository implements ExternalAuthRepository {
+  const FailingExternalAuthRepository(this.error);
 
   final AppException error;
 
@@ -725,7 +777,7 @@ class _FailingExternalAuthRepository implements ExternalAuthRepository {
   }
 }
 
-class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
+class ThrowingExternalAuthRepository implements ExternalAuthRepository {
   @override
   Future<AuthSession> authenticate(ExternalAuthProvider provider) async {
     throw Exception('google sign-in failed unexpectedly');
@@ -740,223 +792,4 @@ class _ThrowingExternalAuthRepository implements ExternalAuthRepository {
   Future<void> clearSession(ExternalAuthProvider provider) async {
     throw Exception('external account sign-out failed unexpectedly');
   }
-}
-
-class _FakeSupportChatRepository extends SupportChatRepository {
-  _FakeSupportChatRepository({
-    this.emptyConversation = false,
-    bool hasConversation = true,
-  }) : _hasConversation = hasConversation,
-       super(dio: Dio(), sessionStorage: AuthSessionStorage());
-
-  final bool emptyConversation;
-  bool _hasConversation;
-  String? lastSentBody;
-  int openConversationCalls = 0;
-  String? lastOpenedInitialMessage;
-  String? lastOpenedRelatedGenerationId;
-  late SupportChatConversation _conversation = SupportChatConversation(
-    conversationId: 'conversation-1',
-    initiatorUserId: 'user-1',
-    userEmail: 'pet@example.com',
-    userDisplayName: 'Pet Parent',
-    assignedAdminId: 'admin-1',
-    assignedAdminDisplayName: 'PetMagic Support',
-    status: 'Open',
-    priority: 'Normal',
-    source: 'Direct',
-    userUnreadCount: 1,
-    adminUnreadCount: 0,
-    createdAtUtc: DateTime.utc(2026, 1, 1, 10),
-    updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-    lastMessageAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-    messages: emptyConversation
-        ? []
-        : [
-            SupportChatMessage(
-              messageId: 'message-1',
-              conversationId: 'conversation-1',
-              senderUserId: 'admin-1',
-              senderDisplayName: 'PetMagic Support',
-              isFromAdmin: true,
-              senderType: 'Admin',
-              body: 'How can we help today?',
-              isRead: false,
-              attachments: const [],
-              createdAtUtc: DateTime.utc(2026, 1, 1, 10, 5),
-            ),
-          ],
-  );
-
-  @override
-  Future<SupportChatConversation> openConversation({
-    String source = 'Direct',
-    String? assistantScenario,
-    String? initialMessage,
-    String? relatedGenerationId,
-    String? relatedPaymentId,
-    String? relatedSubscriptionId,
-    CancelToken? cancelToken,
-  }) async {
-    openConversationCalls += 1;
-    lastOpenedInitialMessage = initialMessage;
-    lastOpenedRelatedGenerationId = relatedGenerationId;
-    if (!_hasConversation) {
-      _hasConversation = true;
-      final now = DateTime.utc(2026, 1, 1, 10, 10);
-      final initialMessages = <SupportChatMessage>[];
-      final trimmedInitial = initialMessage?.trim() ?? '';
-      if (trimmedInitial.isNotEmpty) {
-        initialMessages.add(
-          SupportChatMessage(
-            messageId: 'message-2',
-            conversationId: 'conversation-1',
-            senderUserId: 'user-1',
-            senderDisplayName: 'Pet Parent',
-            isFromAdmin: false,
-            senderType: 'User',
-            body: trimmedInitial,
-            isRead: false,
-            attachments: const [],
-            createdAtUtc: now,
-          ),
-        );
-      }
-
-      _conversation = SupportChatConversation(
-        conversationId: 'conversation-1',
-        initiatorUserId: 'user-1',
-        userEmail: 'pet@example.com',
-        userDisplayName: 'Pet Parent',
-        assignedAdminId: 'admin-1',
-        assignedAdminDisplayName: 'PetMagic Support',
-        status: initialMessages.isEmpty ? 'Open' : 'WaitingForSupport',
-        priority: 'Normal',
-        source: source,
-        userUnreadCount: 0,
-        adminUnreadCount: initialMessages.isEmpty ? 0 : 1,
-        createdAtUtc: DateTime.utc(2026, 1, 1, 10),
-        updatedAtUtc: now,
-        lastMessageAtUtc: initialMessages.isEmpty ? null : now,
-        messages: initialMessages,
-      );
-      return _conversation;
-    }
-
-    return _conversation;
-  }
-
-  @override
-  Future<SupportChatConversation> getConversation({
-    int take = 60,
-    DateTime? beforeMessageCreatedAtUtc,
-    String? beforeMessageId,
-    CancelToken? cancelToken,
-  }) async {
-    if (!_hasConversation) {
-      throw const AppException(
-        'support.conversation_not_found',
-        statusCode: 404,
-      );
-    }
-    return _conversation;
-  }
-
-  @override
-  Future<SupportChatMessage> sendMessage({
-    required String conversationId,
-    required String body,
-    required String localeTag,
-    String? replyToMessageId,
-  }) async {
-    if (!_hasConversation) {
-      throw const AppException(
-        'support.conversation_not_found',
-        statusCode: 404,
-      );
-    }
-
-    lastSentBody = body;
-    final message = SupportChatMessage(
-      messageId: 'message-2',
-      conversationId: conversationId,
-      senderUserId: 'user-1',
-      senderDisplayName: 'Pet Parent',
-      isFromAdmin: false,
-      senderType: 'User',
-      body: body,
-      isRead: false,
-      attachments: const [],
-      createdAtUtc: DateTime.utc(2026, 1, 1, 10, 10),
-    );
-
-    _conversation = _conversation.copyWith(
-      adminUnreadCount: _conversation.adminUnreadCount + 1,
-      updatedAtUtc: message.createdAtUtc,
-      lastMessageAtUtc: message.createdAtUtc,
-      messages: [..._conversation.messages, message],
-    );
-
-    return message;
-  }
-
-  @override
-  Future<void> markConversationRead(String conversationId) async {
-    _conversation = _conversation.copyWith(
-      userUnreadCount: 0,
-      messages: _conversation.messages
-          .map(
-            (message) => message.isFromAdmin
-                ? message.copyWith(
-                    isRead: true,
-                    readAtUtc: DateTime.utc(2026, 1, 1, 10, 6),
-                  )
-                : message,
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
-class _ThrowingSupportChatRepository extends SupportChatRepository {
-  _ThrowingSupportChatRepository()
-    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
-
-  @override
-  Future<SupportChatConversation> getConversation({
-    int take = 60,
-    DateTime? beforeMessageCreatedAtUtc,
-    String? beforeMessageId,
-    CancelToken? cancelToken,
-  }) async {
-    throw Exception('unexpected support failure');
-  }
-}
-
-class _DelayedSupportChatRepository extends SupportChatRepository {
-  _DelayedSupportChatRepository()
-    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
-
-  @override
-  Future<SupportChatConversation> getConversation({
-    int take = 60,
-    DateTime? beforeMessageCreatedAtUtc,
-    String? beforeMessageId,
-    CancelToken? cancelToken,
-  }) async {
-    return Completer<SupportChatConversation>().future;
-  }
-}
-
-class _FakeSupportChatRealtimeClient implements SupportChatRealtimeClient {
-  const _FakeSupportChatRealtimeClient();
-
-  @override
-  Future<void> connect() async {}
-
-  @override
-  Future<void> disconnect() async {}
-
-  @override
-  Stream<SupportChatRealtimeUpdate> get events => const Stream.empty();
 }

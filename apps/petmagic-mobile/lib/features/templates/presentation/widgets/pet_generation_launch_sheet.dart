@@ -18,6 +18,7 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:petmagic_mobile/shared/navigation/petmagic_modal_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/pawspark_icon.dart';
 
+part 'pet_generation_launch_sheet_media.part.dart';
 part 'pet_generation_launch_sheet_content.part.dart';
 
 typedef PetPhotoPicker = Future<XFile?> Function();

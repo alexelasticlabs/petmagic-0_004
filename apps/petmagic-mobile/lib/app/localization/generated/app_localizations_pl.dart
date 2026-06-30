@@ -55,6 +55,10 @@ class AppLocalizationsPl extends AppLocalizations {
       'Otwórz profil, aby sprawdzić najnowszą aktualizację Premium.';
 
   @override
+  String get appUnexpectedErrorFallback =>
+      'Coś poszło nie tak. Spróbuj ponownie.';
+
+  @override
   String get comingSoonMessage =>
       'Ta sekcja jest przygotowana na kolejny etap produktu.';
 
@@ -852,20 +856,6 @@ class AppLocalizationsPl extends AppLocalizations {
       'Reklamy są chwilowo niedostępne. Spróbuj ponownie później.';
 
   @override
-  String get walletPromoTitle => 'Masz kod promocyjny?';
-
-  @override
-  String get walletPromoSubtitle =>
-      'Wpisz kod z PetMagic i dodaj PawSpark do swojego salda.';
-
-  @override
-  String get walletPromoInputPlaceholder => 'Wpisz kod promocyjny';
-
-  @override
-  String get walletPromoSuccessMessage =>
-      'Kod promocyjny został pomyślnie aktywowany!';
-
-  @override
   String get walletBestValueBadge => 'Najlepsza wartość';
 
   @override
@@ -1194,11 +1184,11 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get walletPaymentStoreUnavailableGooglePlay =>
-      'Google Play jest tymczasowo niedostępne na tym urządzeniu. Na razie użyj Stripe.';
+      'Zakupy przez Google Play są tymczasowo niedostępne na tym urządzeniu. Wybierz inną dostępną metodę płatności.';
 
   @override
   String get walletPaymentStoreUnavailableAppStore =>
-      'App Store jest tymczasowo niedostępny na tym urządzeniu. Na razie użyj Stripe.';
+      'Zakupy przez App Store są tymczasowo niedostępne na tym urządzeniu. Wybierz inną dostępną metodę płatności.';
 
   @override
   String get walletCheckoutOrderSectionTitle => 'Podsumowanie zamówienia';
@@ -1270,6 +1260,9 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get walletSourceAdminDebit => 'Regulacja wsparcia';
+
+  @override
+  String get walletSourceOther => 'Inna operacja';
 
   @override
   String get walletPurchaseCompleted => 'Zakończony';
@@ -1495,6 +1488,9 @@ class AppLocalizationsPl extends AppLocalizations {
   String get premiumPaymentApple => 'Apple Pay/App Store';
 
   @override
+  String get premiumPaymentOther => 'Inna metoda płatności';
+
+  @override
   String get premiumPaymentRecommendedBadge => 'Zalecony';
 
   @override
@@ -1624,7 +1620,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get premiumStoreUnavailable =>
-      'Subskrypcje sklepowe czekają na konfigurację produktów w App Store / Google Play. Na razie użyj Stripe Checkout.';
+      'Subskrypcje przez App Store / Google Play są teraz tymczasowo niedostępne. Spróbuj ponownie później lub użyj innej dostępnej metody płatności.';
 
   @override
   String get premiumStoreProductUnavailable =>
@@ -2018,18 +2014,6 @@ class AppLocalizationsPl extends AppLocalizations {
       'Pierwsze artykuły pomocy i przewodniki dotyczące rozwiązywania problemów pojawią się tutaj po opublikowaniu treści pomocy dla urządzeń mobilnych.';
 
   @override
-  String get profileDetailsSupportBody =>
-      'Prośby o wsparcie będą obsługiwane tutaj, bez zmuszania Cię do opuszczenia obszaru profilu.';
-
-  @override
-  String get profileDetailsSupportStatus =>
-      'Bezpośredni kontakt w aplikacji nie jest jeszcze podłączony. Na razie zachowaj ten ekran jako punkt wejścia wsparcia dla następnego fragmentu.';
-
-  @override
-  String get profileDetailsSupportNext =>
-      'Następnym krokiem będzie pełny formularz wsparcia lub przekazanie sprawy przez e-mail.';
-
-  @override
   String get profileDetailsTermsBody =>
       'Sprawdź, jak PetMagic oczekuje, że aplikacja i konto będą używane.';
 
@@ -2043,7 +2027,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileDetailsTermsNext =>
-      'Pełniejszy widok dokumentu prawnego można załączyć tutaj później. Na razie ten ekran potwierdza aktualny stan akceptacji.';
+      'Poniżej możesz przejrzeć aktualny Regulamin i zaakceptować najnowszą wersję, jeśli to konto nadal tego wymaga.';
 
   @override
   String get profileDetailsPrivacyBody =>
@@ -2051,11 +2035,11 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileDetailsPrivacyStatus =>
-      'Szczegóły dotyczące prywatności są obecnie wyświetlane jako ekran podsumowania w aplikacji, podczas gdy przygotowywany jest pełny obieg dokumentów prawnych.';
+      'Ten ekran pokazuje aktualną Politykę prywatności, opublikowaną wersję oraz status akceptacji dla tego konta.';
 
   @override
   String get profileDetailsPrivacyNext =>
-      'Następny fragment może dołączyć do tej trasy kompletny dokument dotyczący polityki lub hostowaną stronę prawną.';
+      'Poniżej możesz przejrzeć aktualną Politykę prywatności i zaakceptować najnowszą wersję, jeśli to konto nadal tego wymaga.';
 
   @override
   String get profileLegalAcceptanceCurrent =>
@@ -4113,6 +4097,14 @@ class AppLocalizationsPl extends AppLocalizations {
       'PetMagic nie moze teraz polaczyc sie z backendem. Sprobuj ponownie za chwile.';
 
   @override
+  String get localBackendAndroidHintTitle => 'Lokalny backend na Androidzie';
+
+  @override
+  String localBackendAndroidHintMessage(Object baseUrl, Object port) {
+    return 'Ta kompilacja debug wskazuje na $baseUrl. Na prawdziwym telefonie z Androidem localhost i 127.0.0.1 wskazuja na sam telefon. Uruchom adb reverse tcp:$port tcp:$port albo ustaw API_BASE_URL na adres LAN komputera.';
+  }
+
+  @override
   String get generationStatusCompareAction => 'Porównaj';
 
   @override
@@ -4569,7 +4561,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileNotificationsPushPurchasesAndSubscriptionsSubtitle =>
-      'Potwierdzenia platnosci i status subskrypcji';
+      'Potwierdzenia płatności i status subskrypcji';
 
   @override
   String get profileNotificationsEmailOffersSubtitle =>
@@ -4581,13 +4573,13 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileNotificationsEmailAccountAlertsSubtitle =>
-      'Alerty bezpieczenstwa i zmiany konta';
+      'Alerty bezpieczeństwa i zmiany konta';
 
   @override
-  String get passwordChangeStepRequestCode => 'Popros o kod';
+  String get passwordChangeStepRequestCode => 'Poproś o kod';
 
   @override
-  String get passwordChangeStepNewPassword => 'Nowe haslo';
+  String get passwordChangeStepNewPassword => 'Nowe hasło';
 
   @override
   String get subscriptionTokensWeeklyGrantPeriodSuffix => ' / 7 dni';
@@ -4620,7 +4612,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String subscriptionGrantNextLabel(String countdown) {
-    return 'Nastepne przyznanie: $countdown';
+    return 'Następne przyznanie: $countdown';
   }
 
   @override
@@ -4636,7 +4628,7 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get subscriptionBenefitPriorityGenerationDescription =>
-      'Twoje zadania maja priorytet';
+      'Twoje zadania mają priorytet';
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Czysty wynik';

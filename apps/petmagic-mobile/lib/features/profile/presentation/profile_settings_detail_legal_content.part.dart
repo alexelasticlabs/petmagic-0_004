@@ -69,7 +69,7 @@ class _ProfileSettingsLegalDetailContent extends ConsumerWidget {
                           kind,
                           legalDocumentsAsync,
                         )?.version ??
-                        '...',
+                        '—',
                   ),
                   _InfoRow(
                     label: text.profileLegalPublishedLabel,

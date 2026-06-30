@@ -1,6 +1,7 @@
 part of 'wallet_controller.dart';
 
-mixin _WalletControllerLoading on _WalletControllerBase {
+mixin _WalletControllerLoading
+    on _WalletControllerBase, _WalletControllerLifecycle {
   @override
   Future<void> load({bool refresh = false}) async {
     final inFlight = _loadInFlight;
@@ -25,7 +26,6 @@ mixin _WalletControllerLoading on _WalletControllerBase {
     }
   }
 
-  @override
   Future<void> _performLoad({
     required bool refresh,
     required CancelToken cancelToken,
@@ -157,7 +157,6 @@ mixin _WalletControllerLoading on _WalletControllerBase {
     }
   }
 
-  @override
   Future<
     ({
       List<WalletPaymentMethodModel> paymentMethods,
@@ -206,7 +205,6 @@ mixin _WalletControllerLoading on _WalletControllerBase {
     return (paymentMethods: resolved, productPrices: productPrices);
   }
 
-  @override
   WalletPaymentMethodModel _copyPaymentMethodWithEnabled(
     WalletPaymentMethodModel method,
     bool isEnabled,
@@ -277,6 +275,26 @@ mixin _WalletControllerLoading on _WalletControllerBase {
     }
   }
 
+  List<WalletLedgerItem> _mergeRefreshedLedgerPage({
+    required List<WalletLedgerItem> existingLedger,
+    required List<WalletLedgerItem> refreshedFirstPage,
+  }) {
+    if (existingLedger.isEmpty || refreshedFirstPage.isEmpty) {
+      return refreshedFirstPage;
+    }
+
+    final merged = <WalletLedgerItem>[...refreshedFirstPage];
+    final seenEntryIds = refreshedFirstPage.map((item) => item.entryId).toSet();
+
+    for (final item in existingLedger) {
+      if (seenEntryIds.add(item.entryId)) {
+        merged.add(item);
+      }
+    }
+
+    return merged;
+  }
+
   @override
   Future<void> _syncWalletSnapshot({bool forceRefresh = false}) async {
     if (_isWalletSyncInFlight || _loadInFlight != null) {
@@ -334,7 +352,12 @@ mixin _WalletControllerLoading on _WalletControllerBase {
       _updateStateIfMounted(
         (state) => state.copyWith(
           wallet: nextWallet,
-          ledger: latestLedgerPage?.items ?? state.ledger,
+          ledger: latestLedgerPage == null
+              ? state.ledger
+              : _mergeRefreshedLedgerPage(
+                  existingLedger: state.ledger,
+                  refreshedFirstPage: latestLedgerPage.items,
+                ),
           ledgerHasMore: latestLedgerPage?.hasMore ?? state.ledgerHasMore,
           clearError: true,
           clearLedgerLoadMoreError: latestLedgerPage != null,

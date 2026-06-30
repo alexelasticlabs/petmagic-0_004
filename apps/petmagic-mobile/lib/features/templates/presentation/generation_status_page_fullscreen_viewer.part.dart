@@ -94,7 +94,15 @@ class _FullscreenResultViewerState extends State<_FullscreenResultViewer> {
         return;
       }
       setState(() {});
-    } catch (_) {
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationStatusFullscreen',
+        operation: 'initialize_video_preview',
+        message: 'Fullscreen video preview failed to initialize.',
+        error: error,
+        stackTrace: stackTrace,
+        context: {'usesLocalFile': widget.localFilePath != null},
+      );
       await controller.dispose();
       if (_isCurrentVideoRequest(requestVersion, mediaUrl, controller)) {
         setState(() {

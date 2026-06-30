@@ -2,14 +2,23 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/core/auth/auth_session_coordinator.dart';
+import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/core/startup/session_scope_reset.dart';
+import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
+import 'package:petmagic_mobile/features/gamification/data/gamification_repository.dart';
+import 'package:petmagic_mobile/features/gamification/presentation/gamification_providers.dart';
+import 'package:petmagic_mobile/features/pets/presentation/pet_profile_providers.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
+import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+
+import 'my_pets_page_test_support.dart';
 
 void main() {
   setUp(() {
@@ -63,6 +72,200 @@ void main() {
       expect(mediaCleanupCalls, 1);
     },
   );
+
+  test(
+    'invalidates pet gallery providers when startup resolves signed out',
+    () async {
+      final repository = FakePetRepository(
+        pets: [
+          PetProfile(
+            id: 'pet-1',
+            name: 'Milo',
+            type: 'dog',
+            photosCount: 1,
+            generationsCount: 1,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        photos: [
+          PetPhoto(
+            id: 'photo-1',
+            petId: 'pet-1',
+            mediaAssetId: 'media-1',
+            url: 'https://cdn.petmagic.test/photo.jpg',
+            fileName: 'photo.jpg',
+            contentType: 'image/jpeg',
+            isFavorite: false,
+            isAvatar: true,
+            sortOrder: 1,
+            createdAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        generations: [
+          TemplateGenerationResult(
+            generationId: 'generation-1',
+            userId: 'user-1',
+            templateId: 'template-1',
+            status: TemplateGenerationStatus.completed,
+            tokenCost: 1,
+            attemptCount: 1,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+            userMediaExpired: false,
+          ),
+        ],
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await Future.wait([
+        container.read(petsProvider.future),
+        container.read(petPhotosProvider('pet-1').future),
+        container.read(petGenerationsProvider('pet-1').future),
+      ]);
+      expect(repository.petsFetchCount, 1);
+      expect(repository.petPhotoFetchCount, 1);
+      expect(repository.petGenerationFetchCount, 1);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      await Future.wait([
+        container.read(petsProvider.future),
+        container.read(petPhotosProvider('pet-1').future),
+        container.read(petGenerationsProvider('pet-1').future),
+      ]);
+      expect(repository.petsFetchCount, 2);
+      expect(repository.petPhotoFetchCount, 2);
+      expect(repository.petGenerationFetchCount, 2);
+    },
+  );
+
+  test(
+    'invalidates gamification providers when startup resolves signed out',
+    () async {
+      final repository = FakeGamificationRepository();
+
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          gamificationRepositoryProvider.overrideWithValue(repository),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await Future.wait([
+        container.read(gamificationSummaryProvider.future),
+        container.read(petProgressProvider('pet-1').future),
+        container.read(achievementsProvider.future),
+        container.read(dailyStreakProvider.future),
+        container.read(weeklyChallengesProvider.future),
+      ]);
+      expect(repository.summaryFetchCount, 1);
+      expect(repository.petProgressFetchCount, 1);
+      expect(repository.achievementsFetchCount, 1);
+      expect(repository.streakFetchCount, 1);
+      expect(repository.weeklyChallengesFetchCount, 1);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      await Future.wait([
+        container.read(gamificationSummaryProvider.future),
+        container.read(petProgressProvider('pet-1').future),
+        container.read(achievementsProvider.future),
+        container.read(dailyStreakProvider.future),
+        container.read(weeklyChallengesProvider.future),
+      ]);
+      expect(repository.summaryFetchCount, 2);
+      expect(repository.petProgressFetchCount, 2);
+      expect(repository.achievementsFetchCount, 2);
+      expect(repository.streakFetchCount, 2);
+      expect(repository.weeklyChallengesFetchCount, 2);
+    },
+  );
+
+  test(
+    'recreates support realtime client when startup resolves signed out',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final firstClient = container.read(supportChatRealtimeClientProvider);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      final secondClient = container.read(supportChatRealtimeClientProvider);
+      expect(identical(firstClient, secondClient), isFalse);
+    },
+  );
+
+  test(
+    'clears push token registration cache when startup resolves signed out',
+    () async {
+      final registrationCache = SharedPreferencesPushTokenRegistrationCache(
+        preferences: SharedPreferencesAsync(),
+      );
+      await registrationCache.writeLastCompletedRegistrationKey(
+        'push-token|android|en_US|1.0.0|device-1',
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      expect(
+        await registrationCache.readLastCompletedRegistrationKey(),
+        isNull,
+      );
+    },
+  );
 }
 
 Future<void> _waitForLaunchState(
@@ -96,4 +299,143 @@ class _SignedOutAuthSessionStorage extends AuthSessionStorage {
 
   @override
   Future<void> clear() async {}
+}
+
+class FakeGamificationRepository extends GamificationRepository {
+  FakeGamificationRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  int summaryFetchCount = 0;
+  int petProgressFetchCount = 0;
+  int achievementsFetchCount = 0;
+  int streakFetchCount = 0;
+  int weeklyChallengesFetchCount = 0;
+
+  @override
+  Future<GamificationSummaryModel> fetchSummary({
+    CancelToken? cancelToken,
+  }) async {
+    summaryFetchCount++;
+    return GamificationSummaryModel(
+      streak: const StreakModel(
+        currentStreak: 4,
+        longestStreak: 7,
+        freezesAvailable: 1,
+        freezesPerWeek: 2,
+        lastActiveDate: '2026-06-30',
+        activeDaysThisWeek: ['2026-06-30'],
+      ),
+      recentAchievements: const [
+        AchievementModel(
+          key: 'achievement-1',
+          category: 'care',
+          rarity: 'common',
+          titleKey: 'achievement.title',
+          descriptionKey: 'achievement.description',
+          requirementValue: 1,
+          currentProgress: 1,
+          rewardSpark: 5,
+          isSecret: false,
+          isUnlocked: true,
+        ),
+      ],
+      activeChallenges: const [
+        WeeklyChallengeModel(
+          id: 'challenge-1',
+          challengeType: 'generations',
+          targetValue: 3,
+          currentValue: 1,
+          titleKey: 'challenge.title',
+          descriptionKey: 'challenge.description',
+          rewardSpark: 10,
+          isCompleted: false,
+          rewardClaimed: false,
+        ),
+      ],
+      topPets: const [
+        PetProgressModel(
+          petId: 'pet-1',
+          xp: 120,
+          level: 3,
+          evolutionStage: 'juvenile',
+          totalGenerations: 4,
+          xpForNextLevel: 200,
+          xpForCurrentLevel: 100,
+          daysActive: 6,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<PetProgressModel> fetchPetProgress(
+    String petId, {
+    CancelToken? cancelToken,
+  }) async {
+    petProgressFetchCount++;
+    return PetProgressModel(
+      petId: petId,
+      xp: 120,
+      level: 3,
+      evolutionStage: 'juvenile',
+      totalGenerations: 4,
+      xpForNextLevel: 200,
+      xpForCurrentLevel: 100,
+      daysActive: 6,
+    );
+  }
+
+  @override
+  Future<List<AchievementModel>> fetchAchievements({
+    CancelToken? cancelToken,
+  }) async {
+    achievementsFetchCount++;
+    return const [
+      AchievementModel(
+        key: 'achievement-1',
+        category: 'care',
+        rarity: 'common',
+        titleKey: 'achievement.title',
+        descriptionKey: 'achievement.description',
+        requirementValue: 1,
+        currentProgress: 1,
+        rewardSpark: 5,
+        isSecret: false,
+        isUnlocked: true,
+      ),
+    ];
+  }
+
+  @override
+  Future<StreakModel?> fetchStreak({CancelToken? cancelToken}) async {
+    streakFetchCount++;
+    return const StreakModel(
+      currentStreak: 4,
+      longestStreak: 7,
+      freezesAvailable: 1,
+      freezesPerWeek: 2,
+      lastActiveDate: '2026-06-30',
+      activeDaysThisWeek: ['2026-06-30'],
+    );
+  }
+
+  @override
+  Future<List<WeeklyChallengeModel>> fetchCurrentChallenges({
+    CancelToken? cancelToken,
+  }) async {
+    weeklyChallengesFetchCount++;
+    return const [
+      WeeklyChallengeModel(
+        id: 'challenge-1',
+        challengeType: 'generations',
+        targetValue: 3,
+        currentValue: 1,
+        titleKey: 'challenge.title',
+        descriptionKey: 'challenge.description',
+        rewardSpark: 10,
+        isCompleted: false,
+        rewardClaimed: false,
+      ),
+    ];
+  }
 }

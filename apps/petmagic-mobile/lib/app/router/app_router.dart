@@ -162,8 +162,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RegisterEntryPage.routePath,
-        pageBuilder: (context, state) =>
-            _buildFadeSlidePage(state: state, child: const RegisterEntryPage()),
+        pageBuilder: (context, state) => _buildFadeSlidePage(
+          state: state,
+          child: RegisterEntryPage(
+            redirectPath: state.uri.queryParameters['redirect'],
+          ),
+        ),
       ),
       GoRoute(
         path: PasswordResetPage.routePath,

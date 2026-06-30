@@ -348,7 +348,11 @@ class _ReadyGridCard extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              formattedDate(text, generation.updatedAtUtc),
+                              formattedDate(
+                                text,
+                                generation.updatedAtUtc,
+                                Localizations.localeOf(context),
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.labelSmall

@@ -17,7 +17,9 @@ import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/legal_acceptance_gate_page.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -29,6 +31,7 @@ import 'package:petmagic_mobile/shared/files/media_share_save.dart';
 import 'package:petmagic_mobile/shared/files/upload_media_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -122,6 +125,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   String? _highlightedMessageId;
   final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
   double _keyboardInset = 0;
+  bool _hasRequestedControllerStart = false;
 
   void _showSupportToast(
     String message, {
@@ -174,18 +178,10 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     super.initState();
     _controller = ref.read(supportChatControllerProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
-    _scheduleLoadingFallbackIfNeeded();
     _messageController.addListener(_handleComposerChanged);
     _messageFocusNode.addListener(_handleComposerFocusChanged);
     _applyInitialMessage(widget.initialMessage);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
-      _controller.start();
-      _controller.setScreenVisible(true);
-    });
+    _ensureControllerStarted();
   }
 
   @override
@@ -205,6 +201,9 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   @override
   void activate() {
     super.activate();
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
     _controller.setScreenVisible(true);
     _scheduleLoadingFallbackIfNeeded();
     unawaited(_controller.start());
@@ -212,6 +211,13 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+      _clearLoadingFallback();
+      _controller.stop();
+      _hasRequestedControllerStart = false;
+      return;
+    }
+
     if (state == AppLifecycleState.resumed) {
       _controller.setScreenVisible(true);
       _scheduleLoadingFallbackIfNeeded();
@@ -304,6 +310,24 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     setState(action);
   }
 
+  void _ensureControllerStarted() {
+    if (_hasRequestedControllerStart ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    _hasRequestedControllerStart = true;
+    _scheduleLoadingFallbackIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      _controller.start();
+      _controller.setScreenVisible(true);
+    });
+  }
+
   Future<T> _runExternalMediaPicker<T>(Future<T> Function() action) async {
     _externalMediaPickerDepth += 1;
     if (_externalMediaPickerDepth == 1) {
@@ -315,7 +339,9 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
       return await action();
     } finally {
       _externalMediaPickerDepth = math.max(0, _externalMediaPickerDepth - 1);
-      if (mounted && !_isExternalMediaPickerOpen) {
+      if (mounted &&
+          !_isExternalMediaPickerOpen &&
+          ref.read(appLaunchControllerProvider).isAuthenticated) {
         _controller.setScreenVisible(true);
         _scheduleLoadingFallbackIfNeeded();
         unawaited(_controller.start());
@@ -479,6 +505,33 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
+    final isAuthenticated = ref.watch(
+      appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
+    );
+    if (!isAuthenticated) {
+      _clearLoadingFallback();
+      _controller.stop();
+      _hasRequestedControllerStart = false;
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: SupportChatPage.routeFor(
+                  initialMessage: widget.initialMessage,
+                  relatedGenerationId: widget.relatedGenerationId,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    _ensureControllerStarted();
     final state = ref.watch(supportChatControllerProvider);
 
     ref.listen<SupportChatState>(supportChatControllerProvider, (
@@ -600,6 +653,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
                           _controller.initialize();
                         },
                         onQuickActionSelected: _prefillComposer,
+                        onOpenAttachment: _openAttachmentExternallyImpl,
                         onOpenImage: _openImageFullscreen,
                         onOpenVideo: _openVideoFullscreen,
                         onRetryAttachment: _retryAttachmentForMessage,

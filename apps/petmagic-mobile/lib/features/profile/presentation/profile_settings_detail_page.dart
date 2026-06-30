@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_avatar_cropper_page.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_feedback_mapper.dart';
+import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_notifications_settings_section.dart';
@@ -16,6 +17,7 @@ import 'package:petmagic_mobile/features/profile/presentation/widgets/profile_se
 import 'package:petmagic_mobile/features/profile/presentation/widgets/legal_document_list_view.dart';
 import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
+import 'package:petmagic_mobile/shared/widgets/protected_auth_gate.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 
 part 'profile_account_info_content.part.dart';
@@ -88,6 +90,23 @@ class _ProfileAccountInfoPageState
       context,
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
     );
+
+    if (!state.isLoading && !state.isAuthenticated) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: ProfileAccountInfoPage.routePath,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     ref.listen(profileControllerProvider, (previous, next) {
       if (!mounted) {
@@ -349,6 +368,25 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       extraSpacing: kPetMagicBottomContentInsetRelaxed,
     );
 
+    if (!state.isLoading &&
+        !state.isAuthenticated &&
+        _profileSettingsDetailRequiresAuth(kind)) {
+      return ProfileScreenBackground(
+        child: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset),
+            child: ProtectedAuthGate(
+              subtitle: text.authRequiredMessage,
+              onSignIn: () => showAuthRequiredSheet(
+                context,
+                redirectPath: ProfileSettingsDetailPage.location(kind),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final title = switch (kind) {
       ProfileSettingsDetailKind.linkedAccounts =>
         text.profileSettingsLinkedAccountsTitle,
@@ -369,7 +407,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       ProfileSettingsDetailKind.notifications =>
         text.profileDetailsNotificationsBody,
       ProfileSettingsDetailKind.helpCenter => text.profileDetailsHelpBody,
-      ProfileSettingsDetailKind.support => text.profileDetailsSupportBody,
+      ProfileSettingsDetailKind.support => text.profileSettingsSupportSubtitle,
       ProfileSettingsDetailKind.terms => text.profileDetailsTermsBody,
       ProfileSettingsDetailKind.privacy => text.profileDetailsPrivacyBody,
       ProfileSettingsDetailKind.deleteAccount => text.profileDetailsDeleteBody,
@@ -426,7 +464,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
             ? text.profileDetailsNotificationsStatusEnabled
             : text.profileDetailsNotificationsStatusDisabled,
       ProfileSettingsDetailKind.helpCenter => text.profileDetailsHelpStatus,
-      ProfileSettingsDetailKind.support => text.profileDetailsSupportStatus,
+      ProfileSettingsDetailKind.support => text.profileSupportCompactSubtitle,
       ProfileSettingsDetailKind.terms => text.profileDetailsTermsStatusAccepted,
       ProfileSettingsDetailKind.privacy => text.profileDetailsPrivacyStatus,
       ProfileSettingsDetailKind.deleteAccount =>
@@ -439,7 +477,7 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
       ProfileSettingsDetailKind.notifications =>
         text.profileDetailsNotificationsNext,
       ProfileSettingsDetailKind.helpCenter => text.profileDetailsHelpNext,
-      ProfileSettingsDetailKind.support => text.profileDetailsSupportNext,
+      ProfileSettingsDetailKind.support => text.supportHomeOpenChatAction,
       ProfileSettingsDetailKind.terms => text.profileDetailsTermsNext,
       ProfileSettingsDetailKind.privacy => text.profileDetailsPrivacyNext,
       ProfileSettingsDetailKind.deleteAccount => text.profileDetailsDeleteNext,
@@ -482,6 +520,18 @@ class ProfileSettingsDetailPage extends ConsumerWidget {
           : null,
     );
   }
+}
+
+bool _profileSettingsDetailRequiresAuth(ProfileSettingsDetailKind kind) {
+  return switch (kind) {
+    ProfileSettingsDetailKind.linkedAccounts ||
+    ProfileSettingsDetailKind.notifications ||
+    ProfileSettingsDetailKind.deleteAccount => true,
+    ProfileSettingsDetailKind.helpCenter ||
+    ProfileSettingsDetailKind.support ||
+    ProfileSettingsDetailKind.terms ||
+    ProfileSettingsDetailKind.privacy => false,
+  };
 }
 
 MobileLegalDocument? _documentFromAsync(

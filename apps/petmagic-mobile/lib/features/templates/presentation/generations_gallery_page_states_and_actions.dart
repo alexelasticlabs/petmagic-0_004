@@ -170,10 +170,18 @@ class _OfflineCacheBanner extends ConsumerWidget {
         ? null
         : (isRecovered
               ? text.generationStatusOnlineBannerSyncedAt(
-                  formattedDate(text, lastSyncedAtUtc!),
+                  formattedDate(
+                    text,
+                    lastSyncedAtUtc!,
+                    Localizations.localeOf(context),
+                  ),
                 )
               : text.generationStatusOfflineBannerSyncedAt(
-                  formattedDate(text, lastSyncedAtUtc!),
+                  formattedDate(
+                    text,
+                    lastSyncedAtUtc!,
+                    Localizations.localeOf(context),
+                  ),
                 ));
 
     final surfaceColor = isRecovered
@@ -767,7 +775,7 @@ String _buildGenerationProblemReportMessage(
     '${text.supportTicketFormRelatedGenerationLabel}: ${generation.generationId}',
     '${text.generationStatusDetailsTitle}: $title',
     '${text.generationStatusTypeLabel}: $type',
-    '${text.generationStatusTitle}: ${generation.status.name}',
+    '${text.generationStatusTitle}: ${statusTitle(text, generation)}',
   ];
   return lines.join('\n');
 }

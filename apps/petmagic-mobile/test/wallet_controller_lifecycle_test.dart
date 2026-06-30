@@ -33,8 +33,11 @@ void main() {
     expect(lifecycleBody, contains('_walletLifecycleStarted = true;'));
     expect(
       lifecycleBody,
-      contains('WidgetsBinding.instance.addObserver(this)'),
+      contains(
+        'AppLifecycleSignal.instance.addListener(_appLifecycleListener!)',
+      ),
     );
+    expect(lifecycleBody, contains('_handleAppLifecycleSignal'));
     expect(lifecycleBody, contains('_repository.purchaseUpdates.listen'));
     expect(lifecycleBody, contains('ref.onDispose'));
   });
@@ -163,6 +166,71 @@ void main() {
     expect(state.ledger.first.entryId, 'entry-sync');
     expect(state.ledgerHasMore, isTrue);
   });
+
+  test(
+    'wallet resume sync skips duplicate snapshot refresh while wallet page is visible',
+    () async {
+      final repository = _LifecycleSyncWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+      controller.setWalletPageVisible(true);
+
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(walletControllerProvider);
+      expect(repository.walletFetchCount, 1);
+      expect(state.wallet?.balance, 10);
+      expect(repository.syncCompleted.isCompleted, isFalse);
+    },
+  );
+
+  test(
+    'wallet resume sync preserves already loaded older ledger pages without duplicates',
+    () async {
+      final repository = _LedgerPreservingSyncWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+      await controller.loadMoreLedger();
+
+      var state = container.read(walletControllerProvider);
+      expect(state.ledger, hasLength(26));
+      expect(state.ledger.first.entryId, 'entry-26');
+      expect(state.ledger.last.entryId, 'entry-1');
+      expect(state.ledgerHasMore, isFalse);
+
+      controller.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      await repository.syncCompleted.future;
+      await Future<void>.delayed(Duration.zero);
+
+      state = container.read(walletControllerProvider);
+      expect(state.wallet?.balance, 42);
+      expect(state.ledger, hasLength(27));
+      expect(state.ledger.first.entryId, 'entry-27');
+      expect(
+        state.ledger.map((item) => item.entryId).toSet().length,
+        state.ledger.length,
+      );
+      expect(state.ledger.take(4).map((item) => item.entryId), [
+        'entry-27',
+        'entry-26',
+        'entry-25',
+        'entry-24',
+      ]);
+      expect(state.ledger.last.entryId, 'entry-1');
+      expect(state.ledgerHasMore, isTrue);
+    },
+  );
 
   test('claim ad reward refreshes ledger pagination snapshot', () async {
     final repository = _MutationLedgerWalletRepository();
@@ -384,6 +452,8 @@ class _LifecycleSyncWalletRepository extends WalletRepository {
   final Completer<void> syncCompleted = Completer<void>();
   int _walletFetchCount = 0;
 
+  int get walletFetchCount => _walletFetchCount;
+
   @override
   Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
 
@@ -438,6 +508,110 @@ class _LifecycleSyncWalletRepository extends WalletRepository {
   @override
   Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
     return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _LedgerPreservingSyncWalletRepository extends WalletRepository {
+  _LedgerPreservingSyncWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> syncCompleted = Completer<void>();
+  int _walletFetchCount = 0;
+  final List<WalletLedgerItem> _initialLedger = List.generate(
+    26,
+    (index) => WalletLedgerItem(
+      entryId: 'entry-${26 - index}',
+      userId: 'user-1',
+      delta: 1,
+      balanceAfter: 100 - index,
+      source: 'weekly_grant',
+      reason: 'Initial ledger item ${26 - index}',
+      createdAtUtc: DateTime.utc(2026, 1, 1, 12, index),
+    ),
+  );
+  late final List<WalletLedgerItem> _syncedLedger = [
+    WalletLedgerItem(
+      entryId: 'entry-27',
+      userId: 'user-1',
+      delta: 5,
+      balanceAfter: 105,
+      source: 'ad_reward',
+      reason: 'Synced top-up',
+      createdAtUtc: DateTime.utc(2026, 1, 1, 13),
+    ),
+    ..._initialLedger,
+  ];
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    _walletFetchCount++;
+    return WalletStateModel(
+      userId: 'user-1',
+      balance: _walletFetchCount == 1 ? 10 : 42,
+      adRewardsRemainingToday: 1,
+      isPremium: false,
+      updatedAtUtc: DateTime.utc(2026, 1, 1, 12, _walletFetchCount),
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final ledger = _walletFetchCount <= 1 ? _initialLedger : _syncedLedger;
+    final start = skip.clamp(0, ledger.length);
+    final end = (start + take).clamp(0, ledger.length);
+    final page = OffsetPagedModel(
+      items: ledger.sublist(start, end),
+      skip: start,
+      take: take,
+      hasMore: end < ledger.length,
+    );
+
+    if (_walletFetchCount > 1 && !syncCompleted.isCompleted) {
+      syncCompleted.complete();
+    }
+
+    return page;
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return const RewardsSummaryModel(
+      referralCode: '',
+      referralBonusSpark: 0,
+      referralStatus: 'none',
+      totalReferralBonusEarned: 0,
+      referredUsersCount: 0,
+      pendingReferredUsersCount: 0,
+      rewardedReferredUsersCount: 0,
+    );
   }
 
   @override

@@ -55,29 +55,7 @@ const _supportAttachmentVideoMaxFileSizeBytes =
 const _supportAttachmentVideoMaxDuration = Duration(seconds: 60);
 
 bool _isSupportSystemMessage(SupportChatMessage message) {
-  if (message.isSystemMessage) {
-    return true;
-  }
-
-  if (!message.isFromAdmin) {
-    return false;
-  }
-
-  final body = message.body.trim().toLowerCase();
-  if (body.isEmpty) {
-    return false;
-  }
-
-  return body.startsWith('сообщение получено') ||
-      body.startsWith('message received') ||
-      body.startsWith('сообщение доставлено') ||
-      body.startsWith('message delivered') ||
-      body.startsWith('message status') ||
-      body.startsWith('delivery status') ||
-      body.startsWith('статус доставки') ||
-      body.startsWith('conversation status') ||
-      body.startsWith('system:') ||
-      body.startsWith('debug:');
+  return message.isSystemMessage;
 }
 
 List<SupportChatMessage> _visibleSupportThreadMessages(

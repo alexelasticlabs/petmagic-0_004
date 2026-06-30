@@ -1,5 +1,3 @@
-// ignore_for_file: unused_element, unused_element_parameter, use_null_aware_elements
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
@@ -53,6 +51,22 @@ class TemplatesPage extends ConsumerStatefulWidget {
   const TemplatesPage({super.key});
 
   static const routePath = '/templates';
+  static const petIdQueryParam = 'petId';
+  static const petPhotoIdQueryParam = 'petPhotoId';
+
+  static String location({String? petId, String? petPhotoId}) {
+    final queryParameters = <String, String>{
+      if (petId != null && petId.trim().isNotEmpty) petIdQueryParam: petId,
+      if (petPhotoId != null && petPhotoId.trim().isNotEmpty)
+        petPhotoIdQueryParam: petPhotoId,
+    };
+
+    if (queryParameters.isEmpty) {
+      return routePath;
+    }
+
+    return Uri(path: routePath, queryParameters: queryParameters).toString();
+  }
 
   @override
   ConsumerState<TemplatesPage> createState() => _TemplatesPageState();
@@ -91,16 +105,13 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     super.initState();
     _templatesController = ref.read(templatesControllerProvider.notifier);
     _walletController = ref.read(walletControllerProvider.notifier);
-    final shouldLoadWallet = ref.read(walletControllerProvider).wallet == null;
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     _scrollController.addListener(_handleScroll);
     _runAfterBuild(() {
       if (!mounted) {
         return;
       }
-      if (shouldLoadWallet) {
-        unawaited(_walletController.load());
-      }
+      _maybeLoadWalletForAuthenticatedUser();
     });
   }
 
@@ -156,6 +167,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
 
   void _handleScreenBecameVisible({required bool fromAppResume}) {
     _templatesController.setScreenVisible(true);
+    _maybeLoadWalletForAuthenticatedUser();
 
     final state = ref.read(templatesControllerProvider);
     final shouldRefresh =
@@ -203,6 +215,19 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     }
 
     return now.difference(lastRefreshAt) >= _refreshCooldown;
+  }
+
+  void _maybeLoadWalletForAuthenticatedUser() {
+    final launchState = ref.read(appLaunchControllerProvider);
+    final walletState = ref.read(walletControllerProvider);
+    if (!launchState.isAuthenticated ||
+        walletState.wallet != null ||
+        walletState.isLoading ||
+        walletState.isRefreshing) {
+      return;
+    }
+
+    unawaited(_walletController.load());
   }
 
   void _runAfterBuild(VoidCallback action) {
@@ -297,8 +322,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           TemplatesTopBarSlot(
-                            onAuthPressed: () =>
-                                context.go(AuthEntryPage.routePath),
+                            onAuthPressed: () => context.go(
+                              '${AuthEntryPage.routePath}?redirect=${Uri.encodeQueryComponent(_templatesPageLocation(context))}',
+                            ),
                             onRewardsPressed: () =>
                                 context.go(RewardsPage.routePath),
                             onTopUpPressed: () =>
