@@ -1,0 +1,801 @@
+.inboxPaneFlat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.72rem;
+  min-width: 0;
+  min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);
+  height: clamp(34rem, calc(100dvh - 9rem), 52rem);
+  overflow: hidden;
+  padding: 0.92rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
+  border-radius: 24px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 99%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1))
+  );
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent),
+    0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent);
+}
+
+.queuePaneHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 0.52rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
+}
+
+.queuePaneTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.queuePaneTitle {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.paneCountBadge {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding-inline: 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  color: color-mix(in srgb, var(--accent) 68%, var(--text-strong) 32%);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.queueSubFilters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.34rem;
+  padding: 0.25rem;
+  border: 1px solid color-mix(in srgb, var(--border-soft) 82%, transparent);
+  border-radius: 13px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 80%, var(--surface-0))
+  );
+}
+
+.queueSubFilter,
+.queueSubFilterActive {
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.25rem 0.42rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-align: center;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.queueSubFilterActive {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border-soft));
+  background: linear-gradient(
+    180deg,
+    var(--surface-1),
+    color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))
+  );
+  color: var(--accent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);
+}
+
+.queueFiltersGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.44rem;
+  align-items: end;
+  padding: 0.44rem;
+  border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 90%, var(--surface-1)),
+    color-mix(in srgb, var(--surface-2) 72%, var(--surface-0))
+  );
+}
+
+.queueToolField {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.queueToolField span {
+  margin-bottom: 0.12rem;
+  color: var(--text-muted);
+  font-size: 0.57rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.queueToolField select {
+  width: 100%;
+  min-width: 0;
+  min-height: 2rem;
+  padding: 0.18rem 0.44rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.queueToolField select:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.queueToolField > div {
+  width: 100%;
+  min-width: 0;
+}
+
+.queueToolField > div > button {
+  min-height: 2.05rem;
+  border-radius: 10px;
+  border-color: color-mix(in srgb, var(--border-soft) 94%, transparent);
+  background: color-mix(in srgb, var(--surface-1) 98%, var(--surface-2));
+  box-shadow: none;
+}
+
+.queueToolField > div > button:hover {
+  border-color: color-mix(in srgb, var(--text-muted) 72%, var(--border-soft));
+  transform: none;
+}
+
+.queueToolField > div > div {
+  border: 1px solid color-mix(in srgb, var(--text-muted) 52%, var(--border-soft));
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--surface-0) 20%, transparent);
+}
+
+.list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 0.66rem;
+  padding-top: 0.3rem;
+  padding-right: 0.18rem;
+}
+
+.conversationRow,
+.conversationRowButton {
+  text-align: left;
+}
+
+.conversationRow {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 8px;
+  height: auto;
+  padding: 0.76rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 33%, var(--border-soft));
+  border-radius: 16px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 99%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1))
+  );
+  color: var(--text-strong);
+  text-decoration: none;
+  overflow: hidden;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 10%, transparent);
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.conversationRow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent);
+}
+
+.conversationRowButton {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.conversationRowButton:disabled,
+.conversationRow[data-disabled="true"] {
+  opacity: 0.62;
+  cursor: progress;
+  pointer-events: none;
+}
+
+.conversationRow:hover:not([data-disabled="true"]),
+.conversationRowButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  transform: translateY(-1px);
+}
+
+.conversationRowActive {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-soft));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent),
+    0 12px 24px color-mix(in srgb, var(--surface-0) 18%, transparent);
+}
+
+.conversationRowClosed {
+  border-color: color-mix(in srgb, var(--text-muted) 24%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 84%, var(--text-muted) 16%);
+}
+
+.conversationRowClosed .avatar,
+.conversationRowClosed .rowPreview {
+  opacity: 0.72;
+}
+
+.conversationRowUnread {
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--success) 12%);
+}
+
+.conversationRow:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
+  outline-offset: 1px;
+  border-color: color-mix(in srgb, var(--success) 72%, var(--border-soft));
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--success) 24%, var(--surface-2)),
+    color-mix(in srgb, var(--success) 82%, var(--surface-1))
+  );
+  color: var(--text-strong);
+  font-size: 0.82rem;
+  font-weight: 600;
+  flex: 0 0 auto;
+}
+
+.queueRowHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.55rem;
+  min-width: 0;
+  padding-bottom: 0.42rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--border-soft) 82%, transparent);
+}
+
+.queueRowIdentity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.58rem;
+  min-width: 0;
+}
+
+.queueRowTextStack {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.queueRowTitleLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.rowTitleUnread {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.unreadDotInline {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.rowPreview {
+  color: color-mix(in srgb, var(--text-muted) 90%, var(--text-strong) 10%);
+  font-size: 0.79rem;
+  line-height: 1.35;
+}
+
+.rowPreview span {
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text-soft);
+}
+
+.queueRowMeta {
+  display: grid;
+  justify-items: end;
+  gap: 0.34rem;
+}
+
+.rowTime {
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-strong) 12%);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.queueRowCounters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.28rem;
+}
+
+.queueCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 1.2rem;
+  padding: 0.1rem 0.34rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.queueBadgeIcon {
+  width: 0.78rem;
+  height: 0.78rem;
+  flex: 0 0 auto;
+}
+
+.queueCountBadgeIncoming {
+  color: color-mix(in srgb, var(--success) 78%, var(--text-strong));
+  background: color-mix(in srgb, var(--success) 15%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 30%, var(--border-soft));
+}
+
+.queueCountBadgeUnread {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-soft));
+}
+
+.queueRowFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.38rem;
+  min-width: 0;
+  margin-top: 0.08rem;
+}
+
+.queueStatusPill,
+.slaPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 1.5rem;
+  padding: 0.14rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, var(--border-soft));
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.queueStatusIcon {
+  width: 0.84rem;
+  height: 0.84rem;
+  flex: 0 0 auto;
+}
+
+.queueStatusPill_New {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+}
+
+.queueStatusPill_InProgress {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 16%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 32%, var(--border-soft));
+}
+
+.queueStatusPill_WaitingForUser {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 17%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--border-soft));
+}
+
+.queueStatusPill_Closed {
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-muted) 17%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--border-soft));
+}
+
+@keyframes pulseSlaRing {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 0%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent);
+  }
+}
+
+.slaPill_good {
+  color: var(--toast-success-fg);
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--success) 28%, var(--border-soft));
+}
+
+.slaPill_warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--warning) 28%, var(--border-soft));
+}
+
+.slaPill_risk {
+  color: color-mix(in srgb, var(--warning) 72%, var(--danger) 28%);
+  background: color-mix(in srgb, var(--warning) 12%, var(--danger-soft-bg));
+  border-color: color-mix(in srgb, var(--warning) 26%, var(--border-soft));
+}
+
+.slaPill_critical {
+  color: var(--danger-soft-fg);
+  background: var(--danger-soft-bg);
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border-soft));
+  animation: pulseSlaRing 2s ease-in-out infinite;
+}
+
+.queueRowDetailLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  align-items: center;
+  margin-top: 0.1rem;
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-strong) 12%);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.queueMetaChip,
+.queueMetaChipMuted {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.36rem;
+  max-width: 100%;
+  padding: 0 0.46rem;
+  border: 1px solid color-mix(in srgb, var(--border-soft) 80%, transparent);
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.queueMetaChip {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border-soft));
+}
+
+.queueMetaChipMuted {
+  background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));
+  color: var(--text-muted);
+}
+
+.queueFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--border-soft) 70%, transparent);
+}
+
+.queueFooterCount {
+  color: color-mix(in srgb, var(--text-muted) 88%, var(--text-strong) 12%);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.queuePagerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.queuePagerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.35rem;
+  min-height: 2rem;
+  padding: 0.36rem 0.58rem;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 32%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-1) 86%, var(--surface-2));
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.queuePagerButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-soft));
+  color: var(--text-strong);
+}
+
+.queuePagerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
+}
+
+.queuePagerIcon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+
+.queuePagerIconPrevious {
+  transform: rotate(90deg);
+}
+
+.queuePagerIconNext {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationRow,
+  .queuePagerButton,
+  .queueSubFilter,
+  .queueSubFilterActive {
+    transition: none !important;
+  }
+
+  .slaPill_critical {
+    animation: none !important;
+  }
+}
+
+@media (max-width: 1500px) {
+  .queueRowHeader {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .queueRowMeta {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-items: start;
+    gap: 8px;
+  }
+
+  .queueRowCounters {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1280px) {
+  .queueFiltersGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .inboxPaneFlat {
+    min-height: auto;
+    height: auto;
+    max-height: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .rowPreview span {
+    line-clamp: 1;
+    -webkit-line-clamp: 1;
+  }
+}
+
+@media (max-width: 780px) {
+  .inboxPaneFlat {
+    border-radius: 1rem;
+  }
+
+  .queueSubFilters,
+  .queueFiltersGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+:global(:root[data-theme="light"]) .paneCountBadge {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));
+}
+
+:global(:root[data-theme="light"]) .slaPill_good {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-soft));
+}
+
+:global(:root[data-theme="light"]) .slaPill_warning {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--warning) 24%, var(--border-soft));
+}
+
+:global(:root[data-theme="light"]) .slaPill_risk {
+  color: color-mix(in srgb, var(--warning) 72%, var(--danger));
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--warning) 22%, var(--border-soft));
+}
+
+:global(:root[data-theme="light"]) .slaPill_critical {
+  color: var(--danger-soft-fg);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-1));
+  border-color: color-mix(in srgb, var(--danger) 22%, var(--border-soft));
+}
+
+:global(:root[data-theme="light"]) .conversationRowUnread {
+  background: color-mix(in srgb, var(--surface-1) 88%, var(--success) 12%);
+  border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));
+}
+
+:global(:root:not([data-theme="light"])) .inboxPaneFlat,
+:global(:root[data-theme="dark"]) .inboxPaneFlat {
+  border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-0));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
+    0 14px 30px color-mix(in srgb, var(--surface-0) 46%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueSubFilters,
+:global(:root[data-theme="dark"]) .queueSubFilters,
+:global(:root:not([data-theme="light"])) .queueFiltersGrid,
+:global(:root[data-theme="dark"]) .queueFiltersGrid {
+  border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField span,
+:global(:root[data-theme="dark"]) .queueToolField span,
+:global(:root:not([data-theme="light"])) .rowPreview span,
+:global(:root[data-theme="dark"]) .rowPreview span,
+:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
+:global(:root[data-theme="dark"]) .queueMetaChipMuted {
+  color: var(--text-muted);
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField > div > button,
+:global(:root[data-theme="dark"]) .queueToolField > div > button,
+:global(:root:not([data-theme="light"])) .queuePagerButton,
+:global(:root[data-theme="dark"]) .queuePagerButton {
+  border-color: color-mix(in srgb, var(--border-soft) 84%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 90%, var(--surface-0));
+  color: var(--text-soft);
+  box-shadow: none;
+}
+
+:global(:root:not([data-theme="light"])) .queueToolField > div > div,
+:global(:root[data-theme="dark"]) .queueToolField > div > div {
+  border-color: color-mix(in srgb, var(--border-soft) 74%, var(--surface-0));
+  background: var(--surface-2);
+  box-shadow: 0 16px 32px color-mix(in srgb, var(--surface-0) 54%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRow,
+:global(:root[data-theme="dark"]) .conversationRow {
+  border-color: color-mix(in srgb, var(--border-soft) 80%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 44%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRow::before,
+:global(:root[data-theme="dark"]) .conversationRow::before {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .conversationRowActive,
+:global(:root[data-theme="dark"]) .conversationRowActive {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-soft));
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent),
+    0 12px 24px color-mix(in srgb, var(--surface-0) 52%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .queueStatusPill,
+:global(:root[data-theme="dark"]) .queueStatusPill,
+:global(:root:not([data-theme="light"])) .slaPill,
+:global(:root[data-theme="dark"]) .slaPill,
+:global(:root:not([data-theme="light"])) .queueMetaChip,
+:global(:root[data-theme="dark"]) .queueMetaChip,
+:global(:root:not([data-theme="light"])) .queueMetaChipMuted,
+:global(:root[data-theme="dark"]) .queueMetaChipMuted {
+  border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 80%, var(--surface-0));
+}
+
+:global(:root:not([data-theme="light"])) .queueMetaChip,
+:global(:root[data-theme="dark"]) .queueMetaChip {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-strong));
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface-2));
+}

@@ -8,10 +8,10 @@ import {
 } from "@/components/admin/admin-icons";
 import { AdminKpiCard, AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import type { PromoCodesViewText } from "@/components/promo-codes-view.content";
+import { formatNumber, formatPromoDisplayText } from "@/components/promo-codes-view.helpers";
 import styles from "@/components/promo-codes-view.module.css";
 import { Button } from "@/components/ui/button";
-import { formatNumber, formatPromoDisplayText } from "@/components/promo-codes-view.helpers";
-import type { PromoCodesViewText } from "@/components/promo-codes-view.content";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import type { AdminRedeemCode } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";

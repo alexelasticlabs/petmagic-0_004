@@ -37,7 +37,7 @@ import {
 } from "@/lib/api-client";
 import { type Locale } from "@/lib/i18n";
 
-import { getFeedbackPageText, type FeedbackPageText } from "./feedback-page.content";
+import { getFeedbackPageText } from "./feedback-page.content";
 
 type FeedbackPageProps = {
   locale: Locale;

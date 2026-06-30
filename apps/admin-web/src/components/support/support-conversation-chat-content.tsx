@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
 
-import { ReplyIcon, SearchIcon, UploadIcon } from "@/components/admin/admin-icons";
+import { ReplyIcon, SearchIcon } from "@/components/admin/admin-icons";
 import { AdminBadge, AdminStateCard } from "@/components/admin/admin-primitives";
+import styles from "@/components/support/support-conversation-chat-content.module.css";
 import {
   formatClockTime,
   formatDateTime,
@@ -14,11 +14,12 @@ import {
   shouldRenderMessageBody,
   type SupportConversationFeedGroup,
 } from "@/components/support/support-conversation-helpers";
-import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import type {
   SupportMessage,
   SupportMessageAttachment,
 } from "@/components/support/support-conversation-page.types";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
+import sharedStyles from "@/components/support/support-page.module.css";
 import {
   sourceLabel,
   statusLabel,
@@ -28,7 +29,8 @@ import { SUPPORT_SEARCH_MAX_LENGTH } from "@/components/support/use-support-conv
 import { Button } from "@/components/ui/button";
 import type { AdminSupportConversation } from "@/lib/api-client";
 import { type Dictionary, type Locale } from "@/lib/i18n";
-import styles from "@/components/support/support-page.module.css";
+
+import type { ReactNode, RefObject } from "react";
 
 type AttachmentTileOptions = {
   overlayCount?: number;
@@ -115,14 +117,14 @@ export function SupportConversationChatHeader({
         <span className={styles.supportPageSubtitle}>{supportWorkspaceSubtitle}</span>
       </div>
       <div className={styles.supportPageToolbar}>
-        <label className={`${styles.searchField} ${styles.supportPageHeroSearch}`}>
+        <label className={`${sharedStyles.searchField} ${styles.supportPageHeroSearch}`}>
           <span className={styles.supportSearchIcon} aria-hidden="true">
             <SearchIcon />
           </span>
-          <span className={styles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
+          <span className={sharedStyles.searchLabelHidden}>{text.supportSearchPlaceholder}</span>
           <input
             ref={searchInputRef}
-            className={`${styles.searchInput} ${styles.supportPageSearchInput}`}
+            className={`${sharedStyles.searchInput} ${styles.supportPageSearchInput}`}
             value={searchQuery}
             onChange={(event) =>
               setSearchQuery(event.target.value.slice(0, SUPPORT_SEARCH_MAX_LENGTH))

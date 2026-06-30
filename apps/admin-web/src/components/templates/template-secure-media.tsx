@@ -42,7 +42,13 @@ function shouldUseDirectMediaUrl(url: string) {
   try {
     const candidate = new URL(url, globalThis.location.href);
     return candidate.origin !== globalThis.location.origin;
-  } catch {
+  } catch (error) {
+    clientLogger.warn("templates.secure_media_origin_check_failed", {
+      errorName: getMediaFetchErrorName(error),
+      rawLength: url.length,
+      startsWithSlash: url.startsWith("/"),
+      isBlobOrData: isLocalObjectUrl(url),
+    });
     return false;
   }
 }

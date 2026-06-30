@@ -1,204 +1,57 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAdminNotifications } from "@/components/admin/admin-notifications";
 import { ensureAdminSession } from "@/components/admin/admin-session";
+import { getSupportConversationDerivedState } from "@/components/support/support-conversation-controller.derived";
 import {
-  buildActivityTimeline,
-  buildConversationTimeline,
-  formatSafeSupportDisplay,
-  formatAccountAgeFact,
-  formatCountFact,
-  getConversationSla,
+  SUPPORT_INBOX_PAGE_SIZE,
+  SUPPORT_REPLY_MAX_LENGTH,
+  SUPPORT_SEARCH_MAX_LENGTH,
+  buildSupportRealtimeToastMessage,
+  formatSupportControllerLogText,
+  getSupportControllerErrorDetails,
+  isUserSupportMessageEvent,
+  mergeSupportConversationMessages,
+  normalizeSupportTag,
+  resolveQueueFilter,
+  supportConversationMessagesTake,
+  supportInboxStaleTimeMs,
+  supportPollingIntervalMs,
+  type SidePanelTab,
+  type SupportQueueFilter,
+  type ToastState,
+  type UseSupportConversationControllerParams,
+  useDebouncedValue,
+} from "@/components/support/support-conversation-controller.helpers";
+import { useSupportConversationMutations } from "@/components/support/support-conversation-controller.mutations";
+import { useSupportConversationSubjectQueries } from "@/components/support/support-conversation-controller.subject";
+import {
   sortSupportQueueItems,
-  type SupportTimelineItem,
 } from "@/components/support/support-conversation-helpers";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
-import { getAvailableStatusActions } from "@/components/support/support-status-helpers";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
-  assignSupportConversation,
-  fetchAdminEconomyPurchases,
-  fetchAdminEconomyUserSubscriptionSummary,
-  fetchAdminUser,
-  fetchAdminUserAnalytics,
   fetchSupportConversation,
   fetchSupportInbox,
   fetchSupportInboxMetrics,
   markSupportConversationRead,
-  sendSupportAttachment,
-  sendSupportMessage,
-  SUPPORT_INBOX_SEARCH_MAX_LENGTH,
-  SUPPORT_MESSAGE_BODY_MAX_LENGTH,
-  updateSupportConversationMetadata,
-  updateSupportConversationStatus,
   useAuthSession,
-  type AdminEconomyPurchase,
-  type AdminEconomyUserSubscriptionSummary,
   type AdminSupportConversation,
   type AdminSupportConversationSummary,
   type AdminSupportInboxPage,
   type AdminSupportInboxMetrics,
-  type AdminUserAnalytics,
-  type AdminUserDetail,
   type SupportConversationPriority,
-  type SupportConversationStatus,
-  type SupportInboxAssignmentScope,
 } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
-import { getDictionary, type Locale } from "@/lib/i18n";
-import { maskEmail, sanitizeSensitiveText } from "@/lib/sensitive-display";
+import { getDictionary } from "@/lib/i18n";
 import { useSupportRealtime } from "@/lib/support-realtime";
 
-type UseSupportConversationControllerParams = {
-  locale: Locale;
-  conversationId: string;
-  queueStatusFilter?: "all" | SupportConversationStatus;
-};
-
-type SendOptimisticContext = {
-  previousConversation?: AdminSupportConversation;
-  optimisticMessageId?: string;
-  optimisticAttachmentObjectUrl?: string;
-};
-
-export type ToastState = {
-  type: "success" | "error";
-  message: string;
-};
-
-export type SupportQueueFilter = "all" | SupportConversationStatus | "mine" | "unassigned";
-
-const SUPPORT_INBOX_PAGE_SIZE = 50;
-
-function resolveQueueFilter(filter: SupportQueueFilter): {
-  status?: SupportConversationStatus;
-  assignment: SupportInboxAssignmentScope;
-} {
-  if (filter === "all") {
-    return { status: undefined, assignment: "all" };
-  }
-  if (filter === "mine") {
-    return { status: undefined, assignment: "mine" };
-  }
-  if (filter === "unassigned") {
-    return { status: undefined, assignment: "unassigned" };
-  }
-  return { status: filter, assignment: "all" };
-}
-
-function useDebouncedValue(value: string, delayMs: number) {
-  const [debounced, setDebounced] = useState(value);
-
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setDebounced(value), delayMs);
-    return () => window.clearTimeout(timeoutId);
-  }, [delayMs, value]);
-
-  return debounced;
-}
-
-function buildSupportRealtimeToastMessage(
-  event: { lastMessagePreview?: string | null },
-  locale: Locale
-): string {
-  const copy = getSupportConversationCopy(locale);
-  const fallback = copy.controller.realtimeMessageFallback;
-  const preview = formatSupportMessagePreview(event.lastMessagePreview, "");
-  if (!preview) {
-    return fallback;
-  }
-
-  return copy.controller.realtimeMessageWithPreview(preview);
-}
-
-function isUserSupportMessageEvent(event: {
-  lastMessageSenderType?: string | null;
-  adminUnreadCount?: number;
-}) {
-  return (
-    (event.adminUnreadCount ?? 0) > 0 &&
-    (event.lastMessageSenderType?.toLowerCase() === "user" || !event.lastMessageSenderType)
-  );
-}
-
-function formatSupportControllerLogText(value: string | null | undefined, maxLength = 80) {
-  return value ? sanitizeSensitiveText(value, maxLength) : undefined;
-}
-
-function getSupportControllerErrorDetails(error: unknown) {
-  return {
-    errorName: error instanceof Error ? error.name : "UnknownError",
-    errorDigest:
-      error && typeof error === "object" && "digest" in error
-        ? sanitizeSensitiveText(String((error as { digest?: unknown }).digest ?? ""), 80)
-        : undefined,
-  };
-}
-
-function isNotFoundError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-
-  if (!("status" in error)) {
-    return false;
-  }
-
-  return (error as { status?: number }).status === 404;
-}
-
-export type SidePanelTab = "user" | "activity" | "dialog" | "attachments";
-
-function normalizeSupportTag(value: string): string {
-  return value.trim().replace(/\s+/g, " ").slice(0, 40);
-}
-
-export const statusOptions: SupportConversationStatus[] = [
-  "New",
-  "InProgress",
-  "WaitingForUser",
-  "Closed",
-];
-
-export const SUPPORT_SEARCH_MAX_LENGTH = SUPPORT_INBOX_SEARCH_MAX_LENGTH;
-export const SUPPORT_REPLY_MAX_LENGTH = SUPPORT_MESSAGE_BODY_MAX_LENGTH;
-
-const supportPollingIntervalMs = 8_000;
-const supportConversationMessagesTake = 80;
-
-function mergeSupportConversationMessages(
-  currentConversation: AdminSupportConversation,
-  incomingConversation: AdminSupportConversation
-): AdminSupportConversation {
-  const mergedById = new Map<string, AdminSupportConversation["messages"][number]>();
-
-  for (const message of currentConversation.messages) {
-    mergedById.set(message.messageId, message);
-  }
-
-  for (const message of incomingConversation.messages) {
-    mergedById.set(message.messageId, message);
-  }
-
-  const mergedMessages = [...mergedById.values()].sort((left, right) =>
-    left.createdAtUtc.localeCompare(right.createdAtUtc)
-  );
-
-  return {
-    ...incomingConversation,
-    messages: mergedMessages,
-    hasOlderMessages: currentConversation.hasOlderMessages || incomingConversation.hasOlderMessages,
-    oldestLoadedMessageCreatedAtUtc:
-      currentConversation.oldestLoadedMessageCreatedAtUtc ??
-      incomingConversation.oldestLoadedMessageCreatedAtUtc,
-  };
-}
+export { SUPPORT_REPLY_MAX_LENGTH, SUPPORT_SEARCH_MAX_LENGTH, statusOptions } from "@/components/support/support-conversation-controller.helpers";
 
 export function useSupportConversationController({
   locale,
@@ -228,17 +81,13 @@ export function useSupportConversationController({
   );
   const [toast, setToast] = useState<ToastState | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
-  const [isSendReplyInFlight, setIsSendReplyInFlight] = useState(false);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
-  const sendReplyInFlightRef = useRef(false);
   const markReadRequestRef = useRef<Promise<void> | null>(null);
   const markReadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastRealtimeToastRef = useRef<string | null>(null);
   const messagesViewportVisibleRef = useRef(false);
   const lastConversationRealtimeFetchRef = useRef(0);
   const loadOlderAbortControllerRef = useRef<AbortController | null>(null);
-  const optimisticAttachmentObjectUrlsRef = useRef(new Map<string, string>());
-  const optimisticMessageCounterRef = useRef(0);
 
   const resetSelectedAttachment = useCallback(() => {
     setSelectedAttachment(null);
@@ -354,10 +203,6 @@ export function useSupportConversationController({
         markReadDebounceRef.current = null;
       }
       loadOlderAbortControllerRef.current?.abort();
-      for (const url of optimisticAttachmentObjectUrlsRef.current.values()) {
-        URL.revokeObjectURL(url);
-      }
-      optimisticAttachmentObjectUrlsRef.current.clear();
     },
     []
   );
@@ -396,6 +241,7 @@ export function useSupportConversationController({
       });
     },
     enabled: Boolean(session && canManageSupportWorkspace),
+    staleTime: supportInboxStaleTimeMs,
     refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
     refetchIntervalInBackground: false,
   });
@@ -403,6 +249,7 @@ export function useSupportConversationController({
     queryKey: adminQueryKeys.supportInboxMetrics,
     queryFn: ({ signal }) => fetchSupportInboxMetrics(signal),
     enabled: Boolean(session && canManageSupportWorkspace),
+    staleTime: supportInboxStaleTimeMs,
     refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false,
     refetchIntervalInBackground: false,
   });
@@ -414,6 +261,17 @@ export function useSupportConversationController({
     sessionUserId && conversation?.assignedAdminId === sessionUserId
   );
   const subjectUserId = conversation?.initiatorUserId ?? null;
+  const {
+    analyticsQuery,
+    isSubjectUserDeleted,
+    purchasesQuery,
+    subscriptionQuery,
+    userQuery,
+  } = useSupportConversationSubjectQueries({
+    hasSession: Boolean(session),
+    subjectUserId,
+    canViewSubjectUserContext,
+  });
 
   useSupportRealtime(canManageSupportWorkspace ? session?.accessToken : undefined, (event) => {
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.supportInboxRoot });
@@ -607,290 +465,37 @@ export function useSupportConversationController({
     };
   }, [scheduleMarkRead]);
 
-  const sendMutation = useMutation({
-    mutationFn: async () => {
-      if (!assertCanManageSupportWorkspace()) {
-        throw new Error(supportActionsForbidden);
-      }
-
-      return selectedAttachment
-        ? sendSupportAttachment(conversationId, selectedAttachment, reply.trim(), replyToMessageId)
-        : sendSupportMessage(conversationId, reply.trim(), replyToMessageId);
-    },
-    onMutate: async (): Promise<SendOptimisticContext> => {
-      if (!canManageSupportWorkspace) {
-        return {};
-      }
-
-      const trimmedReply = reply.trim();
-      const hasAttachment = Boolean(selectedAttachment);
-      const canApplyOptimisticMessage = hasAttachment || trimmedReply.length > 0;
-      if (!canApplyOptimisticMessage) {
-        return {};
-      }
-
-      const queryKey = adminQueryKeys.supportConversation(conversationId);
-      await queryClient.cancelQueries({ queryKey });
-      const previousConversation = queryClient.getQueryData<AdminSupportConversation>(queryKey);
-      if (!previousConversation) {
-        return {};
-      }
-
-      optimisticMessageCounterRef.current += 1;
-      const optimisticMessageId = `optimistic-${conversationId}-${optimisticMessageCounterRef.current}`;
-      const nowUtc = new Date().toISOString();
-      const optimisticAttachmentObjectUrl = selectedAttachment
-        ? URL.createObjectURL(selectedAttachment)
-        : undefined;
-      const optimisticLastMessagePreview =
-        trimmedReply || copy.controller.optimisticAttachmentPreview(selectedAttachment?.name);
-      const optimisticMessage = {
-        messageId: optimisticMessageId,
-        conversationId,
-        senderUserId: session?.user.userId ?? "admin",
-        senderDisplayName:
-          session?.user.displayName?.trim() ||
-          (session?.user.email ? maskEmail(session.user.email) : null) ||
-          copy.shared.operator,
-        isFromAdmin: true,
-        senderType: "Admin",
-        body: trimmedReply,
-        replyToMessageId: replyToMessageId?.trim() || null,
-        replyToPreview: replyToPreview?.trim() || null,
-        attachmentUrl: optimisticAttachmentObjectUrl ?? null,
-        attachmentFileName: selectedAttachment?.name ?? null,
-        attachmentContentType:
-          selectedAttachment?.type?.trim() ||
-          (selectedAttachment ? "application/octet-stream" : null),
-        attachmentFileSizeBytes: selectedAttachment?.size ?? null,
-        attachmentUploadStatus: selectedAttachment ? "uploading" : null,
-        attachmentUploadErrorCode: null,
-        attachments: selectedAttachment
-          ? [
-              {
-                fileUrl: optimisticAttachmentObjectUrl!,
-                type: selectedAttachment.type,
-                mimeType: selectedAttachment.type || "application/octet-stream",
-                fileName: selectedAttachment.name,
-                sizeBytes: selectedAttachment.size,
-                isDeleted: false,
-                expiresAtUtc: null,
-                deletedAtUtc: null,
-                durationSeconds: null,
-                width: null,
-                height: null,
-              },
-            ]
-          : null,
-        isRead: false,
-        readAtUtc: null,
-        deliveredAtUtc: null,
-        isInternalNote: false,
-        createdAtUtc: nowUtc,
-      };
-
-      if (optimisticAttachmentObjectUrl) {
-        optimisticAttachmentObjectUrlsRef.current.set(
-          optimisticMessageId,
-          optimisticAttachmentObjectUrl
-        );
-      }
-
-      queryClient.setQueryData<AdminSupportConversation>(queryKey, {
-        ...previousConversation,
-        messages: [...previousConversation.messages, optimisticMessage],
-        lastMessageAtUtc: nowUtc,
-        lastMessagePreview: optimisticLastMessagePreview,
-        lastMessageSenderType: "Admin",
-        updatedAtUtc: nowUtc,
-      });
-
-      return { previousConversation, optimisticMessageId, optimisticAttachmentObjectUrl };
-    },
-    onSuccess: async (_data, _variables, context) => {
-      if (context?.optimisticMessageId) {
-        const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
-          context.optimisticMessageId
-        );
-        if (optimisticObjectUrl) {
-          URL.revokeObjectURL(optimisticObjectUrl);
-          optimisticAttachmentObjectUrlsRef.current.delete(context.optimisticMessageId);
-        }
-      }
-
-      const queryKey = adminQueryKeys.supportConversation(conversationId);
-      queryClient.setQueryData<AdminSupportConversation>(queryKey, (currentConversation) => {
-        if (!currentConversation) {
-          return currentConversation;
-        }
-
-        return {
-          ...currentConversation,
-          messages: currentConversation.messages.filter(
-            (message) => !message.messageId.startsWith("optimistic-")
-          ),
-        };
-      });
-
-      setReply("");
-      setReplyToMessageId(null);
-      setReplyToPreview(null);
-      resetSelectedAttachment();
-      setToast({ type: "success", message: text.supportReplySent });
-      pushSupportNotification("success", text.supportReplySent);
-      await refreshConversationData();
-    },
-    onError: (error, _variables, context) => {
-      if (context?.optimisticMessageId) {
-        const optimisticObjectUrl = optimisticAttachmentObjectUrlsRef.current.get(
-          context.optimisticMessageId
-        );
-        if (optimisticObjectUrl) {
-          URL.revokeObjectURL(optimisticObjectUrl);
-          optimisticAttachmentObjectUrlsRef.current.delete(context.optimisticMessageId);
-        }
-      }
-
-      if (context?.previousConversation) {
-        queryClient.setQueryData(
-          adminQueryKeys.supportConversation(conversationId),
-          context.previousConversation
-        );
-      }
-
-      pushSupportError(error, "send_reply");
-    },
-    onSettled: () => {
-      sendReplyInFlightRef.current = false;
-      setIsSendReplyInFlight(false);
-    },
-  });
-
-  const isSendReplySubmitting = isSendReplyInFlight || sendMutation.isPending;
-
-  const requestSendReply = useCallback(() => {
-    if (
-      !canManageSupportWorkspace ||
-      sendReplyInFlightRef.current ||
-      sendMutation.isPending ||
-      (!reply.trim() && !selectedAttachment)
-    ) {
-      return false;
-    }
-
-    sendReplyInFlightRef.current = true;
-    setIsSendReplyInFlight(true);
-    sendMutation.mutate();
-    return true;
-  }, [canManageSupportWorkspace, reply, selectedAttachment, sendMutation]);
-
-  const statusMutation = useMutation({
-    mutationFn: async (status: SupportConversationStatus) => {
-      if (!assertCanManageSupportWorkspace()) {
-        throw new Error(supportActionsForbidden);
-      }
-
-      return updateSupportConversationStatus(conversationId, status);
-    },
-    onSuccess: async () => {
-      setToast({ type: "success", message: text.supportStatusSaved });
-      pushSupportNotification("success", text.supportStatusSaved);
-      await refreshConversationData();
-    },
-    onError: (error) => {
-      pushSupportError(error, "update_status");
-    },
-  });
-
-  const assignmentMutation = useMutation({
-    mutationFn: async (assignedAdminId?: string | null) => {
-      if (!assertCanManageSupportWorkspace()) {
-        throw new Error(supportActionsForbidden);
-      }
-
-      return assignSupportConversation(conversationId, assignedAdminId);
-    },
-    onSuccess: async () => {
-      setToast({ type: "success", message: text.supportAssignmentSaved });
-      pushSupportNotification("success", text.supportAssignmentSaved);
-      await refreshConversationData();
-    },
-    onError: (error) => {
-      pushSupportError(error, "assign_conversation");
-    },
-  });
-
-  const metadataMutation = useMutation({
-    mutationFn: async (payload: { priority: SupportConversationPriority; tags: string[] }) => {
-      if (!assertCanManageSupportWorkspace()) {
-        throw new Error(supportActionsForbidden);
-      }
-
-      return updateSupportConversationMetadata(conversationId, payload);
-    },
-    onSuccess: async () => {
-      setToast({ type: "success", message: text.supportStatusSaved });
-      pushSupportNotification("success", text.supportStatusSaved);
-      await refreshConversationData();
-    },
-    onError: (error) => {
-      pushSupportError(error, "update_metadata");
-    },
-  });
-
-  const userQuery = useQuery<AdminUserDetail>({
-    queryKey: subjectUserId
-      ? adminQueryKeys.userDetail(subjectUserId)
-      : adminQueryKeys.userDetailDisabled,
-    queryFn: ({ signal }) => fetchAdminUser(subjectUserId!, signal),
-    enabled: Boolean(session && subjectUserId && canViewSubjectUserContext),
-    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
-  });
-
-  const isSubjectUserDeleted = Boolean(
-    subjectUserId && userQuery.isError && isNotFoundError(userQuery.error)
-  );
-
-  const analyticsQuery = useQuery<AdminUserAnalytics>({
-    queryKey: subjectUserId
-      ? adminQueryKeys.userAnalytics(subjectUserId)
-      : adminQueryKeys.userAnalyticsDisabled,
-    queryFn: ({ signal }) => fetchAdminUserAnalytics(subjectUserId!, signal),
-    enabled: Boolean(
-      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
-    ),
-    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
-  });
-
-  const purchasesQuery = useQuery<AdminEconomyPurchase[]>({
-    queryKey: ["admin", "support", "conversation", subjectUserId ?? "none", "purchases"],
-    queryFn: async ({ signal }) => {
-      const response = await fetchAdminEconomyPurchases(
-        {
-          skip: 0,
-          take: 8,
-          userId: subjectUserId!,
-        },
-        signal
-      );
-
-      return response.items;
-    },
-    enabled: Boolean(
-      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
-    ),
-    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
-  });
-
-  const subscriptionQuery = useQuery<AdminEconomyUserSubscriptionSummary>({
-    queryKey: subjectUserId
-      ? adminQueryKeys.economyUserSubscriptionSummary(subjectUserId)
-      : adminQueryKeys.economyUserSubscriptionSummaryDisabled,
-    queryFn: ({ signal }) => fetchAdminEconomyUserSubscriptionSummary(subjectUserId!, signal),
-    enabled: Boolean(
-      session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted
-    ),
-    retry: (failureCount, error) => !isNotFoundError(error) && failureCount < 2,
+  const {
+    assignmentMutation,
+    isSendReplySubmitting,
+    metadataMutation,
+    requestSendReply,
+    sendMutation,
+    statusMutation,
+  } = useSupportConversationMutations({
+    conversationId,
+    canManageSupportWorkspace,
+    supportActionsForbidden,
+    assertCanManageSupportWorkspace,
+    reply,
+    selectedAttachment,
+    replyToMessageId,
+    replyToPreview,
+    sessionUser: session?.user,
+    queryClient,
+    optimisticAttachmentPreview: copy.controller.optimisticAttachmentPreview,
+    operatorLabel: copy.shared.operator,
+    supportReplySent: text.supportReplySent,
+    supportStatusSaved: text.supportStatusSaved,
+    supportAssignmentSaved: text.supportAssignmentSaved,
+    pushSupportNotification,
+    pushSupportError,
+    setToast,
+    resetSelectedAttachment,
+    refreshConversationData,
+    setReply,
+    setReplyToMessageId,
+    setReplyToPreview,
   });
 
   const filteredInboxItems = useMemo<AdminSupportConversationSummary[]>(
@@ -902,18 +507,6 @@ export function useSupportConversationController({
 
   const composerValue = reply;
   const composerPlaceholder = text.supportReplyPlaceholder;
-  const deletedUserNameFallback = copy.shared.deletedUserName;
-  const deletedUserEmailFallback = copy.shared.deletedUserEmail;
-  const userEmailDisplay = conversation?.userEmail?.trim()
-    ? maskEmail(conversation.userEmail)
-    : isSubjectUserDeleted
-      ? deletedUserEmailFallback
-      : "";
-  const userDisplayName = conversation?.userDisplayName?.trim()
-    ? formatSafeSupportDisplay(conversation.userDisplayName, text.supportConversationTitle, 72)
-    : userEmailDisplay ||
-      (isSubjectUserDeleted ? deletedUserNameFallback : "") ||
-      text.supportConversationTitle;
   const hasComposerAttachment = selectedAttachment !== null;
   const replyToMessage = useMemo(
     () =>
@@ -930,10 +523,6 @@ export function useSupportConversationController({
     },
     [setReplyToMessageId, setReplyToPreview]
   );
-
-  const operatorPriority: SupportConversationPriority = conversation?.priority ?? "Normal";
-
-  const operatorTags = conversation?.tags ?? [];
 
   const setOperatorPriority = useCallback(
     (priority: SupportConversationPriority) => {
@@ -994,97 +583,41 @@ export function useSupportConversationController({
     [canManageSupportWorkspace, conversation, metadataMutation]
   );
 
-  const sidePanelTabs: ReadonlyArray<{ value: SidePanelTab; label: string }> = [
-    { value: "user", label: text.supportViewUserTab },
-    { value: "activity", label: text.supportViewActivityTab },
-    { value: "dialog", label: text.supportViewDialogTab },
-    { value: "attachments", label: text.supportViewAttachmentsTab },
-  ];
-
-  const sidePanelTitle =
-    activeSidePanelTab === "user"
-      ? text.supportUserInformationTitle
-      : activeSidePanelTab === "activity"
-        ? text.supportActivityTitle
-        : activeSidePanelTab === "dialog"
-          ? text.supportDialogTitle
-          : text.supportAttachmentsTitle;
-
-  const sidePanelDescription =
-    activeSidePanelTab === "activity"
-      ? text.supportActivityDescription
-      : activeSidePanelTab === "dialog"
-        ? text.supportDialogDescription
-        : activeSidePanelTab === "attachments"
-          ? text.supportAttachmentsDescription
-          : null;
-
-  const accountCreatedAt = userQuery.data?.createdAtUtc ?? conversation?.createdAtUtc ?? null;
-  const conversationWaitingSince =
-    conversation?.waitingSinceUtc ??
-    conversation?.lastMessageAtUtc ??
-    conversation?.createdAtUtc ??
-    null;
-  const conversationSla = getConversationSla(
-    conversationWaitingSince,
-    locale,
-    conversation?.adminUnreadCount ?? 0
-  );
   const recentUserPurchases = purchasesQuery.data ?? [];
-  const totalPurchases = canViewSubjectUserContext
-    ? (analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length)
-    : 0;
-  const lastUserPurchaseAtUtc =
-    recentUserPurchases[0]?.confirmedAtUtc ?? recentUserPurchases[0]?.createdAtUtc ?? null;
-  const lastActivityAtUtc =
-    analyticsQuery.data?.summary.lastActivityAtUtc ??
-    conversation?.lastMessageAtUtc ??
-    conversation?.updatedAtUtc ??
-    conversation?.createdAtUtc ??
-    null;
-  const failedGenerations =
-    analyticsQuery.data?.recentGenerations.filter(
-      (generation) => generation.status.toLowerCase() === "failed"
-    ) ?? [];
-  const recentFailures = analyticsQuery.data?.failureBreakdown.slice(0, 4) ?? [];
-
-  const chatFacts = [
-    ...(canViewSubjectUserContext
-      ? [userQuery.data?.isPremium ? text.premiumLabel : text.freeLabel]
-      : []),
-    formatAccountAgeFact(accountCreatedAt, locale),
-    formatCountFact(conversation?.messages.length ?? 0, locale, "messages"),
-    ...(canViewSubjectUserContext
-      ? [
-          formatCountFact(
-            analyticsQuery.data?.summary.totalPurchases ?? recentUserPurchases.length,
-            locale,
-            "purchases"
-          ),
-        ]
-      : []),
-  ];
-
-  const activityTimeline: SupportTimelineItem[] = buildActivityTimeline(analyticsQuery.data);
-  const availableStatusActions = conversation
-    ? getAvailableStatusActions(conversation.status, text)
-    : [];
-  const primaryStatusAction =
-    availableStatusActions.find((action) => action.variant === "primary") ?? null;
-  const secondaryStatusActions = availableStatusActions.filter(
-    (action) => action.variant === "secondary"
-  );
-  const destructiveStatusAction =
-    availableStatusActions.find((action) => action.variant === "danger") ?? null;
-
-  const conversationTimeline: SupportTimelineItem[] = buildConversationTimeline({
-    conversation,
+  const {
+    accountCreatedAt,
+    activityTimeline,
+    conversationSla,
+    conversationTimeline,
+    destructiveStatusAction,
+    failedGenerations,
+    lastActivityAtUtc,
+    lastUserPurchaseAtUtc,
+    operatorPriority,
+    operatorTags,
+    primaryStatusAction,
+    recentFailures,
+    sidePanelDescription,
+    sidePanelTabs,
+    sidePanelTitle,
+    secondaryStatusActions,
+    totalPurchases,
     userDisplayName,
-    labels: {
-      conversationCreated: text.supportTimelineConversationCreated,
-      adminReply: text.supportTimelineAdminReply,
-      userMessage: text.supportTimelineUserMessage,
+    userEmailDisplay,
+  } = getSupportConversationDerivedState({
+    locale,
+    activeSidePanelTab,
+    text,
+    copy: {
+      deletedUserName: copy.shared.deletedUserName,
+      deletedUserEmail: copy.shared.deletedUserEmail,
     },
+    conversation,
+    canViewSubjectUserContext,
+    isSubjectUserDeleted,
+    user: userQuery.data,
+    analytics: analyticsQuery.data,
+    recentUserPurchases,
   });
 
   return {
@@ -1095,7 +628,6 @@ export function useSupportConversationController({
     assignmentMutation,
     attachmentInputRef,
     attachmentPreviewUrl,
-    chatFacts,
     composerPlaceholder,
     composerValue,
     conversation,

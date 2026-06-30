@@ -7,16 +7,15 @@ import {
   AdminIconTile,
   AdminSelectField,
   AdminStateCard,
-  adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import {
-  formatDateRange,
   isVideoTemplate,
   safeDisplayText,
 } from "@/components/templates/templates-daily-featured-page.helpers";
+import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import {
   AssignmentSummary,
-  TemplateScheduleCard,
 } from "@/components/templates/templates-daily-featured-page.schedule";
 import type {
   AutoPickSettingsCardProps,
@@ -24,8 +23,6 @@ import type {
   FeaturedPreviewCardProps,
   TemplateAssignmentEditorCardProps,
 } from "@/components/templates/templates-daily-featured-page.types";
-import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
-import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import { Button } from "@/components/ui/button";
 
 export function CurrentAssignmentCard({ current, text }: CurrentAssignmentCardProps) {

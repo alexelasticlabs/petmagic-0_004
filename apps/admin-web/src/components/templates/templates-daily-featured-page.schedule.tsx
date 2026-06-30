@@ -6,11 +6,11 @@ import {
   safeDisplayText,
   statusTone,
 } from "@/components/templates/templates-daily-featured-page.helpers";
+import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import type {
   CurrentAssignmentCardProps,
   TemplateScheduleCardProps,
 } from "@/components/templates/templates-daily-featured-page.types";
-import styles from "@/components/templates/templates-daily-featured-page.module.css";
 import { Button } from "@/components/ui/button";
 import type { AdminTemplateOfTheDay } from "@/lib/api-client";
 

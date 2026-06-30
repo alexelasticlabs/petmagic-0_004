@@ -23,8 +23,8 @@ const templateTestPageStylesPath = fileURLToPath(
 const templateEditorSectionsPath = fileURLToPath(
   new URL("./template-editor-sections.tsx", import.meta.url)
 );
-const templateEditorStylesPath = fileURLToPath(
-  new URL("./template-editor.module.css", import.meta.url)
+const templateEditorAssetStylesPath = fileURLToPath(
+  new URL("./template-editor-assets.module.css", import.meta.url)
 );
 
 describe("template test media actions", () => {
@@ -436,7 +436,7 @@ describe("template test media actions", () => {
     const editorSource = readFileSync(templateEditorPath, "utf8");
     const previewSource = readFileSync(templatePreviewAssetSectionPath, "utf8");
     const sectionsSource = readFileSync(templateEditorSectionsPath, "utf8");
-    const stylesSource = readFileSync(templateEditorStylesPath, "utf8");
+    const stylesSource = readFileSync(templateEditorAssetStylesPath, "utf8");
 
     expect(editorSource).toContain("<TemplatePreviewAssetSection\n                  text={text}");
     expect(editorSource).toContain(

@@ -11,13 +11,13 @@ import {
 import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
 import { safeDisplayText } from "@/components/templates/templates-daily-featured-page.helpers";
 import styles from "@/components/templates/templates-daily-featured-page.module.css";
+import { TemplateScheduleCard } from "@/components/templates/templates-daily-featured-page.schedule";
 import {
   AutoPickSettingsCard,
   CurrentAssignmentCard,
   FeaturedPreviewCard,
   TemplateAssignmentEditorCard,
 } from "@/components/templates/templates-daily-featured-page.sections";
-import { TemplateScheduleCard } from "@/components/templates/templates-daily-featured-page.schedule";
 import type { TemplatesDailyFeaturedPageProps } from "@/components/templates/templates-daily-featured-page.types";
 import { useTemplatesDailyFeaturedController } from "@/components/templates/use-templates-daily-featured-controller";
 import { Button } from "@/components/ui/button";

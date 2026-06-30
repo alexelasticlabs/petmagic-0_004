@@ -1,0 +1,94 @@
+.imageViewerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 1.2rem;
+  background: color-mix(in srgb, var(--surface-0) 86%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.imageViewerPanel {
+  width: min(100%, 72rem);
+  max-height: calc(100dvh - 2.4rem);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--success) 26%, var(--border-soft));
+  background: var(--surface-1);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--surface-0) 46%, transparent);
+}
+
+.imageViewerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-strong);
+}
+
+.imageViewerBody {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: auto;
+}
+
+.imageViewerImage {
+  width: auto;
+  max-width: 100%;
+  max-height: calc(100dvh - 14rem);
+  height: auto;
+  object-fit: contain;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, var(--border-soft));
+}
+
+.imageViewerVideo {
+  width: min(100%, 70rem);
+  max-width: 100%;
+  max-height: calc(100dvh - 14rem);
+  height: auto;
+  border-radius: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 10%, var(--border-soft));
+  background: var(--surface-0);
+}
+
+.imageViewerMeta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 8px;
+}
+
+.imageViewerMeta div {
+  display: grid;
+  gap: 2px;
+  padding: 0.62rem 0.72rem;
+  border-radius: 0.82rem;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-2);
+}
+
+.imageViewerMeta span {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.imageViewerMeta strong {
+  color: var(--text-strong);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.imageViewerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

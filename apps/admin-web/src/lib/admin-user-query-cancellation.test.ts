@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { readSupportConversationControllerLibrarySource } from "@/components/support/support-conversation-controller.test-source";
 import { readUsersManagementPageLibrarySource } from "@/components/users-management-page.test-source";
 
 function readSource(relativePath: string): string {
@@ -30,7 +31,7 @@ describe("admin user query cancellation", () => {
     const profileSource = readSource("components/users/use-admin-user-profile.ts");
     const usersPageSource = readUsersManagementPageLibrarySource();
     const promoCodesSource = readSource("components/promo-codes-view.tsx");
-    const supportSource = readSource("components/support/use-support-conversation-controller.ts");
+    const supportSource = readSupportConversationControllerLibrarySource();
 
     expect(profileSource).toContain("fetchAdminUser(userId!, signal)");
     expect(profileSource).toContain("fetchAdminUserAnalytics(userId!, signal)");

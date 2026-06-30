@@ -261,6 +261,7 @@ export const ruDictionary: Dictionary = {
     "Лимит на пользователя не может быть меньше уже достигнутого значения.",
   promoCodesInvalidWindow: "Дата начала не может быть позже даты окончания.",
   promoCodesCopied: "Код скопирован в буфер обмена.",
+  promoCodesCopyError: "Не удалось скопировать промокод в буфер обмена.",
   promoCodesExported: "CSV выгружен локально.",
   promoCodesArchiveConfirm: "Архивировать этот промокод? Новые активации будут остановлены.",
   promoCodesCreateSuccess: "Промокод создан.",

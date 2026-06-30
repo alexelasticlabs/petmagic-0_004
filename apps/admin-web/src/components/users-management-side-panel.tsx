@@ -5,14 +5,15 @@ import { createPortal } from "react-dom";
 
 import { AdminBadge, AdminStateCard } from "@/components/admin/admin-primitives";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
+import { Button } from "@/components/ui/button";
+import { UserAvatarView } from "@/components/users/user-avatar";
 import {
   getUserAvatarLabel,
   getUserRoleLabel,
   getUserRoleTone,
 } from "@/components/users-management-page.helpers";
+import styles from "@/components/users-management-page.module.css";
 import type { UsersManagementSidePanelProps } from "@/components/users-management-page.types";
-import { Button } from "@/components/ui/button";
-import { UserAvatarView } from "@/components/users/user-avatar";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { formatDateTime } from "@/lib/format-date-time";
 import {
@@ -21,7 +22,6 @@ import {
   sanitizeSensitiveText,
   shortIdentifier,
 } from "@/lib/sensitive-display";
-import styles from "@/components/users-management-page.module.css";
 
 export function UsersManagementSidePanel({
   busyUserId,

@@ -23,6 +23,8 @@ type SupportInboxPageProps = {
   locale: Locale;
 };
 
+const supportInboxStaleTimeMs = 8_000;
+
 export function SupportInboxPage({ locale }: SupportInboxPageProps) {
   const router = useRouter();
   const session = useAuthSession();
@@ -40,6 +42,7 @@ export function SupportInboxPage({ locale }: SupportInboxPageProps) {
     queryKey: adminQueryKeys.supportInbox("all", "all", { page: 1, pageSize: 50 }),
     queryFn: ({ signal }) => fetchSupportInbox(undefined, "all", { page: 1, pageSize: 50, signal }),
     enabled: canManageSupportWorkspace,
+    staleTime: supportInboxStaleTimeMs,
   });
 
   const sortedConversations = useMemo<AdminSupportConversationSummary[]>(

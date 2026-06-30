@@ -4,8 +4,7 @@ const URL_PATTERN = /\bhttps?:\/\/[^\s<>"')]+/gi;
 const PHONE_PATTERN = /(^|[^\w])(\+?\d[\d\s().-]{6,}\d)(?=$|[^\w])/g;
 const SECRET_ASSIGNMENT_PATTERN =
   /\b(authorization|access_?token|refresh_?token|token|secret|password|api_?key|receipt|stripe_signature)\s*[:=]\s*["']?[^"',\s}&]+/gi;
-const CARD_ASSIGNMENT_PATTERN =
-  /\b(card(?:_?number)?|pan|cvv|cvc)\s*[:=]\s*["']?[\d\s-]{3,19}/gi;
+const CARD_ASSIGNMENT_PATTERN = /\b(card(?:_?number)?|pan|cvv|cvc)\s*[:=]\s*["']?[\d\s-]{3,19}/gi;
 const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const STRIPE_SECRET_PATTERN = /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]+\b/g;
@@ -24,8 +23,9 @@ export function maskEmail(value: string | null | undefined): string {
   const local = trimmed.slice(0, atIndex);
   const domain = trimmed.slice(atIndex + 1);
   const [domainHead = "", ...domainRest] = domain.split(".");
-  const visibleLocal = local.length <= 1 ? local[0] ?? "*" : local.slice(0, Math.min(2, local.length));
-  const visibleDomain = domainHead.length <= 1 ? domainHead[0] ?? "*" : domainHead[0];
+  const visibleLocal =
+    local.length <= 1 ? (local[0] ?? "*") : local.slice(0, Math.min(2, local.length));
+  const visibleDomain = domainHead.length <= 1 ? (domainHead[0] ?? "*") : domainHead[0];
   const suffix = domainRest.length ? `.${domainRest.join(".")}` : "";
 
   return `${visibleLocal}***@${visibleDomain}***${suffix}`;
@@ -51,24 +51,31 @@ export function maskSignedUrl(value: string | null | undefined): string {
     return EMPTY_DISPLAY;
   }
 
+  if (trimmed.startsWith("blob:")) {
+    return "blob:***";
+  }
+
+  if (trimmed.startsWith("data:")) {
+    return "data:***";
+  }
+
+  if (trimmed.startsWith("file://")) {
+    return "[redacted-path]";
+  }
+
   try {
     const url = new URL(trimmed);
-    url.username = "";
-    url.password = "";
-    if (url.search) {
-      url.search = "?***";
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return `${url.origin}/***`;
     }
 
-    return url.toString();
+    return `${url.protocol}***`;
   } catch {
     return trimmed.length > 80 ? `${trimmed.slice(0, 80)}...` : trimmed;
   }
 }
 
-export function sanitizeSensitiveText(
-  value: string | null | undefined,
-  maxLength = 512
-): string {
+export function sanitizeSensitiveText(value: string | null | undefined, maxLength = 512): string {
   const normalized = value
     ?.replace(/\s+/g, " ")
     .trim()
@@ -76,7 +83,10 @@ export function sanitizeSensitiveText(
     .replace(URL_PATTERN, (match) => maskSignedUrl(match))
     .replace(SECRET_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
     .replace(CARD_ASSIGNMENT_PATTERN, (_match, key: string) => `${key}=[redacted]`)
-    .replace(PHONE_PATTERN, (_match, prefix: string, phone: string) => `${prefix}${maskPhone(phone)}`)
+    .replace(
+      PHONE_PATTERN,
+      (_match, prefix: string, phone: string) => `${prefix}${maskPhone(phone)}`
+    )
     .replace(BEARER_TOKEN_PATTERN, "Bearer [redacted]")
     .replace(JWT_PATTERN, "[redacted-token]")
     .replace(STRIPE_SECRET_PATTERN, "[redacted-secret]");

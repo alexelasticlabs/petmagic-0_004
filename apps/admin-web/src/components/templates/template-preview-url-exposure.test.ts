@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
 import { readTemplatesAnalyticsHubPageLibrarySource } from "@/components/templates/templates-analytics-hub-page.test-source";
 import { readTemplatesCatalogViewLibrarySource } from "@/components/templates/templates-catalog-view.test-source";
+
 const phonePreviewPath = fileURLToPath(
   new URL("./template-phone-preview-card.tsx", import.meta.url)
 );
@@ -51,8 +52,12 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).toContain("candidate.origin !== globalThis.location.origin");
     expect(secureMediaSource).toContain("fetchWithTimeout(url");
     expect(secureMediaSource).toContain("templates.secure_media_fetch_failed");
+    expect(secureMediaSource).toContain("templates.secure_media_origin_check_failed");
     expect(secureMediaSource).toContain("function getMediaFetchErrorName(error: unknown)");
     expect(secureMediaSource).toContain("function formatTemplateMediaLogText(");
+    expect(secureMediaSource).toContain("rawLength: url.length");
+    expect(secureMediaSource).toContain('startsWithSlash: url.startsWith("/")');
+    expect(secureMediaSource).toContain("isBlobOrData: isLocalObjectUrl(url)");
     expect(secureMediaSource).toContain(
       "templateId: formatTemplateMediaLogText(logContext?.templateId)"
     );
@@ -67,6 +72,7 @@ describe("template preview media URL exposure", () => {
     expect(secureMediaSource).not.toContain("contentType: logContext?.contentType");
     expect(secureMediaSource).not.toContain("surface: logContext?.surface");
     expect(secureMediaSource).not.toContain("error,\n        });");
+    expect(secureMediaSource).not.toContain("clientLogger.warn(\"templates.secure_media_origin_check_failed\", { url");
   });
 
   it("sanitizes visible template media file names before rendering them", () => {

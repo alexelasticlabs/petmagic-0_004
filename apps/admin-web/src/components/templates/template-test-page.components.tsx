@@ -18,15 +18,15 @@ import {
   TableIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
+import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
 import { formatTemplateTestDisplayText } from "@/components/templates/template-test-page.helpers";
 import { TemplateTestMediaActions } from "@/components/templates/template-test-page.media-actions";
+import styles from "@/components/templates/template-test-page.module.css";
 import type {
   DetailItem,
   MediaPreviewCardProps,
   SourceUploadCardProps,
 } from "@/components/templates/template-test-page.types";
-import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
-import styles from "@/components/templates/template-test-page.module.css";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
 export function WorkflowConnector() {

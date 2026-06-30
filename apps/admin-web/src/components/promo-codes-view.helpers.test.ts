@@ -15,6 +15,7 @@ import {
 } from "@/components/promo-codes-view.helpers";
 import type { AdminRedeemCode } from "@/lib/api-client";
 import { getDictionary } from "@/lib/i18n";
+
 import { readPromoCodesViewLibrarySource } from "./promo-codes-view.test-source";
 
 const promoCodesHelpersPath = fileURLToPath(
@@ -121,7 +122,7 @@ describe("promo code CSV export", () => {
     expect(csv).toContain("token=[redacted]");
     expect(csv).toContain("receipt=[redacted]");
     expect(csv).toContain("card_number=[redacted]");
-    expect(csv).toContain("https://cdn.example.com/a.png?***");
+    expect(csv).toContain("https://cdn.example.com/***");
     expect(csv).not.toContain("raw-secret");
     expect(csv).not.toContain("ios-secret");
     expect(csv).not.toContain("4242424242424242");
@@ -140,7 +141,8 @@ describe("promo codes editor drawer hardening", () => {
     expect(source).toContain("}, [isEditorOpen, isMutating]);");
     expect(source).toContain("function handleCloseEditor() {");
     expect(source).toContain("if (isMutating) {\n      return;\n    }");
-    expect(source).toContain("onClose={handleCloseEditor}");
+    expect(source).toContain("onCloseEditor={handleCloseEditor}");
+    expect(source).toContain("onClose={onCloseEditor}");
     expect(source).not.toContain(
       'if (event.key === "Escape") {\n        setIsEditorOpen(false);\n      }'
     );
@@ -327,9 +329,15 @@ describe("promo code dangerous action hardening", () => {
       "async function handleCopyCode(code: string) {\n    if (!assertCanManagePromoCodes())"
     );
     expect(helpersSource).toContain("try {\n      await navigator.clipboard.writeText(value);");
-    expect(helpersSource).toContain("} catch {\n      // Fall back to the legacy path below;");
+    expect(helpersSource).toContain(
+      "} catch {\n      // Fall back to the browser command path below"
+    );
     expect(helpersSource).toContain('const copied = document.execCommand("copy");');
-    expect(helpersSource).toContain('throw new Error("Clipboard fallback copy failed");');
+    expect(helpersSource).toContain(
+      "export async function copyTextToClipboard(value: string, fallbackErrorMessage: string) {"
+    );
+    expect(helpersSource).toContain("throw new Error(fallbackErrorMessage);");
+    expect(helpersSource).not.toContain('throw new Error("Clipboard fallback copy failed");');
     expect(helpersSource).toContain("} finally {\n    input.remove();");
     expect(viewSource).toContain("function getPromoClientErrorDetails(error: unknown)");
     expect(viewSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
@@ -343,7 +351,10 @@ describe("promo code dangerous action hardening", () => {
     expect(viewSource).not.toContain("sanitizeSensitiveText(error.message, 160)");
     expect(viewSource).not.toContain('clientLogger.warn("promo.copy_failed", { error });');
     expect(viewSource).toContain(
-      'setFeedback({ tone: "danger", message: text.promoCodesUpdateError });'
+      'await copyTextToClipboard(code, text.promoCodesCopyError);'
+    );
+    expect(viewSource).toContain(
+      'message: getAdminErrorMessage(error, text.promoCodesCopyError)'
     );
     expect(viewSource).toContain(
       "function handleExport() {\n    if (!assertCanManagePromoCodes())"

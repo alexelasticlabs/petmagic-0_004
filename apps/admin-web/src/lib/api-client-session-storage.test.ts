@@ -43,6 +43,12 @@ class MemoryStorage {
   }
 }
 
+class RemoveFailureStorage extends MemoryStorage {
+  override removeItem(): void {
+    throw new Error("sessionStorage unavailable");
+  }
+}
+
 function createSession(): StoredSession {
   return {
     accessToken: "access-secret",
@@ -133,7 +139,7 @@ describe("api-client session storage", () => {
     expect(getSession()?.accessToken).toBe("access-secret");
   });
 
-  it("clears persisted legacy tokens instead of reviving them", () => {
+  it("clears persisted token sessions instead of reviving them", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const legacySession = createSession();
     window.sessionStorage.setItem(AUTH_KEY, JSON.stringify(legacySession));
@@ -141,7 +147,7 @@ describe("api-client session storage", () => {
     expect(getSession()).toBeNull();
     expect(window.sessionStorage.getItem(AUTH_KEY)).toBeNull();
     const serializedLogs = JSON.stringify(warnSpy.mock.calls);
-    expect(serializedLogs).toContain("auth.legacy_session_cleared");
+    expect(serializedLogs).toContain("auth.persisted_token_session_cleared");
     expect(serializedLogs).not.toContain("access-secret");
     expect(serializedLogs).not.toContain("refresh-secret");
   });
@@ -180,7 +186,7 @@ describe("api-client session storage", () => {
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain("raw-secret");
   });
 
-  it("clears legacy admin-shaped sessions before they can crash the shell", () => {
+  it("clears malformed admin-shaped sessions before they can crash the shell", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     window.sessionStorage.setItem(
       AUTH_KEY,
@@ -211,6 +217,7 @@ describe("api-client session storage", () => {
     expect(source).toContain("function getAuthStorageErrorDetails(error: unknown)");
     expect(source).toContain("function getApiClientErrorDetails(error: unknown)");
     expect(source).toContain("function getApiPayloadParseErrorDetails(error: unknown)");
+    expect(source).toContain("function suppressPersistedAuthSession(raw: string | null): void");
     expect(source).toContain("return getApiClientErrorDetails(error);");
     expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain(
@@ -219,8 +226,9 @@ describe("api-client session storage", () => {
     expect(source).toContain(
       'clientLogger.warn("auth.logout_failed", getAuthStorageErrorDetails(error));'
     );
-    expect(source).toContain('auth.legacy_session_cleanup_failed');
-    expect(source).not.toContain('auth.session_token_migration_failed');
+    expect(source).toContain("auth.persisted_token_session_cleanup_failed");
+    expect(source).toContain("auth.session_clear_failed");
+    expect(source).not.toContain("auth.session_token_migration_failed");
     expect(source).not.toContain('clientLogger.warn("auth.session_parse_failed", { error });');
     expect(source).not.toContain(
       'clientLogger.warn("auth.session_parse_cleanup_failed", { error: storageError });'
@@ -228,7 +236,7 @@ describe("api-client session storage", () => {
     expect(source).not.toContain('clientLogger.warn("auth.logout_failed", { error });');
     expect(source).not.toContain("error: parseError");
     expect(source).not.toContain("error,\n    });\n\n    const networkError");
-    expect(source).not.toContain("correlationId: headers.get(\"X-Correlation-ID\"),\n      error,");
+    expect(source).not.toContain('correlationId: headers.get("X-Correlation-ID"),\n      error,');
     expect(source).not.toContain("hasRefreshToken: Boolean(refreshToken),\n      error,");
   });
 
@@ -259,6 +267,26 @@ describe("api-client session storage", () => {
     const serializedLogs = JSON.stringify(warnSpy.mock.calls);
     expect(serializedLogs).not.toContain("backend-access-secret");
     expect(serializedLogs).not.toContain("backend-refresh-secret");
+  });
+
+  it("keeps the runtime signed out when sessionStorage removal fails during clearSession", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const storage = stubBrowser(new RemoveFailureStorage());
+    const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+
+    await seedLoggedInSession();
+    expect(getSession()?.accessToken).toBe("access-secret");
+    dispatchEventSpy.mockClear();
+
+    clearSession();
+
+    expect(getSession()).toBeNull();
+    expect(storage.getItem(AUTH_KEY)).not.toBeNull();
+    expect(dispatchEventSpy).toHaveBeenCalledTimes(1);
+    const serializedLogs = JSON.stringify(warnSpy.mock.calls);
+    expect(serializedLogs).toContain("auth.session_clear_failed");
+    expect(serializedLogs).not.toContain("access-secret");
+    expect(serializedLogs).not.toContain("refresh-secret");
   });
 
   it("adds canonical correlation header and logs failed API requests without response bodies", async () => {
@@ -294,11 +322,12 @@ describe("api-client session storage", () => {
 
   it("uses fallback messages for non-JSON error responses without noisy parse logs", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const fetchMock = vi.fn(async () =>
-      new Response("<html>token=raw-secret upstream failed</html>", {
-        status: 502,
-        headers: { "content-type": "text/html" },
-      })
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("<html>token=raw-secret upstream failed</html>", {
+          status: 502,
+          headers: { "content-type": "text/html" },
+        })
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -345,7 +374,7 @@ describe("api-client session storage", () => {
     });
 
     expect(apiError.message).toContain("al***@e***.com");
-    expect(apiError.message).toContain("https://cdn.example.com/a.png?***");
+    expect(apiError.message).toContain("https://cdn.example.com/***");
     expect(serialized).toContain("token=[redacted]");
     expect(serialized).toContain("receipt=[redacted]");
     expect(serialized).toContain("card_number=[redacted]");

@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
 
 const adminShellPath = fileURLToPath(new URL("../admin-shell.tsx", import.meta.url));
-const supportControllerPath = fileURLToPath(
-  new URL("./use-support-conversation-controller.ts", import.meta.url)
+const supportControllerHelpersPath = fileURLToPath(
+  new URL("./support-conversation-controller.helpers.ts", import.meta.url)
 );
 
 describe("support message preview display", () => {
@@ -24,7 +24,7 @@ describe("support message preview display", () => {
     );
 
     expect(preview).toContain("al***@e***.com");
-    expect(preview).toContain("https://cdn.example.com/pet.png?***");
+    expect(preview).toContain("https://cdn.example.com/***");
     expect(preview).toContain("receipt=[redacted]");
     expect(preview).toContain("token=[redacted]");
     expect(preview).toContain("card_number=[redacted]");
@@ -42,14 +42,14 @@ describe("support message preview display", () => {
 
   it("routes support realtime preview through the shared sanitizer", () => {
     const adminShellSource = readFileSync(adminShellPath, "utf8");
-    const supportControllerSource = readFileSync(supportControllerPath, "utf8");
+    const supportControllerHelpersSource = readFileSync(supportControllerHelpersPath, "utf8");
 
     expect(adminShellSource).toContain("formatSupportMessagePreview(event.lastMessagePreview");
-    expect(supportControllerSource).toContain(
+    expect(supportControllerHelpersSource).toContain(
       "formatSupportMessagePreview(event.lastMessagePreview"
     );
     expect(adminShellSource).not.toContain("event.lastMessagePreview?.trim()");
-    expect(supportControllerSource).not.toContain("event.lastMessagePreview?.trim()");
+    expect(supportControllerHelpersSource).not.toContain("event.lastMessagePreview?.trim()");
   });
 
   it("encodes support realtime notification route ids before building hrefs", () => {

@@ -16,6 +16,8 @@ describe("support inbox page", () => {
     );
     expect(source).toContain("ensureAdminSession(locale, router);");
     expect(source).toContain("enabled: canManageSupportWorkspace");
+    expect(source).toContain("const supportInboxStaleTimeMs = 8_000;");
+    expect(source).toContain("staleTime: supportInboxStaleTimeMs");
     expect(source).toContain("function requestInboxRetry()");
     expect(source).toContain(
       "if (!canManageSupportWorkspace || inboxQuery.isFetching) {\n      return;\n    }"

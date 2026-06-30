@@ -3,27 +3,25 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
-import { AdminPage, AdminStateCard } from "@/components/admin/admin-primitives";
-import { ConfirmationDialog } from "@/components/admin/confirmation-dialog";
+import { AdminPage } from "@/components/admin/admin-primitives";
+import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
+import { useUsersAdmin } from "@/components/users/use-users-admin";
 import { useUsersManagementActionsMenu } from "@/components/users-management-actions-menu";
+import { UsersManagementPageOverlays } from "@/components/users-management-page-overlays-composition";
+import { UsersManagementPageWorkspace } from "@/components/users-management-page-workspace";
 import {
   UsersManagementAccessState,
   UsersManagementHero,
   UsersManagementLoadingState,
-  UsersManagementSummaryGrid,
 } from "@/components/users-management-page.chrome";
+import { getUsersManagementPageText } from "@/components/users-management-page.content";
 import {
   fetchUserRowEnrichment,
   formatMetricCount,
   getNewUsersCountForRange,
   getUsersPageErrorDetails,
 } from "@/components/users-management-page.helpers";
-import {
-  UsersManagementActionsMenu,
-  UsersManagementWalletDialog,
-} from "@/components/users-management-page-overlays";
-import { UsersManagementSidePanel } from "@/components/users-management-side-panel";
-import { getUsersManagementPageText } from "@/components/users-management-page.content";
+import styles from "@/components/users-management-page.module.css";
 import type {
   ActivityFilter,
   ConfirmationDialogState,
@@ -34,11 +32,6 @@ import type {
   UsersManagementPageProps,
   WalletDialogState,
 } from "@/components/users-management-page.types";
-import { UsersManagementUsersCard } from "@/components/users-management-users-card";
-import { Toast } from "@/components/ui/toast";
-import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
-import { useUsersAdmin } from "@/components/users/use-users-admin";
-import styles from "@/components/users-management-page.module.css";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import {
   adjustAdminUserWallet,
@@ -52,7 +45,6 @@ import {
   revokeRole,
   setActive,
   setPremium,
-  USER_SEARCH_MAX_LENGTH,
   USER_WALLET_REASON_MAX_LENGTH,
   type AdminEconomyUserSubscriptionSummary,
   type AdminUserAnalytics,
@@ -633,21 +625,12 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
     <AdminPage className={styles.page}>
       <UsersManagementHero text={text} />
 
-      <UsersManagementSummaryGrid
+      <UsersManagementPageWorkspace
         activeUsersValue={activeUsersValue}
-        blockedUsersValue={blockedUsersValue}
-        newUsersValue={newUsersValue}
-        openSupportUserCount={openSupportUserCount}
-        premiumUsersValue={premiumUsersValue}
-        rangeDays={rangeDays}
-        totalUsersValue={totalUsersValue}
-        ui={ui}
-      />
-
-      <UsersManagementUsersCard
         activityFilter={activityFilter}
         analyticsByUserId={analyticsByUserId}
         busyUserId={busyUserId}
+        blockedUsersValue={blockedUsersValue}
         canManageRoles={canManageRoles}
         closeActionsMenu={closeActionsMenu}
         currentPage={currentPage}
@@ -657,12 +640,15 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         isUsersFetching={isUsersFetching}
         isUsersRefreshing={isUsersRefreshing}
         locale={locale}
+        newUsersValue={newUsersValue}
+        openSupportUserCount={openSupportUserCount}
         openActionsUserId={openActionsUserId}
         openWalletDialog={openWalletDialog}
         pageSubscriptionsByUserId={pageSubscriptionsByUserId}
         pageUsers={pageUsers}
         pagedUsers={pagedUsers}
         premiumFilter={premiumFilter}
+        premiumUsersValue={premiumUsersValue}
         rangeDays={rangeDays}
         refreshUsers={() => refreshUsers().then(() => undefined)}
         requestActiveChange={requestActiveChange}
@@ -687,65 +673,32 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         setStatusFilter={setStatusFilter}
         statusFilter={statusFilter}
         text={text}
+        totalUsersValue={totalUsersValue}
         totalPages={totalPages}
         triggerRefs={triggerRefs}
         ui={ui}
         usersPageTotalCount={usersPage.totalCount}
       />
 
-      {openActionsUser && actionsMenuPosition ? (
-        <UsersManagementActionsMenu
-          actionsMenuPosition={actionsMenuPosition}
-          busyUserId={busyUserId}
-          canManageRoles={canManageRoles}
-          cannotRevokeLastAdmin={cannotRevokeLastAdmin}
-          closeActionsMenu={closeActionsMenu}
-          isUserActionLocked={isUserActionLocked}
-          locale={locale}
-          menuRootRef={menuRootRef}
-          openActionsUser={openActionsUser}
-          openWalletDialog={openWalletDialog}
-          requestDeleteUser={requestDeleteUser}
-          requestRoleChange={requestRoleChange}
-          setSelectedUserId={setSelectedUserId}
-          text={text}
-          ui={ui}
-        />
-      ) : null}
-
-      <ConfirmationDialog
-        open={confirmationDialog !== null}
-        title={confirmationDialog?.title ?? ""}
-        description={confirmationDialog?.description ?? ""}
-        confirmLabel={confirmationDialog?.confirmLabel ?? ui.confirmAction}
-        cancelLabel={ui.confirmCancel}
-        isSubmitting={confirmationSubmitting}
-        tone={confirmationDialog?.tone ?? "danger"}
-        onCancel={closeConfirmationDialog}
-        onConfirm={() => {
-          void submitConfirmationDialog();
-        }}
-      />
-
-      {walletDialog ? (
-        <UsersManagementWalletDialog
-          closeWalletDialog={closeWalletDialog}
-          setWalletDialog={setWalletDialog}
-          submitWalletDialog={submitWalletDialog}
-          ui={ui}
-          walletDialog={walletDialog}
-          walletDialogErrorId={walletDialogErrorId}
-          walletDialogSubmitting={walletDialogSubmitting}
-          walletDialogTitleId={walletDialogTitleId}
-        />
-      ) : null}
-
-      <UsersManagementSidePanel
+      <UsersManagementPageOverlays
+        actionsMenuPosition={actionsMenuPosition}
         busyUserId={busyUserId}
         canManageRoles={canManageRoles}
+        cannotRevokeLastAdmin={cannotRevokeLastAdmin}
+        closeActionsMenu={closeActionsMenu}
+        closeConfirmationDialog={closeConfirmationDialog}
         closePanel={() => setSelectedUserId(null)}
+        closeWalletDialog={closeWalletDialog}
+        confirmationDialog={confirmationDialog}
+        confirmationSubmitting={confirmationSubmitting}
         isUserActionLocked={isUserActionLocked}
         locale={locale}
+        menuRootRef={menuRootRef}
+        openActionsUser={openActionsUser}
+        openWalletDialog={openWalletDialog}
+        requestRoleChange={requestRoleChange}
+        setSelectedUserId={setSelectedUserId}
+        setWalletDialog={setWalletDialog}
         requestActiveChange={requestActiveChange}
         requestDeleteUser={requestDeleteUser}
         requestSelectedUserProfileRetry={requestSelectedUserProfileRetry}
@@ -755,11 +708,16 @@ export function UsersManagementPage({ locale }: UsersManagementPageProps) {
         selectedUserId={selectedUserId}
         selectedUserProfile={selectedUserProfile}
         selectedUserSupportTickets={selectedUserSupportTickets}
+        submitConfirmationDialog={submitConfirmationDialog}
+        submitWalletDialog={submitWalletDialog}
         text={text}
         ui={ui}
+        toast={toast}
+        walletDialog={walletDialog}
+        walletDialogErrorId={walletDialogErrorId}
+        walletDialogSubmitting={walletDialogSubmitting}
+        walletDialogTitleId={walletDialogTitleId}
       />
-
-      {toast ? <Toast message={toast.message} type={toast.type} /> : null}
     </AdminPage>
   );
 }

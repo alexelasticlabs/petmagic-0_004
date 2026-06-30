@@ -6,8 +6,8 @@ import {
   AdminPageGrid,
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
-import styles from "@/components/users-management-page.module.css";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
+import styles from "@/components/users-management-page.module.css";
 import type { Dictionary } from "@/lib/i18n";
 
 type UsersManagementHeroProps = {

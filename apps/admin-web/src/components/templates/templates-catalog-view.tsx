@@ -14,11 +14,10 @@ import {
 } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
 import { getTemplateStatusLabel } from "@/components/templates/template-admin-shared";
-import { getTemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import {
   TemplateCatalogCard,
-  formatAnalyticsInteger,
 } from "@/components/templates/templates-catalog-view.card";
+import { getTemplatesCatalogViewText } from "@/components/templates/templates-catalog-view.content";
 import { TemplatesCatalogDialogs } from "@/components/templates/templates-catalog-view.dialogs";
 import { TemplatesCatalogListTable } from "@/components/templates/templates-catalog-view.list";
 import styles from "@/components/templates/templates-catalog.module.css";
@@ -31,7 +30,6 @@ import {
   changeTemplateStatus,
   deleteTemplate,
   useAuthSession,
-  type AdminTemplateListItem,
   type TemplateStatus,
   type TemplateType,
 } from "@/lib/api-client";

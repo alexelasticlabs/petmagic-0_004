@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
 import { readTemplatesAnalyticsHubPageLibrarySource } from "./templates-analytics-hub-page.test-source";
 
 const templateAnalyticsPagePath = fileURLToPath(

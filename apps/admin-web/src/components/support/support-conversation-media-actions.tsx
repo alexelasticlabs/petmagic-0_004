@@ -1,6 +1,7 @@
 "use client";
 
 import { FileIcon, PlayCircleIcon } from "@/components/admin/admin-icons";
+import styles from "@/components/support/support-conversation-chat-content.module.css";
 import {
   formatFileSize,
   formatSafeSupportDownloadName,
@@ -8,19 +9,20 @@ import {
   getMessageAttachments,
   shouldRenderMessageBody,
 } from "@/components/support/support-conversation-helpers";
-import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import type {
   FullscreenImage,
   SupportMessage,
   SupportMessageAttachment,
 } from "@/components/support/support-conversation-page.types";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
+import sharedStyles from "@/components/support/support-page.module.css";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
-import styles from "@/components/support/support-page.module.css";
 import type { AdminSupportConversation } from "@/lib/api-client";
 import { clientLogger } from "@/lib/client-logger";
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
+
 import type { MutableRefObject, ReactNode } from "react";
 
 type AttachmentTileOptions = {
@@ -560,7 +562,7 @@ export function useSupportConversationMediaActions({
         className={`${styles.messageAttachmentCard} ${styles.messageMediaFileTile}`}
       >
         <div className={styles.messageAttachmentIcon}>
-          <FileIcon className={styles.supportFileIcon} />
+          <FileIcon className={sharedStyles.supportFileIcon} />
         </div>
         <div className={styles.messageAttachmentMeta}>
           <strong>{safeAttachmentName}</strong>

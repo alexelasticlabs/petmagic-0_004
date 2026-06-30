@@ -21,7 +21,7 @@ describe("sensitive-display", () => {
 
   it("removes query strings from signed URLs", () => {
     expect(maskSignedUrl("https://cdn.example.com/file.png?sig=secret&expires=1")).toBe(
-      "https://cdn.example.com/file.png?***"
+      "https://cdn.example.com/***"
     );
   });
 
@@ -50,7 +50,7 @@ describe("sensitive-display", () => {
     );
 
     expect(sanitized).toContain("al***@e***.com");
-    expect(sanitized).toContain("https://cdn.example.com/file.png?***");
+    expect(sanitized).toContain("https://cdn.example.com/***");
     expect(sanitized).toContain("Authorization=[redacted]");
     expect(sanitized).toContain("receipt=[redacted]");
     expect(sanitized).toContain("card_number=[redacted]");

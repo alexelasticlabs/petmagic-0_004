@@ -1,5 +1,3 @@
-import { getAdminErrorMessage } from "@/lib/admin-error-message";
-import type { AdminTemplate, AdminTemplateTestRun } from "@/lib/api-client";
 import {
   getTemplateTestPageText,
   type TemplateTestPageText,
@@ -10,6 +8,8 @@ import type {
   DetailItem,
   TimelineItem,
 } from "@/components/templates/template-test-page.types";
+import { getAdminErrorMessage } from "@/lib/admin-error-message";
+import type { AdminTemplate, AdminTemplateTestRun } from "@/lib/api-client";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 

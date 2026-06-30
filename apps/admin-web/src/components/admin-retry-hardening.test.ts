@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
 import { readPromoCodesViewLibrarySource } from "./promo-codes-view.test-source";
 
 const roleManagementPath = fileURLToPath(new URL("./role-management-page.tsx", import.meta.url));

@@ -20,9 +20,17 @@ describe("user avatar URL exposure", () => {
     expect(source).toContain("users.avatar_fetch_failed");
     expect(helperSource).toContain("import { sanitizeSensitiveText }");
     expect(helperSource).toContain("export function getUserMediaFetchErrorDetails(error: unknown)");
+    expect(helperSource).toContain("function getUserMediaUrlResolutionErrorDetails(rawUrl: string, error: unknown)");
+    expect(helperSource).toContain('clientLogger.warn(\n      "users.media_url_resolve_failed",');
+    expect(helperSource).toContain("rawLength: rawUrl.length");
+    expect(helperSource).toContain("startsWithSlash: rawUrl.startsWith(\"/\")");
+    expect(helperSource).toContain(
+      'isBlobOrData: rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")'
+    );
     expect(helperSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
     expect(source).toContain("getUserMediaFetchErrorDetails(error)");
     expect(source).not.toContain('clientLogger.warn("users.avatar_fetch_failed", { error })');
+    expect(helperSource).not.toContain("clientLogger.warn(\"users.media_url_resolve_failed\", { rawUrl");
   });
 
   it("does not render backend pet photo URLs directly in user detail cards", () => {

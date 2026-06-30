@@ -1,5 +1,6 @@
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import assetStyles from "@/components/templates/template-editor-assets.module.css";
 import styles from "@/components/templates/template-editor.module.css";
 import { normalizeTemplateTextInput } from "@/components/templates/template-form-mappers";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
@@ -104,13 +105,13 @@ export function TemplateReferenceAssetSection({
       <h3>{text.referenceMotionTitle}</h3>
       <input
         ref={fileInputRef}
-        className={styles.filePickerInput}
+        className={assetStyles.filePickerInput}
         type="file"
         accept={referenceMotionAccept}
         onChange={(event) => handleReferenceFileSelection(event.target.files?.[0] ?? null)}
       />
       <div
-        className={`${styles.assetPreview} ${styles.assetPreviewInteractive} ${isDragActive ? styles.assetPreviewDragActive : ""}`}
+        className={`${assetStyles.assetPreview} ${assetStyles.assetPreviewInteractive} ${isDragActive ? assetStyles.assetPreviewDragActive : ""}`}
         role="button"
         tabIndex={0}
         onClick={(event) => {
@@ -144,10 +145,10 @@ export function TemplateReferenceAssetSection({
         }}
         onDrop={handleReferenceDrop}
       >
-        <div className={styles.assetPreviewOverlay}>
-          <span className={styles.assetPreviewBadge}>{text.referenceMotionSourceBadge}</span>
+        <div className={assetStyles.assetPreviewOverlay}>
+          <span className={assetStyles.assetPreviewBadge}>{text.referenceMotionSourceBadge}</span>
           <span
-            className={`${styles.assetPreviewState} ${hasReference ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
+            className={`${assetStyles.assetPreviewState} ${hasReference ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
           >
             {referenceStateLabel}
           </span>
@@ -156,7 +157,7 @@ export function TemplateReferenceAssetSection({
           <TemplateSecureMedia
             url={effectiveReferenceUrl}
             kind="video"
-            className={styles.assetPreviewMedia}
+            className={assetStyles.assetPreviewMedia}
             controls
             playsInline
             logContext={{
@@ -165,9 +166,9 @@ export function TemplateReferenceAssetSection({
             }}
           />
         ) : (
-          <div className={styles.assetPreviewPlaceholder}>
-            <span className={styles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
-            <span className={styles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+          <div className={assetStyles.assetPreviewPlaceholder}>
+            <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadReference}</span>
+            <span className={assetStyles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
           </div>
         )}
       </div>
@@ -183,11 +184,11 @@ export function TemplateReferenceAssetSection({
             readOnly
           />
         </label>
-        <div className={styles.uploadPanel}>
-          <div className={styles.uploadPanelHeader}>
+        <div className={assetStyles.uploadPanel}>
+          <div className={assetStyles.uploadPanelHeader}>
             <div>
-              <p className={styles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
-              <p className={styles.uploadPanelTitle}>{referenceFileLabel}</p>
+              <p className={assetStyles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
+              <p className={assetStyles.uploadPanelTitle}>{referenceFileLabel}</p>
             </div>
             <span
               className={`${styles.inlineState} ${hasReference ? styles.inlineStateReady : styles.inlineStateAttention}`}
@@ -195,11 +196,11 @@ export function TemplateReferenceAssetSection({
               {referenceStateLabel}
             </span>
           </div>
-          <div className={styles.uploadActions}>
+          <div className={assetStyles.uploadActions}>
             <Button
               type="button"
               variant="primary"
-              className={styles.primaryButton}
+              className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
               disabled={!referenceFile || uploadingKind !== null}
               onClick={onUploadReference}
             >
@@ -208,7 +209,7 @@ export function TemplateReferenceAssetSection({
             <Button
               type="button"
               variant="danger"
-              className={styles.dangerButton}
+              className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
               disabled={!referenceFile && !hasReference}
               onClick={() => {
                 setSelectionError(null);
@@ -230,7 +231,9 @@ export function TemplateReferenceAssetSection({
               {text.clearAsset}
             </Button>
           </div>
-          {selectionError ? <p className={styles.assetSelectionError}>{selectionError}</p> : null}
+          {selectionError ? (
+            <p className={assetStyles.assetSelectionError}>{selectionError}</p>
+          ) : null}
         </div>
         <p className={styles.muted}>{text.referenceMotionUploadHint}</p>
       </div>

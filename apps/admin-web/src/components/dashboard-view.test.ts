@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
 import { readDashboardViewLibrarySource } from "./dashboard-view.test-source";
 
 const dashboardContentPath = fileURLToPath(new URL("./dashboard-view.content.ts", import.meta.url));

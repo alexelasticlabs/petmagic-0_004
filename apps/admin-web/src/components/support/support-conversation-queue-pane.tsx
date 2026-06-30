@@ -11,6 +11,7 @@ import {
   SupportIcon,
 } from "@/components/admin/admin-icons";
 import { AdminStateCard } from "@/components/admin/admin-primitives";
+import paletteStyles from "@/components/support/support-conversation-chat-content.module.css";
 import {
   formatClockTime,
   formatRelativeTime,
@@ -19,9 +20,9 @@ import {
   initialsFor,
   shortId,
 } from "@/components/support/support-conversation-helpers";
+import styles from "@/components/support/support-conversation-queue-pane.module.css";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { formatSupportMessagePreview } from "@/components/support/support-message-preview";
-import styles from "@/components/support/support-page.module.css";
 import { sourceLabel, statusLabel } from "@/components/support/support-status-helpers";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -67,7 +68,9 @@ function avatarColorFor(name: string): string {
   for (let i = 0; i < name.length; i++) {
     hash = (hash + name.charCodeAt(i)) % 8;
   }
-  return styles[`avatarColor${hash}` as keyof typeof styles] ?? styles.avatarColor6;
+  return (
+    paletteStyles[`avatarColor${hash}` as keyof typeof paletteStyles] ?? paletteStyles.avatarColor6
+  );
 }
 
 function QueueStatusIcon({ status }: { status: SupportConversationStatus }) {

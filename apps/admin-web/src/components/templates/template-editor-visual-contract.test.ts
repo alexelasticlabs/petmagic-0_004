@@ -3,11 +3,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const editorStylesPath = fileURLToPath(new URL("./template-editor.module.css", import.meta.url));
+const editorAssetStylesPath = fileURLToPath(
+  new URL("./template-editor-assets.module.css", import.meta.url)
+);
 const editorLayoutPath = fileURLToPath(new URL("./template-editor-layout.tsx", import.meta.url));
 
 describe("template editor visual contract", () => {
   it("keeps editor typography and upload surfaces theme-token based", () => {
     const styles = readFileSync(editorStylesPath, "utf8");
+    const assetStyles = readFileSync(editorAssetStylesPath, "utf8");
     const letterSpacingRules = styles.match(/letter-spacing:\s*[^;]+;/g) ?? [];
 
     expect(styles).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -21,10 +25,10 @@ describe("template editor visual contract", () => {
     expect(styles).toContain("font-size: 1.58rem;");
     expect(styles).not.toMatch(/font-size:\s*[^;]*vw/);
 
-    expect(styles).toContain(".uploadPanel {");
-    expect(styles).toContain("background: linear-gradient(");
-    expect(styles).toContain("color-mix(in srgb, var(--surface-1) 96%, var(--surface-2))");
-    expect(styles).toContain("box-shadow:\n    inset 0 1px 0 color-mix");
+    expect(assetStyles).toContain(".uploadPanel {");
+    expect(assetStyles).toContain("background: linear-gradient(");
+    expect(assetStyles).toContain("color-mix(in srgb, var(--surface-1) 96%, var(--surface-2))");
+    expect(assetStyles).toContain("box-shadow:\n    inset 0 1px 0 color-mix");
   });
 
   it("keeps the medium-screen editor rail below the form after wider breakpoints", () => {

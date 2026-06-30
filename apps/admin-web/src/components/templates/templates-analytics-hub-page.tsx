@@ -36,6 +36,7 @@ import {
   getTemplatesAnalyticsHubPageText,
   getTemplatesAnalyticsHubPeriodOptions,
 } from "@/components/templates/templates-analytics-hub-page.content";
+import styles from "@/components/templates/templates-analytics-hub-page.module.css";
 import {
   BreakdownPanel,
   EventDimensionPanel,
@@ -55,7 +56,6 @@ import {
   type TrendMetricKey,
   TypePanel,
 } from "@/components/templates/templates-analytics-hub-page.sections";
-import styles from "@/components/templates/templates-analytics-hub-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
   fetchAdminTemplatesAnalyticsOverview,

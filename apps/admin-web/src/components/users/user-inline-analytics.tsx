@@ -10,10 +10,10 @@ import {
   AdminStateCard,
 } from "@/components/admin/admin-primitives";
 import { Button } from "@/components/ui/button";
-import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import styles from "@/components/users/user-inline-analytics.module.css";
+import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { useAuthSession } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format-date-time";

@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactElement } from "react";
+
 
 import {
-  CalendarIcon,
   CancelCircleIcon,
   ChartIcon,
   DollarIcon,
@@ -12,7 +11,6 @@ import {
   PencilIcon,
   PlayCircleIcon,
   RefreshIcon,
-  VideoIcon,
 } from "@/components/admin/admin-icons";
 import { AdminStatusBadge } from "@/components/admin/admin-primitives";
 import {
@@ -32,6 +30,8 @@ import type {
   TemplateStatus,
 } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
+
+import type { ReactElement } from "react";
 
 export const statusColors: Record<TemplateStatus, string> = {
   Draft: "var(--warning)",

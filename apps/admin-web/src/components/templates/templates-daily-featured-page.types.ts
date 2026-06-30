@@ -1,8 +1,9 @@
-import type { FormEvent } from "react";
 
 import type { TemplatesDailyFeaturedPageText } from "@/components/templates/templates-daily-featured-page.content";
 import type { AdminTemplateListItem, AdminTemplateOfTheDay, TemplateType } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
+
+import type { FormEvent } from "react";
 
 export type TemplatesDailyFeaturedPageProps = {
   locale: Locale;

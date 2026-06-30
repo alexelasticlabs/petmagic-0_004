@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+
 import { readTemplatesCatalogViewLibrarySource } from "./templates-catalog-view.test-source";
 
 const catalogContentPath = fileURLToPath(

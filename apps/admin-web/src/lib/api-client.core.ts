@@ -124,6 +124,37 @@ function getAuthStorageErrorDetails(error: unknown): {
   };
 }
 
+function resetInMemoryAuthSessionState(): void {
+  cachedAuthRaw = null;
+  cachedAuthSession = null;
+  volatileAccessToken = null;
+  volatileRefreshToken = null;
+  volatileTokenUserId = null;
+  refreshSessionInFlight = null;
+}
+
+function suppressPersistedAuthSession(raw: string | null): void {
+  cachedAuthRaw = raw;
+  cachedAuthSession = null;
+}
+
+function clearStoredAuthSession(storageFailureEvent: string, storedRaw?: string | null): boolean {
+  resetInMemoryAuthSessionState();
+  if (typeof window === "undefined") {
+    return true;
+  }
+
+  try {
+    window.sessionStorage.removeItem(AUTH_KEY);
+    suppressPersistedAuthSession(null);
+    return true;
+  } catch (storageError) {
+    suppressPersistedAuthSession(storedRaw ?? null);
+    clientLogger.warn(storageFailureEvent, getAuthStorageErrorDetails(storageError));
+    return false;
+  }
+}
+
 export function clearAdminListCaches(): void {
   cachedUsersLists.clear();
   cachedAdminUserDetails.clear();
@@ -278,23 +309,11 @@ export function getSession(): AuthSession | null {
       (typeof parsed.accessToken === "string" && parsed.accessToken.trim().length > 0);
 
     if (hasStoredToken) {
-      clientLogger.warn("auth.legacy_session_cleared", {
+      clientLogger.warn("auth.persisted_token_session_cleared", {
         hasAccessToken: Boolean(parsed.accessToken?.trim()),
         hasRefreshToken: Boolean(parsed.refreshToken?.trim()),
       });
-      cachedAuthRaw = null;
-      cachedAuthSession = null;
-      volatileAccessToken = null;
-      volatileRefreshToken = null;
-      volatileTokenUserId = null;
-      try {
-        window.sessionStorage.removeItem(AUTH_KEY);
-      } catch (storageError) {
-        clientLogger.warn(
-          "auth.legacy_session_cleanup_failed",
-          getAuthStorageErrorDetails(storageError)
-        );
-      }
+      clearStoredAuthSession("auth.persisted_token_session_cleanup_failed", raw);
       return null;
     }
 
@@ -315,19 +334,7 @@ export function getSession(): AuthSession | null {
     return cachedAuthSession;
   } catch (error) {
     clientLogger.warn("auth.session_parse_failed", getAuthStorageErrorDetails(error));
-    cachedAuthRaw = null;
-    cachedAuthSession = null;
-    volatileAccessToken = null;
-    volatileRefreshToken = null;
-    volatileTokenUserId = null;
-    try {
-      window.sessionStorage.removeItem(AUTH_KEY);
-    } catch (storageError) {
-      clientLogger.warn(
-        "auth.session_parse_cleanup_failed",
-        getAuthStorageErrorDetails(storageError)
-      );
-    }
+    clearStoredAuthSession("auth.session_parse_cleanup_failed", raw);
     return null;
   }
 }
@@ -341,9 +348,10 @@ export function isAuthSessionExpired(session: AuthSession | null | undefined): b
   return Number.isNaN(expiresAtMs) || expiresAtMs <= Date.now();
 }
 
-function notifyAuthSessionChanged(): void {
-  cachedAuthRaw = undefined;
-
+function notifyAuthSessionChanged(options: { invalidateStoredSnapshot?: boolean } = {}): void {
+  if (options.invalidateStoredSnapshot ?? true) {
+    cachedAuthRaw = undefined;
+  }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(AUTH_SESSION_EVENT));
   }
@@ -388,15 +396,15 @@ export function useAuthSession(): AuthSessionSnapshot {
 export function clearSession(): void {
   clearAdminListCaches();
   authSessionMutationVersion += 1;
-  volatileAccessToken = null;
-  volatileRefreshToken = null;
-  volatileTokenUserId = null;
-  refreshSessionInFlight = null;
 
   if (typeof window !== "undefined") {
-    window.sessionStorage.removeItem(AUTH_KEY);
-    notifyAuthSessionChanged();
+    const storedRaw = window.sessionStorage.getItem(AUTH_KEY);
+    const storageCleared = clearStoredAuthSession("auth.session_clear_failed", storedRaw);
+    notifyAuthSessionChanged({ invalidateStoredSnapshot: storageCleared });
+    return;
   }
+
+  resetInMemoryAuthSessionState();
 }
 
 function getFallbackApiErrorMessage(status: number): string {

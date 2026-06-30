@@ -1,0 +1,704 @@
+.subtle {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.sidePanelTabs {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 8px;
+  align-items: stretch;
+  min-width: 0;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidePanelTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sidePanelContent {
+  display: grid;
+  gap: 12px;
+}
+
+.sectionHeaderCompact,
+.timelineCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.timelineCard {
+  display: grid;
+  gap: 4px;
+  padding: 0.62rem 0.68rem;
+  border-radius: 0.9rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+}
+
+.timelineCardHeader span,
+.timelineCardBody {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.timelineCardHeader strong,
+.sectionHeaderCompact strong {
+  color: var(--text-strong);
+  font-size: 0.92rem;
+}
+
+.sectionBlock,
+.timelineList {
+  display: grid;
+  gap: 8px;
+}
+
+.attachmentPreviewFileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 0.68rem;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));
+  color: var(--toast-success-fg);
+}
+
+.supportFileIcon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+
+.attachmentList {
+  display: grid;
+  gap: 10px;
+  max-height: 40rem;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;
+}
+
+.attachmentList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.attachmentList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.attachmentList::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 999px;
+}
+
+.attachmentListItem {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 92%, var(--surface-1))
+  );
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--surface-0) 12%, transparent);
+}
+
+.attachmentListItem:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  box-shadow: 0 10px 20px color-mix(in srgb, var(--surface-0) 18%, transparent);
+}
+
+.attachmentListThumbButton {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+.attachmentListThumbButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.attachmentListThumbButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);
+  outline-offset: 2px;
+  border-radius: 0.9rem;
+}
+
+.attachmentListThumb {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, var(--border-soft));
+}
+
+.attachmentListMeta {
+  display: grid;
+  gap: 2px;
+}
+
+.attachmentListMeta strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentListMeta span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.attachmentListMetaTop {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.attachmentListMetaTop strong {
+  min-width: 0;
+}
+
+.attachmentListTypeBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.22rem 0.42rem;
+  text-transform: uppercase;
+}
+
+.attachmentListMetaRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.attachmentListMetaHint {
+  overflow-wrap: anywhere;
+}
+
+.attachmentListActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spConfirmBox {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));
+  background: var(--surface-2);
+}
+
+.spConfirmText {
+  color: var(--text-strong);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.spConfirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.spTabBtn {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: max-content;
+  transition:
+    color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.spTabBtn:hover {
+  color: var(--text-soft);
+  background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-2));
+}
+
+.spTabBtnActive {
+  color: var(--text-strong);
+  background: var(--surface-1);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--surface-0) 18%, transparent);
+}
+
+:root[data-theme="light"] .spTabBtnActive {
+  box-shadow:
+    0 1px 3px color-mix(in srgb, var(--surface-0) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.infoPanelFlat {
+  min-width: 0;
+  height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  max-height: clamp(38rem, calc(100dvh - 10rem), 66rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft)) !important;
+  border-radius: 24px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 98%, transparent),
+    color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))
+  );
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--text-inverse) 8%, transparent) inset,
+    0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent) !important;
+}
+
+.infoPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-1) 92%, var(--surface-2)),
+    color-mix(in srgb, var(--surface-2) 94%, var(--surface-1))
+  );
+}
+
+.infoPanel::-webkit-scrollbar {
+  width: 4px;
+}
+
+.infoPanel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.infoPanel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 30%, transparent);
+  border-radius: 999px;
+}
+
+.infoPanelSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0.92rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-soft) 72%, transparent);
+}
+
+.infoPanelSection:last-child {
+  border-bottom: 0;
+}
+
+.infoPanelSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0.12rem;
+}
+
+.infoPanelSectionTitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--text-strong);
+}
+
+.infoPanelSectionLinkButton {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.infoPanelKvRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.infoPanelKvLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.infoPanelKvIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  color: color-mix(in srgb, var(--text-muted) 86%, var(--text-strong) 14%);
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.infoPanelKvRow > span:first-child {
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--text-muted) 86%, var(--text-strong) 14%);
+}
+
+.infoPanelKvRow > strong,
+.infoPanelKvRow > span:last-child:not(:first-child) {
+  max-width: none;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.infoPanelSelect {
+  width: 9.5rem;
+  min-height: 2.15rem;
+  border-radius: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+}
+
+.infoPanelSelect:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.infoPanelSelect:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.infoPanelSelectWrap {
+  width: 9.5rem;
+  min-width: 9.5rem;
+}
+
+.infoPanelAttachmentPreviewStrip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.infoPanelAttachmentPreviewTile,
+.infoPanelAttachmentPreviewMore {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));
+  background: var(--surface-2);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--surface-0) 14%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+
+.infoPanelAttachmentPreviewTile:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+}
+
+.infoPanelAttachmentPreviewTile:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.infoPanelAttachmentPreviewImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.infoPanelAttachmentPreviewIcon {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--text-muted) 14%);
+}
+
+.infoPanelAttachmentPreviewSize {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.15rem;
+  padding: 0 0.36rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-0) 84%, transparent);
+  color: var(--text-inverse);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.infoPanelAttachmentPreviewMore {
+  display: grid;
+  place-items: center;
+  color: var(--text-inverse);
+  font-size: 1.2rem;
+  font-weight: 800;
+  background: linear-gradient(180deg, var(--surface-0), var(--surface-3));
+}
+
+.infoPanelTagAddChip {
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.infoPanelTagAddChip:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+}
+
+.infoPanelTagsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.infoPanelTagChip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
+  color: color-mix(in srgb, var(--accent) 66%, var(--text-strong) 34%);
+  padding: 0.2rem 0.56rem;
+  min-height: 1.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.infoPanelTagInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.infoPanelTagInput {
+  min-height: 2.15rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.55rem;
+}
+
+.infoPanelTagInput:focus-visible {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.infoPanelTagInput:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.infoPanelStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.infoPanelStatsSecondaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.infoPanelStatTile,
+.infoPanelStatTileFull {
+  min-height: 4.2rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);
+  background: linear-gradient(180deg, var(--surface-1), var(--surface-2));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 7%, transparent);
+}
+
+.infoPanelStatTile > span,
+.infoPanelStatTileFull > span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.infoPanelStatTile > strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.infoPanelStatTileButton {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.infoPanelStatTileButton strong {
+  text-align: left;
+}
+
+.infoPanelStatTileFull strong {
+  color: var(--text-strong);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.infoPanelActionStack {
+  display: grid;
+  gap: 10px;
+}
+
+.actionsPanelBtn {
+  width: 100%;
+  min-height: 2.95rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+:global(:root[data-theme="light"]) .timelineCardHeader span,
+:global(:root[data-theme="light"]) .timelineCardBody {
+  color: var(--text-soft);
+  font-size: 0.83rem;
+}
+
+:global(:root[data-theme="light"]) .timelineCardHeader strong,
+:global(:root[data-theme="light"]) .sectionHeaderCompact strong {
+  color: var(--text-strong);
+  font-size: 0.95rem;
+}
+
+:global(:root:not([data-theme="light"])) .infoPanelFlat,
+:global(:root[data-theme="dark"]) .infoPanelFlat {
+  border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-0));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 4%, transparent),
+    0 14px 30px color-mix(in srgb, var(--surface-0) 46%, transparent) !important;
+}
+
+:global(:root:not([data-theme="light"])) .sidePanelTabs,
+:global(:root[data-theme="dark"]) .sidePanelTabs {
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0) 12%);
+  border-color: color-mix(in srgb, var(--border-soft) 84%, var(--surface-0) 16%);
+}
+
+:global(:root:not([data-theme="light"])) .spTabBtnActive,
+:global(:root[data-theme="dark"]) .spTabBtnActive {
+  background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-3) 28%);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--surface-0) 44%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 3%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .infoPanelSection,
+:global(:root[data-theme="dark"]) .infoPanelSection {
+  border-color: color-mix(in srgb, var(--border-soft) 78%, var(--surface-0));
+}
+
+:global(:root:not([data-theme="light"])) .attachmentListItem,
+:global(:root[data-theme="dark"]) .attachmentListItem,
+:global(:root:not([data-theme="light"])) .infoPanelAttachmentPreviewTile,
+:global(:root[data-theme="dark"]) .infoPanelAttachmentPreviewTile,
+:global(:root:not([data-theme="light"])) .infoPanelAttachmentPreviewMore,
+:global(:root[data-theme="dark"]) .infoPanelAttachmentPreviewMore,
+:global(:root:not([data-theme="light"])) .infoPanelStatTile,
+:global(:root[data-theme="dark"]) .infoPanelStatTile,
+:global(:root:not([data-theme="light"])) .infoPanelStatTileFull,
+:global(:root[data-theme="dark"]) .infoPanelStatTileFull {
+  border-color: color-mix(in srgb, var(--border-soft) 80%, var(--surface-0));
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 44%, transparent);
+}
+
+:global(:root:not([data-theme="light"])) .infoPanel,
+:global(:root[data-theme="dark"]) .infoPanel {
+  background: color-mix(in srgb, var(--surface-1) 90%, var(--surface-0));
+}
+
+@media (max-width: 1180px) {
+  .infoPanelFlat {
+    min-height: auto;
+    height: auto;
+    max-height: none;
+  }
+
+  .infoPanelStatsGrid,
+  .infoPanelStatsSecondaryGrid,
+  .infoPanelAttachmentPreviewStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1080px) {
+  .attachmentListItem {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .attachmentListActions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 780px) {
+  .infoPanelFlat {
+    border-radius: 1rem;
+  }
+
+  .infoPanelStatsGrid,
+  .infoPanelStatsSecondaryGrid,
+  .infoPanelAttachmentPreviewStrip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

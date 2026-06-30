@@ -116,7 +116,7 @@ describe("ensureAdminSession", () => {
     expect(router.replace).toHaveBeenCalledWith("/ru");
   });
 
-  it("clears legacy persisted sessions with stored tokens", () => {
+  it("clears persisted sessions with stored tokens", () => {
     const router = { replace: vi.fn() };
 
     storage.setItem(AUTH_KEY, JSON.stringify(createSession(["Admin"])));

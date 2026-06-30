@@ -13,23 +13,19 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSyncFeedbackToAdminNotifications } from "@/components/admin/admin-notifications";
 import { AdminPage } from "@/components/admin/admin-primitives";
 import { ensureAdminSession } from "@/components/admin/admin-session";
-import { PromoCodeActivationsCard } from "@/components/promo-code-activations-card";
-import { PromoCodesActionsMenuPortal } from "@/components/promo-codes-actions-menu-portal";
+import { PromoCodesViewOverlays } from "@/components/promo-codes-view-overlays";
+import { PromoCodesViewWorkspace } from "@/components/promo-codes-view-workspace";
 import {
-  PromoCodesArchiveDialog,
   PromoCodesErrorState,
   PromoCodesLoadingState,
   PromoCodesViewChrome,
 } from "@/components/promo-codes-view.chrome";
-import { PromoCodesEditorDrawer } from "@/components/promo-codes-editor-drawer";
-import { PromoCodesListCard } from "@/components/promo-codes-list-card";
 import { getPromoCodesViewText } from "@/components/promo-codes-view.content";
 import {
   buildPromoCodesCsv,
   copyTextToClipboard,
   createDefaultPromoForm,
   createGeneratedPromoCode,
-  formatNumber,
   getPromoStatus,
   toCreatePayload,
   toPromoForm,
@@ -42,7 +38,6 @@ import {
 } from "@/components/promo-codes-view.helpers";
 import styles from "@/components/promo-codes-view.module.css";
 import { buildPromoCodesViewOptions } from "@/components/promo-codes-view.options";
-import { Button } from "@/components/ui/button";
 import { usePromoActionsMenu } from "@/components/use-promo-actions-menu";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
@@ -619,11 +614,14 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
     }
 
     try {
-      await copyTextToClipboard(code);
+      await copyTextToClipboard(code, text.promoCodesCopyError);
       setFeedback({ tone: "info", message: text.promoCodesCopied });
     } catch (error) {
       clientLogger.warn("promo.copy_failed", getPromoClientErrorDetails(error));
-      setFeedback({ tone: "danger", message: text.promoCodesUpdateError });
+      setFeedback({
+        tone: "danger",
+        message: getAdminErrorMessage(error, text.promoCodesCopyError),
+      });
     }
     closeActionsMenu();
   }
@@ -863,7 +861,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
       />
 
       <div className={styles.workspace}>
-        <PromoCodesListCard
+        <PromoCodesViewWorkspace
           text={text}
           promoText={promoText}
           locale={locale}
@@ -880,10 +878,9 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           hasCodes={hasCodes}
           hasFilteredCodes={hasFilteredCodes}
           canManagePromoCodes={canManagePromoCodes}
-          promoCodesActionLocked={isMutating}
-          promoCodesQueryIsFetching={isPromoRefreshFetching}
-          promoCodesQueryIsRefreshing={isPromoCodesRefreshing}
-          autoRefreshMs={PROMO_CODES_AUTO_REFRESH_MS}
+          isMutating={isMutating}
+          isPromoRefreshFetching={isPromoRefreshFetching}
+          isPromoCodesRefreshing={isPromoCodesRefreshing}
           dataUpdatedAt={promoCodesQuery.dataUpdatedAt}
           pagedCodes={pagedCodes}
           selectedCodeId={selectedCodeId}
@@ -896,6 +893,18 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           shownRangeStart={shownRangeStart}
           shownRangeEnd={shownRangeEnd}
           pageSize={pageSize}
+          selectedCode={selectedCode}
+          selectedStatusLabel={selectedStatus?.label}
+          activationsIsLoading={activationsQuery.isLoading || isActivationsRefreshing}
+          activationsIsError={activationsQuery.isError}
+          activationsIsFetching={activationsQuery.isFetching}
+          redemptionsForView={redemptionsForView}
+          selectedUsersById={selectedUsersById}
+          hasAnyRedemptions={hasAnyRedemptions}
+          showAllActivations={showAllActivations}
+          canExpandActivations={canExpandActivations}
+          canGoToPreviousActivationsPage={canGoToPreviousActivationsPage}
+          canGoToNextActivationsPage={canGoToNextActivationsPage}
           onStatusTabChange={(value) => {
             setStatusFilter(value);
             resetSelectedPromoCode();
@@ -934,23 +943,6 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
           onPreviousPage={() => resetSelectedPromoCode(Math.max(1, currentPage - 1))}
           onNextPage={() => resetSelectedPromoCode(Math.min(totalPages, currentPage + 1))}
           onSelectPage={resetSelectedPromoCode}
-        />
-
-        <PromoCodeActivationsCard
-          text={text}
-          locale={locale}
-          selectedCode={selectedCode}
-          selectedStatusLabel={selectedStatus?.label}
-          activationsIsLoading={activationsQuery.isLoading || isActivationsRefreshing}
-          activationsIsError={activationsQuery.isError}
-          activationsIsFetching={activationsQuery.isFetching}
-          redemptionsForView={redemptionsForView}
-          selectedUsersById={selectedUsersById}
-          hasAnyRedemptions={hasAnyRedemptions}
-          showAllActivations={showAllActivations}
-          canExpandActivations={canExpandActivations}
-          canGoToPreviousActivationsPage={canGoToPreviousActivationsPage}
-          canGoToNextActivationsPage={canGoToNextActivationsPage}
           onRefetchActivations={activationsQuery.refetch}
           onShowAllActivations={() => {
             setShowAllActivations(true);
@@ -967,7 +959,7 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         />
       </div>
 
-      <PromoCodesActionsMenuPortal
+      <PromoCodesViewOverlays
         actionsMenuCode={actionsMenuCode}
         actionsMenuPosition={actionsMenuPosition}
         text={text}
@@ -980,33 +972,24 @@ export function PromoCodesView({ locale }: { locale: Locale }) {
         onEdit={handleOpenEditPanel}
         onToggleState={handleToggleCodeState}
         onArchive={requestArchiveCode}
-      />
-
-      <PromoCodesEditorDrawer
-        isOpen={isEditorOpen}
+        isEditorOpen={isEditorOpen}
         panelMode={panelMode}
-        text={text}
         form={form}
         setForm={setForm}
         formStatusOptions={formStatusOptions}
         selectedCode={selectedCode}
         isMutating={isMutating}
         onSubmit={handleSubmit}
-        onClose={handleCloseEditor}
-        onReset={handleResetPanel}
+        onCloseEditor={handleCloseEditor}
+        onResetEditor={handleResetPanel}
         onGenerateCode={handleGenerateCode}
-        onToggleCodeState={handleToggleCodeState}
-      />
-
-      <PromoCodesArchiveDialog
-        archiveActionLabel={archiveActionLabel}
-        cancelLabel={promoText.archiveCancelLabel}
-        archiveConfirmText={text.promoCodesArchiveConfirm}
         codePendingArchive={codePendingArchive}
+        archiveActionLabel={archiveActionLabel}
+        archiveCancelLabel={promoText.archiveCancelLabel}
+        archiveConfirmText={text.promoCodesArchiveConfirm}
         busyCodeId={busyCodeId}
-        isMutating={isMutating}
-        onCancel={() => setCodePendingArchive(null)}
-        onConfirm={() => {
+        onCancelArchive={() => setCodePendingArchive(null)}
+        onConfirmArchive={() => {
           if (!codePendingArchive) {
             return;
           }

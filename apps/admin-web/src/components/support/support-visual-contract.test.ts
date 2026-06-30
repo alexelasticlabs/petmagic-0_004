@@ -5,12 +5,47 @@ import { describe, expect, it } from "vitest";
 import { readSupportConversationPageLibrarySource } from "./support-conversation-page.test-source";
 import { readSupportInfoPanelLibrarySource } from "./support-info-panel.test-source";
 
-const supportStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
+const supportPageStylesPath = fileURLToPath(new URL("./support-page.module.css", import.meta.url));
+const supportInfoPanelStylesPath = fileURLToPath(
+  new URL("./support-info-panel.module.css", import.meta.url)
+);
+const supportQueuePaneStylesPath = fileURLToPath(
+  new URL("./support-conversation-queue-pane.module.css", import.meta.url)
+);
+const supportChatContentStylesPath = fileURLToPath(
+  new URL("./support-conversation-chat-content.module.css", import.meta.url)
+);
+const supportChatPaneStylesPath = fileURLToPath(
+  new URL("./support-conversation-chat-pane.module.css", import.meta.url)
+);
+const supportFullscreenViewerStylesPath = fileURLToPath(
+  new URL("./support-conversation-fullscreen-viewer.module.css", import.meta.url)
+);
 
 const adminIconsPath = fileURLToPath(new URL("../admin/admin-icons.tsx", import.meta.url));
 
-function readSupportStyles(): string {
-  return readFileSync(supportStylesPath, "utf8");
+function readSupportPageStyles(): string {
+  return readFileSync(supportPageStylesPath, "utf8");
+}
+
+function readSupportInfoPanelStyles(): string {
+  return readFileSync(supportInfoPanelStylesPath, "utf8");
+}
+
+function readSupportQueuePaneStyles(): string {
+  return readFileSync(supportQueuePaneStylesPath, "utf8");
+}
+
+function readSupportChatContentStyles(): string {
+  return readFileSync(supportChatContentStylesPath, "utf8");
+}
+
+function readSupportChatPaneStyles(): string {
+  return readFileSync(supportChatPaneStylesPath, "utf8");
+}
+
+function readSupportFullscreenViewerStyles(): string {
+  return readFileSync(supportFullscreenViewerStylesPath, "utf8");
 }
 
 function sliceBetween(source: string, startMarker: string, endMarker: string): string {
@@ -27,7 +62,10 @@ describe("support visual contract", () => {
   it("uses shared admin icons for support controls and attachment affordances", () => {
     const pageSource = readSupportConversationPageLibrarySource();
     const iconsSource = readFileSync(adminIconsPath, "utf8");
-    const stylesSource = readSupportStyles();
+    const stylesSource = readSupportPageStyles();
+    const chatContentStylesSource = readSupportChatContentStyles();
+    const chatPaneStylesSource = readSupportChatPaneStyles();
+    const queueStylesSource = readSupportQueuePaneStyles();
 
     expect(pageSource).toContain("SearchIcon");
     expect(pageSource).toContain("UploadIcon");
@@ -58,23 +96,23 @@ describe("support visual contract", () => {
     expect(iconsSource).toContain("export function FileIcon");
     expect(iconsSource).toContain("export function ReplyIcon");
     expect(iconsSource).toContain("export function CaretDownIcon");
-    expect(stylesSource).toContain(".dropOverlayIcon {");
-    expect(stylesSource).toContain("width: 40px;");
-    expect(stylesSource).toContain("height: 40px;");
-    expect(stylesSource).toContain(".composerIconSvg {");
+    expect(chatPaneStylesSource).toContain(".dropOverlayIcon {");
+    expect(chatPaneStylesSource).toContain("width: 40px;");
+    expect(chatPaneStylesSource).toContain("height: 40px;");
+    expect(chatPaneStylesSource).toContain(".composerIconSvg {");
     expect(stylesSource).toContain(".supportFileIcon {");
-    expect(stylesSource).toContain(".replyThumbSvg {");
-    expect(stylesSource).toContain(".messageReplyActionIcon {");
-    expect(stylesSource).toContain(".queueBadgeIcon {");
-    expect(stylesSource).toContain(".queueStatusIcon {");
-    expect(stylesSource).toContain(".queuePagerIcon {");
-    expect(stylesSource).toContain(".queuePagerIconPrevious {");
-    expect(stylesSource).toContain(".queuePagerIconNext {");
+    expect(chatContentStylesSource).toContain(".replyThumbSvg {");
+    expect(chatContentStylesSource).toContain(".messageReplyActionIcon {");
+    expect(queueStylesSource).toContain(".queueBadgeIcon {");
+    expect(queueStylesSource).toContain(".queueStatusIcon {");
+    expect(queueStylesSource).toContain(".queuePagerIcon {");
+    expect(queueStylesSource).toContain(".queuePagerIconPrevious {");
+    expect(queueStylesSource).toContain(".queuePagerIconNext {");
   });
 
   it("uses shared file icons for support info-panel attachment placeholders", () => {
     const infoPanelSource = readSupportInfoPanelLibrarySource();
-    const stylesSource = readSupportStyles();
+    const stylesSource = readSupportInfoPanelStyles();
 
     expect(infoPanelSource).toContain("FileIcon");
     expect(infoPanelSource).toContain("className={styles.supportFileIcon}");
@@ -84,11 +122,11 @@ describe("support visual contract", () => {
   });
 
   it("keeps the primary workspace status layer on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportQueuePaneStyles();
     const primaryWorkspaceStatusLayer = sliceBetween(
       source,
       ".slaPill_good",
-      ".messageVideoButton"
+      ".queueRowDetailLine"
     );
 
     expect(primaryWorkspaceStatusLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -100,23 +138,19 @@ describe("support visual contract", () => {
     );
     expect(primaryWorkspaceStatusLayer).toContain("color: var(--danger-soft-fg);");
     expect(primaryWorkspaceStatusLayer).toContain(
-      "border-color: color-mix(in srgb, var(--success) 65%, var(--border-soft)) !important;"
+      "border-color: color-mix(in srgb, var(--warning) 28%, var(--border-soft));"
     );
     expect(primaryWorkspaceStatusLayer).toContain(
-      "background: color-mix(in srgb, var(--info) 14%, var(--surface-2));"
+      "background: color-mix(in srgb, var(--warning) 12%, var(--danger-soft-bg));"
     );
     expect(primaryWorkspaceStatusLayer).toContain(
-      "background: color-mix(in srgb, var(--warning) 85%, transparent);"
+      "animation: pulseSlaRing 2s ease-in-out infinite;"
     );
   });
 
   it("keeps message bubbles and attachment states on semantic theme tokens", () => {
-    const source = readSupportStyles();
-    const messageAndAttachmentLayer = sliceBetween(
-      source,
-      ".messageVideoButton",
-      ".messageSenderWrap"
-    );
+    const source = readSupportChatContentStyles();
+    const messageAndAttachmentLayer = source;
 
     expect(messageAndAttachmentLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(messageAndAttachmentLayer).not.toContain("rgba(");
@@ -143,49 +177,58 @@ describe("support visual contract", () => {
   });
 
   it("keeps reply previews and composer reply state theme-aware", () => {
-    const source = readSupportStyles();
-    const replyComposerLayer = sliceBetween(source, ".messageTick", ".attachmentPreviewCard");
+    const pageSource = readSupportChatContentStyles();
+    const paneSource = readSupportChatPaneStyles();
+    const replyStateLayer = sliceBetween(
+      pageSource,
+      ".messageTick",
+      "/* ── Telegram-like support chat media/composer refinements ── */"
+    );
+    const composerReplyLayer = sliceBetween(paneSource, ".composerReplyPreview", ".closedComposerNotice");
 
-    expect(replyComposerLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(replyComposerLayer).not.toContain("rgba(");
-    expect(replyComposerLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(replyStateLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(replyStateLayer).not.toContain("rgba(");
+    expect(replyStateLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(composerReplyLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(composerReplyLayer).not.toContain("rgba(");
+    expect(composerReplyLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(replyComposerLayer).toContain("letter-spacing: 0;");
-    expect(replyComposerLayer).toContain(
+    expect(replyStateLayer).toContain("letter-spacing: 0;");
+    expect(replyStateLayer).toContain(
       "color: color-mix(in srgb, var(--success) 82%, var(--text-strong));"
     );
-    expect(replyComposerLayer).toContain(
+    expect(replyStateLayer).toContain(
       "background: color-mix(in srgb, var(--success) 9%, var(--surface-2));"
     );
-    expect(replyComposerLayer).toContain(
+    expect(replyStateLayer).toContain(
       "border: 1px dashed color-mix(in srgb, var(--text-muted) 42%, var(--border-soft));"
     );
-    expect(replyComposerLayer).toContain(
+    expect(composerReplyLayer).toContain(
       "border: 1px solid color-mix(in srgb, var(--success) 22%, var(--border-soft));"
     );
-    expect(replyComposerLayer).toContain(
+    expect(composerReplyLayer).toContain(
       "border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));"
     );
   });
 
   it("keeps support inbox rows on compact admin radii", () => {
-    const source = readSupportStyles();
+    const source = readSupportQueuePaneStyles();
     const conversationRowLayer = sliceBetween(
       source,
       ".conversationRow {",
       ".conversationRowButton"
     );
 
-    expect(conversationRowLayer).toContain("border-radius: var(--radius-sm);");
+    expect(conversationRowLayer).toContain("border-radius: 16px;");
     expect(conversationRowLayer).not.toContain("border-radius: 0.9rem;");
   });
 
   it("keeps attachment previews and side panel actions theme-aware", () => {
-    const source = readSupportStyles();
+    const source = readSupportChatPaneStyles();
     const attachmentAndSidePanelLayer = sliceBetween(
       source,
       ".attachmentPreviewImage",
-      ".userSummaryHeader"
+      ".closedComposerNotice"
     );
 
     expect(attachmentAndSidePanelLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -195,81 +238,71 @@ describe("support visual contract", () => {
     expect(attachmentAndSidePanelLayer).toContain(
       "border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, var(--border-soft));"
     );
+    expect(attachmentAndSidePanelLayer).toContain("background: var(--surface-2);");
+    expect(attachmentAndSidePanelLayer).toContain("color: var(--text-soft);");
     expect(attachmentAndSidePanelLayer).toContain(
+      "border-color: color-mix(in srgb, var(--success) 36%, var(--border-soft));"
+    );
+    expect(attachmentAndSidePanelLayer).toContain(
+      "background: color-mix(in srgb, var(--success) 9%, var(--surface-2));"
+    );
+  });
+
+  it("keeps support attachment preview tiles theme-aware", () => {
+    const source = readSupportInfoPanelStyles();
+    const attachmentPreviewLayer = sliceBetween(
+      source,
+      ".infoPanelAttachmentPreviewStrip",
+      ".infoPanelTagAddChip"
+    );
+
+    expect(attachmentPreviewLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(attachmentPreviewLayer).not.toContain("rgba(");
+    expect(attachmentPreviewLayer).not.toMatch(/letter-spacing:\s*-/);
+
+    expect(attachmentPreviewLayer).toContain(
+      "border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));"
+    );
+    expect(attachmentPreviewLayer).toContain(
       "background: color-mix(in srgb, var(--surface-2) 86%, var(--text-muted) 14%);"
     );
-    expect(attachmentAndSidePanelLayer).toContain("color: var(--danger-soft-fg);");
-    expect(attachmentAndSidePanelLayer).toContain(
-      "border-color: color-mix(in srgb, var(--danger) 58%, var(--border-soft)) !important;"
+    expect(attachmentPreviewLayer).toContain(
+      "box-shadow: 0 3px 10px color-mix(in srgb, var(--surface-0) 14%, transparent);"
     );
-    expect(attachmentAndSidePanelLayer).toContain(
-      "background: color-mix(in srgb, var(--success) 12%, var(--surface-2));"
+    expect(attachmentPreviewLayer).toContain(
+      "background: color-mix(in srgb, var(--surface-0) 84%, transparent);"
     );
   });
 
-  it("keeps support template and attachment side-panel lists theme-aware", () => {
-    const source = readSupportStyles();
-    const sidePanelListsLayer = sliceBetween(
+  it("keeps support info-panel stats and action stack theme-aware", () => {
+    const source = readSupportInfoPanelStyles();
+    const infoPanelStatsLayer = sliceBetween(
       source,
-      ".templateListItem",
-      "@media (max-width: 1320px)"
+      ".infoPanelStatsGrid",
+      ':global(:root[data-theme="light"]) .timelineCardHeader span'
     );
 
-    expect(sidePanelListsLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(sidePanelListsLayer).not.toContain("rgba(");
-    expect(sidePanelListsLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(infoPanelStatsLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(infoPanelStatsLayer).not.toContain("rgba(");
+    expect(infoPanelStatsLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(sidePanelListsLayer).toContain(
-      "background: color-mix(in srgb, var(--surface-1) 94%, var(--surface-2));"
+    expect(infoPanelStatsLayer).toContain(
+      "background: linear-gradient(180deg, var(--surface-1), var(--surface-2));"
     );
-    expect(sidePanelListsLayer).toContain(
-      "border-color: color-mix(in srgb, var(--success) 72%, var(--border-soft));"
+    expect(infoPanelStatsLayer).toContain(
+      "box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text-inverse) 7%, transparent);"
     );
-    expect(sidePanelListsLayer).toContain(
-      "box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 24%, transparent);"
-    );
-    expect(sidePanelListsLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--text-inverse) 8%, var(--border-soft));"
-    );
+    expect(infoPanelStatsLayer).toContain("color: var(--text-strong);");
+    expect(infoPanelStatsLayer).toContain("width: 100%;");
   });
 
-  it("keeps side-panel identity and status controls theme-aware", () => {
-    const source = readSupportStyles();
-    const sidePanelIdentityLayer = sliceBetween(source, ".spAvatarMd", ".spTabNav");
-
-    expect(sidePanelIdentityLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(sidePanelIdentityLayer).not.toContain("rgba(");
-    expect(sidePanelIdentityLayer).not.toMatch(/letter-spacing:\s*-/);
-
-    expect(sidePanelIdentityLayer).toContain("color: var(--accent);");
-    expect(sidePanelIdentityLayer).toContain(
-      "color-mix(in srgb, var(--accent) 18%, var(--surface-2)) 0%,"
-    );
-    expect(sidePanelIdentityLayer).toContain(
-      "border-color: color-mix(in srgb, var(--warning) 32%, var(--border-soft));"
-    );
-    expect(sidePanelIdentityLayer).toContain("color: var(--danger);");
-    expect(sidePanelIdentityLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));"
-    );
-  });
-
-  it("keeps side-panel tabs theme-aware across hover, active, and dark overrides", () => {
-    const source = readSupportStyles();
-    const sidePanelTabLayer = sliceBetween(source, ".spTabNav", ".spContent");
-    const darkTabOverrideLayer = sliceBetween(
-      source,
-      ':global(:root:not([data-theme="light"])) .queueSubFilters',
-      ':global(:root:not([data-theme="light"])) .conversationRow'
-    );
+  it("keeps side-panel tabs theme-aware across hover and active states", () => {
+    const source = readSupportInfoPanelStyles();
+    const sidePanelTabLayer = sliceBetween(source, ".sidePanelTabs", ".infoPanelFlat");
 
     expect(sidePanelTabLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(sidePanelTabLayer).not.toContain("rgba(");
     expect(sidePanelTabLayer).not.toMatch(/letter-spacing:\s*-/);
-
-    expect(darkTabOverrideLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(darkTabOverrideLayer).not.toContain("rgba(");
-    expect(darkTabOverrideLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(sidePanelTabLayer).toContain(
       "background: color-mix(in srgb, var(--surface-1) 72%, var(--surface-2));"
@@ -280,33 +313,40 @@ describe("support visual contract", () => {
     expect(sidePanelTabLayer).toContain(
       "0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);"
     );
-    expect(darkTabOverrideLayer).toContain(
-      "background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0) 12%);"
-    );
-    expect(darkTabOverrideLayer).toContain(
-      "0 1px 2px color-mix(in srgb, var(--surface-0) 44%, transparent),"
-    );
   });
 
-  it("keeps side-panel content rows, links, and danger disclosure tokenized", () => {
-    const source = readSupportStyles();
-    const sidePanelContentLayer = sliceBetween(source, ".spContent", "@media (max-width: 640px)");
+  it("keeps info-panel content rows and tags tokenized", () => {
+    const source = readSupportInfoPanelStyles();
+    const infoPanelContentLayer = sliceBetween(
+      source,
+      ".infoPanelSectionTitle",
+      ".infoPanelStatsGrid"
+    );
 
-    expect(sidePanelContentLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(sidePanelContentLayer).not.toContain("rgba(");
-    expect(sidePanelContentLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(infoPanelContentLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(infoPanelContentLayer).not.toContain("rgba(");
+    expect(infoPanelContentLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(sidePanelContentLayer).toContain("border-bottom: 1px solid var(--border-soft);");
-    expect(sidePanelContentLayer).toContain("background: var(--surface-2);");
-    expect(sidePanelContentLayer).toContain("color: var(--danger-soft-fg);");
-    expect(sidePanelContentLayer).toContain("color: var(--danger);");
+    expect(infoPanelContentLayer).toContain("color: var(--accent);");
+    expect(infoPanelContentLayer).toContain("background: var(--surface-1);");
+    expect(infoPanelContentLayer).toContain(
+      "color: color-mix(in srgb, var(--accent) 66%, var(--text-strong) 34%);"
+    );
+    expect(infoPanelContentLayer).toContain(
+      "border-color: color-mix(in srgb, var(--accent) 30%, var(--border-soft));"
+    );
   });
 
   it("keeps support form fields accessible in keyboard and disabled states", () => {
-    const source = readSupportStyles();
-    const inboxFieldLayer = sliceBetween(source, ".searchInput,", ".inboxQueueGrid");
-    const queueToolLayer = sliceBetween(source, ".queueToolField select", ".list");
-    const infoPanelFieldLayer = sliceBetween(source, ".infoPanelSelect", ".infoPanelTagsWrap");
+    const source = readSupportPageStyles();
+    const queueSource = readSupportQueuePaneStyles();
+    const inboxFieldLayer = sliceBetween(source, ".searchInput,", ".supportFileIcon {");
+    const queueToolLayer = sliceBetween(queueSource, ".queueToolField select", ".list");
+    const infoPanelFieldLayer = sliceBetween(
+      readSupportInfoPanelStyles(),
+      ".infoPanelSelect",
+      ".infoPanelStatsGrid"
+    );
 
     expect(inboxFieldLayer).toContain(
       ".searchInput:focus-visible,\n.input:focus-visible,\n.textarea:focus-visible"
@@ -334,88 +374,70 @@ describe("support visual contract", () => {
   });
 
   it("keeps support media viewer, keyboard focus, and local scrollbars theme-aware", () => {
-    const source = readSupportStyles();
-    const mediaFocusScrollLayer = sliceBetween(
-      source,
-      ".imageViewerOverlay",
-      "/* Keep support workspace fully dark when theme is dark/default-dark. */"
-    );
-    const lightShellLayer = sliceBetween(
-      source,
-      ':global(:root[data-theme="light"]) .inboxPane',
-      "/* ── 4-column Full View Layout ── */"
-    );
+    const viewerSource = readSupportFullscreenViewerStyles();
+    const source = readSupportChatContentStyles();
+    const mediaViewerLayer = viewerSource;
     const listScrollbarLayer = sliceBetween(
-      source,
-      ".templateCatalogList,\n.attachmentList",
-      "/* ── prefers-reduced-motion ── */"
+      readSupportInfoPanelStyles(),
+      ".attachmentList",
+      ".spConfirmBox"
     );
 
-    expect(mediaFocusScrollLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(mediaFocusScrollLayer).not.toContain("rgba(");
-    expect(mediaFocusScrollLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(mediaViewerLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(mediaViewerLayer).not.toContain("rgba(");
+    expect(mediaViewerLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(listScrollbarLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(listScrollbarLayer).not.toContain("rgba(");
 
-    expect(lightShellLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(lightShellLayer).not.toContain("rgba(");
-
-    expect(mediaFocusScrollLayer).toContain(
+    expect(mediaViewerLayer).toContain(
       "border: 1px solid color-mix(in srgb, var(--success) 26%, var(--border-soft));"
     );
-    expect(mediaFocusScrollLayer).toContain(
+    expect(mediaViewerLayer).toContain(
       "box-shadow: 0 24px 60px color-mix(in srgb, var(--surface-0) 46%, transparent);"
     );
-    expect(mediaFocusScrollLayer).toContain(
-      "outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);"
-    );
-    expect(mediaFocusScrollLayer).toContain(
+    expect(source).toContain("outline: 2px solid color-mix(in srgb, var(--success) 72%, transparent);");
+    expect(source).toContain(
       "scrollbar-color: color-mix(in srgb, var(--success) 22%, transparent) transparent;"
     );
     expect(listScrollbarLayer).toContain(
       "scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;"
     );
-    expect(lightShellLayer).toContain("color-mix(in srgb, var(--surface-1) 98%, transparent)");
   });
 
   it("keeps redesigned support queue identity and danger actions theme-aware", () => {
-    const source = readSupportStyles();
-    const queueIdentityActionLayer = sliceBetween(
-      source,
-      "/* ── Queue Sub-filter tabs ── */",
-      "/* ── Responsive: Full View ── */"
-    );
+    const queueIdentityActionLayer = readSupportQueuePaneStyles();
 
     expect(queueIdentityActionLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueIdentityActionLayer).not.toContain("rgba(");
     expect(queueIdentityActionLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(queueIdentityActionLayer).toContain(
-      "box-shadow: 0 1px 3px color-mix(in srgb, var(--surface-0) 18%, transparent);"
+      "box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);"
     );
-    expect(queueIdentityActionLayer).toContain("background: var(--accent);");
-    expect(queueIdentityActionLayer).toContain("background: var(--info);");
-    expect(queueIdentityActionLayer).toContain("background: var(--success);");
-    expect(queueIdentityActionLayer).toContain("background: var(--warning);");
-    expect(queueIdentityActionLayer).toContain("color: var(--danger);");
+    expect(queueIdentityActionLayer).toContain("background: linear-gradient(");
     expect(queueIdentityActionLayer).toContain(
-      "scrollbar-color: color-mix(in srgb, var(--text-muted) 30%, transparent) transparent;"
+      "background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));"
+    );
+    expect(queueIdentityActionLayer).toContain(
+      "background: color-mix(in srgb, var(--success) 15%, var(--surface-2));"
+    );
+    expect(queueIdentityActionLayer).toContain(
+      "background: color-mix(in srgb, var(--warning) 17%, var(--surface-2));"
     );
     expect(queueIdentityActionLayer).toContain("color: var(--accent);");
-    expect(queueIdentityActionLayer).toContain("color: var(--danger-soft-fg);");
+    expect(queueIdentityActionLayer).toContain("color: var(--text-strong);");
+    expect(queueIdentityActionLayer).toContain("color: var(--text-muted);");
     expect(queueIdentityActionLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border-soft));"
+      "color-mix(in srgb, var(--accent) 78%, var(--text-strong))"
+    );
+    expect(queueIdentityActionLayer).toContain(
+      "border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);"
     );
   });
 
   it("keeps final support workspace polish theme-token based", () => {
-    const source = readSupportStyles();
-    const finalWorkspacePolishLayer = sliceBetween(
-      source,
-      "/* Final support workspace polish */",
-      "/* Final chat readability and alignment fixes */"
-    );
+    const finalWorkspacePolishLayer = readSupportChatPaneStyles();
 
     expect(finalWorkspacePolishLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(finalWorkspacePolishLayer).not.toContain("rgba(");
@@ -426,18 +448,13 @@ describe("support visual contract", () => {
       "border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft)) !important;"
     );
     expect(finalWorkspacePolishLayer).toContain(
-      "background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));"
-    );
-    expect(finalWorkspacePolishLayer).toContain("color: var(--text-muted);");
-    expect(finalWorkspacePolishLayer).toContain("color: var(--text-soft);");
-    expect(finalWorkspacePolishLayer).toContain("letter-spacing: 0;");
-    expect(finalWorkspacePolishLayer).toContain(
-      "border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));"
+      "0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent) !important;"
     );
   });
 
   it("keeps support workspace typography readable without decorative tracking", () => {
-    const source = readSupportStyles();
+    const source = `${readSupportPageStyles()}\n${readSupportChatContentStyles()}`;
+    const queueSource = readSupportQueuePaneStyles();
     const nonZeroLetterSpacingRules = [...source.matchAll(/letter-spacing:\s*([^;]+);/g)]
       .map((match) => match[1].trim())
       .filter((value) => value !== "0");
@@ -449,12 +466,12 @@ describe("support visual contract", () => {
     expect(source).toContain(".supportPageTitle {");
     expect(source).toContain("font-size: 1.9rem;");
     expect(source).toContain("font-size: 1.52rem;");
-    expect(source).toContain(".queuePaneTitle {");
     expect(source).toContain(".chatHeaderNameRow strong {");
+    expect(queueSource).toContain(".queuePaneTitle {");
   });
 
   it("keeps final support chat readability styles on semantic tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportChatContentStyles();
     const finalChatReadabilityLayer = sliceBetween(
       source,
       "/* Final chat readability and alignment fixes */",
@@ -470,7 +487,6 @@ describe("support visual contract", () => {
       "color-mix(in srgb, var(--surface-2) 82%, var(--surface-1))"
     );
     expect(finalChatReadabilityLayer).toContain("color: var(--text-muted);");
-    expect(finalChatReadabilityLayer).toContain("letter-spacing: 0;");
     expect(finalChatReadabilityLayer).toContain("color: var(--text-strong);");
     expect(finalChatReadabilityLayer).toContain(
       "border-color: color-mix(in srgb, var(--success) 38%, var(--border-soft));"
@@ -481,33 +497,28 @@ describe("support visual contract", () => {
   });
 
   it("keeps late support workspace height rules viewport-safe on tablet and mobile", () => {
-    const source = readSupportStyles();
-    const finalChatReadabilityLayer = sliceBetween(
-      source,
-      "/* Final chat readability and alignment fixes */",
-      "/* Late dark-theme support workspace overrides must stay below final polish rules. */"
-    );
+    const source = readSupportChatPaneStyles();
+    const queueSource = readSupportQueuePaneStyles();
 
     expect(source).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
-    expect(source).toContain("height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
-    expect(finalChatReadabilityLayer).toContain("@media (max-width: 1180px) {");
-    expect(finalChatReadabilityLayer).toContain(
-      ".inboxPaneFlat,\n  .chatShell,\n  .infoPanelFlat {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }"
-    );
-    expect(finalChatReadabilityLayer).toContain("@media (max-width: 780px) {");
-    expect(finalChatReadabilityLayer).toContain("border-radius: 1rem;");
-    expect(finalChatReadabilityLayer).not.toContain(
+    expect(queueSource).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(queueSource).toContain("height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
+    expect(source).toContain("@media (max-width: 1180px) {");
+    expect(source).toContain(".chatShell {\n    min-height: auto;\n    height: auto;\n    max-height: none;\n  }");
+    expect(source).toContain("@media (max-width: 780px) {");
+    expect(source).toContain("border-radius: 1rem;");
+    expect(source).not.toContain(
       "height: clamp(42rem, calc(100dvh - 9rem), 52rem);"
     );
     expect(source).not.toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
   });
 
   it("keeps late light-theme support status overrides tokenized", () => {
-    const source = readSupportStyles();
+    const source = readSupportQueuePaneStyles();
     const lateLightStatusLayer = sliceBetween(
       source,
       ':global(:root[data-theme="light"]) .paneCountBadge',
-      "/* ── Avatar Color Variants (hash-based per user) ── */"
+      ':global(:root:not([data-theme="light"])) .inboxPaneFlat'
     );
 
     expect(lateLightStatusLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -523,16 +534,16 @@ describe("support visual contract", () => {
       "border-color: color-mix(in srgb, var(--danger) 22%, var(--border-soft));"
     );
     expect(lateLightStatusLayer).toContain(
-      "background: color-mix(in srgb, var(--info) 9%, var(--surface-1));"
+      "background: color-mix(in srgb, var(--surface-1) 88%, var(--success) 12%);"
     );
   });
 
   it("keeps hash-based support avatar variants on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportChatContentStyles();
     const avatarVariantLayer = sliceBetween(
       source,
       "/* ── Avatar Color Variants (hash-based per user) ── */",
-      "/* ── Queue Footer ── */"
+      ".messagesWrap {"
     );
 
     expect(avatarVariantLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -556,69 +567,73 @@ describe("support visual contract", () => {
   });
 
   it("keeps support composer and media reply refinements theme-aware", () => {
-    const source = readSupportStyles();
-    const composerMediaLayer = sliceBetween(
-      source,
-      "/* ── Composer Bottom Toolbar ── */",
-      "/* ── Queue Panel Refresh ── */"
+    const pageSource = readSupportChatContentStyles();
+    const paneSource = readSupportChatPaneStyles();
+    const mediaReplyLayer = sliceBetween(
+      pageSource,
+      "/* ── Telegram-like support chat media/composer refinements ── */",
+      "/* Final chat readability and alignment fixes */"
     );
+    const composerPaneLayer = sliceBetween(paneSource, ".composerIconBtn {", "@media (min-width: 1600px) {");
 
-    expect(composerMediaLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
-    expect(composerMediaLayer).not.toContain("rgba(");
-    expect(composerMediaLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(mediaReplyLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(mediaReplyLayer).not.toContain("rgba(");
+    expect(mediaReplyLayer).not.toMatch(/letter-spacing:\s*-/);
+    expect(composerPaneLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
+    expect(composerPaneLayer).not.toContain("rgba(");
+    expect(composerPaneLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(composerMediaLayer).toContain("color: var(--accent);");
-    expect(composerMediaLayer).toContain("color: var(--danger);");
-    expect(composerMediaLayer).toContain("color: var(--success);");
-    expect(composerMediaLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border-soft));"
-    );
-    expect(composerMediaLayer).toContain(
+    expect(composerPaneLayer).toContain("color: var(--text-muted);");
+    expect(composerPaneLayer).toContain("background: transparent;");
+    expect(mediaReplyLayer).toContain(
       "background: color-mix(in srgb, var(--surface-0) 76%, transparent);"
     );
-    expect(composerMediaLayer).toContain(
+    expect(mediaReplyLayer).toContain(
       "background: color-mix(in srgb, var(--surface-2) 78%, var(--success) 22%);"
     );
-    expect(composerMediaLayer).toContain(
+    expect(mediaReplyLayer).toContain(
+      "background: color-mix(in srgb, var(--success) 10%, var(--surface-2));"
+    );
+    expect(composerPaneLayer).toContain(
       "background: color-mix(in srgb, var(--text-muted) 10%, var(--surface-2));"
     );
   });
 
   it("keeps refreshed support queue panel chrome on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportQueuePaneStyles();
     const queueRefreshLayer = sliceBetween(
       source,
-      "/* ── Queue Panel Refresh ── */",
-      "/* ── Ticket Panel Redesign ── */"
+      ".inboxPaneFlat {",
+      ".conversationRow {"
     );
 
     expect(queueRefreshLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueRefreshLayer).not.toContain("rgba(");
     expect(queueRefreshLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(queueRefreshLayer).toContain("color-mix(in srgb, var(--success) 18%, var(--surface-2))");
+    expect(queueRefreshLayer).toContain("color-mix(in srgb, var(--accent) 14%, var(--surface-2))");
     expect(queueRefreshLayer).toContain(
-      "border-color: color-mix(in srgb, var(--success) 34%, var(--border-soft));"
+      "border: 1px solid color-mix(in srgb, var(--border-soft) 74%, transparent);"
     );
     expect(queueRefreshLayer).toContain(".queueToolField select:focus-visible");
     expect(queueRefreshLayer).toContain("box-shadow: var(--focus-ring);");
     expect(queueRefreshLayer).toContain(
-      "color-mix(in srgb, var(--surface-2) 78%, var(--surface-1) 22%)"
+      "color-mix(in srgb, var(--surface-2) 72%, var(--surface-0))"
     );
     expect(queueRefreshLayer).toContain(
-      "0 6px 16px color-mix(in srgb, var(--surface-0) 8%, transparent)"
+      "0 16px 32px color-mix(in srgb, var(--surface-0) 20%, transparent)"
     );
     expect(queueRefreshLayer).toContain(
-      "border-color: color-mix(in srgb, var(--success) 62%, var(--border-soft));"
+      "border-color: color-mix(in srgb, var(--text-muted) 72%, var(--border-soft));"
     );
   });
 
   it("keeps redesigned support ticket info panel on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportInfoPanelStyles();
     const ticketPanelLayer = sliceBetween(
       source,
-      "/* ── Ticket Panel Redesign ── */",
-      "/* ── Support Workspace Reference Refresh ── */"
+      ".infoPanelFlat",
+      "@media (max-width: 1180px)"
     );
 
     expect(ticketPanelLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -626,31 +641,31 @@ describe("support visual contract", () => {
     expect(ticketPanelLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(ticketPanelLayer).toContain(
-      "color-mix(in srgb, var(--surface-2) 82%, var(--surface-1) 18%)"
+      "color-mix(in srgb, var(--surface-2) 95%, var(--surface-1))"
     );
     expect(ticketPanelLayer).toContain(".infoPanelSelect:focus-visible");
     expect(ticketPanelLayer).toContain(".infoPanelTagInput:focus-visible");
     expect(ticketPanelLayer).toContain("box-shadow: var(--focus-ring);");
     expect(ticketPanelLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-soft));"
+      "border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft)) !important;"
     );
     expect(ticketPanelLayer).toContain(
-      "color: color-mix(in srgb, var(--success) 82%, var(--text-strong));"
+      "color: color-mix(in srgb, var(--accent) 66%, var(--text-strong) 34%);"
     );
     expect(ticketPanelLayer).toContain(
-      "border-color: color-mix(in srgb, var(--accent) 38%, var(--border-soft));"
+      "border-color: color-mix(in srgb, var(--border-soft) 82%, var(--surface-0));"
     );
     expect(ticketPanelLayer).toContain(
-      "box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent);"
+      "box-shadow: 0 6px 16px color-mix(in srgb, var(--surface-0) 44%, transparent);"
     );
   });
 
   it("keeps support reference header chrome on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportChatContentStyles();
     const referenceHeaderLayer = sliceBetween(
       source,
       "/* ── Support Workspace Reference Refresh ── */",
-      ".workspaceFullView {\n  grid-template-columns: minmax(16rem, 17.4rem)"
+      "/* ── Chat Header Redesign ── */"
     );
 
     expect(referenceHeaderLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -658,10 +673,7 @@ describe("support visual contract", () => {
     expect(referenceHeaderLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(referenceHeaderLayer).toContain(
-      "color: color-mix(in srgb, var(--text-muted) 84%, var(--success) 16%);"
-    );
-    expect(referenceHeaderLayer).toContain(
-      "background: color-mix(in srgb, var(--accent) 68%, var(--success) 32%);"
+      "color: color-mix(in srgb, var(--text-muted) 92%, var(--text-strong) 8%);"
     );
     expect(referenceHeaderLayer).toContain(
       "border: 1px solid color-mix(in srgb, var(--text-muted) 28%, var(--border-soft));"
@@ -669,16 +681,18 @@ describe("support visual contract", () => {
     expect(referenceHeaderLayer).toContain(
       "box-shadow: 0 14px 30px color-mix(in srgb, var(--surface-0) 6%, transparent);"
     );
-    expect(referenceHeaderLayer).toContain("background: var(--danger);");
-    expect(referenceHeaderLayer).toContain("color: var(--accent-contrast);");
+    expect(referenceHeaderLayer).toContain(
+      "background: color-mix(in srgb, var(--surface-2) 96%, var(--surface-1));"
+    );
+    expect(referenceHeaderLayer).toContain("color: var(--text-muted);");
   });
 
   it("keeps support workspace queue shell chrome on semantic theme tokens", () => {
-    const source = readSupportStyles();
+    const source = readSupportQueuePaneStyles();
     const queueShellLayer = sliceBetween(
       source,
-      ".workspaceFullView {\n  grid-template-columns: minmax(16rem, 17.4rem)",
-      ".queueSortRow"
+      ".inboxPaneFlat {",
+      ".queuePaneHeader {"
     );
 
     expect(queueShellLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
@@ -686,28 +700,25 @@ describe("support visual contract", () => {
     expect(queueShellLayer).not.toMatch(/letter-spacing:\s*-/);
 
     expect(queueShellLayer).toContain(
-      "border: 1px solid color-mix(in srgb, var(--text-muted) 26%, var(--border-soft));"
+      "border: 1px solid color-mix(in srgb, var(--text-muted) 34%, var(--border-soft));"
     );
     expect(queueShellLayer).toContain(
-      "box-shadow: 0 18px 40px color-mix(in srgb, var(--surface-0) 7%, transparent);"
+      "0 14px 30px color-mix(in srgb, var(--surface-0) 14%, transparent)"
     );
     expect(queueShellLayer).toContain(
-      "background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));"
+      "background: linear-gradient("
     );
     expect(queueShellLayer).toContain(
-      "background: color-mix(in srgb, var(--surface-2) 95%, var(--surface-1));"
+      "min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);"
     );
     expect(queueShellLayer).toContain(
-      "box-shadow: 0 6px 14px color-mix(in srgb, var(--surface-0) 8%, transparent);"
-    );
-    expect(queueShellLayer).toContain(
-      "background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));"
+      "border-radius: 24px;"
     );
   });
 
   it("keeps support queue counters and status pills on semantic theme tokens", () => {
-    const source = readSupportStyles();
-    const queueStatusLayer = sliceBetween(source, ".queueCountBadge", ".slaPill");
+    const source = readSupportQueuePaneStyles();
+    const queueStatusLayer = sliceBetween(source, ".queueCountBadge", ".queueRowDetailLine");
 
     expect(queueStatusLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(queueStatusLayer).not.toContain("rgba(");
@@ -727,38 +738,39 @@ describe("support visual contract", () => {
   });
 
   it("uses dynamic viewport heights for support workspace and media viewer panels", () => {
-    const source = readSupportStyles();
+    const source = readSupportChatPaneStyles();
+    const viewerSource = readSupportFullscreenViewerStyles();
 
     expect(source).toContain("height: clamp(38rem, calc(100dvh - 10rem), 66rem);");
-    expect(source).toContain("max-height: calc(100dvh - 2.4rem);");
-    expect(source).toContain("max-height: calc(100dvh - 14rem);");
     expect(source).toContain("min-height: clamp(34rem, calc(100dvh - 9rem), 52rem);");
     expect(source).not.toContain("min-height: clamp(42rem, calc(100dvh - 9rem), 52rem);");
     expect(source).not.toContain("100vh");
+    expect(viewerSource).toContain("max-height: calc(100dvh - 2.4rem);");
+    expect(viewerSource).toContain("max-height: calc(100dvh - 14rem);");
   });
 
   it("keeps late support workspace dark overrides below final polish styles", () => {
-    const source = readSupportStyles();
-    const finalPolishIndex = source.indexOf("/* Final support workspace polish */");
+    const source = readSupportChatContentStyles();
+    const queueSource = readSupportQueuePaneStyles();
     const finalChatPolishIndex = source.indexOf("/* Final chat readability and alignment fixes */");
     const lateDarkOverrideIndex = source.indexOf(
       "/* Late dark-theme support workspace overrides must stay below final polish rules. */"
     );
     const lateDarkOverrideLayer = source.slice(lateDarkOverrideIndex);
+    const queueDarkOverrideStart = queueSource.indexOf(
+      ':global(:root:not([data-theme="light"])) .inboxPaneFlat'
+    );
+    expect(queueDarkOverrideStart).toBeGreaterThanOrEqual(0);
+    const queueDarkOverrideLayer = queueSource.slice(queueDarkOverrideStart);
 
-    expect(finalPolishIndex).toBeGreaterThanOrEqual(0);
-    expect(finalChatPolishIndex).toBeGreaterThan(finalPolishIndex);
+    expect(finalChatPolishIndex).toBeGreaterThanOrEqual(0);
     expect(lateDarkOverrideIndex).toBeGreaterThan(finalChatPolishIndex);
     expect(lateDarkOverrideLayer).not.toMatch(/#[0-9a-fA-F]{3,8}/);
     expect(lateDarkOverrideLayer).not.toContain("rgba(");
     expect(lateDarkOverrideLayer).not.toMatch(/letter-spacing:\s*-/);
 
-    expect(lateDarkOverrideLayer).toContain(
-      ':global(:root:not([data-theme="light"])) .queueSubFilters'
-    );
-    expect(lateDarkOverrideLayer).toContain(
-      ':global(:root:not([data-theme="light"])) .conversationRow'
-    );
+    expect(queueDarkOverrideLayer).toContain(':global(:root:not([data-theme="light"])) .queueSubFilters');
+    expect(queueDarkOverrideLayer).toContain(':global(:root:not([data-theme="light"])) .conversationRow');
     expect(lateDarkOverrideLayer).toContain(
       ':global(:root:not([data-theme="light"])) .messagesWrap'
     );
@@ -769,7 +781,7 @@ describe("support visual contract", () => {
       "background: color-mix(in srgb, var(--surface-2) 88%, var(--surface-0));"
     );
     expect(lateDarkOverrideLayer).toContain(
-      "0 14px 30px color-mix(in srgb, var(--surface-0) 46%, transparent) !important;"
+      "0 1px 4px color-mix(in srgb, var(--surface-0) 40%, transparent);"
     );
   });
 });

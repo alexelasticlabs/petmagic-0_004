@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { MutableRefObject } from "react";
+
 
 import { CaretDownIcon, MoreHorizontalIcon } from "@/components/admin/admin-icons";
 import {
@@ -9,6 +9,9 @@ import {
   AdminStatusBadge,
   adminTableStyles,
 } from "@/components/admin/admin-primitives";
+import { Button } from "@/components/ui/button";
+import { UserAvatarView } from "@/components/users/user-avatar";
+import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import {
   accountStatusColors,
   getAccountStatus,
@@ -17,8 +20,7 @@ import {
   getUserRoleTone,
   premiumStatusColors,
 } from "@/components/users-management-page.helpers";
-import { Button } from "@/components/ui/button";
-import { UserAvatarView } from "@/components/users/user-avatar";
+import styles from "@/components/users-management-page.module.css";
 import type {
   AdminEconomyUserSubscriptionSummary,
   AdminUserAnalytics,
@@ -27,8 +29,8 @@ import type {
 import { formatDateTime } from "@/lib/format-date-time";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { maskEmail, sanitizeSensitiveText, shortIdentifier } from "@/lib/sensitive-display";
-import type { UsersManagementPageText } from "@/components/users-management-page.content";
-import styles from "@/components/users-management-page.module.css";
+
+import type { MutableRefObject } from "react";
 
 type UsersManagementUsersTableProps = {
   analyticsByUserId: Map<string, AdminUserAnalytics>;

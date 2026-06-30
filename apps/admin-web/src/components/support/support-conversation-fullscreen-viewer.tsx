@@ -1,5 +1,6 @@
 "use client";
 
+import styles from "@/components/support/support-conversation-fullscreen-viewer.module.css";
 import {
   formatDateTime,
   formatFileSize,
@@ -7,7 +8,6 @@ import {
 } from "@/components/support/support-conversation-helpers";
 import type { FullscreenImage } from "@/components/support/support-conversation-page.types";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import styles from "@/components/support/support-page.module.css";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import { Button } from "@/components/ui/button";
 import type { Locale } from "@/lib/i18n";

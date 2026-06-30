@@ -458,13 +458,13 @@ export function getUserLabels(userId: string, user?: AdminUserDetail) {
   };
 }
 
-export async function copyTextToClipboard(value: string) {
+export async function copyTextToClipboard(value: string, fallbackErrorMessage: string) {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(value);
       return;
     } catch {
-      // Fall back to the legacy path below; some browsers expose Clipboard API but reject writes.
+      // Fall back to the browser command path below when Clipboard API writes are rejected.
     }
   }
 
@@ -478,7 +478,7 @@ export async function copyTextToClipboard(value: string) {
   try {
     const copied = document.execCommand("copy");
     if (!copied) {
-      throw new Error("Clipboard fallback copy failed");
+      throw new Error(fallbackErrorMessage);
     }
   } finally {
     input.remove();

@@ -7,17 +7,17 @@ import {
   StatusPill,
   StepHeader,
 } from "@/components/templates/template-test-page.components";
+import type { TemplateTestPageText } from "@/components/templates/template-test-page.content";
 import {
   formatDateTime,
   formatTemplateTestDisplayText,
 } from "@/components/templates/template-test-page.helpers";
-import type { DetailItem, TimelineItem } from "@/components/templates/template-test-page.types";
 import styles from "@/components/templates/template-test-page.module.css";
-import { type AdminTemplateTestRun, type TemplateType } from "@/lib/api-client";
+import type { DetailItem, TimelineItem } from "@/components/templates/template-test-page.types";
+import type { AdminTemplateTestRun } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-import type { TemplateTestPageText } from "@/components/templates/template-test-page.content";
 
 export function TemplateTestPageHeader({
   canManageTemplates,

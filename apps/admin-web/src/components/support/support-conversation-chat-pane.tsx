@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
 
 import { FileIcon, PaperclipIcon, ReplyIcon, UploadIcon } from "@/components/admin/admin-icons";
 import { AdminCard } from "@/components/admin/admin-primitives";
@@ -8,24 +7,27 @@ import {
   SupportConversationChatHeader,
   SupportConversationMessages,
 } from "@/components/support/support-conversation-chat-content";
+import styles from "@/components/support/support-conversation-chat-pane.module.css";
 import {
   formatFileSize,
   formatSafeSupportDisplay,
   groupSupportConversationFeed,
 } from "@/components/support/support-conversation-helpers";
-import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import type {
   FullscreenImage,
   SupportMessage,
   SupportMessageAttachment,
 } from "@/components/support/support-conversation-page.types";
+import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
+import sharedStyles from "@/components/support/support-page.module.css";
 import { SupportSecureMedia } from "@/components/support/support-secure-media";
 import { statusHint, statusLabel } from "@/components/support/support-status-helpers";
 import { SUPPORT_REPLY_MAX_LENGTH } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import type { AdminSupportConversation, SupportConversationStatus } from "@/lib/api-client";
 import { getDictionary, type Locale } from "@/lib/i18n";
-import styles from "@/components/support/support-page.module.css";
+
+import type { ReactNode, RefObject } from "react";
 
 type AttachmentTileOptions = {
   overlayCount?: number;
@@ -324,11 +326,11 @@ export function SupportConversationChatPane({
                       </button>
                     ) : (
                       <div className={styles.attachmentPreviewFileIcon}>
-                        <FileIcon className={styles.supportFileIcon} />
+                        <FileIcon className={sharedStyles.supportFileIcon} />
                       </div>
                     )}
                     <div className={styles.attachmentPreviewMeta}>
-                      <span className={styles.subtle}>{text.selectedFileLabel}</span>
+                      <span className={sharedStyles.subtle}>{text.selectedFileLabel}</span>
                       <strong>
                         {formatSafeSupportDisplay(
                           selectedAttachment.name,
@@ -336,7 +338,7 @@ export function SupportConversationChatPane({
                           120
                         )}
                       </strong>
-                      <span className={styles.subtle}>
+                      <span className={sharedStyles.subtle}>
                         {formatFileSize(selectedAttachment.size, locale)}
                       </span>
                     </div>
@@ -380,7 +382,7 @@ export function SupportConversationChatPane({
                     <PaperclipIcon className={styles.composerIconSvg} />
                   </button>
                   <textarea
-                    className={`${styles.textarea} ${styles.composerTextarea}`}
+                    className={`${sharedStyles.textarea} ${styles.composerTextarea}`}
                     value={composerValue}
                     onChange={(event) =>
                       setReply(event.target.value.slice(0, SUPPORT_REPLY_MAX_LENGTH))

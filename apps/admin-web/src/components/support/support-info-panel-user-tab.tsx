@@ -1,6 +1,5 @@
 "use client";
 
-import type { RefObject } from "react";
 
 import {
   formatAccountAge,
@@ -13,15 +12,17 @@ import {
   type SupportInfoAttachment,
   type SupportInfoAttachmentEntry,
 } from "@/components/support/support-info-panel-attachments";
+import styles from "@/components/support/support-info-panel.module.css";
 import type {
   SupportConversationController,
   SupportConversationText,
 } from "@/components/support/support-info-panel.types";
-import styles from "@/components/support/support-page.module.css";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import type { SupportConversationStatus } from "@/lib/api-client";
 import type { Locale } from "@/lib/i18n";
+
+import type { RefObject } from "react";
 
 type SupportInfoPanelCopy = ReturnType<typeof getSupportConversationCopy>["infoPanel"];
 

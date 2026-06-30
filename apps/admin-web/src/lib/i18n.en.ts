@@ -258,6 +258,7 @@ export const enDictionary: Dictionary = {
     "Per-user limit cannot be lower than the highest existing user usage.",
   promoCodesInvalidWindow: "Start date cannot be later than the expiry date.",
   promoCodesCopied: "Promo code copied to clipboard.",
+  promoCodesCopyError: "Failed to copy promo code to clipboard.",
   promoCodesExported: "CSV exported locally.",
   promoCodesArchiveConfirm: "Archive this promo code? New redemptions will stop immediately.",
   promoCodesCreateSuccess: "Promo code created.",

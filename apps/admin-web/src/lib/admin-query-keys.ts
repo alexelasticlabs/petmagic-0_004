@@ -11,8 +11,7 @@ export const adminQueryKeys = {
   userRowAnalytics: (userIds: readonly string[]) =>
     ["admin", "users", "row-analytics", userIds] as const,
   userAnalyticsDisabled: ["admin", "users", "analytics", "disabled"] as const,
-  economyLedger: (source: string, statusUserKey: string) =>
-    ["admin", "economy", "ledger", source, statusUserKey] as const,
+  economyLedger: (query: unknown) => ["admin", "economy", "ledger", query] as const,
   economyDashboardMetrics: ["admin", "economy", "dashboard", "metrics"] as const,
   economyPurchases: (query: unknown) => ["admin", "economy", "purchases", query] as const,
   economySubscriptions: (query: unknown) =>

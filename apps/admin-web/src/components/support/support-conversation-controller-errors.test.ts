@@ -2,11 +2,12 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
+import { readSupportConversationControllerLibrarySource } from "./support-conversation-controller.test-source";
 import { readSupportConversationPageLibrarySource } from "./support-conversation-page.test-source";
 import { readSupportInfoPanelLibrarySource } from "./support-info-panel.test-source";
 
-const controllerPath = fileURLToPath(
-  new URL("./use-support-conversation-controller.ts", import.meta.url)
+const controllerHelpersPath = fileURLToPath(
+  new URL("./support-conversation-controller.helpers.ts", import.meta.url)
 );
 const supportContentPath = fileURLToPath(
   new URL("./support-conversation.content.ts", import.meta.url)
@@ -20,31 +21,33 @@ const adminFollowupsPath = fileURLToPath(
 
 describe("support conversation controller errors", () => {
   it("uses sanitized backend messages for support mutation failures", () => {
-    const source = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
+    const helpersSource = readFileSync(controllerHelpersPath, "utf8");
 
-    expect(source).toContain("import { getAdminErrorMessage }");
-    expect(source).toContain("const pushSupportError = useCallback(");
-    expect(source).toContain("getAdminErrorMessage(error, text.supportLoadError)");
-    expect(source).toContain('clientLogger.warn("support.action_failed", {');
-    expect(source).toContain("action: formatSupportControllerLogText(action, 40)");
-    expect(source).toContain('pushSupportError(error, "send_reply")');
-    expect(source).toContain('pushSupportError(error, "update_status")');
-    expect(source).toContain('pushSupportError(error, "assign_conversation")');
-    expect(source).toContain('pushSupportError(error, "update_metadata")');
-    expect(source).toContain("function getSupportControllerErrorDetails(error: unknown)");
-    expect(source).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
-    expect(source).toContain("function formatSupportControllerLogText(");
-    expect(source).toContain("conversationId: formatSupportControllerLogText(conversationId)");
-    expect(source).toContain("...getSupportControllerErrorDetails(error)");
-    expect(source).not.toContain('setToast({ type: "error", message: text.supportLoadError });');
-    expect(source).not.toContain('pushSupportNotification("error", text.supportLoadError);');
-    expect(source).not.toContain('clientLogger.warn("support.action_failed", { error');
-    expect(source).not.toContain("conversationId,\n            error");
-    expect(source).not.toContain("conversationId,\n          error");
+    expect(controllerSource).toContain("import { getAdminErrorMessage }");
+    expect(controllerSource).toContain("const pushSupportError = useCallback(");
+    expect(controllerSource).toContain("getAdminErrorMessage(error, text.supportLoadError)");
+    expect(controllerSource).toContain('clientLogger.warn("support.action_failed", {');
+    expect(controllerSource).toContain("action: formatSupportControllerLogText(action, 40)");
+    expect(controllerSource).toContain('pushSupportError(error, "send_reply")');
+    expect(controllerSource).toContain('pushSupportError(error, "update_status")');
+    expect(controllerSource).toContain('pushSupportError(error, "assign_conversation")');
+    expect(controllerSource).toContain('pushSupportError(error, "update_metadata")');
+    expect(controllerSource).toContain("conversationId: formatSupportControllerLogText(conversationId)");
+    expect(controllerSource).toContain("...getSupportControllerErrorDetails(error)");
+    expect(helpersSource).toContain("export function getSupportControllerErrorDetails(error: unknown)");
+    expect(helpersSource).toContain('errorName: error instanceof Error ? error.name : "UnknownError"');
+    expect(helpersSource).toContain("export function formatSupportControllerLogText(");
+    expect(controllerSource).not.toContain('setToast({ type: "error", message: text.supportLoadError });');
+    expect(controllerSource).not.toContain('pushSupportNotification("error", text.supportLoadError);');
+    expect(controllerSource).not.toContain('clientLogger.warn("support.action_failed", { error');
+    expect(controllerSource).not.toContain("conversationId,\n            error");
+    expect(controllerSource).not.toContain("conversationId,\n          error");
   });
 
   it("keeps support workspace fetches and actions role-guarded at the controller layer", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
+    const helpersSource = readFileSync(controllerHelpersPath, "utf8");
     const pageSource = readSupportConversationPageLibrarySource();
     const infoPanelSource = readSupportInfoPanelLibrarySource();
     const selectSource = readFileSync(selectPath, "utf8");
@@ -61,6 +64,10 @@ describe("support conversation controller errors", () => {
       'setToast({ type: "error", message: supportActionsForbidden });'
     );
     expect(controllerSource).toContain("enabled: Boolean(session && canManageSupportWorkspace)");
+    expect(helpersSource).toContain("export const supportInboxStaleTimeMs = supportPollingIntervalMs;");
+    expect(helpersSource).toContain("export const supportSubjectContextStaleTimeMs = 30_000;");
+    expect(controllerSource).toContain("staleTime: supportInboxStaleTimeMs");
+    expect(controllerSource).toContain("staleTime: supportSubjectContextStaleTimeMs");
     expect(controllerSource).toContain(
       "refetchInterval: session && canManageSupportWorkspace ? supportPollingIntervalMs : false"
     );
@@ -80,7 +87,7 @@ describe("support conversation controller errors", () => {
     expect(controllerSource).toContain("const [isSendReplyInFlight, setIsSendReplyInFlight]");
     expect(controllerSource).toContain("const sendReplyInFlightRef = useRef(false);");
     expect(controllerSource).toContain(
-      "const isSendReplySubmitting = isSendReplyInFlight || sendMutation.isPending;"
+      "isSendReplySubmitting: isSendReplyInFlight || sendMutation.isPending,"
     );
     expect(controllerSource).toContain("const requestSendReply = useCallback(() => {");
     expect(controllerSource).toContain("sendReplyInFlightRef.current ||");
@@ -111,7 +118,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("keeps support queue pagination on backend query params instead of a fixed first page", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
     const supportContentSource = readFileSync(supportContentPath, "utf8");
     const inboxPageSource = readFileSync(supportInboxPagePath, "utf8");
@@ -172,16 +179,20 @@ describe("support conversation controller errors", () => {
   });
 
   it("bounds support queue search and reply composer values before storing them", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
+    const helpersSource = readFileSync(controllerHelpersPath, "utf8");
     const pageSource = readSupportConversationPageLibrarySource();
 
-    expect(controllerSource).toContain("SUPPORT_INBOX_SEARCH_MAX_LENGTH,");
-    expect(controllerSource).toContain("SUPPORT_MESSAGE_BODY_MAX_LENGTH,");
-    expect(controllerSource).toContain(
+    expect(helpersSource).toContain("SUPPORT_INBOX_SEARCH_MAX_LENGTH,");
+    expect(helpersSource).toContain("SUPPORT_MESSAGE_BODY_MAX_LENGTH,");
+    expect(helpersSource).toContain(
       "export const SUPPORT_SEARCH_MAX_LENGTH = SUPPORT_INBOX_SEARCH_MAX_LENGTH;"
     );
-    expect(controllerSource).toContain(
+    expect(helpersSource).toContain(
       "export const SUPPORT_REPLY_MAX_LENGTH = SUPPORT_MESSAGE_BODY_MAX_LENGTH;"
+    );
+    expect(controllerSource).toContain(
+      'export { SUPPORT_REPLY_MAX_LENGTH, SUPPORT_SEARCH_MAX_LENGTH, statusOptions } from "@/components/support/support-conversation-controller.helpers";'
     );
     expect(controllerSource).toContain(
       "setRawSearchQuery(value.slice(0, SUPPORT_SEARCH_MAX_LENGTH));"
@@ -225,7 +236,8 @@ describe("support conversation controller errors", () => {
   });
 
   it("sends exact support status filters through backend query params", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
+    const helpersSource = readFileSync(controllerHelpersPath, "utf8");
     const pageSource = readSupportConversationPageLibrarySource();
 
     expect(pageSource).toContain("queueStatusFilter,");
@@ -244,7 +256,7 @@ describe("support conversation controller errors", () => {
       'setExactQueueStatusFilter(value as "all" | SupportConversationStatus);'
     );
     expect(pageSource).toContain("disabled={isQueueControlsLocked}");
-    expect(controllerSource).toContain('queueStatusFilter?: "all" | SupportConversationStatus;');
+    expect(helpersSource).toContain('queueStatusFilter?: "all" | SupportConversationStatus;');
     expect(controllerSource).toContain(
       'const effectiveQueueStatus =\n    queueStatusFilter === "all" ? resolvedQueueFilter.status : queueStatusFilter;'
     );
@@ -317,7 +329,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("sources support queue counters from backend aggregate metrics", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
 
     expect(controllerSource).toContain("fetchSupportInboxMetrics,");
@@ -395,7 +407,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("does not expose removed support-side user mutations without a live UI consumer", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
 
     expect(controllerSource).not.toContain("setUserActiveMutation");
     expect(controllerSource).not.toContain("setUserPremiumMutation");
@@ -404,14 +416,14 @@ describe("support conversation controller errors", () => {
   });
 
   it("does not fetch or link admin-only user and economy context for support moderators", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const infoPanelSource = readSupportInfoPanelLibrarySource();
 
     expect(controllerSource).toContain(
-      "enabled: Boolean(session && subjectUserId && canViewSubjectUserContext),"
+      "enabled: Boolean(hasSession && subjectUserId && canViewSubjectUserContext),"
     );
     expect(controllerSource).toContain(
-      "session && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted"
+      "hasSession && subjectUserId && canViewSubjectUserContext && !isSubjectUserDeleted"
     );
     expect(infoPanelSource).toContain(
       "{canViewSubjectUserContext && recentUserPurchases.length > 0 ? ("
@@ -420,7 +432,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("encodes support route ids before building notification and queue hrefs", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
 
     expect(controllerSource).toContain(
@@ -576,7 +588,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("does not keep stale support-side subject-user mutation errors", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
 
     expect(controllerSource).not.toContain("supportSubjectUserMissing");
     expect(controllerSource).not.toContain("Карточка пользователя недоступна для этого обращения.");
@@ -585,7 +597,7 @@ describe("support conversation controller errors", () => {
   });
 
   it("does not abort older-message loads or clear optimistic attachment URLs on preview changes", () => {
-    const controllerSource = readFileSync(controllerPath, "utf8");
+    const controllerSource = readSupportConversationControllerLibrarySource();
     const pageSource = readSupportConversationPageLibrarySource();
 
     expect(controllerSource).toContain("}, [attachmentPreviewUrl]);");

@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 
+import type {
+  AssignmentFormState,
+  TemplateOption,
+} from "@/components/templates/templates-daily-featured-page.types";
 import {
   type AdminTemplateListItem,
   type AdminTemplateOfTheDay,
@@ -8,10 +12,6 @@ import {
 } from "@/lib/api-client";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";
 
-import type {
-  AssignmentFormState,
-  TemplateOption,
-} from "@/components/templates/templates-daily-featured-page.types";
 
 export const SEARCH_LIMIT = 80;
 export const SEARCH_DEBOUNCE_MS = 300;

@@ -379,10 +379,15 @@ describe("api-client.economy query normalization", () => {
     const source = readFileSync(economyControllerPath, "utf8");
 
     expect(source).toContain("ECONOMY_QUERY_FILTER_MAX_LENGTH,");
+    expect(source).toContain("const [ledgerPage, setLedgerPage] = useState(0);");
+    expect(source).toContain("setLedgerSource(value);");
+    expect(source).toContain("setLedgerPage(0);");
+    expect(source).toContain("const ledgerQueryParams = useMemo(");
     expect(source).toContain("setPurchaseSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));");
     expect(source).toContain("setSubscriptionSearch(value.slice(0, ECONOMY_QUERY_FILTER_MAX_LENGTH));");
     expect(source).toContain("queryFn: ({ signal }) =>");
-    expect(source).toContain("fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }, signal)");
+    expect(source).toContain("queryKey: adminQueryKeys.economyLedger(ledgerQueryParams),");
+    expect(source).toContain("fetchAdminEconomyLedger(ledgerQueryParams, signal)");
     expect(source).toContain("fetchAdminSubscriptionPlans(signal)");
     expect(source).toContain("fetchAdminPaymentProviderConfigs(signal)");
     expect(source).toContain("fetchAdminSubscriptionEvents({");
@@ -390,6 +395,7 @@ describe("api-client.economy query normalization", () => {
     expect(source).toContain("fetchAdminCurrencyPacks(signal)");
     expect(source).toContain("fetchAdminEconomyDashboardMetrics(signal)");
     expect(source).toContain("adminQueryKeys.economyDashboardMetrics");
+    expect(source).toContain("placeholderData: keepPreviousData,");
     expect(source).not.toContain("queryFn: () => fetchAdminEconomyLedger");
     expect(source).not.toContain("queryFn: fetchAdminSubscriptionPlans");
     expect(source).not.toContain("queryFn: fetchAdminPaymentProviderConfigs");

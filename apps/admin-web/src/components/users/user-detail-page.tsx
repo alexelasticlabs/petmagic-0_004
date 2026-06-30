@@ -21,9 +21,9 @@ import { Button } from "@/components/ui/button";
 import { useAdminUserProfile } from "@/components/users/use-admin-user-profile";
 import { UserAvatarView } from "@/components/users/user-avatar";
 import { getUserDetailPetText, type UserDetailPetText } from "@/components/users/user-detail-page.content";
+import styles from "@/components/users/user-detail-page.module.css";
 import { formatLabeledMetric } from "@/components/users/user-monetization-format";
 import { UserSecureMediaImage } from "@/components/users/user-secure-media-image";
-import styles from "@/components/users/user-detail-page.module.css";
 import { UserWalletPanel } from "@/components/users/user-wallet-panel";
 import { getAdminErrorMessage } from "@/lib/admin-error-message";
 import {

@@ -1,5 +1,6 @@
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import assetStyles from "@/components/templates/template-editor-assets.module.css";
 import styles from "@/components/templates/template-editor.module.css";
 import { inferTemplateMediaKind } from "@/components/templates/template-media-utils";
 import { TemplateSecureMedia } from "@/components/templates/template-secure-media";
@@ -90,13 +91,13 @@ export function TemplatePreviewAssetSection({
       <h3>{text.previewAssetTitle}</h3>
       <input
         ref={fileInputRef}
-        className={styles.filePickerInput}
+        className={assetStyles.filePickerInput}
         type="file"
         accept="image/*,video/*"
         onChange={(event) => handlePreviewFileSelection(event.target.files?.[0] ?? null)}
       />
       <div
-        className={`${styles.assetPreview} ${styles.assetPreviewInteractive} ${isDragActive ? styles.assetPreviewDragActive : ""}`}
+        className={`${assetStyles.assetPreview} ${assetStyles.assetPreviewInteractive} ${isDragActive ? assetStyles.assetPreviewDragActive : ""}`}
         role="button"
         tabIndex={0}
         onClick={(event) => {
@@ -130,12 +131,12 @@ export function TemplatePreviewAssetSection({
         }}
         onDrop={handlePreviewDrop}
       >
-        <div className={styles.assetPreviewOverlay}>
-          <span className={styles.assetPreviewBadge}>
+        <div className={assetStyles.assetPreviewOverlay}>
+          <span className={assetStyles.assetPreviewBadge}>
             {previewKind === "video" ? text.previewAssetVideoBadge : text.previewAssetCoverBadge}
           </span>
           <span
-            className={`${styles.assetPreviewState} ${hasPreview ? styles.assetPreviewStateReady : styles.assetPreviewStateMissing}`}
+            className={`${assetStyles.assetPreviewState} ${hasPreview ? assetStyles.assetPreviewStateReady : assetStyles.assetPreviewStateMissing}`}
           >
             {previewStateLabel}
           </span>
@@ -145,7 +146,7 @@ export function TemplatePreviewAssetSection({
             <TemplateSecureMedia
               url={effectivePreviewUrl}
               kind="video"
-              className={styles.assetPreviewMedia}
+              className={assetStyles.assetPreviewMedia}
               controls
               playsInline
               logContext={{
@@ -160,7 +161,7 @@ export function TemplatePreviewAssetSection({
               alt={previewFileLabel || text.previewAssetTitle}
               width={480}
               height={600}
-              className={styles.assetPreviewMedia}
+              className={assetStyles.assetPreviewMedia}
               logContext={{
                 contentType: previewFile?.type || form.previewContentType,
                 surface: "template_editor_preview",
@@ -168,9 +169,9 @@ export function TemplatePreviewAssetSection({
             />
           )
         ) : (
-          <div className={styles.assetPreviewPlaceholder}>
-            <span className={styles.assetPreviewPlaceholderTitle}>{text.uploadPreview}</span>
-            <span className={styles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
+          <div className={assetStyles.assetPreviewPlaceholder}>
+            <span className={assetStyles.assetPreviewPlaceholderTitle}>{text.uploadPreview}</span>
+            <span className={assetStyles.assetPreviewPlaceholderHint}>{text.mediaDropzoneHint}</span>
           </div>
         )}
       </div>
@@ -186,11 +187,11 @@ export function TemplatePreviewAssetSection({
             readOnly
           />
         </label>
-        <div className={styles.uploadPanel}>
-          <div className={styles.uploadPanelHeader}>
+        <div className={assetStyles.uploadPanel}>
+          <div className={assetStyles.uploadPanelHeader}>
             <div>
-              <p className={styles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
-              <p className={styles.uploadPanelTitle}>{previewFileLabel}</p>
+              <p className={assetStyles.uploadPanelEyebrow}>{text.selectedFileLabel}</p>
+              <p className={assetStyles.uploadPanelTitle}>{previewFileLabel}</p>
             </div>
             <span
               className={`${styles.inlineState} ${hasPreview ? styles.inlineStateReady : styles.inlineStateAttention}`}
@@ -198,11 +199,11 @@ export function TemplatePreviewAssetSection({
               {previewStateLabel}
             </span>
           </div>
-          <div className={styles.uploadActions}>
+          <div className={assetStyles.uploadActions}>
             <Button
               type="button"
               variant="primary"
-              className={styles.primaryButton}
+              className={`${styles.primaryButton} ${assetStyles.uploadPrimaryButton}`}
               disabled={!previewFile || uploadingKind !== null}
               onClick={onUploadPreview}
             >
@@ -211,7 +212,7 @@ export function TemplatePreviewAssetSection({
             <Button
               type="button"
               variant="danger"
-              className={styles.dangerButton}
+              className={`${styles.dangerButton} ${assetStyles.uploadDangerButton}`}
               disabled={!previewFile && !hasPreview}
               onClick={() => {
                 setSelectionError(null);
@@ -233,7 +234,9 @@ export function TemplatePreviewAssetSection({
               {text.clearAsset}
             </Button>
           </div>
-          {selectionError ? <p className={styles.assetSelectionError}>{selectionError}</p> : null}
+          {selectionError ? (
+            <p className={assetStyles.assetSelectionError}>{selectionError}</p>
+          ) : null}
         </div>
         <p className={styles.muted}>{text.mediaUploadHint}</p>
       </div>

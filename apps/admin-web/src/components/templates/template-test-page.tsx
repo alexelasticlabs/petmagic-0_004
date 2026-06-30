@@ -15,7 +15,6 @@ import {
 } from "@/components/templates/template-test-page.components";
 import {
   getTemplateTestPageText,
-  type TemplateTestPageText,
 } from "@/components/templates/template-test-page.content";
 import {
   buildGeneratedDownloadName,
@@ -35,6 +34,7 @@ import {
   isTemplateTestRunInFlight,
   MAX_TEMPLATE_TEST_IMAGE_BYTES,
 } from "@/components/templates/template-test-page.helpers";
+import styles from "@/components/templates/template-test-page.module.css";
 import {
   TemplateTestHistorySection,
   TemplateTestPageHeader,
@@ -45,7 +45,6 @@ import type {
   ArtifactItem,
   TemplateTestPageProps,
 } from "@/components/templates/template-test-page.types";
-import styles from "@/components/templates/template-test-page.module.css";
 import { Button } from "@/components/ui/button";
 import {
   fetchAdminTemplate,

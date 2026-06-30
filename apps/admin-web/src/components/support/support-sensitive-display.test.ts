@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { getMessageAttachments } from "@/components/support/support-conversation-helpers";
-import { formatSafeSupportDownloadName } from "@/components/support/support-conversation-helpers";
+import {
+  formatSafeSupportDownloadName,
+  getMessageAttachments,
+} from "@/components/support/support-conversation-helpers";
 
 import { readSupportConversationPageLibrarySource } from "./support-conversation-page.test-source";
 import { readSupportInfoPanelLibrarySource } from "./support-info-panel.test-source";

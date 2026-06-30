@@ -2,18 +2,20 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+
 
 import { CancelCircleIcon, DollarIcon, UsersIcon } from "@/components/admin/admin-icons";
 import { Button } from "@/components/ui/button";
 import type { UsersManagementPageText } from "@/components/users-management-page.content";
 import styles from "@/components/users-management-page.module.css";
-import { USER_WALLET_REASON_MAX_LENGTH, type UserListItem } from "@/lib/api-client";
-import type { Dictionary, Locale } from "@/lib/i18n";
 import type {
   ActionsMenuPosition,
   WalletDialogState,
 } from "@/components/users-management-page.types";
+import { USER_WALLET_REASON_MAX_LENGTH, type UserListItem } from "@/lib/api-client";
+import type { Dictionary, Locale } from "@/lib/i18n";
+
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 type UsersManagementActionsMenuProps = {
   actionsMenuPosition: ActionsMenuPosition;

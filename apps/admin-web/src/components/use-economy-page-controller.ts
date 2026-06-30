@@ -44,6 +44,7 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const session = useAuthSession();
   const canLoadEconomy = session?.user.roles.includes("Admin") ?? false;
   const [ledgerSource, setLedgerSource] = useState("");
+  const [ledgerPage, setLedgerPage] = useState(0);
   const [purchaseStatus, setPurchaseStatus] = useState("");
   const [purchaseProvider, setPurchaseProvider] = useState("");
   const [purchaseSearch, setPurchaseSearch] = useState("");
@@ -60,6 +61,11 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   useEffect(() => {
     ensureAdminSession(locale, router, { requiredRole: "Admin" });
   }, [locale, router, session]);
+
+  const updateLedgerSource = useCallback((value: string) => {
+    setLedgerSource(value);
+    setLedgerPage(0);
+  }, []);
 
   const updatePurchaseStatus = useCallback((value: string) => {
     setPurchaseStatus(value);
@@ -91,11 +97,20 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     setSubscriptionPage(0);
   }, []);
 
+  const ledgerQueryParams = useMemo(
+    () => ({
+      skip: ledgerPage * ECONOMY_PAGE_SIZE,
+      take: ECONOMY_PAGE_SIZE,
+      source: ledgerSource || undefined,
+    }),
+    [ledgerPage, ledgerSource]
+  );
+
   const ledgerQuery = useQuery({
-    queryKey: adminQueryKeys.economyLedger(ledgerSource || "all", "all"),
-    queryFn: ({ signal }) =>
-      fetchAdminEconomyLedger({ take: 20, source: ledgerSource || undefined }, signal),
+    queryKey: adminQueryKeys.economyLedger(ledgerQueryParams),
+    queryFn: ({ signal }) => fetchAdminEconomyLedger(ledgerQueryParams, signal),
     enabled: canLoadEconomy,
+    placeholderData: keepPreviousData,
   });
 
   const purchasesQueryParams = useMemo(
@@ -180,11 +195,13 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
   const visibleSubscriptionsPage = subscriptionsQuery.isPlaceholderData
     ? undefined
     : subscriptionsQuery.data;
+  const visibleLedgerPage = ledgerQuery.isPlaceholderData ? undefined : ledgerQuery.data;
+  const ledgerIsRefreshing = ledgerQuery.isFetching && ledgerQuery.isPlaceholderData;
   const purchasesIsRefreshing = purchasesQuery.isFetching && purchasesQuery.isPlaceholderData;
   const subscriptionsIsRefreshing =
     subscriptionsQuery.isFetching && subscriptionsQuery.isPlaceholderData;
 
-  const ledgerItems = useMemo(() => ledgerQuery.data?.items ?? [], [ledgerQuery.data?.items]);
+  const ledgerItems = useMemo(() => visibleLedgerPage?.items ?? [], [visibleLedgerPage?.items]);
   const purchaseItems = useMemo(
     () => visiblePurchasesPage?.items ?? [],
     [visiblePurchasesPage?.items]
@@ -309,7 +326,11 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     economyError,
     isFetching,
     isLoading,
+    ledgerHasMore: visibleLedgerPage?.hasMore ?? false,
     ledgerItems,
+    ledgerIsFetching: ledgerQuery.isFetching,
+    ledgerIsRefreshing,
+    ledgerPage,
     ledgerSource,
     metrics,
     packs,
@@ -324,7 +345,8 @@ export function useEconomyPageController({ locale }: UseEconomyPageControllerPar
     premiumMetrics,
     setEventProvider,
     setEventStatus,
-    setLedgerSource,
+    setLedgerPage,
+    setLedgerSource: updateLedgerSource,
     setPurchasePage,
     setPurchaseProvider: updatePurchaseProvider,
     setPurchaseSearch: updatePurchaseSearch,

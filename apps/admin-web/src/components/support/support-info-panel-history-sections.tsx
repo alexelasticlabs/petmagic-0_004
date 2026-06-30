@@ -5,7 +5,7 @@ import {
   formatSafeSupportDisplay,
 } from "@/components/support/support-conversation-helpers";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
-import styles from "@/components/support/support-page.module.css";
+import styles from "@/components/support/support-info-panel.module.css";
 import type { Locale } from "@/lib/i18n";
 
 type SupportInfoPanelActivityTabProps = {

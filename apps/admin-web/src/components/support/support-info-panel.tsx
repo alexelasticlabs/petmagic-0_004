@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatDateTime } from "@/components/support/support-conversation-helpers";
 import { getSupportConversationCopy } from "@/components/support/support-conversation.content";
 import { useSupportInfoPanelAttachmentActions } from "@/components/support/support-info-panel-attachment-actions";
 import {
-  SupportInfoPanelAttachmentPreviewSection,
   SupportInfoPanelAttachmentsTab,
 } from "@/components/support/support-info-panel-attachments";
 import {
@@ -17,8 +15,8 @@ import {
   SupportInfoPanelTabs,
   SupportInfoPanelUserTab,
 } from "@/components/support/support-info-panel-user-tab";
+import styles from "@/components/support/support-info-panel.module.css";
 import { type SupportInfoPanelProps } from "@/components/support/support-info-panel.types";
-import styles from "@/components/support/support-page.module.css";
 import { type SupportConversationStatus } from "@/lib/api-client";
 
 export function SupportInfoPanel({ locale, controller }: SupportInfoPanelProps) {

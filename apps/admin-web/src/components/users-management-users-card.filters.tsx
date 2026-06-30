@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import type { UsersManagementPageText } from "@/components/users-management-page.content";
+import { getUserRoleLabel } from "@/components/users-management-page.helpers";
+import styles from "@/components/users-management-page.module.css";
 import type {
   ActivityFilter,
   PremiumFilter,
@@ -7,12 +11,10 @@ import type {
   RoleFilter,
   StatusFilter,
 } from "@/components/users-management-page.types";
-import { getUserRoleLabel } from "@/components/users-management-page.helpers";
-import type { UsersManagementPageText } from "@/components/users-management-page.content";
-import { Button } from "@/components/ui/button";
-import { USER_SEARCH_MAX_LENGTH } from "@/lib/api-client";
+import {
+  USER_SEARCH_MAX_LENGTH,
+} from "@/lib/api-client";
 import type { Dictionary } from "@/lib/i18n";
-import styles from "@/components/users-management-page.module.css";
 
 type UsersManagementUsersFiltersProps = {
   activityFilter: ActivityFilter;

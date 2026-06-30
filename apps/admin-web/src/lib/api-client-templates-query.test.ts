@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearAdminListCaches } from "@/lib/api-client.core";
 import { readTemplateTestPageLibrarySource } from "@/components/templates/template-test-page.test-source";
+import { clearAdminListCaches } from "@/lib/api-client.core";
 import {
   createTemplateOfTheDay,
   decideAdminModerationItem,

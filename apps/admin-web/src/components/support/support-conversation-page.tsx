@@ -25,7 +25,7 @@ import {
 } from "@/components/support/use-support-conversation-controller";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
-import type { AdminSupportConversation, SupportConversationStatus } from "@/lib/api-client";
+import type { SupportConversationStatus } from "@/lib/api-client";
 
 export function SupportConversationPage({
   locale,
@@ -366,7 +366,7 @@ export function SupportConversationPage({
       window.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [fullscreenImage]);
+  }, [closeFullscreenImage, fullscreenImage]);
 
   useEffect(
     () => () => {

@@ -245,6 +245,7 @@ export type Dictionary = {
   promoCodesPerUserLimitTooLow: string;
   promoCodesInvalidWindow: string;
   promoCodesCopied: string;
+  promoCodesCopyError: string;
   promoCodesExported: string;
   promoCodesArchiveConfirm: string;
   promoCodesCreateSuccess: string;

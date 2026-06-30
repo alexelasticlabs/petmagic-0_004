@@ -1,8 +1,10 @@
 "use client";
 
-import type { MutableRefObject } from "react";
 
 import { AdminCard, AdminStateCard } from "@/components/admin/admin-primitives";
+import { Button } from "@/components/ui/button";
+import type { UsersManagementPageText } from "@/components/users-management-page.content";
+import styles from "@/components/users-management-page.module.css";
 import type {
   ActivityFilter,
   PremiumFilter,
@@ -12,15 +14,14 @@ import type {
 } from "@/components/users-management-page.types";
 import { UsersManagementUsersFilters } from "@/components/users-management-users-card.filters";
 import { UsersManagementUsersTable } from "@/components/users-management-users-card.table";
-import { Button } from "@/components/ui/button";
 import {
   type AdminEconomyUserSubscriptionSummary,
   type AdminUserAnalytics,
   type UserListItem,
 } from "@/lib/api-client";
 import type { Dictionary, Locale } from "@/lib/i18n";
-import type { UsersManagementPageText } from "@/components/users-management-page.content";
-import styles from "@/components/users-management-page.module.css";
+
+import type { MutableRefObject } from "react";
 
 type UsersManagementUsersCardProps = {
   analyticsByUserId: Map<string, AdminUserAnalytics>;

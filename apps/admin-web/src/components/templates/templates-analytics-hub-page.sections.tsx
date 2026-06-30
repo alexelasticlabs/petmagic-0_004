@@ -3,11 +3,9 @@
 import Link from "next/link";
 
 import {
-  CalendarIcon,
   ChartIcon,
   DashboardIcon,
   ImageIcon,
-  TrendUpIcon,
   VideoIcon,
 } from "@/components/admin/admin-icons";
 import { AdminSelectField, type AdminTone } from "@/components/admin/admin-primitives";
@@ -29,7 +27,6 @@ import type {
   AdminTemplatesAnalyticsOverview,
   AdminTemplatesAnalyticsTemplateRow,
   AdminTemplatesAnalyticsTrendPoint,
-  TemplateType,
 } from "@/lib/api-client";
 import { getDictionary, type Locale as AppLocale } from "@/lib/i18n";
 import { sanitizeSensitiveText } from "@/lib/sensitive-display";

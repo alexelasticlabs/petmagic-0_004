@@ -10,13 +10,9 @@ import {
 } from "@/components/admin/admin-notifications";
 
 const adminTopbarPath = fileURLToPath(new URL("./admin-topbar.tsx", import.meta.url));
-const adminChromeContentPath = fileURLToPath(
-  new URL("./admin-chrome.content.ts", import.meta.url)
-);
+const adminChromeContentPath = fileURLToPath(new URL("./admin-chrome.content.ts", import.meta.url));
 const adminShellStylesPath = fileURLToPath(new URL("./admin-shell.module.css", import.meta.url));
-const adminNotificationsPath = fileURLToPath(
-  new URL("./admin-notifications.tsx", import.meta.url)
-);
+const adminNotificationsPath = fileURLToPath(new URL("./admin-notifications.tsx", import.meta.url));
 
 describe("admin notification sanitization", () => {
   it("masks sensitive values before notifications are persisted", () => {
@@ -33,7 +29,7 @@ describe("admin notification sanitization", () => {
     );
 
     expect(sanitized).toContain("al***@e***.com");
-    expect(sanitized).toContain("https://storage.example.com/file.png?***");
+    expect(sanitized).toContain("https://storage.example.com/***");
     expect(sanitized).toContain("Authorization=[redacted]");
     expect(sanitized).toContain("receipt=[redacted]");
     expect(sanitized).toContain("[redacted-secret]");
@@ -60,7 +56,7 @@ describe("admin notification sanitization", () => {
     );
 
     expect(key).toContain("al***@e***.com");
-    expect(key).toContain("https://cdn.example.com/a?***");
+    expect(key).toContain("https://cdn.example.com/***");
     expect(key).toContain("receipt=[redacted]");
     expect(key).toContain("token=[redacted]");
     expect(key).not.toContain("alice@example.com");
@@ -85,7 +81,7 @@ describe("admin notification sanitization", () => {
     );
 
     expect(key.length).toBeLessThanOrEqual(360);
-    expect(key).toContain("https://cdn.example.com/file.png?***");
+    expect(key).toContain("https://cdn.example.com/***");
     expect(key).toContain("receipt=[redacted]");
     expect(key).toContain("token=[redacted]");
     expect(key).not.toContain("X-Amz-Signature=secret");
@@ -100,7 +96,7 @@ describe("admin notification sanitization", () => {
 
     expect(source).toContain("token=[redacted]");
     expect(source).toContain("receipt=[redacted]");
-    expect(source).toContain("https://cdn.example.com/source?***");
+    expect(source).toContain("https://cdn.example.com/***");
     expect(source).not.toContain("raw-source");
     expect(source).not.toContain("raw-receipt");
     expect(source).not.toContain("sig=raw");
@@ -163,10 +159,10 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("{safeNotificationMessage}");
     expect(source).not.toContain('{locale === "ru" ? "Закреплено" : "Pinned"}');
     expect(source).not.toContain(
-      '<strong className={styles.notificationCardTitle}>{item.title}</strong>'
+      "<strong className={styles.notificationCardTitle}>{item.title}</strong>"
     );
     expect(source).not.toContain(
-      '<p className={styles.notificationCardMessage}>{item.message}</p>'
+      "<p className={styles.notificationCardMessage}>{item.message}</p>"
     );
   });
 
@@ -175,7 +171,9 @@ describe("admin notification sanitization", () => {
     const contentSource = readFileSync(adminChromeContentPath, "utf8");
 
     expect(source).toContain("useCallback, useEffect, useId, useMemo, useRef, useState");
-    expect(source).toContain("const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);");
+    expect(source).toContain(
+      "const notificationTriggerRef = useRef<HTMLButtonElement | null>(null);"
+    );
     expect(source).toContain("const notificationPanelRef = useRef<HTMLDivElement | null>(null);");
     expect(source).toContain("const previousNotificationPathnameRef = useRef(pathname);");
     expect(source).toContain("const notificationPanelId = useId();");
@@ -188,11 +186,17 @@ describe("admin notification sanitization", () => {
     expect(source).toContain("notificationPanelRef.current?.focus();");
     expect(source).toContain("closeNotificationPanel({ restoreFocus: true });");
     expect(source).toContain("ref={notificationTriggerRef}");
-    expect(source).toContain("aria-controls={isNotificationsOpen ? notificationPanelId : undefined}");
+    expect(source).toContain(
+      "aria-controls={isNotificationsOpen ? notificationPanelId : undefined}"
+    );
     expect(source).toContain("const notificationTriggerLabel =");
     expect(source).toContain("copy.topbar.notificationTriggerLabel(isNotificationsOpen)");
-    expect(contentSource).toContain('notificationTriggerLabel: (open) => (open ? "Закрыть уведомления" : "Открыть уведомления")');
-    expect(contentSource).toContain('notificationTriggerLabel: (open) => (open ? "Close notifications" : "Open notifications")');
+    expect(contentSource).toContain(
+      'notificationTriggerLabel: (open) => (open ? "Закрыть уведомления" : "Открыть уведомления")'
+    );
+    expect(contentSource).toContain(
+      'notificationTriggerLabel: (open) => (open ? "Close notifications" : "Open notifications")'
+    );
     expect(source).toContain("aria-label={notificationTriggerLabel}");
     expect(source).toContain("title={notificationTriggerLabel}");
     expect(source).toContain("id={notificationPanelId}");
@@ -213,7 +217,7 @@ describe("admin notification sanitization", () => {
     const source = readFileSync(adminTopbarPath, "utf8");
 
     expect(source).toContain(
-      "const unreadSupportNotificationCount = items.filter(\n    (item) => item.category === \"support\" && !item.read\n  ).length;"
+      'const unreadSupportNotificationCount = items.filter(\n    (item) => item.category === "support" && !item.read\n  ).length;'
     );
     expect(source).toContain(
       "const unreadNonSupportNotificationCount = unreadCount - unreadSupportNotificationCount;"
@@ -221,7 +225,9 @@ describe("admin notification sanitization", () => {
     expect(source).toContain(
       "unreadNonSupportNotificationCount +\n    Math.max(unreadSupportNotificationCount, supportUnreadCount)"
     );
-    expect(source).not.toContain("const totalAttentionCount = Math.max(unreadCount, supportUnreadCount);");
+    expect(source).not.toContain(
+      "const totalAttentionCount = Math.max(unreadCount, supportUnreadCount);"
+    );
   });
 
   it("keeps the topbar notification dialog inside narrow viewports", () => {
