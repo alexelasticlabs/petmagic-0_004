@@ -35,16 +35,24 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
-part 'widgets/support_chat_actions.part.dart';
+part 'widgets/support_chat_actions_attachment_flow.part.dart';
+part 'widgets/support_chat_actions_message_flow.part.dart';
+part 'widgets/support_chat_actions_preview.part.dart';
 part 'widgets/support_chat_attachment_picker.part.dart';
+part 'widgets/support_chat_attachment_picker_asset_tile.part.dart';
+part 'widgets/support_chat_attachment_picker_quick_tiles.part.dart';
 part 'widgets/support_chat_external_media.part.dart';
 part 'widgets/support_chat_composer.part.dart';
 part 'widgets/support_chat_dialogs.part.dart';
 part 'widgets/support_chat_header.part.dart';
 part 'widgets/support_chat_messages.part.dart';
+part 'widgets/support_chat_messages_meta.part.dart';
+part 'widgets/support_chat_messages_reply.part.dart';
 part 'widgets/support_chat_message_media_grid.part.dart';
 part 'widgets/support_chat_message_media.part.dart';
 part 'widgets/support_chat_models.part.dart';
+part 'widgets/support_chat_sections_composer.part.dart';
+part 'widgets/support_chat_sections_interactions.part.dart';
 part 'widgets/support_chat_sections.part.dart';
 part 'widgets/support_chat_states.part.dart';
 
@@ -339,39 +347,33 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   }
 
   Future<void> _showAttachmentOptions() {
-    return _SupportChatPageActions(this)._showAttachmentOptionsImpl();
+    return _showAttachmentOptionsImpl();
   }
 
   Future<void> _sendCurrentMessage(String localeTag) {
-    return _SupportChatPageActions(this)._sendCurrentMessageImpl(localeTag);
+    return _sendCurrentMessageImpl(localeTag);
   }
 
   void _removePendingAttachment(int index) {
-    _SupportChatPageActions(this)._removePendingAttachmentImpl(index);
+    _removePendingAttachmentImpl(index);
   }
 
   Future<void> _retryAttachmentForMessage(SupportChatMessage message) {
-    return _SupportChatPageActions(
-      this,
-    )._retryAttachmentForMessageImpl(message);
+    return _retryAttachmentForMessageImpl(message);
   }
 
   Future<void> _openImageFullscreen({
     required String imageUrl,
     String? fileName,
   }) {
-    return _SupportChatPageActions(
-      this,
-    )._openImageFullscreenImpl(imageUrl: imageUrl, fileName: fileName);
+    return _openImageFullscreenImpl(imageUrl: imageUrl, fileName: fileName);
   }
 
   Future<void> _openVideoFullscreen({
     required String videoUrl,
     String? fileName,
   }) {
-    return _SupportChatPageActions(
-      this,
-    )._openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
+    return _openVideoFullscreenImpl(videoUrl: videoUrl, fileName: fileName);
   }
 
   void _setReplyToMessage(SupportChatMessage message) {
@@ -636,11 +638,11 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
   }
 
   String _formatDayLabel(DateTime value) {
-    return _SupportChatPageActions(this)._formatDayLabelImpl(value);
+    return _formatDayLabelImpl(value);
   }
 
   bool _isSameDay(DateTime left, DateTime right) {
-    return _SupportChatPageActions(this)._isSameDayImpl(left, right);
+    return _isSameDayImpl(left, right);
   }
 
   bool _isPinnedToBottom({double threshold = 72}) {

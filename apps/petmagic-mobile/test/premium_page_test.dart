@@ -55,6 +55,60 @@ void main() {
     expect(plansSource, contains('class _PlansSection'));
     expect(plansSource, contains('class _PlanCard'));
     expect(plansSource, contains('class _BillingChip'));
+    expect(plansSource, contains('bool _isYearlyPlan'));
+  });
+
+  test('premium hero and benefits stay in dedicated section parts', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/premium/presentation/premium_page_content.part.dart',
+    ).readAsStringSync();
+    final sectionsSource = File(
+      'lib/features/premium/presentation/premium_page_sections.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("part 'premium_page_sections.part.dart';"));
+    expect(contentSource, isNot(contains('class _Header')));
+    expect(contentSource, isNot(contains('class _HeroBlock')));
+    expect(contentSource, isNot(contains('class _ComparisonCard')));
+    expect(contentSource, isNot(contains('class _BenefitsSection')));
+    expect(contentSource, isNot(contains('class _BenefitItem')));
+    expect(sectionsSource, contains("part of 'premium_page.dart';"));
+    expect(sectionsSource, contains('class _Header'));
+    expect(sectionsSource, contains('class _HeroBlock'));
+    expect(sectionsSource, contains('class _ComparisonCard'));
+    expect(sectionsSource, contains('class _BenefitsSection'));
+    expect(sectionsSource, contains('class _BenefitItem'));
+  });
+
+  test('premium CTA and footer stay in dedicated part files', () {
+    final pageSource = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/premium/presentation/premium_page_content.part.dart',
+    ).readAsStringSync();
+    final ctaSource = File(
+      'lib/features/premium/presentation/premium_page_cta.part.dart',
+    ).readAsStringSync();
+    final footerSource = File(
+      'lib/features/premium/presentation/premium_page_footer.part.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains("part 'premium_page_cta.part.dart';"));
+    expect(pageSource, contains("part 'premium_page_footer.part.dart';"));
+    expect(contentSource, isNot(contains('class _CtaButton')));
+    expect(contentSource, isNot(contains('class _FadeSlideIn')));
+    expect(contentSource, isNot(contains('class _Footer')));
+    expect(contentSource, isNot(contains('class _Link')));
+    expect(ctaSource, contains("part of 'premium_page.dart';"));
+    expect(ctaSource, contains('class _CtaButton'));
+    expect(ctaSource, contains('class _FadeSlideIn'));
+    expect(footerSource, contains("part of 'premium_page.dart';"));
+    expect(footerSource, contains('class _Footer'));
+    expect(footerSource, contains('class _Link'));
   });
 
   testWidgets('premium page renders monthly/yearly plans and manage action', (

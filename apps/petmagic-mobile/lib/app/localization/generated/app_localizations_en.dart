@@ -2129,15 +2129,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'Account deletion is intentionally protected and not executed from this screen yet.';
+      'Deleting your account starts permanent account removal after you confirm this action.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.';
+      'Deletion is available from this screen and cannot be undone. Continue only if you are ready to remove your account.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.';
+      'Open the confirmation sheet, review the warning, and confirm deletion only after you have saved everything you still need.';
 
   @override
   String get supportChatTitle => 'Support chat';
@@ -3800,6 +3800,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Camera';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Microphone';
 
   @override
   String get profileNotificationsDevicePhotos => 'Photos';

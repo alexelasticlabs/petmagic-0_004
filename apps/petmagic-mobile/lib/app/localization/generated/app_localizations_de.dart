@@ -2143,15 +2143,15 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'Das Löschen des Kontos ist absichtlich geschützt und wird noch nicht über diesen Bildschirm ausgeführt.';
+      'Das Löschen Ihres Kontos startet nach der Bestätigung die endgültige Kontolöschung.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Das Löschen des Kontos ist in der mobilen App derzeit nicht per Ein-Klick möglich. Das schützt vor versehentlichem Löschen, bis der sichere Bestätigungsablauf bereit ist.';
+      'Das Löschen ist auf diesem Bildschirm verfügbar und kann nicht rückgängig gemacht werden. Fahren Sie nur fort, wenn Sie Ihr Konto wirklich entfernen möchten.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'Wenn der Backend-Löschworkflow implementiert ist, kann dieser Bildschirm anstelle eines Platzhalters zum Bestätigungs- und Verifizierungsschritt werden.';
+      'Öffnen Sie den Bestätigungsdialog, lesen Sie die Warnung sorgfältig und bestätigen Sie erst, wenn Sie alles gesichert haben, was Sie noch brauchen.';
 
   @override
   String get supportChatTitle => 'Support-Chat';
@@ -3862,6 +3862,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Kamera';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Mikrofon';
 
   @override
   String get profileNotificationsDevicePhotos => 'Fotos';

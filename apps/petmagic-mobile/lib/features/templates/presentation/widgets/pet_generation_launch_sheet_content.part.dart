@@ -124,9 +124,13 @@ class _PetLaunchTemplateCard extends StatelessWidget {
                     children: [
                       _PetLaunchChip(
                         icon: Icons.movie_creation_rounded,
-                        label: template.isVideo ? 'Video' : 'Image',
+                        label: template.isVideo
+                            ? text.videoLabel
+                            : text.imageLabel,
                       ),
-                      _PetLaunchPawSparkChip(label: '$tokenCost PawSpark'),
+                      _PetLaunchPawSparkChip(
+                        label: '$tokenCost ${text.walletBalanceUnit}',
+                      ),
                     ],
                   ),
                 ],

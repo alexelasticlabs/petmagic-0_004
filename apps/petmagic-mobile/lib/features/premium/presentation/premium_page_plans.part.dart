@@ -1,5 +1,10 @@
 part of 'premium_page.dart';
 
+bool _isYearlyPlan(PremiumPlanModel plan) {
+  return plan.billingInterval.toLowerCase().contains('year') ||
+      plan.planCode.toLowerCase().contains('annual');
+}
+
 class _PlansSection extends StatelessWidget {
   const _PlansSection({
     required this.state,

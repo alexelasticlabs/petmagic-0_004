@@ -246,7 +246,7 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
                           text.authPasswordRulesHint,
                           style: TextStyle(
                             color: colors.textMuted,
-                            fontSize: 10.4,
+                            fontSize: 10,
                             fontWeight: FontWeight.w500,
                           ),
                         ),

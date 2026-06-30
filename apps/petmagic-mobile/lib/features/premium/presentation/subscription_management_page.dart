@@ -16,6 +16,10 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 part 'subscription_management_content.part.dart';
+part 'subscription_management_sections.part.dart';
+part 'subscription_management_progress.part.dart';
+part 'subscription_management_shared.part.dart';
+part 'subscription_management_visuals.part.dart';
 
 class SubscriptionManagementPage extends ConsumerStatefulWidget {
   const SubscriptionManagementPage({super.key});

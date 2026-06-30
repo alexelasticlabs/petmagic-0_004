@@ -9,6 +9,8 @@ import 'package:petmagic_mobile/features/templates/presentation/widgets/template
 import 'package:video_player_platform_interface/video_player_platform_interface.dart'
     show DataSourceType;
 
+import 'template_flow_sheets_test_source.dart';
+
 void main() {
   late Directory sharedMediaCacheRoot;
   late PathProviderPlatform originalPathProvider;
@@ -153,6 +155,46 @@ void main() {
     expect(source, contains('memCacheWidth: _petShortcutAvatarCacheWidth'));
     expect(source, contains('maxWidthDiskCache: _petShortcutAvatarCacheWidth'));
     expect(source, contains('filterQuality: FilterQuality.medium'));
+  });
+
+  test('template of the day preview is split and visibility gated', () async {
+    final mainSource = await File(
+      'lib/features/templates/presentation/widgets/template_of_the_day_card.dart',
+    ).readAsString();
+    final chromeSource = await File(
+      'lib/features/templates/presentation/widgets/template_of_the_day_card_chrome.part.dart',
+    ).readAsString();
+    final mediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_of_the_day_card_media.part.dart',
+    ).readAsString();
+    final fullSource = '$mainSource\n$chromeSource\n$mediaSource';
+
+    expect(
+      mainSource,
+      contains("part 'template_of_the_day_card_chrome.part.dart';"),
+    );
+    expect(
+      mainSource,
+      contains("part 'template_of_the_day_card_media.part.dart';"),
+    );
+    expect(mainSource, contains('TemplatePreviewImage('));
+    expect(mainSource, contains('_templateMediaCacheDimension('));
+    expect(mainSource, isNot(contains('class _TemplateOfTheDayDarkOverlay')));
+    expect(mainSource, isNot(contains('class TemplateOfTheDayVideoPreview')));
+    expect(chromeSource, contains('class _TemplateOfTheDayDarkOverlay'));
+    expect(chromeSource, contains('class _TemplateOfTheDayBadge'));
+    expect(mediaSource, contains('class TemplateOfTheDayVideoPreview'));
+    expect(mediaSource, contains('VisibilityDetector('));
+    expect(
+      mediaSource,
+      contains('MediaLifecyclePolicy.tryAcquireVideoPreviewSlot()'),
+    );
+    expect(
+      mediaSource,
+      contains('createCachedTemplatePreviewVideoController('),
+    );
+    expect(fullSource, contains('parseSafeGenerationMediaUri('));
+    expect(fullSource, isNot(contains('VideoPlayerController.networkUrl(')));
   });
 
   test('template card video preview is visibility gated and cached', () async {
@@ -665,13 +707,13 @@ void main() {
       await TemplateMediaCache.thumbnailCache.putFile(
         thumbnailUrl,
         Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xD9]),
-        maxAge: const Duration(milliseconds: 250),
+        maxAge: const Duration(seconds: 1),
         fileExtension: 'jpg',
       );
       await TemplateMediaCache.previewVideoCache.putFile(
         videoUrl,
         Uint8List.fromList([0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50]),
-        maxAge: const Duration(milliseconds: 250),
+        maxAge: const Duration(seconds: 1),
         fileExtension: 'mp4',
       );
 
@@ -684,7 +726,7 @@ void main() {
         isNotNull,
       );
 
-      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
 
       final refreshedThumbnail = await TemplateMediaCache.fetchThumbnailFile(
         thumbnailUrl,
@@ -844,16 +886,23 @@ void main() {
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
+      final generationSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
+      ).readAsString();
       final previewSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_media_preview.part.dart',
       ).readAsString().then((source) => source.replaceAll('\r\n', '\n'));
-      final flowSource = '$contentSource\n$previewSource';
+      final flowSource = '$contentSource\n$generationSource\n$previewSource';
 
       expect(
         sheetSource,
         contains(
           "import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';",
         ),
+      );
+      expect(
+        sheetSource,
+        contains("part 'template_flow_sheets_generation.part.dart';"),
       );
       expect(flowSource, contains('parseSafeGenerationMediaUri('));
       expect(flowSource, contains('generation.outputUrl'));
@@ -1044,9 +1093,7 @@ void main() {
   test(
     'selected local pet photo preview decodes to bounded thumbnail size',
     () async {
-      final source = await File(
-        'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
-      ).readAsString();
+      final source = readTemplateFlowSheetsLibrarySource();
 
       expect(
         source,
@@ -1069,9 +1116,7 @@ void main() {
   );
 
   test('generation status result media decodes with bounded cache sizes', () async {
-    final sectionsSource = await File(
-      'lib/features/templates/presentation/generation_status_page_sections.dart',
-    ).readAsString();
+    final sectionsSource = _readGenerationStatusSectionsLibrarySource();
     final fullscreenSource = await File(
       'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
     ).readAsString();
@@ -1144,9 +1189,7 @@ void main() {
   );
 
   test('template blocked balance sheet keeps a lazy scroll surface', () async {
-    final source = await File(
-      'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
-    ).readAsString();
+    final source = readTemplateFlowSheetsLibrarySource();
 
     expect(source, contains('child: ListView('));
     expect(source, contains('shrinkWrap: true'));
@@ -1193,6 +1236,17 @@ Future<File> _writeCacheFile(
   await file.writeAsBytes(List<int>.filled(bytes, 1), flush: true);
   await file.setLastModified(modifiedAt);
   return file;
+}
+
+String _readGenerationStatusSectionsLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/generation_status_page_sections.dart',
+    'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
+    'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }
 
 String _readTemplatesPageLibrarySource() {

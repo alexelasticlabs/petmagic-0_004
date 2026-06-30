@@ -5,9 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('network video preview lifecycle', () {
     test('generation result previews ignore stale async initialization', () {
-      final sectionsSource = File(
-        'lib/features/templates/presentation/generation_status_page_sections.dart',
-      ).readAsStringSync();
+      final sectionsSource = _readGenerationStatusSectionsLibrarySource();
       final fullscreenSource = File(
         'lib/features/templates/presentation/generation_status_page_fullscreen_viewer.part.dart',
       ).readAsStringSync();
@@ -112,4 +110,15 @@ void main() {
       }
     });
   });
+}
+
+String _readGenerationStatusSectionsLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/generation_status_page_sections.dart',
+    'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
+    'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
 }

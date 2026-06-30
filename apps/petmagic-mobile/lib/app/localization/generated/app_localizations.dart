@@ -3867,19 +3867,19 @@ abstract class AppLocalizations {
   /// No description provided for @profileDetailsDeleteBody.
   ///
   /// In en, this message translates to:
-  /// **'Account deletion is intentionally protected and not executed from this screen yet.'**
+  /// **'Deleting your account starts permanent account removal after you confirm this action.'**
   String get profileDetailsDeleteBody;
 
   /// No description provided for @profileDetailsDeleteStatus.
   ///
   /// In en, this message translates to:
-  /// **'Deletion is not available as a one-tap action in the mobile app right now. This avoids destructive behavior before the backend confirmation flow is ready.'**
+  /// **'Deletion is available from this screen and cannot be undone. Continue only if you are ready to remove your account.'**
   String get profileDetailsDeleteStatus;
 
   /// No description provided for @profileDetailsDeleteNext.
   ///
   /// In en, this message translates to:
-  /// **'When the backend deletion workflow is implemented, this screen can become the confirmation and verification step instead of a placeholder.'**
+  /// **'Open the confirmation sheet, review the warning, and confirm deletion only after you have saved everything you still need.'**
   String get profileDetailsDeleteNext;
 
   /// No description provided for @supportChatTitle.
@@ -6836,6 +6836,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Camera'**
   String get profileNotificationsDeviceCamera;
+
+  /// No description provided for @profileNotificationsDeviceMicrophone.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone'**
+  String get profileNotificationsDeviceMicrophone;
 
   /// No description provided for @profileNotificationsDevicePhotos.
   ///

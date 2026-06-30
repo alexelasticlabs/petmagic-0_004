@@ -534,20 +534,67 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return;
     }
 
-    await Future.wait<void>([
-      _preloadContextStep(
-        'preload_generation_context',
-        () => ref.read(generationHistoryControllerProvider.notifier).load(),
-      ),
-      _preloadContextStep(
-        'preload_wallet_context',
-        () => ref.read(walletControllerProvider.notifier).load(),
-      ),
-      _preloadContextStep(
-        'preload_premium_context',
-        () => ref.read(premiumControllerProvider.notifier).load(),
-      ),
-    ]);
+    final preloadTasks = <Future<void>>[];
+
+    final generationState = ref.read(generationHistoryControllerProvider);
+    if (_shouldPreloadGenerationContext(generationState)) {
+      preloadTasks.add(
+        _preloadContextStep(
+          'preload_generation_context',
+          () => ref.read(generationHistoryControllerProvider.notifier).load(),
+        ),
+      );
+    }
+
+    final walletState = ref.read(walletControllerProvider);
+    if (_shouldPreloadWalletContext(walletState)) {
+      preloadTasks.add(
+        _preloadContextStep(
+          'preload_wallet_context',
+          () => ref.read(walletControllerProvider.notifier).load(),
+        ),
+      );
+    }
+
+    final premiumState = ref.read(premiumControllerProvider);
+    if (_shouldPreloadPremiumContext(premiumState)) {
+      preloadTasks.add(
+        _preloadContextStep(
+          'preload_premium_context',
+          () => ref.read(premiumControllerProvider.notifier).load(),
+        ),
+      );
+    }
+
+    if (preloadTasks.isEmpty) {
+      return;
+    }
+
+    await Future.wait<void>(preloadTasks);
+  }
+
+  bool _shouldPreloadGenerationContext(GenerationHistoryState state) {
+    if (state.isLoading) {
+      return false;
+    }
+
+    return state.items.isEmpty && state.cachedItemsByFilter.isEmpty;
+  }
+
+  bool _shouldPreloadWalletContext(WalletState state) {
+    if (state.isLoading || state.isRefreshing) {
+      return false;
+    }
+
+    return state.wallet == null && state.purchases.isEmpty;
+  }
+
+  bool _shouldPreloadPremiumContext(PremiumState state) {
+    if (state.isLoading) {
+      return false;
+    }
+
+    return state.status == null && state.plans.isEmpty;
   }
 
   Future<void> _preloadContextStep(

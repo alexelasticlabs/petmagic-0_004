@@ -44,12 +44,20 @@ void main() {
     final messagesSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsString();
+    final replySource = await File(
+      'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
+    ).readAsString();
 
     expect(
       pageSource,
       contains('const int _supportReplyThumbnailCacheWidth = 160;'),
     );
-    for (final source in [composerSource, messagesSource]) {
+    expect(
+      pageSource,
+      contains("part 'widgets/support_chat_messages_reply.part.dart';"),
+    );
+    expect(messagesSource, isNot(contains('memCacheWidth: _supportReplyThumbnailCacheWidth')));
+    for (final source in [composerSource, replySource]) {
       expect(
         source,
         anyOf(
@@ -63,11 +71,16 @@ void main() {
   });
 
   test('support image previews avoid uncached Image.network widgets', () async {
+    final messagesSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
+    ).readAsString();
+    final replySource = await File(
+      'lib/features/support/presentation/widgets/support_chat_messages_reply.part.dart',
+    ).readAsString();
     final sources = [
       await _supportMessageMediaSource(),
-      await File(
-        'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
-      ).readAsString(),
+      messagesSource,
+      replySource,
       await File(
         'lib/features/support/presentation/widgets/support_chat_dialogs.part.dart',
       ).readAsString(),
@@ -76,8 +89,9 @@ void main() {
       ).readAsString(),
     ];
 
+    expect(messagesSource, isNot(contains('CachedNetworkImage(')));
+    expect(replySource, contains('CachedNetworkImage('));
     for (final source in sources) {
-      expect(source, contains('CachedNetworkImage('));
       expect(source, isNot(contains('Image.network(')));
     }
   });
@@ -87,8 +101,11 @@ void main() {
     final messagesSource = await File(
       'lib/features/support/presentation/widgets/support_chat_messages.part.dart',
     ).readAsString();
-    final actionsSource = await File(
-      'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
+    final metaSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_messages_meta.part.dart',
+    ).readAsString();
+    final previewActionsSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_actions_preview.part.dart',
     ).readAsString();
     final dialogsSource = await File(
       'lib/features/support/presentation/widgets/support_chat_dialogs.part.dart',
@@ -109,8 +126,17 @@ void main() {
       ),
     );
     expect(messagesSource, contains('_UnsupportedAttachmentPlaceholder('));
-    expect(actionsSource, contains('parseSafeSupportExternalUri(imageUrl)'));
-    expect(actionsSource, contains('parseSafeSupportExternalUri(videoUrl)'));
+    expect(messagesSource, isNot(contains('class _MessageMetaFooter')));
+    expect(metaSource, contains('class _MessageMetaFooter'));
+    expect(metaSource, contains('class _MessageDeliveryStatusIcon'));
+    expect(
+      previewActionsSource,
+      contains('parseSafeSupportExternalUri(imageUrl)'),
+    );
+    expect(
+      previewActionsSource,
+      contains('parseSafeSupportExternalUri(videoUrl)'),
+    );
     expect(
       mediaSource,
       contains('final safeUri = parseSafeSupportExternalUri(videoUrl);'),
@@ -174,32 +200,54 @@ void main() {
       final pickerSource = await File(
         'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',
       ).readAsString();
+      final assetTileSource = await File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker_asset_tile.part.dart',
+      ).readAsString();
 
       expect(
         pageSource,
         contains('const int _supportRecentMediaThumbnailCacheExtent = 300;'),
       );
-      expect(
-        pickerSource,
-        contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent'),
-      );
-      expect(
-        pickerSource,
-        contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'),
-      );
-      expect(pickerSource, contains('filterQuality: FilterQuality.medium'));
+      expect(pickerSource, isNot(contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent')));
+      expect(assetTileSource, contains('cacheWidth: _supportRecentMediaThumbnailCacheExtent'));
+      expect(assetTileSource, contains('cacheHeight: _supportRecentMediaThumbnailCacheExtent'));
+      expect(assetTileSource, contains('filterQuality: FilterQuality.medium'));
     },
   );
 
   test('support chat empty states use sliver scroll surfaces', () async {
+    final pageSource = await File(
+      'lib/features/support/presentation/support_chat_page.dart',
+    ).readAsString();
     final sectionsSource = await File(
       'lib/features/support/presentation/widgets/support_chat_sections.part.dart',
     ).readAsString();
+    final interactionsSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_sections_interactions.part.dart',
+    ).readAsString();
+    final composerSource = await File(
+      'lib/features/support/presentation/widgets/support_chat_sections_composer.part.dart',
+    ).readAsString();
 
+    expect(
+      pageSource,
+      contains("part 'widgets/support_chat_sections_interactions.part.dart';"),
+    );
+    expect(
+      pageSource,
+      contains("part 'widgets/support_chat_sections_composer.part.dart';"),
+    );
     expect(sectionsSource, contains('CustomScrollView('));
     expect(sectionsSource, contains('SliverFillRemaining('));
     expect(sectionsSource, isNot(contains('SingleChildScrollView(')));
     expect(sectionsSource, isNot(contains('child: LayoutBuilder(')));
+    expect(sectionsSource, isNot(contains('class _SupportComposerPanel')));
+    expect(sectionsSource, isNot(contains('class _SwipeToReplyBubble')));
+    expect(interactionsSource, contains('class _MessageEntranceAnimation'));
+    expect(interactionsSource, contains('class _SwipeToReplyBubble'));
+    expect(composerSource, contains('class _SupportComposerPanel'));
+    expect(composerSource, contains('class _SupportResolutionPrompt'));
+    expect(composerSource, contains('class _SupportClosedConversationBanner'));
   });
 }
 

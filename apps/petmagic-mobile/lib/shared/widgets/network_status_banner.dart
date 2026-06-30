@@ -77,7 +77,7 @@ class NetworkStatusBanner extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.96),
-                        fontSize: 12.8,
+                        fontSize: 13,
                         fontWeight: FontWeight.w800,
                         height: 1.1,
                       ),
@@ -89,7 +89,7 @@ class NetworkStatusBanner extends ConsumerWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.88),
-                        fontSize: 11.8,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                         height: 1.25,
                       ),

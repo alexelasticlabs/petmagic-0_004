@@ -2,12 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'template_flow_sheets_test_source.dart';
+
 void main() {
   test('template user-facing error mappers do not echo raw details', () {
     final templatesPage = _readTemplatesPageLibrarySource();
-    final templateFlowSheets = File(
-      'lib/features/templates/presentation/widgets/template_flow_sheets.dart',
-    ).readAsStringSync();
+    final templateFlowSheets = readTemplateFlowSheetsLibrarySource();
 
     expect(
       _functionBody(templatesPage, '_mapTemplatesError'),

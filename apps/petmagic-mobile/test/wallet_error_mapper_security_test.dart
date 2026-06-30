@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
+
+import 'wallet_page_test_source.dart';
 
 void main() {
   test('wallet user-facing error mapper does not echo raw details', () {
-    final walletPage = File(
-      'lib/features/wallet/presentation/wallet_page.dart',
-    ).readAsStringSync();
+    final walletPage = readWalletPageLibrarySource();
 
     final body = _functionBody(walletPage, '_friendlyError');
 

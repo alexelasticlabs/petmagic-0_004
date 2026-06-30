@@ -24,14 +24,14 @@ class TemplatesSearchField extends StatelessWidget {
       textInputAction: TextInputAction.search,
       style: TextStyle(
         color: colors.textStrong,
-        fontSize: 10.2,
+        fontSize: 10,
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(
         hintText: text.searchTemplates,
         hintStyle: TextStyle(
           color: colors.textMuted,
-          fontSize: 9.8,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
         ),
         prefixIcon: Icon(

@@ -119,7 +119,7 @@ class PetMagicImageError extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: colors.textSoft,
-                  fontSize: 12.4,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),

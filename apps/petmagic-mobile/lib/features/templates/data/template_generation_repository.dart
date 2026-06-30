@@ -22,6 +22,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 export 'template_generation_dtos.dart';
 
+part 'template_generation_repository_cache.part.dart';
+part 'template_generation_repository_media.part.dart';
+part 'template_generation_repository_pets.part.dart';
+
 final templateGenerationSharedPreferencesProvider =
     Provider<SharedPreferencesAsync>((ref) => SharedPreferencesAsync());
 
@@ -331,162 +335,57 @@ class TemplateGenerationRepository {
     required String petId,
     required XFile photo,
     CancelToken? cancelToken,
-  }) async {
-    OptimizedUploadFile? optimizedPhoto;
-    try {
-      optimizedPhoto = await _imageUploadOptimizer.optimizeForPetPhoto(
-        photo,
-        cancelToken: cancelToken,
-      );
-      final uploadFile = optimizedPhoto.file;
-      final encodedPetId = _apiPathSegment(petId);
-      final rawFileName = uploadFile.name.isNotEmpty
-          ? uploadFile.name
-          : uploadFile.path.split(Platform.pathSeparator).last;
-      final fileName = _safeSourceImageFileName(rawFileName);
-      final declaredContentType =
-          uploadFile.mimeType ?? _resolveImageContentType(fileName);
-      if (!_isAllowedImageContentType(declaredContentType) &&
-          !_isGenericBinaryContentType(declaredContentType)) {
-        throw const AppException('pets.photo_type_not_allowed');
-      }
-
-      final fileSize = await _uploadImageSizeBytes(
-        uploadFile.path,
-        unavailableMessage: 'pets.photo_type_not_allowed',
-      );
-      if (fileSize <= 0 || fileSize > _maxPetPhotoBytes) {
-        throw const AppException('pets.photo_type_not_allowed');
-      }
-
-      final contentType = await _detectSourceImageContentType(
-        uploadFile.path,
-        unavailableMessage: 'pets.photo_type_not_allowed',
-      );
-      if (contentType == null) {
-        throw const AppException('pets.photo_type_not_allowed');
-      }
-
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) async => _dio.post<Map<String, dynamic>>(
-          '/api/pets/$encodedPetId/photos',
-          data: FormData.fromMap({
-            'photo': await MultipartFile.fromFile(
-              uploadFile.path,
-              filename: fileName,
-              contentType: MediaType.parse(contentType),
-            ),
-          }),
-          options: authenticatedMultipartRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-        retryTransientFailures: false,
-      );
-
-      return PetPhoto.fromJson(response.data ?? const {});
-    } finally {
-      await optimizedPhoto?.dispose();
-    }
-  }
+  }) => _uploadPetPhoto(
+    this,
+    petId: petId,
+    photo: photo,
+    cancelToken: cancelToken,
+  );
 
   Future<List<PetPhoto>> fetchPetPhotos(
     String petId, {
     CancelToken? cancelToken,
-  }) async {
-    final encodedPetId = _apiPathSegment(petId);
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/pets/$encodedPetId/photos',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    return (response.data ?? const [])
-        .whereType<Map>()
-        .map((item) => PetPhoto.fromJson(Map<String, dynamic>.from(item)))
-        .toList(growable: false);
-  }
+  }) => _fetchPetPhotos(this, petId: petId, cancelToken: cancelToken);
 
   Future<PetPhoto> setPetPhotoAsAvatar({
     required String petId,
     required String photoId,
     CancelToken? cancelToken,
-  }) async {
-    final encodedPetId = _apiPathSegment(petId);
-    final encodedPhotoId = _apiPathSegment(photoId);
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/pets/$encodedPetId/photos/$encodedPhotoId/set-avatar',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return PetPhoto.fromJson(response.data ?? const {});
-  }
+  }) => _setPetPhotoAsAvatar(
+    this,
+    petId: petId,
+    photoId: photoId,
+    cancelToken: cancelToken,
+  );
 
   Future<PetPhoto> setPetPhotoFavorite({
     required String petId,
     required String photoId,
     required bool isFavorite,
     CancelToken? cancelToken,
-  }) async {
-    final encodedPetId = _apiPathSegment(petId);
-    final encodedPhotoId = _apiPathSegment(photoId);
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/pets/$encodedPetId/photos/$encodedPhotoId/favorite',
-        data: {'isFavorite': isFavorite},
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return PetPhoto.fromJson(response.data ?? const {});
-  }
+  }) => _setPetPhotoFavorite(
+    this,
+    petId: petId,
+    photoId: photoId,
+    isFavorite: isFavorite,
+    cancelToken: cancelToken,
+  );
 
   Future<void> deletePetPhoto({
     required String petId,
     required String photoId,
     CancelToken? cancelToken,
-  }) async {
-    final encodedPetId = _apiPathSegment(petId);
-    final encodedPhotoId = _apiPathSegment(photoId);
-    await _authorizedRequest<void>(
-      (session) => _dio.delete<void>(
-        '/api/pets/$encodedPetId/photos/$encodedPhotoId',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-  }
+  }) => _deletePetPhoto(
+    this,
+    petId: petId,
+    photoId: photoId,
+    cancelToken: cancelToken,
+  );
 
   Future<List<TemplateGenerationResult>> fetchPetGenerations(
     String petId, {
     CancelToken? cancelToken,
-  }) async {
-    final encodedPetId = _apiPathSegment(petId);
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/pets/$encodedPetId/generations',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    return (response.data ?? const [])
-        .whereType<Map>()
-        .map(
-          (item) => TemplateGenerationDto.fromJson(
-            Map<String, dynamic>.from(item),
-          ).toDomain(),
-        )
-        .toList(growable: false);
-  }
+  }) => _fetchPetGenerations(this, petId: petId, cancelToken: cancelToken);
 
   Future<void> recordTemplateAnalyticsEvent({
     required String templateId,
@@ -561,286 +460,63 @@ class TemplateGenerationRepository {
   Future<GenerationMediaAccessResult> fetchDownloadUrl(
     String generationId, {
     CancelToken? cancelToken,
-  }) {
-    final encodedGenerationId = _apiPathSegment(generationId);
-    return _fetchMediaAccess(
-      generationId,
-      '/api/templates/generations/$encodedGenerationId/download',
-      method: 'GET',
-      cancelToken: cancelToken,
-    );
-  }
+  }) => _fetchDownloadUrl(this, generationId, cancelToken: cancelToken);
 
   Future<GenerationMediaAccessResult> fetchShareUrl(
     String generationId, {
     CancelToken? cancelToken,
-  }) {
-    final encodedGenerationId = _apiPathSegment(generationId);
-    return _fetchMediaAccess(
-      generationId,
-      '/api/templates/generations/$encodedGenerationId/share',
-      method: 'POST',
-      cancelToken: cancelToken,
-    );
-  }
-
-  Future<GenerationMediaAccessResult> _fetchMediaAccess(
-    String generationId,
-    String path, {
-    required String method,
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.request<Map<String, dynamic>>(
-        path,
-        options: authenticatedRequestOptions(
-          session.accessToken,
-        ).copyWith(method: method),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    return GenerationMediaAccessResult.fromJson(response.data ?? const {});
-  }
+  }) => _fetchShareUrl(this, generationId, cancelToken: cancelToken);
 
   Future<List<TemplateGenerationResult>?> readCachedGenerations({
     String? status,
-  }) async {
-    try {
-      final raw = await _preferences.getString(_cacheKeyForStatus(status));
-      if (raw == null || raw.isEmpty) {
-        return null;
-      }
+  }) => _readCachedGenerations(this, status: status);
 
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) {
-        return null;
-      }
+  Future<TemplateGenerationResult?> readCachedGeneration(String generationId) =>
+      _readCachedGeneration(this, generationId);
 
-      return decoded
-          .whereType<Map>()
-          .map(
-            (item) => TemplateGenerationDto.fromJson(
-              Map<String, dynamic>.from(item),
-            ).toDomain(),
-          )
-          .toList(growable: false);
-    } on Object {
-      return null;
-    }
-  }
-
-  Future<TemplateGenerationResult?> readCachedGeneration(
-    String generationId,
-  ) async {
-    for (final status in _cacheStatuses) {
-      final items = await readCachedGenerations(
-        status: status == _cacheAllStatusKey ? null : status,
-      );
-      if (items == null || items.isEmpty) {
-        continue;
-      }
-
-      for (final item in items) {
-        if (item.generationId == generationId) {
-          return item;
-        }
-      }
-    }
-
-    return null;
-  }
-
-  Future<int?> readCachedUnreadGenerationCount() async {
-    try {
-      return await _preferences.getInt(_unreadCountCacheKey);
-    } on Object {
-      return null;
-    }
-  }
+  Future<int?> readCachedUnreadGenerationCount() =>
+      _readCachedUnreadGenerationCount(this);
 
   Future<({String generationId, String correlationId})?>
-  readActiveGeneration() async {
-    try {
-      final generationId = await _preferences.getString(_activeGenerationIdKey);
-      if (generationId == null || generationId.trim().isEmpty) {
-        return null;
-      }
-
-      final persistedCorrelationId = await _preferences.getString(
-        _activeGenerationCorrelationIdKey,
-      );
-      final normalizedGenerationId = generationId.trim();
-      final correlationId =
-          persistedCorrelationId == null ||
-              persistedCorrelationId.trim().isEmpty
-          ? _createGenerationCorrelationId()
-          : persistedCorrelationId.trim();
-      if (persistedCorrelationId == null ||
-          persistedCorrelationId.trim().isEmpty) {
-        await rememberActiveGeneration(
-          generationId: normalizedGenerationId,
-          correlationId: correlationId,
-        );
-      }
-
-      return (
-        generationId: normalizedGenerationId,
-        correlationId: correlationId,
-      );
-    } on Object {
-      return null;
-    }
-  }
+  readActiveGeneration() => _readActiveGeneration(this);
 
   Future<void> rememberActiveGeneration({
     required String generationId,
     String? correlationId,
-  }) async {
-    try {
-      final normalizedGenerationId = generationId.trim();
-      if (normalizedGenerationId.isEmpty) {
-        return;
-      }
+  }) => _rememberActiveGeneration(
+    this,
+    generationId: generationId,
+    correlationId: correlationId,
+  );
 
-      await _preferences.setString(
-        _activeGenerationIdKey,
-        normalizedGenerationId,
-      );
-      final trimmedCorrelationId = correlationId?.trim();
-      final normalizedCorrelationId =
-          trimmedCorrelationId == null || trimmedCorrelationId.isEmpty
-          ? _createGenerationCorrelationId()
-          : trimmedCorrelationId;
-      await _preferences.setString(
-        _activeGenerationCorrelationIdKey,
-        normalizedCorrelationId,
-      );
-    } on Object {
-      // Keep generation flow functional even if local persistence fails.
-    }
-  }
+  Future<void> clearActiveGeneration(String generationId) =>
+      _clearActiveGeneration(this, generationId);
 
-  Future<void> clearActiveGeneration(String generationId) async {
-    try {
-      final current = await _preferences.getString(_activeGenerationIdKey);
-      if (current != null && current != generationId) {
-        return;
-      }
+  Future<void> clearLocalCache() => _clearLocalCache(this);
 
-      await _preferences.remove(_activeGenerationIdKey);
-      await _preferences.remove(_activeGenerationCorrelationIdKey);
-    } on Object {
-      // Keep cleanup best-effort.
-    }
-  }
-
-  Future<void> clearLocalCache() async {
-    for (final status in _cacheStatuses) {
-      final key = _cacheKeyForStatus(
-        status == _cacheAllStatusKey ? null : status,
-      );
-      try {
-        await _preferences.remove(key);
-      } on Object {
-        // Keep best-effort semantics for logout cleanup.
-      }
-    }
-
-    try {
-      await _preferences.remove(_unreadCountCacheKey);
-    } on Object {
-      // Keep best-effort semantics for logout cleanup.
-    }
-
-    try {
-      await _preferences.remove(_activeGenerationIdKey);
-      await _preferences.remove(_activeGenerationCorrelationIdKey);
-    } on Object {
-      // Keep best-effort semantics for logout cleanup.
-    }
-  }
-
-  String _createGenerationCorrelationId() {
-    final now = DateTime.now().toUtc().microsecondsSinceEpoch;
-    final suffix = _correlationRandom.nextInt(1 << 24).toRadixString(16);
-    return 'generation-$now-$suffix';
-  }
+  String _createGenerationCorrelationId() =>
+      _buildGenerationCorrelationId(this);
 
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,
     int? take,
     CancelToken? cancelToken,
-  }) async {
-    final queryParameters = <String, Object?>{};
-    if (status != null && status.isNotEmpty) {
-      queryParameters['status'] = status;
-    }
-    if (skip != null) {
-      queryParameters['skip'] = skip;
-    }
-    if (take != null) {
-      queryParameters['take'] = take;
-    }
+  }) => _fetchGenerations(
+    this,
+    status: status,
+    skip: skip,
+    take: take,
+    cancelToken: cancelToken,
+  );
 
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/templates/generations',
-        queryParameters: queryParameters,
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    final itemsJson = (response.data ?? const [])
-        .whereType<Map>()
-        .map(Map<String, Object?>.from)
-        .toList(growable: false);
-
-    await _writeCachedGenerations(status: status, items: itemsJson);
-
-    return itemsJson
-        .whereType<Map>()
-        .map(
-          (item) => TemplateGenerationDto.fromJson(
-            Map<String, dynamic>.from(item),
-          ).toDomain(),
-        )
-        .toList(growable: false);
-  }
-
-  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.get<Map<String, dynamic>>(
-        '/api/templates/generations/unread-count',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-
-    final count = (response.data?['count'] as num?)?.toInt() ?? 0;
-    await _writeCachedUnreadGenerationCount(count);
-    return count;
-  }
+  Future<int> fetchUnreadGenerationCount({CancelToken? cancelToken}) =>
+      _fetchUnreadGenerationCount(this, cancelToken: cancelToken);
 
   Future<void> markGenerationRead(
     String generationId, {
     CancelToken? cancelToken,
-  }) async {
-    final encodedGenerationId = _apiPathSegment(generationId);
-    await _authorizedRequest<void>(
-      (session) => _dio.post<void>(
-        '/api/templates/generations/$encodedGenerationId/mark-read',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-      retryTransientFailures: false,
-    );
-
-    await _markCachedGenerationRead(generationId);
-  }
+  }) => _markGenerationRead(this, generationId, cancelToken: cancelToken);
 
   Future<void> deleteGeneration(
     String generationId, {
@@ -859,61 +535,8 @@ class TemplateGenerationRepository {
     await _removeCachedGeneration(generationId);
   }
 
-  Future<void> upsertCachedGeneration(
-    TemplateGenerationResult generation,
-  ) async {
-    for (final status in _cacheStatuses) {
-      try {
-        final cacheStatus = status == _cacheAllStatusKey ? null : status;
-        final key = _cacheKeyForStatus(cacheStatus);
-        final raw = await _preferences.getString(key);
-        if (raw == null || raw.isEmpty) {
-          continue;
-        }
-
-        final decoded = jsonDecode(raw);
-        if (decoded is! List) {
-          continue;
-        }
-
-        final updated = <Map<String, Object?>>[];
-        for (final entry in decoded.whereType<Map>()) {
-          final cachedGeneration = Map<String, Object?>.from(entry);
-          if (cachedGeneration['generationId'] != generation.generationId) {
-            updated.add(cachedGeneration);
-          }
-        }
-
-        if (_matchesCachedGenerationStatus(generation, cacheStatus)) {
-          updated.insert(0, _generationToCachedJson(generation));
-        }
-
-        updated.sort((left, right) {
-          final leftUpdated = DateTime.tryParse(
-            left['updatedAtUtc'] as String? ?? '',
-          );
-          final rightUpdated = DateTime.tryParse(
-            right['updatedAtUtc'] as String? ?? '',
-          );
-          if (leftUpdated == null && rightUpdated == null) {
-            return 0;
-          }
-          if (leftUpdated == null) {
-            return 1;
-          }
-          if (rightUpdated == null) {
-            return -1;
-          }
-          return rightUpdated.compareTo(leftUpdated);
-        });
-
-        final bounded = updated.take(50).toList(growable: false);
-        await _preferences.setString(key, jsonEncode(bounded));
-      } on Object {
-        // Persistent cache updates are best-effort; realtime remains in memory.
-      }
-    }
-  }
+  Future<void> upsertCachedGeneration(TemplateGenerationResult generation) =>
+      _upsertCachedGeneration(this, generation);
 
   Future<void> submitGenerationFeedback({
     required String generationId,
@@ -1042,216 +665,28 @@ class TemplateGenerationRepository {
   Future<void> _writeCachedGenerations({
     required String? status,
     required List<Map<String, Object?>> items,
-  }) async {
-    try {
-      await _preferences.setString(
-        _cacheKeyForStatus(status),
-        jsonEncode(items),
-      );
-    } on Object {
-      // Ignore local cache write errors to keep network flow stable.
-    }
-  }
+  }) => _writeCachedGenerationsImpl(this, status: status, items: items);
 
-  Future<void> _writeCachedUnreadGenerationCount(int count) async {
-    try {
-      await _preferences.setInt(_unreadCountCacheKey, count);
-    } on Object {
-      // Ignore local cache write errors to keep network flow stable.
-    }
-  }
+  Future<void> _writeCachedUnreadGenerationCount(int count) =>
+      _writeCachedUnreadGenerationCountImpl(this, count);
 
-  String _cacheKeyForStatus(String? status) {
-    final normalized = (status == null || status.trim().isEmpty)
-        ? _cacheAllStatusKey
-        : status.trim().toLowerCase();
-    return '$_generationsCachePrefix$normalized';
-  }
+  String _cacheKeyForStatus(String? status) =>
+      _cacheKeyForStatusImpl(this, status);
 
   bool _matchesCachedGenerationStatus(
     TemplateGenerationResult generation,
     String? status,
-  ) {
-    if (status == null || status.isEmpty) {
-      return true;
-    }
-
-    return switch (status.toLowerCase()) {
-      'active' => !generation.isTerminal,
-      'completed' => generation.isCompleted,
-      'failed' => generation.isFailed,
-      _ => true,
-    };
-  }
+  ) => _matchesCachedGenerationStatusImpl(this, generation, status);
 
   Map<String, Object?> _generationToCachedJson(
     TemplateGenerationResult generation,
-  ) {
-    return {
-      'generationId': generation.generationId,
-      'userId': generation.userId,
-      'templateId': generation.templateId,
-      'status': generation.status.name,
-      'tokenCost': generation.tokenCost,
-      'sourceImageAsset': generation.sourceImageAsset == null
-          ? null
-          : {
-              'url': generation.sourceImageAsset!.url,
-              'fileName': generation.sourceImageAsset!.fileName,
-              'contentType': generation.sourceImageAsset!.contentType,
-              'fileSizeBytes': generation.sourceImageAsset!.fileSizeBytes,
-              'durationSeconds': generation.sourceImageAsset!.durationSeconds,
-            },
-      'normalizedImageUrl': generation.normalizedImageUrl,
-      'referenceMotionUrl': generation.referenceMotionUrl,
-      'outputUrl': generation.outputUrl,
-      'attemptCount': generation.attemptCount,
-      'usedPreprocessingModel': generation.usedPreprocessingModel,
-      'usedKlingModel': generation.usedKlingModel,
-      'outputVideoDurationSeconds': generation.outputVideoDurationSeconds,
-      'failureCode': generation.failureCode,
-      'failureMessage': generation.failureMessage,
-      'createdAtUtc': generation.createdAtUtc.toUtc().toIso8601String(),
-      'updatedAtUtc': generation.updatedAtUtc.toUtc().toIso8601String(),
-      'startedAtUtc': generation.startedAtUtc?.toUtc().toIso8601String(),
-      'preprocessingCompletedAtUtc': generation.preprocessingCompletedAtUtc
-          ?.toUtc()
-          .toIso8601String(),
-      'motionGenerationCompletedAtUtc': generation
-          .motionGenerationCompletedAtUtc
-          ?.toUtc()
-          .toIso8601String(),
-      'mediaImportCompletedAtUtc': generation.mediaImportCompletedAtUtc
-          ?.toUtc()
-          .toIso8601String(),
-      'completedAtUtc': generation.completedAtUtc?.toUtc().toIso8601String(),
-      'templateTitle': generation.templateTitle,
-      'templateType': generation.templateType,
-      'stage': generation.stage,
-      'progressPercent': generation.progressPercent,
-      'estimatedDurationLabel': generation.estimatedDurationLabel,
-      'chargedAtUtc': generation.chargedAtUtc?.toUtc().toIso8601String(),
-      'refundedAtUtc': generation.refundedAtUtc?.toUtc().toIso8601String(),
-      'userMediaExpired': generation.userMediaExpired,
-      'isUnread': generation.isUnread,
-      'queuePosition': generation.queuePosition,
-      'estimatedWaitSeconds': generation.estimatedWaitSeconds,
-      'hasWatermark': generation.hasWatermark,
-      'canRemoveWatermark': generation.canRemoveWatermark,
-      'isWatermarkRemoved': generation.isWatermarkRemoved,
-      'removeWatermarkCostCredits': generation.removeWatermarkCostCredits,
-      'userPlan': generation.userPlan,
-      'watermarkMessage': generation.watermarkMessage,
-      'supportsGenerateSimilar': generation.supportsGenerateSimilar,
-      'inputSourceType': generation.inputSourceType,
-      'inputMediaAssetId': generation.inputMediaAssetId,
-      'resultMediaAssetId': generation.resultMediaAssetId,
-      'inputPreviewUrl': generation.inputPreviewUrl,
-      'resultPreviewUrl': generation.resultPreviewUrl,
-      'canCompareBeforeAfter': generation.canCompareBeforeAfter,
-      'petId': generation.petId,
-      'petPhotoId': generation.petPhotoId,
-    };
-  }
+  ) => _generationToCachedJsonImpl(this, generation);
 
-  Future<void> _markCachedGenerationRead(String generationId) async {
-    for (final status in _cacheStatuses) {
-      try {
-        final key = _cacheKeyForStatus(
-          status == _cacheAllStatusKey ? null : status,
-        );
-        final raw = await _preferences.getString(key);
-        if (raw == null || raw.isEmpty) {
-          continue;
-        }
+  Future<void> _markCachedGenerationRead(String generationId) =>
+      _markCachedGenerationReadImpl(this, generationId);
 
-        final decoded = jsonDecode(raw);
-        if (decoded is! List) {
-          continue;
-        }
-
-        var changed = false;
-        final updated = decoded
-            .map((entry) {
-              if (entry is! Map) {
-                return entry;
-              }
-
-              final generation = Map<String, Object?>.from(entry);
-              if (generation['generationId'] != generationId) {
-                return generation;
-              }
-
-              if (generation['isUnread'] == false) {
-                return generation;
-              }
-
-              changed = true;
-              return {...generation, 'isUnread': false};
-            })
-            .toList(growable: false);
-
-        if (changed) {
-          await _preferences.setString(key, jsonEncode(updated));
-        }
-      } on Object {
-        // Keep mark-read cache mutation best-effort per bucket.
-      }
-    }
-
-    final unread = await readCachedUnreadGenerationCount();
-    if (unread != null && unread > 0) {
-      await _writeCachedUnreadGenerationCount(unread - 1);
-    }
-  }
-
-  Future<void> _removeCachedGeneration(String generationId) async {
-    var removedUnread = false;
-
-    for (final status in _cacheStatuses) {
-      try {
-        final key = _cacheKeyForStatus(
-          status == _cacheAllStatusKey ? null : status,
-        );
-        final raw = await _preferences.getString(key);
-        if (raw == null || raw.isEmpty) {
-          continue;
-        }
-
-        final decoded = jsonDecode(raw);
-        if (decoded is! List) {
-          continue;
-        }
-
-        var changed = false;
-        final updated = <Map<String, Object?>>[];
-        for (final entry in decoded.whereType<Map>()) {
-          final generation = Map<String, Object?>.from(entry);
-          if (generation['generationId'] == generationId) {
-            changed = true;
-            if (generation['isUnread'] == true) {
-              removedUnread = true;
-            }
-            continue;
-          }
-          updated.add(generation);
-        }
-
-        if (changed) {
-          await _preferences.setString(key, jsonEncode(updated));
-        }
-      } on Object {
-        // Keep delete cache mutation best-effort per bucket.
-      }
-    }
-
-    if (removedUnread) {
-      final unread = await readCachedUnreadGenerationCount();
-      if (unread != null && unread > 0) {
-        await _writeCachedUnreadGenerationCount(unread - 1);
-      }
-    }
-  }
+  Future<void> _removeCachedGeneration(String generationId) =>
+      _removeCachedGenerationImpl(this, generationId);
 
   Future<Response<T>> _authorizedRequest<T>(
     Future<Response<T>> Function(AuthSession session) request, {
@@ -1294,19 +729,8 @@ class TemplateGenerationRepository {
     );
   }
 
-  String _resolveImageContentType(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (lower.endsWith('.webp')) {
-      return 'image/webp';
-    }
-    if (lower.endsWith('.heic')) {
-      return 'image/heic';
-    }
-    return 'image/jpeg';
-  }
+  String _resolveImageContentType(String fileName) =>
+      _resolveImageContentTypeImpl(this, fileName);
 
   String _safeSourceImageFileName(String rawFileName) {
     final basename = rawFileName
@@ -1343,90 +767,33 @@ class TemplateGenerationRepository {
   Future<String?> _detectSourceImageContentType(
     String path, {
     required String unavailableMessage,
-  }) async {
-    final header = await _sourceImageHeader(
-      path,
-      unavailableMessage: unavailableMessage,
-    );
-    if (_startsWith(header, const [0xFF, 0xD8, 0xFF])) {
-      return 'image/jpeg';
-    }
-    if (_startsWith(header, const [
-      0x89,
-      0x50,
-      0x4E,
-      0x47,
-      0x0D,
-      0x0A,
-      0x1A,
-      0x0A,
-    ])) {
-      return 'image/png';
-    }
-    if (header.length >= 12 &&
-        _asciiEquals(header, 0, 'RIFF') &&
-        _asciiEquals(header, 8, 'WEBP')) {
-      return 'image/webp';
-    }
-    if (header.length >= 12 && _asciiEquals(header, 4, 'ftyp')) {
-      final brand = String.fromCharCodes(header.skip(8).take(4)).toLowerCase();
-      const heicBrands = {'heic', 'heix', 'hevc', 'hevx', 'heis', 'heim'};
-      const heifBrands = {'mif1', 'msf1'};
-      if (heicBrands.contains(brand)) {
-        return 'image/heic';
-      }
-      if (heifBrands.contains(brand)) {
-        return 'image/heif';
-      }
-    }
-
-    return null;
-  }
+  }) => _detectSourceImageContentTypeImpl(
+    this,
+    path,
+    unavailableMessage: unavailableMessage,
+  );
 
   Future<List<int>> _sourceImageHeader(
     String path, {
     required String unavailableMessage,
-  }) async {
-    try {
-      final chunks = await File(path).openRead(0, 32).toList();
-      return [for (final chunk in chunks) ...chunk];
-    } on FileSystemException catch (error) {
-      throw AppException(unavailableMessage, cause: error);
-    }
-  }
+  }) => _sourceImageHeaderImpl(
+    this,
+    path,
+    unavailableMessage: unavailableMessage,
+  );
 
-  bool _startsWith(List<int> bytes, List<int> prefix) {
-    if (bytes.length < prefix.length) {
-      return false;
-    }
-    for (var index = 0; index < prefix.length; index++) {
-      if (bytes[index] != prefix[index]) {
-        return false;
-      }
-    }
-    return true;
-  }
+  bool _startsWith(List<int> bytes, List<int> prefix) =>
+      _startsWithImpl(this, bytes, prefix);
 
-  bool _asciiEquals(List<int> bytes, int offset, String value) {
-    if (bytes.length < offset + value.length) {
-      return false;
-    }
-    for (var index = 0; index < value.length; index++) {
-      if (bytes[offset + index] != value.codeUnitAt(index)) {
-        return false;
-      }
-    }
-    return true;
-  }
+  bool _asciiEquals(List<int> bytes, int offset, String value) =>
+      _asciiEqualsImpl(this, bytes, offset, value);
 
   Future<int> _uploadImageSizeBytes(
     String path, {
     required String unavailableMessage,
-  }) async {
-    try {
-      return await File(path).length();
-    } on FileSystemException catch (error) {
-      throw AppException(unavailableMessage, cause: error);
-    }
-  }
+  }) => _uploadImageSizeBytesImpl(
+    this,
+    path,
+    unavailableMessage: unavailableMessage,
+  );
 }

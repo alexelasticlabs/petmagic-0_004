@@ -175,8 +175,8 @@ Future<void> _pumpPage(
   _ControlledAchievementsRepository repository, {
   _TestNetworkStatusController? networkOverride,
   GamificationSummaryModel? summaryOverride,
-}) {
-  return tester.pumpWidget(
+}) async {
+  await tester.pumpWidget(
     ProviderScope(
       overrides: [
         gamificationRepositoryProvider.overrideWithValue(repository),
@@ -195,6 +195,10 @@ Future<void> _pumpPage(
       ),
     ),
   );
+  addTearDown(() async {
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
 }
 
 class _ControlledAchievementsRepository extends GamificationRepository {

@@ -1263,7 +1263,7 @@ void main() {
     expect(find.text('User ID'), findsNothing);
   });
 
-  testWidgets('delete account detail screen stays informational', (
+  testWidgets('delete account detail screen reflects destructive live flow', (
     tester,
   ) async {
     final profileRepository = _FakeProfileRepository()
@@ -1317,8 +1317,16 @@ void main() {
     expect(find.text('Delete account'), findsWidgets);
     expect(find.text('CURRENT STATUS'), findsOneWidget);
     expect(
-      find.textContaining('Deletion is not available as a one-tap action'),
+      find.textContaining('Deletion is available from this screen'),
       findsOneWidget,
+    );
+    expect(
+      find.textContaining('review the warning, and confirm deletion'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Deletion is not available as a one-tap action'),
+      findsNothing,
     );
   });
 

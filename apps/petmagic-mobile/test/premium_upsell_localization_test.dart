@@ -1,20 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'profile_page_test_source.dart';
+import 'wallet_page_test_source.dart';
 
 void main() {
   test('premium upsell cards use shared localized copy', () async {
-    const paths = <String>[
-      'lib/features/wallet/presentation/widgets/wallet_page_overview_widgets.dart',
-      'lib/features/profile/presentation/profile_page.dart',
-    ];
+    final sources = <String, String>{
+      'wallet_page': readWalletPageLibrarySource(),
+      'lib/features/profile/presentation/profile_page.dart':
+          readProfilePageLibrarySource(),
+    };
 
-    for (final path in paths) {
-      final source = await File(path).readAsString();
+    for (final source in sources.values) {
       expect(source, contains('premiumUpsellHeadline'));
       expect(source, contains('premiumUpsellSubtitle'));
+      expect(source, contains('walletBalanceUnit'));
       expect(source, isNot(contains('Premium is better')));
       expect(source, isNot(contains('Premium выгоднее')));
+      expect(source, isNot(contains("PawSpark';")));
       expect(source, isNot(contains("languageCode.toLowerCase() == 'ru'")));
     }
 

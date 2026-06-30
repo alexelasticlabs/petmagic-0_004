@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('support video recording requests microphone permission', () async {
     final source = await File(
-      'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
+      'lib/features/support/presentation/widgets/support_chat_actions_attachment_flow.part.dart',
     ).readAsString();
 
     final videoMethod = RegExp(
@@ -21,7 +21,7 @@ void main() {
     'support mixed media pickers request photo and video permissions on Android',
     () async {
       final source = await File(
-        'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
+        'lib/features/support/presentation/widgets/support_chat_actions_attachment_flow.part.dart',
       ).readAsString();
       final pickerSource = await File(
         'lib/features/support/presentation/widgets/support_chat_attachment_picker.part.dart',

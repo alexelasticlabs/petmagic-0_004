@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'premium_controller_test_source.dart';
+
 void main() {
   test('premium checkout error mapper does not echo raw details', () {
     final premiumPage = File(
@@ -19,9 +21,7 @@ void main() {
   });
 
   test('premium controller keeps network error key safe', () {
-    final premiumController = File(
-      'lib/features/premium/presentation/premium_controller.dart',
-    ).readAsStringSync();
+    final premiumController = readPremiumControllerLibrarySource();
 
     final body = _functionBody(premiumController, '_isSafePremiumErrorKey');
 

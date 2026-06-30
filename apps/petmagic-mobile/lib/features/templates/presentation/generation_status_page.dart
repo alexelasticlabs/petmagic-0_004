@@ -39,9 +39,12 @@ part 'generation_status_page_compare_viewer.part.dart';
 part 'generation_status_page_feedback.part.dart';
 part 'generation_status_page_feedback_actions.part.dart';
 part 'generation_status_page_fullscreen_viewer.part.dart';
+part 'generation_status_page_active_card.part.dart';
+part 'generation_status_page_active_chrome.part.dart';
 part 'generation_status_page_lifecycle.part.dart';
 part 'generation_status_page_media_actions.part.dart';
 part 'generation_status_page_result_actions.part.dart';
+part 'generation_status_page_result_sections.part.dart';
 part 'generation_status_page_sections.dart';
 
 final generationStatusMediaActionsProvider =
@@ -254,7 +257,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                       generation?.templateTitle ?? text.generationStatusTitle,
                   subtitle: generation == null
                       ? null
-                      : '${typeLabel(text, generation)} • ${generation.tokenCost} PawSpark',
+                      : '${typeLabel(text, generation)} • ${generation.tokenCost} ${text.walletBalanceUnit}',
                   onBack: _handleBackNavigation,
                   onMenu: generation == null
                       ? null
@@ -359,7 +362,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                         ),
                         (
                           text.templateFlowCostLabel,
-                          '${generation.tokenCost} PawSpark',
+                          '${generation.tokenCost} ${text.walletBalanceUnit}',
                         ),
                       ],
                     ),
@@ -414,7 +417,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                         ),
                         (
                           text.templateFlowCostLabel,
-                          '${generation.tokenCost} PawSpark',
+                          '${generation.tokenCost} ${text.walletBalanceUnit}',
                         ),
                       ],
                     ),
@@ -441,7 +444,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                         ),
                         (
                           text.templateFlowCostLabel,
-                          '${generation.tokenCost} PawSpark',
+                          '${generation.tokenCost} ${text.walletBalanceUnit}',
                         ),
                       ],
                     ),

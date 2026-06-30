@@ -151,7 +151,7 @@ class _TemplateDetails extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: titleStyle?.copyWith(
             color: Colors.white,
-            fontSize: 13.4,
+            fontSize: 13.5,
             fontWeight: FontWeight.w700,
             height: 1.04,
             letterSpacing: -0.12,
@@ -271,7 +271,7 @@ class _TemplateFeaturedMetaChip extends StatelessWidget {
               label,
               style: textStyle?.copyWith(
                 color: Colors.white,
-                fontSize: 9.6,
+                fontSize: 10,
                 fontWeight: FontWeight.w800,
                 height: 1,
               ),
@@ -370,7 +370,7 @@ class _TemplateActionButton extends StatelessWidget {
                     color: usePremiumStyle
                         ? premiumTextColor
                         : const Color(0xFF082313),
-                    fontSize: 11.2,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -430,7 +430,7 @@ class _TemplateStatusChip extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: colors.accent,
-            fontSize: 9.8,
+            fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -503,7 +503,7 @@ class _MediaErrorPlaceholder extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelMedium
                             ?.copyWith(
                               color: colors.textSoft,
-                              fontSize: 11.6,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w700,
                             ),
                       ),
@@ -737,7 +737,7 @@ class _TokenChip extends StatelessWidget {
               '$cost',
               style: textStyle?.copyWith(
                 color: Colors.white,
-                fontSize: 12.2,
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -768,7 +768,7 @@ class _TagChip extends StatelessWidget {
           '#$label',
           style: textStyle?.copyWith(
             color: Color.fromRGBO(183, 227, 255, 0.94),
-            fontSize: 9.2,
+            fontSize: 9,
             fontWeight: FontWeight.w700,
             height: 1,
           ),
@@ -804,7 +804,7 @@ class _MusicDescription extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: labelStyle?.copyWith(
               color: const Color.fromRGBO(247, 233, 198, 0.92),
-              fontSize: 9.6,
+              fontSize: 10,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -868,7 +868,7 @@ class _AccessTag extends StatelessWidget {
               label,
               style: textStyle?.copyWith(
                 color: Color(0xFFFFE89E),
-                fontSize: 9.2,
+                fontSize: 9,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.03,
               ),

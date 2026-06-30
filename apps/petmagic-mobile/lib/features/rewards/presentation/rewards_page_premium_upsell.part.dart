@@ -104,7 +104,7 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                                 text.premiumLabel,
                                 style: TextStyle(
                                   color: const Color(0xFFEABA47),
-                                  fontSize: 10.4,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -133,7 +133,7 @@ class _RewardsPremiumUpsellCard extends StatelessWidget {
                             color: isLight
                                 ? const Color(0xFF3B3324)
                                 : const Color(0xFFE3DFD2),
-                            fontSize: 11.2,
+                            fontSize: 11,
                             height: 1.25,
                             fontWeight: FontWeight.w500,
                           ),

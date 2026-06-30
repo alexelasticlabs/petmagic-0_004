@@ -137,7 +137,7 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
                           text.startupWelcomeSubtitle,
                           style: subtitleStyle?.copyWith(
                             color: colors.textSoft,
-                            fontSize: isCompactViewport ? 12.9 : 13.8,
+                            fontSize: isCompactViewport ? 13 : 14,
                             height: 1.3,
                             fontWeight: FontWeight.w500,
                           ),

@@ -321,7 +321,7 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
                             text.pickTemplateSubtitle,
                             style: subtitleStyle?.copyWith(
                               color: colors.textSoft,
-                              fontSize: 10.2,
+                              fontSize: 10,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

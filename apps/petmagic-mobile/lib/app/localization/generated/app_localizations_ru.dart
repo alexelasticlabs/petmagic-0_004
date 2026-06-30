@@ -2129,15 +2129,15 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'Удаление аккаунта намеренно защищено и пока не выполняется с этого экрана.';
+      'Удаление аккаунта запускает необратимое удаление после подтверждения этого действия.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Удаление аккаунта сейчас недоступно в один тап в мобильном приложении. Это сделано для безопасности, пока не завершен подтвержденный сценарий удаления.';
+      'Удаление доступно с этого экрана и не может быть отменено. Продолжайте только если действительно готовы удалить аккаунт.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'После внедрения полного сценария удаления этот экран станет шагом подтверждения и проверки личности.';
+      'Откройте окно подтверждения, прочитайте предупреждение и подтверждайте удаление только после того, как сохранили все нужные данные.';
 
   @override
   String get supportChatTitle => 'Чат поддержки';
@@ -3810,6 +3810,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Камера';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Микрофон';
 
   @override
   String get profileNotificationsDevicePhotos => 'Фото';

@@ -228,7 +228,7 @@ class _NotificationBanner extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.96),
-                                  fontSize: 14.2,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w800,
                                   height: 1.1,
                                 ),
@@ -241,9 +241,9 @@ class _NotificationBanner extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.90),
-                                fontSize: 13.2,
+                                fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                height: 1.28,
+                                height: 1.3,
                               ),
                             ),
                             if (notification.action != null) ...[

@@ -220,7 +220,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                               text.authPasswordRulesHint,
                               style: TextStyle(
                                 color: colors.textMuted,
-                                fontSize: 10.4,
+                                fontSize: 10,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -254,7 +254,7 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
                         elevation: state.isSaving ? 0 : 3,
                         textStyle: Theme.of(context).textTheme.labelLarge
                             ?.copyWith(
-                              fontSize: 13.6,
+                              fontSize: 14,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0,
                             ),

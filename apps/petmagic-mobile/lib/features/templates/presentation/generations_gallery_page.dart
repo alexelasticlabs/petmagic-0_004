@@ -33,6 +33,7 @@ import 'package:petmagic_mobile/shared/widgets/premium_crown_icon.dart';
 import 'package:petmagic_mobile/shared/widgets/premium_shimmer_button.dart';
 
 part 'generations_gallery_page_cards.dart';
+part 'generations_gallery_page_card_chrome.part.dart';
 part 'generations_gallery_page_filters_and_chrome.dart';
 part 'generations_gallery_page_states_and_actions.dart';
 

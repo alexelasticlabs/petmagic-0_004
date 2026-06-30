@@ -2142,15 +2142,15 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'Usuwanie konta jest celowo chronione i nie jest jeszcze wykonywane z tego ekranu.';
+      'Usunięcie konta uruchamia trwałe usunięcie po potwierdzeniu tej akcji.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'Usunięcie konta nie jest obecnie dostępne jednym dotknięciem. To chroni przed nieodwracalnymi działaniami, dopóki bezpieczne potwierdzenie nie będzie gotowe.';
+      'Usunięcie jest dostępne z tego ekranu i nie można go cofnąć. Kontynuuj tylko wtedy, gdy naprawdę chcesz usunąć konto.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'Gdy pełny proces usuwania będzie dostępny, ten ekran stanie się krokiem potwierdzenia i weryfikacji.';
+      'Otwórz ekran potwierdzenia, przeczytaj ostrzeżenie i potwierdź usunięcie dopiero wtedy, gdy masz zapisane wszystko, czego jeszcze potrzebujesz.';
 
   @override
   String get supportChatTitle => 'Czat wsparcia';
@@ -3830,6 +3830,9 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Kamera';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Mikrofon';
 
   @override
   String get profileNotificationsDevicePhotos => 'Zdjęcia';

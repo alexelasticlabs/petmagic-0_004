@@ -2151,15 +2151,15 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'La suppression du compte est intentionnellement protégée et n\'est pas encore exécutée à partir de cet écran.';
+      'La suppression de votre compte lance une suppression définitive après confirmation de cette action.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'La suppression du compte n\'est pas disponible en un seul clic pour le moment. Cela évite les actions irréversibles tant que la confirmation sécurisée n\'est pas prête.';
+      'La suppression est disponible depuis cet écran et ne peut pas être annulée. Continuez seulement si vous êtes prêt à supprimer votre compte.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'Lorsque le processus complet de suppression sera disponible, cet écran deviendra l\'étape de confirmation et de vérification.';
+      'Ouvrez la feuille de confirmation, relisez l\'avertissement et confirmez la suppression seulement après avoir sauvegardé ce dont vous avez encore besoin.';
 
   @override
   String get supportChatTitle => 'Chat d\'assistance';
@@ -3871,6 +3871,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Caméra';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Microphone';
 
   @override
   String get profileNotificationsDevicePhotos => 'Photos';

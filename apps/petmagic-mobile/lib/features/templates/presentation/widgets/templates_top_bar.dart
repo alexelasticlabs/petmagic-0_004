@@ -198,7 +198,7 @@ class _TokenBalance extends StatelessWidget {
                     '$balance',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: colors.textStrong,
-                      fontSize: 12.8,
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

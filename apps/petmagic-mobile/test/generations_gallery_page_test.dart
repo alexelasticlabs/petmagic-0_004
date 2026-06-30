@@ -548,6 +548,7 @@ void main() {
     await tester.pump();
 
     expect(mediaActions.savedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+    await tester.pump(const Duration(seconds: 3));
 
     await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
     await tester.pumpAndSettle();
@@ -555,6 +556,7 @@ void main() {
     await _pumpUntil(tester, () => mediaActions.shareCalls > 0);
 
     expect(mediaActions.sharedFileNames, ['Movie_Star_Pet_g_ready_1_x_2.jpg']);
+    await tester.pump(const Duration(seconds: 3));
     expect(tester.takeException(), isNull);
   });
 

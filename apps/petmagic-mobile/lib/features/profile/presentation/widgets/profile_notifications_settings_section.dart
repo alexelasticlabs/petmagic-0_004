@@ -331,7 +331,8 @@ class _ProfileNotificationsSettingsSectionState
       AppPermissionType.notifications =>
         text.profileNotificationsDeviceNotifications,
       AppPermissionType.camera => text.profileNotificationsDeviceCamera,
-      AppPermissionType.microphone => 'Microphone',
+      AppPermissionType.microphone =>
+        text.profileNotificationsDeviceMicrophone,
       AppPermissionType.photos => text.profileNotificationsDevicePhotos,
       AppPermissionType.videos => text.videoLabel,
     };

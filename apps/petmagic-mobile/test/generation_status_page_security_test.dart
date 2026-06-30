@@ -27,6 +27,8 @@ void main() {
     'lib/features/templates/presentation/generation_status_page.dart',
   ).readAsStringSync();
   final generationStatusLibrarySource = _readGenerationStatusLibrarySource();
+  final generationStatusSectionsLibrarySource =
+      _readGenerationStatusSectionsLibrarySource();
 
   setUpAll(() {
     SharedPreferencesAsyncPlatform.instance =
@@ -429,9 +431,10 @@ void main() {
   );
 
   test('generation result aspect ratio probe is cached and detached', () {
-    final source = File(
-      'lib/features/templates/presentation/generation_status_page_sections.dart',
-    ).readAsStringSync().replaceAll('\r\n', '\n');
+    final source = generationStatusSectionsLibrarySource.replaceAll(
+      '\r\n',
+      '\n',
+    );
 
     expect(source, contains('CachedNetworkImageProvider('));
     expect(
@@ -446,9 +449,7 @@ void main() {
 
   test('generation result media URLs are checked before network use', () {
     final pageSource = generationStatusLibrarySource;
-    final sectionsSource = File(
-      'lib/features/templates/presentation/generation_status_page_sections.dart',
-    ).readAsStringSync();
+    final sectionsSource = generationStatusSectionsLibrarySource;
     final compareSource = File(
       'lib/features/templates/presentation/generation_status_page_compare_viewer.part.dart',
     ).readAsStringSync();
@@ -1468,6 +1469,17 @@ String _readGenerationStatusLibrarySource() {
     'lib/features/templates/presentation/generation_status_page_media_actions.part.dart',
     'lib/features/templates/presentation/generation_status_page_result_actions.part.dart',
     'lib/features/templates/presentation/generation_status_page_feedback_actions.part.dart',
+  ];
+
+  return files.map((path) => File(path).readAsStringSync()).join('\n');
+}
+
+String _readGenerationStatusSectionsLibrarySource() {
+  const files = [
+    'lib/features/templates/presentation/generation_status_page_sections.dart',
+    'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
+    'lib/features/templates/presentation/generation_status_page_active_chrome.part.dart',
+    'lib/features/templates/presentation/generation_status_page_result_sections.part.dart',
   ];
 
   return files.map((path) => File(path).readAsStringSync()).join('\n');

@@ -2149,15 +2149,15 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileDetailsDeleteBody =>
-      'La eliminación de cuenta está protegida intencionalmente y aún no se ejecuta desde esta pantalla.';
+      'Eliminar tu cuenta inicia la eliminación permanente después de confirmar esta acción.';
 
   @override
   String get profileDetailsDeleteStatus =>
-      'La eliminación de la cuenta no está disponible en un solo toque por ahora. Esto evita acciones irreversibles hasta que el proceso de confirmación segura esté listo.';
+      'La eliminación está disponible desde esta pantalla y no se puede deshacer. Continúa solo si realmente quieres eliminar tu cuenta.';
 
   @override
   String get profileDetailsDeleteNext =>
-      'Cuando se implemente el proceso completo de eliminación, esta pantalla se convertirá en el paso de confirmación y verificación.';
+      'Abre la hoja de confirmación, revisa la advertencia y confirma la eliminación solo cuando ya hayas guardado todo lo que todavía necesitas.';
 
   @override
   String get supportChatTitle => 'Chat de soporte';
@@ -3853,6 +3853,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileNotificationsDeviceCamera => 'Cámara';
+
+  @override
+  String get profileNotificationsDeviceMicrophone => 'Micrófono';
 
   @override
   String get profileNotificationsDevicePhotos => 'Fotos';

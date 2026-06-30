@@ -400,6 +400,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: ProfileSettingsDetailPage.routePath,
+        redirect: (context, state) {
+          final kind = ProfileSettingsDetailKind.fromSlug(
+            state.pathParameters['kind'] ?? 'help-center',
+          );
+          if (kind == ProfileSettingsDetailKind.support) {
+            return SupportHomePage.routePath;
+          }
+
+          return null;
+        },
         pageBuilder: (context, state) => _buildFadeSlidePage(
           state: state,
           child: ProfileSettingsDetailPage(

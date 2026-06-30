@@ -17,7 +17,13 @@ void main() {
     final contentSource = await File(
       'lib/features/premium/presentation/subscription_management_content.part.dart',
     ).readAsString();
-    final source = '$pageSource\n$contentSource';
+    final sectionsSource = await File(
+      'lib/features/premium/presentation/subscription_management_sections.part.dart',
+    ).readAsString();
+    final progressSource = await File(
+      'lib/features/premium/presentation/subscription_management_progress.part.dart',
+    ).readAsString();
+    final source = '$pageSource\n$contentSource\n$sectionsSource\n$progressSource';
 
     const expectedGetters = <String>[
       'subscriptionTokensWeeklyGrantPeriodSuffix',
@@ -53,8 +59,32 @@ void main() {
       pageSource,
       contains("part 'subscription_management_content.part.dart';"),
     );
+    expect(
+      pageSource,
+      contains("part 'subscription_management_sections.part.dart';"),
+    );
+    expect(
+      pageSource,
+      contains("part 'subscription_management_progress.part.dart';"),
+    );
     expect(pageSource, isNot(contains('class _SubscriptionContent')));
     expect(contentSource, contains('class _SubscriptionContent'));
+    expect(contentSource, isNot(contains('class _PremiumHeroCard')));
+    expect(contentSource, isNot(contains('class _TokensCard')));
+    expect(contentSource, isNot(contains('class _BenefitsCard')));
+    expect(contentSource, isNot(contains('class _PaymentCard')));
+    expect(contentSource, isNot(contains('class _ActionsSection')));
+    expect(contentSource, isNot(contains('class _TokenGrantProgressBar')));
+    expect(sectionsSource, contains("part of 'subscription_management_page.dart';"));
+    expect(sectionsSource, contains('class _PremiumHeroCard'));
+    expect(sectionsSource, contains('class _TokensCard'));
+    expect(sectionsSource, contains('class _BenefitsCard'));
+    expect(sectionsSource, contains('class _PaymentCard'));
+    expect(sectionsSource, contains('class _ActionsSection'));
+    expect(sectionsSource, contains('String _resolveStatusLabel'));
+    expect(sectionsSource, contains('Color _resolveStatusColor'));
+    expect(progressSource, contains("part of 'subscription_management_page.dart';"));
+    expect(progressSource, contains('class _TokenGrantProgressBar'));
   });
 
   test(

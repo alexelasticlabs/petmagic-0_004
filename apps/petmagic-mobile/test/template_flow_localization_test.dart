@@ -12,13 +12,21 @@ void main() {
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
+      final generationSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
+      ).readAsString();
 
       expect(sheetSource, isNot(contains('_isRussian(')));
       expect(contentSource, isNot(contains('_isRussian(')));
+      expect(generationSource, isNot(contains('_isRussian(')));
       expect(sheetSource, isNot(contains('Preview coming soon')));
       expect(sheetSource, contains('templateDetailHeroImageTitle'));
       expect(sheetSource, contains('templateDetailPreviewMissingTitle'));
       expect(contentSource, contains('AppLocalizations.of(context)'));
+      expect(
+        generationSource,
+        contains("part of 'template_flow_sheets.dart';"),
+      );
     },
   );
 
@@ -28,6 +36,9 @@ void main() {
       final sheetSource = readTemplateFlowSheetsLibrarySource();
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
+      ).readAsString();
+      final generationSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
       ).readAsString();
       final cardSource = await File(
         'lib/features/templates/presentation/widgets/template_card.dart',
@@ -45,13 +56,29 @@ void main() {
         contentSource,
         isNot(contains("languageCode.toLowerCase() == 'ru'")),
       );
+      expect(
+        generationSource,
+        isNot(contains("languageCode.toLowerCase() == 'ru'")),
+      );
       expect(cardSource, isNot(contains("languageCode.toLowerCase() == 'ru'")));
       expect(
         sheetSource,
         contains('templateFlowInsufficientBalanceUpsellMessage'),
       );
-      expect(contentSource, contains('templateFlowCompletedPremiumHeadline'));
-      expect(contentSource, contains('templateFlowCompletedPremiumMessage'));
+      expect(
+        sheetSource,
+        contains("part 'template_flow_sheets_generation.part.dart';"),
+      );
+      expect(
+        contentSource,
+        isNot(contains('class _TemplateGenerationProgressContent')),
+      );
+      expect(
+        generationSource,
+        contains('class _TemplateGenerationProgressContent'),
+      );
+      expect(generationSource, contains('templateFlowCompletedPremiumHeadline'));
+      expect(generationSource, contains('templateFlowCompletedPremiumMessage'));
       expect(
         cardSource,
         contains("part 'template_card_presentation.part.dart';"),
@@ -61,8 +88,8 @@ void main() {
       expect(fullCardSource, contains('supportChatTodayLabel'));
       expect(fullCardSource, isNot(contains('Preview unavailable')));
       expect(fullCardSource, isNot(contains('Превью недоступно')));
-      expect(contentSource, isNot(contains('Video is ready! 🎉')));
-      expect(contentSource, isNot(contains('Видео готово! 🎉')));
+      expect(generationSource, isNot(contains('Video is ready! 🎉')));
+      expect(generationSource, isNot(contains('Видео готово! 🎉')));
     },
   );
 
@@ -80,8 +107,25 @@ void main() {
       'lib/features/templates/presentation/widgets/pet_generation_launch_sheet_content.part.dart',
     ).readAsString();
     final fullPetLaunchSource = '$petLaunchSource\n$petLaunchContentSource';
-    final templateOfDaySource = await File(
+    final templateOfDayMainSource = await File(
       'lib/features/templates/presentation/widgets/template_of_the_day_card.dart',
+    ).readAsString();
+    final templateOfDayChromeSource = await File(
+      'lib/features/templates/presentation/widgets/template_of_the_day_card_chrome.part.dart',
+    ).readAsString();
+    final templateOfDayMediaSource = await File(
+      'lib/features/templates/presentation/widgets/template_of_the_day_card_media.part.dart',
+    ).readAsString();
+    final templateOfDaySource =
+        '$templateOfDayMainSource\n$templateOfDayChromeSource\n$templateOfDayMediaSource';
+    final statusSource = await File(
+      'lib/features/templates/presentation/generation_status_page.dart',
+    ).readAsString();
+    final activeStatusCardSource = await File(
+      'lib/features/templates/presentation/generation_status_page_active_card.part.dart',
+    ).readAsString();
+    final galleryCardsSource = await File(
+      'lib/features/templates/presentation/generations_gallery_page_cards.dart',
     ).readAsString();
 
     expect(
@@ -90,12 +134,37 @@ void main() {
     );
     expect(resultInputSource, isNot(contains("localeName.startsWith('ru')")));
     expect(petLaunchSource, isNot(contains("localeName.startsWith('ru')")));
+    expect(
+      templateOfDayMainSource,
+      contains("part 'template_of_the_day_card_chrome.part.dart';"),
+    );
+    expect(
+      templateOfDayMainSource,
+      contains("part 'template_of_the_day_card_media.part.dart';"),
+    );
     expect(templateOfDaySource, isNot(contains("languageCode == 'ru'")));
+    expect(
+      templateOfDayMainSource,
+      isNot(contains('class _TemplateOfTheDayDarkOverlay')),
+    );
+    expect(
+      templateOfDayMainSource,
+      isNot(contains('class TemplateOfTheDayVideoPreview')),
+    );
+    expect(
+      templateOfDayChromeSource,
+      contains("part of 'template_of_the_day_card.dart';"),
+    );
+    expect(
+      templateOfDayMediaSource,
+      contains("part of 'template_of_the_day_card.dart';"),
+    );
 
     expect(gallerySource, contains('galleryPremiumUpsellTitle'));
     expect(gallerySource, contains('galleryPremiumUpsellSubtitle'));
     expect(resultInputSource, contains('generationResultInputTitle'));
     expect(resultInputSource, contains('generationResultInputCostEstimate'));
+    expect(resultInputSource, contains('walletBalanceUnit'));
     expect(resultInputSource, contains('text.retryAction'));
     expect(
       petLaunchSource,
@@ -103,13 +172,22 @@ void main() {
     );
     expect(petLaunchSource, isNot(contains('class _PetLaunchHeader')));
     expect(fullPetLaunchSource, contains('petGenerationLaunchTitleWithName'));
+    expect(fullPetLaunchSource, contains('text.walletBalanceUnit'));
+    expect(fullPetLaunchSource, contains('text.videoLabel'));
+    expect(fullPetLaunchSource, contains('text.imageLabel'));
     expect(templateOfDaySource, contains('templateOfTheDayLoadFailed'));
+    expect(templateOfDaySource, contains('walletBalanceUnit'));
+    expect(statusSource, contains('walletBalanceUnit'));
+    expect(activeStatusCardSource, contains('walletBalanceUnit'));
+    expect(galleryCardsSource, contains('walletBalanceUnit'));
 
     expect(fullPetLaunchSource, isNot(contains('Magic generation launch')));
     expect(fullPetLaunchSource, isNot(contains('Запуск магии')));
     expect(resultInputSource, isNot(contains('Use result')));
     expect(resultInputSource, isNot(contains('Использовать результат')));
     expect(resultInputSource, isNot(contains("const Text('Retry')")));
+    expect(fullPetLaunchSource, isNot(contains("'Video'")));
+    expect(fullPetLaunchSource, isNot(contains("'Image'")));
   });
 
   test(

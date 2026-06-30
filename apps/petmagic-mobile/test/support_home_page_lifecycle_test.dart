@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
@@ -42,6 +43,37 @@ void main() {
 
     expect(cancelToken.isCancelled, isTrue);
   });
+
+  testWidgets('support home keeps load failures distinct from empty chat state', (
+    tester,
+  ) async {
+    final repository = _FailingSupportChatRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+          theme: AppTheme.light(),
+          home: const SupportHomePage(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.text('Unable to reach support right now. Please try again in a moment.'),
+      findsNWidgets(2),
+    );
+    expect(find.text('Start the conversation'), findsNothing);
+    expect(find.text('Retry'), findsOneWidget);
+  });
 }
 
 class _CancellableSupportChatRepository extends SupportChatRepository {
@@ -64,5 +96,20 @@ class _CancellableSupportChatRepository extends SupportChatRepository {
     }
 
     return Completer<SupportChatConversation>().future;
+  }
+}
+
+class _FailingSupportChatRepository extends SupportChatRepository {
+  _FailingSupportChatRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  @override
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
+    CancelToken? cancelToken,
+  }) {
+    throw AppException('support.unavailable', statusCode: 503);
   }
 }

@@ -10,12 +10,15 @@ import 'package:petmagic_mobile/app/localization/generated/app_localizations.dar
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
 import 'package:petmagic_mobile/core/permissions/app_permission_coordinator.dart';
 import 'package:petmagic_mobile/core/permissions/media_permission_feedback.dart';
+import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_ticket_form_page.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
+import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'test_permission_fakes.dart';
@@ -60,6 +63,41 @@ void main() {
 
       _preloadTracker.completeAll();
       await tester.pump();
+    },
+  );
+
+  testWidgets(
+    'support ticket context preload skips domains that already have snapshots',
+    (tester) async {
+      final generationController = _CountingLoadedGenerationHistoryController();
+      final walletController = _CountingLoadedWalletController();
+      final premiumController = _CountingLoadedPremiumController();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            generationHistoryControllerProvider.overrideWith(
+              () => generationController,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+            premiumControllerProvider.overrideWith(() => premiumController),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(generationController.loadCalls, 0);
+      expect(walletController.loadCalls, 0);
+      expect(premiumController.loadCalls, 0);
     },
   );
 
@@ -284,6 +322,97 @@ class _IdlePremiumController extends PremiumController {
   @override
   Future<void> load({bool refresh = false}) {
     return Future<void>.value();
+  }
+}
+
+class _CountingLoadedGenerationHistoryController
+    extends GenerationHistoryController {
+  int loadCalls = 0;
+
+  @override
+  GenerationHistoryState build() {
+    return GenerationHistoryState(
+      items: [
+        TemplateGenerationResult(
+          generationId: 'generation-1',
+          userId: 'user-1',
+          templateId: 'template-1',
+          templateTitle: 'Magic Portrait',
+          templateType: 'Image',
+          status: TemplateGenerationStatus.completed,
+          tokenCost: 12,
+          attemptCount: 1,
+          createdAtUtc: DateTime.utc(2026, 1, 1, 10),
+          updatedAtUtc: DateTime.utc(2026, 1, 1, 10, 1),
+          userMediaExpired: false,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> load({GenerationHistoryFilter? filter, bool refresh = false}) async {
+    loadCalls++;
+  }
+}
+
+class _CountingLoadedWalletController extends WalletController {
+  int loadCalls = 0;
+
+  @override
+  WalletState build() {
+    return WalletState(
+      wallet: WalletStateModel(
+        userId: 'user-1',
+        balance: 130,
+        adRewardsRemainingToday: 3,
+        isPremium: false,
+        updatedAtUtc: null,
+        nextWeeklyGrantAtUtc: null,
+      ),
+      purchases: [
+        PurchaseHistoryItem(
+          orderId: '00000000-0000-4000-8000-000000000001',
+          packDisplayName: 'Starter Pack',
+          paymentProvider: 'Stripe',
+          status: 'Succeeded',
+          priceAmount: 9.99,
+          currencyCode: 'USD',
+          sparkToGrant: 100,
+          createdAtUtc: DateTime.utc(2026, 1, 1, 9, 30),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
+  }
+}
+
+class _CountingLoadedPremiumController extends PremiumController {
+  int loadCalls = 0;
+
+  @override
+  PremiumState build() {
+    return PremiumState(
+      status: PremiumStatusModel(
+        isPremium: true,
+        canManageBilling: true,
+        status: 'active',
+        cancelAtPeriodEnd: false,
+        monthlyTokenLimit: 1200,
+        tokensAvailable: 300,
+        canManageSubscription: true,
+        manageSubscriptionAction: 'StripeCustomerPortal',
+      ),
+    );
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
   }
 }
 

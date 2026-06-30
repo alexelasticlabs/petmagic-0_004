@@ -12,8 +12,14 @@ void main() {
       final pageSource = File(
         'lib/features/support/presentation/support_chat_page.dart',
       ).readAsStringSync();
-      final actionsSource = File(
-        'lib/features/support/presentation/widgets/support_chat_actions.part.dart',
+      final attachmentFlowSource = File(
+        'lib/features/support/presentation/widgets/support_chat_actions_attachment_flow.part.dart',
+      ).readAsStringSync();
+      final assetTileSource = File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker_asset_tile.part.dart',
+      ).readAsStringSync();
+      final quickTilesSource = File(
+        'lib/features/support/presentation/widgets/support_chat_attachment_picker_quick_tiles.part.dart',
       ).readAsStringSync();
 
       final initializeBody = _methodBody(source, '_initializeAssets');
@@ -24,13 +30,41 @@ void main() {
       expect(source, contains('bool _assetLoadFailed = false;'));
       expect(
         pageSource,
+        contains(
+          "part 'widgets/support_chat_actions_attachment_flow.part.dart';",
+        ),
+      );
+      expect(
+        pageSource,
         contains("part 'widgets/support_chat_attachment_picker.part.dart';"),
       );
       expect(
-        actionsSource,
+        pageSource,
+        contains(
+          "part 'widgets/support_chat_attachment_picker_asset_tile.part.dart';",
+        ),
+      );
+      expect(
+        pageSource,
+        contains(
+          "part 'widgets/support_chat_attachment_picker_quick_tiles.part.dart';",
+        ),
+      );
+      expect(
+        attachmentFlowSource,
         isNot(contains('class _SupportAttachmentPickerSheet')),
       );
+      expect(
+        pageSource,
+        isNot(contains("part 'widgets/support_chat_actions.part.dart';")),
+      );
       expect(source, contains('class _SupportAttachmentPickerSheet'));
+      expect(source, isNot(contains('class _SupportRecentAssetTile')));
+      expect(source, isNot(contains('class _SupportRecentCameraTile')));
+      expect(source, isNot(contains('class _SupportRecentFilesTile')));
+      expect(assetTileSource, contains('class _SupportRecentAssetTile'));
+      expect(quickTilesSource, contains('class _SupportRecentCameraTile'));
+      expect(quickTilesSource, contains('class _SupportRecentFilesTile'));
       expect(
         initializeBody,
         contains('PhotoManager.requestPermissionExtend()'),

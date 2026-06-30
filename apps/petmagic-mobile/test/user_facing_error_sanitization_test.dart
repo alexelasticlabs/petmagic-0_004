@@ -2,21 +2,23 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'premium_controller_test_source.dart';
+import 'wallet_controller_test_source.dart';
+
 void main() {
   test('payment and generation controllers do not expose raw exceptions', () {
     final sources = [
-      File(
-        'lib/features/premium/presentation/premium_controller.dart',
-      ).readAsStringSync(),
+      readPremiumControllerLibrarySource(),
       File(
         'lib/features/premium/presentation/premium_page.dart',
       ).readAsStringSync(),
-      File(
-        'lib/features/wallet/presentation/wallet_controller.dart',
-      ).readAsStringSync(),
-      File(
+      readWalletControllerLibrarySource(),
+      [
         'lib/features/templates/presentation/generation_history_controller.dart',
-      ).readAsStringSync(),
+        'lib/features/templates/presentation/generation_history_controller_cache.part.dart',
+        'lib/features/templates/presentation/generation_history_controller_lifecycle.part.dart',
+        'lib/features/templates/presentation/generation_history_controller_sync.part.dart',
+      ].map((p) => File(p).readAsStringSync()).join('\n'),
       File(
         'lib/features/templates/presentation/template_generation_controller.dart',
       ).readAsStringSync(),

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_models.dart';
@@ -125,6 +126,15 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
     return '${material.formatShortDate(localDateTime)} ${material.formatTimeOfDay(TimeOfDay.fromDateTime(localDateTime), alwaysUse24HourFormat: true)}';
   }
 
+  String _mapConversationError(AppLocalizations text, String code) {
+    final authMessage = mapCommonAuthFeedbackMessage(text, code);
+    if (authMessage != null) {
+      return authMessage;
+    }
+
+    return text.supportChatUnavailableError;
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = AppLocalizations.of(context);
@@ -195,7 +205,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        text.supportChatEmptyTitle,
+                        text.supportChatUnavailableError,
                         style: TextStyle(
                           color: colors.textStrong,
                           fontSize: 16,
@@ -204,7 +214,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        text.supportChatEmptyMessage,
+                        _mapConversationError(text, _conversationError!),
                         style: TextStyle(color: colors.textSoft, fontSize: 14),
                       ),
                       const SizedBox(height: 12),
