@@ -1,6 +1,8 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 
+using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
@@ -8,7 +10,10 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Client) : IMediaStorage
+internal sealed class R2MediaStorage(
+    TemplatesOptions options,
+    IAmazonS3 s3Client,
+    ILogger<R2MediaStorage>? logger = null) : IMediaStorage
 {
     public async Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
     {
@@ -55,7 +60,7 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
             var detectedContentType = MediaMagicBytes.DetectContentType(tempPath);
             if (detectedContentType is null || !ContentTypesMatch(detectedContentType, asset.ContentType))
             {
-                TemplateMediaTempFiles.TryDeleteIfOwned(tempPath);
+                TemplateMediaTempFiles.TryDeleteIfOwned(tempPath, logger);
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
             }
 
@@ -80,9 +85,16 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
                 contentLength,
                 tempPath));
         }
-        catch
+        catch (Exception exception)
         {
-            TemplateMediaTempFiles.TryDeleteIfOwned(tempPath);
+            logger?.LogWarning(
+                exception,
+                "R2 media store failed. Operation={Operation} StorageKey={StorageKey} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey}",
+                "store",
+                storageKey,
+                contentLength,
+                !string.IsNullOrWhiteSpace(preferredStorageKey));
+            TemplateMediaTempFiles.TryDeleteIfOwned(tempPath, logger);
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
         }
     }
@@ -105,8 +117,13 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
             await s3Client.DeleteObjectAsync(options.R2.BucketName, storageKey, cancellationToken);
             return Result.Success();
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "R2 media delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "delete",
+                storageKey);
             return Result.Failure(TemplatesErrors.MediaStorageFailed);
         }
     }
@@ -115,13 +132,13 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
     {
         if (string.IsNullOrWhiteSpace(assetUrl) || !options.R2.IsConfigured)
         {
-            return Task.FromResult(Result.Success(assetUrl));
+            return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
 
         var storageKey = TryResolveManagedKey(assetUrl);
         if (storageKey is null)
         {
-            return Task.FromResult(Result.Success(assetUrl));
+            return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
 
         try
@@ -136,8 +153,14 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
 
             return Task.FromResult(Result.Success(s3Client.GetPreSignedURL(request)));
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "R2 media read-url signing failed. Operation={Operation} StorageKey={StorageKey} TtlMinutes={TtlMinutes}",
+                "sign_read_url",
+                storageKey,
+                ttl.TotalMinutes);
             return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
     }
@@ -211,6 +234,12 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
     private string? TryResolveManagedKey(string assetUrl)
     {
         var candidate = assetUrl.Trim().Replace('\\', '/');
+        var queryIndex = candidate.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            candidate = candidate[..queryIndex];
+        }
+
         var prefix = NormalizePrefix(options.R2.ObjectKeyPrefix);
         if (candidate.StartsWith($"{prefix}/", StringComparison.OrdinalIgnoreCase))
         {
@@ -231,7 +260,7 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
 
     private static bool ContentTypesMatch(string detectedContentType, string declaredContentType)
     {
-        var normalizedDeclared = declaredContentType.Trim().ToLowerInvariant();
+        var normalizedDeclared = NormalizeContentType(declaredContentType);
         if (string.Equals(normalizedDeclared, "application/octet-stream", StringComparison.OrdinalIgnoreCase))
         {
             return true;
@@ -242,6 +271,18 @@ internal sealed class R2MediaStorage(TemplatesOptions options, IAmazonS3 s3Clien
                 && string.Equals(normalizedDeclared, "application/mp4", StringComparison.OrdinalIgnoreCase))
             || (string.Equals(detectedContentType, "image/jpeg", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(normalizedDeclared, "image/jpg", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string NormalizeContentType(string contentType)
+    {
+        if (string.IsNullOrWhiteSpace(contentType))
+        {
+            return string.Empty;
+        }
+
+        var semicolonIndex = contentType.IndexOf(';');
+        var normalized = semicolonIndex >= 0 ? contentType[..semicolonIndex] : contentType;
+        return normalized.Trim().ToLowerInvariant();
     }
 
     private static string NormalizePrefix(string prefix)

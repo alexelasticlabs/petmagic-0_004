@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Threading.Channels;
 
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
+using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Gamification.Application.Abstractions;
+using PetMagic.Modules.Gamification.Application.Contracts;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -340,6 +345,69 @@ public sealed class TemplateGenerationJobProcessorTests
     }
 
     [Fact]
+    public async Task NotifyGamificationAsync_ShouldForwardTemplateOfTheDayAndPremiumFlags()
+    {
+        await using var dbContext = CreateDbContext();
+        var template = CreateReadyImageTemplate();
+        var now = DateTime.UtcNow;
+        var userId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PetId = petId,
+            TemplateId = template.Id,
+            Status = TemplateGenerationStatus.Completed,
+            TokenCost = template.TokenCost,
+            SourceImageUrl = "http://localhost:5000/templates-media/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            SourceImageFileSizeBytes = 1024,
+            CreatedAtUtc = now.AddMinutes(-1),
+            QueuedAtUtc = now.AddMinutes(-1),
+            ChargedAtUtc = now.AddMinutes(-1),
+            CompletedAtUtc = now,
+            UpdatedAtUtc = now.AddMinutes(-1)
+        };
+
+        dbContext.TemplateItems.Add(template);
+        dbContext.TemplateOfTheDay.Add(new TemplateOfTheDay
+        {
+            Id = Guid.NewGuid(),
+            TemplateId = template.Id,
+            StartDate = DateOnly.FromDateTime(job.CreatedAtUtc),
+            EndDate = null,
+            IsActive = true,
+            IsManual = true,
+            Priority = 100,
+            CreatedAtUtc = now.AddDays(-1),
+            UpdatedAtUtc = now.AddDays(-1)
+        });
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var gamification = new RecordingGamificationService();
+        var processor = CreateProcessor(
+            dbContext,
+            gamificationService: gamification,
+            economyService: PremiumEconomyServiceProxy.Create(isPremium: true));
+
+        var notifyMethod = typeof(TemplateGenerationJobProcessor)
+            .GetMethod("NotifyGamificationAsync", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(notifyMethod);
+        var task = Assert.IsAssignableFrom<Task>(notifyMethod!.Invoke(processor, [job, CancellationToken.None]));
+        await task;
+
+        var notification = Assert.Single(gamification.CompletedGenerations);
+        Assert.Equal(userId, notification.UserId);
+        Assert.Equal(petId, notification.PetId);
+        Assert.Equal(template.Id, notification.TemplateId);
+        Assert.True(notification.IsTemplateOfTheDay);
+        Assert.True(notification.IsPremium);
+    }
+
+    [Fact]
     public async Task ProcessNextAsync_ShouldRestoreJobCorrelationId_ForProviderCalls()
     {
         await using var dbContext = CreateDbContext();
@@ -487,7 +555,9 @@ public sealed class TemplateGenerationJobProcessorTests
         IGeneratedMediaImporter? generatedMediaImporter = null,
         IMediaMetadataReader? mediaMetadataReader = null,
         IMediaStorage? mediaStorage = null,
-        TemplatesOptions? options = null)
+        TemplatesOptions? options = null,
+        IGamificationService? gamificationService = null,
+        IEconomyService? economyService = null)
     {
         return new TemplateGenerationJobProcessor(
             dbContext,
@@ -497,13 +567,15 @@ public sealed class TemplateGenerationJobProcessorTests
             generatedMediaImporter ?? new NoopGeneratedMediaImporter(),
             mediaMetadataReader ?? new FixedDurationMetadataReader(),
             mediaStorage ?? new TrackingMediaStorage(),
-            new NoopImagePreviewGenerator(),
-            new PassthroughWatermarkRenderer(),
-            billing ?? new TestTemplateGenerationBilling(),
-            new RecordingTemplateFeedRealtimeService(),
-            new NoopPushNotificationSender(),
-            options ?? CreateOptions(),
-            NullLogger<TemplateGenerationJobProcessor>.Instance);
+            imagePreviewGenerator: new NoopImagePreviewGenerator(),
+            billing: billing ?? new TestTemplateGenerationBilling(),
+            realtimeService: new RecordingTemplateFeedRealtimeService(),
+            pushNotificationSender: new NoopPushNotificationSender(),
+            options: options ?? CreateOptions(),
+            logger: NullLogger<TemplateGenerationJobProcessor>.Instance,
+            watermarkRenderer: new PassthroughWatermarkRenderer(),
+            gamificationService: gamificationService,
+            economyService: economyService);
     }
 
     private sealed class NoopImagePreviewGenerator : IImagePreviewGenerator
@@ -556,6 +628,110 @@ public sealed class TemplateGenerationJobProcessorTests
             return ValueTask.CompletedTask;
         }
     }
+
+    private sealed class RecordingGamificationService : IGamificationService
+    {
+        public List<GamificationCompletionCall> CompletedGenerations { get; } = [];
+
+        public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(
+            Guid userId,
+            Guid petId,
+            Guid templateId,
+            bool isTemplateOfTheDay,
+            bool isPremium,
+            CancellationToken cancellationToken)
+        {
+            CompletedGenerations.Add(new GamificationCompletionCall(userId, petId, templateId, isTemplateOfTheDay, isPremium));
+            return Task.FromResult(new GenerationProcessResult(0, null, null, false, [], 0));
+        }
+
+        public Task<PetProgressResponse?> GetPetProgressAsync(Guid userId, Guid petId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<PetProgressResponse?>(null);
+        }
+
+        public Task<IReadOnlyList<AchievementResponse>> GetAchievementsAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AchievementResponse>>([]);
+        }
+
+        public Task<IReadOnlyList<AchievementResponse>> GetRecentAchievementsAsync(Guid userId, int count, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AchievementResponse>>([]);
+        }
+
+        public Task<StreakResponse?> GetStreakAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StreakResponse?>(null);
+        }
+
+        public Task<UseFreezeResult> UseStreakFreezeAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new UseFreezeResult(false, 0));
+        }
+
+        public Task<IReadOnlyList<ChallengeResponse>> GetCurrentChallengesAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<ChallengeResponse>>([]);
+        }
+
+        public Task<GamificationSummaryResponse> GetSummaryAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new GamificationSummaryResponse(null, [], [], []));
+        }
+
+        public Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+    }
+
+    private class PremiumEconomyServiceProxy : DispatchProxy
+    {
+        public bool IsPremium { get; set; }
+
+        public static IEconomyService Create(bool isPremium)
+        {
+            var service = Create<IEconomyService, PremiumEconomyServiceProxy>();
+            ((PremiumEconomyServiceProxy)(object)service).IsPremium = isPremium;
+            return service;
+        }
+
+        protected override object Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(IEconomyService.GetSubscriptionSummaryAsync)
+                && args is [Guid, CancellationToken])
+            {
+                return Task.FromResult(Result.Success(new SubscriptionSummaryResponse(
+                    IsPremium,
+                    Provider: IsPremium ? "stripe" : null,
+                    PurchaseChannel: IsPremium ? "web" : null,
+                    Status: IsPremium ? "active" : "inactive",
+                    PlanName: IsPremium ? "Premium" : null,
+                    BillingPeriod: IsPremium ? "monthly" : null,
+                    CurrentPeriodStartUtc: null,
+                    CurrentPeriodEndUtc: null,
+                    CancelAtPeriodEnd: false,
+                    MonthlyTokenLimit: 0,
+                    TokensAvailable: 0,
+                    CanManageSubscription: IsPremium,
+                    ManageSubscriptionAction: IsPremium ? "manage" : "none",
+                    LastTokenGrantAtUtc: null,
+                    CardBrand: null,
+                    CardLast4: null,
+                    WeeklyGrantAmount: 0)));
+            }
+
+            throw new NotSupportedException(targetMethod?.Name ?? "Unknown economy method");
+        }
+    }
+
+    private sealed record GamificationCompletionCall(
+        Guid UserId,
+        Guid PetId,
+        Guid TemplateId,
+        bool IsTemplateOfTheDay,
+        bool IsPremium);
 
     private static TemplatesOptions CreateOptions(int refundRetryDelayMilliseconds = 30_000, int retentionDays = 7, int staleProcessingRecoveryDelayMilliseconds = 900_000)
     {

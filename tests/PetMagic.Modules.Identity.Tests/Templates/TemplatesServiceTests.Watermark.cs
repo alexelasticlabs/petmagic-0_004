@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using System.Text.Json;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Gamification.Application.Abstractions;
+using PetMagic.Modules.Gamification.Application.Contracts;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
@@ -447,6 +449,26 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetShareAsync_ShouldRecordShareChallengeProgress()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var gamification = new RecordingGamificationService();
+        var service = new TemplateGenerationService(
+            dbContext,
+            new PassiveGenerationBilling(),
+            new RecordingMediaStorage(),
+            CreateTemplatesOptions(),
+            gamificationService: gamification);
+        var job = await SeedCompletedWatermarkedGenerationAsync(dbContext, userId);
+
+        var share = await service.GetShareAsync(userId, job.Id, isPremium: true, CancellationToken.None);
+
+        Assert.True(share.IsSuccess);
+        Assert.Equal([userId], gamification.SharedUsers);
+    }
+
+    [Fact]
     public async Task MarkReadAsync_ShouldRecordResultViewedAnalyticsOnce()
     {
         await using var dbContext = CreateDbContext();
@@ -609,6 +631,57 @@ public sealed partial class TemplatesServiceTests
         {
             SpendCalls++;
             return Task.FromResult(Result.Success(remainingCredits));
+        }
+    }
+
+    private sealed class RecordingGamificationService : IGamificationService
+    {
+        public List<Guid> SharedUsers { get; } = [];
+
+        public Task<GenerationProcessResult> ProcessGenerationCompletedAsync(Guid userId, Guid petId, Guid templateId, bool isTemplateOfTheDay, bool isPremium, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new GenerationProcessResult(0, null, null, false, [], 0));
+        }
+
+        public Task<PetProgressResponse?> GetPetProgressAsync(Guid userId, Guid petId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<PetProgressResponse?>(null);
+        }
+
+        public Task<IReadOnlyList<AchievementResponse>> GetAchievementsAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AchievementResponse>>([]);
+        }
+
+        public Task<IReadOnlyList<AchievementResponse>> GetRecentAchievementsAsync(Guid userId, int count, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<AchievementResponse>>([]);
+        }
+
+        public Task<StreakResponse?> GetStreakAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<StreakResponse?>(null);
+        }
+
+        public Task<UseFreezeResult> UseStreakFreezeAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new UseFreezeResult(false, 0));
+        }
+
+        public Task<IReadOnlyList<ChallengeResponse>> GetCurrentChallengesAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IReadOnlyList<ChallengeResponse>>([]);
+        }
+
+        public Task<GamificationSummaryResponse> GetSummaryAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new GamificationSummaryResponse(null, [], [], []));
+        }
+
+        public Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+        {
+            SharedUsers.Add(userId);
+            return Task.CompletedTask;
         }
     }
 }

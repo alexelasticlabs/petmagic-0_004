@@ -1,0 +1,165 @@
+using Microsoft.EntityFrameworkCore;
+
+using PetMagic.BuildingBlocks.Observability;
+using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Templates.Application.Contracts;
+using PetMagic.Modules.Templates.Domain;
+using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
+
+namespace PetMagic.Modules.Templates.Infrastructure;
+
+internal sealed partial class TemplateGenerationService
+{
+    public async Task<Result<TemplateGenerationResponse>> StartAsync(
+        StartTemplateGenerationCommand command,
+        CancellationToken cancellationToken)
+    {
+        var normalizedIdempotencyKey = NormalizeOptionalText(command.IdempotencyKey, 256);
+        var normalizedRequestHash = NormalizeOptionalText(command.RequestHash, 128);
+        var correlationId = NormalizeOptionalText(CorrelationContext.CurrentId, CorrelationContext.MaxLength);
+
+        var template = await dbContext.TemplateItems
+            .Include(x => x.Assets)
+            .FirstOrDefaultAsync(x => x.Id == command.TemplateId, cancellationToken);
+
+        if (template is null)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.NotFound);
+        }
+
+        var readiness = ValidateTemplate(template, requireActiveStatus: true);
+        if (readiness is not null)
+        {
+            return Result.Failure<TemplateGenerationResponse>(readiness);
+        }
+
+        var duplicate = await FindActiveDuplicateAsync(
+            command.UserId,
+            normalizedIdempotencyKey,
+            normalizedRequestHash,
+            cancellationToken);
+        if (duplicate is not null)
+        {
+            return Result.Success(await MapResponseWithQueueMetricsAsync(duplicate, cancellationToken));
+        }
+
+        var activeLimit = Math.Max(1, command.ActiveGenerationLimit ?? options.FreeUserMaxActiveGenerations);
+        var activeCount = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .CountAsync(x => x.UserId == command.UserId
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status),
+                cancellationToken);
+        if (activeCount >= activeLimit)
+        {
+            return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.ActiveGenerationLimitReached);
+        }
+
+        if (options.QueueMaxSize > 0)
+        {
+            var queueSize = await dbContext.TemplateGenerationJobs
+                .AsNoTracking()
+                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status), cancellationToken);
+            if (queueSize >= options.QueueMaxSize)
+            {
+                return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationQueueOverloaded);
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        var sourceImageStoragePath = ResolveManagedStoragePathOrUrl(command.SourceImageAsset.Url);
+        var sourceImagePreviewStoragePath = command.SourceImagePreviewAsset is null
+            ? null
+            : ResolveManagedStoragePathOrUrl(command.SourceImagePreviewAsset.Url);
+        var generationId = Guid.NewGuid();
+        var inputMediaAssetId = Guid.NewGuid();
+        var job = new TemplateGenerationJob
+        {
+            Id = generationId,
+            UserId = command.UserId,
+            TemplateId = template.Id,
+            Template = template,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            InputSourceType = "user_upload",
+            InputMediaAssetId = inputMediaAssetId,
+            SourceImageUrl = sourceImageStoragePath,
+            SourceImageFileName = command.SourceImageAsset.FileName,
+            SourceImageContentType = command.SourceImageAsset.ContentType,
+            SourceImageFileSizeBytes = command.SourceImageAsset.FileSizeBytes,
+            ReferenceMotionUrl = GetAsset(template, TemplateAssetKind.ReferenceMotion)?.Url,
+            IdempotencyKey = normalizedIdempotencyKey,
+            RequestHash = normalizedRequestHash,
+            CorrelationId = correlationId,
+            CreatedAtUtc = now,
+            QueuedAtUtc = now,
+            UpdatedAtUtc = now
+        };
+
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = inputMediaAssetId,
+            UserId = command.UserId,
+            MediaType = "image",
+            StoragePath = sourceImageStoragePath,
+            PreviewUrl = sourceImagePreviewStoragePath,
+            SourceType = "user_upload",
+            GenerationId = generationId,
+            Url = command.SourceImageAsset.Url,
+            FileName = command.SourceImageAsset.FileName,
+            ContentType = command.SourceImageAsset.ContentType,
+            FileSizeBytes = command.SourceImageAsset.FileSizeBytes,
+            Role = TemplateMediaRole.GenerationSourceImage,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            GenerationJobId = generationId,
+            UploadedAtUtc = now,
+            AttachedAtUtc = now,
+            ExpiresAtUtc = null,
+            DeletedAtUtc = null,
+            IsDeleted = false
+        });
+        dbContext.TemplateGenerationJobs.Add(job);
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.TemplateSelected);
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationStarted);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobQueued(job);
+        }
+        catch (DbUpdateException) when (normalizedIdempotencyKey is not null || normalizedRequestHash is not null)
+        {
+            dbContext.ChangeTracker.Clear();
+            duplicate = await FindActiveDuplicateAsync(
+                command.UserId,
+                normalizedIdempotencyKey,
+                normalizedRequestHash,
+                cancellationToken);
+            if (duplicate is not null)
+            {
+                return Result.Success(await MapResponseWithQueueMetricsAsync(duplicate, cancellationToken));
+            }
+
+            throw;
+        }
+
+        var charge = await billing.ChargeAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
+        if (charge.IsFailure)
+        {
+            var previousStatus = job.Status;
+            job.Status = TemplateGenerationStatus.Failed;
+            job.LastErrorCode = charge.Error.Code;
+            job.LastErrorMessage = charge.Error.Message;
+            job.UpdatedAtUtc = DateTime.UtcNow;
+            job.CompletedAtUtc = job.UpdatedAtUtc;
+            await dbContext.SaveChangesAsync(cancellationToken);
+            TemplateGenerationMetrics.RecordJobFailed(job, previousStatus, charge.Error.Code);
+            return Result.Failure<TemplateGenerationResponse>(charge.Error);
+        }
+
+        job.ChargedAtUtc = DateTime.UtcNow;
+        job.UpdatedAtUtc = job.ChargedAtUtc.Value;
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(await MapResponseWithQueueMetricsAsync(job, cancellationToken));
+    }
+}

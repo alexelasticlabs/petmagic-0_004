@@ -181,8 +181,21 @@ public sealed partial class EconomyService
         }
 
         if (!string.Equals(order.PaymentProvider, "stripe", StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal)
             || string.IsNullOrWhiteSpace(order.ExternalPaymentId))
+        {
+            return Result.Failure<PurchaseHistoryItemResponse>(EconomyErrors.PurchaseNotRefundable);
+        }
+
+        if (string.Equals(order.Status, PurchaseOrderStatus.Refunded, StringComparison.Ordinal))
+        {
+            var refundedPack = await dbContext.CurrencyPacks
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == order.PackId, cancellationToken);
+
+            return Result.Success(ToPurchaseHistoryItem(order, refundedPack));
+        }
+
+        if (!string.Equals(order.Status, PurchaseOrderStatus.Succeeded, StringComparison.Ordinal))
         {
             return Result.Failure<PurchaseHistoryItemResponse>(EconomyErrors.PurchaseNotRefundable);
         }
@@ -204,8 +217,16 @@ public sealed partial class EconomyService
         }
 
         var oldStatus = order.Status;
-        order.Status = PurchaseOrderStatus.Refunded;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var refundSettlement = await ApplyPurchaseRefundInternalAsync(
+            order,
+            refundResult.Value.ExternalRefundId,
+            cancellationToken);
+        if (refundSettlement.IsFailure)
+        {
+            return Result.Failure<PurchaseHistoryItemResponse>(refundSettlement.Error);
+        }
+
+        order = refundSettlement.Value;
 
         if (adminAuditLog is not null)
         {
@@ -216,7 +237,7 @@ public sealed partial class EconomyService
                     order.Id.ToString("D"),
                     oldStatus,
                     order.Status,
-                    $"Refunded {order.PriceAmount} {order.CurrencyCode}. Provider refund: {refundResult.Value.ExternalRefundId}.",
+                    $"Refunded {order.PriceAmount} {order.CurrencyCode}. Provider refund: {refundResult.Value.ExternalRefundId}. Revoked {order.SparkToGrant} tokens.",
                     order.UserId),
                 cancellationToken);
         }
@@ -236,12 +257,36 @@ public sealed partial class EconomyService
         var previousWeekStart = currentWeekStart.AddDays(-7);
         var nextDayStart = StartOfUtcDay(now).AddDays(1);
 
-        var activeSubscriptions = await dbContext.UserSubscriptions
+        var subscriptionSnapshots = await dbContext.UserSubscriptions
             .AsNoTracking()
-            .CountAsync(x => x.Status.ToLower() == "active", cancellationToken);
-        var renewalStops = await dbContext.UserSubscriptions
-            .AsNoTracking()
-            .CountAsync(x => x.CancelAtPeriodEnd, cancellationToken);
+            .Select(x => new UserSubscription
+            {
+                Id = x.Id,
+                UserId = x.UserId,
+                Provider = x.Provider,
+                PurchaseChannel = x.PurchaseChannel,
+                Region = x.Region,
+                PlanId = x.PlanId,
+                ProductId = x.ProductId,
+                Status = x.Status,
+                ExternalCustomerId = x.ExternalCustomerId,
+                ExternalSubscriptionId = x.ExternalSubscriptionId,
+                ExternalTransactionId = x.ExternalTransactionId,
+                CurrentPeriodStartUtc = x.CurrentPeriodStartUtc,
+                CurrentPeriodEndUtc = x.CurrentPeriodEndUtc,
+                CancelAtPeriodEnd = x.CancelAtPeriodEnd,
+                CancelledAtUtc = x.CancelledAtUtc,
+                ExpiredAtUtc = x.ExpiredAtUtc,
+                MonthlyTokenLimit = x.MonthlyTokenLimit,
+                MonthlyTokensGranted = x.MonthlyTokensGranted,
+                LastTokenGrantAtUtc = x.LastTokenGrantAtUtc,
+                LastValidatedAtUtc = x.LastValidatedAtUtc,
+                CreatedAtUtc = x.CreatedAtUtc,
+                UpdatedAtUtc = x.UpdatedAtUtc
+            })
+            .ToListAsync(cancellationToken);
+        var activeSubscriptions = subscriptionSnapshots.Count(IsActivePremiumSubscription);
+        var renewalStops = subscriptionSnapshots.Count(x => x.CancelAtPeriodEnd && IsActivePremiumSubscription(x));
         var totalWalletCredits = await dbContext.WalletLedgerEntries
             .AsNoTracking()
             .Where(x => x.Delta > 0)

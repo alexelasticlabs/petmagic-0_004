@@ -7,6 +7,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Payments;
 
 internal static partial class EconomyWebhookParser
 {
+    private static readonly TimeSpan StripeFallbackSignatureTolerance = TimeSpan.FromMinutes(5);
+
     public sealed record AppStoreTransactionInfo(
         string? BundleId,
         string? ProductId,
@@ -18,15 +20,19 @@ internal static partial class EconomyWebhookParser
 
     public static bool IsStoreSubscriptionPremium(string status, DateTime? currentPeriodEndUtc)
     {
-        if (!string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "Trialing", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "GracePeriod", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase))
+        if (!IsStoreSubscriptionStatusPremiumEligible(status))
         {
             return false;
         }
 
-        return currentPeriodEndUtc is null || currentPeriodEndUtc >= DateTime.UtcNow;
+        return currentPeriodEndUtc.HasValue && currentPeriodEndUtc.Value >= DateTime.UtcNow;
+    }
+
+    public static string NormalizeStoreSubscriptionStatus(string status, DateTime? currentPeriodEndUtc)
+    {
+        return !currentPeriodEndUtc.HasValue && IsStoreSubscriptionStatusPremiumEligible(status)
+            ? "Expired"
+            : status;
     }
 
     public static string MapStoreSubscriptionStatus(string providerStatus, bool isActive)
@@ -96,6 +102,14 @@ internal static partial class EconomyWebhookParser
             12 or 13 => "Expired",
             _ => MapStoreSubscriptionStatus(providerStatus, isActive)
         };
+    }
+
+    private static bool IsStoreSubscriptionStatusPremiumEligible(string status)
+    {
+        return string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Trialing", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "GracePeriod", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase);
     }
 
     public static (bool Success, string? EventId, string? NotificationType, string? Subtype, string? ProductId, string? ExternalSubscriptionId, string? ExternalPurchaseId, DateTime? ExpiresAtUtc, bool CancelAtPeriodEnd) ParseAppStoreServerNotification(string signedPayload)
@@ -280,7 +294,7 @@ internal static partial class EconomyWebhookParser
         }
     }
 
-    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? Purpose, string? SetupIntentId, string? Status, string? PlanCode, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
+    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
     {
         try
         {
@@ -292,13 +306,23 @@ internal static partial class EconomyWebhookParser
                 || !dataElement.TryGetProperty("object", out var objectElement)
                 || objectElement.ValueKind != JsonValueKind.Object)
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
             }
 
             string? objectId = null;
             if (objectElement.TryGetProperty("id", out var idElement) && idElement.ValueKind == JsonValueKind.String)
             {
                 objectId = idElement.GetString();
+            }
+
+            string? paymentReferenceId = null;
+            if (objectElement.TryGetProperty("payment_intent", out var paymentIntentElement) && paymentIntentElement.ValueKind == JsonValueKind.String)
+            {
+                paymentReferenceId = paymentIntentElement.GetString();
+            }
+            else if (objectElement.TryGetProperty("charge", out var chargeElement) && chargeElement.ValueKind == JsonValueKind.String)
+            {
+                paymentReferenceId = chargeElement.GetString();
             }
 
             string? setupIntentId = null;
@@ -336,6 +360,8 @@ internal static partial class EconomyWebhookParser
             {
                 subscriptionId = objectId;
             }
+
+            var stripePriceId = TryReadStripePriceId(objectElement);
 
             DateTime? currentPeriodStartUtc = null;
             if (objectElement.TryGetProperty("current_period_start", out var currentPeriodStartElement)
@@ -376,7 +402,7 @@ internal static partial class EconomyWebhookParser
                 ApplyStripeMetadata(subscriptionMetadataElement, ref orderId, ref userId, ref purpose, ref planCode);
             }
 
-            return (true, orderId, userId, objectId, purpose, setupIntentId, status, planCode, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
+            return (true, orderId, userId, objectId, paymentReferenceId, purpose, setupIntentId, status, planCode, stripePriceId, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
         }
         catch
         {
@@ -401,11 +427,90 @@ internal static partial class EconomyWebhookParser
 
             if (!orderId.HasValue && string.IsNullOrWhiteSpace(objectId))
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
             }
 
-            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, false);
+            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, null, null, false);
         }
+    }
+
+    private static string? TryReadStripePriceId(JsonElement objectElement)
+    {
+        if (TryReadStripePriceIdFromContainer(objectElement, out var directPriceId))
+        {
+            return directPriceId;
+        }
+
+        if (objectElement.TryGetProperty("items", out var itemsElement)
+            && itemsElement.ValueKind == JsonValueKind.Object
+            && itemsElement.TryGetProperty("data", out var itemDataElement)
+            && itemDataElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var itemElement in itemDataElement.EnumerateArray())
+            {
+                if (TryReadStripePriceIdFromContainer(itemElement, out var itemPriceId))
+                {
+                    return itemPriceId;
+                }
+            }
+        }
+
+        if (objectElement.TryGetProperty("lines", out var linesElement)
+            && linesElement.ValueKind == JsonValueKind.Object
+            && linesElement.TryGetProperty("data", out var lineDataElement)
+            && lineDataElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var lineElement in lineDataElement.EnumerateArray())
+            {
+                if (TryReadStripePriceIdFromContainer(lineElement, out var linePriceId))
+                {
+                    return linePriceId;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryReadStripePriceIdFromContainer(JsonElement containerElement, out string? stripePriceId)
+    {
+        stripePriceId = null;
+
+        if (containerElement.TryGetProperty("price", out var priceElement))
+        {
+            if (priceElement.ValueKind == JsonValueKind.String)
+            {
+                stripePriceId = priceElement.GetString();
+                return !string.IsNullOrWhiteSpace(stripePriceId);
+            }
+
+            if (priceElement.ValueKind == JsonValueKind.Object
+                && priceElement.TryGetProperty("id", out var nestedPriceIdElement)
+                && nestedPriceIdElement.ValueKind == JsonValueKind.String)
+            {
+                stripePriceId = nestedPriceIdElement.GetString();
+                return !string.IsNullOrWhiteSpace(stripePriceId);
+            }
+        }
+
+        if (containerElement.TryGetProperty("plan", out var planElement))
+        {
+            if (planElement.ValueKind == JsonValueKind.String)
+            {
+                stripePriceId = planElement.GetString();
+                return !string.IsNullOrWhiteSpace(stripePriceId);
+            }
+
+            if (planElement.ValueKind == JsonValueKind.Object
+                && planElement.TryGetProperty("id", out var nestedPlanIdElement)
+                && nestedPlanIdElement.ValueKind == JsonValueKind.String)
+            {
+                stripePriceId = nestedPlanIdElement.GetString();
+                return !string.IsNullOrWhiteSpace(stripePriceId);
+            }
+        }
+
+        return false;
     }
 
     private static void ApplyStripeMetadata(
@@ -521,6 +626,18 @@ internal static partial class EconomyWebhookParser
         }
 
         if (string.IsNullOrWhiteSpace(timestamp) || string.IsNullOrWhiteSpace(expectedSignature))
+        {
+            return false;
+        }
+
+        if (!long.TryParse(timestamp, out var unixTimestampSeconds))
+        {
+            return false;
+        }
+
+        var signedAtUtc = DateTimeOffset.FromUnixTimeSeconds(unixTimestampSeconds);
+        var age = DateTimeOffset.UtcNow - signedAtUtc;
+        if (age < TimeSpan.Zero || age > StripeFallbackSignatureTolerance)
         {
             return false;
         }

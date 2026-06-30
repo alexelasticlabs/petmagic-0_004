@@ -8,8 +8,10 @@ using System.Text.Json;
 using FluentValidation;
 
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.AspNetCore.TestHost;
@@ -22,6 +24,7 @@ using Microsoft.Extensions.Options;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
+using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 using PetMagic.Modules.SupportChat.Api;
@@ -33,7 +36,7 @@ using PetMagic.Modules.SupportChat.Infrastructure.Data;
 
 namespace PetMagic.Modules.Identity.Tests.SupportChat;
 
-public sealed class SupportChatEndpointsIntegrationTests
+public sealed partial class SupportChatEndpointsIntegrationTests
 {
     private static readonly Guid UserId = Guid.Parse("A61F6697-8254-45F0-9C24-B6941A92D8E1");
     private static readonly Guid OtherUserId = Guid.Parse("6C0F443A-BAFC-4D80-A7F2-130839E95C35");
@@ -77,6 +80,38 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
+    public async Task OpenConversationEndpoint_ShouldIgnoreClientProvidedPaymentLinks()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var generationId = Guid.NewGuid();
+        var paymentId = Guid.NewGuid();
+        var subscriptionId = Guid.NewGuid();
+
+        var opened = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationWithPaymentLinksRequest(
+                "Billing issue",
+                SupportConversationPriority.Normal,
+                RelatedGenerationId: generationId,
+                RelatedPaymentId: paymentId,
+                RelatedSubscriptionId: subscriptionId));
+
+        Assert.Null(opened.RelatedGenerationId);
+        Assert.Null(opened.RelatedPaymentId);
+        Assert.Null(opened.RelatedSubscriptionId);
+
+        var adminContext = await GetFromJsonAsync<SupportTicketContextResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            $"/api/admin/support/tickets/{opened.ConversationId}/context");
+
+        Assert.Null(adminContext.LinkedGeneration);
+        Assert.Null(adminContext.RelatedPaymentId);
+        Assert.Null(adminContext.RelatedSubscriptionId);
+    }
+
+    [Fact]
     public async Task AdminEndpoints_ShouldRejectRegularUser_AndAllowModeratorInboxAccess()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
@@ -99,151 +134,6 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal(created.ConversationId, conversation.ConversationId);
         Assert.Equal("New", conversation.Status);
         Assert.Equal("user@petmagic.test", conversation.UserEmail);
-    }
-
-    [Fact]
-    public async Task AdminInbox_ShouldFilterByAssignmentScope()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var adminClient = application.CreateClient(AdminId, "Admin");
-
-        var mine = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Assigned case", SupportConversationPriority.Normal));
-
-        var adminReply = await PostAsJsonAsync<SupportMessageResponse>(
-            adminClient,
-            $"/api/admin/support/tickets/{mine.ConversationId}/messages",
-            new SendSupportMessageRequest("Assigned via first admin reply"));
-        Assert.True(adminReply.IsFromAdmin);
-
-        var unassignedApplication = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(OtherUserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Unassigned case", SupportConversationPriority.Normal));
-
-        var mineInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            adminClient,
-            "/api/admin/support/tickets?assignment=mine");
-
-        var unassignedInbox = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            adminClient,
-            "/api/admin/support/tickets?assignment=unassigned");
-
-        Assert.Single(mineInbox.Items);
-        Assert.Single(unassignedInbox.Items);
-        Assert.Equal(1, mineInbox.TotalCount);
-        Assert.Equal(1, unassignedInbox.TotalCount);
-        Assert.Equal(mine.ConversationId, mineInbox.Items[0].ConversationId);
-        Assert.Equal(unassignedApplication.ConversationId, unassignedInbox.Items[0].ConversationId);
-    }
-
-    [Fact]
-    public async Task AdminInbox_ShouldReturnPagedMetadata()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("First paged case", SupportConversationPriority.Normal));
-
-        await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(OtherUserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Second paged case", SupportConversationPriority.Normal));
-
-        var firstPage = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            application.CreateClient(AdminId, "Admin"),
-            "/api/admin/support/tickets?page=1&pageSize=1");
-
-        Assert.Equal(1, firstPage.Page);
-        Assert.Equal(1, firstPage.PageSize);
-        Assert.Equal(2, firstPage.TotalCount);
-        Assert.True(firstPage.HasMore);
-        Assert.Single(firstPage.Items);
-
-        var secondPage = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            application.CreateClient(AdminId, "Admin"),
-            "/api/admin/support/tickets?page=2&pageSize=1");
-
-        Assert.Equal(2, secondPage.Page);
-        Assert.Equal(1, secondPage.PageSize);
-        Assert.Equal(2, secondPage.TotalCount);
-        Assert.False(secondPage.HasMore);
-        Assert.Single(secondPage.Items);
-        Assert.NotEqual(firstPage.Items[0].ConversationId, secondPage.Items[0].ConversationId);
-    }
-
-    [Fact]
-    public async Task AdminInbox_ShouldAcceptRepeatedStatusFiltersWithPrioritySort()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var otherUserClient = application.CreateClient(OtherUserId, "User");
-        var adminClient = application.CreateClient(AdminId, "Admin");
-
-        var newTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("New high priority case", SupportConversationPriority.High));
-
-        var waitingTicket = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            otherUserClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Waiting case", SupportConversationPriority.Normal));
-
-        await PostAsJsonAsync<SupportMessageResponse>(
-            adminClient,
-            $"/api/admin/support/tickets/{waitingTicket.ConversationId}/messages",
-            new SendSupportMessageRequest("Need more details"));
-
-        var tickets = await GetFromJsonAsync<SupportConversationInboxPageResponse>(
-            adminClient,
-            "/api/admin/support/tickets?status=New&status=WaitingForUser&sort=priority&page=1&pageSize=10");
-
-        Assert.Equal(2, tickets.TotalCount);
-        Assert.Equal(newTicket.ConversationId, tickets.Items[0].ConversationId);
-        Assert.Equal("High", tickets.Items[0].Priority);
-        Assert.Contains(tickets.Items, item => item.Status == "New");
-        Assert.Contains(tickets.Items, item => item.Status == "WaitingForUser");
-    }
-
-    [Fact]
-    public async Task AdminInbox_ShouldReturnFieldSpecificProblemForInvalidAssignmentFilter()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        using var response = await application.CreateClient(AdminId, "Admin")
-            .GetAsync("/api/admin/support/tickets?assignment=everyone");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("support.assignment_invalid", body, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("status=1", "support.status_invalid")]
-    [InlineData("status=-1", "support.status_invalid")]
-    [InlineData("source=1", "support.source_invalid")]
-    [InlineData("source=-1", "support.source_invalid")]
-    [InlineData("priority=1", "support.priority_invalid")]
-    [InlineData("priority=-1", "support.priority_invalid")]
-    public async Task AdminInbox_ShouldRejectNumericEnumFilters(string query, string expectedErrorCode)
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        using var response = await application.CreateClient(AdminId, "Admin")
-            .GetAsync($"/api/admin/support/tickets?{query}");
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains(expectedErrorCode, body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -274,13 +164,18 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Equal("User", ticket.LastMessageSenderType);
         Assert.True(ticket.UnreadForAdmin);
 
-        using var assignBlockedResponse = await adminClient.PostAsync(
-            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me",
-            content: null);
+        var assigned = await PostEmptyAsync<SupportConversationDetailResponse>(
+            adminClient,
+            $"/api/admin/support/tickets/{created.ConversationId}/assign-to-me");
 
-        Assert.Equal(HttpStatusCode.BadRequest, assignBlockedResponse.StatusCode);
-        var assignBlockedBody = await assignBlockedResponse.Content.ReadAsStringAsync();
-        Assert.Contains("support.status_transition_invalid", assignBlockedBody);
+        Assert.Equal("InProgress", assigned.Status);
+        Assert.Equal(AdminId, assigned.AssignedAdminId);
+        Assert.Contains(
+            assigned.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+        Assert.Contains(
+            assigned.Messages,
+            message => message.SenderType == "System" && message.Body == "Status changed: New -> InProgress");
 
         using var waitingBlockedResponse = await adminClient.PostAsync(
             $"/api/admin/support/tickets/{created.ConversationId}/mark-waiting-for-user",
@@ -384,6 +279,73 @@ public sealed class SupportChatEndpointsIntegrationTests
         Assert.Contains(
             afterReopen.Messages,
             message => message.SenderType == "System" && message.Body == "Ticket reopened by user message");
+    }
+
+    [Fact]
+    public async Task AdminAssignmentEndpoint_ShouldAssignNewConversationAndMoveToInProgress()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Please assign this case", SupportConversationPriority.Normal));
+
+        var assigned = await PutAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(AdminId, "Admin"),
+            $"/api/admin/support/tickets/{created.ConversationId}/assignment",
+            new AssignSupportConversationRequest(AdminId));
+
+        Assert.Equal("InProgress", assigned.Status);
+        Assert.Equal(AdminId, assigned.AssignedAdminId);
+        Assert.Contains(
+            assigned.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+        Assert.Contains(
+            assigned.Messages,
+            message => message.SenderType == "System" && message.Body == "Status changed: New -> InProgress");
+    }
+
+    [Fact]
+    public async Task AdminAssignmentEndpoint_ShouldRejectEmptyAssignedAdminId()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Please validate assignment", SupportConversationPriority.Normal));
+
+        using var response = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/assignment",
+            new AssignSupportConversationRequest(Guid.Empty));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Contains(nameof(AssignSupportConversationRequest.AssignedAdminId), problem.Errors.Keys);
+    }
+
+    [Fact]
+    public async Task AdminAssignmentEndpoint_ShouldRejectRegularUserAssignee()
+    {
+        await using var application = await SupportChatTestApplication.CreateAsync();
+
+        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
+            application.CreateClient(UserId, "User"),
+            "/api/support/conversation/open",
+            new OpenConversationRequest("Please validate support assignee", SupportConversationPriority.Normal));
+
+        using var response = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
+            $"/api/admin/support/tickets/{created.ConversationId}/assignment",
+            new AssignSupportConversationRequest(OtherUserId));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>(JsonOptions);
+        Assert.NotNull(problem);
+        Assert.Equal("support.assigned_admin_invalid", problem.Title);
     }
 
     [Fact]
@@ -551,438 +513,6 @@ public sealed class SupportChatEndpointsIntegrationTests
             .Intersect(secondPage.Messages.Select(x => x.MessageId))
             .ToList();
         Assert.Empty(overlap);
-    }
-
-    [Fact]
-    public async Task UserAttachmentEndpoint_ShouldUploadImageAndExposeAttachmentMetadata()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need help with screenshot", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(fileContent, "file", "issue.png");
-        form.Add(new StringContent("Screenshot of the payment error"), "body");
-
-        using var response = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/attachments",
-            form);
-
-        await AssertSuccessAsync(response);
-
-        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
-        Assert.False(message.IsFromAdmin);
-        Assert.Equal("Screenshot of the payment error", message.Body);
-        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
-        Assert.Null(message.AttachmentUploadErrorCode);
-        Assert.Null(message.PendingAttachment);
-        var uploadedAttachment = Assert.Single(message.Attachments);
-        Assert.Equal("issue.png", uploadedAttachment.FileName);
-        Assert.Equal("image/png", uploadedAttachment.MimeType);
-        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
-        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
-
-        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(AdminId, "Admin"),
-            $"/api/admin/support/tickets/{created.ConversationId}");
-
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
-        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
-        Assert.Equal("issue.png", conversationAttachment.FileName);
-        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
-        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
-    }
-
-    [Fact]
-    public async Task UserAttachmentEndpoint_ShouldUploadVideoAndExposeAttachmentMetadata()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need help with uploaded video", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6F, 0x6D]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("video/mp4");
-        form.Add(fileContent, "file", "issue.mp4");
-        form.Add(new StringContent("Video of the issue"), "body");
-
-        using var response = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/attachments",
-            form);
-
-        await AssertSuccessAsync(response);
-
-        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
-        Assert.False(message.IsFromAdmin);
-        Assert.Equal("Video of the issue", message.Body);
-        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
-        Assert.Null(message.AttachmentUploadErrorCode);
-        Assert.Null(message.PendingAttachment);
-        var uploadedAttachment = Assert.Single(message.Attachments);
-        Assert.Equal("issue.mp4", uploadedAttachment.FileName);
-        Assert.Equal("video/mp4", uploadedAttachment.MimeType);
-        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
-        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
-
-        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(AdminId, "Admin"),
-            $"/api/admin/support/tickets/{created.ConversationId}");
-
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
-        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
-        Assert.Equal("issue.mp4", conversationAttachment.FileName);
-        Assert.Equal("video/mp4", conversationAttachment.MimeType);
-        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
-        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
-    }
-
-    [Fact]
-    public async Task AttachmentBatchEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need help with batch upload", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(fileContent, "files", "issue.png");
-        form.Add(new StringContent(new string('x', 4001)), "body");
-        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
-
-        using var response = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/messages/attachments",
-            form);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
-    }
-
-    [Fact]
-    public async Task UserSingleAttachmentEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need help with single upload", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(fileContent, "file", "issue.png");
-        form.Add(new StringContent(new string('x', 4001)), "body");
-        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
-
-        using var response = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/attachments",
-            form);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
-    }
-
-    [Fact]
-    public async Task UserMessageEndpoint_ShouldAppendLocalizedAutomaticReply_ForFirstMessage()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest(null, SupportConversationPriority.Normal));
-
-        var sent = await PostAsJsonAsync<SupportMessageResponse>(
-            userClient,
-            $"/api/support/conversation/{created.ConversationId}/messages",
-            new SendSupportMessageRequest("Bonjour", "fr-FR"));
-
-        Assert.False(sent.IsFromAdmin);
-
-        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation");
-
-        var userMessage = Assert.Single(conversation.Messages, message => message.SenderType == "User");
-        Assert.Equal("Bonjour", userMessage.Body);
-        var botMessage = Assert.Single(conversation.Messages, message => message.SenderType == "Bot");
-        Assert.Equal(
-            "Message recu. Le support repondra dans ce chat.",
-            botMessage.Body);
-        Assert.True(botMessage.IsFromAdmin);
-        Assert.True(botMessage.IsRead);
-    }
-
-    [Fact]
-    public async Task AdminSingleAttachmentEndpoint_ShouldValidateCheapFormFieldsBeforeStoringFiles()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need admin upload review", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(fileContent, "file", "admin-screenshot.png");
-        form.Add(new StringContent(new string('x', 4001)), "body");
-        form.Add(new StringContent("not-a-guid"), "replyToMessageId");
-
-        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
-            $"/api/admin/support/tickets/{created.ConversationId}/attachments",
-            form);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var body = await response.Content.ReadAsStringAsync();
-        Assert.Contains("body", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("replyToMessageId", body, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, application.AttachmentStorage.StoreCallCount);
-    }
-
-    [Fact]
-    public async Task AdminAttachmentEndpoint_ShouldUploadImageAndExposeAttachmentMetadata()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need screenshot review", SupportConversationPriority.Normal));
-
-        using var form = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        form.Add(fileContent, "file", "admin-screenshot.png");
-        form.Add(new StringContent("Screenshot attached"), "body");
-
-        using var response = await application.CreateClient(AdminId, "Admin").PostAsync(
-            $"/api/admin/support/tickets/{created.ConversationId}/attachments",
-            form);
-
-        await AssertSuccessAsync(response);
-
-        var message = (await response.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
-        Assert.True(message.IsFromAdmin);
-        Assert.Equal("Screenshot attached", message.Body);
-        Assert.Equal("Uploaded", message.AttachmentUploadStatus);
-        Assert.Null(message.PendingAttachment);
-        var uploadedAttachment = Assert.Single(message.Attachments);
-        Assert.Equal("admin-screenshot.png", uploadedAttachment.FileName);
-        Assert.Equal("image/png", uploadedAttachment.MimeType);
-        Assert.False(string.IsNullOrWhiteSpace(uploadedAttachment.FileUrl));
-        AssertSignedSupportAttachmentUrl(uploadedAttachment.FileUrl);
-
-        var conversation = await GetFromJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation");
-
-        var attachmentMessage = Assert.Single(conversation.Messages, x => x.Attachments.Count > 0);
-        var conversationAttachment = Assert.Single(attachmentMessage.Attachments);
-        Assert.Equal("admin-screenshot.png", conversationAttachment.FileName);
-        Assert.Equal("image/png", conversationAttachment.MimeType);
-        Assert.Equal("Uploaded", attachmentMessage.AttachmentUploadStatus);
-        AssertSignedSupportAttachmentUrl(conversationAttachment.FileUrl);
-    }
-
-    [Fact]
-    public async Task UserAttachmentRetryEndpoint_ShouldRetryFailedAttachmentAndUploadImage()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var userClient = application.CreateClient(UserId, "User");
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            userClient,
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Need retry flow", SupportConversationPriority.Normal));
-
-        using var failedForm = new MultipartFormDataContent();
-        var failedContent = new ByteArrayContent([0x25, 0x50, 0x44, 0x46]);
-        failedContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-        failedForm.Add(failedContent, "file", "invoice.pdf");
-        failedForm.Add(new StringContent("First upload should fail"), "body");
-
-        using var failedResponse = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/attachments",
-            failedForm);
-
-        await AssertSuccessAsync(failedResponse);
-        var failedMessage = (await failedResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
-        Assert.Equal("Failed", failedMessage.AttachmentUploadStatus);
-        Assert.Equal("support.attachment_content_type_not_allowed", failedMessage.AttachmentUploadErrorCode);
-        Assert.Empty(failedMessage.Attachments);
-        Assert.NotNull(failedMessage.PendingAttachment);
-        Assert.Equal("invoice.pdf", failedMessage.PendingAttachment!.FileName);
-        Assert.Equal("application/pdf", failedMessage.PendingAttachment.MimeType);
-
-        using var retryForm = new MultipartFormDataContent();
-        var retryContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        retryContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-        retryForm.Add(retryContent, "file", "fixed.png");
-
-        using var retryResponse = await userClient.PostAsync(
-            $"/api/support/conversation/{created.ConversationId}/messages/{failedMessage.MessageId}/attachment/retry",
-            retryForm);
-
-        await AssertSuccessAsync(retryResponse);
-        var retriedMessage = (await retryResponse.Content.ReadFromJsonAsync<SupportMessageResponse>(JsonOptions))!;
-        Assert.Equal(failedMessage.MessageId, retriedMessage.MessageId);
-        Assert.Equal("Uploaded", retriedMessage.AttachmentUploadStatus);
-        Assert.Null(retriedMessage.AttachmentUploadErrorCode);
-        Assert.Null(retriedMessage.PendingAttachment);
-        var retriedAttachment = Assert.Single(retriedMessage.Attachments);
-        Assert.Equal("fixed.png", retriedAttachment.FileName);
-        Assert.False(string.IsNullOrWhiteSpace(retriedAttachment.FileUrl));
-    }
-
-    [Theory]
-    [InlineData("NotARealStatus")]
-    [InlineData("1")]
-    [InlineData("-1")]
-    public async Task UpdateStatusEndpoint_ShouldRejectInvalidStatusValues(string status)
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Wrong charge", SupportConversationPriority.Normal));
-
-        using var invalidStatusResponse = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
-            $"/api/admin/support/tickets/{created.ConversationId}/status",
-            new UpdateSupportConversationStatusRequest(status));
-
-        Assert.Equal(HttpStatusCode.BadRequest, invalidStatusResponse.StatusCode);
-    }
-
-    [Theory]
-    [InlineData("1")]
-    [InlineData("-1")]
-    public async Task UpdateMetadataEndpoint_ShouldRejectNumericPriorityValues(string priority)
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-            application.CreateClient(UserId, "User"),
-            "/api/support/conversation/open",
-            new OpenConversationRequest("Wrong charge", SupportConversationPriority.Normal));
-
-        using var invalidPriorityResponse = await application.CreateClient(AdminId, "Admin").PutAsJsonAsync(
-            $"/api/admin/support/tickets/{created.ConversationId}/metadata",
-            new { priority, tags = Array.Empty<string>() });
-
-        Assert.Equal(HttpStatusCode.BadRequest, invalidPriorityResponse.StatusCode);
-
-        var body = await invalidPriorityResponse.Content.ReadAsStringAsync();
-        Assert.Contains("support.priority_invalid", body);
-    }
-
-    [Fact]
-    public async Task ReplyTemplateEndpoints_ShouldSupportCrudFlow()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-        var adminClient = application.CreateClient(AdminId, "Admin");
-
-        var seededTemplates = await GetFromJsonAsync<IReadOnlyList<SupportReplyTemplateResponse>>(
-            adminClient,
-            "/api/admin/support/templates");
-        var initialTemplateCount = seededTemplates.Count;
-
-        var created = await PostAsJsonAsync<SupportReplyTemplateResponse>(
-            adminClient,
-            "/api/admin/support/templates",
-            new UpsertSupportReplyTemplateRequest(
-                "Custom reply",
-                "Please reinstall the app and try again.",
-                true,
-                99));
-
-        Assert.Equal("Custom reply", created.Title);
-
-        var updated = await PutAsJsonAsync<SupportReplyTemplateResponse>(
-            adminClient,
-            $"/api/admin/support/templates/{created.TemplateId}",
-            new UpsertSupportReplyTemplateRequest(
-                "Escalate case",
-                "Escalate this case to backend if repro persists.",
-                true,
-                15));
-
-        Assert.Equal("Escalate case", updated.Title);
-
-        using var deleteResponse = await adminClient.DeleteAsync($"/api/admin/support/templates/{created.TemplateId}");
-        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
-
-        var afterDelete = await GetFromJsonAsync<IReadOnlyList<SupportReplyTemplateResponse>>(
-            adminClient,
-            "/api/admin/support/templates");
-
-        Assert.DoesNotContain(afterDelete, x => x.TemplateId == created.TemplateId);
-        Assert.Equal(initialTemplateCount, afterDelete.Count);
-    }
-
-    [Fact]
-    public async Task SupportHub_ShouldRequireAuthentication_AndBroadcastConversationUpdates()
-    {
-        await using var application = await SupportChatTestApplication.CreateAsync();
-
-        await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            var anonymousConnection = application.CreateHubConnection();
-            try
-            {
-                await anonymousConnection.StartAsync();
-            }
-            finally
-            {
-                await anonymousConnection.DisposeAsync();
-            }
-        });
-
-        var adminConnection = application.CreateHubConnection(AdminId, "Admin");
-        var eventReceived = new TaskCompletionSource<SupportConversationUpdatedEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        adminConnection.On<SupportConversationUpdatedEvent>("conversation-updated", payload => eventReceived.TrySetResult(payload));
-
-        await adminConnection.StartAsync();
-        try
-        {
-            var created = await PostAsJsonAsync<SupportConversationDetailResponse>(
-                application.CreateClient(UserId, "User"),
-                "/api/support/conversation/open",
-                new OpenConversationRequest("Realtime issue", SupportConversationPriority.Normal));
-
-            var notification = await eventReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            Assert.Equal(created.ConversationId, notification.ConversationId);
-            Assert.Equal(UserId, notification.InitiatorUserId);
-        }
-        finally
-        {
-            await adminConnection.DisposeAsync();
-        }
     }
 
     private static async Task<TResponse> GetFromJsonAsync<TResponse>(HttpClient client, string url)
@@ -1196,6 +726,30 @@ public sealed class SupportChatEndpointsIntegrationTests
 
             await identityDbContext.SaveChangesAsync();
 
+            var adminRole = new IdentityRole<Guid>(SystemRoles.Admin)
+            {
+                NormalizedName = SystemRoles.Admin.ToUpperInvariant(),
+            };
+            var moderatorRole = new IdentityRole<Guid>(SystemRoles.Moderator)
+            {
+                NormalizedName = SystemRoles.Moderator.ToUpperInvariant(),
+            };
+            var userRole = new IdentityRole<Guid>(SystemRoles.User)
+            {
+                NormalizedName = SystemRoles.User.ToUpperInvariant(),
+            };
+
+            identityDbContext.Roles.AddRange(adminRole, moderatorRole, userRole);
+            await identityDbContext.SaveChangesAsync();
+
+            identityDbContext.UserRoles.AddRange(
+                new IdentityUserRole<Guid> { UserId = UserId, RoleId = userRole.Id },
+                new IdentityUserRole<Guid> { UserId = OtherUserId, RoleId = userRole.Id },
+                new IdentityUserRole<Guid> { UserId = ModeratorId, RoleId = moderatorRole.Id },
+                new IdentityUserRole<Guid> { UserId = AdminId, RoleId = adminRole.Id });
+
+            await identityDbContext.SaveChangesAsync();
+
             var supportChatDbContext = scope.ServiceProvider.GetRequiredService<SupportChatDbContext>();
             await supportChatDbContext.Database.EnsureCreatedAsync();
         }
@@ -1230,19 +784,67 @@ public sealed class SupportChatEndpointsIntegrationTests
                 var users = await identityDbContext.Users
                     .AsNoTracking()
                     .Where(x => distinctUserIds.Contains(x.Id))
-                    .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
                     .ToListAsync(cancellationToken);
 
-                return users.ToDictionary(x => x.UserId);
+                var rolesByUserId = await LoadRolesByUserIdAsync(distinctUserIds, cancellationToken);
+
+                return users.ToDictionary(
+                    x => x.Id,
+                    x => new IdentityUserLookup(
+                        x.Id,
+                        x.Email ?? string.Empty,
+                        x.DisplayName,
+                        rolesByUserId.TryGetValue(x.Id, out var roles) ? roles : []));
             }
 
             public async Task<IdentityUserLookup?> GetUserByIdAsync(Guid userId, CancellationToken cancellationToken)
             {
-                return await identityDbContext.Users
+                var user = await identityDbContext.Users
                     .AsNoTracking()
                     .Where(x => x.Id == userId)
-                    .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
                     .FirstOrDefaultAsync(cancellationToken);
+
+                if (user is null)
+                {
+                    return null;
+                }
+
+                var rolesByUserId = await LoadRolesByUserIdAsync([userId], cancellationToken);
+                return new IdentityUserLookup(
+                    user.Id,
+                    user.Email ?? string.Empty,
+                    user.DisplayName,
+                    rolesByUserId.TryGetValue(user.Id, out var roles) ? roles : []);
+            }
+
+            private async Task<IReadOnlyDictionary<Guid, IReadOnlyList<string>>> LoadRolesByUserIdAsync(
+                IReadOnlyCollection<Guid> userIds,
+                CancellationToken cancellationToken)
+            {
+                var roleRows = await identityDbContext.UserRoles
+                    .AsNoTracking()
+                    .Where(x => userIds.Contains(x.UserId))
+                    .Join(
+                        identityDbContext.Roles.AsNoTracking(),
+                        userRole => userRole.RoleId,
+                        role => role.Id,
+                        (userRole, role) => new
+                        {
+                            userRole.UserId,
+                            RoleName = role.Name
+                        })
+                    .Where(x => !string.IsNullOrWhiteSpace(x.RoleName))
+                    .ToListAsync(cancellationToken);
+
+                return roleRows
+                    .GroupBy(x => x.UserId)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyList<string>)group
+                            .Select(x => x.RoleName!)
+                            .Distinct(StringComparer.Ordinal)
+                            .OrderBy(x => x, StringComparer.Ordinal)
+                            .ToArray());
             }
         }
     }
@@ -1338,6 +940,13 @@ public sealed class SupportChatEndpointsIntegrationTests
     }
 
     private sealed record OpenConversationRequest(string? InitialMessage, SupportConversationPriority Priority);
+
+    private sealed record OpenConversationWithPaymentLinksRequest(
+        string? InitialMessage,
+        SupportConversationPriority Priority,
+        Guid? RelatedGenerationId = null,
+        Guid? RelatedPaymentId = null,
+        Guid? RelatedSubscriptionId = null);
 
     private sealed record SendSupportMessageRequest(string Body, string? Locale = null);
 

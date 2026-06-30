@@ -1,16 +1,43 @@
 using System.Text;
 
+using System.Reflection;
+using System.Text.Json;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Contracts;
+using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
+using PetMagic.Modules.Economy.Infrastructure.Payments;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
 public sealed partial class EconomyServiceTests
 {
+    [Fact]
+    public void VerifyStripeSignatureFallback_ShouldAcceptFreshTimestamp()
+    {
+        const string payload = "{\"id\":\"evt_test\",\"object\":\"event\"}";
+        const string secret = "test_webhook_secret";
+
+        var signature = BuildStripeSignature(payload, secret);
+
+        Assert.True(EconomyWebhookParser.VerifyStripeSignatureFallback(payload, signature, secret));
+    }
+
+    [Fact]
+    public void VerifyStripeSignatureFallback_ShouldRejectStaleTimestamp()
+    {
+        const string payload = "{\"id\":\"evt_test\",\"object\":\"event\"}";
+        const string secret = "test_webhook_secret";
+        var staleTimestamp = DateTimeOffset.UtcNow.AddMinutes(-10).ToUnixTimeSeconds().ToString();
+        var staleSignature = $"t={staleTimestamp},v1={ComputeHmacSha256Hex($"{staleTimestamp}.{payload}", secret)}";
+
+        Assert.False(EconomyWebhookParser.VerifyStripeSignatureFallback(payload, staleSignature, secret));
+    }
+
     [Fact]
     public async Task HandleStripeWebhook_ShouldBeIdempotent()
     {
@@ -65,7 +92,8 @@ public sealed partial class EconomyServiceTests
         await using var dbContext = CreateDbContext();
 
         var userId = Guid.NewGuid();
-        var service = CreateService(dbContext);
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
 
         var setupResult = await service.CreatePaymentMethodSetupAsync(
             new CreatePaymentMethodSetupCommand(userId, "stripe"),
@@ -88,6 +116,31 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("visa", method.Brand);
         Assert.Equal("4242", method.Last4);
         Assert.True(method.IsDefault);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldNotGrantPremiumForInvalidSubscriptionPlanContext()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds();
+        var periodEnd = DateTimeOffset.UtcNow.AddDays(29).ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_invalid_plan\",\"object\":\"checkout.session\",\"customer\":\"cus_invalid\",\"subscription\":\"sub_invalid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"unknown_plan\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.PremiumPlanNotFound.Code, result.Error.Code);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
+        Assert.Empty(await dbContext.Wallets.ToListAsync());
     }
 
     [Fact]
@@ -250,6 +303,108 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldNotDuplicateAllowanceAcrossDuplicateProviderSubscriptions()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var now = DateTime.UtcNow;
+        var periodStartUtc = now.AddDays(-3);
+        var periodEndUtc = now.AddDays(27);
+        var userId = Guid.NewGuid();
+        var existingSubscriptionId = Guid.NewGuid();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.Wallets.Add(new Wallet
+        {
+            UserId = userId,
+            Balance = 40,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = existingSubscriptionId,
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "Active",
+            ExternalSubscriptionId = "sub_existing",
+            CurrentPeriodStartUtc = periodStartUtc,
+            CurrentPeriodEndUtc = periodEndUtc,
+            MonthlyTokenLimit = 777,
+            MonthlyTokensGranted = 40,
+            LastTokenGrantAtUtc = now.AddDays(-2),
+            CreatedAtUtc = periodStartUtc,
+            UpdatedAtUtc = now,
+        });
+        dbContext.WalletLedgerEntries.Add(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Delta = 40,
+            BalanceAfter = 40,
+            Source = WalletLedgerSource.PremiumSubscriptionGrant,
+            Reason = $"premium_allowance:stripe:{existingSubscriptionId:D}:{periodStartUtc:O}",
+            CreatedAtUtc = now.AddDays(-2),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = periodEndUtc,
+            Status = "active",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                userId,
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "server-payload-duplicate-subscription",
+                null,
+                "purchase-duplicate-subscription",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var grantEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.PremiumSubscriptionGrant)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync();
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var googleSubscription = await dbContext.UserSubscriptions.SingleAsync(
+            x => x.UserId == userId && x.Provider == "google_play");
+
+        _ = Assert.Single(grantEntries);
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal(40, googleSubscription.MonthlyTokensGranted);
+        Assert.NotNull(googleSubscription.LastTokenGrantAtUtc);
+        Assert.Equal("Active", googleSubscription.Status);
+        _ = Assert.Single(identityService.SetPremiumStatusCalls);
+    }
+
+    [Fact]
     public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectSubscriptionOwnedByAnotherUser()
     {
         await using var dbContext = CreateDbContext();
@@ -310,6 +465,284 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, second.Error.Code);
         Assert.Single(await dbContext.UserSubscriptions.ToListAsync());
         Assert.Single(await dbContext.WalletLedgerEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectActiveStoreVerificationWithoutExpiry()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly Plus",
+            BillingPeriod = "monthly",
+            PriceAmount = 19.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 777,
+            IsRecommended = false,
+            IsActive = true,
+            AppleProductId = "com.petmagic.custom.monthly.apple",
+            GoogleProductId = "com.petmagic.custom.monthly.google",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var storeVerifier = new FakeStoreSubscriptionVerifier
+        {
+            ExpiresAtUtc = null,
+            Status = "active",
+            IsActive = true,
+        };
+        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
+
+        var result = await service.VerifyPremiumStorePurchaseAsync(
+            new VerifyPremiumStorePurchaseCommand(
+                Guid.NewGuid(),
+                "monthly",
+                "google_play",
+                "com.petmagic.custom.monthly.google",
+                "server-payload-without-expiry",
+                null,
+                "purchase-without-expiry",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
+    }
+
+    [Fact]
+    public void ResolveStripeCurrentPeriodBounds_ShouldPreferRawCurrentPeriodFieldsOverStartDateFallback()
+    {
+        var originalStartUtc = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var currentPeriodStartUtc = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var currentPeriodEndUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var subscription = new Stripe.Subscription
+        {
+            StartDate = originalStartUtc,
+            CancelAt = currentPeriodEndUtc.AddDays(10),
+        };
+
+        SetStripeRawJsonElement(
+            subscription,
+            $$"""
+            {
+              "current_period_start": {{new DateTimeOffset(currentPeriodStartUtc).ToUnixTimeSeconds()}},
+              "current_period_end": {{new DateTimeOffset(currentPeriodEndUtc).ToUnixTimeSeconds()}}
+            }
+            """);
+
+        var periodBounds = EconomyService.ResolveStripeCurrentPeriodBounds(subscription);
+
+        Assert.Equal(currentPeriodStartUtc, periodBounds.CurrentPeriodStartUtc);
+        Assert.Equal(currentPeriodEndUtc, periodBounds.CurrentPeriodEndUtc);
+    }
+
+    [Fact]
+    public void ResolveStripeCurrentPeriodBounds_ShouldFallbackToKnownSubscriptionDatesWhenRawPeriodIsMissing()
+    {
+        var startUtc = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var cancelAtUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var subscription = new Stripe.Subscription
+        {
+            StartDate = startUtc,
+            CancelAt = cancelAtUtc,
+        };
+
+        var periodBounds = EconomyService.ResolveStripeCurrentPeriodBounds(subscription);
+
+        Assert.Equal(startUtc, periodBounds.CurrentPeriodStartUtc);
+        Assert.Equal(cancelAtUtc, periodBounds.CurrentPeriodEndUtc);
+    }
+
+    [Fact]
+    public void ResolveStripeCurrentPeriodBounds_ShouldUseSubscriptionItemPeriodWhenRawFieldsAreMissing()
+    {
+        var createdStartUtc = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var currentPeriodStartUtc = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var currentPeriodEndUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc);
+        var subscription = new Stripe.Subscription
+        {
+            StartDate = createdStartUtc,
+            Items = new Stripe.StripeList<Stripe.SubscriptionItem>
+            {
+                Data =
+                [
+                    new Stripe.SubscriptionItem
+                    {
+                        CurrentPeriodStart = currentPeriodStartUtc,
+                        CurrentPeriodEnd = currentPeriodEndUtc,
+                    }
+                ]
+            }
+        };
+
+        var periodBounds = EconomyService.ResolveStripeCurrentPeriodBounds(subscription);
+
+        Assert.Equal(currentPeriodStartUtc, periodBounds.CurrentPeriodStartUtc);
+        Assert.Equal(currentPeriodEndUtc, periodBounds.CurrentPeriodEndUtc);
+    }
+
+    [Fact]
+    public void ShouldStripeSubscriptionRemainPremium_ShouldKeepPastDueUntilCurrentPeriodEnds()
+    {
+        var result = EconomyService.ShouldStripeSubscriptionRemainPremium(
+            "past_due",
+            DateTime.UtcNow.AddDays(3),
+            cancelAtPeriodEnd: false);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void ShouldStripeSubscriptionRemainPremium_ShouldStopPastDueAfterCurrentPeriodEnds()
+    {
+        var result = EconomyService.ShouldStripeSubscriptionRemainPremium(
+            "past_due",
+            DateTime.UtcNow.AddMinutes(-1),
+            cancelAtPeriodEnd: false);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldStripeSubscriptionRemainPremium_ShouldStopPastDueWhenPeriodEndIsMissing()
+    {
+        var result = EconomyService.ShouldStripeSubscriptionRemainPremium(
+            "past_due",
+            null,
+            cancelAtPeriodEnd: false);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ShouldStripeSubscriptionRemainPremium_ShouldStopActiveWhenPeriodEndIsMissing()
+    {
+        var result = EconomyService.ShouldStripeSubscriptionRemainPremium(
+            "active",
+            null,
+            cancelAtPeriodEnd: false);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsStripeSubscriptionForPlan_ShouldMatchConfiguredStripePriceId()
+    {
+        var subscription = new Stripe.Subscription
+        {
+            Items = new Stripe.StripeList<Stripe.SubscriptionItem>
+            {
+                Data =
+                [
+                    new Stripe.SubscriptionItem
+                    {
+                        Price = new Stripe.Price
+                        {
+                            Id = "price_yearly",
+                            Currency = "usd",
+                            UnitAmount = 9999,
+                            Recurring = new Stripe.PriceRecurring { Interval = "year" }
+                        }
+                    }
+                ]
+            }
+        };
+
+        var result = EconomyService.IsStripeSubscriptionForPlan(
+            subscription,
+            "price_yearly",
+            "USD",
+            9.99m,
+            "year");
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsStripeSubscriptionForPlan_ShouldRejectMismatchedConfiguredStripePriceId()
+    {
+        var subscription = new Stripe.Subscription
+        {
+            Items = new Stripe.StripeList<Stripe.SubscriptionItem>
+            {
+                Data =
+                [
+                    new Stripe.SubscriptionItem
+                    {
+                        Price = new Stripe.Price
+                        {
+                            Id = "price_monthly",
+                            Currency = "usd",
+                            UnitAmount = 1499,
+                            Recurring = new Stripe.PriceRecurring { Interval = "month" }
+                        }
+                    }
+                ]
+            }
+        };
+
+        var result = EconomyService.IsStripeSubscriptionForPlan(
+            subscription,
+            "price_yearly",
+            "USD",
+            99.99m,
+            "year");
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsStripeSubscriptionForPlan_ShouldMatchInlineRecurringAmountCurrencyAndIntervalWithoutConfiguredPriceId()
+    {
+        var subscription = new Stripe.Subscription
+        {
+            Items = new Stripe.StripeList<Stripe.SubscriptionItem>
+            {
+                Data =
+                [
+                    new Stripe.SubscriptionItem
+                    {
+                        Price = new Stripe.Price
+                        {
+                            Currency = "usd",
+                            UnitAmount = 1999,
+                            Recurring = new Stripe.PriceRecurring { Interval = "month" }
+                        }
+                    }
+                ]
+            }
+        };
+
+        var result = EconomyService.IsStripeSubscriptionForPlan(
+            subscription,
+            null,
+            "USD",
+            19.99m,
+            "month");
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsStoreSubscriptionPremium_ShouldRequirePeriodEndForCanceledStatus()
+    {
+        Assert.False(EconomyWebhookParser.IsStoreSubscriptionPremium("Canceled", null));
+        Assert.True(EconomyWebhookParser.IsStoreSubscriptionPremium("Canceled", DateTime.UtcNow.AddDays(1)));
+    }
+
+    [Fact]
+    public void IsStoreSubscriptionPremium_ShouldRequirePeriodEndForActiveStatus()
+    {
+        Assert.False(EconomyWebhookParser.IsStoreSubscriptionPremium("Active", null));
+        Assert.True(EconomyWebhookParser.IsStoreSubscriptionPremium("Active", DateTime.UtcNow.AddDays(1)));
     }
 
     [Fact]
@@ -394,6 +827,15 @@ public sealed partial class EconomyServiceTests
         var pack = Assert.Single(result.Value, x => x.Code == "pack100");
         Assert.Equal("com.petmagic.app.tokens.google.pack100", pack.GooglePlayProductId);
         Assert.Equal("com.petmagic.app.tokens.apple.pack100", pack.AppStoreProductId);
+    }
+
+    private static void SetStripeRawJsonElement(Stripe.Subscription subscription, string json)
+    {
+        var property = typeof(Stripe.StripeEntity).GetProperty(
+            "RawJsonElement",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        var element = JsonDocument.Parse(json).RootElement.Clone();
+        property!.SetValue(subscription, (JsonElement?)element);
     }
 
     [Fact]
@@ -704,6 +1146,515 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task HandleStripeWebhook_ShouldNotActivatePremiumWithoutConfirmedCurrentPeriodEnd()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Ultra Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 149.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 2222,
+            IsRecommended = true,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var userId = Guid.NewGuid();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_missing_period_end\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("Pending", subscription.Status);
+        Assert.Null(subscription.CurrentPeriodEndUtc);
+        Assert.Equal(0, subscription.MonthlyTokensGranted);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.ExternalEventId == eventId);
+        Assert.Equal("SubscriptionPending", eventLog.EventType);
+        Assert.Equal("Pending", eventLog.Status);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldResolvePlanFromStripePriceIdWithoutMetadataPlanCode()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Ultra Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 149.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 2222,
+            IsRecommended = true,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = userId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_price_lookup",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var periodEnd = new DateTimeOffset(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = JsonSerializer.Serialize(new
+        {
+            id = eventId,
+            @object = "event",
+            type = "customer.subscription.created",
+            created,
+            data = new
+            {
+                @object = new
+                {
+                    id = "sub_price_lookup",
+                    @object = "subscription",
+                    customer = "cus_price_lookup",
+                    status = "active",
+                    current_period_start = periodStart,
+                    current_period_end = periodEnd,
+                    cancel_at_period_end = false,
+                    items = new
+                    {
+                        data = new object[]
+                        {
+                            new
+                            {
+                                id = "si_test",
+                                @object = "subscription_item",
+                                current_period_start = periodStart,
+                                current_period_end = periodEnd,
+                                price = new
+                                {
+                                    id = "price_yearly",
+                                    currency = "usd",
+                                    unit_amount = 14999,
+                                    recurring = new
+                                    {
+                                        interval = "year"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+
+        Assert.Equal("yearly", subscription.PlanId);
+        Assert.Equal("Active", subscription.Status);
+        Assert.Equal(2222, subscription.MonthlyTokenLimit);
+        Assert.Equal(40, wallet.Balance);
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldKeepExistingPremiumStateWhenActiveUpdateOmitsCurrentPeriodEnd()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 99.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 700,
+            IsRecommended = false,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = userId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_active_missing_period_end",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            ProductId = "price_yearly",
+            Status = "Active",
+            ExternalCustomerId = "cus_active_missing_period_end",
+            ExternalSubscriptionId = "sub_active_missing_period_end",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = now.AddDays(20),
+            MonthlyTokenLimit = 700,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-10),
+            UpdatedAtUtc = now.AddMinutes(-5),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"customer.subscription.updated\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"sub_active_missing_period_end\",\"object\":\"subscription\",\"customer\":\"cus_active_missing_period_end\",\"status\":\"active\",\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(
+            result.IsSuccess,
+            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("Active", subscription.Status);
+        Assert.Equal(40, subscription.MonthlyTokensGranted);
+        Assert.True(subscription.CurrentPeriodEndUtc >= DateTime.UtcNow);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.ExternalEventId == eventId);
+        Assert.Equal("SubscriptionStatusUpdated", eventLog.EventType);
+        Assert.Equal("Active", eventLog.Status);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldKeepPremiumEntitlementOnInvoicePaymentFailedUntilTerminalSubscriptionEvent()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 99.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 700,
+            IsRecommended = false,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = userId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_test",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            ProductId = "price_yearly",
+            Status = "Active",
+            ExternalCustomerId = "cus_test",
+            ExternalSubscriptionId = "sub_test",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = now.AddDays(20),
+            MonthlyTokenLimit = 700,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-10),
+            UpdatedAtUtc = now.AddMinutes(-5),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"invoice.payment_failed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"in_test\",\"object\":\"invoice\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"status\":\"open\"}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("PastDue", subscription.Status);
+        Assert.Equal(now.AddDays(20).Date, subscription.CurrentPeriodEndUtc?.Date);
+
+        var eventLog = await dbContext.SubscriptionEventLogs
+            .SingleAsync(x => x.ExternalEventId == eventId);
+        Assert.Equal(userId, eventLog.UserId);
+        Assert.Equal("SubscriptionPaymentFailed", eventLog.EventType);
+        Assert.Equal("PastDue", eventLog.Status);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldKeepPremiumEntitlementOnPastDueSubscriptionUpdatedUntilCurrentPeriodEnds()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 99.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 700,
+            IsRecommended = false,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var periodEnd = DateTimeOffset.UtcNow.AddDays(15).ToUnixTimeSeconds();
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = userId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_test",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            ProductId = "price_yearly",
+            Status = "Active",
+            ExternalCustomerId = "cus_test",
+            ExternalSubscriptionId = "sub_test",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = now.AddDays(20),
+            MonthlyTokenLimit = 700,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-10),
+            UpdatedAtUtc = now.AddMinutes(-5),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"customer.subscription.updated\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"sub_test\",\"object\":\"subscription\",\"customer\":\"cus_test\",\"status\":\"past_due\",\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("PastDue", subscription.Status);
+        Assert.True(subscription.CurrentPeriodEndUtc >= DateTime.UtcNow);
+
+        var summary = await service.GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+        Assert.True(summary.IsSuccess);
+        Assert.True(summary.Value.IsPremium);
+
+        var eventLog = await dbContext.SubscriptionEventLogs
+            .SingleAsync(x => x.ExternalEventId == eventId);
+        Assert.Equal("SubscriptionStatusUpdated", eventLog.EventType);
+        Assert.Equal("PastDue", eventLog.Status);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldResolveStripeSubscriptionUserWithoutMetadata()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 99.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 700,
+            IsRecommended = false,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 1,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = userId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_test",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            ProductId = "price_yearly",
+            Status = "Active",
+            ExternalCustomerId = "cus_test",
+            ExternalSubscriptionId = "sub_test",
+            CurrentPeriodStartUtc = now.AddDays(-10),
+            CurrentPeriodEndUtc = now.AddDays(20),
+            MonthlyTokenLimit = 700,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-10),
+            UpdatedAtUtc = now.AddMinutes(-5),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"customer.subscription.deleted\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"sub_test\",\"object\":\"subscription\",\"customer\":\"cus_test\",\"status\":\"canceled\",\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.Equal(userId, identityService.SetPremiumStatusCalls[0].UserId);
+        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("Expired", subscription.Status);
+
+        var eventLog = await dbContext.SubscriptionEventLogs
+            .SingleAsync(x => x.ExternalEventId == eventId);
+        Assert.Equal(userId, eventLog.UserId);
+        Assert.Equal("SubscriptionExpired", eventLog.EventType);
+    }
+
+    [Fact]
+    public async Task AdminRevokePremiumSubscriptionAsync_ShouldExpireLocalStripeSubscriptionWithoutExternalSubscriptionId()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            Status = "Active",
+            ExternalCustomerId = "cus_legacy",
+            ExternalSubscriptionId = null,
+            CurrentPeriodStartUtc = now.AddDays(-5),
+            CurrentPeriodEndUtc = now.AddDays(25),
+            MonthlyTokenLimit = 700,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-5),
+            UpdatedAtUtc = now.AddMinutes(-1),
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+
+        var result = await service.AdminRevokePremiumSubscriptionAsync(
+            new AdminRevokePremiumSubscriptionCommand(userId, "stripe"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
+        Assert.False(result.Value.IsPremium);
+        Assert.Equal("Expired", result.Value.Status);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal("Expired", subscription.Status);
+        Assert.False(subscription.CancelAtPeriodEnd);
+        Assert.NotNull(subscription.CurrentPeriodEndUtc);
+        Assert.True(subscription.CurrentPeriodEndUtc <= DateTime.UtcNow);
+
+        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.UserId == userId);
+        Assert.Equal("AdminImmediateCancelRequested", eventLog.EventType);
+        Assert.Equal("Expired", eventLog.Status);
+    }
+
+    [Fact]
     public async Task GetAdminSubscriptionsAsync_ShouldFilterByProviderStatusAndSearch()
     {
         await using var dbContext = CreateDbContext();
@@ -793,6 +1744,137 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetSubscriptionSummaryAsync_ShouldPreferActiveSubscriptionOverNewerExpiredRecord()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.SubscriptionPlans.AddRange(
+            new SubscriptionPlan
+            {
+                Id = "monthly",
+                Name = "PetMagic Premium Monthly",
+                BillingPeriod = "monthly",
+                PriceAmount = 14.99m,
+                CurrencyCode = "USD",
+                MonthlyTokenLimit = 500,
+                IsRecommended = true,
+                IsActive = true,
+                DisplayOrder = 1,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            },
+            new SubscriptionPlan
+            {
+                Id = "yearly",
+                Name = "PetMagic Premium Yearly",
+                BillingPeriod = "yearly",
+                PriceAmount = 99.99m,
+                CurrencyCode = "USD",
+                MonthlyTokenLimit = 700,
+                IsRecommended = false,
+                IsActive = true,
+                DisplayOrder = 2,
+                CreatedAtUtc = now,
+                UpdatedAtUtc = now,
+            });
+        dbContext.UserSubscriptions.AddRange(
+            new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Provider = "google_play",
+                PurchaseChannel = "in_app",
+                Region = "US",
+                PlanId = "monthly",
+                Status = "Active",
+                ExternalSubscriptionId = "gp_active",
+                CurrentPeriodStartUtc = now.AddDays(-7),
+                CurrentPeriodEndUtc = now.AddDays(21),
+                MonthlyTokenLimit = 500,
+                MonthlyTokensGranted = 40,
+                CreatedAtUtc = now.AddDays(-7),
+                UpdatedAtUtc = now.AddMinutes(-10),
+            },
+            new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Provider = "stripe",
+                PurchaseChannel = "web",
+                Region = "US",
+                PlanId = "yearly",
+                Status = "Expired",
+                ExternalSubscriptionId = "sub_expired",
+                CurrentPeriodStartUtc = now.AddDays(-40),
+                CurrentPeriodEndUtc = now.AddDays(-5),
+                MonthlyTokenLimit = 700,
+                MonthlyTokensGranted = 40,
+                CreatedAtUtc = now.AddDays(-40),
+                UpdatedAtUtc = now.AddMinutes(-1),
+            });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsPremium);
+        Assert.Equal("google_play", result.Value.Provider);
+        Assert.Equal("Active", result.Value.Status);
+        Assert.Equal("monthly", result.Value.BillingPeriod);
+    }
+
+    [Fact]
+    public async Task GetSubscriptionSummaryAsync_ShouldNotTreatPastDueWithoutPeriodEndAsPremium()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "monthly",
+            Name = "PetMagic Premium Monthly",
+            BillingPeriod = "monthly",
+            PriceAmount = 14.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 500,
+            IsRecommended = true,
+            IsActive = true,
+            DisplayOrder = 1,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "monthly",
+            Status = "PastDue",
+            ExternalSubscriptionId = "sub_missing_period_end",
+            CurrentPeriodStartUtc = now.AddDays(-7),
+            CurrentPeriodEndUtc = null,
+            MonthlyTokenLimit = 500,
+            MonthlyTokensGranted = 40,
+            CreatedAtUtc = now.AddDays(-7),
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await CreateService(dbContext).GetSubscriptionSummaryAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.IsPremium);
+        Assert.Equal("PastDue", result.Value.Status);
+    }
+
+    [Fact]
     public async Task GetAdminSubscriptionEventsAsync_ShouldFilterCanonicalStatusesFromAdminQuery()
     {
         await using var dbContext = CreateDbContext();
@@ -843,715 +1925,6 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(subscriptionId, item.UserSubscriptionId);
         Assert.Equal("Active", item.Status);
         Assert.Equal("evt_active", item.ExternalEventId);
-    }
-
-    [Fact]
-    public async Task HandleAppStoreServerNotificationAsync_ShouldUpdateExistingSubscription()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(20);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "app_store",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "orig-app-1",
-            ExternalTransactionId = "txn-app-1",
-            CurrentPeriodStartUtc = now.AddDays(-10),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-1\",\"transactionId\":\"txn-app-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
-        var signedRenewalInfo = CreateUnsignedJws("{\"autoRenewStatus\":0}");
-        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-notification-1\",\"notificationType\":\"DID_CHANGE_RENEWAL_STATUS\",\"subtype\":\"AUTO_RENEW_DISABLED\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\",\"signedRenewalInfo\":\"{signedRenewalInfo}\"}}}}");
-
-        var identityService = new FakeIdentityService();
-        var service = CreateService(dbContext, identityService: identityService);
-
-        var result = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        Assert.Equal("Canceled", subscription.Status);
-        Assert.True(subscription.CancelAtPeriodEnd);
-        Assert.Equal("txn-app-2", subscription.ExternalTransactionId);
-        Assert.Equal(40, subscription.MonthlyTokensGranted);
-        Assert.Equal(40, wallet.Balance);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
-
-        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "app_store");
-        Assert.NotNull(eventLog.PayloadJson);
-        Assert.Contains("DID_CHANGE_RENEWAL_STATUS", eventLog.PayloadJson);
-        Assert.Contains("com.petmagic.custom.monthly.apple", eventLog.PayloadJson);
-        Assert.DoesNotContain(signedPayload, eventLog.PayloadJson);
-        Assert.DoesNotContain(signedTransactionInfo, eventLog.PayloadJson);
-        Assert.DoesNotContain("signedTransactionInfo", eventLog.PayloadJson);
-        Assert.DoesNotContain("txn-app-2", eventLog.PayloadJson);
-    }
-
-    [Fact]
-    public async Task HandleAppStoreServerNotificationAsync_ShouldIgnoreDuplicateDelivery()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(20);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "app_store",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "orig-app-duplicate-1",
-            ExternalTransactionId = "txn-app-duplicate-1",
-            CurrentPeriodStartUtc = now.AddDays(-10),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-duplicate-1\",\"transactionId\":\"txn-app-duplicate-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
-        var signedRenewalInfo = CreateUnsignedJws("{\"autoRenewStatus\":0}");
-        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-duplicate-notification-1\",\"notificationType\":\"DID_CHANGE_RENEWAL_STATUS\",\"subtype\":\"AUTO_RENEW_DISABLED\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\",\"signedRenewalInfo\":\"{signedRenewalInfo}\"}}}}");
-
-        var identityService = new FakeIdentityService();
-        var service = CreateService(dbContext, identityService: identityService);
-
-        var firstResult = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-        var secondResult = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-
-        Assert.True(firstResult.IsSuccess);
-        Assert.True(secondResult.IsSuccess);
-        Assert.True(firstResult.Value.Processed);
-        Assert.False(secondResult.Value.Processed);
-        Assert.Equal("ignored_duplicate", secondResult.Value.Status);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
-        Assert.Equal(40, wallet.Balance);
-        Assert.Equal(40, subscription.MonthlyTokensGranted);
-        Assert.Equal("txn-app-duplicate-2", subscription.ExternalTransactionId);
-        Assert.Single(await dbContext.ProcessedWebhookEvents.Where(x => x.Provider == "app_store" && x.EventId == "app-duplicate-notification-1").ToListAsync());
-        Assert.Single(await dbContext.SubscriptionEventLogs.Where(x => x.Provider == "app_store").ToListAsync());
-    }
-
-    [Fact]
-    public async Task HandleAppStoreServerNotificationAsync_ShouldExpireSubscriptionOnRefund()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(20);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "app_store",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "orig-app-refund-1",
-            ExternalTransactionId = "txn-app-refund-1",
-            CurrentPeriodStartUtc = now.AddDays(-10),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-refund-1\",\"transactionId\":\"txn-app-refund-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
-        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-refund-notification-1\",\"notificationType\":\"REFUND\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
-
-        var identityService = new FakeIdentityService();
-        var service = CreateService(dbContext, identityService: identityService);
-
-        var result = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
-        Assert.Equal("Expired", subscription.Status);
-        Assert.NotNull(subscription.ExpiredAtUtc);
-        Assert.Equal("txn-app-refund-2", subscription.ExternalTransactionId);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
-    }
-
-    [Fact]
-    public async Task HandleAppStoreServerNotificationAsync_ShouldExpireSubscriptionOnRevoke()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(20);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "app_store",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "orig-app-revoke-1",
-            ExternalTransactionId = "txn-app-revoke-1",
-            CurrentPeriodStartUtc = now.AddDays(-10),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var signedTransactionInfo = CreateUnsignedJws($"{{\"productId\":\"com.petmagic.custom.monthly.apple\",\"originalTransactionId\":\"orig-app-revoke-1\",\"transactionId\":\"txn-app-revoke-2\",\"expiresDate\":\"{new DateTimeOffset(expiresAtUtc).ToUnixTimeMilliseconds()}\"}}");
-        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-revoke-notification-1\",\"notificationType\":\"REVOKE\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
-
-        var identityService = new FakeIdentityService();
-        var service = CreateService(dbContext, identityService: identityService);
-
-        var result = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
-        Assert.Equal("Expired", subscription.Status);
-        Assert.NotNull(subscription.ExpiredAtUtc);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
-    }
-
-    [Fact]
-    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldUpdateExistingSubscription()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(14);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "google_play",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "order-1",
-            ExternalTransactionId = "gp-token-1",
-            CurrentPeriodStartUtc = now.AddDays(-5),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":3,\"purchaseToken\":\"gp-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
-        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
-
-        var identityService = new FakeIdentityService();
-        var storeVerifier = new FakeStoreSubscriptionVerifier
-        {
-            ExpiresAtUtc = expiresAtUtc,
-            Status = "SUBSCRIPTION_STATE_ACTIVE",
-            IsActive = true,
-        };
-        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
-
-        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-message-1"),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        Assert.Equal("Canceled", subscription.Status);
-        Assert.True(subscription.CancelAtPeriodEnd);
-        Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
-        Assert.Equal("order-1", subscription.ExternalSubscriptionId);
-        Assert.Equal(40, subscription.MonthlyTokensGranted);
-        Assert.Equal(40, wallet.Balance);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
-
-        var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.Provider == "google_play");
-        Assert.NotNull(eventLog.PayloadJson);
-        Assert.Contains("\"NotificationType\":3", eventLog.PayloadJson);
-        Assert.Contains("com.petmagic.custom.monthly.google", eventLog.PayloadJson);
-        Assert.DoesNotContain(messageData, eventLog.PayloadJson);
-        Assert.DoesNotContain("purchaseToken", eventLog.PayloadJson);
-        Assert.DoesNotContain("gp-token-1", eventLog.PayloadJson);
-    }
-
-    [Fact]
-    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldIgnoreDuplicateDelivery()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiresAtUtc = now.AddDays(14);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "google_play",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "order-duplicate-1",
-            ExternalTransactionId = "gp-duplicate-token-1",
-            CurrentPeriodStartUtc = now.AddDays(-5),
-            CurrentPeriodEndUtc = expiresAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":3,\"purchaseToken\":\"gp-duplicate-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
-        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
-
-        var identityService = new FakeIdentityService();
-        var storeVerifier = new FakeStoreSubscriptionVerifier
-        {
-            ExpiresAtUtc = expiresAtUtc,
-            Status = "SUBSCRIPTION_STATE_ACTIVE",
-            IsActive = true,
-        };
-        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
-
-        var firstResult = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-duplicate-message-1"),
-            CancellationToken.None);
-        var secondResult = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-duplicate-message-1"),
-            CancellationToken.None);
-
-        Assert.True(firstResult.IsSuccess);
-        Assert.True(secondResult.IsSuccess);
-        Assert.True(firstResult.Value.Processed);
-        Assert.False(secondResult.Value.Processed);
-        Assert.Equal("ignored_duplicate", secondResult.Value.Status);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-
-        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
-        Assert.Equal(40, wallet.Balance);
-        Assert.Equal(40, subscription.MonthlyTokensGranted);
-        Assert.Equal("gp-duplicate-token-1", subscription.ExternalTransactionId);
-        Assert.Single(await dbContext.ProcessedWebhookEvents.Where(x => x.Provider == "google_play" && x.EventId == "google-duplicate-message-1").ToListAsync());
-        Assert.Single(await dbContext.SubscriptionEventLogs.Where(x => x.Provider == "google_play").ToListAsync());
-    }
-
-    [Fact]
-    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldRenewExistingSubscription()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var previousExpiryUtc = now.AddDays(1);
-        var renewedExpiryUtc = now.AddDays(31);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "google_play",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "order-renewal-1",
-            ExternalTransactionId = "gp-renewal-token-1",
-            CurrentPeriodStartUtc = now.AddDays(-29),
-            CurrentPeriodEndUtc = previousExpiryUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":2,\"purchaseToken\":\"gp-renewal-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
-        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
-
-        var identityService = new FakeIdentityService();
-        var storeVerifier = new FakeStoreSubscriptionVerifier
-        {
-            ExpiresAtUtc = renewedExpiryUtc,
-            Status = "SUBSCRIPTION_STATE_ACTIVE",
-            IsActive = true,
-        };
-        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
-
-        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-renewal-message-1"),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
-        Assert.Equal("Active", subscription.Status);
-        Assert.False(subscription.CancelAtPeriodEnd);
-        Assert.Equal(renewedExpiryUtc, subscription.CurrentPeriodEndUtc);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
-    }
-
-    [Fact]
-    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldExpireExistingSubscription()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-        var expiredAtUtc = now.AddDays(-1);
-
-        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
-        {
-            Id = "monthly",
-            Name = "PetMagic Premium Monthly",
-            BillingPeriod = "monthly",
-            PriceAmount = 14.99m,
-            CurrencyCode = "USD",
-            MonthlyTokenLimit = 500,
-            IsRecommended = false,
-            IsActive = true,
-            AppleProductId = "com.petmagic.custom.monthly.apple",
-            GoogleProductId = "com.petmagic.custom.monthly.google",
-            DisplayOrder = 1,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        dbContext.UserSubscriptions.Add(new UserSubscription
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Provider = "google_play",
-            PurchaseChannel = "in_app",
-            Region = "US",
-            PlanId = "monthly",
-            Status = "Active",
-            ExternalSubscriptionId = "order-expired-1",
-            ExternalTransactionId = "gp-expired-token-1",
-            CurrentPeriodStartUtc = now.AddDays(-31),
-            CurrentPeriodEndUtc = expiredAtUtc,
-            CancelAtPeriodEnd = false,
-            MonthlyTokenLimit = 500,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        });
-        await dbContext.SaveChangesAsync();
-
-        var messageJson = "{\"subscriptionNotification\":{\"notificationType\":13,\"purchaseToken\":\"gp-expired-token-1\",\"subscriptionId\":\"com.petmagic.custom.monthly.google\"}}";
-        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
-
-        var identityService = new FakeIdentityService();
-        var storeVerifier = new FakeStoreSubscriptionVerifier
-        {
-            ExpiresAtUtc = expiredAtUtc,
-            Status = "SUBSCRIPTION_STATE_EXPIRED",
-            IsActive = false,
-        };
-        var service = CreateService(dbContext, storeVerifier: storeVerifier, identityService: identityService);
-
-        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-expired-message-1"),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-
-        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
-        Assert.Equal("Expired", subscription.Status);
-        Assert.NotNull(subscription.ExpiredAtUtc);
-        Assert.Single(identityService.SetPremiumStatusCalls);
-        Assert.False(identityService.SetPremiumStatusCalls[0].IsPremium);
-    }
-
-    [Fact]
-    public async Task HandleGooglePlayDeveloperNotificationAsync_ShouldSettleOneTimeProductOrder()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var packId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-
-        dbContext.CurrencyPacks.Add(new CurrencyPack
-        {
-            Id = packId,
-            Code = "pack100",
-            DisplayName = "Pack 100",
-            CurrencyCode = "USD",
-            PriceAmount = 4.99m,
-            GrantedSpark = 100,
-            BonusSpark = 20,
-            IsActive = true,
-            SortOrder = 1
-        });
-        dbContext.PurchaseOrders.Add(new PurchaseOrder
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            PackId = packId,
-            PaymentProvider = "google_play",
-            Status = "Pending",
-            PriceAmount = 4.99m,
-            CurrencyCode = "USD",
-            SparkToGrant = 120,
-            ExternalPaymentId = "gp-one-time-token-1",
-            CreatedAtUtc = now
-        });
-        await dbContext.SaveChangesAsync();
-
-        var messageJson = "{\"oneTimeProductNotification\":{\"notificationType\":1,\"purchaseToken\":\"gp-one-time-token-1\",\"sku\":\"com.petmagic.app.tokens.google.pack100\"}}";
-        var messageData = Convert.ToBase64String(Encoding.UTF8.GetBytes(messageJson));
-
-        var service = CreateService(dbContext);
-        var result = await service.HandleGooglePlayDeveloperNotificationAsync(
-            new GooglePlayDeveloperNotificationCommand(messageData, "google-one-time-message-1"),
-            CancellationToken.None);
-
-        Assert.True(
-            result.IsSuccess,
-            result.IsFailure ? $"{result.Error.Code}:{result.Error.Message}" : "unexpected failure state");
-        Assert.False(result.Value.Processed);
-        Assert.Equal("ignored_not_found", result.Value.Status);
-
-        var order = await dbContext.PurchaseOrders.SingleAsync();
-        Assert.Equal("Pending", order.Status);
-
-        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
-    }
-
-    [Fact]
-    public async Task HandleAppStoreServerNotificationAsync_ShouldSettleOneTimeProductOrder()
-    {
-        await using var dbContext = CreateDbContext();
-
-        var userId = Guid.NewGuid();
-        var packId = Guid.NewGuid();
-        var now = DateTime.UtcNow;
-
-        dbContext.CurrencyPacks.Add(new CurrencyPack
-        {
-            Id = packId,
-            Code = "pack200",
-            DisplayName = "Pack 200",
-            CurrencyCode = "USD",
-            PriceAmount = 6.99m,
-            GrantedSpark = 180,
-            BonusSpark = 20,
-            IsActive = true,
-            SortOrder = 2
-        });
-        dbContext.PurchaseOrders.Add(new PurchaseOrder
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            PackId = packId,
-            PaymentProvider = "app_store",
-            Status = "Pending",
-            PriceAmount = 6.99m,
-            CurrencyCode = "USD",
-            SparkToGrant = 200,
-            ExternalPaymentId = "txn-app-one-time-1",
-            CreatedAtUtc = now
-        });
-        await dbContext.SaveChangesAsync();
-
-        var signedTransactionInfo = CreateUnsignedJws("{\"productId\":\"com.petmagic.app.tokens.apple.pack200\",\"originalTransactionId\":\"orig-app-one-time\",\"transactionId\":\"txn-app-one-time-1\"}");
-        var signedPayload = CreateUnsignedJws($"{{\"notificationUUID\":\"app-one-time-notification-1\",\"notificationType\":\"ONE_TIME_CHARGE\",\"data\":{{\"signedTransactionInfo\":\"{signedTransactionInfo}\"}}}}");
-
-        var service = CreateService(dbContext);
-        var result = await service.HandleAppStoreServerNotificationAsync(
-            new AppStoreServerNotificationCommand(signedPayload),
-            CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-        Assert.False(result.Value.Processed);
-        Assert.Equal("ignored_not_found", result.Value.Status);
-
-        var order = await dbContext.PurchaseOrders.SingleAsync();
-        Assert.Equal("Pending", order.Status);
-
-        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
     }
 
     [Fact]
@@ -1612,6 +1985,48 @@ public sealed partial class EconomyServiceTests
 
         var wallet = await dbContext.Wallets.FirstAsync(x => x.UserId == userId);
         Assert.Equal(120, wallet.Balance);
+    }
+
+    [Fact]
+    public async Task CreatePackPurchase_WithSavedPaymentMethodForStoreProvider_ShouldFailWithoutPersistingOrder()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "starter-google",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+
+        var purchase = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(
+                userId,
+                packId,
+                "USD",
+                "google_play",
+                "android",
+                "1.0.0",
+                "US",
+                "en",
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(purchase.IsFailure);
+        Assert.Equal("economy.payment_method_provider_invalid", purchase.Error.Code);
+        Assert.Empty(await dbContext.PurchaseOrders.ToListAsync());
     }
 
     [Fact]

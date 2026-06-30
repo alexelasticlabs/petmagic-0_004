@@ -49,11 +49,22 @@ public sealed class CreatePackPurchaseCommandValidator : AbstractValidator<Creat
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.PackId).NotEmpty();
         RuleFor(x => x.CurrencyCode).NotEmpty().Length(3);
-        RuleFor(x => x.PaymentProvider).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsSupportedCheckoutProvider)
+            .WithMessage("PaymentProvider must be one of: stripe, app_store, google_play.");
         RuleFor(x => x.Platform).NotEmpty().MaximumLength(24);
         RuleFor(x => x.AppVersion).NotEmpty().MaximumLength(32);
         RuleFor(x => x.Country).NotEmpty().MaximumLength(16);
         RuleFor(x => x.Locale).NotEmpty().MaximumLength(16);
+        RuleFor(x => x.PaymentMethodId)
+            .NotEmpty()
+            .When(x => x.PaymentMethodId.HasValue);
+        RuleFor(x => x.PaymentMethodId)
+            .Null()
+            .When(x => x.PaymentMethodId.HasValue && !PremiumSubscriptionValidationRules.IsStripeProvider(x.PaymentProvider))
+            .WithMessage("PaymentMethodId is only supported for stripe purchases.");
     }
 }
 
@@ -82,7 +93,11 @@ public sealed class CreatePremiumBillingPortalCommandValidator : AbstractValidat
     public CreatePremiumBillingPortalCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.PaymentProvider).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsStripeProvider)
+            .WithMessage("PaymentProvider must be stripe.");
     }
 }
 
@@ -191,7 +206,11 @@ public sealed class CreatePaymentMethodSetupCommandValidator : AbstractValidator
     public CreatePaymentMethodSetupCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.PaymentProvider).NotEmpty().MaximumLength(24);
+        RuleFor(x => x.PaymentProvider)
+            .NotEmpty()
+            .MaximumLength(24)
+            .Must(PremiumSubscriptionValidationRules.IsStripeProvider)
+            .WithMessage("PaymentProvider must be stripe.");
     }
 }
 
@@ -305,6 +324,11 @@ internal static class PremiumSubscriptionValidationRules
     {
         var provider = value.Trim().ToLowerInvariant();
         return provider is "app_store" or "google_play";
+    }
+
+    public static bool IsStripeProvider(string value)
+    {
+        return string.Equals(value.Trim(), "stripe", StringComparison.OrdinalIgnoreCase);
     }
 }
 

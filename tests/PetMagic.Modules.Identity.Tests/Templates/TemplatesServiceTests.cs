@@ -346,6 +346,11 @@ public sealed partial class TemplatesServiceTests
         {
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Failure(TemplatesErrors.MediaStorageFailed));
         }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(assetUrl));
+        }
     }
 
     private sealed class PassiveGenerationBilling : ITemplateGenerationBilling

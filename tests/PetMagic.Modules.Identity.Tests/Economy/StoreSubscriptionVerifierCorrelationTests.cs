@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using System.Security.Cryptography;
@@ -160,6 +161,91 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
         Assert.Equal("store-verifier-correlation-test", Assert.Single(values));
     }
 
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldLogSafeContext_WhenGooglePlayVerificationThrows()
+    {
+        using var rsa = RSA.Create(2048);
+        var logger = new CapturingLogger<StoreSubscriptionVerifier>();
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new ThrowingGooglePlayProductHandler())),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()),
+            logger);
+
+        var purchaseId = "GPA.1234-5678-9012-34567";
+        var verificationData = "gp-sensitive-token-1234567890";
+        var result = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "google_play",
+                "com.petmagic.app.tokens.google.pack100",
+                verificationData,
+                "local-proof",
+                purchaseId,
+                "2026-07-01T12:34:56Z"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StoreVerificationUnavailable.Code, result.Error.Code);
+
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Store product verification failed.", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Provider=google_play", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Operation=product_verify", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("VerificationDataKind=token", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("PurchaseId=GPA.***4567", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseId, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(verificationData, entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ShouldLogSafeContext_WhenAppStoreVerificationThrows()
+    {
+        var logger = new CapturingLogger<StoreSubscriptionVerifier>();
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new ThrowingAppStoreHandler())),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreSharedSecret = "app-store-shared-secret",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()),
+            logger);
+
+        var purchaseId = "1000001234567890";
+        var verificationData = new string('r', 256);
+        var result = await verifier.VerifyAsync(
+            new StoreSubscriptionVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "premium_monthly",
+                "com.petmagic.spark100",
+                verificationData,
+                null,
+                purchaseId,
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StoreVerificationUnavailable.Code, result.Error.Code);
+
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Store subscription verification failed.", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Provider=app_store", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Operation=subscription_verify", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("Endpoint=production", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("VerificationDataKind=receipt", entry.Message, StringComparison.Ordinal);
+        Assert.Contains("PurchaseId=1000***7890", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(purchaseId, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(verificationData, entry.Message, StringComparison.Ordinal);
+    }
+
     private sealed class SingleClientFactory(HttpClient httpClient) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name)
@@ -256,6 +342,64 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
             }
 
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        }
+    }
+
+    private sealed class ThrowingGooglePlayProductHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.Host == "oauth2.googleapis.com")
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"google-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600}")
+                });
+            }
+
+            throw new HttpRequestException("google play verification upstream unavailable");
+        }
+    }
+
+    private sealed class ThrowingAppStoreHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            throw new HttpRequestException("app store verification upstream unavailable");
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception));
+        }
+    }
+
+    private sealed record CapturedLogEntry(LogLevel LogLevel, string Message, Exception? Exception);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
         }
     }
 }

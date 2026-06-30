@@ -46,13 +46,13 @@ internal sealed class FcmEconomyPushNotificationSender(
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         foreach (var token in tokens)
         {
-            var isRussian = token.Locale?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
-            var title = notification.Title ??
-                (isRussian ? "Баланс PawSpark обновлен" : "PawSpark balance updated");
-            var body = notification.Body ??
-                (notification.SparkDelta.HasValue && notification.SparkDelta.Value > 0
-                    ? (isRussian ? $"Начислено +{notification.SparkDelta.Value} PawSpark." : $"Added +{notification.SparkDelta.Value} PawSpark.")
-                    : (isRussian ? "Проверьте последние операции в кошельке." : "Open wallet to see your latest transaction."));
+            var locale = token.Locale;
+            var title = notification.Title
+                ?? EconomyPushNotificationLocalizer.BuildWalletTitle(locale);
+            var body = notification.Body
+                ?? EconomyPushNotificationLocalizer.BuildWalletBody(
+                    locale,
+                    notification.SparkDelta);
 
             var data = new Dictionary<string, string>
             {
@@ -88,11 +88,13 @@ internal sealed class FcmEconomyPushNotificationSender(
         var accessToken = await GetAccessTokenAsync(cancellationToken);
         foreach (var token in tokens)
         {
-            var isRussian = token.Locale?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
-            var title = notification.Title ??
-                (isRussian ? "Статус Premium обновлен" : "Premium status updated");
-            var body = notification.Body ??
-                BuildPremiumBody(notification.Status, isRussian);
+            var locale = token.Locale;
+            var title = notification.Title
+                ?? EconomyPushNotificationLocalizer.BuildPremiumTitle(locale);
+            var body = notification.Body
+                ?? EconomyPushNotificationLocalizer.BuildPremiumBody(
+                    locale,
+                    notification.Status);
 
             var data = new Dictionary<string, string>
             {
@@ -203,35 +205,9 @@ internal sealed class FcmEconomyPushNotificationSender(
         return CreateCredentialFromJson(File.ReadAllText(options.Value.FirebaseServiceAccountJsonPath));
     }
 
-    private static string BuildPremiumBody(string status, bool isRussian)
-    {
-        return status.ToLowerInvariant() switch
-        {
-            "active" => isRussian
-                ? "Premium активирован. Возможности обновлены."
-                : "Premium is active. Your access has been updated.",
-            "inactive" => isRussian
-                ? "Premium сейчас не активен. Проверить статус можно в профиле."
-                : "Premium is not active right now. You can review status in Profile.",
-            "expired" => isRussian
-                ? "Срок Premium завершился."
-                : "Premium subscription has expired.",
-            "failed" or "error" => isRussian
-                ? "Не удалось обновить Premium. Попробуйте снова."
-                : "Premium update failed. Please try again.",
-            _ => isRussian
-                ? "Статус Premium обновлен."
-                : "Premium status has been updated."
-        };
-    }
-
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        var parameters = JsonSerializer.Deserialize<JsonCredentialParameters>(json)
-            ?? throw new InvalidOperationException("Firebase service account JSON is invalid.");
-#pragma warning disable CS0618
-        return GoogleCredential.FromJsonParameters(parameters);
-#pragma warning restore CS0618
+        return GoogleCredential.FromJson(json);
     }
 
     private static string NormalizeJson(string value)

@@ -9,6 +9,7 @@ using System.Text.Json;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using PetMagic.Host.Api.Security;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -190,6 +192,8 @@ public sealed partial class TemplatesApiIntegrationTests
 
         public TestTemplateGenerationBilling Billing { get; }
 
+        public IServiceProvider Services => app.Services;
+
         public static async Task<TestApplication> CreateAsync(bool failGeneratedMediaImport = false)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
@@ -225,10 +229,23 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddMemoryCache();
             builder.Services.AddRateLimiter(options =>
             {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+                options.OnRejected = RateLimitProblemResponse.WriteAsync;
                 options.AddFixedWindowLimiter("templates", limiterOptions =>
                 {
                     limiterOptions.PermitLimit = 1_000;
                     limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
+                options.AddFixedWindowLimiter("templates-analytics", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 48;
+                    limiterOptions.Window = TimeSpan.FromMinutes(1);
+                    limiterOptions.QueueLimit = 0;
+                });
+                options.AddConcurrencyLimiter("templates-events", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 3;
                     limiterOptions.QueueLimit = 0;
                 });
                 options.AddFixedWindowLimiter("generation-create", limiterOptions =>
@@ -377,6 +394,11 @@ public sealed partial class TemplatesApiIntegrationTests
             assets.TryRemove(assetUrl, out _);
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
         }
     }
 

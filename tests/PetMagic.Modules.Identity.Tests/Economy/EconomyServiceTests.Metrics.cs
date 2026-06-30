@@ -146,6 +146,23 @@ public sealed partial class EconomyServiceTests
                 MonthlyTokensGranted = 40,
                 CreatedAtUtc = now.AddDays(-10),
                 UpdatedAtUtc = now
+            },
+            new UserSubscription
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                Provider = "stripe",
+                PurchaseChannel = "web",
+                Region = "US",
+                PlanId = "monthly",
+                Status = "Canceled",
+                CurrentPeriodStartUtc = now.AddDays(-5),
+                CurrentPeriodEndUtc = now.AddDays(3),
+                CancelAtPeriodEnd = true,
+                MonthlyTokenLimit = 500,
+                MonthlyTokensGranted = 40,
+                CreatedAtUtc = now.AddDays(-5),
+                UpdatedAtUtc = now
             });
         dbContext.WalletLedgerEntries.AddRange(
             new WalletLedgerEntry
@@ -193,7 +210,7 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(5m, result.Value.RevenuePreviousWeek);
         Assert.Equal(150, result.Value.TotalWalletCredits);
         Assert.Equal(45, result.Value.TotalWalletDebits);
-        Assert.Equal(2, result.Value.ActiveSubscriptions);
+        Assert.Equal(3, result.Value.ActiveSubscriptions);
         Assert.Equal(2, result.Value.RenewalStops);
         Assert.Equal("USD", result.Value.CurrencyCode);
         Assert.Equal(7, result.Value.RevenueSeries.Count);

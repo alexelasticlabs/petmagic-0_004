@@ -11,6 +11,24 @@ public sealed class OpenSupportConversationCommandValidator : AbstractValidator<
         RuleFor(x => x.InitialMessage)
             .MaximumLength(4000)
             .When(x => !string.IsNullOrWhiteSpace(x.InitialMessage));
+        RuleFor(x => x.Priority)
+            .Must(priority => Enum.IsDefined(priority))
+            .WithMessage("Support conversation priority is not supported.");
+        RuleFor(x => x.Source)
+            .Must(source => Enum.IsDefined(source))
+            .WithMessage("Support conversation source is not supported.");
+        RuleFor(x => x.AssistantScenario)
+            .MaximumLength(64)
+            .When(x => !string.IsNullOrWhiteSpace(x.AssistantScenario));
+        RuleFor(x => x.RelatedGenerationId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .When(x => x.RelatedGenerationId.HasValue);
+        RuleFor(x => x.RelatedPaymentId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .When(x => x.RelatedPaymentId.HasValue);
+        RuleFor(x => x.RelatedSubscriptionId)
+            .Must(id => id is null || id.Value != Guid.Empty)
+            .When(x => x.RelatedSubscriptionId.HasValue);
     }
 }
 
@@ -124,6 +142,10 @@ public sealed class AssignSupportConversationCommandValidator : AbstractValidato
     {
         RuleFor(x => x.ConversationId).NotEmpty();
         RuleFor(x => x.AdminUserId).NotEmpty();
+        RuleFor(x => x.AssignedAdminId)
+            .NotEqual(Guid.Empty)
+            .When(x => x.AssignedAdminId.HasValue)
+            .WithMessage("Assigned admin id must not be empty.");
     }
 }
 

@@ -25,6 +25,8 @@ public interface IGamificationService
     Task<IReadOnlyList<ChallengeResponse>> GetCurrentChallengesAsync(Guid userId, CancellationToken cancellationToken);
 
     Task<GamificationSummaryResponse> GetSummaryAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 public sealed record GenerationProcessResult(

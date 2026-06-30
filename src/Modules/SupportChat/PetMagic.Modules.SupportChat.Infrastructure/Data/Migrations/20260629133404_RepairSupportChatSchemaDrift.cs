@@ -60,7 +60,8 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally irreversible: schema repair backfills drifted
+            // columns/table shape without tracking a lossless prior schema.
         }
     }
 }

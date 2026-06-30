@@ -143,13 +143,13 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseOrderResponse>(EconomyErrors.PaymentGatewayFailed);
         }
 
-        StripeConfiguration.ApiKey = apiKey;
+        var stripeClient = CreateStripeClient(apiKey);
 
         try
         {
             if (stripeReferenceId.StartsWith("cs_", StringComparison.OrdinalIgnoreCase))
             {
-                var sessionService = new Stripe.Checkout.SessionService();
+                var sessionService = new Stripe.Checkout.SessionService(stripeClient);
                 var session = await sessionService.GetAsync(stripeReferenceId, cancellationToken: cancellationToken);
 
                 if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
@@ -166,7 +166,7 @@ public sealed partial class EconomyService
             }
             else if (stripeReferenceId.StartsWith("pi_", StringComparison.OrdinalIgnoreCase))
             {
-                var paymentIntentService = new PaymentIntentService();
+                var paymentIntentService = new PaymentIntentService(stripeClient);
                 var paymentIntent = await paymentIntentService.GetAsync(stripeReferenceId, cancellationToken: cancellationToken);
 
                 if (!string.Equals(paymentIntent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))

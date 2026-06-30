@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 
+using Microsoft.Extensions.Logging;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Infrastructure;
 
@@ -87,7 +89,8 @@ public sealed class FileMediaMetadataReaderTests
     public async Task GetVideoDurationSecondsAsync_ShouldFail_WhenMp4PayloadIsMalformed()
     {
         var filePath = CreateTempFile([1, 2, 3, 4, 5, 6, 7, 8]);
-        var reader = new FileMediaMetadataReader();
+        var logger = new CapturingLogger<FileMediaMetadataReader>();
+        var reader = new FileMediaMetadataReader(logger);
 
         try
         {
@@ -97,10 +100,50 @@ public sealed class FileMediaMetadataReaderTests
 
             Assert.True(result.IsFailure);
             Assert.Equal("templates.media_metadata_failed", result.Error.Code);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Warning
+                    && entry.Message.Contains("Template media metadata read failed.", StringComparison.Ordinal)
+                    && Equals(entry.Properties["Operation"], "read_mp4_duration"));
         }
         finally
         {
             File.Delete(filePath);
+        }
+    }
+
+    [Fact]
+    public async Task GetVideoDurationSecondsAsync_ShouldLogCleanupFailure_ForOwnedLockedTempFile()
+    {
+        var logger = new CapturingLogger<FileMediaMetadataReader>();
+        var reader = new FileMediaMetadataReader(logger);
+        var filePath = await TemplateMediaTempFiles.WriteAsync([1, 2, 3, 4], ".mp4", CancellationToken.None);
+        await using var lockStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        try
+        {
+            var result = await reader.GetVideoDurationSecondsAsync(
+                new StoredMediaResponse(
+                    "https://cdn.example.com/locked.mp4",
+                    "templates/locked.mp4",
+                    "locked.mp4",
+                    "video/mp4",
+                    null,
+                    filePath),
+                CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Warning
+                    && entry.Message.Contains("Template metadata temp file cleanup failed.", StringComparison.Ordinal)
+                    && Equals(entry.Properties["Operation"], "delete_owned")
+                    && Equals(entry.Properties["TempFileName"], Path.GetFileName(filePath)));
+        }
+        finally
+        {
+            lockStream.Dispose();
+            TemplateMediaTempFiles.TryDeleteIfOwned(filePath);
         }
     }
 
@@ -153,4 +196,47 @@ public sealed class FileMediaMetadataReaderTests
         payload.CopyTo(box, 8);
         return box;
     }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), properties));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties);
 }

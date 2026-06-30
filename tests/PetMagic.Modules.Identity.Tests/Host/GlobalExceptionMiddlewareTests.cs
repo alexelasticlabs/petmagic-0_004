@@ -27,13 +27,7 @@ public sealed class GlobalExceptionMiddlewareTests
         await using var app = builder.Build();
         app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseMiddleware<GlobalExceptionMiddleware>();
-        app.MapGet("/boom", () =>
-        {
-            throw new InvalidOperationException("secret-provider-token");
-#pragma warning disable CS0162
-            return Results.Ok();
-#pragma warning restore CS0162
-        });
+        app.MapGet("/boom", static IResult () => throw new InvalidOperationException("secret-provider-token"));
         await app.StartAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/boom");

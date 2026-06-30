@@ -60,6 +60,7 @@ public sealed class GamificationService(
         var previousLevel = progress.Level;
         progress.Xp += xpAwarded;
         progress.TotalGenerations += 1;
+        progress.FavoriteTemplateId = templateId;
         progress.FirstGenerationAtUtc ??= now;
         progress.LastGenerationAtUtc = now;
         progress.Level = XpThresholds.GetLevel(progress.Xp);
@@ -73,10 +74,12 @@ public sealed class GamificationService(
 
         await UpdateDailyStreakAsync(userId, today, isPremium, cancellationToken);
         await UpdateChallengeProgressAsync(userId, "generate_images", 1, cancellationToken);
+        await UpdateChallengeProgressAsync(userId, "try_templates", 1, cancellationToken);
 
         var unlockedAchievements = await EvaluateAchievementsAsync(userId, cancellationToken);
 
         var totalSparkReward = 0;
+        var unlockedAchievementResponses = new List<AchievementResponse>();
         if (unlockedAchievements.Count > 0)
         {
             var unlockedKeys = unlockedAchievements.Select(a => a.AchievementKey).ToHashSet();
@@ -89,6 +92,19 @@ public sealed class GamificationService(
                 if (definitions.TryGetValue(achievement.AchievementKey, out var def))
                 {
                     totalSparkReward += def.RewardSpark;
+                    unlockedAchievementResponses.Add(new AchievementResponse(
+                        def.Key,
+                        def.Category,
+                        def.Rarity,
+                        def.TitleKey,
+                        def.DescriptionKey,
+                        def.IconEmoji,
+                        def.RequirementValue,
+                        def.RequirementValue,
+                        def.RewardSpark,
+                        def.IsSecret,
+                        true,
+                        achievement.UnlockedAtUtc));
                 }
                 achievement.RewardCredited = true;
             }
@@ -108,7 +124,7 @@ public sealed class GamificationService(
             didLevelUp ? progress.Level : null,
             newEvolutionStage,
             didLevelUp,
-            unlockedAchievements.Select(MapAchievement).ToList(),
+            unlockedAchievementResponses,
             totalSparkReward);
     }
 
@@ -271,11 +287,7 @@ public sealed class GamificationService(
     public async Task<IReadOnlyList<ChallengeResponse>> GetCurrentChallengesAsync(Guid userId, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var startOfWeek = today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday);
-        if (today.DayOfWeek == DayOfWeek.Sunday)
-        {
-            startOfWeek = today.AddDays(-6);
-        }
+        var startOfWeek = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
 
         var challenges = await dbContext.WeeklyChallenges
             .Where(x => x.WeekStartDate == startOfWeek)
@@ -284,7 +296,7 @@ public sealed class GamificationService(
 
         if (challenges.Count == 0)
         {
-            await EnsureWeeklyChallengesAsync(startOfWeek, cancellationToken);
+            await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(dbContext, startOfWeek, cancellationToken);
             challenges = await dbContext.WeeklyChallenges
                 .Where(x => x.WeekStartDate == startOfWeek)
                 .OrderBy(x => x.SortOrder)
@@ -336,6 +348,12 @@ public sealed class GamificationService(
                 XpThresholds.GetXpForCurrentLevel(p.Level),
                 p.FirstGenerationAtUtc.HasValue ? (int)(DateTime.UtcNow - p.FirstGenerationAtUtc.Value).TotalDays + 1 : 0,
                 p.FavoriteTemplateId, p.LastGenerationAtUtc)).ToList());
+    }
+
+    public async Task RecordCreationSharedAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        await UpdateChallengeProgressAsync(userId, "share_creations", 1, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task UpdateDailyStreakAsync(Guid userId, DateOnly today, bool isPremium, CancellationToken cancellationToken)
@@ -413,18 +431,21 @@ public sealed class GamificationService(
     private async Task UpdateChallengeProgressAsync(Guid userId, string challengeType, int increment, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var startOfWeek = today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday);
-        if (today.DayOfWeek == DayOfWeek.Sunday)
-        {
-            startOfWeek = today.AddDays(-6);
-        }
+        var startOfWeek = GamificationWeeklyChallengeCatalog.GetCurrentWeekStart(today);
 
         var challenge = await dbContext.WeeklyChallenges
             .FirstOrDefaultAsync(x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType, cancellationToken);
 
         if (challenge is null)
         {
-            return;
+            await GamificationWeeklyChallengeCatalog.EnsureWeeklyChallengesAsync(dbContext, startOfWeek, cancellationToken);
+            challenge = await dbContext.WeeklyChallenges
+                .FirstOrDefaultAsync(x => x.WeekStartDate == startOfWeek && x.ChallengeType == challengeType, cancellationToken);
+
+            if (challenge is null)
+            {
+                return;
+            }
         }
 
         var progress = await dbContext.UserChallengeProgresses
@@ -452,36 +473,6 @@ public sealed class GamificationService(
             progress.Completed = true;
             progress.CompletedAtUtc = DateTime.UtcNow;
         }
-    }
-
-    private async Task EnsureWeeklyChallengesAsync(DateOnly weekStart, CancellationToken cancellationToken)
-    {
-        var existing = await dbContext.WeeklyChallenges
-            .AnyAsync(x => x.WeekStartDate == weekStart, cancellationToken);
-
-        if (existing)
-        {
-            return;
-        }
-
-        var now = DateTime.UtcNow;
-        foreach (var template in DefaultChallenges.Templates.Select((t, i) => (t, i)))
-        {
-            dbContext.WeeklyChallenges.Add(new WeeklyChallenge
-            {
-                Id = Guid.NewGuid(),
-                WeekStartDate = weekStart,
-                ChallengeType = template.t.ChallengeType,
-                TargetValue = template.t.TargetValue,
-                TitleKey = template.t.TitleKey,
-                DescriptionKey = template.t.DescriptionKey,
-                RewardSpark = template.t.RewardSpark,
-                SortOrder = template.i,
-                CreatedAtUtc = now
-            });
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<List<UserAchievement>> EvaluateAchievementsAsync(Guid userId, CancellationToken cancellationToken)
@@ -555,20 +546,6 @@ public sealed class GamificationService(
         "pet_level" => counters.MaxPetLevel,
         _ => 0
     };
-
-    private static AchievementResponse MapAchievement(UserAchievement earned) => new(
-        earned.AchievementKey,
-        "special",
-        "common",
-        earned.AchievementKey,
-        string.Empty,
-        null,
-        0,
-        0,
-        0,
-        false,
-        true,
-        earned.UnlockedAtUtc);
 
     private sealed class UserProgressCounters
     {

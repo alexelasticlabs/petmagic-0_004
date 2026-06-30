@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
@@ -7,7 +8,10 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvironment hostEnvironment) : IMediaStorage
+internal sealed class LocalFileMediaStorage(
+    TemplatesOptions options,
+    IHostEnvironment hostEnvironment,
+    ILogger<LocalFileMediaStorage>? logger = null) : IMediaStorage
 {
     private static readonly Dictionary<string, string> ImageSubtypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -63,8 +67,6 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
             ? options.LocalMediaRootPath
             : Path.Combine(hostEnvironment.ContentRootPath, options.LocalMediaRootPath);
 
-        Directory.CreateDirectory(root);
-
         var now = DateTime.UtcNow;
         var safeName = $"{Guid.NewGuid():N}{extension}";
         if (!TryResolvePreferredStorageKey(asset.PreferredStorageKey, extension, out var preferredStorageKey))
@@ -76,10 +78,13 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
             ?? Path.Combine(now.ToString("yyyy"), now.ToString("MM"), safeName);
         var relativePath = Path.Combine("templates-media", storageRelativePath);
         var physicalPath = Path.Combine(root, storageRelativePath);
+        var normalizedRelativePath = relativePath.Replace("\\", "/");
 
-        Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
         try
         {
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
+
             if (asset.Content is not null)
             {
                 await File.WriteAllBytesAsync(physicalPath, asset.Content, cancellationToken);
@@ -107,17 +112,24 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.InvalidMediaUpload);
             }
         }
-        catch
+        catch (Exception exception)
         {
             if (File.Exists(physicalPath))
             {
                 File.Delete(physicalPath);
             }
 
+            logger?.LogWarning(
+                exception,
+                "Local media store failed. Operation={Operation} StorageKey={StorageKey} ContentType={ContentType} ContentLength={ContentLength} HasPreferredStorageKey={HasPreferredStorageKey}",
+                "store",
+                normalizedRelativePath,
+                normalizedContentType,
+                contentLength,
+                preferredStorageKey is not null);
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed);
         }
 
-        var normalizedRelativePath = relativePath.Replace("\\", "/");
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
         var url = $"{baseUrl}/{normalizedRelativePath}";
 
@@ -212,8 +224,13 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
 
             return Task.FromResult(Result.Success());
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "Local media delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "delete",
+                relativePath);
             return Task.FromResult(Result.Failure(TemplatesErrors.MediaStorageFailed));
         }
     }
@@ -231,13 +248,13 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
     {
         if (string.IsNullOrWhiteSpace(assetUrl))
         {
-            return Task.FromResult(Result.Success(assetUrl));
+            return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
 
         var relativePath = TryResolveManagedRelativePath(assetUrl);
         if (relativePath is null)
         {
-            return Task.FromResult(Result.Success(assetUrl));
+            return Task.FromResult(Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
         }
 
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
@@ -247,6 +264,12 @@ internal sealed class LocalFileMediaStorage(TemplatesOptions options, IHostEnvir
     private string? TryResolveManagedRelativePath(string assetUrl)
     {
         var candidate = assetUrl.Trim().Replace('\\', '/');
+        var queryIndex = candidate.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            candidate = candidate[..queryIndex];
+        }
+
         if (candidate.StartsWith("templates-media/", StringComparison.OrdinalIgnoreCase))
         {
             return candidate;

@@ -273,6 +273,7 @@ public static partial class SupportChatEndpoints
             "support.feedback_not_allowed" => StatusCodes.Status409Conflict,
             "support.feedback_rating_invalid" => StatusCodes.Status400BadRequest,
             "support.push_token_invalid" => StatusCodes.Status400BadRequest,
+            "support.assigned_admin_invalid" => StatusCodes.Status400BadRequest,
             _ => StatusCodes.Status400BadRequest,
         };
 

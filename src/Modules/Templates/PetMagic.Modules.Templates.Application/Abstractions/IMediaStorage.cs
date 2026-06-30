@@ -11,6 +11,7 @@ public interface IMediaStorage
 
     Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
     {
-        return Task.FromResult(Result.Success(assetUrl));
+        return Task.FromResult(Result.Failure<string>(
+            new Error("templates.media_storage_failed", "Media upload could not be stored.")));
     }
 }

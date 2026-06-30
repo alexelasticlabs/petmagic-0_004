@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Identity.Domain.Enums;
 using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Data;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -49,7 +52,10 @@ public sealed class SupportChatServiceTests
     [Fact]
     public async Task OpenConversationAsync_ShouldSucceedWhenRealtimeNotifierFails()
     {
-        var store = CreateStore(new ThrowingSupportChatRealtimeNotifier());
+        var logger = new CapturingLogger<SupportChatService>();
+        var store = CreateStore(
+            realtimeNotifier: new ThrowingSupportChatRealtimeNotifier(),
+            logger: logger);
 
         var userId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
@@ -67,6 +73,52 @@ public sealed class SupportChatServiceTests
         var conversation = await scope.SupportDbContext.SupportConversations.Include(x => x.Messages).SingleAsync();
         Assert.Equal(userId, conversation.InitiatorUserId);
         Assert.Equal(3, conversation.Messages.Count);
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Support chat notification fan-out failed.", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("conversation_update", entry.Properties["Operation"]);
+        Assert.Equal("realtime", entry.Properties["Channel"]);
+        Assert.Equal(userId, entry.Properties["InitiatorUserId"]);
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_ByAdmin_ShouldSucceedWhenPushNotifierFails_AndLogWarning()
+    {
+        var logger = new CapturingLogger<SupportChatService>();
+        var store = CreateStore(
+            pushNotificationSender: new ThrowingSupportChatPushNotificationSender(),
+            logger: logger);
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(conversationId, adminId, "We are on it", true),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        var entry = Assert.Single(
+            logger.Entries,
+            x => x.LogLevel == LogLevel.Warning && Equals(x.Properties.GetValueOrDefault("Channel"), "push"));
+        Assert.Contains("Support chat notification fan-out failed.", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("message_delivery", entry.Properties["Operation"]);
+        Assert.Equal("push", entry.Properties["Channel"]);
+        Assert.Equal(conversationId, entry.Properties["ConversationId"]);
+        Assert.Equal(userId, entry.Properties["InitiatorUserId"]);
+        Assert.Equal(sendResult.Value.MessageId, entry.Properties["MessageId"]);
+        Assert.Equal("SupportAgent", entry.Properties["SenderType"]);
+        Assert.Equal(false, entry.Properties["HasAttachments"]);
     }
 
     [Fact]
@@ -77,7 +129,7 @@ public sealed class SupportChatServiceTests
         var userId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
 
         Guid conversationId;
         await using (var openScope = await store.CreateScopeAsync())
@@ -112,6 +164,72 @@ public sealed class SupportChatServiceTests
         Assert.Equal(1, detail.Value.Messages.Count(message => message.SenderType == "SupportAgent"));
         Assert.Contains(detail.Value.Messages, message => message.SenderType == "System" && message.Body == "Support replied");
         Assert.Contains(store.Notifications, x => x.ConversationId == conversationId);
+    }
+
+    [Fact]
+    public async Task AssignConversationAsync_ForNewConversation_ShouldMoveToInProgress()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need billing help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var assignScope = await store.CreateScopeAsync();
+        var assignResult = await assignScope.CreateService().AssignConversationAsync(
+            new AssignSupportConversationCommand(conversationId, adminId, adminId),
+            CancellationToken.None);
+
+        Assert.True(assignResult.IsSuccess);
+        Assert.Equal("InProgress", assignResult.Value.Status);
+        Assert.Equal(adminId, assignResult.Value.AssignedAdminId);
+        Assert.Equal("Support Admin", assignResult.Value.AssignedAdminDisplayName);
+        Assert.Contains(
+            assignResult.Value.Messages,
+            message => message.SenderType == "System" && message.Body == "Ticket assigned to operator");
+        Assert.Contains(
+            assignResult.Value.Messages,
+            message => message.SenderType == "System" && message.Body == "Status changed: New -> InProgress");
+    }
+
+    [Fact]
+    public async Task AssignConversationAsync_ShouldRejectNonSupportUserAssignee()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var regularUserId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
+        await SeedUserAsync(store, regularUserId, "other@petmagic.test", "Regular User", SystemRoles.User);
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need billing help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var assignScope = await store.CreateScopeAsync();
+        var assignResult = await assignScope.CreateService().AssignConversationAsync(
+            new AssignSupportConversationCommand(conversationId, adminId, regularUserId),
+            CancellationToken.None);
+
+        Assert.True(assignResult.IsFailure);
+        Assert.Equal("support.assigned_admin_invalid", assignResult.Error.Code);
     }
 
     [Fact]
@@ -159,6 +277,45 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task SendMessageWithAttachmentsAsync_WithExternalAttachmentUrl_ShouldSuppressReturnedFileUrl()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        await using var sendScope = await store.CreateScopeAsync();
+        var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+            new SendSupportAttachmentsCommand(
+                conversationId,
+                userId,
+                "Screenshot from the broken screen",
+                false,
+                [
+                    new SupportMessageAttachmentInput(
+                        "https://tracker.example.com/broken-screen.png",
+                        "image/png",
+                        "broken-screen.png",
+                        2048)
+                ]),
+            CancellationToken.None);
+
+        Assert.True(sendResult.IsSuccess);
+        var attachment = Assert.Single(sendResult.Value.Attachments);
+        Assert.Equal(string.Empty, attachment.FileUrl);
+        Assert.Equal("broken-screen.png", attachment.FileName);
+    }
+
+    [Fact]
     public async Task SendMessageAsync_WithReplyToMessage_ShouldPersistReplyMetadata()
     {
         var store = CreateStore();
@@ -166,7 +323,7 @@ public sealed class SupportChatServiceTests
         var userId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
 
         Guid conversationId;
         Guid replyTargetMessageId;
@@ -242,8 +399,8 @@ public sealed class SupportChatServiceTests
         var adminAId = Guid.NewGuid();
         var adminBId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
-        await SeedUserAsync(store, adminAId, "admin-a@petmagic.test", "Support Admin A");
-        await SeedUserAsync(store, adminBId, "admin-b@petmagic.test", "Support Admin B");
+        await SeedUserAsync(store, adminAId, "admin-a@petmagic.test", "Support Admin A", SystemRoles.Admin);
+        await SeedUserAsync(store, adminBId, "admin-b@petmagic.test", "Support Admin B", SystemRoles.Admin);
 
         Guid conversationId;
         await using (var openScope = await store.CreateScopeAsync())
@@ -283,7 +440,7 @@ public sealed class SupportChatServiceTests
         var adminId = Guid.NewGuid();
         await SeedUserAsync(store, userA, "user-a@petmagic.test", "Pet User A");
         await SeedUserAsync(store, userB, "user-b@petmagic.test", "Pet User B");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
 
         Guid assignedConversationId;
         Guid unassignedConversationId;
@@ -344,7 +501,7 @@ public sealed class SupportChatServiceTests
         await SeedUserAsync(store, normalUserId, "normal@petmagic.test", "Normal User");
         await SeedUserAsync(store, highUserId, "high@petmagic.test", "High User");
         await SeedUserAsync(store, waitingUserId, "waiting@petmagic.test", "Waiting User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
 
         Guid normalConversationId;
         Guid highConversationId;
@@ -412,7 +569,7 @@ public sealed class SupportChatServiceTests
         var userId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
         await SeedUserAsync(store, userId, "legacy@petmagic.test", "Legacy User");
-        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin");
+        await SeedUserAsync(store, adminId, "admin@petmagic.test", "Support Admin", SystemRoles.Admin);
 
         Guid conversationId;
 
@@ -924,7 +1081,7 @@ public sealed class SupportChatServiceTests
         Assert.Equal("Necesito ayuda", userMessage.Body);
         var botReply = Assert.Single(detail.Value.Messages, message => message.SenderType == "Bot");
         Assert.Equal(
-            "Mensaje recibido. Soporte respondera en este chat.",
+            "Mensaje recibido. Soporte responderá en este chat.",
             botReply.Body);
         Assert.True(botReply.IsFromAdmin);
         Assert.True(botReply.IsRead);
@@ -932,17 +1089,42 @@ public sealed class SupportChatServiceTests
         Assert.Equal(0, detail.Value.UserUnreadCount);
     }
 
-    private static TestStore CreateStore(ISupportChatRealtimeNotifier? realtimeNotifier = null)
+    private static TestStore CreateStore(
+        ISupportChatRealtimeNotifier? realtimeNotifier = null,
+        ISupportChatPushNotificationSender? pushNotificationSender = null,
+        ILogger<SupportChatService>? logger = null)
     {
         return new TestStore(
             $"support-chat-tests-{Guid.NewGuid():N}",
             $"support-chat-identity-tests-{Guid.NewGuid():N}",
-            realtimeNotifier);
+            realtimeNotifier,
+            pushNotificationSender,
+            logger);
     }
 
-    private static async Task SeedUserAsync(TestStore store, Guid userId, string email, string displayName)
+    private static async Task SeedUserAsync(
+        TestStore store,
+        Guid userId,
+        string email,
+        string displayName,
+        params string[] roles)
     {
         await using var scope = await store.CreateScopeAsync();
+
+        foreach (var role in roles.Distinct(StringComparer.Ordinal))
+        {
+            if (!await scope.IdentityDbContext.Roles.AnyAsync(existing => existing.Name == role))
+            {
+                scope.IdentityDbContext.Roles.Add(new IdentityRole<Guid>
+                {
+                    Id = Guid.NewGuid(),
+                    Name = role,
+                    NormalizedName = role.ToUpperInvariant(),
+                });
+            }
+        }
+
+        await scope.IdentityDbContext.SaveChangesAsync();
 
         scope.IdentityDbContext.Users.Add(new AppUser
         {
@@ -958,11 +1140,41 @@ public sealed class SupportChatServiceTests
         });
 
         await scope.IdentityDbContext.SaveChangesAsync();
+
+        if (roles.Length > 0)
+        {
+            var normalizedRoles = roles
+                .Distinct(StringComparer.Ordinal)
+                .Select(role => role.ToUpperInvariant())
+                .ToArray();
+            var roleIds = await scope.IdentityDbContext.Roles
+                .Where(role => normalizedRoles.Contains(role.NormalizedName!))
+                .Select(role => role.Id)
+                .ToListAsync();
+
+            foreach (var roleId in roleIds)
+            {
+                scope.IdentityDbContext.UserRoles.Add(new IdentityUserRole<Guid>
+                {
+                    UserId = userId,
+                    RoleId = roleId,
+                });
+            }
+
+            await scope.IdentityDbContext.SaveChangesAsync();
+        }
     }
 
-    private sealed class TestStore(string supportDatabaseName, string identityDatabaseName, ISupportChatRealtimeNotifier? realtimeNotifier = null)
+    private sealed class TestStore(
+        string supportDatabaseName,
+        string identityDatabaseName,
+        ISupportChatRealtimeNotifier? realtimeNotifier = null,
+        ISupportChatPushNotificationSender? pushNotificationSender = null,
+        ILogger<SupportChatService>? logger = null)
     {
         private readonly ISupportChatRealtimeNotifier notifier = realtimeNotifier ?? new FakeSupportChatRealtimeNotifier();
+        private readonly ISupportChatPushNotificationSender pushNotifier = pushNotificationSender ?? new NoopSupportChatPushNotificationSender();
+        private readonly ILogger<SupportChatService>? supportLogger = logger;
 
         public IReadOnlyList<SupportConversationRealtimeEvent> Notifications => notifier is FakeSupportChatRealtimeNotifier fakeNotifier
             ? fakeNotifier.Events
@@ -982,14 +1194,16 @@ public sealed class SupportChatServiceTests
             await identityDbContext.Database.EnsureCreatedAsync();
             await supportDbContext.Database.EnsureCreatedAsync();
 
-            return new TestScope(supportDbContext, identityDbContext, notifier);
+            return new TestScope(supportDbContext, identityDbContext, notifier, pushNotifier, supportLogger);
         }
     }
 
     private sealed class TestScope(
         SupportChatDbContext supportDbContext,
         IdentityDbContext identityDbContext,
-        ISupportChatRealtimeNotifier realtimeNotifier) : IAsyncDisposable
+        ISupportChatRealtimeNotifier realtimeNotifier,
+        ISupportChatPushNotificationSender pushNotificationSender,
+        ILogger<SupportChatService>? logger) : IAsyncDisposable
     {
         public SupportChatDbContext SupportDbContext { get; } = supportDbContext;
 
@@ -1001,9 +1215,10 @@ public sealed class SupportChatServiceTests
                 SupportDbContext,
                 new IdentityUserLookupService(IdentityDbContext),
                 realtimeNotifier,
-                new NoopSupportChatPushNotificationSender(),
+                pushNotificationSender,
                 new NoopSupportAttachmentStorage(),
-                new SupportAttachmentStorageOptions());
+                new SupportAttachmentStorageOptions(),
+                logger);
         }
 
         public async ValueTask DisposeAsync()
@@ -1042,6 +1257,14 @@ public sealed class SupportChatServiceTests
         }
     }
 
+    private sealed class ThrowingSupportChatPushNotificationSender : ISupportChatPushNotificationSender
+    {
+        public Task NotifyUserAsync(SupportChatPushNotification notification, CancellationToken cancellationToken)
+        {
+            throw new InvalidOperationException("push provider is unavailable");
+        }
+    }
+
     private sealed class NoopSupportAttachmentStorage : ISupportAttachmentStorage
     {
         public Task<Result<StoredSupportAttachmentResponse>> StoreAsync(
@@ -1064,6 +1287,47 @@ public sealed class SupportChatServiceTests
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(x => x.Key, x => x.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel LogLevel,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
         }
     }
 }

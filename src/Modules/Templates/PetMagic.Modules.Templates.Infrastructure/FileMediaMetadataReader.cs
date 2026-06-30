@@ -1,10 +1,13 @@
+using Microsoft.Extensions.Logging;
+
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class FileMediaMetadataReader : IMediaMetadataReader
+internal sealed class FileMediaMetadataReader(
+    ILogger<FileMediaMetadataReader>? logger = null) : IMediaMetadataReader
 {
     private static readonly StringComparison FileNameComparison = StringComparison.OrdinalIgnoreCase;
 
@@ -30,19 +33,30 @@ internal sealed class FileMediaMetadataReader : IMediaMetadataReader
             using var stream = File.OpenRead(storedMedia.LocalPath);
             if (!Mp4DurationReader.TryReadDurationSeconds(stream, out var durationSeconds))
             {
+                logger?.LogWarning(
+                    "Template media metadata read failed. Operation={Operation} FileName={FileName} ContentType={ContentType}",
+                    "read_mp4_duration",
+                    storedMedia.FileName,
+                    storedMedia.ContentType);
                 return Task.FromResult(Result.Failure<double?>(TemplatesErrors.MediaMetadataFailed));
             }
 
             var seconds = Math.Round(durationSeconds, 2, MidpointRounding.AwayFromZero);
             return Task.FromResult(Result.Success<double?>(seconds));
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "Template media metadata read threw while processing file. Operation={Operation} FileName={FileName} ContentType={ContentType}",
+                "read_mp4_duration",
+                storedMedia.FileName,
+                storedMedia.ContentType);
             return Task.FromResult(Result.Failure<double?>(TemplatesErrors.MediaMetadataFailed));
         }
         finally
         {
-            TemplateMediaTempFiles.TryDeleteIfOwned(storedMedia.LocalPath);
+            TemplateMediaTempFiles.TryDeleteIfOwned(storedMedia.LocalPath, logger);
         }
     }
 

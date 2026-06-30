@@ -27,7 +27,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally irreversible: sentinel legacy window timestamps are
+            // collapsed to NULL and the old invalid values are not retained.
         }
     }
 }

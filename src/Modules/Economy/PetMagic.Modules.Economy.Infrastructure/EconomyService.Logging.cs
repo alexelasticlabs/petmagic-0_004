@@ -21,11 +21,11 @@ public sealed partial class EconomyService
         logger?.LogInformation(
             "Payment webhook received. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
-            paymentIntentId,
-            stripeCustomerId,
+            EconomyLogSanitizer.SafeExternalId(paymentIntentId),
+            EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
             CurrentCorrelationId);
     }
 
@@ -40,11 +40,11 @@ public sealed partial class EconomyService
         logger?.LogInformation(
             "Payment webhook processed. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
-            paymentIntentId,
-            stripeCustomerId,
+            EconomyLogSanitizer.SafeExternalId(paymentIntentId),
+            EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
             CurrentCorrelationId);
     }
 
@@ -59,11 +59,11 @@ public sealed partial class EconomyService
         logger?.LogWarning(
             "Duplicate payment webhook ignored. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
-            paymentIntentId,
-            stripeCustomerId,
+            EconomyLogSanitizer.SafeExternalId(paymentIntentId),
+            EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
             CurrentCorrelationId);
     }
 
@@ -82,7 +82,7 @@ public sealed partial class EconomyService
         logger?.LogInformation(
             "Payment succeeded. Source={Source} PaymentIntentId={PaymentIntentId} UserId={UserId} CorrelationId={CorrelationId}",
             source,
-            SafePaymentIntentId(order.ExternalPaymentId),
+            EconomyLogSanitizer.SafePaymentIntentId(order.ExternalPaymentId),
             order.UserId,
             CurrentCorrelationId);
     }
@@ -92,7 +92,7 @@ public sealed partial class EconomyService
         logger?.LogError(
             "Payment failed. Source={Source} PaymentIntentId={PaymentIntentId} UserId={UserId} ErrorCode={ErrorCode} CorrelationId={CorrelationId}",
             source,
-            SafePaymentIntentId(order.ExternalPaymentId),
+            EconomyLogSanitizer.SafePaymentIntentId(order.ExternalPaymentId),
             order.UserId,
             error.Code,
             CurrentCorrelationId);
@@ -112,12 +112,12 @@ public sealed partial class EconomyService
             "Subscription {SubscriptionOutcome}. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} Status={Status} PaymentIntentId={PaymentIntentId} StripeCustomerId={StripeCustomerId} CorrelationId={CorrelationId}",
             subscriptionOutcome,
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
             status,
-            paymentIntentId,
-            stripeCustomerId,
+            EconomyLogSanitizer.SafeExternalId(paymentIntentId),
+            EconomyLogSanitizer.SafeExternalId(stripeCustomerId),
             CurrentCorrelationId);
     }
 
@@ -130,7 +130,7 @@ public sealed partial class EconomyService
         logger?.LogInformation(
             "Payment webhook received. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
             CurrentCorrelationId);
@@ -146,7 +146,7 @@ public sealed partial class EconomyService
         logger?.LogInformation(
             "Payment webhook processed. Provider={Provider} EventId={EventId} EventType={EventType} UserId={UserId} Result={Result} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             userId,
             result,
@@ -161,19 +161,8 @@ public sealed partial class EconomyService
         logger?.LogWarning(
             "Duplicate payment webhook ignored. Provider={Provider} EventId={EventId} EventType={EventType} CorrelationId={CorrelationId}",
             provider,
-            eventId,
+            EconomyLogSanitizer.SafeExternalId(eventId),
             eventType,
             CurrentCorrelationId);
-    }
-
-    private static string? SafePaymentIntentId(string? externalPaymentId)
-    {
-        if (string.IsNullOrWhiteSpace(externalPaymentId))
-        {
-            return null;
-        }
-
-        var trimmed = externalPaymentId.Trim();
-        return trimmed.StartsWith("pi_", StringComparison.OrdinalIgnoreCase) ? trimmed : null;
     }
 }

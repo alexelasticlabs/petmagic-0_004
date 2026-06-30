@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Results;
@@ -96,6 +97,38 @@ public sealed class TemplateMediaCleanupProcessorTests
         Assert.False(File.Exists(path));
     }
 
+    [Fact]
+    public async Task CleanupNextExpiredMetadataTempFileAsync_ShouldLogWarning_WhenOwnedFileIsLocked()
+    {
+        var path = await TemplateMediaTempFiles.WriteAsync("metadata"u8.ToArray(), ".tmp", CancellationToken.None);
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddHours(-6));
+        var logger = new CapturingLogger<TemplateMediaCleanupProcessor>();
+        await using var lockStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        try
+        {
+            await using var dbContext = CreateDbContext();
+            var processor = CreateProcessor(
+                dbContext,
+                options: CreateOptions(metadataTempRetentionHours: 1),
+                logger: logger);
+
+            var processed = await processor.CleanupNextExpiredMetadataTempFileAsync(CancellationToken.None);
+
+            Assert.False(processed);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Warning
+                    && entry.Message.Contains("Template metadata temp file sweep failed.", StringComparison.Ordinal)
+                    && Equals(entry.Properties["Operation"], "sweep_expired"));
+        }
+        finally
+        {
+            lockStream.Dispose();
+            TemplateMediaTempFiles.TryDeleteIfOwned(path);
+        }
+    }
+
     private static TemplatesDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TemplatesDbContext>()
@@ -108,13 +141,14 @@ public sealed class TemplateMediaCleanupProcessorTests
     private static TemplateMediaCleanupProcessor CreateProcessor(
         TemplatesDbContext dbContext,
         IMediaStorage? mediaStorage = null,
-        TemplatesOptions? options = null)
+        TemplatesOptions? options = null,
+        ILogger<TemplateMediaCleanupProcessor>? logger = null)
     {
         return new TemplateMediaCleanupProcessor(
             dbContext,
             mediaStorage ?? new TrackingMediaStorage(),
             options ?? CreateOptions(),
-            NullLogger<TemplateMediaCleanupProcessor>.Instance);
+            logger ?? NullLogger<TemplateMediaCleanupProcessor>.Instance);
     }
 
     private static TemplatesOptions CreateOptions(int retentionDays = 7, int metadataTempRetentionHours = 24)
@@ -228,5 +262,53 @@ public sealed class TemplateMediaCleanupProcessorTests
             DeletedUrls.Add(assetUrl);
             return Task.FromResult(Result.Success());
         }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
     }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), properties));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties);
 }

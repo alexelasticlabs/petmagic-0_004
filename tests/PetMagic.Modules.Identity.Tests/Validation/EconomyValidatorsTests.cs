@@ -51,6 +51,41 @@ public sealed class EconomyValidatorsTests
     }
 
     [Fact]
+    public void CreatePackPurchaseValidator_ShouldFail_WhenProviderUnsupported()
+    {
+        var validator = new CreatePackPurchaseCommandValidator();
+        var result = validator.Validate(new CreatePackPurchaseCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "USD",
+            "paypal",
+            "android",
+            "1.0.0",
+            "US",
+            "en"));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CreatePackPurchaseValidator_ShouldFail_WhenSavedPaymentMethodUsedWithStoreProvider()
+    {
+        var validator = new CreatePackPurchaseCommandValidator();
+        var result = validator.Validate(new CreatePackPurchaseCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "USD",
+            "google_play",
+            "android",
+            "1.0.0",
+            "US",
+            "en",
+            Guid.NewGuid()));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
     public void ConfirmPackPurchaseValidator_ShouldPass_WhenPayloadValid()
     {
         var validator = new ConfirmPackPurchaseCommandValidator();
@@ -147,6 +182,28 @@ public sealed class EconomyValidatorsTests
             "1.0.0",
             "US",
             "en"));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CreatePremiumBillingPortalValidator_ShouldFail_WhenProviderUnsupported()
+    {
+        var validator = new CreatePremiumBillingPortalCommandValidator();
+        var result = validator.Validate(new CreatePremiumBillingPortalCommand(
+            Guid.NewGuid(),
+            "google_play"));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CreatePaymentMethodSetupValidator_ShouldFail_WhenProviderUnsupported()
+    {
+        var validator = new CreatePaymentMethodSetupCommandValidator();
+        var result = validator.Validate(new CreatePaymentMethodSetupCommand(
+            Guid.NewGuid(),
+            "app_store"));
 
         Assert.False(result.IsValid);
     }

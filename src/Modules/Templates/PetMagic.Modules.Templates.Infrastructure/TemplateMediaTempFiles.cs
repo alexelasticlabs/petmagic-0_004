@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class TemplateMediaTempFiles
@@ -30,7 +32,7 @@ internal static class TemplateMediaTempFiles
         return path;
     }
 
-    public static void TryDeleteIfOwned(string? path)
+    public static void TryDeleteIfOwned(string? path, ILogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -55,13 +57,18 @@ internal static class TemplateMediaTempFiles
                 File.Delete(fullPath);
             }
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "Template metadata temp file cleanup failed. Operation={Operation} TempFileName={TempFileName}",
+                "delete_owned",
+                SafeFileName(path));
             // Metadata temp files are best-effort cleanup and must not fail request handling.
         }
     }
 
-    public static bool CleanupNextExpiredAsync(TimeSpan retention)
+    public static bool CleanupNextExpiredAsync(TimeSpan retention, ILogger? logger = null)
     {
         try
         {
@@ -85,9 +92,25 @@ internal static class TemplateMediaTempFiles
             file.Delete();
             return true;
         }
-        catch
+        catch (Exception exception)
         {
+            logger?.LogWarning(
+                exception,
+                "Template metadata temp file sweep failed. Operation={Operation} RetentionHours={RetentionHours}",
+                "sweep_expired",
+                retention.TotalHours);
             return false;
         }
+    }
+
+    private static string SafeFileName(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return "unknown";
+        }
+
+        var fileName = Path.GetFileName(path.Trim());
+        return string.IsNullOrWhiteSpace(fileName) ? "unknown" : fileName;
     }
 }

@@ -94,21 +94,27 @@ internal sealed class LocalAvatarStorage(
             normalizedImage.Content.LongLength);
 
         var root = ResolveRootPath();
-        Directory.CreateDirectory(root);
-
         var safeName = $"{Guid.NewGuid():N}{extension}";
         var year = DateTime.UtcNow.ToString("yyyy");
         var month = DateTime.UtcNow.ToString("MM");
         var relativePath = Path.Combine("user-avatars", year, month, safeName);
         var physicalPath = Path.Combine(root, year, month, safeName);
 
-        Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
         try
         {
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
             await File.WriteAllBytesAsync(physicalPath, normalizedImage.Content, cancellationToken);
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(
+                exception,
+                "Avatar storage write failed. Operation={Operation} ContentType={ContentType} OutputBytes={OutputBytes} WasNormalized={WasNormalized}",
+                "store",
+                normalizedContentType,
+                normalizedImage.Content.LongLength,
+                normalizedImage.WasNormalized);
             return Result.Failure<StoredAvatarResponse>(IdentityErrors.AvatarStorageFailed);
         }
 
@@ -185,8 +191,13 @@ internal sealed class LocalAvatarStorage(
 
             return Task.FromResult(Result.Success());
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(
+                exception,
+                "Avatar storage delete failed. Operation={Operation} AvatarFileName={AvatarFileName}",
+                "delete",
+                Path.GetFileName(relativePath));
             return Task.FromResult(Result.Failure(IdentityErrors.AvatarStorageFailed));
         }
     }
@@ -202,19 +213,31 @@ internal sealed class LocalAvatarStorage(
 
     private string? TryResolveManagedRelativePath(string avatarUrl)
     {
+        var candidate = avatarUrl.Trim().Replace('\\', '/');
+        var queryIndex = candidate.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            candidate = candidate[..queryIndex];
+        }
+
+        if (candidate.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        {
+            return candidate;
+        }
+
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!avatarUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!candidate.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var relativePath = avatarUrl[baseUrl.Length..].TrimStart('/');
+        var relativePath = candidate[baseUrl.Length..].TrimStart('/');
         if (!relativePath.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        return relativePath.Replace('\\', '/');
+        return relativePath;
     }
 
     private static bool TryResolveAvatarFileFormat(string contentType, out string extension, out string normalizedContentType)

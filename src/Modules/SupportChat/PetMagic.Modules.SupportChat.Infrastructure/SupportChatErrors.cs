@@ -16,4 +16,5 @@ internal static class SupportChatErrors
     public static readonly Error FeedbackNotAllowed = new("support.feedback_not_allowed", "Support feedback is only allowed after the conversation is resolved or closed.");
     public static readonly Error InvalidFeedbackRating = new("support.feedback_rating_invalid", "Support feedback rating must be between 1 and 5.");
     public static readonly Error InvalidPushToken = new("support.push_token_invalid", "Support push token is invalid.");
+    public static readonly Error InvalidAssignedAdmin = new("support.assigned_admin_invalid", "Assigned support operator is invalid.");
 }

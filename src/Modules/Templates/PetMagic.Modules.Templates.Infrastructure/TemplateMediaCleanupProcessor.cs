@@ -140,6 +140,9 @@ internal sealed class TemplateMediaCleanupProcessor(
     public Task<bool> CleanupNextExpiredMetadataTempFileAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(TemplateMediaTempFiles.CleanupNextExpiredAsync(TimeSpan.FromHours(options.MetadataTempRetentionHours)));
+        return Task.FromResult(
+            TemplateMediaTempFiles.CleanupNextExpiredAsync(
+                TimeSpan.FromHours(options.MetadataTempRetentionHours),
+                logger));
     }
 }

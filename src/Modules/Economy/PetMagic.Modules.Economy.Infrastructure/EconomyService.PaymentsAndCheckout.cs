@@ -398,6 +398,11 @@ public sealed partial class EconomyService
             return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.UnsupportedPaymentProvider);
         }
 
+        if (command.PaymentMethodId.HasValue && !isStripe)
+        {
+            return Result.Failure<PurchaseCheckoutResponse>(EconomyErrors.PaymentMethodProviderInvalid);
+        }
+
         PaymentProviderConfiguration? providerConfig = await ResolveEnabledPaymentProviderConfigAsync(
             provider,
             command.Platform,

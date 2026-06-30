@@ -2,6 +2,7 @@ using System.Linq;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure;
@@ -71,9 +72,68 @@ public sealed partial class TemplatesServiceTests
 
         Assert.True(result.IsSuccess);
         var pet = Assert.Single(result.Value);
-        Assert.Equal("https://cdn.petmagic.test/milo-original.jpg", pet.AvatarUrl);
-        Assert.Empty(storage.ReadUrls);
+        Assert.Equal("https://cdn.petmagic.test/milo-original.jpg?signed=1", pet.AvatarUrl);
+        Assert.Equal(["https://cdn.petmagic.test/milo-original.jpg"], storage.ReadUrls);
         Assert.Equal(1, pet.PhotosCount);
+    }
+
+    [Fact]
+    public async Task ListPetsAsync_ShouldSuppressUnsafeExternalAvatarUrl()
+    {
+        await using var dbContext = CreateDbContext();
+        var userId = Guid.NewGuid();
+        var petId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.Pets.Add(new Pet
+        {
+            Id = petId,
+            UserId = userId,
+            Name = "Milo",
+            Type = "dog",
+            Breed = "Corgi",
+            Status = "active",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        dbContext.TemplateMediaRecords.Add(new TemplateMediaRecord
+        {
+            Id = mediaId,
+            UserId = userId,
+            MediaType = "image",
+            StoragePath = string.Empty,
+            Url = "https://tracker.example.com/milo-original.jpg",
+            FileName = "milo.jpg",
+            ContentType = "image/jpeg",
+            FileSizeBytes = 512,
+            SourceType = "pet_photo",
+            Role = TemplateMediaRole.GenerationSourceImage,
+            LifecycleState = TemplateMediaLifecycleState.AttachedToGeneration,
+            UploadedAtUtc = now,
+            AttachedAtUtc = now
+        });
+        dbContext.PetPhotos.Add(new PetPhoto
+        {
+            Id = Guid.NewGuid(),
+            PetId = petId,
+            UserId = userId,
+            MediaAssetId = mediaId,
+            Status = "active",
+            SortOrder = 1,
+            CreatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var storage = new RejectingReadUrlMediaStorage();
+        var service = new PetsService(dbContext, storage, CreateTemplatesOptions(), NullLogger<PetsService>.Instance);
+
+        var result = await service.ListAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var pet = Assert.Single(result.Value);
+        Assert.Null(pet.AvatarUrl);
+        Assert.Equal(["https://tracker.example.com/milo-original.jpg"], storage.ReadUrls);
     }
 
     [Fact]
@@ -139,5 +199,26 @@ public sealed partial class TemplatesServiceTests
         using var buffer = new MemoryStream();
         image.Save(buffer, new PngEncoder());
         return buffer.ToArray();
+    }
+
+    private sealed class RejectingReadUrlMediaStorage : IMediaStorage
+    {
+        public List<string> ReadUrls { get; } = [];
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            ReadUrls.Add(assetUrl);
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Failure<string>(TemplatesErrors.MediaStorageFailed));
+        }
     }
 }

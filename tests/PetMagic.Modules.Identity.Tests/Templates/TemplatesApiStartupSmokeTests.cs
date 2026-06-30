@@ -178,6 +178,8 @@ public sealed class TemplatesApiStartupSmokeTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("templates", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("templates-analytics", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("templates-events", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("generation-create", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("generation-status", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));

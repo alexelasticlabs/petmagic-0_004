@@ -322,6 +322,11 @@ public sealed class TemplateWatermarkRendererTests
         {
             return Task.FromResult(Result.Success());
         }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
     }
 
     private sealed class StaticHttpClientFactory : IHttpClientFactory

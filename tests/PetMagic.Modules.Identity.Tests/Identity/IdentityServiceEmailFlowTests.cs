@@ -220,6 +220,40 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task ConfirmEmailAsync_ShouldRejectAlreadyConfirmedAccountWithoutValidCode()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = await CreateServiceAsync(dbContext);
+
+        var registerResult = await service.RegisterAsync(
+            new RegisterUserCommand("confirmed.state@petmagic.app", "StrongPassword123", "Confirmed State", true, true, CurrentLegalVersion, CurrentLegalVersion, false),
+            CancellationToken.None);
+
+        Assert.True(registerResult.IsSuccess);
+
+        var user = await dbContext.Users.SingleAsync();
+        var verificationCode = await dbContext.UserEmailCodes
+            .Where(x => x.UserId == user.Id && x.Purpose == EmailCodePurpose.EmailConfirmation)
+            .OrderByDescending(x => x.RequestedAtUtc)
+            .FirstAsync();
+        verificationCode.CodeHash = HashValue("123456");
+        await dbContext.SaveChangesAsync();
+
+        var confirmResult = await service.ConfirmEmailAsync(
+            new ConfirmEmailCommand("confirmed.state@petmagic.app", "123456"),
+            CancellationToken.None);
+
+        Assert.True(confirmResult.IsSuccess);
+
+        var repeatedResult = await service.ConfirmEmailAsync(
+            new ConfirmEmailCommand("confirmed.state@petmagic.app", "000000"),
+            CancellationToken.None);
+
+        Assert.True(repeatedResult.IsFailure);
+        Assert.Equal("auth.email_code_invalid", repeatedResult.Error.Code);
+    }
+
+    [Fact]
     public async Task ConfirmPasswordResetAsync_ShouldUpdatePassword_And_RevokeRefreshTokens()
     {
         await using var dbContext = CreateDbContext();

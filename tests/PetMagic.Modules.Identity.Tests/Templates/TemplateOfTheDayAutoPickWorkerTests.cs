@@ -1,6 +1,7 @@
 using System.Reflection;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Results;
@@ -47,6 +48,31 @@ public sealed class TemplateOfTheDayAutoPickWorkerTests
         Assert.Null(command.CreatedByAdminId);
         Assert.False(command.Force);
         Assert.Equal(1, recorder.CallCount);
+    }
+
+    [Fact]
+    public async Task EnsureTomorrowAutoPickAsync_ShouldLogStructuredWarning_WhenAutoPickFails()
+    {
+        var (templatesService, _) = FailingTemplatesServiceProxy.Create("templates.auto_pick_failed");
+        using var serviceProvider = new ServiceCollection()
+            .AddSingleton(templatesService)
+            .BuildServiceProvider();
+        var logger = new CapturingLogger<TemplateOfTheDayAutoPickWorker>();
+        var worker = new TemplateOfTheDayAutoPickWorker(
+            serviceProvider.GetRequiredService<IServiceScopeFactory>(),
+            new TemplatesOptions
+            {
+                TemplateOfTheDayBusinessTimeZone = "UTC"
+            },
+            logger);
+
+        await worker.EnsureTomorrowAutoPickAsync(CancellationToken.None);
+
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Template of the Day auto-pick failed.", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("ensure_tomorrow_auto_pick", entry.Properties["Operation"]);
+        Assert.Equal("UTC", entry.Properties["BusinessTimeZone"]);
+        Assert.Equal("templates.auto_pick_failed", entry.Properties["ErrorCode"]);
     }
 
     private static (string TimeZoneId, DateOnly BusinessDate) ResolveBusinessDateDifferentFromUtc()
@@ -126,6 +152,70 @@ public sealed class TemplateOfTheDayAutoPickWorkerTests
                 DateTime.UtcNow,
                 DateTime.UtcNow,
                 null);
+        }
+    }
+
+    private class FailingTemplatesServiceProxy : DispatchProxy
+    {
+        public string ErrorCode { get; private set; } = "templates.auto_pick_failed";
+
+        public static (ITemplatesService Service, FailingTemplatesServiceProxy Recorder) Create(string errorCode)
+        {
+            var service = Create<ITemplatesService, FailingTemplatesServiceProxy>();
+            var proxy = (FailingTemplatesServiceProxy)(object)service;
+            proxy.ErrorCode = errorCode;
+            return (service, proxy);
+        }
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == nameof(ITemplatesService.AutoPickTemplateOfTheDayAsync))
+            {
+                return Task.FromResult(Result.Failure<AdminTemplateOfTheDayResponse>(new Error(ErrorCode, "failed")));
+            }
+
+            throw new NotSupportedException($"{targetMethod?.Name} is not used by this test.");
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(x => x.Key, x => x.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel LogLevel,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
         }
     }
 }

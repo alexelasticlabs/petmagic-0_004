@@ -58,10 +58,10 @@ internal sealed class FcmSupportChatPushNotificationSender(
         string accessToken,
         CancellationToken cancellationToken)
     {
-        var isRussian = token.Locale?.StartsWith("ru", StringComparison.OrdinalIgnoreCase) == true;
+        var locale = token.Locale;
         var route = "/profile/support";
         var eventId = $"{notification.ConversationId}:{notification.MessageId}";
-        var body = BuildBody(notification, isRussian);
+        var body = BuildBody(notification, locale);
         var data = new Dictionary<string, string>
         {
             ["type"] = "support_chat",
@@ -74,7 +74,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
             new FcmMessage(
                 token.Token,
                 new FcmNotification(
-                    isRussian ? "Поддержка PetMagic ответила" : "PetMagic Support replied",
+                    SupportChatPushNotificationLocalizer.BuildTitle(locale),
                     body),
                 data,
                 new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
@@ -170,14 +170,14 @@ internal sealed class FcmSupportChatPushNotificationSender(
         return CreateCredentialFromJson(File.ReadAllText(options.ServiceAccountJsonPath));
     }
 
-    private static string BuildBody(SupportChatPushNotification notification, bool isRussian)
+    private static string BuildBody(SupportChatPushNotification notification, string? locale)
     {
         var body = notification.Body.Trim();
         if (string.IsNullOrWhiteSpace(body))
         {
-            body = notification.HasAttachment
-                ? (isRussian ? "Новое вложение в диалоге поддержки." : "New attachment in your support conversation.")
-                : (isRussian ? "Новый ответ в диалоге поддержки." : "New reply in your support conversation.");
+            body = SupportChatPushNotificationLocalizer.BuildFallbackBody(
+                locale,
+                notification.HasAttachment);
         }
 
         if (body.Length <= 120)
@@ -190,11 +190,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        var parameters = JsonSerializer.Deserialize<JsonCredentialParameters>(json)
-            ?? throw new InvalidOperationException("Firebase service account JSON is invalid.");
-#pragma warning disable CS0618
-        return GoogleCredential.FromJsonParameters(parameters);
-#pragma warning restore CS0618
+        return GoogleCredential.FromJson(json);
     }
 
     private static string NormalizeJson(string value)

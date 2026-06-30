@@ -1,6 +1,7 @@
 using System.Data;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,6 +73,7 @@ public sealed partial class EconomyService(
 
     public async Task<Result<WalletOperationResponse>> ClaimWeeklyGrantAsync(ClaimWeeklyGrantCommand command, CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
         var resolvedPremium = await ResolvePremiumStatusAsync(command.UserId, command.IsPremium, cancellationToken);
@@ -88,6 +90,11 @@ public sealed partial class EconomyService(
             }
 
             var adRewardsRemainingToday = Math.Max(0, options.Value.AdRewardDailyLimit - wallet.AdRewardsClaimedInWindow);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+
             return Result.Success(new WalletOperationResponse(
                 wallet.UserId,
                 delta,
@@ -112,11 +119,17 @@ public sealed partial class EconomyService(
         wallet.LastWeeklyGrantAtUtc = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return Result.Success(response);
     }
 
     public async Task<Result<WalletOperationResponse>> ClaimAdRewardAsync(ClaimAdRewardCommand command, CancellationToken cancellationToken)
     {
+        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
 
@@ -135,6 +148,11 @@ public sealed partial class EconomyService(
         wallet.AdRewardsClaimedInWindow += 1;
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
+
         return Result.Success(response);
     }
 
@@ -145,6 +163,7 @@ public sealed partial class EconomyService(
             return Result.Failure<WalletOperationResponse>(EconomyErrors.InvalidAmount);
         }
 
+        await using var transaction = await BeginWalletSerializableTransactionAsync(cancellationToken);
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
         var source = string.IsNullOrWhiteSpace(command.Source)
@@ -195,6 +214,11 @@ public sealed partial class EconomyService(
             }
 
             throw;
+        }
+
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
         }
 
         return Result.Success(response);
@@ -462,5 +486,15 @@ public sealed partial class EconomyService(
             existingSpend.CreatedAtUtc,
             wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
             Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
+    }
+
+    private async Task<IDbContextTransaction?> BeginWalletSerializableTransactionAsync(CancellationToken cancellationToken)
+    {
+        if (!dbContext.Database.IsRelational() || dbContext.Database.CurrentTransaction is not null)
+        {
+            return null;
+        }
+
+        return await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
     }
 }

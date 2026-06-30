@@ -21,6 +21,7 @@ public static class GamificationInfrastructureServiceCollectionExtensions
         });
 
         services.AddScoped<IGamificationService, GamificationService>();
+        services.AddScoped<IGamificationAdminService, GamificationAdminService>();
 
         return services;
     }

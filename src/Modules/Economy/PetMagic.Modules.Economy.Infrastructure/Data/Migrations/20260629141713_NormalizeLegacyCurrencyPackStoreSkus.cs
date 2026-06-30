@@ -21,6 +21,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // Intentionally irreversible: legacy dotted SKU values are normalized
+            // in-place and the previous source values are not preserved.
         }
     }
 }

@@ -61,6 +61,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
         CancellationToken cancellationToken)
     {
         var isFailed = generation.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase);
+        var locale = token.Locale;
         var route = $"/generations/{generation.GenerationId}";
         var eventId = generation.GenerationId.ToString();
         var data = new Dictionary<string, string>
@@ -75,10 +76,8 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
             new FcmMessage(
                 token.Token,
                 new FcmNotification(
-                    isFailed ? "PetMagic не смог создать результат" : "Ваш PetMagic результат готов",
-                    isFailed
-                        ? "Мы сохранили статус генерации и вернули токены, если списание прошло."
-                        : "Откройте Галерею, чтобы посмотреть результат."),
+                    TemplateGenerationPushNotificationLocalizer.BuildTitle(locale, isFailed),
+                    TemplateGenerationPushNotificationLocalizer.BuildBody(locale, isFailed)),
                 data,
                 new FcmAndroidConfig("high", new FcmAndroidNotification("petmagic_updates")),
                 new FcmApnsConfig(new FcmApnsPayload(new FcmAps("default")))));
@@ -176,11 +175,7 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
 
     private static GoogleCredential CreateCredentialFromJson(string json)
     {
-        var parameters = JsonSerializer.Deserialize<JsonCredentialParameters>(json)
-            ?? throw new InvalidOperationException("Firebase service account JSON is invalid.");
-#pragma warning disable CS0618
-        return GoogleCredential.FromJsonParameters(parameters);
-#pragma warning restore CS0618
+        return GoogleCredential.FromJson(json);
     }
 
     private static string NormalizeJson(string value)

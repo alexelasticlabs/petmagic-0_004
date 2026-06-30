@@ -3,6 +3,19 @@ namespace PetMagic.Modules.Identity.Tests.Host;
 public sealed class FcmPushPayloadContractTests
 {
     [Theory]
+    [InlineData("src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/FcmTemplateGenerationPushNotificationSender.cs")]
+    [InlineData("src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/FcmSupportChatPushNotificationSender.cs")]
+    [InlineData("src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/FcmEconomyPushNotificationSender.cs")]
+    public void FcmSenders_ShouldUseNonDeprecatedGoogleCredentialJsonFactory(string relativePath)
+    {
+        var source = File.ReadAllText(ResolveRepositoryPath(relativePath));
+
+        Assert.Contains("GoogleCredential.FromJson(json)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("FromJsonParameters(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("#pragma warning disable CS0618", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/FcmTemplateGenerationPushNotificationSender.cs", "$\"/generations/{generation.GenerationId}\"")]
     [InlineData("src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/FcmSupportChatPushNotificationSender.cs", "\"/profile/support\"")]
     [InlineData("src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/FcmEconomyPushNotificationSender.cs", "\"/profile")]

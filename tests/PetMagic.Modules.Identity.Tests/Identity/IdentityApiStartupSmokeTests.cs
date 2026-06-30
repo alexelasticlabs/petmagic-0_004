@@ -32,8 +32,19 @@ public sealed class IdentityApiStartupSmokeTests
     [Theory]
     [InlineData("POST", "/api/auth/register", "auth-register")]
     [InlineData("POST", "/api/auth/login", "auth")]
+    [InlineData("POST", "/api/auth/email-confirmation/request", "auth-email-verification")]
+    [InlineData("POST", "/api/auth/email-confirmation/confirm", "auth-email-verification")]
+    [InlineData("POST", "/api/auth/resend-email-verification-code", "auth-email-verification")]
+    [InlineData("POST", "/api/auth/verify-email-code", "auth-email-verification")]
     [InlineData("POST", "/api/auth/password-reset/request", "auth-password-reset")]
+    [InlineData("POST", "/api/auth/verify-password-reset-code", "auth-password-reset")]
     [InlineData("POST", "/api/auth/me/password-change/request", "auth-password-reset")]
+    [InlineData("GET", "/api/auth/external/{provider}", "auth-external")]
+    [InlineData("GET", "/api/auth/external/callback", "auth-external")]
+    [InlineData("POST", "/api/auth/external/exchange", "auth-external")]
+    [InlineData("POST", "/api/auth/external/google/native", "auth-external")]
+    [InlineData("POST", "/api/auth/google", "auth-external")]
+    [InlineData("POST", "/api/auth/apple", "auth-external")]
     [InlineData("GET", "/api/auth/me", "auth")]
     [InlineData("GET", "/api/admin/users", "admin")]
     public async Task IdentityEndpoints_ShouldUseExpectedRateLimitPolicies(
@@ -95,6 +106,8 @@ public sealed class IdentityApiStartupSmokeTests
                 options.AddPolicy("auth", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("auth-register", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("auth-password-reset", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-email-verification", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-external", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("admin", _ => RateLimitPartition.GetNoLimiter("tests"));
             });
 

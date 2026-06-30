@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 using Microsoft.EntityFrameworkCore;
 
 using PetMagic.BuildingBlocks.Results;
@@ -112,13 +114,31 @@ internal sealed partial class TemplateGenerationService
         bool isPremium,
         CancellationToken cancellationToken)
     {
-        return await GetMediaAccessAsync(
+        var result = await GetMediaAccessAsync(
             userId,
             generationId,
             isPremium,
             TemplateAnalyticsEventTypes.ShareWatermarked,
             TemplateAnalyticsEventTypes.ShareClean,
             cancellationToken);
+
+        if (result.IsSuccess && gamificationService is not null)
+        {
+            try
+            {
+                await gamificationService.RecordCreationSharedAsync(userId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(
+                    ex,
+                    "Failed to record shared creation gamification progress. UserId={UserId} GenerationId={GenerationId}",
+                    userId,
+                    generationId);
+            }
+        }
+
+        return result;
     }
 
     private async Task<Result<GenerationDownloadResponse>> GetMediaAccessAsync(

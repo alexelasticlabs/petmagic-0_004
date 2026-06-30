@@ -35,7 +35,8 @@ namespace PetMagic.Modules.SupportChat.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally irreversible: legacy enum values are normalized
+            // in-place and the previous semantic mapping is not preserved.
         }
     }
 }

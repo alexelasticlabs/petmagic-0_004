@@ -50,7 +50,22 @@ public sealed class StoreWebhookSecurityValidator(
     IOptions<EconomyOptions> options,
     IGoogleStoreWebhookTokenVerifier googleTokenVerifier) : IStoreWebhookSecurityValidator
 {
+    private const string AppStoreLeafCertificateOid = "1.2.840.113635.100.6.11.1";
+    private const string AppStoreIntermediateCertificateOid = "1.2.840.113635.100.6.2.1";
+    private static readonly HashSet<string> TrustedAppleRootThumbprints = ["B52CB02FD567E0359FE8FA4D4C41037970FE01B0"];
     private static readonly string[] ValidGoogleIssuers = ["accounts.google.com", "https://accounts.google.com"];
+    private readonly HashSet<string> _trustedAppleRootThumbprints = new(TrustedAppleRootThumbprints, StringComparer.OrdinalIgnoreCase);
+
+    internal StoreWebhookSecurityValidator(
+        IOptions<EconomyOptions> options,
+        IGoogleStoreWebhookTokenVerifier googleTokenVerifier,
+        IEnumerable<string> trustedAppleRootThumbprints)
+        : this(options, googleTokenVerifier)
+    {
+        _trustedAppleRootThumbprints = new HashSet<string>(
+            trustedAppleRootThumbprints.Where(x => !string.IsNullOrWhiteSpace(x)),
+            StringComparer.OrdinalIgnoreCase);
+    }
 
     public Result ValidateAppStoreSignedPayload(string signedPayload)
     {
@@ -78,12 +93,11 @@ public sealed class StoreWebhookSecurityValidator(
                 return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
             }
 
-            if (!header.TryGetProperty("x5c", out var chainElement) || chainElement.ValueKind != JsonValueKind.Array || chainElement.GetArrayLength() == 0)
+            if (!header.TryGetProperty("x5c", out var chainElement) || chainElement.ValueKind != JsonValueKind.Array || chainElement.GetArrayLength() != 3)
             {
                 return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
             }
 
-#pragma warning disable SYSLIB0057
             var certificates = chainElement.EnumerateArray()
                 .Where(x => x.ValueKind == JsonValueKind.String)
                 .Select(x =>
@@ -92,24 +106,37 @@ public sealed class StoreWebhookSecurityValidator(
                     return X509CertificateLoader.LoadCertificate(certificateBytes.AsSpan());
                 })
                 .ToArray();
-#pragma warning restore SYSLIB0057
 
             if (certificates.Length == 0)
             {
                 return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
             }
 
-            using var chain = new X509Chain();
-            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
-            chain.ChainPolicy.VerificationTime = DateTime.UtcNow;
-            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+            if (!HasExtension(certificates[0], AppStoreLeafCertificateOid)
+                || !HasExtension(certificates[1], AppStoreIntermediateCertificateOid))
+            {
+                return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
+            }
 
-            foreach (var certificate in certificates.Skip(1))
+            if (!IsTrustedAppleRoot(certificates[2]))
+            {
+                return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
+            }
+
+            using var chain = new X509Chain();
+            chain.ChainPolicy.TrustMode = X509ChainTrustMode.CustomRootTrust;
+            chain.ChainPolicy.CustomTrustStore.Add(certificates[2]);
+            chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+            chain.ChainPolicy.VerificationTime = ResolveVerificationTimeUtc(parts[1]);
+            chain.ChainPolicy.VerificationFlags = X509VerificationFlags.NoFlag;
+            chain.ChainPolicy.DisableCertificateDownloads = true;
+
+            foreach (var certificate in certificates.Skip(1).Take(1))
             {
                 chain.ChainPolicy.ExtraStore.Add(certificate);
             }
 
-            if (!chain.Build(certificates[0]))
+            if (!chain.Build(certificates[0]) || !HasExpectedChain(chain, certificates))
             {
                 return Result.Failure(EconomyErrors.InvalidStoreWebhookSignature);
             }
@@ -229,6 +256,63 @@ public sealed class StoreWebhookSecurityValidator(
         return element.TryGetProperty("bundleId", out var bundleElement) && bundleElement.ValueKind == JsonValueKind.String
             ? bundleElement.GetString()
             : null;
+    }
+
+    private static DateTime ResolveVerificationTimeUtc(string payloadSegment)
+    {
+        using var payloadDocument = JsonDocument.Parse(DecodeBase64UrlJson(payloadSegment));
+        var payload = payloadDocument.RootElement;
+
+        return TryReadSignedDateUtc(payload) ?? DateTime.UtcNow;
+    }
+
+    private static DateTime? TryReadSignedDateUtc(JsonElement element)
+    {
+        if (!element.TryGetProperty("signedDate", out var signedDateElement))
+        {
+            return null;
+        }
+
+        if (signedDateElement.ValueKind == JsonValueKind.Number && signedDateElement.TryGetInt64(out var milliseconds))
+        {
+            return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds).UtcDateTime;
+        }
+
+        return null;
+    }
+
+    private static bool HasExpectedChain(X509Chain chain, IReadOnlyList<X509Certificate2> expectedCertificates)
+    {
+        if (chain.ChainElements.Count != expectedCertificates.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < expectedCertificates.Count; index++)
+        {
+            if (!string.Equals(
+                    chain.ChainElements[index].Certificate.Thumbprint,
+                    expectedCertificates[index].Thumbprint,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool HasExtension(X509Certificate2 certificate, string oid)
+    {
+        return certificate.Extensions
+            .OfType<X509Extension>()
+            .Any(extension => string.Equals(extension.Oid?.Value, oid, StringComparison.Ordinal));
+    }
+
+    private bool IsTrustedAppleRoot(X509Certificate2 certificate)
+    {
+        return string.Equals(certificate.Subject, certificate.Issuer, StringComparison.Ordinal)
+            && _trustedAppleRootThumbprints.Contains(certificate.Thumbprint);
     }
 
     private static string DecodeSignedPayloadJson(string signedPayload)

@@ -86,6 +86,38 @@ public sealed class AdminTemplateUploadEndpointTests
     }
 
     [Fact]
+    public async Task UploadMediaAsync_ShouldAcceptQuickTimePreviewVideo()
+    {
+        await using var dbContext = CreateDbContext();
+        var lifecycleService = CreateLifecycleService(dbContext);
+        var file = CreateFormFile("preview.mov", "video/quicktime", QuickTimeBytes());
+        var storage = new RecordingMediaStorage(new StoredMediaResponse(
+            "https://cdn.example.com/templates/preview.mov",
+            "templates/preview.mov",
+            "preview.mov",
+            "video/quicktime",
+            file.Length,
+            "c:/temp/preview.mov"));
+        var metadataReader = new RecordingMediaMetadataReader(7.25);
+
+        var result = await AdminTemplateEndpoints.UploadMediaAsync(
+            file,
+            TemplateAssetKind.Preview.ToString(),
+            storage,
+            lifecycleService,
+            new FixedTemplateMediaUploadPolicy(2048),
+            metadataReader,
+            CancellationToken.None);
+
+        var (statusCode, body) = await ExecuteAsync(result);
+
+        Assert.Equal(StatusCodes.Status200OK, statusCode);
+        Assert.Contains("preview.mov", body);
+        Assert.Contains("video/quicktime", body);
+        Assert.Equal(1, metadataReader.StoredMediaCalls);
+    }
+
+    [Fact]
     public async Task UploadMediaAsync_ShouldAcceptReferenceMp4_WhenMimeTypeFallsBackToOctetStream()
     {
         await using var dbContext = CreateDbContext();
@@ -285,6 +317,11 @@ public sealed class AdminTemplateUploadEndpointTests
         return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32, 0x00, 0x00, 0x00, 0x00];
     }
 
+    private static byte[] QuickTimeBytes()
+    {
+        return [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00];
+    }
+
     private static byte[] WebmBytes()
     {
         return [0x1A, 0x45, 0xDF, 0xA3, 0x00, 0x00, 0x00, 0x00];
@@ -356,6 +393,11 @@ public sealed class AdminTemplateUploadEndpointTests
         public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
         }
     }
 

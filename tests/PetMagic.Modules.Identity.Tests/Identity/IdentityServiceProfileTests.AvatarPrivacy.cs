@@ -49,6 +49,49 @@ public sealed partial class IdentityServiceProfileTests
         AssertSignedAvatarUrl(item.Avatar!.Url);
     }
 
+    [Fact]
+    public async Task GetCurrentUserAsync_ShouldSuppressExternalAvatarUrl()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var user = CreateListUser("avatar-external@petmagic.app", DateTime.UtcNow);
+        user.AvatarUrl = "https://tracker.example.com/avatar.jpg";
+        user.AvatarFileName = "avatar.jpg";
+        user.AvatarContentType = "image/jpeg";
+        identityDb.Users.Add(user);
+        await identityDb.SaveChangesAsync();
+
+        var result = await service.GetCurrentUserAsync(user.Id, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(result.Value.Avatar);
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_ShouldSuppressExternalAvatarUrls()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+        var user = CreateListUser("avatar-admin-external@petmagic.app", DateTime.UtcNow);
+        user.AvatarUrl = "https://tracker.example.com/list-avatar.jpg";
+        user.AvatarFileName = "list-avatar.jpg";
+        user.AvatarContentType = "image/jpeg";
+        identityDb.Users.Add(user);
+        await identityDb.SaveChangesAsync();
+        await AddUserRoleAsync(identityDb, user.Id, SystemRoles.User);
+
+        var result = await service.ListUsersAsync(0, 10, null, null, null, null, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var item = Assert.Single(result.Value.Items);
+        Assert.Null(item.Avatar);
+    }
+
     private static void AssertSignedAvatarUrl(string avatarUrl)
     {
         var uri = new Uri(avatarUrl);

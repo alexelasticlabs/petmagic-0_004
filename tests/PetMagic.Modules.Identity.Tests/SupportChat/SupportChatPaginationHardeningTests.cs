@@ -5,13 +5,7 @@ public sealed class SupportChatPaginationHardeningTests
     [Fact]
     public void AdminInbox_ShouldUseStablePaginationOrder()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "SupportChat",
-            "PetMagic.Modules.SupportChat.Infrastructure",
-            "SupportChatService.cs"));
+        var source = ReadSupportChatInfrastructureSource("SupportChatService.AdminInbox.cs");
 
         Assert.Contains("var orderedConversationsQuery = normalizedSort switch", source, StringComparison.Ordinal);
         Assert.Contains("\"priority\" => conversationsQuery", source, StringComparison.Ordinal);
@@ -33,13 +27,9 @@ public sealed class SupportChatPaginationHardeningTests
     [Fact]
     public void AdminInbox_ShouldKeepMultiStatusAndFieldSpecificFilterErrors()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "SupportChat",
-            "PetMagic.Modules.SupportChat.Infrastructure",
-            "SupportChatService.cs"));
+        var source = ReadSupportChatInfrastructureSources(
+            "SupportChatService.AdminInbox.cs",
+            "SupportChatService.cs");
 
         Assert.Contains("query.Statuses is { Count: > 0 }", source, StringComparison.Ordinal);
         Assert.Contains("requestedStatuses.Add(ToCanonicalStatus(status));", source, StringComparison.Ordinal);
@@ -51,13 +41,7 @@ public sealed class SupportChatPaginationHardeningTests
     [Fact]
     public void AdminInbox_ShouldRejectInvalidSortBeforeCountingRows()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "SupportChat",
-            "PetMagic.Modules.SupportChat.Infrastructure",
-            "SupportChatService.cs"));
+        var source = ReadSupportChatInfrastructureSource("SupportChatService.AdminInbox.cs");
 
         var sortValidationIndex = source.IndexOf(
             "if (normalizedSort is not (null or \"\" or \"default\" or \"priority\" or \"waiting\" or \"updated\" or \"created\"))",
@@ -76,13 +60,7 @@ public sealed class SupportChatPaginationHardeningTests
     [Fact]
     public void ConversationMessages_ShouldUseStablePaginationOrder()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "SupportChat",
-            "PetMagic.Modules.SupportChat.Infrastructure",
-            "SupportChatService.NotificationsAndMessages.cs"));
+        var source = ReadSupportChatInfrastructureSource("SupportChatService.ConversationDetailBuilder.cs");
 
         Assert.Contains(
             ".OrderByDescending(x => x.CreatedAtUtc)\n            .ThenByDescending(x => x.Id)\n            .Take(normalizedTake + 1)",
@@ -101,15 +79,12 @@ public sealed class SupportChatPaginationHardeningTests
     }
 
     [Fact]
-    public void MessageOperations_ShouldAvoidLoadingWholeConversationHistoryForHotActions()
+    public void MessageHotPaths_ShouldAvoidLoadingWholeConversationHistoryForHotActions()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "SupportChat",
-            "PetMagic.Modules.SupportChat.Infrastructure",
-            "SupportChatService.MessageOperations.cs"));
+        var source = ReadSupportChatInfrastructureSources(
+            "SupportChatService.MessageSending.cs",
+            "SupportChatService.MessageReadTracking.cs",
+            "SupportChatService.ConversationDetailBuilder.cs");
 
         Assert.DoesNotContain(".Include(x => x.Messages)", source, StringComparison.Ordinal);
         Assert.Contains("supportChatDbContext.ConversationMessages\n            .AsNoTracking()\n            .AnyAsync(", source, StringComparison.Ordinal);
@@ -132,5 +107,23 @@ public sealed class SupportChatPaginationHardeningTests
         }
 
         throw new InvalidOperationException("Could not locate repository root.");
+    }
+
+    private static string ReadSupportChatInfrastructureSource(string fileName)
+    {
+        return File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "SupportChat",
+            "PetMagic.Modules.SupportChat.Infrastructure",
+            fileName));
+    }
+
+    private static string ReadSupportChatInfrastructureSources(params string[] fileNames)
+    {
+        return string.Join(
+            "\n",
+            fileNames.Select(ReadSupportChatInfrastructureSource));
     }
 }

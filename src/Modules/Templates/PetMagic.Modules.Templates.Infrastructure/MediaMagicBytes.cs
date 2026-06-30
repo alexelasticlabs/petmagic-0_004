@@ -2,6 +2,17 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal static class MediaMagicBytes
 {
+    private static readonly HashSet<string> SupportedMp4Brands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mp41",
+        "mp42",
+        "isom",
+        "iso2",
+        "avc1",
+        "m4v ",
+        "m4a "
+    };
+
     public static string? DetectContentType(ReadOnlySpan<byte> header)
     {
         if (header.Length >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
@@ -46,20 +57,8 @@ internal static class MediaMagicBytes
             return "image/gif";
         }
 
-        if (header.Length >= 12
-            && header[4] == 0x66
-            && header[5] == 0x74
-            && header[6] == 0x79
-            && header[7] == 0x70)
+        if (TryReadIsoBmffBrand(header, out var brand))
         {
-            var brand = string.Create(4, header, static (chars, bytes) =>
-            {
-                for (var i = 0; i < chars.Length; i++)
-                {
-                    chars[i] = (char)bytes[8 + i];
-                }
-            });
-
             if (string.Equals(brand, "heic", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(brand, "heix", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(brand, "hevc", StringComparison.OrdinalIgnoreCase)
@@ -76,7 +75,15 @@ internal static class MediaMagicBytes
                 return "image/heif";
             }
 
-            return "video/mp4";
+            if (string.Equals(brand, "qt  ", StringComparison.OrdinalIgnoreCase))
+            {
+                return "video/quicktime";
+            }
+
+            if (SupportedMp4Brands.Contains(brand))
+            {
+                return "video/mp4";
+            }
         }
 
         if (header.Length >= 4 && header[0] == 0x1A && header[1] == 0x45 && header[2] == 0xDF && header[3] == 0xA3)
@@ -93,5 +100,27 @@ internal static class MediaMagicBytes
         using var stream = File.OpenRead(path);
         var read = stream.Read(buffer);
         return DetectContentType(buffer[..read]);
+    }
+
+    private static bool TryReadIsoBmffBrand(ReadOnlySpan<byte> header, out string brand)
+    {
+        brand = string.Empty;
+        if (header.Length < 12
+            || header[4] != 0x66
+            || header[5] != 0x74
+            || header[6] != 0x79
+            || header[7] != 0x70)
+        {
+            return false;
+        }
+
+        brand = string.Create(4, header, static (chars, bytes) =>
+        {
+            for (var i = 0; i < chars.Length; i++)
+            {
+                chars[i] = (char)bytes[8 + i];
+            }
+        });
+        return true;
     }
 }

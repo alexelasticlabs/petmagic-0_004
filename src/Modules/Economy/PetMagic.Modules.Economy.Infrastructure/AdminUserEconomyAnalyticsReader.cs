@@ -112,6 +112,7 @@ internal sealed class AdminUserEconomyAnalyticsReader(EconomyDbContext dbContext
             WalletLedgerSource.AdminGrant => "Admin token grant",
             WalletLedgerSource.AdminDebit => "Admin token debit",
             WalletLedgerSource.PackPurchase => "Pack purchase credited",
+            WalletLedgerSource.PurchaseRefund => "Purchase refunded",
             WalletLedgerSource.AdReward => "Ad reward credited",
             WalletLedgerSource.WeeklyGrant => "Weekly grant credited",
             WalletLedgerSource.GenerationRefund => "Generation refunded",

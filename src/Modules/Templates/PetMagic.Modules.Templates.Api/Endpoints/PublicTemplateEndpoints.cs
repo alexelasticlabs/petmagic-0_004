@@ -19,6 +19,38 @@ public static class PublicTemplateEndpoints
 {
     private const string PublicCatalogCacheControl = "public, max-age=10";
     private const string PublicCategoriesCacheControl = "public, max-age=60";
+    private const int MaxAnalyticsMetadataEntries = 12;
+    private const int MaxAnalyticsMetadataKeyLength = 64;
+    private const int MaxAnalyticsMetadataValueLength = 160;
+    private static readonly HashSet<string> AllowedPublicAnalyticsEventTypes =
+    [
+        TemplateAnalyticsEventTypes.View,
+        TemplateAnalyticsEventTypes.VideoView,
+        TemplateAnalyticsEventTypes.Complaint,
+        TemplateAnalyticsEventTypes.Feedback,
+        TemplateAnalyticsEventTypes.FeedbackPromptViewed,
+        TemplateAnalyticsEventTypes.FeedbackRatingSelected,
+        TemplateAnalyticsEventTypes.FeedbackSubmitFailed,
+        TemplateAnalyticsEventTypes.FeedbackReportClicked,
+        TemplateAnalyticsEventTypes.UseAsInputClicked,
+        TemplateAnalyticsEventTypes.TemplateOfTheDayViewed,
+        TemplateAnalyticsEventTypes.TemplateOfTheDayClicked,
+        TemplateAnalyticsEventTypes.TemplateOfTheDayOpened,
+        TemplateAnalyticsEventTypes.TemplateSelected,
+        TemplateAnalyticsEventTypes.GenerationStarted,
+        TemplateAnalyticsEventTypes.GenerationCompleted,
+        TemplateAnalyticsEventTypes.GenerationFailed,
+        TemplateAnalyticsEventTypes.RemoveClicked,
+        TemplateAnalyticsEventTypes.PaywallViewed,
+        TemplateAnalyticsEventTypes.CreateVideoClicked,
+        TemplateAnalyticsEventTypes.CompareClicked,
+        TemplateAnalyticsEventTypes.CompareViewed,
+        TemplateAnalyticsEventTypes.CompareSliderMoved,
+        TemplateAnalyticsEventTypes.CompareShareClicked,
+        TemplateAnalyticsEventTypes.CompareClosed,
+        TemplateAnalyticsEventTypes.GenerateSimilarClicked,
+        TemplateAnalyticsEventTypes.GenerateSimilarConfirmed
+    ];
 
     public static IEndpointRouteBuilder MapPublicTemplateEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -33,9 +65,17 @@ public static class PublicTemplateEndpoints
         group.MapGet("/feed", ListFeedAsync).AllowAnonymous();
         group.MapGet("/random", GetRandomTemplateAsync).AllowAnonymous();
         group.MapGet("/template-of-the-day", GetTemplateOfTheDayAsync).AllowAnonymous();
-        group.MapGet("/events", StreamEventsAsync).AllowAnonymous();
         group.MapGet("/{templateId:guid}", GetAsync).AllowAnonymous();
-        group.MapPost("/{templateId:guid}/analytics/events", RecordAnalyticsEventAsync).AllowAnonymous();
+
+        endpoints.MapGet("/api/templates/events", StreamEventsAsync)
+            .WithTags("Templates")
+            .AllowAnonymous()
+            .RequireRateLimiting("templates-events");
+
+        endpoints.MapPost("/api/templates/{templateId:guid}/analytics/events", RecordAnalyticsEventAsync)
+            .WithTags("Templates")
+            .AllowAnonymous()
+            .RequireRateLimiting("templates-analytics");
 
         return endpoints;
     }
@@ -376,10 +416,18 @@ public static class PublicTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        if (!TryResolvePublicEventType(request.EventType, out var eventType))
+        {
+            return TypedResults.Problem(
+                title: "templates.invalid_event_type",
+                detail: "Request field eventType must be a supported analytics event name.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
         var result = await service.RecordAnalyticsEventAsync(
             new RecordTemplateAnalyticsEventCommand(
                 templateId,
-                ResolveEventType(request.EventType),
+                eventType,
                 request.Source,
                 string.IsNullOrWhiteSpace(request.DeviceClass) ? DetectDeviceClass(httpContext) : request.DeviceClass,
                 string.IsNullOrWhiteSpace(request.CountryCode) ? ResolveCountryCode(httpContext) : request.CountryCode,
@@ -397,36 +445,92 @@ public static class PublicTemplateEndpoints
         return TypedResults.NoContent();
     }
 
-    private static string ResolveEventType(string? eventType)
+    private static bool TryResolvePublicEventType(string? eventType, out string normalizedEventType)
     {
-        return eventType?.Trim().ToLowerInvariant() switch
+        normalizedEventType = string.Empty;
+        if (string.IsNullOrWhiteSpace(eventType))
         {
-            TemplateAnalyticsEventTypes.VideoView => TemplateAnalyticsEventTypes.VideoView,
-            TemplateAnalyticsEventTypes.Complaint => TemplateAnalyticsEventTypes.Complaint,
-            TemplateAnalyticsEventTypes.Feedback => TemplateAnalyticsEventTypes.Feedback,
-            TemplateAnalyticsEventTypes.UseAsInputClicked => TemplateAnalyticsEventTypes.UseAsInputClicked,
-            TemplateAnalyticsEventTypes.TemplateOfTheDayViewed => TemplateAnalyticsEventTypes.TemplateOfTheDayViewed,
-            TemplateAnalyticsEventTypes.TemplateOfTheDayClicked => TemplateAnalyticsEventTypes.TemplateOfTheDayClicked,
-            TemplateAnalyticsEventTypes.TemplateOfTheDayOpened => TemplateAnalyticsEventTypes.TemplateOfTheDayOpened,
-            TemplateAnalyticsEventTypes.TemplateSelected => TemplateAnalyticsEventTypes.TemplateSelected,
-            TemplateAnalyticsEventTypes.GenerationStarted => TemplateAnalyticsEventTypes.GenerationStarted,
-            TemplateAnalyticsEventTypes.GenerationCompleted => TemplateAnalyticsEventTypes.GenerationCompleted,
-            TemplateAnalyticsEventTypes.GenerationFailed => TemplateAnalyticsEventTypes.GenerationFailed,
-            TemplateAnalyticsEventTypes.RemoveClicked => TemplateAnalyticsEventTypes.RemoveClicked,
-            TemplateAnalyticsEventTypes.PaywallViewed => TemplateAnalyticsEventTypes.PaywallViewed,
-            TemplateAnalyticsEventTypes.CreateVideoClicked => TemplateAnalyticsEventTypes.CreateVideoClicked,
-            TemplateAnalyticsEventTypes.CompareClicked => TemplateAnalyticsEventTypes.CompareClicked,
-            TemplateAnalyticsEventTypes.CompareViewed => TemplateAnalyticsEventTypes.CompareViewed,
-            TemplateAnalyticsEventTypes.CompareSliderMoved => TemplateAnalyticsEventTypes.CompareSliderMoved,
-            TemplateAnalyticsEventTypes.CompareShareClicked => TemplateAnalyticsEventTypes.CompareShareClicked,
-            TemplateAnalyticsEventTypes.CompareClosed => TemplateAnalyticsEventTypes.CompareClosed,
-            _ => TemplateAnalyticsEventTypes.View
-        };
+            return false;
+        }
+
+        var candidate = eventType.Trim().ToLowerInvariant();
+        if (!AllowedPublicAnalyticsEventTypes.Contains(candidate))
+        {
+            return false;
+        }
+
+        normalizedEventType = candidate;
+        return true;
     }
 
     private static string? SerializeMetadata(IReadOnlyDictionary<string, JsonElement>? metadata)
     {
-        return metadata is { Count: > 0 } ? JsonSerializer.Serialize(metadata) : null;
+        if (metadata is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var sanitized = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (rawKey, rawValue) in metadata)
+        {
+            if (sanitized.Count >= MaxAnalyticsMetadataEntries)
+            {
+                break;
+            }
+
+            var key = NormalizeMetadataKey(rawKey);
+            var value = NormalizeMetadataValue(rawValue);
+            if (key is null || value is null)
+            {
+                continue;
+            }
+
+            sanitized[key] = value;
+        }
+
+        return sanitized.Count == 0 ? null : JsonSerializer.Serialize(sanitized);
+    }
+
+    private static string? NormalizeMetadataKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Length <= MaxAnalyticsMetadataKeyLength
+            ? normalized
+            : normalized[..MaxAnalyticsMetadataKeyLength];
+    }
+
+    private static string? NormalizeMetadataValue(JsonElement value)
+    {
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.Undefined => null,
+            JsonValueKind.String => NormalizeMetadataText(value.GetString()),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Number => NormalizeMetadataText(value.GetRawText()),
+            JsonValueKind.Array => NormalizeMetadataText(value.GetRawText()),
+            JsonValueKind.Object => NormalizeMetadataText(value.GetRawText()),
+            _ => NormalizeMetadataText(value.GetRawText())
+        };
+    }
+
+    private static string? NormalizeMetadataText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim();
+        return normalized.Length <= MaxAnalyticsMetadataValueLength
+            ? normalized
+            : normalized[..MaxAnalyticsMetadataValueLength];
     }
 
     private static string DetectDeviceClass(HttpContext httpContext)

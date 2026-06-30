@@ -9,7 +9,6 @@ public sealed class AchievementDefinition
     public string TitleKey { get; set; } = string.Empty;
     public string DescriptionKey { get; set; } = string.Empty;
     public string? IconEmoji { get; set; }
-    public string? IconAssetPath { get; set; }
     public string RequirementType { get; set; } = string.Empty;
     public int RequirementValue { get; set; }
     public int RewardSpark { get; set; }

@@ -42,7 +42,8 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally irreversible: empty and legacy Stripe disclosure
+            // text is normalized in-place without retaining the prior values.
         }
     }
 }

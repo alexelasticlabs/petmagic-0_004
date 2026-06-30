@@ -32,7 +32,8 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-
+            // Intentionally irreversible: schema repair aligns drifted columns
+            // to the current model and does not attempt lossy rollback.
         }
     }
 }

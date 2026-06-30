@@ -199,6 +199,8 @@ public sealed partial class EconomyServiceTests
 
         public SubscriptionCheckoutCreateRequest? LastSubscriptionCheckoutRequest { get; private set; }
 
+        public List<PaymentRefundRequest> RefundRequests { get; } = [];
+
         public Task<Result<PaymentCreateResponse>> CreatePaymentAsync(PaymentCreateRequest request, CancellationToken cancellationToken)
         {
             LastPaymentCreateRequest = request;
@@ -252,6 +254,7 @@ public sealed partial class EconomyServiceTests
 
         public Task<Result<PaymentRefundResponse>> RefundPaymentAsync(PaymentRefundRequest request, CancellationToken cancellationToken)
         {
+            RefundRequests.Add(request);
             return Task.FromResult(Result.Success(new PaymentRefundResponse($"re_{request.OrderId:N}", "succeeded")));
         }
     }
@@ -260,7 +263,7 @@ public sealed partial class EconomyServiceTests
     {
         public bool IsActive { get; init; } = true;
 
-        public DateTime ExpiresAtUtc { get; init; } = DateTime.UtcNow.AddDays(30);
+        public DateTime? ExpiresAtUtc { get; init; } = DateTime.UtcNow.AddDays(30);
 
         public string Status { get; init; } = "active";
 

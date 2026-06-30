@@ -8,7 +8,7 @@ public sealed class JwtOptions
 
     public string Audience { get; init; } = "petmagic-clients";
 
-    public string SigningKey { get; init; } = "SUPER_CHANGE_ME_IN_PROD_64_BYTES_MINIMUM___________";
+    public string SigningKey { get; init; } = string.Empty;
 
     public int AccessTokenMinutes { get; init; } = 30;
 

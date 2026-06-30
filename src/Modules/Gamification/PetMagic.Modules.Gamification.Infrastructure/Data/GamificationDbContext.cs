@@ -35,7 +35,6 @@ public sealed class GamificationDbContext(DbContextOptions<GamificationDbContext
             entity.Property(x => x.TitleKey).HasMaxLength(200).IsRequired();
             entity.Property(x => x.DescriptionKey).HasMaxLength(200).IsRequired();
             entity.Property(x => x.IconEmoji).HasMaxLength(10);
-            entity.Property(x => x.IconAssetPath).HasMaxLength(500);
             entity.Property(x => x.RequirementType).HasMaxLength(50).IsRequired();
         });
 

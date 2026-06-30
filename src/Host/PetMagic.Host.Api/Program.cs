@@ -167,6 +167,27 @@ try
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
                 }));
 
+        options.AddPolicy("templates-analytics", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("TemplatesAnalytics", 48),
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("templates-events", httpContext =>
+            RateLimitPartition.GetConcurrencyLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new ConcurrencyLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("TemplatesEventsConcurrent", 3),
+                    QueueLimit = 0,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
         options.AddPolicy("generation-create", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: RateLimitPartitionKeys.UserOrIp(httpContext),
@@ -223,22 +244,48 @@ try
                 }));
 
         options.AddPolicy("auth-register", httpContext =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("AuthRegister", 8),
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("auth-password-reset", httpContext =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                partitionKey: RateLimitPartitionKeys.Ip(httpContext),
+                factory: _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = RateLimitPermit("AuthPasswordReset", 10),
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+                }));
+
+        options.AddPolicy("auth-email-verification", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: RateLimitPartitionKeys.Ip(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = RateLimitPermit("AuthRegister", 8),
+                    PermitLimit = RateLimitPermit("AuthEmailVerification", 10),
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
                 }));
 
-        options.AddPolicy("auth-password-reset", httpContext =>
+        options.AddPolicy("auth-external", httpContext =>
             RateLimitPartition.GetFixedWindowLimiter(
                 partitionKey: RateLimitPartitionKeys.Ip(httpContext),
                 factory: _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = RateLimitPermit("AuthPasswordReset", 10),
+                    PermitLimit = RateLimitPermit("AuthExternal", 12),
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst
@@ -258,7 +305,8 @@ try
         .AddGamificationApiModule();
 
     builder.Services.AddHealthChecks()
-        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
+        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy())
+        .AddCheck<PremiumSubscriptionPlansHealthCheck>("economy_subscription_plans");
 
     builder.Services
         .AddOpenTelemetry()

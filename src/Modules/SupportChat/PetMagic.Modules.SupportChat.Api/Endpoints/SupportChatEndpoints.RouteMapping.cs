@@ -6,6 +6,14 @@ namespace PetMagic.Modules.SupportChat.Api.Endpoints;
 
 public static partial class SupportChatEndpoints
 {
+    public static IEndpointRouteBuilder MapSupportChatEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        MapUserRoutes(endpoints);
+        MapAdminRoutes(endpoints);
+
+        return endpoints;
+    }
+
     private static RouteGroupBuilder MapUserRoutes(IEndpointRouteBuilder endpoints)
     {
         var userGroup = endpoints.MapGroup("/api/support")

@@ -51,6 +51,7 @@ public static class EconomyErrors
     public static readonly Error StorePurchaseInactive = new("economy.store_purchase_inactive", "Store subscription is not active.");
 
     public static readonly Error PaymentMethodNotFound = new("economy.payment_method_not_found", "Payment method was not found.");
+    public static readonly Error PaymentMethodProviderInvalid = new("economy.payment_method_provider_invalid", "Saved payment methods are only supported for Stripe purchases.");
 
     public static readonly Error RedeemCodeNotFound = new("economy.redeem_code_not_found", "Redeem code was not found.");
 

@@ -56,15 +56,19 @@ internal sealed class TemplateOfTheDayAutoPickWorker(
             if (result.IsFailure)
             {
                 logger.LogWarning(
-                    "Template of the Day auto-pick failed for {TargetDate}: {ErrorCode}",
+                    "Template of the Day auto-pick failed. Operation={Operation} TargetDate={TargetDate} BusinessTimeZone={BusinessTimeZone} ErrorCode={ErrorCode}",
+                    "ensure_tomorrow_auto_pick",
                     targetDate,
+                    options.TemplateOfTheDayBusinessTimeZone,
                     result.Error.Code);
                 return;
             }
 
             logger.LogInformation(
-                "Template of the Day auto-pick ensured for {TargetDate} with template {TemplateId}.",
+                "Template of the Day auto-pick ensured. Operation={Operation} TargetDate={TargetDate} BusinessTimeZone={BusinessTimeZone} TemplateId={TemplateId}",
+                "ensure_tomorrow_auto_pick",
                 targetDate,
+                options.TemplateOfTheDayBusinessTimeZone,
                 result.Value.TemplateId);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -73,7 +77,11 @@ internal sealed class TemplateOfTheDayAutoPickWorker(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Template of the Day auto-pick worker iteration failed.");
+            logger.LogWarning(
+                exception,
+                "Template of the Day auto-pick worker iteration failed. Operation={Operation} BusinessTimeZone={BusinessTimeZone}",
+                "ensure_tomorrow_auto_pick",
+                options.TemplateOfTheDayBusinessTimeZone);
         }
     }
 

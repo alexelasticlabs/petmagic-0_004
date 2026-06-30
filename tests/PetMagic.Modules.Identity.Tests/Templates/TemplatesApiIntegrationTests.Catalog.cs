@@ -3,10 +3,14 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
 using PetMagic.Modules.Templates.Api.Endpoints;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure.Data;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -176,6 +180,36 @@ public sealed partial class TemplatesApiIntegrationTests
         var receivedEvent = await eventTask.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(TemplateFeedRealtimeTopics.TemplatesFeedInvalidated, receivedEvent.Topic);
         Assert.Equal("{}", receivedEvent.Data);
+    }
+
+    [Fact]
+    public async Task EventsStream_ShouldRejectFourthConcurrentAnonymousConnection()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        using var firstRequest = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var firstResponse = await application.Client.SendAsync(
+            firstRequest,
+            HttpCompletionOption.ResponseHeadersRead);
+        using var secondRequest = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var secondResponse = await application.Client.SendAsync(
+            secondRequest,
+            HttpCompletionOption.ResponseHeadersRead);
+        using var thirdRequest = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var thirdResponse = await application.Client.SendAsync(
+            thirdRequest,
+            HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, thirdResponse.StatusCode);
+
+        using var fourthRequest = new HttpRequestMessage(HttpMethod.Get, "/api/templates/events");
+        using var fourthResponse = await application.Client.SendAsync(
+            fourthRequest,
+            HttpCompletionOption.ResponseHeadersRead);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, fourthResponse.StatusCode);
     }
 
     [Fact]
@@ -1112,6 +1146,143 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal("profile", item.Source);
         Assert.Equal("web", item.DeviceClass);
         Assert.Equal("DE", item.CountryCode);
+    }
+
+    [Fact]
+    public async Task PublicAnalyticsEndpoint_ShouldClampAnonymousMetadataPayload()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var previewAsset = await UploadMediaAsync(
+            application.Client,
+            "metadata-guard-preview.jpg",
+            "image/jpeg",
+            TemplateAssetKind.Preview,
+            "metadata-guard-preview-content"u8.ToArray());
+
+        var created = await PostAsJsonAsync<AdminTemplateResponse>(
+            application.Client,
+            "/api/admin/templates/image",
+            new CreateImageTemplateCommand(
+                "Metadata Guard",
+                "Template used to validate analytics metadata guards",
+                "Utility",
+                ["analytics"],
+                false,
+                15,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                new TemplateAssetCommand(
+                    previewAsset.Url,
+                    previewAsset.FileName,
+                    previewAsset.ContentType,
+                    previewAsset.FileSizeBytes,
+                    previewAsset.DurationSeconds),
+                "openai/gpt-image-2/edit",
+                "Keep the pet centered.",
+                TemplateStatus.Active.ToString()));
+
+        var oversizedValue = new string('x', 240);
+        using var postResponse = await application.Client.PostAsJsonAsync(
+            $"/api/templates/{created.TemplateId}/analytics/events",
+            new
+            {
+                eventType = "feedback",
+                source = "gallery",
+                metadata = new Dictionary<string, object?>
+                {
+                    ["screen"] = "templates",
+                    ["longValue"] = oversizedValue,
+                    ["nested"] = new { route = "/templates", section = "hero" },
+                    ["flag"] = true,
+                    ["one"] = "1",
+                    ["two"] = "2",
+                    ["three"] = "3",
+                    ["four"] = "4",
+                    ["five"] = "5",
+                    ["six"] = "6",
+                    ["seven"] = "7",
+                    ["eight"] = "8",
+                    ["nine"] = "9"
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.NoContent, postResponse.StatusCode);
+
+        using var scope = application.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        var stored = await dbContext.TemplateAnalyticsEvents
+            .SingleAsync(x => x.TemplateId == created.TemplateId);
+
+        Assert.NotNull(stored.MetadataJson);
+
+        using var metadata = JsonDocument.Parse(stored.MetadataJson!);
+        var properties = metadata.RootElement.EnumerateObject().ToArray();
+        Assert.Equal(12, properties.Length);
+        Assert.Contains(properties, property => property.NameEquals("screen"));
+        Assert.Contains(properties, property => property.NameEquals("longValue"));
+        Assert.Contains(properties, property => property.NameEquals("nested"));
+        Assert.DoesNotContain(properties, property => property.NameEquals("nine"));
+
+        Assert.True(
+            metadata.RootElement.GetProperty("longValue").GetString()!.Length <= 160);
+        Assert.True(
+            metadata.RootElement.GetProperty("nested").GetString()!.Length <= 160);
+    }
+
+    [Fact]
+    public async Task PublicAnalyticsEndpoint_ShouldReturnProblem_WhenEventTypeIsUnknown()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Contract Guard",
+            "Contracts",
+            ["analytics", "contract"]);
+
+        using var response = await application.Client.PostAsJsonAsync(
+            $"/api/templates/{created.TemplateId}/analytics/events",
+            new
+            {
+                eventType = "totally_unknown_event",
+                source = "mobile"
+            });
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("templates.invalid_event_type", body);
+
+        using var scope = application.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        Assert.Empty(await dbContext.TemplateAnalyticsEvents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task PublicAnalyticsEndpoint_ShouldReturnTooManyRequests_WhenAnonymousRateLimitExceeded()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Rate Limit Guard",
+            "Contracts",
+            ["analytics", "rate-limit"]);
+
+        HttpResponseMessage? lastResponse = null;
+        for (var index = 0; index < 49; index++)
+        {
+            lastResponse?.Dispose();
+            lastResponse = await application.Client.PostAsJsonAsync(
+                $"/api/templates/{created.TemplateId}/analytics/events",
+                new
+                {
+                    eventType = "view",
+                    source = "mobile"
+                });
+        }
+
+        Assert.NotNull(lastResponse);
+        using (lastResponse)
+        {
+            Assert.Equal(HttpStatusCode.TooManyRequests, lastResponse.StatusCode);
+        }
     }
 
 

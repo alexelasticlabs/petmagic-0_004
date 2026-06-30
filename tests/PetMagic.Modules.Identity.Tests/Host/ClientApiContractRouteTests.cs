@@ -347,6 +347,7 @@ public sealed class ClientApiContractRouteTests
                 options.AddPolicy("auth", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("auth-register", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("auth-password-reset", _ => RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-external", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("economy", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("templates", _ => RateLimitPartition.GetNoLimiter("tests"));
                 options.AddPolicy("generation-create", _ => RateLimitPartition.GetNoLimiter("tests"));

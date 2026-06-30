@@ -39,16 +39,27 @@ public sealed class IdentityUserLookupService(IdentityDbContext dbContext, IMemo
             return result;
         }
 
+        var rolesByUserId = await LoadRolesByUserIdAsync(missingUserIds, cancellationToken);
         var users = await dbContext.Users
             .AsNoTracking()
             .Where(x => missingUserIds.Contains(x.Id))
-            .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
+            .Select(x => new
+            {
+                x.Id,
+                x.Email,
+                x.DisplayName
+            })
             .ToListAsync(cancellationToken);
 
         foreach (var user in users)
         {
-            result[user.UserId] = user;
-            cache?.Set(GetCacheKey(user.UserId), user, CacheDuration);
+            var resolvedUser = new IdentityUserLookup(
+                user.Id,
+                user.Email ?? string.Empty,
+                user.DisplayName,
+                rolesByUserId.TryGetValue(user.Id, out var roles) ? roles : []);
+            result[user.Id] = resolvedUser;
+            cache?.Set(GetCacheKey(user.Id), resolvedUser, CacheDuration);
         }
 
         return result;
@@ -61,18 +72,66 @@ public sealed class IdentityUserLookupService(IdentityDbContext dbContext, IMemo
             return cachedUser;
         }
 
+        var rolesByUserId = await LoadRolesByUserIdAsync([userId], cancellationToken);
         var user = await dbContext.Users
             .AsNoTracking()
             .Where(x => x.Id == userId)
-            .Select(x => new IdentityUserLookup(x.Id, x.Email ?? string.Empty, x.DisplayName))
+            .Select(x => new
+            {
+                x.Id,
+                x.Email,
+                x.DisplayName
+            })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (user is not null)
         {
-            cache?.Set(GetCacheKey(userId), user, CacheDuration);
+            var resolvedUser = new IdentityUserLookup(
+                user.Id,
+                user.Email ?? string.Empty,
+                user.DisplayName,
+                rolesByUserId.TryGetValue(user.Id, out var roles) ? roles : []);
+            cache?.Set(GetCacheKey(userId), resolvedUser, CacheDuration);
+            return resolvedUser;
         }
 
-        return user;
+        return null;
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, IReadOnlyList<string>>> LoadRolesByUserIdAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        if (userIds.Count == 0)
+        {
+            return new Dictionary<Guid, IReadOnlyList<string>>();
+        }
+
+        var distinctUserIds = userIds.Distinct().ToArray();
+        var roleRows = await dbContext.UserRoles
+            .AsNoTracking()
+            .Where(x => distinctUserIds.Contains(x.UserId))
+            .Join(
+                dbContext.Roles.AsNoTracking(),
+                userRole => userRole.RoleId,
+                role => role.Id,
+                (userRole, role) => new
+                {
+                    userRole.UserId,
+                    RoleName = role.Name
+                })
+            .Where(x => !string.IsNullOrWhiteSpace(x.RoleName))
+            .ToListAsync(cancellationToken);
+
+        return roleRows
+            .GroupBy(x => x.UserId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group
+                    .Select(x => x.RoleName!)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(x => x, StringComparer.Ordinal)
+                    .ToArray());
     }
 
     private static string GetCacheKey(Guid userId) => $"identity-user-lookup:{userId:N}";

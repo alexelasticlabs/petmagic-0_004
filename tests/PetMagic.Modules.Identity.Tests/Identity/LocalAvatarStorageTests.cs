@@ -2,6 +2,7 @@ using System.Linq;
 
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.Modules.Identity.Infrastructure;
@@ -53,6 +54,143 @@ public sealed class LocalAvatarStorageTests
         }
     }
 
+    [Fact]
+    public async Task DeleteAsync_ShouldRemoveManagedLocalFile_ByStorageKey()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new AvatarUploadCommand("avatar.png", "image/png", PngBytes()),
+                CancellationToken.None);
+
+            Assert.True(stored.IsSuccess);
+            Assert.NotNull(stored.Value.LocalPath);
+            Assert.True(File.Exists(stored.Value.LocalPath));
+
+            var deleted = await storage.DeleteAsync(stored.Value.StorageKey, CancellationToken.None);
+
+            Assert.True(deleted.IsSuccess);
+            Assert.False(File.Exists(stored.Value.LocalPath));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldRemoveManagedLocalFile_BySignedUrl()
+    {
+        var rootPath = CreateTempDirectory();
+        var storage = CreateStorage(rootPath);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new AvatarUploadCommand("avatar.png", "image/png", PngBytes()),
+                CancellationToken.None);
+
+            Assert.True(stored.IsSuccess);
+            Assert.NotNull(stored.Value.LocalPath);
+            Assert.True(File.Exists(stored.Value.LocalPath));
+
+            var signedUrl = $"{stored.Value.Url}?pmexp=123&pmsig=abc";
+            var deleted = await storage.DeleteAsync(signedUrl, CancellationToken.None);
+
+            Assert.True(deleted.IsSuccess);
+            Assert.False(File.Exists(stored.Value.LocalPath));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task StoreAsync_ShouldLogWarning_WhenDirectoryCreationOrWriteFails()
+    {
+        var rootPath = Path.Combine(Path.GetTempPath(), $"petmagic-avatar-root-file-{Guid.NewGuid():N}");
+        await File.WriteAllTextAsync(rootPath, "not-a-directory");
+        var logger = new CapturingLogger<LocalAvatarStorage>();
+        var storage = CreateStorage(rootPath, logger);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new AvatarUploadCommand("avatar.png", "image/png", PngBytes()),
+                CancellationToken.None);
+
+            Assert.True(stored.IsFailure);
+            Assert.Equal("users.avatar_storage_failed", stored.Error.Code);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Warning
+                    && entry.Message.Contains("Avatar storage write failed.", StringComparison.Ordinal)
+                    && Equals(entry.Properties["Operation"], "store")
+                    && Equals(entry.Properties["ContentType"], "image/jpeg"));
+        }
+        finally
+        {
+            File.Delete(rootPath);
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldLogWarning_WhenManagedFileDeletionFails()
+    {
+        var rootPath = CreateTempDirectory();
+        var logger = new CapturingLogger<LocalAvatarStorage>();
+        var storage = CreateStorage(rootPath, logger);
+
+        try
+        {
+            var stored = await storage.StoreAsync(
+                new AvatarUploadCommand("avatar.png", "image/png", PngBytes()),
+                CancellationToken.None);
+
+            Assert.True(stored.IsSuccess);
+            Assert.NotNull(stored.Value.LocalPath);
+            await using var lockStream = new FileStream(
+                stored.Value.LocalPath!,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.None);
+
+            var deleted = await storage.DeleteAsync(stored.Value.StorageKey, CancellationToken.None);
+
+            Assert.True(deleted.IsFailure);
+            Assert.Equal("users.avatar_storage_failed", deleted.Error.Code);
+            Assert.Contains(
+                logger.Entries,
+                entry => entry.Level == LogLevel.Warning
+                    && entry.Message.Contains("Avatar storage delete failed.", StringComparison.Ordinal)
+                    && Equals(entry.Properties["Operation"], "delete")
+                    && Equals(entry.Properties["AvatarFileName"], Path.GetFileName(stored.Value.StorageKey)));
+        }
+        finally
+        {
+            Directory.Delete(rootPath, recursive: true);
+        }
+    }
+
+    private static LocalAvatarStorage CreateStorage(
+        string rootPath,
+        ILogger<LocalAvatarStorage>? logger = null)
+    {
+        return new LocalAvatarStorage(
+            new AvatarStorageOptions
+            {
+                PublicBaseUrl = "http://localhost:5000",
+                LocalMediaRootPath = rootPath,
+                MaxFileSizeBytes = 8 * 1024 * 1024
+            },
+            new TestHostEnvironment(rootPath),
+            logger ?? NullLogger<LocalAvatarStorage>.Instance);
+    }
+
     private static string CreateTempDirectory()
     {
         var path = Path.Combine(Path.GetTempPath(), $"petmagic-avatar-{Guid.NewGuid():N}");
@@ -89,4 +227,47 @@ public sealed class LocalAvatarStorageTests
 
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), properties));
+        }
+
+        private sealed class NullScope : IDisposable
+        {
+            public static readonly NullScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        IReadOnlyDictionary<string, object?> Properties);
 }

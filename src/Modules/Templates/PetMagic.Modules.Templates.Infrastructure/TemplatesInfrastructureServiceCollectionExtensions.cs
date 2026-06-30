@@ -162,7 +162,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddSingleton<IMediaMetadataReader, FileMediaMetadataReader>();
         services.AddSingleton<ITemplateWatermarkRenderer, TemplateWatermarkRenderer>();
         AddMediaStorage(services, options);
-        AddGenerationBilling(services);
+        AddGenerationBilling(services, environment);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
         services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient);
@@ -411,12 +411,17 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static void ConfigureExternalHttpClient(HttpClient client) =>
         client.Timeout = ExternalHttpClientTimeout;
 
-    private static void AddGenerationBilling(IServiceCollection services)
+    private static void AddGenerationBilling(IServiceCollection services, IHostEnvironment? environment)
     {
         if (services.Any(descriptor => descriptor.ServiceType == typeof(IEconomyService)))
         {
             services.AddScoped<ITemplateGenerationBilling, EconomyTemplateGenerationBilling>();
             return;
+        }
+
+        if (environment is not null && environment.IsProduction())
+        {
+            throw new InvalidOperationException("Economy-backed template generation billing must be registered in Production.");
         }
 
         services.AddScoped<ITemplateGenerationBilling, NoopTemplateGenerationBilling>();

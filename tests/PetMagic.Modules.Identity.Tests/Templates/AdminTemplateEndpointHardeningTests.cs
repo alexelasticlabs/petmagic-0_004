@@ -16,14 +16,7 @@ public sealed class AdminTemplateEndpointHardeningTests
     [Fact]
     public void RecentGenerationsEndpoint_ShouldUseBoundedDefaultTake()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "Templates",
-            "PetMagic.Modules.Templates.Api",
-            "Endpoints",
-            "AdminTemplateEndpoints.cs"));
+        var source = ReadAllEndpointPartialFiles("AdminTemplateEndpoints");
 
         Assert.Contains("private const int RecentGenerationsDefaultTake = 25;", source, StringComparison.Ordinal);
         Assert.Contains("private const int RecentGenerationsMaxTake = 250;", source, StringComparison.Ordinal);
@@ -85,13 +78,9 @@ public sealed class AdminTemplateEndpointHardeningTests
     [Fact]
     public void TemplateFeedbackSummary_ShouldAggregateInDatabase()
     {
-        var source = File.ReadAllText(Path.Combine(
-            FindRepositoryRoot(),
-            "src",
-            "Modules",
-            "Templates",
-            "PetMagic.Modules.Templates.Infrastructure",
-            "FeedbackService.cs"));
+        var source = ReadAllPartialFiles(
+            "FeedbackService",
+            "PetMagic.Modules.Templates.Infrastructure");
         var method = ExtractMethodBody(source, "GetTemplateSummaryAsync");
 
         Assert.Contains(".GroupBy(_ => 1)", method, StringComparison.Ordinal);
@@ -292,6 +281,13 @@ public sealed class AdminTemplateEndpointHardeningTests
         var dir = Path.Combine(root, "src", "Modules", "Templates", namespacePath);
         var files = Directory.GetFiles(dir, $"{baseFileName}*.cs");
         return string.Join("\n", files.Select(File.ReadAllText));
+    }
+
+    private static string ReadAllEndpointPartialFiles(string baseFileName)
+    {
+        return ReadAllPartialFiles(
+            baseFileName,
+            Path.Combine("PetMagic.Modules.Templates.Api", "Endpoints"));
     }
 
     private static string ExtractMethodBody(string source, string methodName)

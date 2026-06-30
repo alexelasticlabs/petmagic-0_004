@@ -8,10 +8,10 @@ internal static class SupportChatAutoReplyLocalizer
         {
             "ru" => "Спасибо, мы получили ваше сообщение. Поддержка ответит в этом чате.",
             "de" => "Nachricht erhalten. Der Support antwortet in diesem Chat.",
-            "pl" => "Wiadomosc otrzymana. Wsparcie odpowie w tym czacie.",
-            "it" => "Messaggio ricevuto. Il supporto rispondera in questa chat.",
-            "fr" => "Message recu. Le support repondra dans ce chat.",
-            "es" => "Mensaje recibido. Soporte respondera en este chat.",
+            "pl" => "Wiadomość otrzymana. Wsparcie odpowie w tym czacie.",
+            "it" => "Messaggio ricevuto. Il supporto risponderà in questa chat.",
+            "fr" => "Message reçu. Le support répondra dans ce chat.",
+            "es" => "Mensaje recibido. Soporte responderá en este chat.",
             _ => "Message received. Support will reply in this chat.",
         };
     }

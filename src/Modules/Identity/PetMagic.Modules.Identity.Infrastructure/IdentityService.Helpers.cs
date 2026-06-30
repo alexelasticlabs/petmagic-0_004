@@ -58,12 +58,41 @@ public sealed partial class IdentityService
             return null;
         }
 
+        var avatarUrl = ResolveManagedAvatarUrl(user.AvatarUrl);
+        if (string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            return null;
+        }
+
         return new UserAvatarResponse(
-            avatarReadUrlSigner.CreateReadUrl(user.AvatarUrl),
+            avatarUrl,
             user.AvatarFileName,
             user.AvatarContentType,
             user.AvatarFileSizeBytes,
             user.AvatarUpdatedAtUtc);
+    }
+
+    private string? ResolveManagedAvatarUrl(string? avatarUrl)
+    {
+        if (string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            return null;
+        }
+
+        var trimmed = avatarUrl.Trim();
+        var baseUrl = avatarStorageOptions.PublicBaseUrl.TrimEnd('/');
+        if (!trimmed.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var relativePath = trimmed[baseUrl.Length..].TrimStart('/').Replace('\\', '/');
+        if (!relativePath.StartsWith("user-avatars/", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return avatarReadUrlSigner.CreateReadUrl(trimmed);
     }
 
     private LegalAcceptanceStatusResponse ToLegalAcceptanceResponse(AppUser user)

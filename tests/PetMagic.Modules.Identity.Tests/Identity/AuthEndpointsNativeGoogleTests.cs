@@ -38,6 +38,79 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task Register_ShouldReturnAccepted_WhenRegistrationSucceeds()
+    {
+        var service = new FakeIdentityService
+        {
+            RegisterResult = Result.Success(new UserProfileResponse(
+                Guid.NewGuid(),
+                "new@example.com",
+                "Pet Parent",
+                false,
+                false,
+                "PendingEmailVerification",
+                true,
+                true,
+                false,
+                FakeIdentityService.DefaultLegalAcceptance,
+                ["user"],
+                null))
+        };
+
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterUserCommand(
+                "new@example.com",
+                "StrongPassword123",
+                "Pet Parent",
+                true,
+                true,
+                "2026-05-20",
+                "2026-05-20",
+                false));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.NotNull(service.LastRegisterCommand);
+        Assert.Equal("new@example.com", service.LastRegisterCommand!.Email);
+    }
+
+    [Fact]
+    public async Task Register_ShouldMaskAlreadyRegisteredEmail_AsAccepted()
+    {
+        var service = new FakeIdentityService
+        {
+            RegisterResult = Result.Failure<UserProfileResponse>(
+                new Error("auth.user_exists", "A user with this email already exists."))
+        };
+
+        await using var app = await TestApplication.CreateAsync(
+            new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id"),
+            service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/register",
+            new RegisterUserCommand(
+                "existing@example.com",
+                "StrongPassword123",
+                "Pet Parent",
+                true,
+                true,
+                "2026-05-20",
+                "2026-05-20",
+                false));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.DoesNotContain("auth.user_exists", body, StringComparison.Ordinal);
+        Assert.NotNull(service.LastRegisterCommand);
+        Assert.Equal("existing@example.com", service.LastRegisterCommand!.Email);
+    }
+
+    [Fact]
     public async Task GoogleNativeLogin_ShouldReturnSession_WhenTokenVerificationSucceeds()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(
@@ -68,6 +141,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             setCookieValues,
             value => value.Contains("petmagic_refresh_token=refresh-token", StringComparison.Ordinal));
         AssertRefreshCookieSecurity(refreshCookie, expectSecure: false);
+        AssertNoStoreCacheHeaders(response);
     }
 
     [Fact]
@@ -180,6 +254,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             setCookieValues,
             value => value.Contains("petmagic_refresh_token=rotated-refresh-token", StringComparison.Ordinal));
         AssertRefreshCookieSecurity(refreshCookie, expectSecure: false);
+        AssertNoStoreCacheHeaders(response);
     }
 
     [Fact]
@@ -232,6 +307,16 @@ public sealed class AuthEndpointsNativeGoogleTests
         Assert.Equal(expectSecure, setCookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
     }
 
+    private static void AssertNoStoreCacheHeaders(HttpResponseMessage response)
+    {
+        Assert.NotNull(response.Headers.CacheControl);
+        Assert.True(response.Headers.CacheControl!.NoStore);
+        Assert.True(response.Headers.CacheControl.NoCache);
+        Assert.Contains(
+            response.Headers.Pragma,
+            value => string.Equals(value.Name, "no-cache", StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class GoogleMobileConfigResponse
     {
         public string ServerClientId { get; set; } = string.Empty;
@@ -268,6 +353,14 @@ public sealed class AuthEndpointsNativeGoogleTests
             builder.Services.AddRateLimiter(options =>
             {
                 options.AddPolicy("auth", _ =>
+                    RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-register", _ =>
+                    RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-password-reset", _ =>
+                    RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-email-verification", _ =>
+                    RateLimitPartition.GetNoLimiter("tests"));
+                options.AddPolicy("auth-external", _ =>
                     RateLimitPartition.GetNoLimiter("tests"));
             });
             builder.Services.AddAuthentication(TestAuthHandler.SchemeName)
@@ -363,7 +456,7 @@ public sealed class AuthEndpointsNativeGoogleTests
 
     private sealed class FakeIdentityService : IIdentityService
     {
-        private static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
+        public static readonly LegalAcceptanceStatusResponse DefaultLegalAcceptance = new(
             true,
             "2026-05-20",
             DateTime.UtcNow,
@@ -374,14 +467,37 @@ public sealed class AuthEndpointsNativeGoogleTests
             "2026-05-20",
             false);
 
+        public Result<UserProfileResponse>? RegisterResult { get; init; }
+
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
+
+        public RegisterUserCommand? LastRegisterCommand { get; private set; }
 
         public RefreshTokenCommand? LastRefreshCommand { get; private set; }
 
         public UpdateUserAvatarCommand? LastUpdateAvatarCommand { get; private set; }
 
         public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
-        public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken) => NotSupported<UserProfileResponse>();
+        public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
+        {
+            LastRegisterCommand = command;
+            return Task.FromResult(
+                RegisterResult
+                ?? Result.Success(new UserProfileResponse(
+                    Guid.NewGuid(),
+                    command.Email,
+                    command.DisplayName,
+                    false,
+                    false,
+                    "PendingEmailVerification",
+                    command.TermsOfUseAccepted,
+                    command.PrivacyPolicyAccepted,
+                    command.MarketingEmailsEnabled,
+                    DefaultLegalAcceptance,
+                    ["user"],
+                    null)));
+        }
+
         public Task<Result<TokenPairResponse>> LoginAsync(LoginCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result<TokenPairResponse>> VerifyEmailCodeAsync(VerifyEmailCodeCommand command, CancellationToken cancellationToken) => NotSupported<TokenPairResponse>();
         public Task<Result> ResendEmailVerificationCodeAsync(ResendEmailVerificationCodeCommand command, CancellationToken cancellationToken) => NotSupported();

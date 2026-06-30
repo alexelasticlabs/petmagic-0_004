@@ -1,8 +1,10 @@
-using System.Net;
-using System.Net.Mail;
-using System.Text;
+using MailKit.Net.Smtp;
+using MailKit.Security;
 
 using Microsoft.Extensions.Logging;
+
+using MimeKit;
+using MimeKit.Text;
 
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
@@ -19,59 +21,40 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
             return Result.Failure(IdentityErrors.EmailProviderNotConfigured);
         }
 
-        using var message = new MailMessage
-        {
-            From = new MailAddress(options.FromAddress, options.FromName),
-            Subject = job.Subject,
-            SubjectEncoding = Encoding.UTF8
-        };
-        message.To.Add(job.RecipientEmail);
+        var message = new MimeMessage();
+        message.From.Add(new MailboxAddress(options.FromName, options.FromAddress));
+        message.To.Add(MailboxAddress.Parse(job.RecipientEmail));
+        message.Subject = job.Subject;
 
         var textBody = string.IsNullOrWhiteSpace(job.TextBody)
             ? StripHtml(job.HtmlBody)
             : job.TextBody;
-        message.AlternateViews.Add(
-            AlternateView.CreateAlternateViewFromString(
-                textBody,
-                Encoding.UTF8,
-                "text/plain"));
 
-        message.AlternateViews.Add(
-            AlternateView.CreateAlternateViewFromString(
-                job.HtmlBody,
-                Encoding.UTF8,
-                "text/html"));
-
-        if (!string.IsNullOrWhiteSpace(job.TextBody))
+        message.Body = new BodyBuilder
         {
-            message.Body = job.TextBody;
-            message.IsBodyHtml = false;
-            message.BodyEncoding = Encoding.UTF8;
-        }
-        else
-        {
-            message.Body = job.HtmlBody;
-            message.IsBodyHtml = true;
-            message.BodyEncoding = Encoding.UTF8;
-        }
-
-        using var client = new SmtpClient(options.Host, options.Port)
-        {
-            EnableSsl = options.UseSsl,
-            DeliveryMethod = SmtpDeliveryMethod.Network
-        };
-
-        if (options.HasCredentials)
-        {
-            client.Credentials = new NetworkCredential(options.Username, options.Password);
-        }
+            TextBody = textBody,
+            HtmlBody = job.HtmlBody
+        }.ToMessageBody();
 
         try
         {
-            await client.SendMailAsync(message, cancellationToken);
+            using var client = new SmtpClient();
+            await client.ConnectAsync(
+                options.Host,
+                options.Port,
+                ResolveSecureSocketOptions(options),
+                cancellationToken);
+
+            if (options.HasCredentials)
+            {
+                await client.AuthenticateAsync(options.Username, options.Password, cancellationToken);
+            }
+
+            await client.SendAsync(message, cancellationToken);
+            await client.DisconnectAsync(true, cancellationToken);
             return Result.Success();
         }
-        catch (SmtpException exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger.LogWarning(
                 exception,
@@ -83,18 +66,18 @@ internal sealed class SmtpEmailSender(EmailOptions options, ILogger<SmtpEmailSen
                 GetRecipientDomain(job.RecipientEmail));
             return Result.Failure(IdentityErrors.EmailDispatchFailed);
         }
-        catch (InvalidOperationException exception)
+    }
+
+    private static SecureSocketOptions ResolveSecureSocketOptions(EmailOptions options)
+    {
+        if (!options.UseSsl)
         {
-            logger.LogWarning(
-                exception,
-                "SMTP email dispatch failed before send. Host={EmailHost} Port={EmailPort} UseSsl={UseSsl} HasCredentials={HasCredentials} RecipientDomain={RecipientDomain}",
-                options.Host,
-                options.Port,
-                options.UseSsl,
-                options.HasCredentials,
-                GetRecipientDomain(job.RecipientEmail));
-            return Result.Failure(IdentityErrors.EmailDispatchFailed);
+            return SecureSocketOptions.None;
         }
+
+        // Auto supports STARTTLS and implicit TLS without forcing the repo to
+        // encode provider-specific transport behavior in config.
+        return SecureSocketOptions.Auto;
     }
 
     private static string StripHtml(string html)

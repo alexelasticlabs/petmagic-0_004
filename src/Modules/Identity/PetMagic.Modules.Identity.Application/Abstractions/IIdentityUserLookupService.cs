@@ -3,7 +3,8 @@ namespace PetMagic.Modules.Identity.Application.Abstractions;
 public sealed record IdentityUserLookup(
     Guid UserId,
     string Email,
-    string? DisplayName);
+    string? DisplayName,
+    IReadOnlyList<string> Roles);
 
 public interface IIdentityUserLookupService
 {

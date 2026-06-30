@@ -15,6 +15,7 @@ public static class GamificationApiModule
     public static IApplicationBuilder MapGamificationApiModule(this WebApplication app)
     {
         app.MapGamificationEndpoints();
+        app.MapAdminGamificationEndpoints();
         return app;
     }
 }

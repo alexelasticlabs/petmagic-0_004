@@ -33,6 +33,17 @@ internal sealed class LocalSupportAttachmentStorage(
     IHostEnvironment hostEnvironment,
     ILogger<LocalSupportAttachmentStorage> logger) : ISupportAttachmentStorage
 {
+    private static readonly HashSet<string> SupportedMp4Brands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "mp41",
+        "mp42",
+        "isom",
+        "iso2",
+        "avc1",
+        "m4v ",
+        "m4a "
+    };
+
     private static readonly Dictionary<string, string> AllowedContentTypeExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ["image/jpeg"] = ".jpg",
@@ -139,7 +150,6 @@ internal sealed class LocalSupportAttachmentStorage(
         }
 
         var root = ResolveRootPath();
-        Directory.CreateDirectory(root);
 
         var safeName = $"{Guid.NewGuid():N}{extension}";
         var now = DateTime.UtcNow;
@@ -147,11 +157,13 @@ internal sealed class LocalSupportAttachmentStorage(
         var month = now.ToString("MM");
         var relativePath = Path.Combine("support-attachments", year, month, safeName);
         var physicalPath = Path.Combine(root, year, month, safeName);
-
-        Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
+        var normalizedRelativePath = relativePath.Replace("\\", "/");
 
         try
         {
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
+
             if (normalizedAttachmentBytes is not null)
             {
                 await File.WriteAllBytesAsync(physicalPath, normalizedAttachmentBytes, cancellationToken);
@@ -175,12 +187,18 @@ internal sealed class LocalSupportAttachmentStorage(
                 return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.InvalidAttachmentUpload);
             }
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(
+                exception,
+                "Support attachment store failed. Operation={Operation} StorageKey={StorageKey} ContentType={ContentType} ContentLength={ContentLength}",
+                "store",
+                normalizedRelativePath,
+                normalizedContentType,
+                contentLength);
             return Result.Failure<StoredSupportAttachmentResponse>(SupportChatErrors.AttachmentStorageFailed);
         }
 
-        var normalizedRelativePath = relativePath.Replace("\\", "/");
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
         var url = $"{baseUrl}/{normalizedRelativePath}";
 
@@ -236,8 +254,13 @@ internal sealed class LocalSupportAttachmentStorage(
 
             return Task.FromResult(Result.Success());
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(
+                exception,
+                "Support attachment delete failed. Operation={Operation} StorageKey={StorageKey}",
+                "delete",
+                relativePath);
             return Task.FromResult(Result.Failure(SupportChatErrors.AttachmentStorageFailed));
         }
     }
@@ -253,19 +276,53 @@ internal sealed class LocalSupportAttachmentStorage(
 
     private string? TryResolveManagedRelativePath(string attachmentUrl)
     {
+        var normalizedInput = attachmentUrl.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedInput))
+        {
+            return null;
+        }
+
+        if (TryNormalizeManagedRelativePath(normalizedInput, out var managedRelativePath))
+        {
+            return managedRelativePath;
+        }
+
         var baseUrl = options.PublicBaseUrl.TrimEnd('/');
-        if (!attachmentUrl.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
+        if (!normalizedInput.StartsWith(baseUrl, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
 
-        var relativePath = attachmentUrl[baseUrl.Length..].TrimStart('/');
-        if (!relativePath.StartsWith("support-attachments/", StringComparison.OrdinalIgnoreCase))
+        var relativePathWithQuery = normalizedInput[baseUrl.Length..].TrimStart('/');
+        var relativePath = relativePathWithQuery.Split(['?', '#'])[0];
+        if (!TryNormalizeManagedRelativePath(relativePath, out managedRelativePath))
         {
             return null;
         }
 
-        return relativePath.Replace('\\', '/');
+        return managedRelativePath;
+    }
+
+    private static bool TryNormalizeManagedRelativePath(string candidate, out string managedRelativePath)
+    {
+        managedRelativePath = string.Empty;
+        var normalized = candidate
+            .Replace('\\', '/')
+            .TrimStart('/');
+        if (!normalized.StartsWith("support-attachments/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var pathOnly = normalized.Split(['?', '#'])[0];
+        if (string.IsNullOrWhiteSpace(pathOnly)
+            || pathOnly.EndsWith("/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        managedRelativePath = pathOnly;
+        return true;
     }
 
     private static async Task<byte[]?> ReadAllBytesAsync(Stream? stream, CancellationToken cancellationToken)
@@ -369,11 +426,10 @@ internal sealed class LocalSupportAttachmentStorage(
                 && attachmentContent[9] == 0x45
                 && attachmentContent[10] == 0x42
                 && attachmentContent[11] == 0x50,
-            "video/mp4" or "video/quicktime" => attachmentContent.Length >= 12
-                && attachmentContent[4] == 0x66
-                && attachmentContent[5] == 0x74
-                && attachmentContent[6] == 0x79
-                && attachmentContent[7] == 0x70,
+            "video/mp4" => TryReadIsoBmffBrand(attachmentContent, out var brand)
+                && SupportedMp4Brands.Contains(brand),
+            "video/quicktime" => TryReadIsoBmffBrand(attachmentContent, out var brand)
+                && string.Equals(brand, "qt  ", StringComparison.OrdinalIgnoreCase),
             _ => false,
         };
     }
@@ -398,5 +454,27 @@ internal sealed class LocalSupportAttachmentStorage(
             : contentType;
 
         return normalized.Trim();
+    }
+
+    private static bool TryReadIsoBmffBrand(byte[] attachmentContent, out string brand)
+    {
+        brand = string.Empty;
+        if (attachmentContent.Length < 12
+            || attachmentContent[4] != 0x66
+            || attachmentContent[5] != 0x74
+            || attachmentContent[6] != 0x79
+            || attachmentContent[7] != 0x70)
+        {
+            return false;
+        }
+
+        brand = string.Create(4, attachmentContent, static (chars, bytes) =>
+        {
+            for (var i = 0; i < chars.Length; i++)
+            {
+                chars[i] = (char)bytes[8 + i];
+            }
+        });
+        return true;
     }
 }
