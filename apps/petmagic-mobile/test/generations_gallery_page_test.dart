@@ -122,6 +122,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'gallery skips wallet preload when wallet snapshot is fully hydrated',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final walletController = TrackingGalleryWalletController(
+        hasWallet: true,
+        hasCompletedFullLoad: true,
+      );
+      final harness = GalleryHarness(walletController: walletController);
+      addTearDown(harness.router.dispose);
+
+      await tester.pumpWidget(harness.app());
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+    },
+  );
+
+  testWidgets('gallery preloads wallet for partial wallet snapshot', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final walletController = TrackingGalleryWalletController(hasWallet: true);
+    final harness = GalleryHarness(walletController: walletController);
+    addTearDown(harness.router.dispose);
+
+    await tester.pumpWidget(harness.app());
+    await tester.pump();
+    await tester.pump();
+
+    expect(walletController.loadCalls, 1);
+  });
+
   testWidgets('gallery does not load wallet for guests', (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -168,7 +206,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     var text = galleryText(tester);
-    expect(find.text('Network is unavailable'), findsOneWidget);
+    expect(find.text(text.templatesRequestFailedError), findsOneWidget);
+    expect(find.text('Network is unavailable'), findsNothing);
     expect(find.text(text.retryAction), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());

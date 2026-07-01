@@ -206,7 +206,10 @@ Future<void> pumpRewardsPage(
 
 class AutoRefreshProbeWalletController extends WalletController {
   int loadCalls = 0;
+  int syncSnapshotCalls = 0;
   Completer<void>? _delayedLoad;
+
+  int get refreshCalls => loadCalls + syncSnapshotCalls;
 
   @override
   WalletState build() {
@@ -217,6 +220,7 @@ class AutoRefreshProbeWalletController extends WalletController {
       packs: packsFixture,
       paymentMethods: paymentMethodsFixture,
       purchases: purchasesFixture,
+      hasCompletedFullLoad: true,
     );
   }
 
@@ -232,6 +236,15 @@ class AutoRefreshProbeWalletController extends WalletController {
   @override
   Future<void> load({bool refresh = false}) async {
     loadCalls++;
+    final delayed = _delayedLoad;
+    if (delayed != null) {
+      return delayed.future;
+    }
+  }
+
+  @override
+  Future<void> syncSnapshot({bool forceRefresh = false}) async {
+    syncSnapshotCalls++;
     final delayed = _delayedLoad;
     if (delayed != null) {
       return delayed.future;
@@ -265,6 +278,8 @@ class FakeWalletRepository extends WalletRepository {
   final List<WalletPaymentMethodModel> paymentMethods;
   int walletFetchCount = 0;
   int ledgerFetchCount = 0;
+  int checkoutConfigFetchCount = 0;
+  int purchasesFetchCount = 0;
 
   @override
   Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
@@ -308,6 +323,7 @@ class FakeWalletRepository extends WalletRepository {
     required Locale locale,
     CancelToken? cancelToken,
   }) async {
+    checkoutConfigFetchCount++;
     return WalletCheckoutConfigModel(
       packs: packs,
       paymentMethods: paymentMethods,
@@ -325,6 +341,7 @@ class FakeWalletRepository extends WalletRepository {
     int take = 20,
     CancelToken? cancelToken,
   }) async {
+    purchasesFetchCount++;
     if (failPurchases) {
       throw Exception('purchases failed');
     }

@@ -11,11 +11,19 @@ import 'package:petmagic_mobile/features/support/data/support_chat_repository.da
 import 'package:petmagic_mobile/features/support/presentation/support_chat_controller.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 import 'support_chat_test_support.dart';
 import 'widget_test_support.dart';
 
 void main() {
   configureWidgetTestHarness();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues(const {});
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
 
   test('support chat controller loads existing messages', () async {
     final supportRepository = FakeSupportChatRepository();
@@ -579,9 +587,10 @@ void main() {
   test(
     'app preferences controller preserves stored country-specific locale',
     () async {
-      SharedPreferences.setMockInitialValues(const {
-        'petmagic_mobile_locale': 'en_US',
-      });
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.withData(const {
+            'petmagic_mobile_locale': 'en_US',
+          });
 
       final container = ProviderContainer();
       addTearDown(container.dispose);

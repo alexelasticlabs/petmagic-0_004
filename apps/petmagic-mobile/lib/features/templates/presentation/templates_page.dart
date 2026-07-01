@@ -221,9 +221,9 @@ class _TemplatesPageState extends ConsumerState<TemplatesPage> {
     final launchState = ref.read(appLaunchControllerProvider);
     final walletState = ref.read(walletControllerProvider);
     if (!launchState.isAuthenticated ||
-        walletState.wallet != null ||
         walletState.isLoading ||
-        walletState.isRefreshing) {
+        walletState.isRefreshing ||
+        walletState.hasCompletedFullLoad) {
       return;
     }
 

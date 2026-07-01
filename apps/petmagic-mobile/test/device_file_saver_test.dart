@@ -184,6 +184,38 @@ void main() {
       expect(await file.readAsBytes(), const [0xFF, 0xD8, 0xFF, 0xD9]);
     });
 
+    test('uses unique temp files for repeated remote cache names', () async {
+      final dio = Dio()
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          return ResponseBody.fromBytes(const [0xFF, 0xD8, 0xFF, 0xD9], 200);
+        });
+
+      final first = await cacheRemoteMediaFile(
+        mediaUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
+        fileName: 'shared-name.jpg',
+        client: dio,
+      );
+      final second = await cacheRemoteMediaFile(
+        mediaUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
+        fileName: 'shared-name.jpg',
+        client: dio,
+      );
+      addTearDown(() async {
+        if (await first.exists()) {
+          await first.delete();
+        }
+        if (await second.exists()) {
+          await second.delete();
+        }
+      });
+
+      expect(first.path, isNot(second.path));
+      expect(await first.exists(), isTrue);
+      expect(await second.exists(), isTrue);
+      expect(await first.readAsBytes(), const [0xFF, 0xD8, 0xFF, 0xD9]);
+      expect(await second.readAsBytes(), const [0xFF, 0xD8, 0xFF, 0xD9]);
+    });
+
     test('accepts supported mp4 container brands', () async {
       final dio = Dio()
         ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
@@ -348,6 +380,76 @@ void main() {
       expect(source, isNot(contains('} catch (_) {')));
     },
   );
+
+  test(
+    'shareRemoteMediaFile always deletes temp cache after share completes',
+    () async {
+      final source = await File(
+        'lib/shared/files/media_share_save.dart',
+      ).readAsString();
+      final method = _extractMethodBody(
+        source,
+        'Future<void> shareRemoteMediaFile({',
+      );
+
+      expect(method, contains('try {'));
+      expect(method, contains('await SharePlus.instance.share('));
+      expect(method, contains('finally {'));
+      expect(
+        method,
+        contains('await TempMediaCleanup.deleteIfExists(tempFile);'),
+      );
+      expect(method, isNot(contains('TempMediaCleanup.scheduleTtlSweep();')));
+    },
+  );
+
+  test('saveBytesToDevice uses resilient temp cleanup in finally', () async {
+    final source = await File(
+      'lib/shared/files/device_file_saver.dart',
+    ).readAsString();
+
+    expect(source, contains('Future<bool> saveBytesToDevice({'));
+    expect(source, contains('finally {'));
+    expect(
+      source,
+      contains('await TempMediaCleanup.deleteIfExists(tempFile);'),
+    );
+    expect(
+      source,
+      isNot(
+        contains(
+          'if (await tempFile.exists()) {\n      await tempFile.delete();\n    }',
+        ),
+      ),
+    );
+    expect(
+      source,
+      contains('TempMediaCleanup.createScopedTempFile(safeFileName)'),
+    );
+  });
+}
+
+String _extractMethodBody(String source, String signature) {
+  final start = source.indexOf(signature);
+  expect(start, isNonNegative);
+
+  final bodyStart = source.indexOf('{', start + signature.length);
+  expect(bodyStart, isNonNegative);
+
+  var depth = 0;
+  for (var index = bodyStart; index < source.length; index++) {
+    final char = source[index];
+    if (char == '{') {
+      depth++;
+    } else if (char == '}') {
+      depth--;
+      if (depth == 0) {
+        return source.substring(bodyStart, index + 1);
+      }
+    }
+  }
+
+  fail('Could not extract method body for $signature');
 }
 
 class _FakeHttpClientAdapter implements HttpClientAdapter {

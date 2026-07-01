@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:petmagic_mobile/core/network/api_base_url_resolver.dart';
@@ -76,7 +77,10 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
       }
 
       Object? lastError;
+      final attemptedBaseUrls = <String>{};
+      var hasRetriableTransportFailure = false;
       for (final baseUrl in candidates) {
+        attemptedBaseUrls.add(baseUrl);
         try {
           final connection = await _buildOrReuseConnection(baseUrl);
           if (connection.state == HubConnectionState.Disconnected) {
@@ -87,13 +91,39 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
           return;
         } catch (error) {
           lastError = error;
-          await _apiBaseUrlResolver.invalidate(baseUrl);
+          final shouldInvalidate = _shouldInvalidateBaseUrlOnConnectFailure(
+            error,
+          );
+          if (shouldInvalidate) {
+            hasRetriableTransportFailure = true;
+            await _apiBaseUrlResolver.invalidate(baseUrl);
+          }
         }
+      }
+
+      if (attemptedBaseUrls.isNotEmpty && !hasRetriableTransportFailure) {
+        if (lastError != null) {
+          throw lastError;
+        }
+
+        throw StateError(
+          'Unable to establish support chat realtime connection.',
+        );
       }
 
       final fallbackBaseUrl = await _apiBaseUrlResolver.resolveBaseUrl(
         forceRefresh: true,
       );
+      if (attemptedBaseUrls.contains(fallbackBaseUrl)) {
+        if (lastError != null) {
+          throw lastError;
+        }
+
+        throw StateError(
+          'Unable to establish support chat realtime connection.',
+        );
+      }
+
       final fallbackConnection = await _buildOrReuseConnection(fallbackBaseUrl);
       if (fallbackConnection.state == HubConnectionState.Disconnected) {
         await fallbackConnection.start();
@@ -101,7 +131,7 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
         return;
       }
 
-      if (lastError is Exception) {
+      if (lastError != null) {
         throw lastError;
       }
 
@@ -182,6 +212,35 @@ class SignalRSupportChatRealtimeClient implements SupportChatRealtimeClient {
   Future<String> _readAccessToken() async {
     final session = await _sessionStorage.read();
     return session?.accessToken ?? '';
+  }
+
+  bool _shouldInvalidateBaseUrlOnConnectFailure(Object error) {
+    if (error is SocketException ||
+        error is HandshakeException ||
+        error is TlsException ||
+        error is TimeoutException) {
+      return true;
+    }
+
+    final message = error.toString().toLowerCase();
+    final statusCodeMatch = RegExp(r'^(\d{3}):').firstMatch(message);
+    if (statusCodeMatch != null) {
+      final statusCode = int.tryParse(statusCodeMatch.group(1)!);
+      if (statusCode == 401 || statusCode == 403) {
+        return false;
+      }
+      if (statusCode != null && statusCode >= 500 && statusCode <= 599) {
+        return false;
+      }
+      if (statusCode == 400 || statusCode == 404) {
+        return true;
+      }
+    }
+
+    return message.contains('socketexception') ||
+        message.contains('connection refused') ||
+        message.contains('network is unreachable') ||
+        message.contains('timed out');
   }
 
   void _handleConversationUpdated(List<Object?>? arguments) {

@@ -8,6 +8,7 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
       _premiumLifecycleStarted = true;
       ref.onDispose(() {
         _cancelActiveLoad();
+        _cancelActiveStatusRefresh();
       });
     }
 
@@ -48,6 +49,27 @@ mixin _PremiumControllerLifecycle on _PremiumControllerBase {
   void _clearActiveLoad(CancelToken cancelToken) {
     if (identical(_activeLoadCancelToken, cancelToken)) {
       _activeLoadCancelToken = null;
+    }
+  }
+
+  CancelToken _startStatusRefreshCancelToken() {
+    _cancelActiveStatusRefresh();
+    final cancelToken = CancelToken();
+    _activeStatusRefreshCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveStatusRefresh() {
+    final cancelToken = _activeStatusRefreshCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('premium_status_refresh_cancelled');
+    }
+    _activeStatusRefreshCancelToken = null;
+  }
+
+  void _clearActiveStatusRefresh(CancelToken cancelToken) {
+    if (identical(_activeStatusRefreshCancelToken, cancelToken)) {
+      _activeStatusRefreshCancelToken = null;
     }
   }
 

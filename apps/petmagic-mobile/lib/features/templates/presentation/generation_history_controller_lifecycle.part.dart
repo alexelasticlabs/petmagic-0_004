@@ -172,6 +172,10 @@ mixin _GenerationHistoryControllerLifecycle
   }
 
   Duration _currentAutoRefreshInterval() {
+    if (_shouldUseIdleRefreshInterval()) {
+      return _GenerationHistoryControllerBase._idleRealtimeRefreshInterval;
+    }
+
     final multiplier = 1 << _autoRefreshFailureStreak.clamp(0, 3);
     final nextSeconds =
         _GenerationHistoryControllerBase._autoRefreshMinInterval.inSeconds *
@@ -182,17 +186,22 @@ mixin _GenerationHistoryControllerLifecycle
     return Duration(seconds: boundedSeconds);
   }
 
+  bool _shouldUseIdleRefreshInterval() {
+    return _isRealtimeConnected &&
+        !state.syncFailed &&
+        state.activeGeneration == null;
+  }
+
   @override
   void _registerAutoRefreshSuccess() {
     if (!ref.mounted) {
       return;
     }
 
-    if (_autoRefreshFailureStreak == 0) {
-      return;
+    if (_autoRefreshFailureStreak != 0) {
+      _autoRefreshFailureStreak = 0;
     }
 
-    _autoRefreshFailureStreak = 0;
     _scheduleNextAutoRefresh();
   }
 
@@ -342,6 +351,7 @@ mixin _GenerationHistoryControllerLifecycle
       }
 
       _isRealtimeConnected = true;
+      _scheduleNextAutoRefresh();
     } on Object {
       // Realtime is best-effort; gallery remains available via manual refresh.
     } finally {

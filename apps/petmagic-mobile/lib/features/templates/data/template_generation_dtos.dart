@@ -227,6 +227,12 @@ class TemplateGenerationDto {
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
+    this.estimatedCompletionAtUtc,
+    this.estimatedTotalSeconds,
+    this.mediaType,
+    this.tier,
+    this.queueStatus,
+    this.canCancel,
     this.hasWatermark = false,
     this.canRemoveWatermark = false,
     this.isWatermarkRemoved = false,
@@ -277,6 +283,12 @@ class TemplateGenerationDto {
   final bool isUnread;
   final int? queuePosition;
   final int? estimatedWaitSeconds;
+  final DateTime? estimatedCompletionAtUtc;
+  final int? estimatedTotalSeconds;
+  final String? mediaType;
+  final String? tier;
+  final String? queueStatus;
+  final bool? canCancel;
   final bool hasWatermark;
   final bool canRemoveWatermark;
   final bool isWatermarkRemoved;
@@ -340,6 +352,14 @@ class TemplateGenerationDto {
       isUnread: json['isUnread'] as bool? ?? false,
       queuePosition: (json['queuePosition'] as num?)?.toInt(),
       estimatedWaitSeconds: (json['estimatedWaitSeconds'] as num?)?.toInt(),
+      estimatedCompletionAtUtc: _dateTime(
+        json['estimatedCompletionAtUtc'] ?? json['estimatedCompletionAt'],
+      ),
+      estimatedTotalSeconds: (json['estimatedTotalSeconds'] as num?)?.toInt(),
+      mediaType: _string(json['mediaType']),
+      tier: _string(json['tier'] ?? json['priorityTier'] ?? json['userTier']),
+      queueStatus: _string(json['queueStatus'] ?? json['queueState']),
+      canCancel: json['canCancel'] as bool?,
       hasWatermark: json['hasWatermark'] as bool? ?? false,
       canRemoveWatermark: json['canRemoveWatermark'] as bool? ?? false,
       isWatermarkRemoved: json['isWatermarkRemoved'] as bool? ?? false,
@@ -395,6 +415,12 @@ class TemplateGenerationDto {
       isUnread: isUnread,
       queuePosition: queuePosition,
       estimatedWaitSeconds: estimatedWaitSeconds,
+      estimatedCompletionAtUtc: estimatedCompletionAtUtc,
+      estimatedTotalSeconds: estimatedTotalSeconds,
+      mediaType: mediaType,
+      tier: tier,
+      queueStatus: queueStatus,
+      canCancel: canCancel,
       hasWatermark: hasWatermark,
       canRemoveWatermark: canRemoveWatermark,
       isWatermarkRemoved: isWatermarkRemoved,
@@ -420,6 +446,52 @@ class TemplateGenerationDto {
 
     return DateTime.tryParse(value)?.toUtc();
   }
+
+  static String? _string(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+}
+
+class GenerationCancelResultDto {
+  const GenerationCancelResultDto({
+    required this.generation,
+    required this.refunded,
+    this.cancelledAtUtc,
+  });
+
+  final TemplateGenerationDto generation;
+  final bool refunded;
+  final DateTime? cancelledAtUtc;
+
+  factory GenerationCancelResultDto.fromJson(Map<String, dynamic> json) {
+    final rawGeneration = json['generation'];
+    final generationJson = rawGeneration is Map
+        ? Map<String, dynamic>.from(rawGeneration)
+        : Map<String, dynamic>.from(json);
+    generationJson['status'] ??= 'Cancelled';
+
+    return GenerationCancelResultDto(
+      generation: TemplateGenerationDto.fromJson(generationJson),
+      refunded:
+          json['refunded'] as bool? ??
+          json['creditsRefunded'] as bool? ??
+          false,
+      cancelledAtUtc: TemplateGenerationDto._dateTime(
+        json['cancelledAtUtc'] ?? json['canceledAtUtc'],
+      ),
+    );
+  }
+
+  GenerationCancelResult toDomain() => GenerationCancelResult(
+    generation: generation.toDomain(),
+    refunded: refunded,
+    cancelledAtUtc: cancelledAtUtc,
+  );
 }
 
 class RemoveGenerationWatermarkResult {

@@ -145,10 +145,7 @@ class _ProfileSettingsPageContent extends StatelessWidget {
                   ProfileSettingsRow(
                     icon: Icons.language_rounded,
                     title: text.profileSettingsLanguageTitle,
-                    subtitle: ProfileSettingsPage._languageLabel(
-                      text,
-                      resolvedLocale,
-                    ),
+                    subtitle: profileLanguageLabel(text, resolvedLocale),
                     onTap: onOpenLanguageSheet,
                   ),
                   ProfileSettingsRow(

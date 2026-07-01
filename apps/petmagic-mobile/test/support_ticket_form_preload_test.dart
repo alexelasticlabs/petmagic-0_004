@@ -195,6 +195,112 @@ void main() {
     },
   );
 
+  testWidgets(
+    'support ticket context preload refreshes partial wallet snapshot without purchases',
+    (tester) async {
+      final walletController = _CountingPartialWalletController();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _CountingLoadedGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+            premiumControllerProvider.overrideWith(
+              _CountingLoadedPremiumController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(walletController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'support ticket context preload refreshes partial premium snapshot without status',
+    (tester) async {
+      final premiumController = _CountingPartialPremiumController();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _CountingLoadedGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(
+              _CountingLoadedWalletController.new,
+            ),
+            premiumControllerProvider.overrideWith(() => premiumController),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'generation_failed'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(premiumController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'support ticket shows localized premium label instead of raw subscription status',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            generationHistoryControllerProvider.overrideWith(
+              _IdleGenerationHistoryController.new,
+            ),
+            walletControllerProvider.overrideWith(_IdleWalletController.new),
+            premiumControllerProvider.overrideWith(
+              _CountingLoadedPremiumController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const SupportTicketFormPage(scenario: 'premium_missing'),
+          ),
+        ),
+      );
+
+      await tester.pump();
+
+      expect(find.text('Премиум'), findsOneWidget);
+      expect(find.text('active'), findsNothing);
+    },
+  );
+
   testWidgets('support ticket submit skips attachment uploads after disposal', (
     tester,
   ) async {
@@ -564,6 +670,60 @@ class _CountingLoadedPremiumController extends PremiumController {
         canManageSubscription: true,
         manageSubscriptionAction: 'StripeCustomerPortal',
       ),
+    );
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
+  }
+}
+
+class _CountingPartialWalletController extends WalletController {
+  int loadCalls = 0;
+
+  @override
+  WalletState build() {
+    return WalletState(
+      wallet: WalletStateModel(
+        userId: 'user-1',
+        balance: 130,
+        adRewardsRemainingToday: 3,
+        isPremium: false,
+        updatedAtUtc: null,
+        nextWeeklyGrantAtUtc: null,
+      ),
+      hasCompletedFullLoad: false,
+      purchases: const [],
+    );
+  }
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
+  }
+}
+
+class _CountingPartialPremiumController extends PremiumController {
+  int loadCalls = 0;
+
+  @override
+  PremiumState build() {
+    return const PremiumState(
+      plans: [
+        PremiumPlanModel(
+          planCode: 'monthly',
+          billingInterval: 'month',
+          priceAmount: 14.99,
+          currencyCode: 'USD',
+          tokenAllowance: 500,
+          isPopular: false,
+          sortOrder: 1,
+          stripeCheckoutEnabled: true,
+          googlePlayProductId: 'com.petmagic.app.premium.monthly',
+          appStoreProductId: 'com.petmagic.app.premium.monthly',
+        ),
+      ],
     );
   }
 

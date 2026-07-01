@@ -51,6 +51,7 @@ mixin _SupportChatControllerMessagingMixin
             clearSendProgress: true,
           ),
         );
+        _hasLoadedConversationSnapshot = true;
         await _markReadIfNeeded(createdConversation);
         if (!ref.mounted) {
           return false;
@@ -149,6 +150,7 @@ mixin _SupportChatControllerMessagingMixin
         _updateStateIfMounted(
           (state) => state.copyWith(conversation: conversation),
         );
+        _hasLoadedConversationSnapshot = true;
       }
 
       uploadCancelToken = _newActiveUploadCancelToken();
@@ -255,6 +257,7 @@ mixin _SupportChatControllerMessagingMixin
         _updateStateIfMounted(
           (state) => state.copyWith(conversation: conversation),
         );
+        _hasLoadedConversationSnapshot = true;
       }
 
       uploadCancelToken = _newActiveUploadCancelToken();

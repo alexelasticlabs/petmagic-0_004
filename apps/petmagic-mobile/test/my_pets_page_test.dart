@@ -462,6 +462,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('My Pets shows unavailable state for online load failures', (
+    tester,
+  ) async {
+    await pumpMyPets(
+      tester,
+      repository: FakePetRepository(
+        pets: const [],
+        fetchPetsError: const FormatException(
+          'raw socket trace /private/token should never reach the UI',
+        ),
+      ),
+      brightness: Brightness.light,
+    );
+
+    expect(find.text('Server is unavailable'), findsOneWidget);
+    expect(find.text('Could not load pets'), findsNothing);
+    expect(
+      find.textContaining('/private/token should never reach the UI'),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('My Pets create action preserves reserved pet ID for templates', (
     tester,
   ) async {

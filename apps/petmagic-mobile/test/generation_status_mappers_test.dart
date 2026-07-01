@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 
@@ -73,6 +74,90 @@ void main() {
       expect(english, contains('2026'));
       expect(russian, contains('2026'));
     });
+
+    testWidgets('queued status does not require backend stage duplication', (
+      tester,
+    ) async {
+      late AppLocalizations text;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              text = AppLocalizations.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(
+        statusTitle(
+          text,
+          _generation(status: TemplateGenerationStatus.queued, stage: null),
+        ),
+        text.generationStatusStageQueued,
+      );
+    });
+
+    testWidgets('async provider statuses use public waiting labels', (
+      tester,
+    ) async {
+      late AppLocalizations text;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              text = AppLocalizations.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(
+        statusTitle(
+          text,
+          _generation(status: TemplateGenerationStatus.providerQueued),
+        ),
+        text.generationStatusStageQueued,
+      );
+      expect(
+        etaLabel(
+          text,
+          _generation(
+            status: TemplateGenerationStatus.providerQueued,
+            queuePosition: 3,
+            estimatedWaitSeconds: 180,
+          ),
+        ),
+        text.generationStatusEtaEstimated(
+          text.generationStatusQueuePositionWithWait(
+            3,
+            text.generationStatusWaitMinutes(3),
+          ),
+        ),
+      );
+      expect(
+        statusTitle(
+          text,
+          _generation(status: TemplateGenerationStatus.providerProcessing),
+        ),
+        text.templateFlowStepCreateMagic,
+      );
+      expect(
+        statusTitle(
+          text,
+          _generation(status: TemplateGenerationStatus.importingMedia),
+        ),
+        text.templateFlowStepFinalTouches,
+      );
+    });
   });
 }
 
@@ -80,19 +165,26 @@ TemplateGenerationResult _generation({
   String? templateType = 'Image',
   String? outputUrl,
   double? outputVideoDurationSeconds,
+  TemplateGenerationStatus status = TemplateGenerationStatus.completed,
+  String? stage,
+  int? queuePosition,
+  int? estimatedWaitSeconds,
 }) {
   final now = DateTime.utc(2026, 6, 15, 12);
   return TemplateGenerationResult(
     generationId: 'generation-1',
     userId: 'user-1',
     templateId: 'template-1',
-    status: TemplateGenerationStatus.completed,
+    status: status,
     tokenCost: 1,
     attemptCount: 1,
     createdAtUtc: now,
     updatedAtUtc: now,
     userMediaExpired: false,
     templateType: templateType,
+    stage: stage,
+    queuePosition: queuePosition,
+    estimatedWaitSeconds: estimatedWaitSeconds,
     outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,
   );

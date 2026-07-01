@@ -286,7 +286,7 @@ Future<TemplateBlockedAction?> showTemplateBlockedSheet({
               ).pop(TemplateBlockedAction.chooseAnother),
               onOpenPremium: () =>
                   Navigator.of(sheetContext).pop(TemplateBlockedAction.premium),
-              onBuyPowSpark: () =>
+              onTopUpBalance: () =>
                   Navigator.of(sheetContext).pop(TemplateBlockedAction.wallet),
               onLater: () => Navigator.of(
                 sheetContext,

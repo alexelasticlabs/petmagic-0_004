@@ -58,6 +58,13 @@ void main() {
     expect(plansSource, contains('class _PlanCard'));
     expect(plansSource, contains('class _BillingChip'));
     expect(plansSource, contains('bool _isYearlyPlan'));
+    expect(plansSource, contains('NumberFormat.simpleCurrency('));
+    expect(
+      plansSource,
+      isNot(
+        contains(r"displayPrice ?? '\$${plan.priceAmount.toStringAsFixed(2)}'"),
+      ),
+    );
   });
 
   test('premium hero and benefits stay in dedicated section parts', () {
@@ -228,6 +235,96 @@ void main() {
     expect(find.text('Yearly'), findsOneWidget);
     expect(find.text('Restore purchases'), findsWidgets);
   });
+
+  testWidgets(
+    'premium page skips eager reload when premium snapshot is already hydrated',
+    (tester) async {
+      final controller = _TrackedPremiumPageController(
+        const PremiumState(
+          plans: [
+            PremiumPlanModel(
+              planCode: 'monthly',
+              billingInterval: 'month',
+              priceAmount: 14.99,
+              currencyCode: 'USD',
+              tokenAllowance: 500,
+              isPopular: false,
+              sortOrder: 1,
+              stripeCheckoutEnabled: true,
+              googlePlayProductId: 'com.petmagic.app.premium.monthly',
+              appStoreProductId: 'com.petmagic.app.premium.monthly',
+            ),
+          ],
+          paymentMethods: [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+          status: PremiumStatusModel(
+            isPremium: false,
+            canManageBilling: false,
+            paymentProvider: 'stripe',
+            purchaseChannel: 'external_checkout',
+            status: 'None',
+            cancelAtPeriodEnd: false,
+            monthlyTokenLimit: 0,
+            tokensAvailable: 0,
+            canManageSubscription: false,
+            manageSubscriptionAction: '',
+          ),
+          legalTexts: PremiumLegalTextsModel(
+            storeNotice: 'store',
+            externalCheckoutNotice: 'external',
+            stripeNotice: 'stripe',
+          ),
+          isLoading: false,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            premiumControllerProvider.overrideWith(() => controller),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => const PremiumPage(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(controller.loadCalls, 0);
+      expect(find.text('Monthly'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 400));
+    },
+  );
 
   testWidgets(
     'premium page keeps guest paywall public and gates checkout with auth sheet',
@@ -409,6 +506,21 @@ class _FakePremiumRepository extends PremiumRepository {
       productIds: <String>{},
       productPrices: <String, String>{},
     );
+  }
+}
+
+class _TrackedPremiumPageController extends PremiumController {
+  _TrackedPremiumPageController(this._initialState);
+
+  final PremiumState _initialState;
+  int loadCalls = 0;
+
+  @override
+  PremiumState build() => _initialState;
+
+  @override
+  Future<void> load({bool refresh = false}) async {
+    loadCalls++;
   }
 }
 

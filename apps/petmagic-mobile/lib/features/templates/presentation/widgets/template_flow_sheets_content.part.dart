@@ -147,7 +147,8 @@ class TemplateDetailContent extends StatelessWidget {
                       children: [
                         _Pill(
                           leading: const PawSparkIcon(size: 15),
-                          label: '${template.tokenCost} PawSpark',
+                          label:
+                              '${template.tokenCost} ${text.walletBalanceUnit}',
                           color: isPremiumTheme ? colors.gold : colors.gold,
                         ),
                         _Pill(
@@ -186,7 +187,8 @@ class TemplateDetailContent extends StatelessWidget {
                         icon: Icons.generating_tokens_rounded,
                         iconColor: colors.gold,
                         label: text.templateFlowCostLabel,
-                        value: '${template.tokenCost} PawSpark',
+                        value:
+                            '${template.tokenCost} ${text.walletBalanceUnit}',
                         colors: colors,
                       ),
                     ),

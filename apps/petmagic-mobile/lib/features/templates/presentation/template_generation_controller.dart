@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/logging/log_correlation_context.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
@@ -46,6 +47,7 @@ class TemplateGenerationState {
     this.isCreating = false,
     this.isPolling = false,
     this.errorMessage,
+    this.queueRejection,
   });
 
   final XFile? selectedPhoto;
@@ -53,6 +55,7 @@ class TemplateGenerationState {
   final bool isCreating;
   final bool isPolling;
   final String? errorMessage;
+  final GenerationWaitTooLongException? queueRejection;
 
   TemplateGenerationState copyWith({
     XFile? selectedPhoto,
@@ -60,9 +63,11 @@ class TemplateGenerationState {
     bool? isCreating,
     bool? isPolling,
     String? errorMessage,
+    GenerationWaitTooLongException? queueRejection,
     bool clearSelectedPhoto = false,
     bool clearGeneration = false,
     bool clearError = false,
+    bool clearQueueRejection = false,
   }) {
     return TemplateGenerationState(
       selectedPhoto: clearSelectedPhoto
@@ -72,13 +77,15 @@ class TemplateGenerationState {
       isCreating: isCreating ?? this.isCreating,
       isPolling: isPolling ?? this.isPolling,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      queueRejection: clearQueueRejection
+          ? null
+          : queueRejection ?? this.queueRejection,
     );
   }
 }
 
 class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   static final Random _correlationRandom = Random.secure();
-  static const Duration _pollInterval = Duration(seconds: 3);
 
   late final TemplateGenerationRepository _repository;
   late final ImageUploadOptimizer _imageUploadOptimizer;
@@ -111,6 +118,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       selectedPhoto: photo,
       clearGeneration: true,
       clearError: true,
+      clearQueueRejection: true,
       isCreating: false,
       isPolling: false,
     );
@@ -125,6 +133,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       clearSelectedPhoto: true,
       clearGeneration: true,
       clearError: true,
+      clearQueueRejection: true,
       isCreating: false,
       isPolling: false,
     );
@@ -185,6 +194,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       isPolling: false,
       clearGeneration: true,
       clearError: true,
+      clearQueueRejection: true,
     );
 
     return LogCorrelationContext.runWithCorrelationId(
@@ -229,6 +239,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         generation: generation,
         isCreating: false,
         isPolling: !generation.isTerminal,
+        clearQueueRejection: true,
       );
 
       if (!generation.isTerminal) {
@@ -265,6 +276,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         isCreating: false,
         isPolling: false,
         errorMessage: _mapGenerationError(error),
+        queueRejection: error is GenerationWaitTooLongException ? error : null,
       );
       return null;
     } finally {
@@ -291,16 +303,21 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     }
 
     _stopPolling();
-    _scheduleNextPoll(generationId);
+    _scheduleNextPoll(state.generation);
   }
 
-  void _scheduleNextPoll(String generationId) {
+  void _scheduleNextPoll(TemplateGenerationResult? generation) {
     if (_disposed) {
       return;
     }
 
+    final generationId = generation?.generationId;
+    if (generationId == null || generationId.isEmpty) {
+      return;
+    }
+
     _pollTimer?.cancel();
-    _pollTimer = Timer(_pollInterval, () {
+    _pollTimer = Timer(_generationPollInterval(generation), () {
       _pollTimer = null;
       unawaited(_pollGeneration(generationId, scheduleNext: true));
     });
@@ -329,7 +346,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
 
     if (_pollTickInFlight) {
       if (scheduleNext && !_disposed) {
-        _scheduleNextPoll(generationId);
+        _scheduleNextPoll(state.generation);
       }
       return;
     }
@@ -351,6 +368,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         generation: generation,
         isPolling: !generation.isTerminal,
         clearError: true,
+        clearQueueRejection: true,
       );
 
       if (generation.isTerminal) {
@@ -362,7 +380,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         _activeCorrelationId = null;
         await _refreshWalletIfAlive();
       } else if (scheduleNext) {
-        _scheduleNextPoll(generationId);
+        _scheduleNextPoll(generation);
       }
     } catch (error) {
       if (_disposed) {
@@ -376,6 +394,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       state = state.copyWith(
         errorMessage: _mapGenerationError(error),
         isPolling: false,
+        queueRejection: error is GenerationWaitTooLongException ? error : null,
       );
     } finally {
       final cancelToken = requestCancelToken;
@@ -438,6 +457,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
         generation: generation,
         isPolling: !generation.isTerminal,
         clearError: true,
+        clearQueueRejection: true,
       );
 
       if (generation.isTerminal) {
@@ -469,6 +489,7 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
       state = state.copyWith(
         errorMessage: _mapGenerationError(error),
         isPolling: false,
+        queueRejection: error is GenerationWaitTooLongException ? error : null,
       );
     } finally {
       final cancelToken = requestCancelToken;
@@ -512,6 +533,10 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 
   String _mapGenerationError(Object error) {
+    if (error is GenerationWaitTooLongException) {
+      return error.message;
+    }
+
     if (error is AppException && error.statusCode == 401) {
       return 'auth.sign_in_required';
     }
@@ -521,11 +546,9 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
     }
 
     if (error is AppException) {
-      final message = error.message.trim();
-      if (_isSafeGenerationErrorKey(message)) {
-        return message == 'economy.insufficient_balance'
-            ? 'templates.insufficient_balance'
-            : message;
+      final message = normalizeTemplateErrorKey(error.message);
+      if (message != null) {
+        return message;
       }
     }
 
@@ -533,12 +556,17 @@ class TemplateGenerationController extends Notifier<TemplateGenerationState> {
   }
 }
 
-bool _isSafeGenerationErrorKey(String value) {
-  return value == 'auth.sign_in_required' ||
-      value == 'auth.session_expired' ||
-      value == 'auth.legal_acceptance_required' ||
-      value == 'economy.insufficient_balance' ||
-      value == 'templates.insufficient_balance' ||
-      value == 'templates.server_unavailable' ||
-      value == 'templates.generation_failed';
+Duration _generationPollInterval(TemplateGenerationResult? generation) {
+  return switch (generation?.status) {
+    TemplateGenerationStatus.queued => const Duration(seconds: 8),
+    TemplateGenerationStatus.submittingToProvider ||
+    TemplateGenerationStatus.providerQueued => const Duration(seconds: 5),
+    TemplateGenerationStatus.processing ||
+    TemplateGenerationStatus.preprocessing ||
+    TemplateGenerationStatus.generating ||
+    TemplateGenerationStatus.providerProcessing ||
+    TemplateGenerationStatus.importingMedia ||
+    TemplateGenerationStatus.finalizing => const Duration(seconds: 3),
+    _ => const Duration(seconds: 5),
+  };
 }

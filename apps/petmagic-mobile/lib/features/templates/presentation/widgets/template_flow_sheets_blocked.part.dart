@@ -7,7 +7,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
     required this.showPremiumCta,
     required this.onClose,
     required this.onOpenPremium,
-    required this.onBuyPowSpark,
+    required this.onTopUpBalance,
     required this.onLater,
   });
 
@@ -16,7 +16,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
   final bool showPremiumCta;
   final VoidCallback onClose;
   final VoidCallback onOpenPremium;
-  final VoidCallback onBuyPowSpark;
+  final VoidCallback onTopUpBalance;
   final VoidCallback onLater;
 
   @override
@@ -153,7 +153,7 @@ class _InsufficientBalanceBanner extends StatelessWidget {
                       width: double.infinity,
                       height: 40,
                       child: OutlinedButton(
-                        onPressed: onBuyPowSpark,
+                        onPressed: onTopUpBalance,
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(
                             color: Color(0xFF0EA76A),

@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
@@ -56,6 +58,8 @@ class FakeGenerationStatusTemplateGenerationRepository
     this.removeWatermarkStatusCode,
     this.mediaAccessUrl = 'https://cdn.petmagic.test/result.jpg',
     this.mediaAccessFileName = 'result.jpg',
+    this.cancelRefunded = false,
+    this.cancelError,
   }) : super(
          dio: Dio(),
          sessionStorage: AuthSessionStorage(),
@@ -66,11 +70,14 @@ class FakeGenerationStatusTemplateGenerationRepository
   final int? removeWatermarkStatusCode;
   final String mediaAccessUrl;
   final String mediaAccessFileName;
+  final bool cancelRefunded;
+  final AppException? cancelError;
   final List<String> analyticsEvents = [];
   final List<GenerationStatusAnalyticsCall> analyticsCalls = [];
   final List<String> removeWatermarkCalls = [];
   int fetchDownloadCalls = 0;
   int fetchShareCalls = 0;
+  int cancelGenerationCalls = 0;
 
   @override
   Future<TemplateGenerationResult> fetchGeneration(
@@ -86,6 +93,28 @@ class FakeGenerationStatusTemplateGenerationRepository
     String generationId,
   ) async {
     return generation;
+  }
+
+  @override
+  Future<GenerationCancelResult> cancelGeneration(
+    String generationId, {
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    cancelGenerationCalls++;
+    final error = cancelError;
+    if (error != null) {
+      throw error;
+    }
+
+    generation = generation.copyWith(
+      status: TemplateGenerationStatus.cancelled,
+      canCancel: false,
+    );
+    return GenerationCancelResult(
+      generation: generation,
+      refunded: cancelRefunded,
+    );
   }
 
   @override
@@ -212,6 +241,36 @@ class DelayedLoadGenerationStatusTemplateGenerationRepository
     throw DioException.requestCancelled(
       requestOptions: RequestOptions(path: ''),
       reason: 'generation_status_load_cancelled',
+    );
+  }
+}
+
+class FakeGenerationStatusRealtimeClient implements RealtimeClient {
+  final StreamController<RealtimeEvent> _controller =
+      StreamController<RealtimeEvent>.broadcast();
+
+  int connectCalls = 0;
+  int disconnectCalls = 0;
+
+  @override
+  Stream<RealtimeEvent> get events => _controller.stream;
+
+  @override
+  Future<void> connect() async {
+    connectCalls++;
+  }
+
+  @override
+  Future<void> disconnect() async {
+    disconnectCalls++;
+  }
+
+  void emitGenerationStatus(Map<String, Object?> payload) {
+    _controller.add(
+      RealtimeEvent(
+        topic: RealtimeTopics.templatesGenerationStatusChanged,
+        payload: payload,
+      ),
     );
   }
 }
@@ -391,6 +450,11 @@ TemplateGenerationResult generationStatusFixture({
   String? inputPreviewUrl,
   String? resultPreviewUrl,
   bool canCompareBeforeAfter = false,
+  int? queuePosition,
+  int? estimatedWaitSeconds,
+  bool? canCancel,
+  String? mediaType,
+  String? templateType = 'image',
   String? localOutputPath,
   String? petId,
   String? petPhotoId,
@@ -409,7 +473,7 @@ TemplateGenerationResult generationStatusFixture({
     failureCode: failureCode,
     userMediaExpired: false,
     templateTitle: templateTitle,
-    templateType: 'image',
+    templateType: templateType,
     outputUrl: 'https://cdn.petmagic.test/result.jpg?signature=secret',
     hasWatermark: hasWatermark,
     canRemoveWatermark: canRemoveWatermark,
@@ -421,6 +485,10 @@ TemplateGenerationResult generationStatusFixture({
     inputPreviewUrl: inputPreviewUrl,
     resultPreviewUrl: resultPreviewUrl,
     canCompareBeforeAfter: canCompareBeforeAfter,
+    queuePosition: queuePosition,
+    estimatedWaitSeconds: estimatedWaitSeconds,
+    mediaType: mediaType,
+    canCancel: canCancel,
     localOutputPath: localOutputPath,
     petId: petId,
     petPhotoId: petPhotoId,

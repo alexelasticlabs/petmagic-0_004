@@ -82,6 +82,43 @@ void main() {
       expect(repository.openConversationCalls, 0);
     },
   );
+
+  test(
+    'resume after suspend keeps loaded support conversation without refetching it',
+    () async {
+      final repository = FakeSupportChatRepository();
+      final realtimeClient = TrackingSupportChatRealtimeClient();
+      final container = ProviderContainer(
+        overrides: [
+          supportChatRepositoryProvider.overrideWithValue(repository),
+          supportChatRealtimeClientProvider.overrideWithValue(realtimeClient),
+        ],
+      );
+      addTearDown(() {
+        realtimeClient.closeStream();
+        container.dispose();
+      });
+
+      final controller = container.read(supportChatControllerProvider.notifier);
+
+      await controller.start();
+
+      expect(repository.getConversationCalls, 1);
+      expect(realtimeClient.connectCalls, 1);
+
+      controller.suspend();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(realtimeClient.disconnectCalls, 1);
+
+      controller.setScreenVisible(true);
+      await controller.start();
+
+      expect(repository.getConversationCalls, 1);
+      expect(realtimeClient.connectCalls, 2);
+      expect(realtimeClient.disconnectCalls, 1);
+    },
+  );
 }
 
 class _FlakyRefreshSupportChatRepository extends SupportChatRepository {

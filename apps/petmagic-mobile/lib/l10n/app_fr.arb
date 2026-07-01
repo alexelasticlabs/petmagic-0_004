@@ -14,7 +14,6 @@
   "notificationWalletBody": "Ouvrez votre portefeuille pour vérifier le dernier changement de solde.",
   "notificationPremiumBody": "Ouvrez votre profil pour vérifier la dernière mise à jour Premium.",
   "appUnexpectedErrorFallback": "Une erreur s'est produite. Veuillez réessayer.",
-  "comingSoonMessage": "Cette section est prete pour la prochaine etape produit.",
   "createMagicTitle": "Creer la magie",
   "pickTemplateSubtitle": "Choisissez un modele pour votre animal",
   "searchTemplates": "Rechercher des modeles",
@@ -82,6 +81,7 @@
   "profileEmailConfirmed": "E-mail confirmé",
   "profileEmailPending": "E-mail non confirmé",
   "profileSignedOut": "Déconnecté sur cet appareil.",
+  "profileAccountDeleted": "Votre compte a ete supprime.",
   "magicLoadingPreparing": "Preparation de la magie...",
   "magicLoadingCutestAngle": "Recherche de l'angle le plus mignon...",
   "magicLoadingAiPaws": "Activation des pattes AI...",
@@ -306,7 +306,7 @@
   "premiumPaymentStripeSubtitle": "Carte, Apple Pay ou Google Pay",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Paiement via Google Play",
-  "premiumPaymentApple": "Apple Pay/App Store",
+  "premiumPaymentApple": "Apple Pay / App Store",
   "premiumPaymentOther": "Autre moyen de paiement",
   "premiumPaymentTrustStripeProcesses": "Les données de carte sont traitées de manière sécurisée par Stripe.",
   "premiumPaymentTrustNoStorage": "PetMagic ne stocke pas les informations de votre carte.",
@@ -335,7 +335,7 @@
   "premiumTermsNotice": "En continuant, vous acceptez les Conditions d'utilisation et la Politique de confidentialité.",
   "premiumStoreUnavailable": "Les abonnements App Store / Google Play sont temporairement indisponibles pour le moment. Réessayez plus tard ou utilisez un autre moyen de paiement disponible.",
   "premiumStoreProductUnavailable": "Ce produit d'abonnement n'est pas disponible dans le store sur cet appareil.",
-  "premiumStoreVerificationUnavailable": "La vérification store côté serveur n'est pas encore configurée.",
+  "premiumStoreVerificationUnavailable": "La vérification de la boutique est temporairement indisponible.",
   "premiumStorePurchaseInvalid": "L'achat n'a pas pu être vérifié.",
   "premiumStorePurchaseInactive": "Cet abonnement n'est plus actif.",
   "premiumPurchaseActivated": "Premium est maintenant actif.",
@@ -486,7 +486,7 @@
   "authReceiveUpdatesLabel": "Je souhaite recevoir des mises à jour et des offres de PetMagic",
   "authAcceptTermsRequired": "Vous devez accepter les conditions d'utilisation et la politique de confidentialité pour créer un compte.",
   "authGoogleShortLabel": "Google",
-  "authAppleShortLabel": "Pomme",
+  "authAppleShortLabel": "Apple",
   "authExternalCancelled": "La connexion a été annulée.",
   "authExternalFailed": "La connexion externe a échoué. Veuillez réessayer.",
   "authExternalTimedOut": "La connexion a pris trop de temps. Veuillez réessayer.",
@@ -588,6 +588,17 @@
   "generationStatusEtaDefault": "Encore environ 1-2 min",
   "generationStatusEtaStartsSoon": "Demarrera dans quelques minutes",
   "generationStatusEtaNotifyHint": "Nous vous informerons lorsque le resultat sera pret.",
+  "generationStatusCancelledTitle": "Génération annulée",
+  "generationStatusCancelledMessage": "Cette génération a été arrêtée avant le début du traitement.",
+  "generationStatusCancelQueuedHint": "Vous pouvez annuler tant que cette génération attend encore dans la file.",
+  "generationStatusCancelQueuedAction": "Annuler la génération",
+  "generationStatusCancelQueuedTitle": "Annuler la génération ?",
+  "generationStatusCancelQueuedMessage": "Cela fonctionne uniquement tant que la génération est encore en file. Si des PawSpark ont été réservés, le backend les rendra automatiquement.",
+  "generationStatusCancelQueuedKeepAction": "Continuer a attendre",
+  "generationStatusCancelQueuedConfirmAction": "Confirmer l'annulation",
+  "generationStatusCancelQueuedSuccess": "Génération annulée.",
+  "generationStatusCancelQueuedAlreadyStarted": "La génération a déjà commencé et ne peut plus être annulée.",
+  "generationStatusCancelQueuedFailed": "Impossible d'annuler la génération. Veuillez réessayer.",
   "generationStatusFailurePhotoHint": "La photo ne convient pas a ce modele. Essayez une photo ou l'animal est clairement visible.",
   "generationStatusFailureTechnicalHint": "Impossible de creer le resultat en raison d'un probleme technique. Les PawSpark ont ete recredites sur votre solde.",
   "generationStatusStatusCompleted": "Votre resultat est pret",
@@ -666,7 +677,7 @@
   "subscriptionPaymentCardLabel": "Carte",
   "subscriptionPaymentProviderStripe": "Carte via Stripe",
   "subscriptionPaymentProviderGooglePlay": "Google Play",
-  "subscriptionPaymentProviderAppStore": "Apple/App Store",
+  "subscriptionPaymentProviderAppStore": "App Store",
   "subscriptionChangePaymentAction": "Modifier le mode de paiement",
   "subscriptionCancelAction": "Annuler l'abonnement",
   "subscriptionCancelledHint": "L'abonnement est actif jusqu'au {date}. Il ne sera pas renouvelé après.",
@@ -1165,7 +1176,7 @@
   "emailVerificationCodeSentMessage": "Nous avons envoyé un code à 6 chiffres à {email}.",
   "@emailVerificationCodeSentMessage": {},
   "emailVerificationCodeLabel": "Code",
-  "emailVerificationWorkingLabel": "Fonctionnement...",
+  "emailVerificationWorkingLabel": "Traitement...",
   "emailVerificationVerifyAction": "Vérifier",
   "emailVerificationResendAction": "Envoyer à nouveau le code",
   "emailVerificationChangeEmailAction": "Changer d'e-mail",
@@ -1221,10 +1232,10 @@
   "generationStatusRemovingWatermark": "Suppression...",
   "generationStatusUpgradePremium": "Passer à Premium",
   "generationStatusRemoveWatermarkSheetTitle": "Supprimer le filigrane",
-  "generationStatusRemoveWatermarkSheetBody": "Utilisez {cost} crédit pour ce résultat ou passez à Premium pour des téléchargements sans filigrane.",
-  "generationStatusRemoveWatermarkUseCredit": "Utiliser {cost} crédit",
+  "generationStatusRemoveWatermarkSheetBody": "Utilisez {cost} PawSpark pour ce résultat ou passez à Premium pour des téléchargements sans filigrane.",
+  "generationStatusRemoveWatermarkUseCredit": "Utiliser {cost} PawSpark",
   "generationStatusRemoveWatermarkFailed": "Impossible de supprimer le filigrane. Réessayez.",
-  "generationStatusRemoveWatermarkNoCredits": "Crédits insuffisants. Achetez des crédits ou passez à Premium.",
+  "generationStatusRemoveWatermarkNoCredits": "Pas assez de PawSpark. Rechargez PawSpark ou passez à Premium.",
   "globalOfflineBannerTitle": "Pas de connexion internet",
   "globalOfflineBannerMessage": "Certaines fonctions sont indisponibles jusqu'au rétablissement de la connexion.",
   "globalOnlineRestoredBannerTitle": "Connexion rétablie",
@@ -1461,5 +1472,46 @@
         "type": "String"
       }
     }
-  }
+  },
+  "generationStatusQueuePositionWithWait": "Position dans la file #{position} - {wait}",
+  "@generationStatusQueuePositionWithWait": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "wait": {
+        "type": "String"
+      }
+    }
+  },
+  "generationStatusQueuePosition": "Position dans la file #{position}",
+  "@generationStatusQueuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusWaitMinutes": "{minutes} min",
+  "@generationStatusWaitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusStatusCancelled": "Génération annulée",
+  "generationStatusTerminalCancelledHint": "La génération a été annulée avant la fin.",
+  "generationStatusQueuedVideoHint": "La video prend generalement plus de temps que les photos et peut demander quelques minutes.",
+  "templateFlowGenerationWaitTooLongTitle": "Charge elevee en ce moment",
+  "templateFlowGenerationWaitTooLongMessage": "Le temps d'attente estime pour cette generation est trop long. Reessayez plus tard ou choisissez une generation photo, generalement plus rapide.",
+  "templateFlowGenerationWaitTooLongRetryAfter": "Reessayez dans environ {value}.",
+  "@templateFlowGenerationWaitTooLongRetryAfter": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium donne acces a une file prioritaire et attend generalement moins."
 }

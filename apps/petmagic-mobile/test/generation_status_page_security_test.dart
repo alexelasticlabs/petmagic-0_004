@@ -7,11 +7,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_status_page.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
+
 import 'generation_status_page_test_support.dart';
 
 void main() {
@@ -40,7 +44,14 @@ void main() {
     );
     expect(errorBody, contains('_mapStatusLoadError(error)'));
     expect(source, contains('String _mapStatusLoadError(Object error)'));
+    expect(source, contains('normalizeTemplateErrorKey(error.message)'));
     expect(source, contains('_statusLoadErrorText(text, _errorMessage!)'));
+    expect(
+      source,
+      contains(
+        'switch (normalizeTemplateErrorKey(raw) ?? raw.trim().toLowerCase())',
+      ),
+    );
   });
 
   test('generation status feedback UI stays in a dedicated part file', () {
@@ -190,6 +201,9 @@ void main() {
                 generationStatusFixture(),
               ),
             ),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -209,7 +223,8 @@ void main() {
         ),
       );
 
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump();
       expect(find.byType(GenerationStatusPage), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
@@ -255,6 +270,9 @@ void main() {
                 ),
               ),
             ),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -293,6 +311,260 @@ void main() {
       await tester.tap(find.text(text.generationStatusContinueInAppAction));
       await tester.pumpAndSettle();
       expect(find.text('creations-route'), findsOneWidget);
+    },
+  );
+
+  testWidgets('queued generation status exposes cancellable queued action', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final repository = FakeGenerationStatusTemplateGenerationRepository(
+      generationStatusFixture(
+        status: TemplateGenerationStatus.queued,
+        queuePosition: 3,
+        estimatedWaitSeconds: 240,
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+          generationHistoryControllerProvider.overrideWith(
+            IdleGenerationStatusHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const GenerationStatusPage(generationId: 'generation-1'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    final text = AppLocalizations.of(
+      tester.element(find.byType(GenerationStatusPage)),
+    );
+
+    expect(find.text(text.generationStatusCancelQueuedAction), findsOneWidget);
+    expect(
+      find.text(
+        text.generationStatusEtaEstimated(
+          text.generationStatusQueuePositionWithWait(3, '4 min'),
+        ),
+      ),
+      findsWidgets,
+    );
+
+    await tester.tap(
+      find
+          .widgetWithText(
+            OutlinedButton,
+            text.generationStatusCancelQueuedAction,
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(text.generationStatusCancelQueuedTitle), findsOneWidget);
+
+    await tester.tap(find.text(text.generationStatusCancelQueuedConfirmAction));
+    await tester.pumpAndSettle();
+
+    expect(repository.cancelGenerationCalls, 1);
+    expect(find.text(text.generationStatusCancelledTitle), findsWidgets);
+    expect(find.text(text.generationStatusCancelQueuedAction), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pump();
+  });
+
+  testWidgets('queued cancel race shows already started safe message', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final repository = FakeGenerationStatusTemplateGenerationRepository(
+      generationStatusFixture(
+        status: TemplateGenerationStatus.queued,
+        queuePosition: 1,
+        estimatedWaitSeconds: 90,
+      ),
+      cancelError: const AppException('templates.generation_already_started'),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+          generationHistoryControllerProvider.overrideWith(
+            IdleGenerationStatusHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const GenerationStatusPage(generationId: 'generation-1'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    final text = AppLocalizations.of(
+      tester.element(find.byType(GenerationStatusPage)),
+    );
+
+    await tester.tap(
+      find
+          .widgetWithText(
+            OutlinedButton,
+            text.generationStatusCancelQueuedAction,
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(text.generationStatusCancelQueuedConfirmAction));
+    await tester.pumpAndSettle();
+
+    expect(repository.cancelGenerationCalls, 1);
+    expect(
+      PetMagicNotificationCenter.instance.current?.message,
+      text.generationStatusCancelQueuedAlreadyStarted,
+    );
+    expect(find.text(text.generationStatusCancelledTitle), findsNothing);
+    await PetMagicNotificationCenter.instance.clearQueue();
+  });
+
+  testWidgets('queued video generation explains longer wait', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(
+            FakeGenerationStatusTemplateGenerationRepository(
+              generationStatusFixture(
+                status: TemplateGenerationStatus.queued,
+                mediaType: 'video',
+                templateType: null,
+                queuePosition: 4,
+                estimatedWaitSeconds: 420,
+              ),
+            ),
+          ),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
+          generationHistoryControllerProvider.overrideWith(
+            IdleGenerationStatusHistoryController.new,
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const GenerationStatusPage(generationId: 'generation-1'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    final text = AppLocalizations.of(
+      tester.element(find.byType(GenerationStatusPage)),
+    );
+
+    expect(find.text(text.generationStatusQueuedVideoHint), findsOneWidget);
+  });
+
+  testWidgets(
+    'generation status applies realtime status update before polling',
+    (tester) async {
+      final repository = FakeGenerationStatusTemplateGenerationRepository(
+        generationStatusFixture(
+          status: TemplateGenerationStatus.queued,
+          queuePosition: 2,
+          estimatedWaitSeconds: 480,
+          canCancel: true,
+        ),
+      );
+      final realtimeClient = FakeGenerationStatusRealtimeClient();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(realtimeClient),
+            generationHistoryControllerProvider.overrideWith(
+              IdleGenerationStatusHistoryController.new,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const GenerationStatusPage(generationId: 'generation-1'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      final text = AppLocalizations.of(
+        tester.element(find.byType(GenerationStatusPage)),
+      );
+
+      expect(realtimeClient.connectCalls, 1);
+      expect(find.text(text.generationStatusStageQueued), findsWidgets);
+
+      realtimeClient.emitGenerationStatus({
+        'generationId': 'generation-1',
+        'userId': 'user-1',
+        'templateId': 'template-1',
+        'status': 'Completed',
+        'tokenCost': 1,
+        'createdAtUtc': '2026-06-14T12:00:00Z',
+        'updatedAtUtc': '2026-06-14T12:04:00Z',
+        'completedAtUtc': '2026-06-14T12:04:00Z',
+        'mediaUrl': 'https://cdn.petmagic.test/result.jpg',
+        'templateTitle': 'Magic portrait',
+        'templateType': 'image',
+        'mediaType': 'image',
+        'tier': 'free',
+        'userPlan': 'free',
+      });
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text(text.generationStatusStatusCompleted), findsWidgets);
+      expect(repository.cancelGenerationCalls, 0);
     },
   );
 
@@ -344,6 +616,7 @@ void main() {
       ProviderScope(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
             IdleGenerationStatusHistoryController.new,
           ),
@@ -523,6 +796,9 @@ void main() {
                 ),
               ),
             ),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -555,6 +831,9 @@ void main() {
               FakeGenerationStatusTemplateGenerationRepository(
                 generationStatusFixture(),
               ),
+            ),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
             ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
@@ -590,6 +869,7 @@ void main() {
       ProviderScope(
         overrides: [
           templateGenerationRepositoryProvider.overrideWithValue(repository),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
             IdleGenerationStatusHistoryController.new,
           ),

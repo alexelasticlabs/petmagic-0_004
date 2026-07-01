@@ -38,12 +38,34 @@ void main() {
     await tester.tap(find.text(text.profileSettingsLanguageTitle));
     await tester.pumpAndSettle();
 
-    expect(find.text('English'), findsOneWidget);
+    expect(find.text('EN'), findsOneWidget);
 
-    await tester.tap(find.text('English'));
+    await tester.tap(find.text('EN'));
     await tester.pumpAndSettle();
 
-    expect(find.text('English'), findsWidgets);
+    expect(find.text(text.profileSettingsLanguageEnglish), findsWidgets);
+  });
+
+  test('profile settings page uses shared localized language helpers', () {
+    final pageSource = File(
+      'lib/features/profile/presentation/profile_settings_page.dart',
+    ).readAsStringSync();
+    final contentSource = File(
+      'lib/features/profile/presentation/profile_settings_page_content.part.dart',
+    ).readAsStringSync();
+    final bottomSheetSource = File(
+      'lib/features/profile/presentation/widgets/profile_settings_bottom_sheets.dart',
+    ).readAsStringSync();
+
+    expect(pageSource, contains('options: profileLanguageSheetOptions'));
+    expect(pageSource, isNot(contains("nativeLabel: 'Русский'")));
+    expect(pageSource, isNot(contains("=> 'English'")));
+    expect(
+      contentSource,
+      contains('profileLanguageLabel(text, resolvedLocale)'),
+    );
+    expect(bottomSheetSource, contains('profileLanguageSheetOptions ='));
+    expect(bottomSheetSource, contains('text.profileSettingsLanguageGerman'));
   });
 
   testWidgets('theme sheet applies selected theme mode', (tester) async {

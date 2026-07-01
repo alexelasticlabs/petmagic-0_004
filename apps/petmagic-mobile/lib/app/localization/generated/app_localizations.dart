@@ -198,12 +198,6 @@ abstract class AppLocalizations {
   /// **'Something went wrong. Please try again.'**
   String get appUnexpectedErrorFallback;
 
-  /// No description provided for @comingSoonMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'This section is prepared for the next product wave.'**
-  String get comingSoonMessage;
-
   /// No description provided for @createMagicTitle.
   ///
   /// In en, this message translates to:
@@ -623,6 +617,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Signed out on this device.'**
   String get profileSignedOut;
+
+  /// No description provided for @profileAccountDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account was deleted.'**
+  String get profileAccountDeleted;
 
   /// No description provided for @profileAccountCenterTitle.
   ///
@@ -2985,7 +2985,7 @@ abstract class AppLocalizations {
   /// No description provided for @premiumStoreVerificationUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Server-side store verification is not configured yet.'**
+  /// **'Store verification is temporarily unavailable.'**
   String get premiumStoreVerificationUnavailable;
 
   /// No description provided for @premiumStorePurchaseInvalid.
@@ -6465,6 +6465,78 @@ abstract class AppLocalizations {
   /// **'We will notify you when the result is ready.'**
   String get generationStatusEtaNotifyHint;
 
+  /// No description provided for @generationStatusCancelledTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation cancelled'**
+  String get generationStatusCancelledTitle;
+
+  /// No description provided for @generationStatusCancelledMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This generation was stopped before processing started.'**
+  String get generationStatusCancelledMessage;
+
+  /// No description provided for @generationStatusCancelQueuedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can cancel while this generation is still waiting in queue.'**
+  String get generationStatusCancelQueuedHint;
+
+  /// No description provided for @generationStatusCancelQueuedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel generation'**
+  String get generationStatusCancelQueuedAction;
+
+  /// No description provided for @generationStatusCancelQueuedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel generation?'**
+  String get generationStatusCancelQueuedTitle;
+
+  /// No description provided for @generationStatusCancelQueuedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This only works while generation is still queued. If PawSpark were reserved, backend will return them automatically.'**
+  String get generationStatusCancelQueuedMessage;
+
+  /// No description provided for @generationStatusCancelQueuedKeepAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep waiting'**
+  String get generationStatusCancelQueuedKeepAction;
+
+  /// No description provided for @generationStatusCancelQueuedConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm cancellation'**
+  String get generationStatusCancelQueuedConfirmAction;
+
+  /// No description provided for @generationStatusCancelQueuedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation cancelled.'**
+  String get generationStatusCancelQueuedSuccess;
+
+  /// No description provided for @generationStatusCancelQueuedAlreadyStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation already started and cannot be cancelled.'**
+  String get generationStatusCancelQueuedAlreadyStarted;
+
+  /// No description provided for @generationStatusCancelQueuedFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not cancel generation. Please try again.'**
+  String get generationStatusCancelQueuedFailed;
+
+  /// No description provided for @generationStatusQueuedVideoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Video usually takes longer than photos and can take a few minutes.'**
+  String get generationStatusQueuedVideoHint;
+
   /// No description provided for @generationStatusFailurePhotoHint.
   ///
   /// In en, this message translates to:
@@ -7230,13 +7302,13 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusRemoveWatermarkSheetBody.
   ///
   /// In en, this message translates to:
-  /// **'Use {cost} credit for this result, or upgrade to Premium for clean downloads.'**
+  /// **'Use {cost} PawSpark for this result, or upgrade to Premium for clean downloads.'**
   String generationStatusRemoveWatermarkSheetBody(Object cost);
 
   /// No description provided for @generationStatusRemoveWatermarkUseCredit.
   ///
   /// In en, this message translates to:
-  /// **'Use {cost} credit'**
+  /// **'Use {cost} PawSpark'**
   String generationStatusRemoveWatermarkUseCredit(Object cost);
 
   /// No description provided for @generationStatusRemoveWatermarkFailed.
@@ -7248,7 +7320,7 @@ abstract class AppLocalizations {
   /// No description provided for @generationStatusRemoveWatermarkNoCredits.
   ///
   /// In en, this message translates to:
-  /// **'Not enough credits. Buy credits or upgrade to Premium.'**
+  /// **'Not enough PawSpark. Top up PawSpark or upgrade to Premium.'**
   String get generationStatusRemoveWatermarkNoCredits;
 
   /// No description provided for @globalOfflineBannerTitle.
@@ -8218,6 +8290,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clean result'**
   String get subscriptionBenefitNoWatermarkDescription;
+
+  /// No description provided for @generationStatusQueuePositionWithWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue position #{position} • {wait}'**
+  String generationStatusQueuePositionWithWait(int position, String wait);
+
+  /// No description provided for @generationStatusQueuePosition.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue position #{position}'**
+  String generationStatusQueuePosition(int position);
+
+  /// No description provided for @generationStatusWaitMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String generationStatusWaitMinutes(int minutes);
+
+  /// No description provided for @generationStatusStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation cancelled'**
+  String get generationStatusStatusCancelled;
+
+  /// No description provided for @generationStatusTerminalCancelledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Generation was cancelled before completion.'**
+  String get generationStatusTerminalCancelledHint;
+
+  /// No description provided for @templateFlowGenerationWaitTooLongTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'High load right now'**
+  String get templateFlowGenerationWaitTooLongTitle;
+
+  /// No description provided for @templateFlowGenerationWaitTooLongMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The estimated wait for this generation is too long. Try again later or choose a photo generation, which is usually faster.'**
+  String get templateFlowGenerationWaitTooLongMessage;
+
+  /// No description provided for @templateFlowGenerationWaitTooLongRetryAfter.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again in about {value}.'**
+  String templateFlowGenerationWaitTooLongRetryAfter(String value);
+
+  /// No description provided for @templateFlowGenerationWaitTooLongPremiumHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium gets priority queue access and usually waits less.'**
+  String get templateFlowGenerationWaitTooLongPremiumHint;
 }
 
 class _AppLocalizationsDelegate

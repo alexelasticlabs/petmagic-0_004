@@ -22,7 +22,7 @@ void main() {
     () async {
       final preferences = SharedPreferencesAsync();
       await preferences.setString(
-        'templates_generations_v1:completed',
+        'templates_generations_v1:user-1:completed',
         jsonEncode([
           generationJson(
             generationId: 'generation-expired',
@@ -32,7 +32,7 @@ void main() {
         ]),
       );
       await preferences.setString(
-        'templates_generations_updated_at_v1:completed',
+        'templates_generations_updated_at_v1:user-1:completed',
         '2026-01-01T00:00:00Z',
       );
       final repository = TemplateGenerationRepository(
@@ -47,12 +47,14 @@ void main() {
 
       expect(cached, isNull);
       expect(
-        await preferences.getString('templates_generations_v1:completed'),
+        await preferences.getString(
+          'templates_generations_v1:user-1:completed',
+        ),
         isNull,
       );
       expect(
         await preferences.getString(
-          'templates_generations_updated_at_v1:completed',
+          'templates_generations_updated_at_v1:user-1:completed',
         ),
         isNull,
       );
@@ -63,9 +65,9 @@ void main() {
     'expired unread generation count is discarded and purged from storage',
     () async {
       final preferences = SharedPreferencesAsync();
-      await preferences.setInt('templates_generations_unread_v1', 4);
+      await preferences.setInt('templates_generations_unread_v1:user-1', 4);
       await preferences.setString(
-        'templates_generations_unread_updated_at_v1',
+        'templates_generations_unread_updated_at_v1:user-1',
         '2026-01-01T00:00:00Z',
       );
       final repository = TemplateGenerationRepository(
@@ -78,12 +80,12 @@ void main() {
 
       expect(unread, isNull);
       expect(
-        await preferences.getInt('templates_generations_unread_v1'),
+        await preferences.getInt('templates_generations_unread_v1:user-1'),
         isNull,
       );
       expect(
         await preferences.getString(
-          'templates_generations_unread_updated_at_v1',
+          'templates_generations_unread_updated_at_v1:user-1',
         ),
         isNull,
       );
@@ -165,9 +167,12 @@ void main() {
     'mark read skips corrupted cache buckets and updates readable buckets',
     () async {
       final preferences = SharedPreferencesAsync();
-      await preferences.setString('templates_generations_v1:all', '{broken');
       await preferences.setString(
-        'templates_generations_v1:completed',
+        'templates_generations_v1:user-1:all',
+        '{broken',
+      );
+      await preferences.setString(
+        'templates_generations_v1:user-1:completed',
         jsonEncode([
           generationJson(
             generationId: 'generation-1',
@@ -177,7 +182,7 @@ void main() {
           ),
         ]),
       );
-      await preferences.setInt('templates_generations_unread_v1', 2);
+      await preferences.setInt('templates_generations_unread_v1:user-1', 2);
       final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
         ..httpClientAdapter = FakeHttpClientAdapter((options) async {
           expect(options.method, 'POST');
@@ -205,9 +210,12 @@ void main() {
     'delete skips corrupted cache buckets and removes readable cached items',
     () async {
       final preferences = SharedPreferencesAsync();
-      await preferences.setString('templates_generations_v1:all', '{broken');
       await preferences.setString(
-        'templates_generations_v1:completed',
+        'templates_generations_v1:user-1:all',
+        '{broken',
+      );
+      await preferences.setString(
+        'templates_generations_v1:user-1:completed',
         jsonEncode([
           generationJson(
             generationId: 'generation-1',
@@ -217,7 +225,7 @@ void main() {
           ),
         ]),
       );
-      await preferences.setInt('templates_generations_unread_v1', 2);
+      await preferences.setInt('templates_generations_unread_v1:user-1', 2);
       final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
         ..httpClientAdapter = FakeHttpClientAdapter((options) async {
           expect(options.method, 'DELETE');
@@ -300,9 +308,12 @@ void main() {
     'realtime cache upsert skips corrupted buckets without breaking others',
     () async {
       final preferences = SharedPreferencesAsync();
-      await preferences.setString('templates_generations_v1:all', '{broken');
       await preferences.setString(
-        'templates_generations_v1:active',
+        'templates_generations_v1:user-1:all',
+        '{broken',
+      );
+      await preferences.setString(
+        'templates_generations_v1:user-1:active',
         jsonEncode([
           generationJson(
             generationId: 'generation-1',
@@ -311,7 +322,10 @@ void main() {
           ),
         ]),
       );
-      await preferences.setString('templates_generations_v1:completed', '[]');
+      await preferences.setString(
+        'templates_generations_v1:user-1:completed',
+        '[]',
+      );
       final repository = TemplateGenerationRepository(
         dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
         sessionStorage: TestSessionStorage(sessionFixture()),
@@ -344,4 +358,27 @@ void main() {
       expect(ready?.single.isCompleted, isTrue);
     },
   );
+
+  test('generation cache is isolated by account scope', () async {
+    final preferences = SharedPreferencesAsync();
+    await preferences.setString(
+      'templates_generations_v1:user-1:completed',
+      jsonEncode([
+        generationJson(
+          generationId: 'generation-user-1',
+          status: 'completed',
+          updatedAtUtc: '2026-06-14T12:00:00Z',
+        ),
+      ]),
+    );
+    final repository = TemplateGenerationRepository(
+      dio: Dio(BaseOptions(baseUrl: 'https://api.petmagic.test')),
+      sessionStorage: TestSessionStorage(sessionFixtureFor('user-2')),
+      preferences: preferences,
+    );
+
+    final cached = await repository.readCachedGenerations(status: 'completed');
+
+    expect(cached, isNull);
+  });
 }

@@ -23,9 +23,20 @@ class ApiBaseUrlResolver {
     SharedPreferencesAsync? preferences,
     BaseUrlHealthProbe? healthProbe,
     LocalSubnetCandidatesProvider? localSubnetCandidatesProvider,
+    List<String>? baseUrls,
+    bool? preferConfiguredBaseUrls,
+    Duration? backgroundRefreshInterval,
+    DateTime Function()? now,
   }) : _preferences = preferences ?? SharedPreferencesAsync(),
        _healthProbe = healthProbe,
-       _localSubnetCandidatesProvider = localSubnetCandidatesProvider;
+       _localSubnetCandidatesProvider = localSubnetCandidatesProvider,
+       _baseUrls = baseUrls ?? AppConfig.apiBaseUrls,
+       _preferConfiguredBaseUrls =
+           preferConfiguredBaseUrls ??
+           AppConfig.configuredApiBaseUrl.trim().isNotEmpty,
+       _backgroundRefreshInterval =
+           backgroundRefreshInterval ?? const Duration(minutes: 5),
+       _now = now ?? DateTime.now;
 
   static const _persistedBaseUrlKey = 'petmagic_mobile_last_api_base_url';
   static const _healthPath = '/health';
@@ -38,11 +49,16 @@ class ApiBaseUrlResolver {
   final SharedPreferencesAsync _preferences;
   final BaseUrlHealthProbe? _healthProbe;
   final LocalSubnetCandidatesProvider? _localSubnetCandidatesProvider;
+  final List<String> _baseUrls;
+  final bool _preferConfiguredBaseUrls;
+  final Duration _backgroundRefreshInterval;
+  final DateTime Function() _now;
 
   String? _activeBaseUrl;
   Completer<String>? _resolveInFlight;
   bool _backgroundRefreshInFlight = false;
   bool _disposed = false;
+  DateTime? _lastSuccessfulConnectionAt;
 
   String? get activeBaseUrl => _activeBaseUrl;
 
@@ -56,15 +72,27 @@ class ApiBaseUrlResolver {
     }
 
     final activeBaseUrl = _activeBaseUrl;
-    if (activeBaseUrl != null) {
-      _refreshInBackground();
+    if (activeBaseUrl != null &&
+        (!_preferConfiguredBaseUrls ||
+            _isConfiguredBaseUrlCandidate(activeBaseUrl))) {
+      _refreshInBackgroundIfStale();
       return activeBaseUrl;
+    }
+
+    if (_preferConfiguredBaseUrls) {
+      if (kDebugMode) {
+        return _resolveWithProbe();
+      }
+
+      _activeBaseUrl = _configuredBaseUrlFallback();
+      _refreshInBackgroundIfStale();
+      return _activeBaseUrl!;
     }
 
     final persisted = await _readPersistedBaseUrl();
     if (persisted != null) {
       _activeBaseUrl = persisted;
-      _refreshInBackground();
+      _refreshInBackgroundIfStale();
       return persisted;
     }
 
@@ -73,7 +101,7 @@ class ApiBaseUrlResolver {
     }
 
     _activeBaseUrl = AppConfig.apiBaseUrl;
-    _refreshInBackground();
+    _refreshInBackgroundIfStale();
     return _activeBaseUrl!;
   }
 
@@ -106,6 +134,7 @@ class ApiBaseUrlResolver {
 
       final fallback = _activeBaseUrl ?? AppConfig.apiBaseUrl;
       _activeBaseUrl = fallback;
+      _lastSuccessfulConnectionAt = null;
       completer.complete(fallback);
       return completer.future;
     } catch (error, stackTrace) {
@@ -118,8 +147,8 @@ class ApiBaseUrlResolver {
     }
   }
 
-  void _refreshInBackground() {
-    if (_disposed || _backgroundRefreshInFlight) {
+  void _refreshInBackgroundIfStale() {
+    if (!_shouldRefreshInBackground()) {
       return;
     }
 
@@ -139,6 +168,20 @@ class ApiBaseUrlResolver {
     );
   }
 
+  bool _shouldRefreshInBackground() {
+    if (_disposed || _backgroundRefreshInFlight) {
+      return false;
+    }
+
+    final lastSuccessfulConnectionAt = _lastSuccessfulConnectionAt;
+    if (lastSuccessfulConnectionAt == null) {
+      return true;
+    }
+
+    return _now().difference(lastSuccessfulConnectionAt) >=
+        _backgroundRefreshInterval;
+  }
+
   Future<List<String>> prioritizedCandidates() async {
     if (_disposed) {
       return const [];
@@ -153,10 +196,22 @@ class ApiBaseUrlResolver {
       }
     }
 
+    if (_preferConfiguredBaseUrls) {
+      for (final baseUrl in _baseUrls) {
+        addCandidate(baseUrl);
+      }
+
+      if (candidates.isEmpty) {
+        addCandidate(AppConfig.apiBaseUrl);
+      }
+
+      return candidates.toList(growable: false);
+    }
+
     addCandidate(_activeBaseUrl);
     addCandidate(await _readPersistedBaseUrl());
 
-    for (final baseUrl in AppConfig.apiBaseUrls) {
+    for (final baseUrl in _baseUrls) {
       addCandidate(baseUrl);
     }
 
@@ -180,6 +235,7 @@ class ApiBaseUrlResolver {
       return;
     }
 
+    _lastSuccessfulConnectionAt = _now();
     if (_activeBaseUrl == normalized) {
       return;
     }
@@ -200,11 +256,13 @@ class ApiBaseUrlResolver {
 
     if (_activeBaseUrl == normalized) {
       _activeBaseUrl = null;
+      _lastSuccessfulConnectionAt = null;
     }
 
     final persisted = await _readPersistedBaseUrl();
     if (persisted == normalized) {
       await _preferences.remove(_persistedBaseUrlKey);
+      _lastSuccessfulConnectionAt = null;
     }
   }
 
@@ -360,6 +418,32 @@ class ApiBaseUrlResolver {
       _logResolverFailure('read_local_subnet_candidates', error, stackTrace);
       return const [];
     }
+  }
+
+  bool _isConfiguredBaseUrlCandidate(String baseUrl) {
+    final normalized = _normalizeBaseUrl(baseUrl);
+    if (normalized == null) {
+      return false;
+    }
+
+    for (final configured in _baseUrls) {
+      if (_normalizeBaseUrl(configured) == normalized) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  String _configuredBaseUrlFallback() {
+    for (final configured in _baseUrls) {
+      final normalized = _normalizeBaseUrl(configured);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+
+    return AppConfig.apiBaseUrl;
   }
 
   void _logResolverFailure(

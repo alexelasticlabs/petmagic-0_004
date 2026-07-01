@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +36,26 @@ void main() {
 
       expect(find.text('Connect'), findsNWidgets(2));
       expect(find.text('Change password'), findsOneWidget);
+    },
+  );
+
+  test(
+    'linked accounts provider labels use localized short labels instead of api values',
+    () async {
+      final source = await File(
+        'lib/features/profile/presentation/widgets/profile_linked_accounts_settings_section.dart',
+      ).readAsString();
+
+      expect(source, contains('providerLabel: text.authGoogleShortLabel'));
+      expect(source, contains('providerLabel: text.authAppleShortLabel'));
+      expect(
+        source,
+        isNot(contains('providerLabel: ExternalAuthProvider.google.apiValue')),
+      );
+      expect(
+        source,
+        isNot(contains('providerLabel: ExternalAuthProvider.apple.apiValue')),
+      );
     },
   );
 

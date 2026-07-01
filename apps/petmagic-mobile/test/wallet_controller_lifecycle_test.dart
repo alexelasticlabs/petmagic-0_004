@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -56,6 +57,35 @@ void main() {
       activateBody,
       isNot(contains('unawaited(_walletController.load(refresh: true))')),
     );
+    expect(
+      activateBody,
+      contains('unawaited(_refreshVisibleWalletData(forceRefresh: true))'),
+    );
+  });
+
+  test(
+    'wallet page uses lightweight snapshot refresh after full hydration',
+    () {
+      final source = File(
+        'lib/features/wallet/presentation/wallet_page.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('if (state.wallet != null)'));
+      expect(
+        source,
+        contains('await controller.syncSnapshot(forceRefresh: forceRefresh);'),
+      );
+      expect(source, contains('await controller.load(refresh: true);'));
+    },
+  );
+
+  test('all transactions page keeps wallet surface marked visible', () {
+    final source = File(
+      'lib/features/wallet/presentation/all_transactions_page.dart',
+    ).readAsStringSync();
+
+    expect(source, contains('_walletController.setWalletPageVisible(true);'));
+    expect(source, contains('_walletController.setWalletPageVisible(false);'));
   });
 
   test('wallet load completes safely after provider disposal', () async {
@@ -121,6 +151,45 @@ void main() {
     },
   );
 
+  test('wallet load normalizes wrapped backend error keys', () async {
+    final repository = _ErrorWalletRepository(
+      fetchWalletError: const AppException(
+        '  RuntimeError: WALLET.NETWORK_UNAVAILABLE  ',
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+
+    final state = container.read(walletControllerProvider);
+    expect(state.errorMessage, 'wallet.network_unavailable');
+    expect(state.isLoading, isFalse);
+  });
+
+  test('wallet checkout normalizes wrapped purchase error keys', () async {
+    final repository = _ErrorWalletRepository(
+      createPurchaseError: const AppException(
+        ' AppException: wallet.payment_unavailable ',
+      ),
+    );
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    final checkout = await controller.buyPack(_pack, _stripeMethod);
+
+    final state = container.read(walletControllerProvider);
+    expect(checkout, isNull);
+    expect(state.errorMessage, 'wallet.payment_unavailable');
+    expect(state.isBuying, isFalse);
+  });
+
   test(
     'buyPack double-submit guard ignores second call while first is in flight',
     () async {
@@ -166,6 +235,42 @@ void main() {
     expect(state.ledger.first.entryId, 'entry-sync');
     expect(state.ledgerHasMore, isTrue);
   });
+
+  test(
+    'wallet load marks full snapshot as hydrated after ancillary requests',
+    () async {
+      final repository = _LifecycleSyncWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+
+      final state = container.read(walletControllerProvider);
+      expect(state.hasCompletedFullLoad, isTrue);
+    },
+  );
+
+  test(
+    'wallet load keeps snapshot unhydrated when ancillary request fails',
+    () async {
+      final repository = _PartialWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+
+      final state = container.read(walletControllerProvider);
+      expect(state.wallet, isNotNull);
+      expect(state.errorMessage, 'rewards.summary_failed');
+      expect(state.hasCompletedFullLoad, isFalse);
+    },
+  );
 
   test(
     'wallet resume sync skips duplicate snapshot refresh while wallet page is visible',
@@ -229,6 +334,64 @@ void main() {
       ]);
       expect(state.ledger.last.entryId, 'entry-1');
       expect(state.ledgerHasMore, isTrue);
+    },
+  );
+
+  test('wallet refresh cancels in-flight ledger load more request', () async {
+    final repository = _CancelableLedgerLoadMoreWalletRepository();
+    final container = ProviderContainer(
+      overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(walletControllerProvider.notifier);
+    await controller.load();
+
+    final loadMoreFuture = controller.loadMoreLedger();
+    await repository.loadMoreStarted.future;
+
+    expect(
+      container.read(walletControllerProvider).isLoadingMoreLedger,
+      isTrue,
+    );
+
+    final refreshFuture = controller.load(refresh: true);
+    expect(repository.loadMoreCancelToken?.isCancelled, isTrue);
+
+    repository.completeLoadMore();
+
+    await loadMoreFuture;
+    await refreshFuture;
+
+    final state = container.read(walletControllerProvider);
+    expect(state.isLoadingMoreLedger, isFalse);
+    expect(state.ledgerLoadMoreErrorMessage, isNull);
+    expect(state.ledger.map((item) => item.entryId), ['entry-1']);
+  });
+
+  test(
+    'wallet load more skips duplicate ledger entries from overlapping pages',
+    () async {
+      final repository = _OverlappingLedgerLoadMoreWalletRepository();
+      final container = ProviderContainer(
+        overrides: [walletRepositoryProvider.overrideWithValue(repository)],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(walletControllerProvider.notifier);
+      await controller.load();
+      await controller.loadMoreLedger();
+
+      final state = container.read(walletControllerProvider);
+      expect(state.ledger.map((item) => item.entryId), [
+        'entry-24',
+        'entry-23',
+        'entry-22',
+        'entry-21',
+        'entry-20',
+        'entry-19',
+      ]);
+      expect(state.ledgerHasMore, isFalse);
     },
   );
 
@@ -442,6 +605,33 @@ class _DelayedWalletRepository extends WalletRepository {
     if (!_verifyStripeCompleter.isCompleted) {
       _verifyStripeCompleter.complete();
     }
+  }
+}
+
+class _ErrorWalletRepository extends _DelayedWalletRepository {
+  _ErrorWalletRepository({this.fetchWalletError, this.createPurchaseError});
+
+  final Object? fetchWalletError;
+  final Object? createPurchaseError;
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    if (fetchWalletError != null) {
+      throw fetchWalletError!;
+    }
+    return _wallet();
+  }
+
+  @override
+  Future<PurchaseCheckoutModel> createPurchase(
+    CurrencyPackModel pack,
+    WalletPaymentMethodModel paymentMethod,
+    Locale locale,
+  ) async {
+    if (createPurchaseError != null) {
+      throw createPurchaseError!;
+    }
+    return super.createPurchase(pack, paymentMethod, locale);
   }
 }
 
@@ -745,6 +935,238 @@ class _MutationLedgerWalletRepository extends WalletRepository {
 }
 
 enum _MutationLedgerPhase { initial, claimed, redeemed }
+
+class _CancelableLedgerLoadMoreWalletRepository extends WalletRepository {
+  _CancelableLedgerLoadMoreWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  final Completer<void> loadMoreStarted = Completer<void>();
+  final Completer<void> _loadMoreCompleter = Completer<void>();
+  CancelToken? loadMoreCancelToken;
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  void completeLoadMore() {
+    if (!_loadMoreCompleter.isCompleted) {
+      _loadMoreCompleter.complete();
+    }
+  }
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    return _wallet();
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    if (skip == 0) {
+      return OffsetPagedModel(
+        items: [
+          WalletLedgerItem(
+            entryId: 'entry-1',
+            userId: 'user-1',
+            delta: 5,
+            balanceAfter: 10,
+            source: 'weekly_grant',
+            reason: 'Initial page',
+            createdAtUtc: DateTime.utc(2026, 1, 1, 12),
+          ),
+        ],
+        skip: skip,
+        take: take,
+        hasMore: true,
+      );
+    }
+
+    loadMoreCancelToken = cancelToken;
+    if (!loadMoreStarted.isCompleted) {
+      loadMoreStarted.complete();
+    }
+
+    await _loadMoreCompleter.future;
+    if (cancelToken?.isCancelled ?? false) {
+      throw const RequestCancelledException();
+    }
+
+    return OffsetPagedModel(
+      items: [
+        WalletLedgerItem(
+          entryId: 'entry-older',
+          userId: 'user-1',
+          delta: 1,
+          balanceAfter: 5,
+          source: 'generation_refund',
+          reason: 'Older page',
+          createdAtUtc: DateTime.utc(2025, 12, 31, 23),
+        ),
+      ],
+      skip: skip,
+      take: take,
+      hasMore: false,
+    );
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _OverlappingLedgerLoadMoreWalletRepository extends WalletRepository {
+  _OverlappingLedgerLoadMoreWalletRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  @override
+  Stream<List<PurchaseDetails>> get purchaseUpdates => const Stream.empty();
+
+  @override
+  Future<WalletStateModel> fetchWallet({CancelToken? cancelToken}) async {
+    return _wallet();
+  }
+
+  @override
+  Future<OffsetPagedModel<WalletLedgerItem>> fetchLedger({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final items = switch (skip) {
+      0 => [
+        WalletLedgerItem(
+          entryId: 'entry-24',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 24,
+          source: 'weekly_grant',
+          reason: 'Latest page item 24',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 12, 0),
+        ),
+        WalletLedgerItem(
+          entryId: 'entry-23',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 23,
+          source: 'weekly_grant',
+          reason: 'Latest page item 23',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 59),
+        ),
+        WalletLedgerItem(
+          entryId: 'entry-22',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 22,
+          source: 'weekly_grant',
+          reason: 'Latest page item 22',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 58),
+        ),
+        WalletLedgerItem(
+          entryId: 'entry-21',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 21,
+          source: 'weekly_grant',
+          reason: 'Latest page item 21',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 57),
+        ),
+      ],
+      _ => [
+        WalletLedgerItem(
+          entryId: 'entry-21',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 21,
+          source: 'weekly_grant',
+          reason: 'Overlapping page item 21',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 57),
+        ),
+        WalletLedgerItem(
+          entryId: 'entry-20',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 20,
+          source: 'generation_refund',
+          reason: 'Older page item 20',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 56),
+        ),
+        WalletLedgerItem(
+          entryId: 'entry-19',
+          userId: 'user-1',
+          delta: 4,
+          balanceAfter: 19,
+          source: 'generation_refund',
+          reason: 'Older page item 19',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 11, 55),
+        ),
+      ],
+    };
+
+    return OffsetPagedModel(
+      items: items,
+      skip: skip,
+      take: take,
+      hasMore: skip == 0,
+    );
+  }
+
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    return _emptyRewards();
+  }
+
+  @override
+  Future<WalletCheckoutConfigModel> fetchCheckoutConfig({
+    required Locale locale,
+    CancelToken? cancelToken,
+  }) async {
+    return const WalletCheckoutConfigModel(
+      packs: [],
+      paymentMethods: [],
+      externalPaymentWarningRequired: false,
+    );
+  }
+
+  @override
+  Future<OffsetPagedModel<PurchaseHistoryItem>> fetchPurchases({
+    int skip = 0,
+    int take = 20,
+    CancelToken? cancelToken,
+  }) async {
+    return const OffsetPagedModel(items: [], skip: 0, take: 20, hasMore: false);
+  }
+}
+
+class _PartialWalletRepository extends _LifecycleSyncWalletRepository {
+  @override
+  Future<RewardsSummaryModel> fetchRewards({CancelToken? cancelToken}) async {
+    throw const AppException('rewards.summary_failed');
+  }
+}
 
 RewardsSummaryModel _emptyRewards() {
   return const RewardsSummaryModel(

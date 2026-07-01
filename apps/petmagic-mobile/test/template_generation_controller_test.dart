@@ -53,6 +53,78 @@ void main() {
     },
   );
 
+  test(
+    'normalizes wrapped balance error keys before exposing UI state',
+    () async {
+      final repository = _FakeTemplateGenerationRepository(
+        startError: const AppException(
+          '  AppException: ECONOMY.INSUFFICIENT_BALANCE  ',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      await controller.startGeneration(_template(tokenCost: 50));
+
+      final state = container.read(templateGenerationControllerProvider);
+      expect(state.errorMessage, 'templates.insufficient_balance');
+    },
+  );
+
+  test(
+    'keeps structured queue rejection for high-load generation errors',
+    () async {
+      const rejection = GenerationWaitTooLongException(
+        mediaType: 'video',
+        tier: 'free',
+        estimatedWaitSeconds: 1800,
+        maxAllowedWaitSeconds: 1200,
+        retryAfterSeconds: 300,
+        canRetry: true,
+        canUpgradeForPriority: true,
+      );
+      final repository = _FakeTemplateGenerationRepository(
+        startError: rejection,
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      await controller.startGeneration(_template(tokenCost: 50));
+
+      final state = container.read(templateGenerationControllerProvider);
+      expect(state.isCreating, false);
+      expect(state.isPolling, false);
+      expect(state.errorMessage, 'templates.generation_wait_too_long');
+      expect(state.queueRejection, same(rejection));
+      expect(state.queueRejection?.retryAfterSeconds, 300);
+      expect(state.queueRejection?.canUpgradeForPriority, true);
+    },
+  );
+
   test('stops polling when generation refresh fails', () async {
     final repository = _FakeTemplateGenerationRepository(
       startResult: _generation(status: TemplateGenerationStatus.queued),
@@ -89,6 +161,39 @@ void main() {
     expect(state.isPolling, false);
     expect(state.errorMessage, 'templates.server_unavailable');
   });
+
+  test(
+    'normalizes wrapped polling error keys before exposing UI state',
+    () async {
+      final repository = _FakeTemplateGenerationRepository(
+        startResult: _generation(status: TemplateGenerationStatus.queued),
+        fetchError: const AppException(
+          ' RuntimeError: templates.server_unavailable ',
+        ),
+      );
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(
+            () => _FakeWalletController(_wallet(balance: 100)),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(
+        templateGenerationControllerProvider.notifier,
+      );
+      controller.selectPhoto(XFile('pet.jpg', name: 'pet.jpg'));
+
+      await controller.startGeneration(_template(tokenCost: 50));
+      await controller.refreshGeneration();
+
+      final state = container.read(templateGenerationControllerProvider);
+      expect(state.isPolling, false);
+      expect(state.errorMessage, 'templates.server_unavailable');
+    },
+  );
 
   test('keeps state quiet when generation start is cancelled', () async {
     final repository = _FakeTemplateGenerationRepository(
@@ -379,6 +484,42 @@ void main() {
   );
 
   test(
+    'restored terminal generation clears active marker and stops polling',
+    () async {
+      final repository = _FakeTemplateGenerationRepository()
+        ..activeGeneration = (
+          generationId: 'generation-1',
+          correlationId: 'generation-restored-terminal',
+        );
+      final walletController = _FakeWalletController(_wallet(balance: 100));
+      final container = ProviderContainer(
+        overrides: [
+          templateGenerationRepositoryProvider.overrideWithValue(repository),
+          walletControllerProvider.overrideWith(() => walletController),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(templateGenerationControllerProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      final state = container.read(templateGenerationControllerProvider);
+      expect(repository.fetchCalls, 1);
+      expect(repository.clearActiveCalls, 1);
+      expect(repository.rememberActiveCalls, 0);
+      expect(repository.activeGeneration, isNull);
+      expect(
+        repository.fetchCorrelationIds.single,
+        'generation-restored-terminal',
+      );
+      expect(state.generation?.status, TemplateGenerationStatus.completed);
+      expect(state.isPolling, isFalse);
+      expect(state.errorMessage, isNull);
+      expect(walletController.loadCalls, 1);
+    },
+  );
+
+  test(
     'stale active generation restore does not override newly selected photo',
     () async {
       final restoreReadCompleter = Completer<void>();
@@ -516,6 +657,8 @@ class _FakeTemplateGenerationRepository
   final Completer<void> rememberStarted = Completer<void>();
   int startCalls = 0;
   int fetchCalls = 0;
+  int rememberActiveCalls = 0;
+  int clearActiveCalls = 0;
   final List<XFile> startSourceImages = <XFile>[];
   final List<String?> startCorrelationIds = <String?>[];
   final List<String?> fetchCorrelationIds = <String?>[];
@@ -563,6 +706,21 @@ class _FakeTemplateGenerationRepository
   }
 
   @override
+  Future<GenerationCancelResult> cancelGeneration(
+    String generationId, {
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    return GenerationCancelResult(
+      generation: _generation(
+        generationId: generationId,
+        status: TemplateGenerationStatus.cancelled,
+      ),
+      refunded: false,
+    );
+  }
+
+  @override
   Future<TemplateGenerationResult?> readCachedGeneration(
     String generationId,
   ) async {
@@ -596,6 +754,7 @@ class _FakeTemplateGenerationRepository
     required String generationId,
     String? correlationId,
   }) async {
+    rememberActiveCalls++;
     if (!rememberStarted.isCompleted) {
       rememberStarted.complete();
     }
@@ -611,6 +770,7 @@ class _FakeTemplateGenerationRepository
 
   @override
   Future<void> clearActiveGeneration(String generationId) async {
+    clearActiveCalls++;
     if (activeGeneration?.generationId == generationId) {
       activeGeneration = null;
     }
@@ -981,10 +1141,11 @@ TemplateItem _template({required int tokenCost}) {
 
 TemplateGenerationResult _generation({
   required TemplateGenerationStatus status,
+  String generationId = 'generation-1',
 }) {
   final now = DateTime.utc(2026, 5, 25);
   return TemplateGenerationResult(
-    generationId: 'generation-1',
+    generationId: generationId,
     userId: 'user-1',
     templateId: 'template-1',
     status: status,

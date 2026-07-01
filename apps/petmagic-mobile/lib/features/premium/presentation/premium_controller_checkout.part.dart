@@ -2,9 +2,32 @@ part of 'premium_controller.dart';
 
 mixin _PremiumControllerCheckout
     on _PremiumControllerBase, _PremiumControllerLifecycle {
+  bool _hasAuthenticatedPremiumSession() {
+    return ref.read(appLaunchControllerProvider).isAuthenticated;
+  }
+
+  void _resetCheckoutVerificationForSignedOutSession() {
+    _updateStateIfMounted(
+      (state) => state.copyWith(
+        status: _guestPremiumStatus,
+        checkoutVerificationState: PremiumCheckoutVerificationState.idle,
+        isAwaitingCheckoutVerification: false,
+        recentlyActivatedPremium: false,
+        clearCheckoutError: true,
+        clearError: true,
+      ),
+    );
+  }
+
   Future<void> _refreshPremiumStatusSnapshot() async {
+    if (!_hasAuthenticatedPremiumSession()) {
+      _resetCheckoutVerificationForSignedOutSession();
+      return;
+    }
+
+    final cancelToken = _startStatusRefreshCancelToken();
     try {
-      final status = await _repository.fetchStatus();
+      final status = await _repository.fetchStatus(cancelToken: cancelToken);
       if (!ref.mounted) {
         return;
       }
@@ -12,12 +35,16 @@ mixin _PremiumControllerCheckout
       _updateStateIfMounted(
         (state) => state.copyWith(status: status, clearError: true),
       );
+    } on RequestCancelledException {
+      return;
     } catch (error) {
       _updateStateIfMounted(
         (state) => state.copyWith(
           errorMessage: _premiumErrorMessage(error, 'premium.request_failed'),
         ),
       );
+    } finally {
+      _clearActiveStatusRefresh(cancelToken);
     }
   }
 
@@ -260,6 +287,11 @@ mixin _PremiumControllerCheckout
       return;
     }
 
+    if (!_hasAuthenticatedPremiumSession()) {
+      _resetCheckoutVerificationForSignedOutSession();
+      return;
+    }
+
     final normalizedPlanCode = stripePlanCode?.trim();
     final normalizedSubscriptionId = stripeExternalSubscriptionId?.trim();
     if ((normalizedPlanCode?.isNotEmpty ?? false) &&
@@ -293,13 +325,25 @@ mixin _PremiumControllerCheckout
 
     const maxAttempts = 4;
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (!_hasAuthenticatedPremiumSession()) {
+        _resetCheckoutVerificationForSignedOutSession();
+        return;
+      }
       await _refreshProfile();
       if (!ref.mounted) {
+        return;
+      }
+      if (!_hasAuthenticatedPremiumSession()) {
+        _resetCheckoutVerificationForSignedOutSession();
         return;
       }
       // Poll subscription status only; paywall config does not need a full reload here.
       await _refreshPremiumStatusSnapshot();
       if (!ref.mounted) {
+        return;
+      }
+      if (!_hasAuthenticatedPremiumSession()) {
+        _resetCheckoutVerificationForSignedOutSession();
         return;
       }
 

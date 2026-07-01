@@ -109,8 +109,7 @@ String _mapSupportError(AppLocalizations text, String raw) {
     return text.supportChatUnavailableError;
   }
 
-  if (value.contains('support.conversation_not_found') ||
-      value.contains('support conversation was not found')) {
+  if (value.contains('support.conversation_not_found')) {
     return text.supportChatUnavailableError;
   }
 

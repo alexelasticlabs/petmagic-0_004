@@ -389,14 +389,20 @@ class TemplatesRemoteDataSource {
       return true;
     }
 
-    final message = [
-      error.message,
-      innerError?.toString(),
-      error.toString(),
-    ].whereType<String>().join('\n');
     return CancelToken.isCancel(error) ||
         error.type == DioExceptionType.cancel ||
-        message.contains('Request cancelled');
+        _containsCancellationMarker(error.message) ||
+        (innerError is AppException && innerError.isRequestCancelled) ||
+        (innerError is String && _containsCancellationMarker(innerError));
+  }
+
+  bool _containsCancellationMarker(String? value) {
+    final message = value?.trim();
+    if (message == null || message.isEmpty) {
+      return false;
+    }
+
+    return message.toLowerCase() == 'request_cancelled';
   }
 
   String _mapMessage(DioException error) {

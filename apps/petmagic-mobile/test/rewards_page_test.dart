@@ -59,18 +59,18 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(controller.loadCalls, 1);
+    expect(controller.refreshCalls, 0);
 
     controller.delayNextLoad();
     await tester.pump(const Duration(seconds: 12));
-    expect(controller.loadCalls, 2);
+    expect(controller.refreshCalls, 1);
 
     await tester.pumpWidget(const SizedBox.shrink());
     controller.completeDelayedLoad();
     await tester.pump();
 
     await tester.pump(const Duration(seconds: 13));
-    expect(controller.loadCalls, 2);
+    expect(controller.refreshCalls, 1);
     expect(tester.takeException(), isNull);
   });
 
@@ -225,6 +225,60 @@ void main() {
 
       expect(find.byType(ProtectedAuthGate), findsNothing);
       expect(walletController.loadCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'rewards page skips eager reload when wallet snapshot is already hydrated',
+    (tester) async {
+      final walletController = _TransitionRewardsWalletController(
+        const WalletState(
+          wallet: walletStateFixture,
+          rewards: rewardsSummaryFixture,
+          ledger: ledgerItemsFixture,
+          hasCompletedFullLoad: true,
+          isLoading: false,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedWalletAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) =>
+                      const Material(child: RewardsPage()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
     },
   );
 

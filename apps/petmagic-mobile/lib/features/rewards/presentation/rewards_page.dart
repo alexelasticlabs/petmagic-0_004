@@ -80,18 +80,40 @@ class _RewardsPageState extends ConsumerState<RewardsPage>
   void _handleLaunchState(AppLaunchState launchState) {
     if (launchState.isAuthenticated && !_wasAuthenticated) {
       _wasAuthenticated = true;
-      Future.microtask(() {
-        if (!mounted ||
-            !ref.read(appLaunchControllerProvider).isAuthenticated) {
-          return;
-        }
-
-        ref.read(walletControllerProvider.notifier).load();
-      });
+      _scheduleInitialLoadIfNeeded();
       return;
     }
 
     _wasAuthenticated = launchState.isAuthenticated;
+  }
+
+  bool _hasHydratedRewardsSnapshot(WalletState state) {
+    return state.hasCompletedFullLoad &&
+        state.wallet != null &&
+        state.rewards != null;
+  }
+
+  void _scheduleInitialLoadIfNeeded() {
+    final snapshot = ref.read(walletControllerProvider);
+    if (_hasHydratedRewardsSnapshot(snapshot)) {
+      return;
+    }
+
+    Future.microtask(() {
+      if (!mounted) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+        return;
+      }
+
+      final current = ref.read(walletControllerProvider);
+      if (_hasHydratedRewardsSnapshot(current)) {
+        return;
+      }
+
+      ref.read(walletControllerProvider.notifier).load();
+    });
   }
 
   @override

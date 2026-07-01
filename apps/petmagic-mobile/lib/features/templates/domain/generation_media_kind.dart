@@ -1,8 +1,10 @@
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 
 bool isVideoGenerationResult(TemplateGenerationResult generation) {
+  final mediaType = generation.mediaType?.toLowerCase() ?? '';
   final type = generation.templateType?.toLowerCase() ?? '';
-  return type.contains('video') ||
+  return mediaType.contains('video') ||
+      type.contains('video') ||
       generation.outputVideoDurationSeconds != null ||
       isLikelyGenerationVideoUrl(generation.outputUrl);
 }

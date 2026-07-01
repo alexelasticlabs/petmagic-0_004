@@ -144,11 +144,16 @@ class _ErrorState extends ConsumerWidget {
 }
 
 String _galleryHistoryErrorText(AppLocalizations text, String raw) {
-  return switch (raw.trim()) {
+  final authMessage = mapCommonAuthFeedbackMessage(text, raw);
+  if (authMessage != null) {
+    return authMessage;
+  }
+
+  return switch (normalizeTemplateErrorKey(raw)) {
     'templates.connection_timeout' => text.templatesConnectionTimeoutError,
     'templates.server_timeout' => text.templatesServerTimeoutError,
     'templates.request_failed' => text.templatesRequestFailedError,
-    _ => raw,
+    _ => text.templatesRequestFailedError,
   };
 }
 

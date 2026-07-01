@@ -200,7 +200,6 @@ class ServerSentEventsRealtimeClient implements RealtimeClient {
       final response = await request.close();
       if (response.statusCode != HttpStatus.ok) {
         await response.drain<void>();
-        await _apiBaseUrlResolver.invalidate(baseUrl);
         return false;
       }
 

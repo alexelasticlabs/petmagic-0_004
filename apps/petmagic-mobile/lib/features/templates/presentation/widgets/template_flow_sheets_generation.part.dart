@@ -77,6 +77,7 @@ class _TemplateGenerationProgressContentState
                       isFailed: isFailed,
                       errorMessage:
                           state.errorMessage ?? generation?.failureMessage,
+                      queueRejection: state.queueRejection,
                     ),
             ),
           ),
@@ -405,19 +406,23 @@ class _GenerationWorkingView extends ConsumerWidget {
     required this.generation,
     required this.isFailed,
     this.errorMessage,
+    this.queueRejection,
   });
 
   final TemplateItem template;
   final TemplateGenerationResult? generation;
   final bool isFailed;
   final String? errorMessage;
+  final GenerationWaitTooLongException? queueRejection;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = AppLocalizations.of(context);
     final colors = context.petMagicColors;
     final progress = _progressValue(generation, isFailed);
-    final isBalanceError = errorMessage == 'templates.insufficient_balance';
+    final isBalanceError =
+        normalizeTemplateErrorKey(errorMessage) ==
+        'templates.insufficient_balance';
 
     return Column(
       key: const ValueKey('generation-working'),
@@ -494,14 +499,24 @@ class _GenerationWorkingView extends ConsumerWidget {
         const SizedBox(height: 22),
         if (isFailed) ...[
           if (errorMessage != null && errorMessage!.isNotEmpty)
-            Text(
-              _generationErrorText(text, errorMessage!),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.textMuted,
-                height: 1.35,
-              ),
-            ),
+            queueRejection == null
+                ? Text(
+                    _generationErrorText(text, errorMessage!),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.textMuted,
+                      height: 1.35,
+                    ),
+                  )
+                : _GenerationWaitTooLongMessage(
+                    rejection: queueRejection!,
+                    isFreeUser:
+                        !(ref
+                                .watch(walletControllerProvider)
+                                .wallet
+                                ?.isPremium ??
+                            false),
+                  ),
           const SizedBox(height: 14),
           if (isBalanceError)
             FilledButton.icon(
@@ -552,6 +567,82 @@ class _GenerationWorkingView extends ConsumerWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+class _GenerationWaitTooLongMessage extends StatelessWidget {
+  const _GenerationWaitTooLongMessage({
+    required this.rejection,
+    required this.isFreeUser,
+  });
+
+  final GenerationWaitTooLongException rejection;
+  final bool isFreeUser;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+    final retryAfterSeconds = rejection.retryAfterSeconds;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.56)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              text.templateFlowGenerationWaitTooLongTitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: colors.textStrong,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              text.templateFlowGenerationWaitTooLongMessage,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textMuted,
+                height: 1.35,
+              ),
+            ),
+            if (retryAfterSeconds != null && retryAfterSeconds > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                text.templateFlowGenerationWaitTooLongRetryAfter(
+                  _formatLocalizedWaitDuration(text, retryAfterSeconds),
+                ),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.textSoft,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+            if (isFreeUser && rejection.canUpgradeForPriority) ...[
+              const SizedBox(height: 8),
+              Text(
+                text.templateFlowGenerationWaitTooLongPremiumHint,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colors.gold,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

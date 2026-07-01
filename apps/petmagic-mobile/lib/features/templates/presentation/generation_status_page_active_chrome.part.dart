@@ -281,9 +281,11 @@ class _TimelineRow extends StatelessWidget {
 
     return switch (stageValue) {
       'queued' => stage.threshold == 10,
+      'submittingToProvider' || 'providerQueued' => stage.threshold == 10,
       'preprocessing' || 'processing' => stage.threshold == 30,
+      'providerProcessing' => stage.threshold == 65,
       'generating' => stage.threshold == 65,
-      'finalizing' => stage.threshold == 90,
+      'finalizing' || 'importingMedia' => stage.threshold == 90,
       _ => false,
     };
   }

@@ -15,7 +15,6 @@
   "notificationWalletBody": "Откройте кошелёк, чтобы проверить последнее изменение баланса.",
   "notificationPremiumBody": "Откройте профиль, чтобы проверить последнее изменение Premium.",
   "appUnexpectedErrorFallback": "Что-то пошло не так. Попробуйте еще раз.",
-  "comingSoonMessage": "Раздел подготовлен для следующей продуктовой волны.",
   "createMagicTitle": "Создай магию",
   "pickTemplateSubtitle": "Выберите шаблон для питомца",
   "searchTemplates": "Поиск шаблонов",
@@ -86,6 +85,7 @@
   "profileEmailVerifiedShort": "Email подтвержден",
   "profileEmailPendingShort": "Подтвердите email",
   "profileSignedOut": "Вы вышли на этом устройстве.",
+  "profileAccountDeleted": "Ваш аккаунт удален.",
   "profileAccountCenterTitle": "Центр аккаунта",
   "profileAccountCenterSubtitle": "Проверьте предпочтения, приватность и настройки приложения.",
   "profileTermsStat": "Условия приняты",
@@ -516,7 +516,7 @@
   "premiumTermsNotice": "Продолжая, вы соглашаетесь с Условиями использования и Политикой конфиденциальности.",
   "premiumStoreUnavailable": "Подписки через App Store / Google Play сейчас временно недоступны. Попробуйте позже или используйте другой доступный способ оплаты.",
   "premiumStoreProductUnavailable": "Этот тариф недоступен в магазине на текущем устройстве.",
-  "premiumStoreVerificationUnavailable": "Серверная проверка подписки магазина еще не настроена.",
+  "premiumStoreVerificationUnavailable": "Проверка покупки через магазин временно недоступна.",
   "premiumStorePurchaseInvalid": "Покупку не удалось подтвердить.",
   "premiumStorePurchaseInactive": "Эта подписка больше не активна.",
   "premiumPurchaseActivated": "Premium уже активен.",
@@ -1103,6 +1103,18 @@
   "generationStatusEtaDefault": "Примерно 1-2 мин осталось",
   "generationStatusEtaStartsSoon": "Начнем через несколько минут",
   "generationStatusEtaNotifyHint": "Мы сообщим, когда результат будет готов.",
+  "generationStatusCancelledTitle": "Генерация отменена",
+  "generationStatusCancelledMessage": "Генерация остановлена до начала обработки.",
+  "generationStatusCancelQueuedHint": "Отменить можно, пока генерация ещё ждёт в очереди.",
+  "generationStatusCancelQueuedAction": "Отменить генерацию",
+  "generationStatusCancelQueuedTitle": "Отменить генерацию?",
+  "generationStatusCancelQueuedMessage": "Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, backend вернёт их автоматически.",
+  "generationStatusCancelQueuedKeepAction": "Продолжить ждать",
+  "generationStatusCancelQueuedConfirmAction": "Подтвердить отмену",
+  "generationStatusCancelQueuedSuccess": "Генерация отменена.",
+  "generationStatusCancelQueuedAlreadyStarted": "Генерация уже началась, её нельзя отменить.",
+  "generationStatusCancelQueuedFailed": "Не удалось отменить генерацию. Попробуйте снова.",
+  "generationStatusQueuedVideoHint": "Видео обычно занимает дольше фото и может готовиться несколько минут.",
   "generationStatusFailurePhotoHint": "Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.",
   "generationStatusFailureTechnicalHint": "Не удалось создать результат из-за технической ошибки. Мы вернули PawSpark на ваш баланс.",
   "generationStatusStatusCompleted": "Ваш результат готов",
@@ -1456,5 +1468,45 @@
         "type": "String"
       }
     }
-  }
+  },
+  "generationStatusQueuePositionWithWait": "Позиция в очереди: №{position} • {wait}",
+  "@generationStatusQueuePositionWithWait": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "wait": {
+        "type": "String"
+      }
+    }
+  },
+  "generationStatusQueuePosition": "Позиция в очереди: №{position}",
+  "@generationStatusQueuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusWaitMinutes": "{minutes} мин",
+  "@generationStatusWaitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusStatusCancelled": "Генерация отменена",
+  "generationStatusTerminalCancelledHint": "Генерация была отменена до завершения.",
+  "templateFlowGenerationWaitTooLongTitle": "Сейчас высокая нагрузка",
+  "templateFlowGenerationWaitTooLongMessage": "Примерное ожидание для этой генерации слишком большое. Попробуйте позже или выберите фото-генерацию, которая обычно готовится быстрее.",
+  "templateFlowGenerationWaitTooLongRetryAfter": "Попробуйте снова примерно через {value}.",
+  "@templateFlowGenerationWaitTooLongRetryAfter": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium получает приоритетную очередь и обычно ждёт меньше."
 }

@@ -1,0 +1,147 @@
+import 'dart:async';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
+
+void main() {
+  test(
+    'store product availability cache reuses fresh successful entries',
+    () async {
+      var now = DateTime(2026, 7, 1, 12);
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache(now: () => now);
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$9.99',
+          },
+        );
+      }
+
+      final first = await cache.read({
+        ' premium.year ',
+        'premium.month',
+      }, loader: loader);
+      final second = await cache.read({
+        'premium.month',
+        'premium.year',
+      }, loader: loader);
+
+      expect(loadCalls, 1);
+      expect(first.productIds, {'premium.month', 'premium.year'});
+      expect(second.productPrices['premium.month'], '\$9.99');
+
+      now = now.add(const Duration(minutes: 11));
+      await cache.read({'premium.month', 'premium.year'}, loader: loader);
+      expect(loadCalls, 2);
+    },
+  );
+
+  test(
+    'store product availability cache reuses fresh superset entries for subset lookups',
+    () async {
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$4.99',
+          },
+        );
+      }
+
+      final first = await cache.read({
+        'premium.month',
+        'premium.year',
+      }, loader: loader);
+      final second = await cache.read({'premium.month'}, loader: loader);
+
+      expect(loadCalls, 1);
+      expect(first.productIds, {'premium.month', 'premium.year'});
+      expect(second.productIds, {'premium.month'});
+      expect(second.productPrices, {'premium.month': '\$4.99'});
+    },
+  );
+
+  test(
+    'store product availability cache dedupes concurrent in-flight lookups',
+    () async {
+      final completer = Completer<StoreProductAvailabilitySnapshot>();
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(Set<String> productIds) {
+        loadCalls++;
+        return completer.future;
+      }
+
+      final firstFuture = cache.read({'pack.small'}, loader: loader);
+      final secondFuture = cache.read({'pack.small'}, loader: loader);
+
+      expect(loadCalls, 1);
+
+      completer.complete(
+        const StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: {'pack.small'},
+          productPrices: {'pack.small': '\$1.99'},
+        ),
+      );
+
+      final results = await Future.wait([firstFuture, secondFuture]);
+      expect(results[0].productIds, {'pack.small'});
+      expect(results[1].productPrices['pack.small'], '\$1.99');
+    },
+  );
+
+  test(
+    'store product availability cache isolates entries by scope key',
+    () async {
+      var loadCalls = 0;
+      final cache = StoreProductAvailabilityCache();
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$7.99',
+          },
+        );
+      }
+
+      await cache.read(
+        {'premium.month'},
+        scopeKey: 'app_store',
+        loader: loader,
+      );
+      await cache.read(
+        {'premium.month'},
+        scopeKey: 'app_store',
+        loader: loader,
+      );
+      await cache.read(
+        {'premium.month'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+
+      expect(loadCalls, 2);
+    },
+  );
+}

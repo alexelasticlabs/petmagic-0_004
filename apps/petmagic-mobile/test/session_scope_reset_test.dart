@@ -14,6 +14,7 @@ import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -25,6 +26,7 @@ void main() {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
+    sharedStoreProductAvailabilityCache.clear();
   });
 
   test(
@@ -43,9 +45,13 @@ void main() {
       );
       var mediaCleanupCalls = 0;
 
-      await repository.rememberActiveGeneration(
-        generationId: 'previous-user-generation',
-        correlationId: 'previous-user-flow',
+      await preferences.setString(
+        'templates_active_generation_id_v1:user-1',
+        'previous-user-generation',
+      );
+      await preferences.setString(
+        'templates_active_generation_correlation_id_v1:user-1',
+        'previous-user-flow',
       );
 
       final container = ProviderContainer(
@@ -60,7 +66,10 @@ void main() {
       addTearDown(container.dispose);
 
       container.read(sessionScopeResetProvider);
-      expect(await repository.readActiveGeneration(), isNotNull);
+      expect(
+        await preferences.getString('templates_active_generation_id_v1:user-1'),
+        'previous-user-generation',
+      );
 
       await _waitForLaunchState(
         container,
@@ -68,7 +77,16 @@ void main() {
       );
       await _flushMicrotasks();
 
-      expect(await repository.readActiveGeneration(), isNull);
+      expect(
+        await preferences.getString('templates_active_generation_id_v1:user-1'),
+        isNull,
+      );
+      expect(
+        await preferences.getString(
+          'templates_active_generation_correlation_id_v1:user-1',
+        ),
+        isNull,
+      );
       expect(mediaCleanupCalls, 1);
     },
   );
@@ -173,16 +191,10 @@ void main() {
 
       await Future.wait([
         container.read(gamificationSummaryProvider.future),
-        container.read(petProgressProvider('pet-1').future),
         container.read(achievementsProvider.future),
-        container.read(dailyStreakProvider.future),
-        container.read(weeklyChallengesProvider.future),
       ]);
       expect(repository.summaryFetchCount, 1);
-      expect(repository.petProgressFetchCount, 1);
       expect(repository.achievementsFetchCount, 1);
-      expect(repository.streakFetchCount, 1);
-      expect(repository.weeklyChallengesFetchCount, 1);
 
       container.read(sessionScopeResetProvider);
       await _waitForLaunchState(
@@ -193,16 +205,10 @@ void main() {
 
       await Future.wait([
         container.read(gamificationSummaryProvider.future),
-        container.read(petProgressProvider('pet-1').future),
         container.read(achievementsProvider.future),
-        container.read(dailyStreakProvider.future),
-        container.read(weeklyChallengesProvider.future),
       ]);
       expect(repository.summaryFetchCount, 2);
-      expect(repository.petProgressFetchCount, 2);
       expect(repository.achievementsFetchCount, 2);
-      expect(repository.streakFetchCount, 2);
-      expect(repository.weeklyChallengesFetchCount, 2);
     },
   );
 
@@ -240,7 +246,7 @@ void main() {
         preferences: SharedPreferencesAsync(),
       );
       await registrationCache.writeLastCompletedRegistrationKey(
-        'push-token|android|en_US|1.0.0|device-1',
+        'push-token|user-1|android|en_US|1.0.0|device-1',
       );
 
       final container = ProviderContainer(
@@ -264,6 +270,62 @@ void main() {
         await registrationCache.readLastCompletedRegistrationKey(),
         isNull,
       );
+    },
+  );
+
+  test(
+    'clears store product availability cache when startup resolves signed out',
+    () async {
+      var loadCalls = 0;
+
+      Future<StoreProductAvailabilitySnapshot> loader(
+        Set<String> productIds,
+      ) async {
+        loadCalls++;
+        return StoreProductAvailabilitySnapshot(
+          isAvailable: true,
+          productIds: productIds,
+          productPrices: {
+            for (final productId in productIds) productId: '\$3.99',
+          },
+        );
+      }
+
+      await sharedStoreProductAvailabilityCache.read(
+        {'pack.small'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+      await sharedStoreProductAvailabilityCache.read(
+        {'pack.small'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+      expect(loadCalls, 1);
+
+      final container = ProviderContainer(
+        overrides: [
+          authSessionStorageProvider.overrideWithValue(
+            _SignedOutAuthSessionStorage(),
+          ),
+          sessionMediaCacheCleanerProvider.overrideWithValue(() async {}),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      container.read(sessionScopeResetProvider);
+      await _waitForLaunchState(
+        container,
+        (state) => !state.isLoading && !state.isAuthenticated,
+      );
+      await _flushMicrotasks();
+
+      await sharedStoreProductAvailabilityCache.read(
+        {'pack.small'},
+        scopeKey: 'google_play',
+        loader: loader,
+      );
+      expect(loadCalls, 2);
     },
   );
 }
@@ -306,10 +368,7 @@ class FakeGamificationRepository extends GamificationRepository {
     : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   int summaryFetchCount = 0;
-  int petProgressFetchCount = 0;
   int achievementsFetchCount = 0;
-  int streakFetchCount = 0;
-  int weeklyChallengesFetchCount = 0;
 
   @override
   Future<GamificationSummaryModel> fetchSummary({
@@ -368,24 +427,6 @@ class FakeGamificationRepository extends GamificationRepository {
   }
 
   @override
-  Future<PetProgressModel> fetchPetProgress(
-    String petId, {
-    CancelToken? cancelToken,
-  }) async {
-    petProgressFetchCount++;
-    return PetProgressModel(
-      petId: petId,
-      xp: 120,
-      level: 3,
-      evolutionStage: 'juvenile',
-      totalGenerations: 4,
-      xpForNextLevel: 200,
-      xpForCurrentLevel: 100,
-      daysActive: 6,
-    );
-  }
-
-  @override
   Future<List<AchievementModel>> fetchAchievements({
     CancelToken? cancelToken,
   }) async {
@@ -402,39 +443,6 @@ class FakeGamificationRepository extends GamificationRepository {
         rewardSpark: 5,
         isSecret: false,
         isUnlocked: true,
-      ),
-    ];
-  }
-
-  @override
-  Future<StreakModel?> fetchStreak({CancelToken? cancelToken}) async {
-    streakFetchCount++;
-    return const StreakModel(
-      currentStreak: 4,
-      longestStreak: 7,
-      freezesAvailable: 1,
-      freezesPerWeek: 2,
-      lastActiveDate: '2026-06-30',
-      activeDaysThisWeek: ['2026-06-30'],
-    );
-  }
-
-  @override
-  Future<List<WeeklyChallengeModel>> fetchCurrentChallenges({
-    CancelToken? cancelToken,
-  }) async {
-    weeklyChallengesFetchCount++;
-    return const [
-      WeeklyChallengeModel(
-        id: 'challenge-1',
-        challengeType: 'generations',
-        targetValue: 3,
-        currentValue: 1,
-        titleKey: 'challenge.title',
-        descriptionKey: 'challenge.description',
-        rewardSpark: 10,
-        isCompleted: false,
-        rewardClaimed: false,
       ),
     ];
   }

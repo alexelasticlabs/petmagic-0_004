@@ -79,7 +79,10 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
 
     _hasInitializedController = true;
     Future.microtask(() {
-      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      if (!mounted) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 
@@ -378,7 +381,8 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
     }
 
     final nextState = ref.read(passwordChangeControllerProvider);
-    if (nextState.successMessage == 'auth.password_reset_success') {
+    if (normalizeProfileSuccessKey(nextState.successMessage) ==
+        'auth.password_reset_success') {
       FocusManager.instance.primaryFocus?.unfocus();
     }
   }
@@ -405,14 +409,7 @@ class _PasswordChangePageState extends ConsumerState<PasswordChangePage> {
   }
 
   String? _mapSuccessMessage(String raw, AppLocalizations text) {
-    switch (raw) {
-      case 'auth.password_reset_code_sent':
-        return text.authPasswordResetCodeSent;
-      case 'auth.password_reset_success':
-        return text.authPasswordResetSuccess;
-      default:
-        return null;
-    }
+    return mapProfileSuccessMessage(raw, text);
   }
 }
 

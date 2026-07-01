@@ -264,6 +264,86 @@ void main() {
     expect(walletController.loadCalls, 1);
   });
 
+  testWidgets(
+    'templates page skips wallet preload when wallet snapshot is fully hydrated',
+    (tester) async {
+      final controller = FakeTemplatesController();
+      final walletController = TrackingWalletController(
+        hasWallet: true,
+        hasCompletedFullLoad: true,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+            templatesControllerProvider.overrideWith(() => controller),
+            realtimeClientProvider.overrideWith(
+              (ref) => const NoopRealtimeClient(),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            locale: const Locale('en'),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const Scaffold(body: TemplatesPage()),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+    },
+  );
+
+  testWidgets('templates page preloads wallet for partial wallet snapshot', (
+    tester,
+  ) async {
+    final controller = FakeTemplatesController();
+    final walletController = TrackingWalletController(hasWallet: true);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            AuthenticatedAppLaunchController.new,
+          ),
+          walletControllerProvider.overrideWith(() => walletController),
+          templatesControllerProvider.overrideWith(() => controller),
+          realtimeClientProvider.overrideWith(
+            (ref) => const NoopRealtimeClient(),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: TemplatesPage()),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(walletController.loadCalls, 1);
+  });
+
   testWidgets('templates page debounces backend search input', (tester) async {
     final controller = FakeTemplatesController();
 

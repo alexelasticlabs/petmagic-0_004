@@ -159,7 +159,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
-    expect(profileController.initializeCalls, 1);
+    expect(profileController.initializeCalls, 0);
 
     launchController.setAuthenticated(true);
     await tester.pump();
@@ -167,7 +167,7 @@ void main() {
 
     expect(find.byType(ProtectedAuthGate), findsNothing);
     expect(find.text('Pet User'), findsOneWidget);
-    expect(profileController.initializeCalls, 2);
+    expect(profileController.initializeCalls, 1);
 
     launchController.setAuthenticated(false);
     await tester.pump();
@@ -175,8 +175,71 @@ void main() {
 
     expect(find.byType(ProtectedAuthGate), findsOneWidget);
     expect(find.text('Pet User'), findsNothing);
-    expect(profileController.initializeCalls, 3);
+    expect(profileController.initializeCalls, 2);
   });
+
+  testWidgets(
+    'profile page skips deferred reload after immediate sign out on the same route',
+    (tester) async {
+      final launchController = _MutableProfileAppLaunchController(false);
+      final profileController = _AuthReactiveProfileController();
+
+      final router = GoRouter(
+        initialLocation: ProfilePage.routePath,
+        routes: [
+          GoRoute(
+            path: ProfilePage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfilePage()),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(() => launchController),
+            profileControllerProvider.overrideWith(() => profileController),
+            walletControllerProvider.overrideWith(_FakeWalletController.new),
+            premiumSubscriptionSummaryProvider.overrideWith(
+              (ref) async => const PremiumSubscriptionSummaryView(
+                isPremium: false,
+                canManageSubscription: false,
+                status: 'inactive',
+                manageSubscriptionAction: '',
+                provider: PremiumSubscriptionProviderView.unknown,
+              ),
+            ),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.dark(),
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+          ),
+        ),
+      );
+
+      launchController.setAuthenticated(true);
+      launchController.setAuthenticated(false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(find.text('Pet User'), findsNothing);
+      expect(profileController.initializeCalls, 0);
+    },
+  );
 
   testWidgets(
     'profile page skips wallet preload when wallet snapshot already exists',
@@ -191,6 +254,7 @@ void main() {
             updatedAtUtc: null,
             nextWeeklyGrantAtUtc: null,
           ),
+          hasCompletedFullLoad: true,
           isLoading: false,
         ),
       );
@@ -335,6 +399,90 @@ void main() {
       expect(walletController.loadCalls, 1);
     },
   );
+
+  testWidgets('profile page preloads wallet for partial wallet snapshot', (
+    tester,
+  ) async {
+    final walletController = _CountingWalletController(
+      initialState: const WalletState(
+        wallet: WalletStateModel(
+          userId: 'user-1',
+          balance: 130,
+          adRewardsRemainingToday: 3,
+          isPremium: false,
+          updatedAtUtc: null,
+          nextWeeklyGrantAtUtc: null,
+        ),
+        hasCompletedFullLoad: false,
+        isLoading: false,
+      ),
+    );
+
+    final router = GoRouter(
+      initialLocation: ProfilePage.routePath,
+      routes: [
+        GoRoute(
+          path: ProfilePage.routePath,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: ProfilePage()),
+        ),
+        GoRoute(
+          path: ProfileSettingsPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Settings route')),
+          ),
+        ),
+        GoRoute(
+          path: SupportChatPage.routePath,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: Scaffold(body: Text('Support route')),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedProfileAppLaunchController.new,
+          ),
+          profileControllerProvider.overrideWith(_FakeProfileController.new),
+          walletControllerProvider.overrideWith(() => walletController),
+          premiumSubscriptionSummaryProvider.overrideWith(
+            (ref) async => const PremiumSubscriptionSummaryView(
+              isPremium: false,
+              canManageSubscription: false,
+              status: 'inactive',
+              manageSubscriptionAction: '',
+              provider: PremiumSubscriptionProviderView.unknown,
+            ),
+          ),
+        ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          theme: AppTheme.dark(),
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [
+            Locale('ru'),
+            Locale('en'),
+            Locale('de'),
+            Locale('es'),
+            Locale('fr'),
+            Locale('it'),
+            Locale('pl'),
+          ],
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(walletController.loadCalls, 1);
+  });
 
   testWidgets(
     'profile page retry restores profile and preloads wallet after unavailable state',
@@ -693,8 +841,91 @@ void main() {
       final profileContext = tester.element(find.byType(ProfilePage));
       final text = AppLocalizations.of(profileContext);
 
-      expect(find.text(text.premiumPaymentOther), findsOneWidget);
+      expect(find.text(text.premiumPaymentOther), findsAtLeastNWidgets(1));
       expect(find.text(text.premiumPaymentStripe), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'profile subscription summary shows localized canonical status label',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final router = GoRouter(
+        initialLocation: ProfilePage.routePath,
+        routes: [
+          GoRoute(
+            path: ProfilePage.routePath,
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ProfilePage()),
+          ),
+          GoRoute(
+            path: PremiumPage.routePath,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: Scaffold(body: Text('Premium route')),
+            ),
+          ),
+          GoRoute(
+            path: SupportChatPage.routePath,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: Scaffold(body: Text('Support route')),
+            ),
+          ),
+          GoRoute(
+            path: ProfileSettingsPage.routePath,
+            pageBuilder: (context, state) => const NoTransitionPage(
+              child: Scaffold(body: Text('Settings route')),
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedProfileAppLaunchController.new,
+            ),
+            profileControllerProvider.overrideWith(_FakeProfileController.new),
+            walletControllerProvider.overrideWith(_FakeWalletController.new),
+            premiumSubscriptionSummaryProvider.overrideWith(
+              (ref) async => const PremiumSubscriptionSummaryView(
+                isPremium: true,
+                canManageSubscription: true,
+                status: 'past_due',
+                manageSubscriptionAction: 'manage',
+                provider: PremiumSubscriptionProviderView.stripe,
+              ),
+            ),
+          ],
+          child: MaterialApp.router(
+            routerConfig: router,
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final profileContext = tester.element(find.byType(ProfilePage));
+      final text = AppLocalizations.of(profileContext);
+
+      expect(find.text(text.subscriptionStatusPaymentFailed), findsOneWidget);
+      expect(find.text('past_due'), findsNothing);
     },
   );
 

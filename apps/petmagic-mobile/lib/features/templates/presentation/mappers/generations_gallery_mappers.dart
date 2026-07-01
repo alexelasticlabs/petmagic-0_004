@@ -31,13 +31,27 @@ String stageStatusLabel(
     return text.generationStatusEtaFinalizing;
   }
 
+  if (generation.status == TemplateGenerationStatus.submittingToProvider ||
+      generation.status == TemplateGenerationStatus.providerQueued) {
+    return text.generationStatusStageQueued;
+  }
+  if (generation.status == TemplateGenerationStatus.providerProcessing) {
+    return text.templateFlowStepCreateMagic;
+  }
+  if (generation.status == TemplateGenerationStatus.importingMedia) {
+    return text.templateFlowStepFinalTouches;
+  }
+
   return switch (generation.stage) {
     'queued' => text.generationStatusStageQueued,
+    'submittingToProvider' ||
+    'providerQueued' => text.generationStatusStageQueued,
     'uploading' => text.templateFlowStepProcessPhoto,
     'preprocessing' => text.templateFlowStepProcessPhoto,
     'processing' => text.templateFlowStepCreateMagic,
+    'providerProcessing' => text.templateFlowStepCreateMagic,
     'generating' => text.templateFlowStepCreateMagic,
-    'finalizing' => text.templateFlowStepFinalTouches,
+    'finalizing' || 'importingMedia' => text.templateFlowStepFinalTouches,
     _ => text.templateFlowStepCreateMagic,
   };
 }
@@ -46,7 +60,7 @@ String estimatedTimeLabel(
   AppLocalizations text,
   TemplateGenerationResult generation,
 ) {
-  if (generation.stage == 'queued') {
+  if (generation.stage == 'queued' || generation.isWaitingInQueue) {
     return text.generationStatusEtaStartsSoon;
   }
   if ((generation.estimatedDurationLabel ?? '').isNotEmpty) {

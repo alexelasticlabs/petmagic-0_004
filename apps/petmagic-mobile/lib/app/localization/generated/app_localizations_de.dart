@@ -59,10 +59,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Etwas ist schiefgelaufen. Bitte versuche es erneut.';
 
   @override
-  String get comingSoonMessage =>
-      'Dieser Bereich ist fuer die naechste Produktphase vorbereitet.';
-
-  @override
   String get createMagicTitle => 'Magie erstellen';
 
   @override
@@ -281,6 +277,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Auf diesem Gerät abgemeldet.';
+
+  @override
+  String get profileAccountDeleted => 'Ihr Konto wurde geloescht.';
 
   @override
   String get profileAccountCenterTitle => 'Kontocenter';
@@ -1632,7 +1631,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'Die serverseitige Store-Verifizierung ist noch nicht konfiguriert.';
+      'Die Store-Verifizierung ist vorübergehend nicht verfügbar.';
 
   @override
   String get premiumStorePurchaseInvalid =>
@@ -2960,7 +2959,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get authGoogleShortLabel => 'Google';
 
   @override
-  String get authAppleShortLabel => 'Apfel';
+  String get authAppleShortLabel => 'Apple';
 
   @override
   String get authContinueWithGoogle => 'Weiter mit Google';
@@ -3642,6 +3641,48 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wir benachrichtigen dich, sobald das Ergebnis fertig ist.';
 
   @override
+  String get generationStatusCancelledTitle => 'Generierung abgebrochen';
+
+  @override
+  String get generationStatusCancelledMessage =>
+      'Diese Generierung wurde vor dem Start der Verarbeitung gestoppt.';
+
+  @override
+  String get generationStatusCancelQueuedHint =>
+      'Du kannst abbrechen, solange diese Generierung noch in der Warteschlange wartet.';
+
+  @override
+  String get generationStatusCancelQueuedAction => 'Generierung abbrechen';
+
+  @override
+  String get generationStatusCancelQueuedTitle => 'Generierung abbrechen?';
+
+  @override
+  String get generationStatusCancelQueuedMessage =>
+      'Das funktioniert nur, solange die Generierung noch in der Warteschlange ist. Falls PawSpark reserviert wurden, gibt der Backend sie automatisch zurueck.';
+
+  @override
+  String get generationStatusCancelQueuedKeepAction => 'Weiter warten';
+
+  @override
+  String get generationStatusCancelQueuedConfirmAction => 'Abbruch bestaetigen';
+
+  @override
+  String get generationStatusCancelQueuedSuccess => 'Generierung abgebrochen.';
+
+  @override
+  String get generationStatusCancelQueuedAlreadyStarted =>
+      'Die Generierung hat bereits begonnen und kann nicht abgebrochen werden.';
+
+  @override
+  String get generationStatusCancelQueuedFailed =>
+      'Generierung konnte nicht abgebrochen werden. Bitte versuche es erneut.';
+
+  @override
+  String get generationStatusQueuedVideoHint =>
+      'Video dauert normalerweise langer als Fotos und kann einige Minuten brauchen.';
+
+  @override
   String get generationStatusFailurePhotoHint =>
       'Das Foto passt nicht zu dieser Vorlage. Versuche ein Foto, auf dem das Haustier klar zu sehen ist.';
 
@@ -3804,7 +3845,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get emailVerificationCodeLabel => 'Code';
 
   @override
-  String get emailVerificationWorkingLabel => 'Arbeiten...';
+  String get emailVerificationWorkingLabel => 'Wird verarbeitet...';
 
   @override
   String get emailVerificationVerifyAction => 'Verifizieren';
@@ -4085,12 +4126,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String generationStatusRemoveWatermarkSheetBody(Object cost) {
-    return 'Verwende $cost Credit für dieses Ergebnis oder upgrade auf Premium für saubere Downloads.';
+    return 'Verwende $cost PawSpark für dieses Ergebnis oder upgrade auf Premium für saubere Downloads.';
   }
 
   @override
   String generationStatusRemoveWatermarkUseCredit(Object cost) {
-    return '$cost Credit verwenden';
+    return '$cost PawSpark verwenden';
   }
 
   @override
@@ -4099,7 +4140,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get generationStatusRemoveWatermarkNoCredits =>
-      'Nicht genug Credits. Kaufe Credits oder upgrade auf Premium.';
+      'Nicht genug PawSpark. Lade PawSpark auf oder upgrade auf Premium.';
 
   @override
   String get globalOfflineBannerTitle => 'Keine Internetverbindung';
@@ -4666,4 +4707,43 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Sauberes Ergebnis';
+
+  @override
+  String generationStatusQueuePositionWithWait(int position, String wait) {
+    return 'Warteschlangenposition #$position - $wait';
+  }
+
+  @override
+  String generationStatusQueuePosition(int position) {
+    return 'Warteschlangenposition #$position';
+  }
+
+  @override
+  String generationStatusWaitMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get generationStatusStatusCancelled => 'Generierung abgebrochen';
+
+  @override
+  String get generationStatusTerminalCancelledHint =>
+      'Die Generierung wurde vor dem Abschluss abgebrochen.';
+
+  @override
+  String get templateFlowGenerationWaitTooLongTitle =>
+      'Derzeit hohe Auslastung';
+
+  @override
+  String get templateFlowGenerationWaitTooLongMessage =>
+      'Die geschatzte Wartezeit fur diese Generierung ist im Moment zu lang. Versuche es spater erneut oder wahle eine Foto-Generierung, die normalerweise schneller ist.';
+
+  @override
+  String templateFlowGenerationWaitTooLongRetryAfter(String value) {
+    return 'Versuche es in etwa $value erneut.';
+  }
+
+  @override
+  String get templateFlowGenerationWaitTooLongPremiumHint =>
+      'Premium erhaelt Zugang zur priorisierten Warteschlange und wartet normalerweise weniger.';
 }

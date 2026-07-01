@@ -30,10 +30,12 @@ mixin _WalletControllerLoading
     required bool refresh,
     required CancelToken cancelToken,
   }) async {
+    _cancelActiveLedgerLoadMore();
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoading: !refresh,
         isRefreshing: refresh,
+        isLoadingMoreLedger: false,
         clearError: true,
         clearLedgerLoadMoreError: true,
         clearCheckoutUrl: true,
@@ -134,6 +136,7 @@ mixin _WalletControllerLoading
           rewards: rewards,
           ledger: ledger,
           ledgerHasMore: ledgerHasMore,
+          hasCompletedFullLoad: softError == null,
           packs: packs,
           paymentMethods: paymentMethods,
           storeProductPrices: storeProductPrices,
@@ -229,6 +232,11 @@ mixin _WalletControllerLoading
   }
 
   @override
+  Future<void> syncSnapshot({bool forceRefresh = false}) {
+    return _syncWalletSnapshot(forceRefresh: forceRefresh);
+  }
+
+  @override
   Future<void> loadMoreLedger({bool force = false}) async {
     if (!ref.mounted) {
       return;
@@ -240,6 +248,7 @@ mixin _WalletControllerLoading
       return;
     }
 
+    final loadMoreCancelToken = _startLedgerLoadMoreCancelToken();
     _updateStateIfMounted(
       (state) => state.copyWith(
         isLoadingMoreLedger: true,
@@ -252,6 +261,7 @@ mixin _WalletControllerLoading
       final page = await _repository.fetchLedger(
         skip: skip,
         take: _WalletControllerBase.walletLedgerPageSize,
+        cancelToken: loadMoreCancelToken,
       );
       if (!ref.mounted) {
         return;
@@ -259,19 +269,34 @@ mixin _WalletControllerLoading
 
       _updateStateIfMounted(
         (state) => state.copyWith(
-          ledger: [...state.ledger, ...page.items],
+          ledger: _appendUniqueLedgerPage(
+            existingLedger: state.ledger,
+            nextPage: page.items,
+          ),
           ledgerHasMore: page.hasMore,
           isLoadingMoreLedger: false,
           clearLedgerLoadMoreError: true,
         ),
       );
     } catch (error) {
+      if (_isRequestCancelled(error)) {
+        _updateStateIfMounted(
+          (state) => state.copyWith(
+            isLoadingMoreLedger: false,
+            clearLedgerLoadMoreError: true,
+          ),
+        );
+        return;
+      }
+
       _updateStateIfMounted(
         (state) => state.copyWith(
           isLoadingMoreLedger: false,
           ledgerLoadMoreErrorMessage: _errorMessage(error),
         ),
       );
+    } finally {
+      _clearActiveLedgerLoadMore(loadMoreCancelToken);
     }
   }
 
@@ -295,9 +320,31 @@ mixin _WalletControllerLoading
     return merged;
   }
 
+  List<WalletLedgerItem> _appendUniqueLedgerPage({
+    required List<WalletLedgerItem> existingLedger,
+    required List<WalletLedgerItem> nextPage,
+  }) {
+    if (existingLedger.isEmpty || nextPage.isEmpty) {
+      return nextPage.isEmpty
+          ? existingLedger
+          : [...existingLedger, ...nextPage];
+    }
+
+    final merged = <WalletLedgerItem>[...existingLedger];
+    final seenEntryIds = existingLedger.map((item) => item.entryId).toSet();
+    for (final item in nextPage) {
+      if (seenEntryIds.add(item.entryId)) {
+        merged.add(item);
+      }
+    }
+    return merged;
+  }
+
   @override
   Future<void> _syncWalletSnapshot({bool forceRefresh = false}) async {
-    if (_isWalletSyncInFlight || _loadInFlight != null) {
+    if (_isWalletSyncInFlight ||
+        _loadInFlight != null ||
+        state.isLoadingMoreLedger) {
       return;
     }
     if (!forceRefresh &&

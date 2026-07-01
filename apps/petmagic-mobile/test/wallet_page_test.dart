@@ -121,6 +121,112 @@ void main() {
     expect(find.text(text.appUnavailableServerTitle), findsNothing);
   });
 
+  testWidgets(
+    'wallet page skips deferred initial load after immediate sign out',
+    (tester) async {
+      final launchController = _MutableWalletAppLaunchController(false);
+      final walletController = _TransitionWalletController(
+        const WalletState(isLoading: false),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(() => launchController),
+            walletControllerProvider.overrideWith(() => walletController),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) =>
+                      const Material(child: WalletPage()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(walletController.loadCalls, 0);
+
+      launchController.setAuthenticated(true);
+      launchController.setAuthenticated(false);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(walletController.loadCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'wallet page skips eager reload when wallet snapshot is already hydrated',
+    (tester) async {
+      final walletController = _TransitionWalletController(
+        const WalletState(
+          wallet: walletStateFixture,
+          hasCompletedFullLoad: true,
+          isLoading: false,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedWalletAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) =>
+                      const Material(child: WalletPage()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 0);
+    },
+  );
+
   testWidgets('authenticated wallet unavailable state still shows retry card', (
     tester,
   ) async {
@@ -142,6 +248,47 @@ void main() {
     expect(find.text(text.appUnavailableServerTitle), findsOneWidget);
     expect(find.text(text.retryAction), findsOneWidget);
   });
+
+  testWidgets(
+    'wallet auto refresh uses lightweight sync when only partial wallet snapshot is available',
+    (tester) async {
+      final repository = FakeWalletRepository(
+        wallet: walletStateFixture,
+        ledger: ledgerItemsFixture,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+        failPurchases: true,
+      );
+
+      await pumpWalletPage(tester, repository: repository);
+
+      expect(repository.walletFetchCount, 1);
+      expect(repository.ledgerFetchCount, 1);
+      expect(repository.checkoutConfigFetchCount, 1);
+      expect(repository.purchasesFetchCount, 1);
+
+      await tester.pump(const Duration(seconds: 13));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(repository.walletFetchCount, 2);
+      expect(
+        repository.ledgerFetchCount,
+        1,
+        reason: 'unchanged wallet snapshot should not re-fetch ledger pages',
+      );
+      expect(
+        repository.checkoutConfigFetchCount,
+        1,
+        reason: 'background sync should not re-fetch checkout configuration',
+      );
+      expect(
+        repository.purchasesFetchCount,
+        1,
+        reason: 'background sync should not re-fetch purchase history',
+      );
+    },
+  );
 
   testWidgets(
     'wallet page shows legal acceptance action for legal gate errors',
@@ -340,6 +487,59 @@ void main() {
     },
   );
 
+  testWidgets(
+    'all transactions reloads when only partial wallet snapshot exists',
+    (tester) async {
+      final walletController = _TransitionWalletController(
+        const WalletState(
+          wallet: walletStateFixture,
+          ledger: <WalletLedgerItem>[],
+          hasCompletedFullLoad: false,
+          isLoading: false,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              AuthenticatedWalletAppLaunchController.new,
+            ),
+            walletControllerProvider.overrideWith(() => walletController),
+          ],
+          child: MaterialApp.router(
+            theme: AppTheme.dark(),
+            locale: const Locale('ru'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [
+              Locale('ru'),
+              Locale('en'),
+              Locale('de'),
+              Locale('es'),
+              Locale('fr'),
+              Locale('it'),
+              Locale('pl'),
+            ],
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) =>
+                      const Material(child: AllTransactionsPage()),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(walletController.loadCalls, 1);
+    },
+  );
+
   testWidgets('all transactions error state exposes explicit safe retry', (
     tester,
   ) async {
@@ -442,6 +642,48 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets(
+    'all transactions auto-loads more ledger when first page does not fill viewport',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 2200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final pagedLedger = List<WalletLedgerItem>.generate(
+        40,
+        (index) => WalletLedgerItem(
+          entryId: 'entry-$index',
+          userId: 'user-1',
+          delta: index.isEven ? 4 : -2,
+          balanceAfter: 500 + index,
+          source: index.isEven ? 'ad_reward' : 'generation_spend',
+          reason: 'Ledger entry $index',
+          createdAtUtc: DateTime.utc(2026, 1, 1, 9, index % 60),
+        ),
+        growable: false,
+      );
+      final repository = PagedLedgerWalletRepository(
+        wallet: walletStateFixture,
+        ledger: pagedLedger,
+        packs: packsFixture,
+        purchases: purchasesFixture,
+      );
+
+      await pumpAllTransactionsPage(tester, repository: repository);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(
+        repository.ledgerSkips,
+        [0, 24],
+        reason: 'short first page should auto-prefetch the next ledger page',
+      );
+      expect(
+        find.byKey(const ValueKey<String>('wallet_transactions_load_more')),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets(
     'all transactions keeps load-more failures explicit and manual-retry only',

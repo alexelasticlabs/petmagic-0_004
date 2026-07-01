@@ -231,7 +231,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
 
     _controller.setScreenVisible(false);
     _clearLoadingFallback();
-    _controller.stop();
+    _controller.suspend();
   }
 
   @override
@@ -333,7 +333,7 @@ class _SupportChatPageState extends ConsumerState<SupportChatPage>
     if (_externalMediaPickerDepth == 1) {
       _controller.setScreenVisible(false);
       _clearLoadingFallback();
-      _controller.stop();
+      _controller.suspend();
     }
     try {
       return await action();

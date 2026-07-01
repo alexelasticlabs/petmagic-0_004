@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_repository.dart';
+import 'package:petmagic_mobile/features/premium/presentation/mappers/premium_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
@@ -52,6 +53,8 @@ const PremiumStatusModel _guestPremiumStatus = PremiumStatusModel(
   canManageSubscription: false,
   manageSubscriptionAction: '',
 );
+
+const _premiumProviderCacheTtl = Duration(minutes: 5);
 
 class PremiumSubscriptionSummaryView {
   const PremiumSubscriptionSummaryView({
@@ -123,8 +126,25 @@ class PremiumSubscriptionSummaryView {
 
 final premiumSubscriptionSummaryProvider =
     FutureProvider.autoDispose<PremiumSubscriptionSummaryView>((ref) async {
+      final link = ref.keepAlive();
+      Timer? disposeTimer;
+      ref.onCancel(() {
+        disposeTimer?.cancel();
+        disposeTimer = Timer(_premiumProviderCacheTtl, link.close);
+      });
+      ref.onResume(() {
+        disposeTimer?.cancel();
+        disposeTimer = null;
+      });
       final repository = ref.watch(premiumRepositoryProvider);
-      final status = await repository.fetchStatus();
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        disposeTimer?.cancel();
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('premium_summary_cancelled');
+        }
+      });
+      final status = await repository.fetchStatus(cancelToken: cancelToken);
       return PremiumSubscriptionSummaryView.fromStatus(status);
     });
 
@@ -420,6 +440,7 @@ abstract class _PremiumControllerBase extends Notifier<PremiumState> {
   late PremiumRefreshProfile _refreshProfile;
   Future<void>? _loadInFlight;
   CancelToken? _activeLoadCancelToken;
+  CancelToken? _activeStatusRefreshCancelToken;
   bool _premiumLifecycleStarted = false;
 
   Future<void> load({bool refresh = false});

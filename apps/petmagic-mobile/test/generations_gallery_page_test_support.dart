@@ -237,11 +237,13 @@ class StaticGalleryWalletController extends WalletController {
 class TrackingGalleryWalletController extends WalletController {
   TrackingGalleryWalletController({
     this.hasWallet = false,
+    this.hasCompletedFullLoad = false,
     this.initiallyLoading = false,
     this.initiallyRefreshing = false,
   });
 
   final bool hasWallet;
+  final bool hasCompletedFullLoad;
   final bool initiallyLoading;
   final bool initiallyRefreshing;
   int loadCalls = 0;
@@ -258,6 +260,7 @@ class TrackingGalleryWalletController extends WalletController {
               updatedAtUtc: DateTime.utc(2026, 6, 15),
             )
           : null,
+      hasCompletedFullLoad: hasCompletedFullLoad,
       isLoading: initiallyLoading,
       isRefreshing: initiallyRefreshing,
     );

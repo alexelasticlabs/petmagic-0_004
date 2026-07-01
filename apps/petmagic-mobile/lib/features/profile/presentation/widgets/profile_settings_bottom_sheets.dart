@@ -16,6 +16,29 @@ class ProfileLanguageSheetOption {
   final String nativeLabel;
 }
 
+const profileLanguageSheetOptions = <ProfileLanguageSheetOption>[
+  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
+  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
+  ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
+  ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
+  ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
+  ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
+  ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
+];
+
+String profileLanguageLabel(AppLocalizations text, Locale locale) {
+  return switch (locale.languageCode) {
+    'ru' => text.profileSettingsLanguageRussian,
+    'en' => text.profileSettingsLanguageEnglish,
+    'de' => text.profileSettingsLanguageGerman,
+    'es' => text.profileSettingsLanguageSpanish,
+    'fr' => text.profileSettingsLanguageFrench,
+    'it' => text.profileSettingsLanguageItalian,
+    'pl' => text.profileSettingsLanguagePolish,
+    _ => text.profileSettingsLanguageEnglish,
+  };
+}
+
 Future<void> showProfileLanguageSheet({
   required BuildContext context,
   required Locale selectedLocale,

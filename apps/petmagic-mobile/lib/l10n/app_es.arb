@@ -14,7 +14,6 @@
   "notificationWalletBody": "Abre tu cartera para revisar el último cambio de saldo.",
   "notificationPremiumBody": "Abre tu perfil para revisar la última actualización de Premium.",
   "appUnexpectedErrorFallback": "Algo salió mal. Inténtalo de nuevo.",
-  "comingSoonMessage": "Esta sección está preparada para la próxima ola de productos.",
   "createMagicTitle": "Crear magia",
   "pickTemplateSubtitle": "Elige una plantilla para tu mascota",
   "searchTemplates": "Buscar plantillas",
@@ -82,6 +81,7 @@
   "profileEmailConfirmed": "Correo electrónico confirmado",
   "profileEmailPending": "Correo electrónico no confirmado",
   "profileSignedOut": "Cerró sesión en este dispositivo.",
+  "profileAccountDeleted": "Tu cuenta fue eliminada.",
   "magicLoadingPreparing": "Preparando la magia...",
   "magicLoadingCutestAngle": "Buscando el ángulo más lindo...",
   "magicLoadingAiPaws": "Calentando patas de IA...",
@@ -304,9 +304,9 @@
   "premiumPaymentChooseSubtitle": "Elige cómo quieres suscribirte",
   "premiumPaymentStripe": "Tarjeta vía Stripe",
   "premiumPaymentStripeSubtitle": "Tarjeta, Apple Pay o Google Pay",
-  "premiumPaymentGooglePlay": "GooglePlay",
+  "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Pago a través de Google Play",
-  "premiumPaymentApple": "Apple Pay/Tienda de aplicaciones",
+  "premiumPaymentApple": "Apple Pay / App Store",
   "premiumPaymentOther": "Otro método de pago",
   "premiumPaymentTrustStripeProcesses": "Los datos de la tarjeta se procesan de forma segura a través de Stripe.",
   "premiumPaymentTrustNoStorage": "PetMagic no guarda los datos de tu tarjeta.",
@@ -335,7 +335,7 @@
   "premiumTermsNotice": "Al continuar, aceptas los Términos de uso y la Política de privacidad.",
   "premiumStoreUnavailable": "Las suscripciones de App Store / Google Play están temporalmente no disponibles en este momento. Inténtalo más tarde o usa otro método de pago disponible.",
   "premiumStoreProductUnavailable": "Este producto de suscripción no está disponible en la tienda de este dispositivo.",
-  "premiumStoreVerificationUnavailable": "La verificación del store en el servidor aún no está configurada.",
+  "premiumStoreVerificationUnavailable": "La verificación de la tienda no está disponible temporalmente.",
   "premiumStorePurchaseInvalid": "No se pudo verificar la compra.",
   "premiumStorePurchaseInactive": "Esta suscripción ya no está activa.",
   "premiumPurchaseActivated": "Premium ya está activo.",
@@ -486,7 +486,7 @@
   "authReceiveUpdatesLabel": "Quiero recibir actualizaciones y ofertas de PetMagic",
   "authAcceptTermsRequired": "Debe aceptar los Términos de uso y la Política de privacidad para crear una cuenta.",
   "authGoogleShortLabel": "Google",
-  "authAppleShortLabel": "Manzana",
+  "authAppleShortLabel": "Apple",
   "authExternalCancelled": "El inicio de sesión fue cancelado.",
   "authExternalFailed": "Error de inicio de sesión externo. Por favor inténtalo de nuevo.",
   "authExternalTimedOut": "El inicio de sesión tardó demasiado. Por favor inténtalo de nuevo.",
@@ -588,6 +588,17 @@
   "generationStatusEtaDefault": "Quedan aprox. 1-2 min",
   "generationStatusEtaStartsSoon": "Comenzara en unos minutos",
   "generationStatusEtaNotifyHint": "Te avisaremos cuando el resultado este listo.",
+  "generationStatusCancelledTitle": "Generación cancelada",
+  "generationStatusCancelledMessage": "Esta generación se detuvo antes de iniciar el procesamiento.",
+  "generationStatusCancelQueuedHint": "Puedes cancelar mientras esta generación siga esperando en cola.",
+  "generationStatusCancelQueuedAction": "Cancelar generación",
+  "generationStatusCancelQueuedTitle": "¿Cancelar generación?",
+  "generationStatusCancelQueuedMessage": "Esto solo funciona mientras la generación sigue en cola. Si se reservaron PawSpark, el backend los devolverá automáticamente.",
+  "generationStatusCancelQueuedKeepAction": "Seguir esperando",
+  "generationStatusCancelQueuedConfirmAction": "Confirmar cancelación",
+  "generationStatusCancelQueuedSuccess": "Generación cancelada.",
+  "generationStatusCancelQueuedAlreadyStarted": "La generación ya comenzó y no se puede cancelar.",
+  "generationStatusCancelQueuedFailed": "No se pudo cancelar la generación. Inténtalo de nuevo.",
   "generationStatusFailurePhotoHint": "La foto no es adecuada para esta plantilla. Prueba con una foto donde la mascota se vea claramente.",
   "generationStatusFailureTechnicalHint": "No se pudo crear el resultado por un problema tecnico. Los PawSpark se devolvieron a tu saldo.",
   "generationStatusStatusCompleted": "Tu resultado esta listo",
@@ -665,8 +676,8 @@
   "subscriptionPaymentMethodLabel": "Método de pago",
   "subscriptionPaymentCardLabel": "Tarjeta",
   "subscriptionPaymentProviderStripe": "Tarjeta a través de Stripe",
-  "subscriptionPaymentProviderGooglePlay": "GooglePlay",
-  "subscriptionPaymentProviderAppStore": "Apple/tienda de aplicaciones",
+  "subscriptionPaymentProviderGooglePlay": "Google Play",
+  "subscriptionPaymentProviderAppStore": "App Store",
   "subscriptionChangePaymentAction": "Cambiar método de pago",
   "subscriptionCancelAction": "Cancelar suscripción",
   "subscriptionCancelledHint": "La suscripción está activa hasta el {date}. No se renovará después.",
@@ -722,7 +733,7 @@
   "walletSpendVideoSubtitle": "Vídeos\nde 50 Spark",
   "walletSpendPremiumSubtitle": "Premium\ndesde 80 Spark",
   "walletContactSupportAction": "Contactar con soporte",
-  "walletRetryAction": "Rever",
+  "walletRetryAction": "Reintentar",
   "rewardsPageTitle": "Recompensas",
   "rewardsPageSubtitle": "Gana PawSpark con códigos promocionales e invitaciones",
   "rewardsLastUpdatedLabel": "Actualizado: {value}",
@@ -1154,7 +1165,7 @@
   "generationStatusOnlineBannerSyncedAt": "Actualizado: {value}",
   "@generationStatusOnlineBannerSyncedAt": {},
   "walletStripeCardBrandsLabel": "Visa • Mastercard",
-  "walletStripeWalletsLabel": "Pago de Apple • Pago de Google",
+  "walletStripeWalletsLabel": "Apple Pay • Google Pay",
   "walletPackUsageNote": "Utilizado para generaciones de fotos y videos.",
   "walletCheckoutTaxLabel": "Impuesto",
   "walletCheckoutTaxIncludedValue": "Incluido",
@@ -1165,7 +1176,7 @@
   "emailVerificationCodeSentMessage": "Enviamos un código de 6 dígitos a {email}.",
   "@emailVerificationCodeSentMessage": {},
   "emailVerificationCodeLabel": "Código",
-  "emailVerificationWorkingLabel": "Laboral...",
+  "emailVerificationWorkingLabel": "Procesando...",
   "emailVerificationVerifyAction": "Verificar",
   "emailVerificationResendAction": "Enviar código nuevamente",
   "emailVerificationChangeEmailAction": "Cambiar correo electrónico",
@@ -1221,10 +1232,10 @@
   "generationStatusRemovingWatermark": "Eliminando...",
   "generationStatusUpgradePremium": "Pasar a Premium",
   "generationStatusRemoveWatermarkSheetTitle": "Eliminar marca de agua",
-  "generationStatusRemoveWatermarkSheetBody": "Usa {cost} crédito para este resultado o pasa a Premium para descargas limpias.",
-  "generationStatusRemoveWatermarkUseCredit": "Usar {cost} crédito",
+  "generationStatusRemoveWatermarkSheetBody": "Usa {cost} PawSpark para este resultado o pasa a Premium para descargas limpias.",
+  "generationStatusRemoveWatermarkUseCredit": "Usar {cost} PawSpark",
   "generationStatusRemoveWatermarkFailed": "No se pudo eliminar la marca de agua. Inténtalo de nuevo.",
-  "generationStatusRemoveWatermarkNoCredits": "No tienes créditos suficientes. Compra créditos o pasa a Premium.",
+  "generationStatusRemoveWatermarkNoCredits": "No tienes suficiente PawSpark. Recarga PawSpark o pásate a Premium.",
   "globalOfflineBannerTitle": "Sin conexión a internet",
   "globalOfflineBannerMessage": "Algunas funciones no estarán disponibles hasta que se restablezca la conexión.",
   "globalOnlineRestoredBannerTitle": "Conexión restablecida",
@@ -1461,5 +1472,46 @@
         "type": "String"
       }
     }
-  }
+  },
+  "generationStatusQueuePositionWithWait": "Posicion en cola #{position} - {wait}",
+  "@generationStatusQueuePositionWithWait": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "wait": {
+        "type": "String"
+      }
+    }
+  },
+  "generationStatusQueuePosition": "Posicion en cola #{position}",
+  "@generationStatusQueuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusWaitMinutes": "{minutes} min",
+  "@generationStatusWaitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusStatusCancelled": "Generación cancelada",
+  "generationStatusTerminalCancelledHint": "La generación se canceló antes de completarse.",
+  "generationStatusQueuedVideoHint": "El video suele tardar mas que las fotos y puede requerir unos minutos.",
+  "templateFlowGenerationWaitTooLongTitle": "Ahora hay mucha carga",
+  "templateFlowGenerationWaitTooLongMessage": "El tiempo de espera estimado para esta generacion es demasiado largo. Pruebalo mas tarde o elige una generacion de foto, que normalmente es mas rapida.",
+  "templateFlowGenerationWaitTooLongRetryAfter": "Vuelve a intentarlo en aproximadamente {value}.",
+  "@templateFlowGenerationWaitTooLongRetryAfter": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium accede a una cola prioritaria y normalmente espera menos."
 }

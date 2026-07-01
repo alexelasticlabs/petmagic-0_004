@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
+import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -202,18 +203,256 @@ void main() {
     );
   });
 
+  test('parses queue metadata and cancelled status as terminal', () {
+    final dto = TemplateGenerationDto.fromJson({
+      'generationId': 'generation-queue-1',
+      'userId': 'user-1',
+      'templateId': 'template-video-1',
+      'status': 'Cancelled',
+      'tokenCost': 10,
+      'attemptCount': 1,
+      'createdAtUtc': '2026-06-14T12:00:00Z',
+      'updatedAtUtc': '2026-06-14T12:01:00Z',
+      'mediaType': 'video',
+      'tier': 'free',
+      'queuePosition': 4,
+      'estimatedWaitSeconds': 420,
+      'estimatedTotalSeconds': 540,
+      'estimatedCompletionAtUtc': '2026-06-14T12:09:00Z',
+      'queueStatus': 'queued',
+      'canCancel': false,
+    });
+
+    final generation = dto.toDomain();
+
+    expect(generation.status, TemplateGenerationStatus.cancelled);
+    expect(generation.isTerminal, isTrue);
+    expect(generation.isCancelled, isTrue);
+    expect(generation.mediaType, 'video');
+    expect(generation.tier, 'free');
+    expect(generation.queuePosition, 4);
+    expect(generation.estimatedWaitSeconds, 420);
+    expect(generation.estimatedTotalSeconds, 540);
+    expect(
+      generation.estimatedCompletionAtUtc,
+      DateTime.utc(2026, 6, 14, 12, 9),
+    );
+    expect(generation.queueStatus, 'queued');
+    expect(generation.canCancelQueued, isFalse);
+  });
+
+  test('parses legacy generation responses without queue metadata', () {
+    final dto = TemplateGenerationDto.fromJson(
+      generationJson(
+        generationId: 'generation-legacy-1',
+        status: 'Processing',
+        updatedAtUtc: '2026-06-14T12:01:00Z',
+      ),
+    );
+
+    final generation = dto.toDomain();
+
+    expect(generation.status, TemplateGenerationStatus.processing);
+    expect(generation.queuePosition, isNull);
+    expect(generation.estimatedWaitSeconds, isNull);
+    expect(generation.estimatedCompletionAtUtc, isNull);
+    expect(generation.estimatedTotalSeconds, isNull);
+    expect(generation.mediaType, isNull);
+    expect(generation.tier, isNull);
+    expect(generation.queueStatus, isNull);
+    expect(generation.canCancelQueued, isFalse);
+  });
+
+  test(
+    'parses async provider queue statuses as active non-cancellable states',
+    () {
+      final cases = {
+        'SubmittingToProvider': TemplateGenerationStatus.submittingToProvider,
+        'ProviderQueued': TemplateGenerationStatus.providerQueued,
+        'ProviderProcessing': TemplateGenerationStatus.providerProcessing,
+        'ImportingMedia': TemplateGenerationStatus.importingMedia,
+      };
+
+      for (final entry in cases.entries) {
+        final generation = TemplateGenerationDto.fromJson(
+          generationJson(
+            generationId: 'generation-${entry.key}',
+            status: entry.key,
+            updatedAtUtc: '2026-06-14T12:01:00Z',
+          ),
+        ).toDomain();
+
+        expect(generation.status, entry.value);
+        expect(generation.isTerminal, isFalse);
+        expect(generation.canCancelQueued, isFalse);
+      }
+    },
+  );
+
+  test(
+    'maps GENERATION_WAIT_TOO_LONG response to structured exception',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          expect(options.path, '/api/templates/generations/from-pet');
+          return jsonResponse({
+            'code': 'GENERATION_WAIT_TOO_LONG',
+            'mediaType': 'video',
+            'tier': 'free',
+            'estimatedWaitSeconds': 1800,
+            'maxAllowedWaitSeconds': 1200,
+            'retryAfterSeconds': 300,
+            'canRetry': true,
+            'canUpgradeForPriority': true,
+          }, statusCode: 503);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: SharedPreferencesAsync(),
+      );
+
+      await expectLater(
+        repository.startGenerationFromPet(
+          petId: 'pet-1',
+          templateId: 'template-video-1',
+        ),
+        throwsA(
+          isA<GenerationWaitTooLongException>()
+              .having((error) => error.mediaType, 'mediaType', 'video')
+              .having((error) => error.tier, 'tier', 'free')
+              .having(
+                (error) => error.estimatedWaitSeconds,
+                'estimatedWaitSeconds',
+                1800,
+              )
+              .having(
+                (error) => error.retryAfterSeconds,
+                'retryAfterSeconds',
+                300,
+              )
+              .having(
+                (error) => error.canUpgradeForPriority,
+                'canUpgradeForPriority',
+                isTrue,
+              )
+              .having(
+                (error) => error.message,
+                'message',
+                'templates.generation_wait_too_long',
+              ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'maps 503 wait metadata to structured exception when code is generic',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          return jsonResponse({
+            'code': 'INTERNAL_SERVER_ERROR',
+            'mediaType': 'video',
+            'tier': 'free',
+            'estimatedWaitSeconds': 4200,
+            'maxAllowedWaitSeconds': 3600,
+            'retryAfterSeconds': 300,
+            'canRetry': true,
+            'canUpgradeForPriority': true,
+          }, statusCode: 503);
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: SharedPreferencesAsync(),
+      );
+
+      await expectLater(
+        repository.startGenerationFromPet(
+          petId: 'pet-1',
+          templateId: 'template-video-1',
+        ),
+        throwsA(
+          isA<GenerationWaitTooLongException>()
+              .having((error) => error.mediaType, 'mediaType', 'video')
+              .having((error) => error.tier, 'tier', 'free')
+              .having(
+                (error) => error.estimatedWaitSeconds,
+                'estimatedWaitSeconds',
+                4200,
+              )
+              .having(
+                (error) => error.maxAllowedWaitSeconds,
+                'maxAllowedWaitSeconds',
+                3600,
+              )
+              .having(
+                (error) => error.canUpgradeForPriority,
+                'canUpgradeForPriority',
+                isTrue,
+              ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'cancelGeneration posts cancel endpoint and parses refund result',
+    () async {
+      const generationId = 'generation/queued 1?x=true';
+      final encodedGenerationId = Uri.encodeComponent(generationId);
+      RequestOptions? capturedOptions;
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = FakeHttpClientAdapter((options) async {
+          capturedOptions = options;
+          expect(options.method, 'POST');
+          expect(
+            options.path,
+            '/api/templates/generations/$encodedGenerationId/cancel',
+          );
+          expect(options.headers['X-Correlation-Id'], 'corr-cancel');
+          return jsonResponse({
+            'generation': generationJson(
+              generationId: generationId,
+              status: 'Cancelled',
+              updatedAtUtc: '2026-06-14T12:05:00Z',
+            ),
+            'refunded': true,
+            'cancelledAtUtc': '2026-06-14T12:05:00Z',
+          });
+        });
+      final repository = TemplateGenerationRepository(
+        dio: dio,
+        sessionStorage: TestSessionStorage(sessionFixture()),
+        preferences: SharedPreferencesAsync(),
+      );
+
+      final result = await repository.cancelGeneration(
+        generationId,
+        correlationId: 'corr-cancel',
+      );
+
+      expect(capturedOptions, isNotNull);
+      expect(result.refunded, isTrue);
+      expect(result.generation.status, TemplateGenerationStatus.cancelled);
+      expect(result.generation.isTerminal, isTrue);
+      expect(result.cancelledAtUtc, DateTime.utc(2026, 6, 14, 12, 5));
+    },
+  );
+
   test(
     'readActiveGeneration migrates missing correlation id in persisted state',
     () async {
       final preferences = SharedPreferencesAsync();
       await preferences.setString(
-        'templates_active_generation_id_v1',
+        'templates_active_generation_id_v1:user-1',
         'generation-1',
       );
 
       final repository = TemplateGenerationRepository(
         dio: Dio(),
-        sessionStorage: AuthSessionStorage(),
+        sessionStorage: TestSessionStorage(sessionFixture()),
         preferences: preferences,
       );
 
@@ -223,7 +462,7 @@ void main() {
       expect(restored?.correlationId, startsWith('generation-'));
 
       final persistedCorrelationId = await preferences.getString(
-        'templates_active_generation_correlation_id_v1',
+        'templates_active_generation_correlation_id_v1:user-1',
       );
       expect(persistedCorrelationId, restored?.correlationId);
     },

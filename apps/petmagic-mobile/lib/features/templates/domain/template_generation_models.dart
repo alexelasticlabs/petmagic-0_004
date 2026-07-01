@@ -7,8 +7,13 @@ enum TemplateGenerationStatus {
   preprocessing,
   generating,
   finalizing,
+  submittingToProvider,
+  providerQueued,
+  providerProcessing,
+  importingMedia,
   completed,
   failed,
+  cancelled,
 }
 
 TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
@@ -18,8 +23,22 @@ TemplateGenerationStatus templateGenerationStatusFromApi(String value) {
     'preprocessing' => TemplateGenerationStatus.preprocessing,
     'generating' => TemplateGenerationStatus.generating,
     'finalizing' => TemplateGenerationStatus.finalizing,
+    'submittingtoprovider' ||
+    'submitting_to_provider' ||
+    'submitting-to-provider' => TemplateGenerationStatus.submittingToProvider,
+    'providerqueued' ||
+    'provider_queued' ||
+    'provider-queued' => TemplateGenerationStatus.providerQueued,
+    'providerprocessing' ||
+    'provider_processing' ||
+    'provider-processing' => TemplateGenerationStatus.providerProcessing,
+    'importingmedia' ||
+    'importing_media' ||
+    'importing-media' => TemplateGenerationStatus.importingMedia,
     'completed' => TemplateGenerationStatus.completed,
+    'succeeded' => TemplateGenerationStatus.completed,
     'failed' => TemplateGenerationStatus.failed,
+    'cancelled' || 'canceled' => TemplateGenerationStatus.cancelled,
     _ => TemplateGenerationStatus.queued,
   };
 }
@@ -59,6 +78,12 @@ class TemplateGenerationResult {
     this.isUnread = false,
     this.queuePosition,
     this.estimatedWaitSeconds,
+    this.estimatedCompletionAtUtc,
+    this.estimatedTotalSeconds,
+    this.mediaType,
+    this.tier,
+    this.queueStatus,
+    this.canCancel,
     this.localPreviewPath,
     this.localOutputPath,
     this.isLocalMediaReady = false,
@@ -112,6 +137,12 @@ class TemplateGenerationResult {
   final bool isUnread;
   final int? queuePosition;
   final int? estimatedWaitSeconds;
+  final DateTime? estimatedCompletionAtUtc;
+  final int? estimatedTotalSeconds;
+  final String? mediaType;
+  final String? tier;
+  final String? queueStatus;
+  final bool? canCancel;
   final String? localPreviewPath;
   final String? localOutputPath;
   final bool isLocalMediaReady;
@@ -165,6 +196,12 @@ class TemplateGenerationResult {
     bool? isUnread,
     int? queuePosition,
     int? estimatedWaitSeconds,
+    DateTime? estimatedCompletionAtUtc,
+    int? estimatedTotalSeconds,
+    String? mediaType,
+    String? tier,
+    String? queueStatus,
+    bool? canCancel,
     String? localPreviewPath,
     bool clearLocalPreviewPath = false,
     String? localOutputPath,
@@ -226,6 +263,14 @@ class TemplateGenerationResult {
       isUnread: isUnread ?? this.isUnread,
       queuePosition: queuePosition ?? this.queuePosition,
       estimatedWaitSeconds: estimatedWaitSeconds ?? this.estimatedWaitSeconds,
+      estimatedCompletionAtUtc:
+          estimatedCompletionAtUtc ?? this.estimatedCompletionAtUtc,
+      estimatedTotalSeconds:
+          estimatedTotalSeconds ?? this.estimatedTotalSeconds,
+      mediaType: mediaType ?? this.mediaType,
+      tier: tier ?? this.tier,
+      queueStatus: queueStatus ?? this.queueStatus,
+      canCancel: canCancel ?? this.canCancel,
       localPreviewPath: clearLocalPreviewPath
           ? null
           : localPreviewPath ?? this.localPreviewPath,
@@ -256,11 +301,28 @@ class TemplateGenerationResult {
 
   bool get isTerminal =>
       status == TemplateGenerationStatus.completed ||
-      status == TemplateGenerationStatus.failed;
+      status == TemplateGenerationStatus.failed ||
+      status == TemplateGenerationStatus.cancelled;
 
   bool get isCompleted => status == TemplateGenerationStatus.completed;
 
   bool get isFailed => status == TemplateGenerationStatus.failed;
+
+  bool get isCancelled => status == TemplateGenerationStatus.cancelled;
+
+  bool get isWaitingInQueue =>
+      status == TemplateGenerationStatus.queued ||
+      status == TemplateGenerationStatus.submittingToProvider ||
+      status == TemplateGenerationStatus.providerQueued;
+
+  bool get isActivelyGenerating =>
+      status == TemplateGenerationStatus.processing ||
+      status == TemplateGenerationStatus.preprocessing ||
+      status == TemplateGenerationStatus.generating ||
+      status == TemplateGenerationStatus.providerProcessing;
+
+  bool get canCancelQueued =>
+      status == TemplateGenerationStatus.queued && (canCancel ?? true);
 
   int get effectiveProgressPercent {
     final explicit = progressPercent;
@@ -271,14 +333,31 @@ class TemplateGenerationResult {
     return switch (status) {
       TemplateGenerationStatus.completed => 100,
       TemplateGenerationStatus.failed => 100,
+      TemplateGenerationStatus.cancelled => 100,
       TemplateGenerationStatus.finalizing => 90,
+      TemplateGenerationStatus.importingMedia => 90,
       TemplateGenerationStatus.generating => 65,
+      TemplateGenerationStatus.providerProcessing => 65,
       TemplateGenerationStatus.preprocessing ||
       TemplateGenerationStatus.processing => 30,
+      TemplateGenerationStatus.providerQueued => 24,
+      TemplateGenerationStatus.submittingToProvider => 18,
       TemplateGenerationStatus.uploading => 15,
       TemplateGenerationStatus.queued => 10,
     };
   }
+}
+
+class GenerationCancelResult {
+  const GenerationCancelResult({
+    required this.generation,
+    this.refunded = false,
+    this.cancelledAtUtc,
+  });
+
+  final TemplateGenerationResult generation;
+  final bool refunded;
+  final DateTime? cancelledAtUtc;
 }
 
 class CompatibleGenerationTemplate {

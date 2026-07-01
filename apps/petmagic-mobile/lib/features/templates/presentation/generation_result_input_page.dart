@@ -490,7 +490,8 @@ class _CompatibleTemplateTile extends StatelessWidget {
                         ),
                         if (template.isRecommended)
                           _MiniBadge(label: copy.recommended),
-                        if (template.isPremium) _MiniBadge(label: 'Premium'),
+                        if (template.isPremium)
+                          _MiniBadge(label: text.premiumLabel),
                       ],
                     ),
                     const SizedBox(height: 6),

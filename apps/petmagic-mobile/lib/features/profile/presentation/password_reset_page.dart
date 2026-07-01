@@ -322,7 +322,8 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
     }
 
     final nextState = ref.read(passwordResetControllerProvider);
-    if (nextState.successMessage == 'auth.password_reset_success') {
+    if (normalizeProfileSuccessKey(nextState.successMessage) ==
+        'auth.password_reset_success') {
       PetMagicToast.show(
         context,
         message: text.authPasswordResetSuccess,
@@ -363,13 +364,6 @@ class _PasswordResetPageState extends ConsumerState<PasswordResetPage> {
   }
 
   String? _mapSuccessMessage(String raw, AppLocalizations text) {
-    switch (raw) {
-      case 'auth.password_reset_code_sent':
-        return text.authPasswordResetCodeSent;
-      case 'auth.password_reset_success':
-        return text.authPasswordResetSuccess;
-      default:
-        return null;
-    }
+    return mapProfileSuccessMessage(raw, text);
   }
 }

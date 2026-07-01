@@ -301,13 +301,15 @@ void main() {
   testWidgets(
     'auto refresh polls every 8 seconds and backs off to 30 after errors',
     (tester) async {
-      final ready = generationFixture(
-        generationId: 'generation-ready',
-        status: TemplateGenerationStatus.completed,
+      final active = generationFixture(
+        generationId: 'generation-active',
+        status: TemplateGenerationStatus.processing,
+        stage: 'rendering',
+        progressPercent: 42,
       );
       final repository = FakeTemplateGenerationRepository(
         remoteByStatus: {
-          null: [ready],
+          null: [active],
         },
       );
       final harness = GenerationHistoryControllerHarness(
@@ -365,6 +367,48 @@ void main() {
         await tester.pump();
 
         expect(repository.fetchCalls.length, 6);
+      } finally {
+        controller.setScreenVisible(false);
+        harness.dispose();
+      }
+    },
+  );
+
+  testWidgets(
+    'idle generation history uses sparse refresh cadence when realtime is connected',
+    (tester) async {
+      final ready = generationFixture(
+        generationId: 'generation-ready',
+        status: TemplateGenerationStatus.completed,
+      );
+      final repository = FakeTemplateGenerationRepository(
+        remoteByStatus: {
+          null: [ready],
+        },
+      );
+      final harness = GenerationHistoryControllerHarness(
+        repository: repository,
+      );
+      final controller = harness.controller;
+
+      try {
+        controller.setScreenVisible(true);
+        await controller.load();
+        expect(repository.fetchCalls.length, 1);
+        expect(harness.realtimeClient.connectCalls, 1);
+
+        await tester.pump(const Duration(minutes: 4));
+        await tester.pump(const Duration(seconds: 59));
+        expect(
+          repository.fetchCalls.length,
+          1,
+          reason:
+              'idle gallery should not poll every few seconds while realtime is healthy',
+        );
+
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pump();
+        expect(repository.fetchCalls.length, 2);
       } finally {
         controller.setScreenVisible(false);
         harness.dispose();

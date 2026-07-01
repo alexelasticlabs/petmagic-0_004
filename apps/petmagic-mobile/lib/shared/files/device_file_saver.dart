@@ -1,9 +1,9 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
 import 'package:share_plus/share_plus.dart';
+
+import 'temp_media_cleanup.dart';
 
 const defaultRemoteFileDownloadMaxBytes = 128 * 1024 * 1024;
 
@@ -172,9 +172,7 @@ Future<bool> saveBytesToDevice({
     return result.status == ShareResultStatus.success;
   }
 
-  final tempFile = File(
-    '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_$safeFileName',
-  );
+  final tempFile = TempMediaCleanup.createScopedTempFile(safeFileName);
   await tempFile.writeAsBytes(bytes, flush: true);
   try {
     final result = await SharePlus.instance.share(
@@ -182,9 +180,7 @@ Future<bool> saveBytesToDevice({
     );
     return result.status == ShareResultStatus.success;
   } finally {
-    if (await tempFile.exists()) {
-      await tempFile.delete();
-    }
+    await TempMediaCleanup.deleteIfExists(tempFile);
   }
 }
 

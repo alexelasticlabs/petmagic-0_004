@@ -5,13 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations_en.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/data/premium_models.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
+import 'package:petmagic_mobile/features/premium/presentation/mappers/premium_error_key_mapper.dart';
+import 'package:petmagic_mobile/features/premium/presentation/paywall_feedback_scope.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_stripe_checkout_page.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
+import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
 import 'package:petmagic_mobile/features/profile/presentation/widgets/auth_required_sheet.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
@@ -62,17 +68,29 @@ class PremiumPage extends ConsumerStatefulWidget {
 
 class _PremiumPageState extends ConsumerState<PremiumPage>
     with WidgetsBindingObserver {
-  static const _paywallFeedbackLastShownKey =
-      'feedback_paywall_last_shown_utc_v1';
   static const _paywallFeedbackCooldown = Duration(days: 3);
 
   bool _shouldReloadOnResume = false;
   bool _didAutoCloseAfterActivation = false;
 
+  bool _hasHydratedPremiumSnapshot(PremiumState state) {
+    return state.plans.isNotEmpty &&
+        state.legalTexts != null &&
+        state.status != null;
+  }
+
   void _initializePremiumPage() {
     WidgetsBinding.instance.addObserver(this);
+    if (_hasHydratedPremiumSnapshot(ref.read(premiumControllerProvider))) {
+      return;
+    }
+
     Future.microtask(() {
       if (!mounted) {
+        return;
+      }
+
+      if (_hasHydratedPremiumSnapshot(ref.read(premiumControllerProvider))) {
         return;
       }
 
@@ -131,10 +149,22 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 
   Future<void> _maybeAskPaywallFeedback() async {
     final preferences = SharedPreferencesAsync();
+    final scopeKey =
+        await PaywallFeedbackScopeResolver(
+          sessionStorage: ref.read(authSessionStorageProvider),
+        ).resolve(
+          isAuthenticated: ref
+              .read(appLaunchControllerProvider)
+              .isAuthenticated,
+          profileUserId: ref.read(profileControllerProvider).profile?.userId,
+        );
+    if (scopeKey == null) {
+      return;
+    }
+
+    final lastShownKey = buildPaywallFeedbackLastShownStorageKey(scopeKey);
     final now = DateTime.now().toUtc();
-    final lastShownRaw = await preferences.getString(
-      _paywallFeedbackLastShownKey,
-    );
+    final lastShownRaw = await preferences.getString(lastShownKey);
     final lastShown = lastShownRaw == null
         ? null
         : DateTime.tryParse(lastShownRaw)?.toUtc();
@@ -143,10 +173,7 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
       return;
     }
 
-    await preferences.setString(
-      _paywallFeedbackLastShownKey,
-      now.toIso8601String(),
-    );
+    await preferences.setString(lastShownKey, now.toIso8601String());
     if (!mounted) {
       return;
     }
@@ -505,8 +532,10 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
           previous?.recentlyActivatedPremium != true &&
           next.recentlyActivatedPremium;
       final justActivatedViaSuccessMessage =
-          previous?.successMessage != 'premium.purchase_activated' &&
-          next.successMessage == 'premium.purchase_activated' &&
+          normalizePremiumErrorKey(previous?.successMessage) !=
+              'premium.purchase_activated' &&
+          normalizePremiumErrorKey(next.successMessage) ==
+              'premium.purchase_activated' &&
           next.isPremium;
 
       final justActivated =
@@ -564,6 +593,11 @@ class _PremiumPageState extends ConsumerState<PremiumPage>
 }
 
 String _resolveCheckoutErrorMessage(AppLocalizations text, String value) {
+  final authMessage = mapCommonAuthFeedbackMessage(text, value);
+  if (authMessage != null) {
+    return authMessage;
+  }
+
   final normalized = value.trim().toLowerCase();
   if (normalized.contains('premium.purchase_cancelled')) {
     return text.premiumPurchaseCancelled;

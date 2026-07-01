@@ -287,11 +287,15 @@ class SupportChatRepository {
     }
   }
 
-  Future<void> markConversationRead(String conversationId) async {
+  Future<void> markConversationRead(
+    String conversationId, {
+    CancelToken? cancelToken,
+  }) async {
     await _authorizedRequest<void>(
       (session) => _dio.post<void>(
         '/api/support/conversation/$conversationId/read',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
       retryTransientFailures: false,
     );

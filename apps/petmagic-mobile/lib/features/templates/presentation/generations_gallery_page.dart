@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/performance/performance_guard.dart';
 import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
@@ -20,6 +21,7 @@ import 'package:petmagic_mobile/features/templates/presentation/generation_statu
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generations_gallery_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart'
     show statusTitle;
+import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
@@ -631,9 +633,9 @@ class _GenerationsGalleryPageState extends ConsumerState<GenerationsGalleryPage>
     final launchState = ref.read(appLaunchControllerProvider);
     final walletState = ref.read(walletControllerProvider);
     if (!launchState.isAuthenticated ||
-        walletState.wallet != null ||
         walletState.isLoading ||
-        walletState.isRefreshing) {
+        walletState.isRefreshing ||
+        walletState.hasCompletedFullLoad) {
       return;
     }
 

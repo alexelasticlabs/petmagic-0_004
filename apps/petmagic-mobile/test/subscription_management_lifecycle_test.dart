@@ -59,6 +59,14 @@ void main() {
       expect(source, isNot(contains(literal)));
     }
     expect(
+      sectionsSource,
+      contains('summary.planName ?? text.premiumPageTitle'),
+    );
+    expect(
+      sectionsSource,
+      isNot(contains("summary.planName ?? 'PetMagic Premium'")),
+    );
+    expect(
       pageSource,
       contains("part 'subscription_management_content.part.dart';"),
     );

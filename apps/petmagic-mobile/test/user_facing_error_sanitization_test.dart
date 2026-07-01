@@ -22,6 +22,18 @@ void main() {
       File(
         'lib/features/templates/presentation/template_generation_controller.dart',
       ).readAsStringSync(),
+      File(
+        'lib/features/gamification/presentation/achievements_page.dart',
+      ).readAsStringSync(),
+      File(
+        'lib/features/profile/presentation/profile_page_gamification.part.dart',
+      ).readAsStringSync(),
+      File(
+        'lib/features/pets/presentation/my_pets_page.dart',
+      ).readAsStringSync(),
+      File(
+        'lib/features/templates/presentation/generations_gallery_page_states_and_actions.dart',
+      ).readAsStringSync(),
     ];
 
     for (final source in sources) {
@@ -30,10 +42,19 @@ void main() {
     }
 
     expect(sources[0], contains('_premiumErrorMessage(error,'));
+    expect(sources[0], contains('normalizePremiumErrorKey(error.message)'));
     expect(sources[1], isNot(contains('result.errorMessage?.trim()')));
     expect(sources[1], isNot(contains('message: failureMessage')));
+    expect(sources[1], contains('mapCommonAuthFeedbackMessage(text, value)'));
     expect(sources[2], contains('_errorMessage(error)'));
+    expect(sources[2], contains('normalizeWalletErrorKey(error.message)'));
     expect(sources[3], contains('_historyLoadErrorMessage(error)'));
-    expect(sources[4], contains('_isSafeGenerationErrorKey(message)'));
+    expect(sources[3], contains('normalizeTemplateErrorKey(error.message)'));
+    expect(sources[4], contains('normalizeTemplateErrorKey(error.message)'));
+    expect(sources[5], contains('achievementsErrorMessage('));
+    expect(sources[6], contains('achievementsErrorMessage('));
+    expect(sources[7], contains('_petsErrorMessage('));
+    expect(sources[8], contains('normalizeTemplateErrorKey(raw)'));
+    expect(sources[8], isNot(contains('=> raw')));
   });
 }

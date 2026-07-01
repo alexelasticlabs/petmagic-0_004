@@ -69,6 +69,45 @@ void main() {
     },
   );
 
+  test(
+    'explicit configured base URL ignores stale persisted preference',
+    () async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() {
+        SharedPreferencesAsyncPlatform.instance = previousPreferences;
+      });
+
+      final preferences = SharedPreferencesAsync();
+      await preferences.setString(
+        persistedBaseUrlKey,
+        'http://192.168.1.9:5000',
+      );
+
+      final probedBaseUrls = <String>[];
+      final resolver = ApiBaseUrlResolver(
+        preferences: preferences,
+        baseUrls: const ['http://127.0.0.1:5000'],
+        preferConfiguredBaseUrls: true,
+        healthProbe: (baseUrl) async {
+          probedBaseUrls.add(baseUrl);
+          return true;
+        },
+      );
+
+      addTearDown(resolver.dispose);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      expect(resolver.activeBaseUrl, 'http://127.0.0.1:5000');
+      expect(probedBaseUrls, ['http://127.0.0.1:5000']);
+      expect(
+        await preferences.getString(persistedBaseUrlKey),
+        'http://127.0.0.1:5000',
+      );
+    },
+  );
+
   test('late health probe completion does not mutate after dispose', () async {
     final previousPreferences = SharedPreferencesAsyncPlatform.instance;
     SharedPreferencesAsyncPlatform.instance =
@@ -104,4 +143,54 @@ void main() {
       AppConfig.apiBaseUrl,
     );
   });
+
+  test(
+    'recent successful base URL resolution skips redundant background probe until stale',
+    () async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(() {
+        SharedPreferencesAsyncPlatform.instance = previousPreferences;
+      });
+
+      final preferences = SharedPreferencesAsync();
+      var now = DateTime.utc(2026, 1, 1, 12);
+      var probeCount = 0;
+      final resolver = ApiBaseUrlResolver(
+        preferences: preferences,
+        baseUrls: const ['http://127.0.0.1:5000'],
+        backgroundRefreshInterval: const Duration(minutes: 5),
+        now: () => now,
+        healthProbe: (baseUrl) async {
+          probeCount++;
+          return baseUrl == 'http://127.0.0.1:5000';
+        },
+      );
+
+      addTearDown(resolver.dispose);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      expect(probeCount, 1);
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        probeCount,
+        1,
+        reason:
+            'recent successful traffic should keep the active base URL warm',
+      );
+
+      now = now.add(const Duration(minutes: 6));
+
+      expect(await resolver.resolveBaseUrl(), 'http://127.0.0.1:5000');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(
+        probeCount,
+        2,
+        reason: 'stale health should trigger a single background re-probe',
+      );
+    },
+  );
 }

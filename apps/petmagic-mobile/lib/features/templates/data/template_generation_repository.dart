@@ -50,6 +50,7 @@ class TemplateGenerationRepository {
     ImageUploadOptimizer? imageUploadOptimizer,
     AuthSessionCoordinator? authSessionCoordinator,
   }) : _dio = dio,
+       _sessionStorage = sessionStorage,
        _preferences = preferences,
        _imageUploadOptimizer =
            imageUploadOptimizer ?? const ImageUploadOptimizer(),
@@ -78,9 +79,11 @@ class TemplateGenerationRepository {
   static final Random _correlationRandom = Random.secure();
 
   final Dio _dio;
+  final AuthSessionStorage _sessionStorage;
   final SharedPreferencesAsync _preferences;
   final ImageUploadOptimizer _imageUploadOptimizer;
   final AuthSessionCoordinator _authSessionCoordinator;
+  Future<String?>? _cacheScopeFuture;
 
   Future<TemplateGenerationResult> startGeneration({
     required String templateId,
@@ -159,6 +162,35 @@ class TemplateGenerationRepository {
     );
 
     return TemplateGenerationDto.fromJson(response.data ?? const {}).toDomain();
+  }
+
+  Future<GenerationCancelResult> cancelGeneration(
+    String generationId, {
+    String? correlationId,
+    CancelToken? cancelToken,
+  }) async {
+    final encodedGenerationId = _apiPathSegment(generationId);
+    final response = await _authorizedRequest<Map<String, dynamic>>(
+      (session) => _dio.post<Map<String, dynamic>>(
+        '/api/templates/generations/$encodedGenerationId/cancel',
+        options: authenticatedRequestOptions(
+          session.accessToken,
+          correlationId: correlationId,
+        ),
+        cancelToken: cancelToken,
+      ),
+      retryTransientFailures: false,
+    );
+
+    final result = GenerationCancelResultDto.fromJson(
+      response.data ?? const {},
+    ).toDomain();
+    await _upsertCachedGeneration(this, result.generation);
+    if (result.generation.isTerminal) {
+      await clearActiveGeneration(result.generation.generationId);
+    }
+
+    return result;
   }
 
   Future<CompatibleGenerationTemplates> fetchCompatibleTemplates(
@@ -503,6 +535,9 @@ class TemplateGenerationRepository {
   String _createGenerationCorrelationId() =>
       _buildGenerationCorrelationId(this);
 
+  Future<String?> _readCacheScope() =>
+      _cacheScopeFuture ??= _resolveGenerationCacheScope(this);
+
   Future<List<TemplateGenerationResult>> fetchGenerations({
     String? status,
     int? skip,
@@ -676,9 +711,6 @@ class TemplateGenerationRepository {
   Future<void> _writeCachedUnreadGenerationCount(int count) =>
       _writeCachedUnreadGenerationCountImpl(this, count);
 
-  String _cacheKeyForStatus(String? status) =>
-      _cacheKeyForStatusImpl(this, status);
-
   bool _matchesCachedGenerationStatus(
     TemplateGenerationResult generation,
     String? status,
@@ -711,6 +743,11 @@ class TemplateGenerationRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    final generationQueueRejection = _mapGenerationQueueRejection(error);
+    if (generationQueueRejection != null) {
+      return generationQueueRejection;
+    }
+
     if (NetworkErrorMapper.isConnectivityIssue(error)) {
       return NetworkErrorMapper.fromMessage(
         error,
@@ -733,6 +770,114 @@ class TemplateGenerationRepository {
       statusCode: error.response?.statusCode,
       cause: error,
     );
+  }
+
+  GenerationWaitTooLongException? _mapGenerationQueueRejection(
+    DioException error,
+  ) {
+    if (error.response?.statusCode != 503) {
+      return null;
+    }
+
+    final data = error.response?.data;
+    if (data is! Map) {
+      return null;
+    }
+
+    final payload = Map<Object?, Object?>.from(data);
+    final code =
+        _readString(payload, 'code') ??
+        _readString(payload, 'title') ??
+        _readString(payload, 'detail') ??
+        _readString(payload, 'type');
+    final hasWaitTooLongCode =
+        code?.toUpperCase().contains('GENERATION_WAIT_TOO_LONG') ?? false;
+    final estimatedWaitSeconds = _readInt(payload, 'estimatedWaitSeconds');
+    final maxAllowedWaitSeconds = _readInt(payload, 'maxAllowedWaitSeconds');
+    final mediaType = _readString(payload, 'mediaType');
+    final tier = _readString(payload, 'tier');
+    final hasStructuredWaitMetadata =
+        estimatedWaitSeconds != null &&
+        maxAllowedWaitSeconds != null &&
+        (mediaType != null || tier != null);
+    if (!hasWaitTooLongCode && !hasStructuredWaitMetadata) {
+      return null;
+    }
+
+    return GenerationWaitTooLongException(
+      statusCode: error.response?.statusCode,
+      cause: error,
+      mediaType: mediaType,
+      tier: tier,
+      estimatedWaitSeconds: estimatedWaitSeconds,
+      maxAllowedWaitSeconds: maxAllowedWaitSeconds,
+      retryAfterSeconds:
+          _readInt(payload, 'retryAfterSeconds') ??
+          _retryAfterHeaderSeconds(error),
+      canRetry: _readBool(payload, 'canRetry') ?? true,
+      canUpgradeForPriority:
+          _readBool(payload, 'canUpgradeForPriority') ?? false,
+    );
+  }
+
+  String? _readString(Map<Object?, Object?> payload, String key) {
+    final value = payload[key];
+    if (value is! String) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  int? _readInt(Map<Object?, Object?> payload, String key) {
+    final value = payload[key];
+    if (value is num) {
+      return value.toInt();
+    }
+    if (value is String) {
+      return int.tryParse(value.trim());
+    }
+    return null;
+  }
+
+  bool? _readBool(Map<Object?, Object?> payload, String key) {
+    final value = payload[key];
+    if (value is bool) {
+      return value;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+        return false;
+      }
+    }
+    return null;
+  }
+
+  int? _retryAfterHeaderSeconds(DioException error) {
+    final value = error.response?.headers.value(HttpHeaders.retryAfterHeader);
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+
+    final seconds = int.tryParse(value.trim());
+    if (seconds != null) {
+      return seconds;
+    }
+
+    try {
+      final retryAt = HttpDate.parse(value);
+      return retryAt
+          .difference(DateTime.now().toUtc())
+          .inSeconds
+          .clamp(0, 24 * 60 * 60);
+    } on FormatException {
+      return null;
+    }
   }
 
   String _resolveImageContentType(String fileName) =>

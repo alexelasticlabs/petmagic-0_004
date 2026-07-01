@@ -13,6 +13,7 @@ void main() {
     final body = _functionBody(premiumPage, '_resolveCheckoutErrorMessage');
 
     expect(body, isNot(contains('return value;')));
+    expect(body, contains('mapCommonAuthFeedbackMessage(text, value)'));
     expect(body, contains('text.premiumCheckoutFailed'));
     expect(body, contains('text.premiumPurchaseCancelled'));
     expect(body, contains('text.premiumStoreUnavailable'));
@@ -20,12 +21,27 @@ void main() {
     expect(body, contains('text.templateFlowNetworkError'));
   });
 
-  test('premium controller keeps network error key safe', () {
+  test('premium controller normalizes safe premium error keys', () {
     final premiumController = readPremiumControllerLibrarySource();
+    expect(
+      premiumController,
+      contains('normalizePremiumErrorKey(error.message)'),
+    );
+  });
 
-    final body = _functionBody(premiumController, '_isSafePremiumErrorKey');
+  test('premium page activation flow normalizes wrapped success keys', () {
+    final premiumPage = File(
+      'lib/features/premium/presentation/premium_page.dart',
+    ).readAsStringSync();
 
-    expect(body, contains("value == 'templates.network_unavailable'"));
+    expect(
+      premiumPage,
+      contains("normalizePremiumErrorKey(next.successMessage) =="),
+    );
+    expect(
+      premiumPage,
+      isNot(contains("next.successMessage == 'premium.purchase_activated'")),
+    );
   });
 }
 

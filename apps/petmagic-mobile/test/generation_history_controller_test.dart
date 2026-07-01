@@ -351,6 +351,37 @@ void main() {
   );
 
   test(
+    'normalizes wrapped history timeout errors before exposing UI state',
+    () async {
+      final failed = generationFixture(
+        generationId: 'generation-failed',
+        status: TemplateGenerationStatus.failed,
+      );
+      final repository = FakeTemplateGenerationRepository(
+        persistedByStatus: {
+          'failed': [failed],
+        },
+        fetchError: const AppException(
+          '  RuntimeError: templates.connection_timeout  ',
+        ),
+      );
+      final harness = GenerationHistoryControllerHarness(
+        repository: repository,
+      );
+      addTearDown(harness.dispose);
+
+      await harness.controller.load(filter: GenerationHistoryFilter.failed);
+
+      expect(harness.state.items.map((item) => item.generationId), [
+        'generation-failed',
+      ]);
+      expect(harness.state.syncFailed, isTrue);
+      expect(harness.state.showOfflineBanner, isTrue);
+      expect(harness.state.isConnectionRecovered, isFalse);
+    },
+  );
+
+  test(
     'filtered loads subtract unread tombstones found in the all-history cache',
     () async {
       final active = generationFixture(

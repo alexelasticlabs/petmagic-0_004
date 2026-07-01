@@ -32,12 +32,16 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   static const double _ledgerLoadMoreThreshold = 320;
 
   final ScrollController _scrollController = ScrollController();
+  late final WalletController _walletController;
   ProviderSubscription<AppLaunchState>? _launchSubscription;
   bool _wasAuthenticated = false;
+  bool _autoLoadMoreScheduled = false;
 
   @override
   void initState() {
     super.initState();
+    _walletController = ref.read(walletControllerProvider.notifier);
+    _walletController.setWalletPageVisible(true);
     _scrollController.addListener(_handleScroll);
     _launchSubscription = ref.listenManual<AppLaunchState>(
       appLaunchControllerProvider,
@@ -50,7 +54,20 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
   void dispose() {
     _launchSubscription?.close();
     _scrollController.dispose();
+    _walletController.setWalletPageVisible(false);
     super.dispose();
+  }
+
+  @override
+  void deactivate() {
+    _walletController.setWalletPageVisible(false);
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _walletController.setWalletPageVisible(true);
   }
 
   void _handleLaunchState(AppLaunchState launchState) {
@@ -65,22 +82,30 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
 
   void _scheduleInitialLoadIfNeeded() {
     final snapshot = ref.read(walletControllerProvider);
-    if (snapshot.wallet != null || snapshot.ledger.isNotEmpty) {
+    if (_hasHydratedTransactionsSnapshot(snapshot)) {
       return;
     }
 
     Future.microtask(() {
-      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      if (!mounted) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 
       final current = ref.read(walletControllerProvider);
-      if (current.wallet != null || current.ledger.isNotEmpty) {
+      if (_hasHydratedTransactionsSnapshot(current)) {
         return;
       }
 
-      ref.read(walletControllerProvider.notifier).load();
+      _walletController.load();
     });
+  }
+
+  bool _hasHydratedTransactionsSnapshot(WalletState state) {
+    return state.ledger.isNotEmpty ||
+        (state.hasCompletedFullLoad && state.wallet != null);
   }
 
   void _handleScroll() {
@@ -93,7 +118,32 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       return;
     }
 
-    ref.read(walletControllerProvider.notifier).loadMoreLedger();
+    _walletController.loadMoreLedger();
+  }
+
+  void _scheduleAutoLoadMoreIfNeeded(WalletState state) {
+    if (_autoLoadMoreScheduled ||
+        state.ledger.isEmpty ||
+        !state.ledgerHasMore ||
+        state.isLoadingMoreLedger ||
+        state.ledgerLoadMoreErrorMessage != null) {
+      return;
+    }
+
+    _autoLoadMoreScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoLoadMoreScheduled = false;
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+
+      final position = _scrollController.position;
+      if (position.maxScrollExtent > _ledgerLoadMoreThreshold) {
+        return;
+      }
+
+      _walletController.loadMoreLedger();
+    });
   }
 
   @override
@@ -104,7 +154,6 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       appLaunchControllerProvider.select((launch) => launch.isAuthenticated),
     );
     final state = ref.watch(walletControllerProvider);
-    final controller = ref.read(walletControllerProvider.notifier);
     final router = GoRouter.of(context);
     final errorToShow = state.errorMessage != null && state.ledger.isEmpty
         ? _friendlyTransactionsError(text, state.errorMessage!)
@@ -140,13 +189,15 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
       );
     }
 
+    _scheduleAutoLoadMoreIfNeeded(state);
+
     return ProfileScreenBackground(
       child: SafeArea(
         child: state.isInitialLoading
             ? const Center(child: CircularProgressIndicator.adaptive())
             : RefreshIndicator.adaptive(
                 color: colors.accent,
-                onRefresh: () => controller.load(refresh: true),
+                onRefresh: () => _walletController.load(refresh: true),
                 child: ListView.builder(
                   controller: _scrollController,
                   padding: EdgeInsets.fromLTRB(16, 14, 16, bottomInset),
@@ -180,7 +231,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                           message: errorToShow,
                           tone: colors.gold,
                           onRetry: () =>
-                              unawaited(controller.load(refresh: true)),
+                              unawaited(_walletController.load(refresh: true)),
                         ),
                       );
                     }
@@ -204,7 +255,7 @@ class _AllTransactionsPageState extends ConsumerState<AllTransactionsPage> {
                             message: loadMoreErrorToShow,
                             tone: colors.gold,
                             onRetry: () => unawaited(
-                              controller.loadMoreLedger(force: true),
+                              _walletController.loadMoreLedger(force: true),
                             ),
                           ),
                         );

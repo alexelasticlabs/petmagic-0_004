@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/core/lifecycle/app_lifecycle_signal.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/mappers/wallet_error_key_mapper.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 part 'wallet_controller_checkout.part.dart';
@@ -44,6 +45,7 @@ class WalletState {
     this.rewards,
     this.ledger = const [],
     this.ledgerHasMore = false,
+    this.hasCompletedFullLoad = false,
     this.isLoadingMoreLedger = false,
     this.ledgerLoadMoreErrorMessage,
     this.packs = const [],
@@ -70,6 +72,7 @@ class WalletState {
   final RewardsSummaryModel? rewards;
   final List<WalletLedgerItem> ledger;
   final bool ledgerHasMore;
+  final bool hasCompletedFullLoad;
   final bool isLoadingMoreLedger;
   final String? ledgerLoadMoreErrorMessage;
   final List<CurrencyPackModel> packs;
@@ -117,6 +120,7 @@ class WalletState {
     RewardsSummaryModel? rewards,
     List<WalletLedgerItem>? ledger,
     bool? ledgerHasMore,
+    bool? hasCompletedFullLoad,
     bool? isLoadingMoreLedger,
     String? ledgerLoadMoreErrorMessage,
     List<CurrencyPackModel>? packs,
@@ -151,6 +155,7 @@ class WalletState {
       rewards: rewards ?? this.rewards,
       ledger: ledger ?? this.ledger,
       ledgerHasMore: ledgerHasMore ?? this.ledgerHasMore,
+      hasCompletedFullLoad: hasCompletedFullLoad ?? this.hasCompletedFullLoad,
       isLoadingMoreLedger: isLoadingMoreLedger ?? this.isLoadingMoreLedger,
       ledgerLoadMoreErrorMessage: clearLedgerLoadMoreError
           ? null
@@ -196,12 +201,15 @@ abstract class _WalletControllerBase extends Notifier<WalletState> {
   Future<void>? _loadInFlight;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeWalletSyncCancelToken;
+  CancelToken? _activeLedgerLoadMoreCancelToken;
   bool _isWalletSyncInFlight = false;
   bool _walletLifecycleStarted = false;
   bool _isWalletPageVisible = false;
   VoidCallback? _appLifecycleListener;
 
   Future<void> load({bool refresh = false});
+
+  Future<void> syncSnapshot({bool forceRefresh = false});
 
   Future<void> loadMoreLedger({bool force = false});
 

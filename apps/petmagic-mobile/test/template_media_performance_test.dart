@@ -203,8 +203,18 @@ void main() {
     expect(source, contains('VisibilityDetector('));
     expect(source, contains('_prewarmVisibilityFraction'));
     expect(source, contains('_playVisibilityFraction'));
-    expect(source, contains('WidgetsBinding.instance.addObserver(this);'));
-    expect(source, contains('WidgetsBinding.instance.removeObserver(this);'));
+    expect(
+      source,
+      contains(
+        'AppLifecycleSignal.instance.addListener(_appLifecycleListener);',
+      ),
+    );
+    expect(
+      source,
+      contains(
+        'AppLifecycleSignal.instance.removeListener(_appLifecycleListener);',
+      ),
+    );
     expect(source, contains('AppLifecycleState.resumed'));
     expect(source, contains('_disposeVideoController()'));
     expect(source, contains('bool _hasPreviewSlot = false;'));

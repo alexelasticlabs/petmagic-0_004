@@ -356,7 +356,7 @@ void main() {
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump(const Duration(milliseconds: 500));
-      await tester.pump(const Duration(minutes: 1, milliseconds: 1));
+      await tester.pump(const Duration(minutes: 5, milliseconds: 1));
     },
   );
 
@@ -441,6 +441,11 @@ void main() {
             .kind,
         ProfileSettingsDetailKind.privacy,
       );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      container.dispose();
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pump(const Duration(minutes: 5, milliseconds: 1));
     },
   );
 

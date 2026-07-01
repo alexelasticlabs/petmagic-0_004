@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/core/network/dio_provider.dart';
 import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_models.dart';
+import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 
 final walletRepositoryProvider = Provider<WalletRepository>((ref) {
   return WalletRepository(
@@ -224,27 +225,16 @@ class WalletRepository {
       );
     }
 
-    final isAvailable = await _inAppPurchase.isAvailable();
-    if (!isAvailable) {
-      return (
-        isAvailable: false,
-        productIds: const <String>{},
-        productPrices: const <String, String>{},
-      );
-    }
-
-    final response = await _inAppPurchase.queryProductDetails(requestedIds);
-    if (response.error != null) {
-      throw const AppException('wallet.payment_unavailable');
-    }
+    final availability = await sharedStoreProductAvailabilityCache.read(
+      requestedIds,
+      loader: _loadStoreAvailabilitySnapshot,
+      scopeKey: paymentMethod.provider,
+    );
 
     return (
-      isAvailable: true,
-      productIds: response.productDetails.map((product) => product.id).toSet(),
-      productPrices: {
-        for (final product in response.productDetails)
-          product.id: product.price,
-      },
+      isAvailable: availability.isAvailable,
+      productIds: availability.productIds,
+      productPrices: availability.productPrices,
     );
   }
 
@@ -257,24 +247,50 @@ class WalletRepository {
       throw const AppException('wallet.payment_unavailable');
     }
 
-    final isAvailable = await _inAppPurchase.isAvailable();
-    if (!isAvailable) {
-      throw const AppException('wallet.payment_unavailable');
-    }
-
-    final response = await _inAppPurchase.queryProductDetails({productId});
-    if (response.error != null || response.productDetails.isEmpty) {
+    final availability = await sharedStoreProductAvailabilityCache.read(
+      {productId},
+      loader: _loadStoreAvailabilitySnapshot,
+      scopeKey: paymentMethod.provider,
+    );
+    final productDetails = availability.productDetailsById[productId];
+    if (!availability.isAvailable || productDetails == null) {
       throw const AppException('wallet.payment_unavailable');
     }
 
     final launched = await _inAppPurchase.buyConsumable(
-      purchaseParam: PurchaseParam(
-        productDetails: response.productDetails.first,
-      ),
+      purchaseParam: PurchaseParam(productDetails: productDetails),
     );
     if (!launched) {
       throw const AppException('wallet.payment_unavailable');
     }
+  }
+
+  Future<StoreProductAvailabilitySnapshot> _loadStoreAvailabilitySnapshot(
+    Set<String> requestedProductIds,
+  ) async {
+    final isAvailable = await _inAppPurchase.isAvailable();
+    if (!isAvailable) {
+      return const StoreProductAvailabilitySnapshot(isAvailable: false);
+    }
+
+    final response = await _inAppPurchase.queryProductDetails(
+      requestedProductIds,
+    );
+    if (response.error != null) {
+      throw const AppException('wallet.payment_unavailable');
+    }
+
+    return StoreProductAvailabilitySnapshot(
+      isAvailable: true,
+      productIds: response.productDetails.map((product) => product.id).toSet(),
+      productPrices: {
+        for (final product in response.productDetails)
+          product.id: product.price,
+      },
+      productDetailsById: {
+        for (final product in response.productDetails) product.id: product,
+      },
+    );
   }
 
   Future<PurchaseHistoryItem> verifyStorePurchase({

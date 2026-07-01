@@ -43,20 +43,6 @@ class GamificationRepository {
     return GamificationSummaryModel.fromJson(response.data ?? const {});
   }
 
-  Future<PetProgressModel> fetchPetProgress(
-    String petId, {
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.get<Map<String, dynamic>>(
-        '/api/gamification/pets/$petId/progress',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-    return PetProgressModel.fromJson(response.data ?? const {});
-  }
-
   Future<List<AchievementModel>> fetchAchievements({
     CancelToken? cancelToken,
   }) async {
@@ -69,65 +55,6 @@ class GamificationRepository {
     );
     return (response.data ?? [])
         .map((e) => AchievementModel.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<AchievementModel>> fetchRecentAchievements({
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/gamification/achievements/recent',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-    return (response.data ?? [])
-        .map((e) => AchievementModel.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<StreakModel?> fetchStreak({CancelToken? cancelToken}) async {
-    try {
-      final response = await _authorizedRequest<Map<String, dynamic>>(
-        (session) => _dio.get<Map<String, dynamic>>(
-          '/api/gamification/streaks',
-          options: authenticatedRequestOptions(session.accessToken),
-          cancelToken: cancelToken,
-        ),
-      );
-      return StreakModel.fromJson(response.data ?? const {});
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 404) return null;
-      rethrow;
-    }
-  }
-
-  Future<UseFreezeResultModel> useStreakFreeze({
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<Map<String, dynamic>>(
-      (session) => _dio.post<Map<String, dynamic>>(
-        '/api/gamification/streaks/freeze',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-    return UseFreezeResultModel.fromJson(response.data ?? const {});
-  }
-
-  Future<List<WeeklyChallengeModel>> fetchCurrentChallenges({
-    CancelToken? cancelToken,
-  }) async {
-    final response = await _authorizedRequest<List<dynamic>>(
-      (session) => _dio.get<List<dynamic>>(
-        '/api/gamification/challenges/current',
-        options: authenticatedRequestOptions(session.accessToken),
-        cancelToken: cancelToken,
-      ),
-    );
-    return (response.data ?? [])
-        .map((e) => WeeklyChallengeModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -167,22 +94,5 @@ class GamificationRepository {
     }
 
     return NetworkErrorMapper.fallback(error, fallbackMessage: fallbackMessage);
-  }
-}
-
-class UseFreezeResultModel {
-  const UseFreezeResultModel({
-    required this.success,
-    required this.freezesRemaining,
-  });
-
-  final bool success;
-  final int freezesRemaining;
-
-  factory UseFreezeResultModel.fromJson(Map<String, dynamic> json) {
-    return UseFreezeResultModel(
-      success: json['success'] as bool? ?? false,
-      freezesRemaining: (json['freezesRemaining'] as num?)?.toInt() ?? 0,
-    );
   }
 }

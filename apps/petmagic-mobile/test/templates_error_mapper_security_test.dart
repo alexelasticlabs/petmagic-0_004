@@ -34,6 +34,10 @@ void main() {
       _functionBody(templateFlowSheets, '_generationErrorText'),
       contains('text.templateFlowStartFailedError'),
     );
+    expect(
+      _functionBody(templateFlowSheets, '_generationErrorText'),
+      contains('normalizeTemplateErrorKey(raw)'),
+    );
   });
 
   test(

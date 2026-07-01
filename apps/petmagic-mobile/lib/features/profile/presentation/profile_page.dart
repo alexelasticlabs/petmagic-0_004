@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/core/startup/app_launch_controller.dart';
 import 'package:petmagic_mobile/features/pets/presentation/my_pets_page.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_controller.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
+import 'package:petmagic_mobile/features/premium/presentation/premium_subscription_status_presenter.dart';
 import 'package:petmagic_mobile/features/premium/presentation/subscription_management_page.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_controller.dart';
@@ -78,17 +79,34 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   void _preloadWalletIfNeeded() {
     final profileState = ref.read(profileControllerProvider);
     final walletState = ref.read(walletControllerProvider);
-    if (!profileState.isAuthenticated || profileState.profile == null) {
+    if (!profileState.isAuthenticated ||
+        profileState.profile == null ||
+        !ref.read(appLaunchControllerProvider).isAuthenticated) {
       return;
     }
 
-    if (walletState.wallet != null ||
-        walletState.isLoading ||
-        walletState.isRefreshing) {
+    if (!_shouldPreloadWalletSnapshot(walletState)) {
       return;
     }
 
     unawaited(ref.read(walletControllerProvider.notifier).load());
+  }
+
+  bool _shouldPreloadWalletSnapshot(WalletState walletState) {
+    if (walletState.isLoading || walletState.isRefreshing) {
+      return false;
+    }
+
+    return !walletState.hasCompletedFullLoad;
+  }
+
+  bool _shouldSkipDeferredProfileReload() {
+    if (ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return false;
+    }
+
+    final profileState = ref.read(profileControllerProvider);
+    return !profileState.isLoading && !profileState.isAuthenticated;
   }
 
   @override
@@ -119,7 +137,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
     _isProfileReloadScheduled = true;
     Future.microtask(() async {
       _isProfileReloadScheduled = false;
-      if (!mounted) {
+      if (!mounted || _shouldSkipDeferredProfileReload()) {
         return;
       }
 
@@ -311,14 +329,14 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
       final previousSuccess = previous?.successMessage;
       if (next.successMessage != null &&
           next.successMessage != previousSuccess) {
-        final message = next.successMessage == 'logout'
-            ? text.profileSignedOut
-            : mapProfileFeedbackMessage(next.successMessage!, text);
-        PetMagicToast.show(
-          context,
-          message: message,
-          tone: PetMagicToastTone.success,
-        );
+        final message = mapProfileSuccessMessage(next.successMessage!, text);
+        if (message != null) {
+          PetMagicToast.show(
+            context,
+            message: message,
+            tone: PetMagicToastTone.success,
+          );
+        }
       }
     });
 

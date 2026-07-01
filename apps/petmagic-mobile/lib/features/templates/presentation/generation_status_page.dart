@@ -13,6 +13,7 @@ import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/core/performance/media_lifecycle_policy.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/premium/presentation/premium_page.dart';
 import 'package:petmagic_mobile/features/support/presentation/support_chat_page.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
@@ -21,8 +22,10 @@ import 'package:petmagic_mobile/features/templates/domain/template_generation_mo
 import 'package:petmagic_mobile/features/templates/domain/template_models.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_result_input_page.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/features/templates/presentation/mappers/generation_status_mappers.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_page.dart';
+import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_page.dart';
 import 'package:petmagic_mobile/shared/files/device_file_saver.dart';
 import 'package:petmagic_mobile/shared/files/file_name_sanitizer.dart';
@@ -149,11 +152,17 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   bool _isMediaActionInFlight = false;
   bool _isRemovingWatermark = false;
   bool _isGeneratingSimilar = false;
+  bool _isCancellingGeneration = false;
   String? _errorMessage;
   bool _isPollInFlight = false;
   bool _isPageActive = true;
   CancelToken? _activeLoadCancelToken;
   CancelToken? _activeMediaActionCancelToken;
+  RealtimeClient? _activeRealtimeClient;
+  // ignore: cancel_subscriptions
+  StreamSubscription<RealtimeEvent>? _realtimeSubscription;
+  Future<void>? _realtimeConnectFuture;
+  bool _isRealtimeConnected = false;
   late final GenerationGalleryStore _galleryStore;
   final Set<String> _recordedTemplateOfTheDayTerminalEvents = <String>{};
   final Set<String> _recordedFeedbackPromptEvents = <String>{};
@@ -171,8 +180,10 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void initState() {
     super.initState();
     _galleryStore = ref.read(generationGalleryStoreProvider);
+    _activeRealtimeClient = ref.read(realtimeClientProvider);
     WidgetsBinding.instance.addObserver(this);
     unawaited(_load());
+    unawaited(_resumeRealtimeIfNeeded());
     _startPolling();
   }
 
@@ -180,12 +191,14 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _isPageActive = true;
+      unawaited(_resumeRealtimeIfNeeded());
       _startPolling();
       unawaited(_load(silent: true));
       return;
     }
 
     _isPageActive = false;
+    _pauseRealtime();
     _stopPolling();
     _cancelActiveLocalMediaDownloads();
   }
@@ -194,6 +207,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void dispose() {
     _isPageActive = false;
     WidgetsBinding.instance.removeObserver(this);
+    _pauseRealtime();
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
@@ -204,6 +218,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   @override
   void deactivate() {
     _isPageActive = false;
+    _pauseRealtime();
     _stopPolling();
     _cancelActiveLoad();
     _cancelActiveMediaAction();
@@ -215,6 +230,7 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
   void activate() {
     super.activate();
     _isPageActive = true;
+    unawaited(_resumeRealtimeIfNeeded());
     _startPolling();
     unawaited(_load(silent: true));
   }
@@ -422,9 +438,43 @@ class _GenerationStatusPageState extends ConsumerState<GenerationStatusPage>
                         ),
                       ],
                     ),
+                  ] else if (generation.isCancelled) ...[
+                    _CancelledCard(generation: generation),
+                    const SizedBox(height: 14),
+                    _ActiveActions(onContinue: () => context.go('/creations')),
+                    const SizedBox(height: 14),
+                    _DetailsCard(
+                      title: text.generationStatusDetailsTitle,
+                      rows: [
+                        (
+                          text.templateFlowTemplateLabel,
+                          generation.templateTitle ??
+                              text.generationStatusUntitledFallback,
+                        ),
+                        (
+                          text.generationStatusTypeLabel,
+                          typeLabel(text, generation),
+                        ),
+                        (
+                          text.templateFlowCostLabel,
+                          '${generation.tokenCost} ${text.walletBalanceUnit}',
+                        ),
+                      ],
+                    ),
                   ] else ...[
                     _ActiveGenerationCard(generation: generation),
                     const SizedBox(height: 14),
+                    if (generation.canCancelQueued) ...[
+                      _QueuedCancelAction(
+                        isCancelling: _isCancellingGeneration,
+                        onCancel: _isCancellingGeneration
+                            ? null
+                            : () => unawaited(
+                                _confirmAndCancelQueuedGeneration(generation),
+                              ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     _ActiveActions(onContinue: () => context.go('/creations')),
                     const SizedBox(height: 14),
                     _DetailsCard(

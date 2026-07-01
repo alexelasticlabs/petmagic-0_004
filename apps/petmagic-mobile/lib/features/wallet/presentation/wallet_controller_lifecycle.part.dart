@@ -20,6 +20,7 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
       }
       _cancelActiveLoad();
       _cancelActiveWalletSync();
+      _cancelActiveLedgerLoadMore();
       unawaited(purchaseSubscription.cancel());
     });
   }
@@ -72,6 +73,27 @@ mixin _WalletControllerLifecycle on _WalletControllerBase {
   void _clearActiveWalletSync(CancelToken cancelToken) {
     if (identical(_activeWalletSyncCancelToken, cancelToken)) {
       _activeWalletSyncCancelToken = null;
+    }
+  }
+
+  CancelToken _startLedgerLoadMoreCancelToken() {
+    _cancelActiveLedgerLoadMore();
+    final cancelToken = CancelToken();
+    _activeLedgerLoadMoreCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveLedgerLoadMore() {
+    final cancelToken = _activeLedgerLoadMoreCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('wallet_ledger_load_more_cancelled');
+    }
+    _activeLedgerLoadMoreCancelToken = null;
+  }
+
+  void _clearActiveLedgerLoadMore(CancelToken cancelToken) {
+    if (identical(_activeLedgerLoadMoreCancelToken, cancelToken)) {
+      _activeLedgerLoadMoreCancelToken = null;
     }
   }
 

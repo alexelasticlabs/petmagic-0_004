@@ -10,6 +10,7 @@ import 'package:petmagic_mobile/core/logging/app_logger.dart';
 import 'package:petmagic_mobile/features/profile/presentation/avatar_crop_viewport.dart';
 import 'package:petmagic_mobile/features/profile/presentation/profile_surface_widgets.dart';
 import 'package:petmagic_mobile/shared/files/image_upload_optimizer.dart';
+import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_toast.dart';
 
 @visibleForTesting
@@ -201,6 +202,7 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
     setState(() => _isSaving = true);
 
+    File? outputFile;
     try {
       final cropRect = viewport.cropRect;
       final imageWidth = _imageSize.width.round();
@@ -227,15 +229,19 @@ class _ProfileAvatarCropperPageState extends State<ProfileAvatarCropperPage> {
 
       final outputPath =
           '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_avatar_${DateTime.now().microsecondsSinceEpoch}.jpg';
-      final outputFile = File(outputPath);
+      outputFile = File(outputPath);
       await outputFile.writeAsBytes(jpgBytes, flush: true);
 
       if (!mounted) {
+        await TempMediaCleanup.deleteIfExists(outputFile);
         return;
       }
 
       Navigator.of(context).pop(outputFile.path);
     } catch (error, stackTrace) {
+      if (outputFile != null) {
+        await TempMediaCleanup.deleteIfExists(outputFile);
+      }
       AppLogger.warn(
         feature: 'Profile.AvatarCropper',
         operation: 'save_cropped_avatar',

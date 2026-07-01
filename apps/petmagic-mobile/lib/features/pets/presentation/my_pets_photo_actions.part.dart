@@ -155,11 +155,27 @@ bool _isUnauthorizedError(Object? error) {
 
 String _petPhotoUploadErrorMessage(AppLocalizations text, Object error) {
   if (error is AppException &&
-      error.message.trim() == 'pets.photo_type_not_allowed') {
+      _normalizePetPhotoUploadErrorKey(error.message) ==
+          'pets.photo_type_not_allowed') {
     return text.petsUnsupportedPhotoTypeError;
   }
 
   return text.petsPhotoUploadError;
+}
+
+String? _normalizePetPhotoUploadErrorKey(String? raw) {
+  final normalized = raw?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final lower = normalized.toLowerCase();
+  if (lower == 'pets.photo_type_not_allowed' ||
+      lower.contains('pets.photo_type_not_allowed')) {
+    return 'pets.photo_type_not_allowed';
+  }
+
+  return null;
 }
 
 Future<void> _deletePet(

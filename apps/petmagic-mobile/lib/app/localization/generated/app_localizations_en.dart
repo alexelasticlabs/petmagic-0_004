@@ -59,10 +59,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Something went wrong. Please try again.';
 
   @override
-  String get comingSoonMessage =>
-      'This section is prepared for the next product wave.';
-
-  @override
   String get createMagicTitle => 'Create Magic';
 
   @override
@@ -279,6 +275,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Signed out on this device.';
+
+  @override
+  String get profileAccountDeleted => 'Your account was deleted.';
 
   @override
   String get profileAccountCenterTitle => 'Account center';
@@ -1619,7 +1618,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'Server-side store verification is not configured yet.';
+      'Store verification is temporarily unavailable.';
 
   @override
   String get premiumStorePurchaseInvalid =>
@@ -3583,6 +3582,49 @@ class AppLocalizationsEn extends AppLocalizations {
       'We will notify you when the result is ready.';
 
   @override
+  String get generationStatusCancelledTitle => 'Generation cancelled';
+
+  @override
+  String get generationStatusCancelledMessage =>
+      'This generation was stopped before processing started.';
+
+  @override
+  String get generationStatusCancelQueuedHint =>
+      'You can cancel while this generation is still waiting in queue.';
+
+  @override
+  String get generationStatusCancelQueuedAction => 'Cancel generation';
+
+  @override
+  String get generationStatusCancelQueuedTitle => 'Cancel generation?';
+
+  @override
+  String get generationStatusCancelQueuedMessage =>
+      'This only works while generation is still queued. If PawSpark were reserved, backend will return them automatically.';
+
+  @override
+  String get generationStatusCancelQueuedKeepAction => 'Keep waiting';
+
+  @override
+  String get generationStatusCancelQueuedConfirmAction =>
+      'Confirm cancellation';
+
+  @override
+  String get generationStatusCancelQueuedSuccess => 'Generation cancelled.';
+
+  @override
+  String get generationStatusCancelQueuedAlreadyStarted =>
+      'Generation already started and cannot be cancelled.';
+
+  @override
+  String get generationStatusCancelQueuedFailed =>
+      'Could not cancel generation. Please try again.';
+
+  @override
+  String get generationStatusQueuedVideoHint =>
+      'Video usually takes longer than photos and can take a few minutes.';
+
+  @override
   String get generationStatusFailurePhotoHint =>
       'The photo is not suitable for this template. Try a photo where the pet is clearly visible.';
 
@@ -4017,12 +4059,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String generationStatusRemoveWatermarkSheetBody(Object cost) {
-    return 'Use $cost credit for this result, or upgrade to Premium for clean downloads.';
+    return 'Use $cost PawSpark for this result, or upgrade to Premium for clean downloads.';
   }
 
   @override
   String generationStatusRemoveWatermarkUseCredit(Object cost) {
-    return 'Use $cost credit';
+    return 'Use $cost PawSpark';
   }
 
   @override
@@ -4031,7 +4073,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get generationStatusRemoveWatermarkNoCredits =>
-      'Not enough credits. Buy credits or upgrade to Premium.';
+      'Not enough PawSpark. Top up PawSpark or upgrade to Premium.';
 
   @override
   String get globalOfflineBannerTitle => 'No internet connection';
@@ -4591,4 +4633,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Clean result';
+
+  @override
+  String generationStatusQueuePositionWithWait(int position, String wait) {
+    return 'Queue position #$position • $wait';
+  }
+
+  @override
+  String generationStatusQueuePosition(int position) {
+    return 'Queue position #$position';
+  }
+
+  @override
+  String generationStatusWaitMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get generationStatusStatusCancelled => 'Generation cancelled';
+
+  @override
+  String get generationStatusTerminalCancelledHint =>
+      'Generation was cancelled before completion.';
+
+  @override
+  String get templateFlowGenerationWaitTooLongTitle => 'High load right now';
+
+  @override
+  String get templateFlowGenerationWaitTooLongMessage =>
+      'The estimated wait for this generation is too long. Try again later or choose a photo generation, which is usually faster.';
+
+  @override
+  String templateFlowGenerationWaitTooLongRetryAfter(String value) {
+    return 'Try again in about $value.';
+  }
+
+  @override
+  String get templateFlowGenerationWaitTooLongPremiumHint =>
+      'Premium gets priority queue access and usually waits less.';
 }

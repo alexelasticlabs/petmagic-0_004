@@ -61,4 +61,113 @@ void main() {
 
     expect(mapped, text.templateFlowNetworkError);
   });
+
+  testWidgets(
+    'email confirmation errors map to localized copy instead of generic fallback',
+    (tester) async {
+      late AppLocalizations text;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: Builder(
+            builder: (context) {
+              text = AppLocalizations.of(context);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      final mapped = mapProfileFeedbackMessage(
+        ' AUTH.EMAIL_NOT_CONFIRMED ',
+        text,
+      );
+
+      expect(mapped, text.profileEmailPending);
+      expect(mapped, isNot(text.authRequestFailed));
+    },
+  );
+
+  test('normalizes wrapped profile auth feedback keys', () {
+    expect(
+      normalizeProfileFeedbackKey(' AppException: AUTH.ACCEPT_TERMS_REQUIRED '),
+      'auth.accept_terms_required',
+    );
+    expect(
+      normalizeProfileFeedbackKey('RuntimeError: auth.email_not_confirmed'),
+      'auth.email_not_confirmed',
+    );
+    expect(
+      normalizeProfileFeedbackKey('Failure: auth.legal_documents_unavailable'),
+      'auth.legal_documents_unavailable',
+    );
+    expect(
+      normalizeProfileFeedbackKey('FileSystemException: /private/user.jpg'),
+      isNull,
+    );
+  });
+
+  test('normalizes wrapped profile success keys', () {
+    expect(
+      normalizeProfileSuccessKey(' AppException: AUTH.PASSWORD_RESET_SUCCESS '),
+      'auth.password_reset_success',
+    );
+    expect(
+      normalizeProfileSuccessKey(
+        'RuntimeError: auth.registration_pending_verification',
+      ),
+      'auth.registration_pending_verification',
+    );
+    expect(
+      normalizeProfileSuccessKey('Result: profile.account_deleted'),
+      'profile.account_deleted',
+    );
+    expect(
+      normalizeProfileSuccessKey('FileSystemException: /private/user.jpg'),
+      isNull,
+    );
+  });
+
+  testWidgets('wrapped profile success keys map to localized success copy', (
+    tester,
+  ) async {
+    late AppLocalizations text;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [Locale('en')],
+        home: Builder(
+          builder: (context) {
+            text = AppLocalizations.of(context);
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    expect(
+      mapProfileSuccessMessage(
+        ' AppException: auth.password_reset_success ',
+        text,
+      ),
+      text.authPasswordResetSuccess,
+    );
+    expect(
+      mapProfileSuccessMessage('profile.account_deleted', text),
+      text.profileAccountDeleted,
+    );
+    expect(
+      mapProfileSuccessMessage(
+        'Failure: auth.registration_pending_verification',
+        text,
+      ),
+      isNull,
+    );
+    expect(mapProfileSuccessMessage('unknown_success', text), isNull);
+  });
 }

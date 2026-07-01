@@ -1,4 +1,5 @@
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
+import 'package:petmagic_mobile/core/errors/app_exception.dart';
 import 'package:petmagic_mobile/core/errors/auth_feedback_mapper.dart';
 import 'package:petmagic_mobile/core/errors/app_unavailable_state.dart';
 import 'package:petmagic_mobile/features/gamification/data/gamification_models.dart';
@@ -54,14 +55,30 @@ AppUnavailableKind? classifyAchievementsUnavailable({
   required Object? error,
   required bool hasInternet,
 }) {
+  final raw = achievementsErrorMessage(error);
+  if (raw == null) {
+    return null;
+  }
+
+  return classifyAppUnavailable(raw: raw, hasInternet: hasInternet);
+}
+
+String? achievementsErrorMessage(Object? error) {
   if (error == null) {
     return null;
   }
 
-  return classifyAppUnavailable(
-    raw: error.toString(),
-    hasInternet: hasInternet,
-  );
+  if (error is AppException) {
+    final message = error.message.trim();
+    return message.isEmpty ? 'gamification.request_failed' : message;
+  }
+
+  if (error is String) {
+    final message = error.trim();
+    return message.isEmpty ? 'gamification.request_failed' : message;
+  }
+
+  return 'gamification.request_failed';
 }
 
 String mapAchievementsLoadMessage(String? raw, AppLocalizations text) {

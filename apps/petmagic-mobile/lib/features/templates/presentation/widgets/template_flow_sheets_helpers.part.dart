@@ -10,6 +10,8 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
   return switch (generation.status) {
     TemplateGenerationStatus.queued => 0.28,
     TemplateGenerationStatus.uploading => 0.36,
+    TemplateGenerationStatus.submittingToProvider => 0.40,
+    TemplateGenerationStatus.providerQueued => 0.44,
     TemplateGenerationStatus.preprocessing => 0.52,
     TemplateGenerationStatus.processing =>
       generation.motionGenerationCompletedAtUtc != null
@@ -17,9 +19,12 @@ double? _progressValue(TemplateGenerationResult? generation, bool isFailed) {
           : generation.preprocessingCompletedAtUtc != null
           ? 0.64
           : 0.48,
+    TemplateGenerationStatus.providerProcessing => 0.68,
     TemplateGenerationStatus.generating => 0.74,
     TemplateGenerationStatus.finalizing => 0.9,
+    TemplateGenerationStatus.importingMedia => 0.92,
     TemplateGenerationStatus.completed => 1,
+    TemplateGenerationStatus.cancelled => 1,
     TemplateGenerationStatus.failed => 1,
   };
 }
@@ -30,23 +35,20 @@ String _generationErrorText(AppLocalizations text, String raw) {
     return authMessage;
   }
 
-  if (raw == 'templates.insufficient_balance') {
-    return text.templateFlowInsufficientBalanceError;
-  }
+  return switch (normalizeTemplateErrorKey(raw)) {
+    'templates.insufficient_balance' =>
+      text.templateFlowInsufficientBalanceError,
+    'templates.network_unavailable' ||
+    'templates.connection_timeout' => text.templateFlowNetworkError,
+    'templates.server_unavailable' ||
+    'templates.server_timeout' => text.templateFlowServerError,
+    _ => text.templateFlowStartFailedError,
+  };
+}
 
-  if (raw.contains('templates.network_unavailable')) {
-    return text.templateFlowNetworkError;
-  }
-
-  if (raw.contains('templates.server_unavailable')) {
-    return text.templateFlowServerError;
-  }
-
-  if (raw.contains('templates.generation_failed')) {
-    return text.templateFlowStartFailedError;
-  }
-
-  return text.templateFlowStartFailedError;
+String _formatLocalizedWaitDuration(AppLocalizations text, int totalSeconds) {
+  final minutes = (totalSeconds / 60).ceil().clamp(1, 24 * 60);
+  return text.generationStatusWaitMinutes(minutes);
 }
 
 String _templateHeroTitle(AppLocalizations text, {required bool isVideo}) {

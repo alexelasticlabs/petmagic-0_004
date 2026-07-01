@@ -58,10 +58,6 @@ class AppLocalizationsRu extends AppLocalizations {
       'Что-то пошло не так. Попробуйте еще раз.';
 
   @override
-  String get comingSoonMessage =>
-      'Раздел подготовлен для следующей продуктовой волны.';
-
-  @override
   String get createMagicTitle => 'Создай магию';
 
   @override
@@ -279,6 +275,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Вы вышли на этом устройстве.';
+
+  @override
+  String get profileAccountDeleted => 'Ваш аккаунт удален.';
 
   @override
   String get profileAccountCenterTitle => 'Центр аккаунта';
@@ -1618,7 +1617,7 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'Серверная проверка подписки магазина еще не настроена.';
+      'Проверка покупки через магазин временно недоступна.';
 
   @override
   String get premiumStorePurchaseInvalid => 'Покупку не удалось подтвердить.';
@@ -3593,6 +3592,48 @@ class AppLocalizationsRu extends AppLocalizations {
       'Мы сообщим, когда результат будет готов.';
 
   @override
+  String get generationStatusCancelledTitle => 'Генерация отменена';
+
+  @override
+  String get generationStatusCancelledMessage =>
+      'Генерация остановлена до начала обработки.';
+
+  @override
+  String get generationStatusCancelQueuedHint =>
+      'Отменить можно, пока генерация ещё ждёт в очереди.';
+
+  @override
+  String get generationStatusCancelQueuedAction => 'Отменить генерацию';
+
+  @override
+  String get generationStatusCancelQueuedTitle => 'Отменить генерацию?';
+
+  @override
+  String get generationStatusCancelQueuedMessage =>
+      'Это сработает только пока генерация в очереди. Если PawSpark были зарезервированы, backend вернёт их автоматически.';
+
+  @override
+  String get generationStatusCancelQueuedKeepAction => 'Продолжить ждать';
+
+  @override
+  String get generationStatusCancelQueuedConfirmAction => 'Подтвердить отмену';
+
+  @override
+  String get generationStatusCancelQueuedSuccess => 'Генерация отменена.';
+
+  @override
+  String get generationStatusCancelQueuedAlreadyStarted =>
+      'Генерация уже началась, её нельзя отменить.';
+
+  @override
+  String get generationStatusCancelQueuedFailed =>
+      'Не удалось отменить генерацию. Попробуйте снова.';
+
+  @override
+  String get generationStatusQueuedVideoHint =>
+      'Видео обычно занимает дольше фото и может готовиться несколько минут.';
+
+  @override
   String get generationStatusFailurePhotoHint =>
       'Фото не подошло для этого шаблона. Попробуйте выбрать фото, где питомец хорошо виден.';
 
@@ -4610,4 +4651,43 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Чистый результат';
+
+  @override
+  String generationStatusQueuePositionWithWait(int position, String wait) {
+    return 'Позиция в очереди: №$position • $wait';
+  }
+
+  @override
+  String generationStatusQueuePosition(int position) {
+    return 'Позиция в очереди: №$position';
+  }
+
+  @override
+  String generationStatusWaitMinutes(int minutes) {
+    return '$minutes мин';
+  }
+
+  @override
+  String get generationStatusStatusCancelled => 'Генерация отменена';
+
+  @override
+  String get generationStatusTerminalCancelledHint =>
+      'Генерация была отменена до завершения.';
+
+  @override
+  String get templateFlowGenerationWaitTooLongTitle =>
+      'Сейчас высокая нагрузка';
+
+  @override
+  String get templateFlowGenerationWaitTooLongMessage =>
+      'Примерное ожидание для этой генерации слишком большое. Попробуйте позже или выберите фото-генерацию, которая обычно готовится быстрее.';
+
+  @override
+  String templateFlowGenerationWaitTooLongRetryAfter(String value) {
+    return 'Попробуйте снова примерно через $value.';
+  }
+
+  @override
+  String get templateFlowGenerationWaitTooLongPremiumHint =>
+      'Premium получает приоритетную очередь и обычно ждёт меньше.';
 }

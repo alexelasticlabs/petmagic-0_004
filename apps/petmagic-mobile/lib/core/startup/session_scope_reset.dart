@@ -20,6 +20,7 @@ import 'package:petmagic_mobile/features/templates/presentation/template_generat
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
 import 'package:petmagic_mobile/features/templates/presentation/templates_controller.dart';
 import 'package:petmagic_mobile/features/wallet/presentation/wallet_controller.dart';
+import 'package:petmagic_mobile/shared/payments/store_product_availability_cache.dart';
 
 typedef SessionMediaCacheCleaner = Future<void> Function();
 
@@ -39,6 +40,7 @@ final sessionScopeResetProvider = Provider<void>((ref) {
     }
 
     Future.microtask(() {
+      ref.invalidate(templateGenerationRepositoryProvider);
       ref.invalidate(walletControllerProvider);
       ref.invalidate(templatesControllerProvider);
       ref.invalidate(generationHistoryControllerProvider);
@@ -53,10 +55,7 @@ final sessionScopeResetProvider = Provider<void>((ref) {
       ref.invalidate(petPhotosProvider);
       ref.invalidate(petGenerationsProvider);
       ref.invalidate(gamificationSummaryProvider);
-      ref.invalidate(petProgressProvider);
       ref.invalidate(achievementsProvider);
-      ref.invalidate(dailyStreakProvider);
-      ref.invalidate(weeklyChallengesProvider);
     });
 
     if (!next.isAuthenticated) {
@@ -74,6 +73,9 @@ final sessionScopeResetProvider = Provider<void>((ref) {
             'push_token_registration_state',
             PushTokenRegistrar.clearRegistrationState,
           ),
+          _runBestEffortCleanup('store_product_availability_cache', () async {
+            sharedStoreProductAvailabilityCache.clear();
+          }),
           clearMediaCaches(),
         ]),
       );

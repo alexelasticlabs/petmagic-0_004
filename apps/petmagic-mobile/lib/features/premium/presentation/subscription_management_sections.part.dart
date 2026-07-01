@@ -61,7 +61,7 @@ class _PremiumHeroCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  summary.planName ?? 'PetMagic Premium',
+                  summary.planName ?? text.premiumPageTitle,
                   style: TextStyle(
                     color: colors.textStrong,
                     fontSize: 18,
@@ -616,19 +616,12 @@ String _resolveStatusLabel(
   PremiumSubscriptionSummaryView summary,
   AppLocalizations text,
 ) {
-  if (!summary.isPremium) {
-    return text.subscriptionStatusInactive;
-  }
-  if (summary.cancelAtPeriodEnd == true) {
-    return text.subscriptionStatusCancelled;
-  }
-  return switch (summary.status.toLowerCase()) {
-    'active' || 'trialing' => text.subscriptionStatusActive,
-    'past_due' || 'unpaid' => text.subscriptionStatusPaymentFailed,
-    'canceled' => text.subscriptionStatusExpired,
-    'incomplete' || 'incomplete_expired' => text.subscriptionStatusPending,
-    _ => text.subscriptionStatusActive,
-  };
+  return premiumSubscriptionStatusLabel(
+    text: text,
+    isPremium: summary.isPremium,
+    cancelAtPeriodEnd: summary.cancelAtPeriodEnd == true,
+    status: summary.status,
+  );
 }
 
 Color _resolveStatusColor(

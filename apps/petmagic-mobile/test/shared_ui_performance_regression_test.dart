@@ -12,9 +12,16 @@ import 'package:petmagic_mobile/shared/navigation/petmagic_shell.dart';
 import 'package:petmagic_mobile/shared/notifications/petmagic_notification_center.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_action_sheet.dart';
 import 'package:petmagic_mobile/shared/widgets/petmagic_notification_host.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
   final notificationCenter = PetMagicNotificationCenter.instance;
+
+  setUp(() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
 
   tearDown(() async {
     debugDefaultTargetPlatformOverride = null;

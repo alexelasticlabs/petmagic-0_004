@@ -12,6 +12,12 @@ void main() {
       final contentSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_content.part.dart',
       ).readAsString();
+      final actionsSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_actions.part.dart',
+      ).readAsString();
+      final blockedSource = await File(
+        'lib/features/templates/presentation/widgets/template_flow_sheets_blocked.part.dart',
+      ).readAsString();
       final generationSource = await File(
         'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
       ).readAsString();
@@ -23,6 +29,19 @@ void main() {
       expect(sheetSource, contains('templateDetailHeroImageTitle'));
       expect(sheetSource, contains('templateDetailPreviewMissingTitle'));
       expect(contentSource, contains('AppLocalizations.of(context)'));
+      expect(contentSource, contains('text.walletBalanceUnit'));
+      expect(actionsSource, contains('onTopUpBalance'));
+      expect(blockedSource, contains('onTopUpBalance'));
+      expect(actionsSource, isNot(contains('onBuyPowSpark')));
+      expect(blockedSource, isNot(contains('onBuyPowSpark')));
+      expect(
+        contentSource,
+        isNot(contains("label: '\${template.tokenCost} PawSpark'")),
+      );
+      expect(
+        contentSource,
+        isNot(contains("value: '\${template.tokenCost} PawSpark'")),
+      );
       expect(
         generationSource,
         contains("part of 'template_flow_sheets.dart';"),
@@ -104,6 +123,36 @@ void main() {
       expect(generationSource, isNot(contains('Видео готово! 🎉')));
     },
   );
+
+  test('template flow high-load rejection uses dedicated safe UX copy', () async {
+    final sheetSource = readTemplateFlowSheetsLibrarySource();
+    final generationSource = await File(
+      'lib/features/templates/presentation/widgets/template_flow_sheets_generation.part.dart',
+    ).readAsString();
+
+    expect(generationSource, contains('GenerationWaitTooLongException'));
+    expect(generationSource, contains('queueRejection'));
+    expect(
+      generationSource,
+      contains('templateFlowGenerationWaitTooLongTitle'),
+    );
+    expect(
+      generationSource,
+      contains('templateFlowGenerationWaitTooLongMessage'),
+    );
+    expect(
+      generationSource,
+      contains('templateFlowGenerationWaitTooLongRetryAfter'),
+    );
+    expect(
+      generationSource,
+      contains('templateFlowGenerationWaitTooLongPremiumHint'),
+    );
+    expect(generationSource, contains('walletControllerProvider'));
+    expect(sheetSource, isNot(contains('ProblemDetails')));
+    expect(sheetSource.toLowerCase(), isNot(contains('stack trace')));
+    expect(sheetSource.toLowerCase(), isNot(contains('guarantee')));
+  });
 
   test('templates domain secondary flows use shared localizations', () async {
     final gallerySource = await File(
@@ -204,6 +253,7 @@ void main() {
     expect(resultInputSource, contains('generationResultInputTitle'));
     expect(resultInputSource, contains('generationResultInputCostEstimate'));
     expect(resultInputSource, contains('walletBalanceUnit'));
+    expect(resultInputSource, contains('text.premiumLabel'));
     expect(resultInputSource, contains('text.retryAction'));
     expect(
       petLaunchSource,
@@ -269,6 +319,7 @@ void main() {
     expect(fullPetLaunchSource, isNot(contains('Запуск магии')));
     expect(resultInputSource, isNot(contains('Use result')));
     expect(resultInputSource, isNot(contains('Использовать результат')));
+    expect(resultInputSource, isNot(contains("_MiniBadge(label: 'Premium')")));
     expect(resultInputSource, isNot(contains("const Text('Retry')")));
     expect(fullPetLaunchSource, isNot(contains("'Video'")));
     expect(fullPetLaunchSource, isNot(contains("'Image'")));
@@ -328,6 +379,21 @@ void main() {
         'templateFlowInsufficientBalanceUpsellMessage',
         'templateFlowCompletedPremiumHeadline',
         'templateFlowCompletedPremiumMessage',
+        'templateFlowGenerationWaitTooLongTitle',
+        'templateFlowGenerationWaitTooLongMessage',
+        'templateFlowGenerationWaitTooLongRetryAfter',
+        'templateFlowGenerationWaitTooLongPremiumHint',
+        'generationStatusCancelledTitle',
+        'generationStatusCancelledMessage',
+        'generationStatusCancelQueuedHint',
+        'generationStatusCancelQueuedAction',
+        'generationStatusCancelQueuedTitle',
+        'generationStatusCancelQueuedMessage',
+        'generationStatusCancelQueuedKeepAction',
+        'generationStatusCancelQueuedConfirmAction',
+        'generationStatusCancelQueuedSuccess',
+        'generationStatusCancelQueuedAlreadyStarted',
+        'generationStatusCancelQueuedFailed',
       ];
 
       for (final path in arbFiles) {
@@ -336,6 +402,165 @@ void main() {
           expect(source, contains('"$key"'), reason: '$path is missing $key');
         }
       }
+    },
+  );
+
+  test(
+    'non-English template flow wait-localizations do not keep English fallback copy',
+    () async {
+      const localizedArbFiles = <String>[
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+
+      for (final path in localizedArbFiles) {
+        final source = await File(path).readAsString();
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusQueuedVideoHint": "Video usually takes longer than photos and can take a few minutes."',
+            ),
+          ),
+          reason: '$path still contains English queued-video hint',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"templateFlowGenerationWaitTooLongTitle": "High load right now"',
+            ),
+          ),
+          reason: '$path still contains English high-load title',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusQueuePositionWithWait": "Queue position #{position}',
+            ),
+          ),
+          reason: '$path still contains English queue position with wait',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusQueuePosition": "Queue position #{position}"',
+            ),
+          ),
+          reason: '$path still contains English queue position',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"templateFlowGenerationWaitTooLongPremiumHint": "Premium gets priority queue access and usually waits less."',
+            ),
+          ),
+          reason: '$path still contains English Premium queue hint',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"templateFlowGenerationWaitTooLongMessage": "The estimated wait for this generation is too long. Try again later or choose a photo generation, which is usually faster."',
+            ),
+          ),
+          reason: '$path still contains English high-load message',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"templateFlowGenerationWaitTooLongRetryAfter": "Try again in about {value}."',
+            ),
+          ),
+          reason: '$path still contains English retry-after copy',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusStatusCancelled": "Generation cancelled"',
+            ),
+          ),
+          reason: '$path still contains English cancelled title',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusTerminalCancelledHint": "Generation was cancelled before completion."',
+            ),
+          ),
+          reason: '$path still contains English cancelled hint',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelledTitle": "Generation cancelled"',
+            ),
+          ),
+          reason: '$path still contains English cancelled card title',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelledMessage": "This generation was stopped before processing started."',
+            ),
+          ),
+          reason: '$path still contains English cancelled card message',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelQueuedHint": "You can cancel while this generation is still waiting in queue."',
+            ),
+          ),
+          reason: '$path still contains English cancel hint',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelQueuedAction": "Cancel generation"',
+            ),
+          ),
+          reason: '$path still contains English cancel action',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelQueuedAlreadyStarted": "Generation already started and cannot be cancelled."',
+            ),
+          ),
+          reason: '$path still contains English already-started message',
+        );
+        expect(
+          source,
+          isNot(
+            contains(
+              '"generationStatusCancelQueuedFailed": "Could not cancel generation. Please try again."',
+            ),
+          ),
+          reason: '$path still contains English cancel failure message',
+        );
+      }
+
+      final spanishSource = await File('lib/l10n/app_es.arb').readAsString();
+      expect(
+        spanishSource,
+        isNot(contains('"walletRetryAction": "Rever"')),
+        reason: 'Spanish wallet retry label still contains typo',
+      );
     },
   );
 
@@ -386,6 +611,53 @@ void main() {
         for (final key in requiredKeys) {
           expect(source, contains('"$key"'), reason: '$path is missing $key');
         }
+      }
+    },
+  );
+
+  test(
+    'remove-watermark localizations use PawSpark wording in every supported locale',
+    () async {
+      const arbFiles = <String>[
+        'lib/l10n/app_en.arb',
+        'lib/l10n/app_ru.arb',
+        'lib/l10n/app_de.arb',
+        'lib/l10n/app_es.arb',
+        'lib/l10n/app_fr.arb',
+        'lib/l10n/app_it.arb',
+        'lib/l10n/app_pl.arb',
+      ];
+
+      final bodyPattern = RegExp(
+        r'^  "generationStatusRemoveWatermarkSheetBody": ".*PawSpark.*",$',
+        multiLine: true,
+      );
+      final actionPattern = RegExp(
+        r'^  "generationStatusRemoveWatermarkUseCredit": ".*PawSpark.*",$',
+        multiLine: true,
+      );
+      final emptyPattern = RegExp(
+        r'^  "generationStatusRemoveWatermarkNoCredits": ".*PawSpark.*",$',
+        multiLine: true,
+      );
+
+      for (final path in arbFiles) {
+        final source = await File(path).readAsString();
+        expect(
+          bodyPattern.hasMatch(source),
+          isTrue,
+          reason: '$path missing PawSpark remove-watermark body',
+        );
+        expect(
+          actionPattern.hasMatch(source),
+          isTrue,
+          reason: '$path missing PawSpark remove-watermark CTA',
+        );
+        expect(
+          emptyPattern.hasMatch(source),
+          isTrue,
+          reason: '$path missing PawSpark remove-watermark empty-state',
+        );
       }
     },
   );

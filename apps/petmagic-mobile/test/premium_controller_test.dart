@@ -182,6 +182,92 @@ void main() {
     expect(state.isBuying, isFalse);
   });
 
+  test('premium load normalizes wrapped backend error keys', () async {
+    final repository = _FakePremiumRepository(
+      config: _paywallConfig(
+        methods: const [
+          PremiumPaymentMethodModel(
+            provider: PremiumPaymentProvider.stripe,
+            purchaseChannel: 'external_checkout',
+            platform: 'android',
+            region: '*',
+            isEnabled: true,
+            isSelectedByDefault: true,
+            requiresExternalWarning: false,
+            requiresStoreDisclosure: false,
+            isRecommended: true,
+            bonusTokensPercent: 0,
+          ),
+        ],
+      ),
+      status: _status(provider: 'stripe', canManageSubscription: false),
+      paywallError: const AppException(
+        '  RuntimeError: PREMIUM.STORE_UNAVAILABLE  ',
+      ),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
+        premiumRepositoryProvider.overrideWithValue(repository),
+        premiumRefreshProfileProvider.overrideWithValue(() async {}),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(premiumControllerProvider.notifier).load();
+
+    final state = container.read(premiumControllerProvider);
+    expect(state.errorMessage, 'premium.store_unavailable');
+    expect(state.isLoading, isFalse);
+  });
+
+  test('premium checkout normalizes wrapped purchase error keys', () async {
+    final repository = _FakePremiumRepository(
+      config: _paywallConfig(
+        methods: const [
+          PremiumPaymentMethodModel(
+            provider: PremiumPaymentProvider.stripe,
+            purchaseChannel: 'external_checkout',
+            platform: 'android',
+            region: '*',
+            isEnabled: true,
+            isSelectedByDefault: true,
+            requiresExternalWarning: false,
+            requiresStoreDisclosure: false,
+            isRecommended: true,
+            bonusTokensPercent: 0,
+          ),
+        ],
+      ),
+      status: _status(provider: 'stripe', canManageSubscription: false),
+      checkoutError: const AppException(
+        ' AppException: premium.checkout_failed ',
+      ),
+    );
+
+    final container = ProviderContainer(
+      overrides: [
+        appLaunchControllerProvider.overrideWith(
+          _AuthenticatedAppLaunchController.new,
+        ),
+        premiumRepositoryProvider.overrideWithValue(repository),
+        premiumRefreshProfileProvider.overrideWithValue(() async {}),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(premiumControllerProvider.notifier);
+    await controller.load();
+    await controller.startCheckout();
+
+    final state = container.read(premiumControllerProvider);
+    expect(state.errorMessage, 'premium.checkout_failed');
+    expect(state.isBuying, isFalse);
+  });
+
   test(
     'canStartCheckout is false while a checkout is already in flight',
     () async {
@@ -409,6 +495,113 @@ void main() {
 
     await expectLater(verificationFuture, completes);
   });
+
+  test(
+    'checkout verification stops quietly after sign out without polling subscription status',
+    () async {
+      final launchController = _MutableAppLaunchController(true);
+      final repository = _FakePremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(() => launchController),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {
+            launchController.markSignedOut();
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      await controller.verifyCheckoutStatus();
+
+      final state = container.read(premiumControllerProvider);
+      expect(repository.fetchPaywallConfigCalls, 1);
+      expect(repository.fetchStatusCalls, 1);
+      expect(
+        state.checkoutVerificationState,
+        PremiumCheckoutVerificationState.idle,
+      );
+      expect(state.isAwaitingCheckoutVerification, isFalse);
+      expect(state.errorMessage, isNull);
+      expect(state.isPremium, isFalse);
+      expect(
+        container.read(appLaunchControllerProvider).isAuthenticated,
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'checkout status refresh cancels active subscription status request on provider disposal',
+    () async {
+      final repository = _DelayedVerificationStatusPremiumRepository(
+        config: _paywallConfig(
+          methods: const [
+            PremiumPaymentMethodModel(
+              provider: PremiumPaymentProvider.stripe,
+              purchaseChannel: 'external_checkout',
+              platform: 'android',
+              region: '*',
+              isEnabled: true,
+              isSelectedByDefault: true,
+              requiresExternalWarning: false,
+              requiresStoreDisclosure: false,
+              isRecommended: true,
+              bonusTokensPercent: 0,
+            ),
+          ],
+        ),
+        status: _status(provider: 'stripe', canManageSubscription: false),
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          appLaunchControllerProvider.overrideWith(
+            _AuthenticatedAppLaunchController.new,
+          ),
+          premiumRepositoryProvider.overrideWithValue(repository),
+          premiumRefreshProfileProvider.overrideWithValue(() async {}),
+        ],
+      );
+
+      final controller = container.read(premiumControllerProvider.notifier);
+      await controller.load();
+      controller.markCheckoutOpened(wasPremiumBeforeCheckout: false);
+
+      final verificationFuture = controller.verifyCheckoutStatus();
+      final cancelToken = await repository.statusRefreshStarted.future;
+      expect(cancelToken.isCancelled, isFalse);
+
+      container.dispose();
+
+      expect(cancelToken.isCancelled, isTrue);
+      repository.completeStatusRefresh();
+      await expectLater(verificationFuture, completes);
+    },
+  );
 
   test(
     'checkout verification refreshes status without reloading paywall',
@@ -664,6 +857,8 @@ class _FakePremiumRepository extends PremiumRepository {
     ),
     this.availabilityByProvider = const {},
     this.statusSequence = const [],
+    this.paywallError,
+    this.checkoutError,
   }) : super(dio: Dio(), sessionStorage: AuthSessionStorage());
 
   final PremiumPaywallConfigModel config;
@@ -679,6 +874,8 @@ class _FakePremiumRepository extends PremiumRepository {
   >
   availabilityByProvider;
   final List<PremiumStatusModel> statusSequence;
+  final Object? paywallError;
+  final Object? checkoutError;
 
   final _streamController = StreamController<List<PurchaseDetails>>.broadcast();
   int fetchPaywallConfigCalls = 0;
@@ -694,6 +891,9 @@ class _FakePremiumRepository extends PremiumRepository {
     CancelToken? cancelToken,
   }) async {
     fetchPaywallConfigCalls++;
+    if (paywallError != null) {
+      throw paywallError!;
+    }
     return config;
   }
 
@@ -716,7 +916,12 @@ class _FakePremiumRepository extends PremiumRepository {
   Future<PremiumCheckoutModel> createStripeCheckout(
     PremiumPlanModel plan,
     Locale locale,
-  ) async => stripeCheckout;
+  ) async {
+    if (checkoutError != null) {
+      throw checkoutError!;
+    }
+    return stripeCheckout;
+  }
 
   @override
   Future<PremiumBillingPortalModel> createBillingPortal() async =>
@@ -797,6 +1002,41 @@ class _DelayedPremiumRepository extends _FakePremiumRepository {
   }
 }
 
+class _DelayedVerificationStatusPremiumRepository
+    extends _FakePremiumRepository {
+  _DelayedVerificationStatusPremiumRepository({
+    required super.config,
+    required super.status,
+  });
+
+  final statusRefreshStarted = Completer<CancelToken>();
+  final _statusRefresh = Completer<PremiumStatusModel>();
+
+  @override
+  Future<PremiumStatusModel> fetchStatus({CancelToken? cancelToken}) async {
+    fetchStatusCalls++;
+    if (fetchStatusCalls == 1) {
+      return status;
+    }
+
+    final token = cancelToken ?? CancelToken();
+    if (!statusRefreshStarted.isCompleted) {
+      statusRefreshStarted.complete(token);
+    }
+
+    return Future.any<PremiumStatusModel>([
+      _statusRefresh.future,
+      token.whenCancel.then((_) => throw const RequestCancelledException()),
+    ]);
+  }
+
+  void completeStatusRefresh() {
+    if (!_statusRefresh.isCompleted) {
+      _statusRefresh.complete(status);
+    }
+  }
+}
+
 class _GuestAppLaunchController extends AppLaunchController {
   @override
   AppLaunchState build() {
@@ -820,5 +1060,28 @@ class _AuthenticatedAppLaunchController extends AppLaunchController {
       hasSeenOnboarding: true,
       guestSessionReady: true,
     );
+  }
+}
+
+class _MutableAppLaunchController extends AppLaunchController {
+  _MutableAppLaunchController(this._isAuthenticated);
+
+  bool _isAuthenticated;
+
+  @override
+  AppLaunchState build() {
+    return AppLaunchState(
+      isLoading: false,
+      isAuthenticated: _isAuthenticated,
+      requiresLegalAcceptance: false,
+      hasSeenOnboarding: true,
+      guestSessionReady: true,
+    );
+  }
+
+  @override
+  void markSignedOut() {
+    _isAuthenticated = false;
+    super.markSignedOut();
   }
 }

@@ -763,6 +763,27 @@ void main() {
     expect(firstCancelObserved.isCompleted, isFalse);
     expect(response.items.single.templateId, 'recovered-result');
   });
+
+  test(
+    'fetchFeed treats nested cancelled app exception as request cancellation',
+    () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.petmagic.test'))
+        ..httpClientAdapter = _FakeHttpClientAdapter((options) async {
+          throw DioException(
+            requestOptions: options,
+            type: DioExceptionType.unknown,
+            message: 'Lifecycle aborted request',
+            error: const AppException('request_cancelled'),
+          );
+        });
+      final dataSource = TemplatesRemoteDataSource(dio);
+
+      await expectLater(
+        dataSource.fetchFeed(const TemplatesQuery(search: 'cancelled')),
+        throwsA(isA<RequestCancelledException>()),
+      );
+    },
+  );
 }
 
 class _FakeHttpClientAdapter implements HttpClientAdapter {

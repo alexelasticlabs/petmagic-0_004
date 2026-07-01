@@ -194,10 +194,12 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final showTopConsentError =
         _consentErrorMessage != null &&
         !_isInlineConsentMessage(_consentErrorMessage!);
-    final showInlineTermsError =
-        _consentErrorMessage == 'auth.accept_terms_required';
-    final showInlineLegalError =
-        _consentErrorMessage == 'auth.legal_documents_unavailable';
+    final showInlineTermsError = _hasConsentErrorCode(
+      'auth.accept_terms_required',
+    );
+    final showInlineLegalError = _hasConsentErrorCode(
+      'auth.legal_documents_unavailable',
+    );
     final socialProviders = authSocialProvidersForPlatform(
       isIOS: !kIsWeb && Platform.isIOS,
     );
@@ -363,14 +365,15 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
     final nextState = ref.read(profileControllerProvider);
     if (!nextState.isAuthenticated || !context.mounted) {
       if (_isSignUp &&
-          nextState.successMessage ==
+          normalizeProfileSuccessKey(nextState.successMessage) ==
               'auth.registration_pending_verification') {
         final email = nextState.email.trim();
         router.go(
           '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}&cooldown=1',
         );
       } else if (!_isSignUp &&
-          nextState.errorMessage == 'auth.email_not_confirmed') {
+          normalizeProfileFeedbackKey(nextState.errorMessage) ==
+              'auth.email_not_confirmed') {
         final email = nextState.email.trim();
         router.go(
           '${EmailVerificationPage.routePath}?email=${Uri.encodeQueryComponent(email)}',
@@ -463,22 +466,20 @@ class _AuthFlowPageState extends ConsumerState<_AuthFlowPage> {
   }
 
   String? _mapSuccessMessage(String raw, AppLocalizations text) {
-    switch (raw) {
-      case 'logout':
-        return text.profileSignedOut;
-      case 'auth.registration_pending_verification':
-        return null;
-      default:
-        return null;
-    }
+    return mapProfileSuccessMessage(raw, text);
   }
 
   void _openLegalDocument(ProfileSettingsDetailKind kind) {
     context.push(ProfileSettingsDetailPage.location(kind));
   }
 
+  bool _hasConsentErrorCode(String key) {
+    return normalizeProfileFeedbackKey(_consentErrorMessage) == key;
+  }
+
   bool _isInlineConsentMessage(String raw) {
-    return raw == 'auth.accept_terms_required' ||
-        raw == 'auth.legal_documents_unavailable';
+    final normalized = normalizeProfileFeedbackKey(raw);
+    return normalized == 'auth.accept_terms_required' ||
+        normalized == 'auth.legal_documents_unavailable';
   }
 }

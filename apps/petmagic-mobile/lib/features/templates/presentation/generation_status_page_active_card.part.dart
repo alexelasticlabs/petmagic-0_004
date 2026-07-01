@@ -141,6 +141,29 @@ class _ActiveGenerationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   _PremiumProgressBar(value: progressValue, color: statusColor),
+                  if (!generation.isTerminal &&
+                      isVideoGeneration(generation)) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      text.generationStatusQueuedVideoHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.textSoft,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (_shouldShowPremiumPriorityHint(generation)) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      text.templateFlowGenerationWaitTooLongPremiumHint,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.gold,
+                        height: 1.35,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
                   _StageTimeline(generation: generation),
                   const SizedBox(height: 16),
@@ -315,6 +338,98 @@ class _ActivePreviewPlaceholder extends StatelessWidget {
       ),
     );
   }
+}
+
+class _QueuedCancelAction extends StatelessWidget {
+  const _QueuedCancelAction({
+    required this.isCancelling,
+    required this.onCancel,
+  });
+
+  final bool isCancelling;
+  final VoidCallback? onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.surfaceStrong.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colors.border.withValues(alpha: 0.58)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cancelButton = OutlinedButton.icon(
+            onPressed: onCancel,
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+            icon: isCancelling
+                ? SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colors.textSoft,
+                    ),
+                  )
+                : const Icon(Icons.cancel_outlined),
+            label: Text(text.generationStatusCancelQueuedAction),
+          );
+
+          final hint = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.schedule_rounded, color: colors.textSoft, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text.generationStatusCancelQueuedHint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.textSoft,
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+
+          return Padding(
+            padding: const EdgeInsets.all(12),
+            child: constraints.maxWidth < 420
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [hint, const SizedBox(height: 12), cancelButton],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: hint),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        flex: 0,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: cancelButton,
+                        ),
+                      ),
+                    ],
+                  ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+bool _shouldShowPremiumPriorityHint(TemplateGenerationResult generation) {
+  if (generation.isTerminal) {
+    return false;
+  }
+
+  final tier = generation.tier?.trim().toLowerCase();
+  final plan = generation.userPlan.trim().toLowerCase();
+  return tier == 'free' || (tier == null && plan == 'free');
 }
 
 String? _activePreviewUrl(TemplateGenerationResult generation) {

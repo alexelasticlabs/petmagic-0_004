@@ -27,7 +27,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     }
 
     _stopPolling();
-    _pollTimer = Timer(const Duration(seconds: 3), () {
+    _pollTimer = Timer(_generationPollInterval(_generation), () {
       unawaited(_handlePollTick());
     });
   }
@@ -106,7 +106,6 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     final loadCancelToken = _startLoadRequest();
 
     try {
-      final previousGeneration = _generation;
       final fetchedGeneration = await repository.fetchGeneration(
         widget.generationId,
         cancelToken: loadCancelToken,
@@ -116,46 +115,7 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
       }
 
       final generation = _reuseCurrentLocalMedia(fetchedGeneration);
-      if (!mounted) {
-        return;
-      }
-
-      unawaited(
-        ref
-            .read(generationHistoryControllerProvider.notifier)
-            .mergeFetchedGeneration(generation),
-      );
-
-      _setPageState(() {
-        _generation = generation;
-        _isLoading = false;
-        _errorMessage = null;
-      });
-
-      if (generation.isUnread) {
-        unawaited(
-          ref
-              .read(generationHistoryControllerProvider.notifier)
-              .markRead(generation.generationId),
-        );
-      }
-
-      if (generation.isCompleted) {
-        unawaited(_materializeLocalMediaAndRefresh(generation));
-        unawaited(_recordFeedbackPromptViewed(generation));
-      }
-
-      if (generation.isTerminal) {
-        _stopPolling();
-        unawaited(_recordTemplateOfTheDayTerminalAnalytics(generation));
-
-        final reachedTerminalNow = previousGeneration != null
-            ? !previousGeneration.isTerminal
-            : true;
-        if (reachedTerminalNow) {
-          unawaited(PetMagicHaptics.heavy());
-        }
-      }
+      _applyGenerationSnapshot(generation);
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) {
         return;
@@ -167,6 +127,145 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
     } finally {
       _completeLoadRequest(loadCancelToken);
     }
+  }
+
+  void _applyGenerationSnapshot(TemplateGenerationResult generation) {
+    if (!mounted) {
+      return;
+    }
+
+    final previousGeneration = _generation;
+    unawaited(
+      ref
+          .read(generationHistoryControllerProvider.notifier)
+          .mergeFetchedGeneration(generation),
+    );
+
+    _setPageState(() {
+      _generation = generation;
+      _isLoading = false;
+      _errorMessage = null;
+    });
+
+    if (generation.isUnread) {
+      unawaited(
+        ref
+            .read(generationHistoryControllerProvider.notifier)
+            .markRead(generation.generationId),
+      );
+    }
+
+    if (generation.isCompleted) {
+      unawaited(_materializeLocalMediaAndRefresh(generation));
+      unawaited(_recordFeedbackPromptViewed(generation));
+    }
+
+    if (generation.isTerminal) {
+      _stopPolling();
+      unawaited(_recordTemplateOfTheDayTerminalAnalytics(generation));
+
+      final reachedTerminalNow = previousGeneration != null
+          ? !previousGeneration.isTerminal
+          : true;
+      if (reachedTerminalNow) {
+        unawaited(PetMagicHaptics.heavy());
+      }
+    }
+  }
+
+  void _handleRealtimeEvent(RealtimeEvent event) {
+    if (!mounted || !_isPageActive || _isMediaActionInFlight) {
+      return;
+    }
+
+    if (event.topic != RealtimeTopics.templatesGenerationStatusChanged ||
+        event.payload.isEmpty) {
+      return;
+    }
+
+    try {
+      final generation = TemplateGenerationDto.fromJson(
+        Map<String, dynamic>.from(event.payload),
+      ).toDomain();
+      if (generation.generationId != widget.generationId) {
+        return;
+      }
+
+      _applyGenerationSnapshot(_reuseCurrentLocalMedia(generation));
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationStatus',
+        operation: 'realtime_event_parse',
+        message: 'Generation status realtime payload parsing failed',
+        context: {
+          'topic': event.topic,
+          'payload_keys': event.payload.keys.take(8).toList(growable: false),
+        },
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _resumeRealtimeIfNeeded() async {
+    if (!mounted || !_isPageActive) {
+      return;
+    }
+
+    final realtimeClient = _activeRealtimeClient;
+    if (realtimeClient == null) {
+      return;
+    }
+
+    _realtimeSubscription ??= realtimeClient.events.listen(
+      _handleRealtimeEvent,
+    );
+    if (_isRealtimeConnected) {
+      return;
+    }
+
+    final connectFuture = _realtimeConnectFuture;
+    if (connectFuture != null) {
+      await connectFuture;
+      return;
+    }
+
+    Future<void>? nextConnectFuture;
+    try {
+      nextConnectFuture = realtimeClient.connect();
+      _realtimeConnectFuture = nextConnectFuture;
+      await nextConnectFuture;
+      if (!mounted || !_isPageActive) {
+        unawaited(realtimeClient.disconnect());
+        return;
+      }
+
+      _isRealtimeConnected = true;
+    } catch (error, stackTrace) {
+      AppLogger.warn(
+        feature: 'Templates.GenerationStatus',
+        operation: 'realtime_connect',
+        message:
+            'Generation status realtime unavailable; polling remains active',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      if (identical(_realtimeConnectFuture, nextConnectFuture)) {
+        _realtimeConnectFuture = null;
+      }
+    }
+  }
+
+  void _pauseRealtime() {
+    unawaited(_realtimeSubscription?.cancel());
+    _realtimeSubscription = null;
+
+    final realtimeClient = _activeRealtimeClient;
+    if (_isRealtimeConnected && realtimeClient != null) {
+      unawaited(realtimeClient.disconnect());
+    }
+    _isRealtimeConnected = false;
   }
 
   Future<void> _showCachedOrMappedLoadError(
@@ -265,6 +364,137 @@ extension _GenerationStatusPageLifecycle on _GenerationStatusPageState {
           .mergeFetchedGeneration(localizedGeneration),
     );
   }
+
+  Future<void> _confirmAndCancelQueuedGeneration(
+    TemplateGenerationResult generation,
+  ) async {
+    if (!generation.canCancelQueued) {
+      _showGenerationAlreadyStartedMessage();
+      return;
+    }
+
+    final text = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(text.generationStatusCancelQueuedTitle),
+          content: Text(text.generationStatusCancelQueuedMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(text.generationStatusCancelQueuedKeepAction),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(text.generationStatusCancelQueuedConfirmAction),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    await _cancelQueuedGeneration(generation);
+  }
+
+  Future<void> _cancelQueuedGeneration(
+    TemplateGenerationResult generation,
+  ) async {
+    final text = AppLocalizations.of(context);
+    final current = _generation;
+    if (current == null ||
+        current.generationId != generation.generationId ||
+        !current.canCancelQueued) {
+      _showGenerationAlreadyStartedMessage();
+      return;
+    }
+
+    _setPageState(() {
+      _isCancellingGeneration = true;
+      _errorMessage = null;
+    });
+
+    final repository = ref.read(templateGenerationRepositoryProvider);
+    try {
+      final result = await repository.cancelGeneration(generation.generationId);
+      if (!mounted) {
+        return;
+      }
+
+      _stopPolling();
+      _setPageState(() {
+        _generation = _reuseCurrentLocalMedia(result.generation);
+        _isCancellingGeneration = false;
+        _isLoading = false;
+        _errorMessage = null;
+      });
+
+      unawaited(
+        ref
+            .read(generationHistoryControllerProvider.notifier)
+            .mergeFetchedGeneration(result.generation),
+      );
+
+      if (result.refunded || result.generation.refundedAtUtc != null) {
+        unawaited(
+          ref.read(walletControllerProvider.notifier).load(refresh: true),
+        );
+      }
+
+      PetMagicToast.show(
+        context,
+        message: text.generationStatusCancelQueuedSuccess,
+        tone: PetMagicToastTone.success,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      _setPageState(() {
+        _isCancellingGeneration = false;
+      });
+
+      if (_isGenerationAlreadyStartedCancelError(error)) {
+        _showGenerationAlreadyStartedMessage();
+        unawaited(_load(silent: true));
+        return;
+      }
+
+      PetMagicToast.show(
+        context,
+        message: text.generationStatusCancelQueuedFailed,
+        tone: PetMagicToastTone.warning,
+      );
+    }
+  }
+
+  bool _isGenerationAlreadyStartedCancelError(Object error) {
+    if (error is AppException) {
+      if (error.statusCode == 409 || error.statusCode == 422) {
+        return true;
+      }
+
+      final normalized = normalizeTemplateErrorKey(error.message);
+      return normalized == 'templates.generation_already_started' ||
+          normalized == 'templates.generation_cancel_not_allowed';
+    }
+
+    return false;
+  }
+
+  void _showGenerationAlreadyStartedMessage() {
+    final text = AppLocalizations.of(context);
+    PetMagicToast.show(
+      context,
+      message: text.generationStatusCancelQueuedAlreadyStarted,
+      tone: PetMagicToastTone.info,
+    );
+  }
 }
 
 String _mapStatusLoadError(Object error) {
@@ -276,14 +506,8 @@ String _mapStatusLoadError(Object error) {
       return 'templates.insufficient_balance';
     }
 
-    final message = error.message.trim();
-    if (message == 'auth.legal_acceptance_required') {
-      return message;
-    }
-    if (message == 'templates.connection_timeout' ||
-        message == 'templates.server_timeout' ||
-        message == 'templates.request_failed' ||
-        message == 'templates.generation_failed') {
+    final message = normalizeTemplateErrorKey(error.message);
+    if (message != null) {
       return message;
     }
   }
@@ -297,13 +521,30 @@ String _statusLoadErrorText(AppLocalizations text, String raw) {
     return authMessage;
   }
 
-  return switch (raw) {
+  return switch (normalizeTemplateErrorKey(raw) ?? raw.trim().toLowerCase()) {
     'auth.sign_in_required' => text.authSignInRequired,
     'templates.insufficient_balance' =>
       text.templateFlowInsufficientBalanceTitle,
+    'templates.network_unavailable' => text.templateFlowNetworkError,
     'templates.connection_timeout' => text.templateFlowNetworkError,
+    'templates.server_unavailable' => text.templateFlowServerError,
     'templates.server_timeout' => text.templateFlowServerError,
     'templates.request_failed' => text.templatesRequestFailedError,
     _ => text.templateFlowStartFailedError,
+  };
+}
+
+Duration _generationPollInterval(TemplateGenerationResult? generation) {
+  return switch (generation?.status) {
+    TemplateGenerationStatus.queued => const Duration(seconds: 8),
+    TemplateGenerationStatus.submittingToProvider ||
+    TemplateGenerationStatus.providerQueued => const Duration(seconds: 5),
+    TemplateGenerationStatus.processing ||
+    TemplateGenerationStatus.preprocessing ||
+    TemplateGenerationStatus.generating ||
+    TemplateGenerationStatus.providerProcessing ||
+    TemplateGenerationStatus.importingMedia ||
+    TemplateGenerationStatus.finalizing => const Duration(seconds: 3),
+    _ => const Duration(seconds: 5),
   };
 }

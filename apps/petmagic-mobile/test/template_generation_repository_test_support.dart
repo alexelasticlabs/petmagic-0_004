@@ -73,10 +73,10 @@ Future<File> writeFtypImage(
   return file;
 }
 
-ResponseBody jsonResponse(Object body) {
+ResponseBody jsonResponse(Object body, {int statusCode = 200}) {
   return ResponseBody.fromString(
     jsonEncode(body),
-    200,
+    statusCode,
     headers: {
       Headers.contentTypeHeader: [Headers.jsonContentType],
     },
@@ -135,13 +135,17 @@ Map<String, dynamic> generationJson({
 }
 
 AuthSession sessionFixture() {
+  return sessionFixtureFor('user-1');
+}
+
+AuthSession sessionFixtureFor(String userId) {
   return AuthSession(
     accessToken: 'access-token',
     refreshToken: 'refresh-token',
     expiresAtUtc: DateTime.now().toUtc().add(const Duration(hours: 1)),
-    user: const MobileUserProfile(
-      userId: 'user-1',
-      email: 'pet@example.com',
+    user: MobileUserProfile(
+      userId: userId,
+      email: '$userId@example.com',
       displayName: 'Pet Parent',
       isPremium: false,
       emailConfirmed: true,
@@ -149,7 +153,7 @@ AuthSession sessionFixture() {
       privacyPolicyAccepted: true,
       marketingEmailsEnabled: false,
       legalAcceptance: legalAcceptanceFixture,
-      roles: ['user'],
+      roles: const ['user'],
       avatar: null,
     ),
   );

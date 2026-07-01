@@ -44,7 +44,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
       return;
     }
 
-    _reloadAll();
+    _reloadCachedUnavailableAchievementsIfNeeded();
   }
 
   @override
@@ -115,7 +115,7 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
     final hasInternet = ref.watch(
       networkStatusControllerProvider.select((status) => status.hasInternet),
     );
-    final rawError = achievementsAsync.asError?.error.toString();
+    final rawError = achievementsErrorMessage(achievementsAsync.asError?.error);
     final unavailableKind = classifyAchievementsUnavailable(
       error: achievementsAsync.asError?.error,
       hasInternet: hasInternet,
@@ -313,6 +313,28 @@ class _AchievementsPageState extends ConsumerState<AchievementsPage>
         ),
       ),
     );
+  }
+
+  void _reloadCachedUnavailableAchievementsIfNeeded() {
+    if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
+    if (!ref.exists(achievementsProvider)) {
+      return;
+    }
+
+    final achievements = ref.read(achievementsProvider);
+    final hasInternet = ref.read(networkStatusControllerProvider).hasInternet;
+    if (classifyAchievementsUnavailable(
+          error: achievements.asError?.error,
+          hasInternet: hasInternet,
+        ) ==
+        null) {
+      return;
+    }
+
+    _reloadAll();
   }
 
   void _reloadAll() {

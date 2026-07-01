@@ -334,9 +334,15 @@ class _GenerationHistoryLoadRequest {
 
 String _historyLoadErrorMessage(Object error) {
   if (error is AppException) {
-    final message = error.message.trim();
-    if (_isSafeHistoryErrorKey(message)) {
-      return message;
+    final message = normalizeTemplateErrorKey(error.message);
+    final safeMessage = switch (message) {
+      'templates.connection_timeout' => message,
+      'templates.server_timeout' => message,
+      'templates.request_failed' => message,
+      _ => null,
+    };
+    if (safeMessage != null) {
+      return safeMessage;
     }
 
     final statusCode = error.statusCode;
@@ -354,12 +360,6 @@ String _historyLoadErrorMessage(Object error) {
   }
 
   return 'templates.request_failed';
-}
-
-bool _isSafeHistoryErrorKey(String value) {
-  return value == 'templates.connection_timeout' ||
-      value == 'templates.server_timeout' ||
-      value == 'templates.request_failed';
 }
 
 bool _isCancelledRequest(Object error) {

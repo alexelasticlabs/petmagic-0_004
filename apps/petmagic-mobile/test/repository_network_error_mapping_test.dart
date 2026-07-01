@@ -15,6 +15,20 @@ void main() {
   });
 
   test(
+    'profile repository session-expired fallback avoids human detail text',
+    () {
+      final source = File(
+        'lib/features/profile/data/profile_repository.dart',
+      ).readAsStringSync();
+      final body = _methodBody(source, '_mapDioException');
+
+      expect(body, contains("title == 'users.not_found'"));
+      expect(body, isNot(contains("detail == 'User not found.'")));
+      expect(body, contains("'auth.session_expired'"));
+    },
+  );
+
+  test(
     'premium repository maps connectivity and server failures explicitly',
     () {
       final source = File(

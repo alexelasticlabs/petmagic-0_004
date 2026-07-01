@@ -15,9 +15,9 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
     final summary = summaryAsync.asData?.value;
     final achievements = achievementsAsync.asData?.value;
     final rawError = summaryAsync.hasError
-        ? summaryAsync.error.toString()
+        ? achievementsErrorMessage(summaryAsync.error)
         : achievementsAsync.hasError
-        ? achievementsAsync.error.toString()
+        ? achievementsErrorMessage(achievementsAsync.error)
         : null;
     final unavailableKind = classifyAchievementsUnavailable(
       error: rawError,
@@ -38,10 +38,7 @@ class _GamificationHighlightsWrapper extends ConsumerWidget {
       ref.invalidate(achievementsProvider);
     }
 
-    void openAchievements() {
-      reloadPreview();
-      context.push(AchievementsPage.routePath);
-    }
+    void openAchievements() => context.push(AchievementsPage.routePath);
 
     void retry() => reloadPreview();
 

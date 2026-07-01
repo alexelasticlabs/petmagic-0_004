@@ -70,7 +70,10 @@ extension _SupportChatPagePreviewActions on _SupportChatPageState {
       return AppLocalizations.of(context).supportChatTodayLabel;
     }
 
-    return DateFormat('MMM d').format(localValue);
+    return DateFormat(
+      'MMM d',
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(localValue);
   }
 
   bool _isSameDayImpl(DateTime left, DateTime right) {

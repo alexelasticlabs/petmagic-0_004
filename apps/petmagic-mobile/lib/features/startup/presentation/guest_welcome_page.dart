@@ -301,7 +301,7 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
     await showProfileLanguageSheet(
       context: context,
       selectedLocale: selectedLocale,
-      options: _languageOptions,
+      options: profileLanguageSheetOptions,
       onSelect: (locale) => ref
           .read(appPreferencesControllerProvider.notifier)
           .updateLocale(locale),
@@ -330,13 +330,3 @@ class _GuestWelcomePageState extends ConsumerState<GuestWelcomePage>
     }
   }
 }
-
-const _languageOptions = <ProfileLanguageSheetOption>[
-  ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
-  ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
-  ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
-  ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
-  ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
-  ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
-  ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
-];

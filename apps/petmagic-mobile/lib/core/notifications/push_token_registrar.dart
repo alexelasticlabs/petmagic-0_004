@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:petmagic_mobile/core/config/app_config.dart';
 import 'package:petmagic_mobile/core/notifications/push_token_registration_cache.dart';
+import 'package:petmagic_mobile/features/profile/data/auth_session_storage.dart';
 import 'package:petmagic_mobile/features/support/data/support_chat_repository.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/wallet/data/wallet_repository.dart';
@@ -11,10 +12,12 @@ final class PushTokenRegistrar {
     required TemplateGenerationRepository templateRepository,
     required SupportChatRepository supportRepository,
     required WalletRepository walletRepository,
+    AuthSessionStorage? sessionStorage,
     PushTokenRegistrationCache? registrationCache,
   }) : _templateRepository = templateRepository,
        _supportRepository = supportRepository,
        _walletRepository = walletRepository,
+       _sessionStorage = sessionStorage ?? AuthSessionStorage(),
        _registrationCache =
            registrationCache ?? SharedPreferencesPushTokenRegistrationCache();
 
@@ -27,6 +30,7 @@ final class PushTokenRegistrar {
   final TemplateGenerationRepository _templateRepository;
   final SupportChatRepository _supportRepository;
   final WalletRepository _walletRepository;
+  final AuthSessionStorage _sessionStorage;
   final PushTokenRegistrationCache _registrationCache;
 
   Future<bool> registerToken({
@@ -42,10 +46,19 @@ final class PushTokenRegistrar {
       return false;
     }
 
+    final normalizedPlatform = _normalizePlatform(platform);
+    final normalizedLocale = _normalizeLocale(locale);
+
+    final accountScope = await _readAccountScope();
+    if (accountScope == null || !_canContinue(canContinue)) {
+      return false;
+    }
+
     final registrationKey = _registrationKey(
       token: normalizedToken,
-      platform: platform,
-      locale: locale,
+      accountScope: accountScope,
+      platform: normalizedPlatform,
+      locale: normalizedLocale,
       appVersion: appVersion,
       deviceId: deviceId,
     );
@@ -62,8 +75,8 @@ final class PushTokenRegistrar {
 
     final task = _registerTokenUncached(
       token: normalizedToken,
-      platform: platform,
-      locale: locale,
+      platform: normalizedPlatform,
+      locale: normalizedLocale,
       appVersion: appVersion,
       deviceId: deviceId,
       canContinue: canContinue,
@@ -159,6 +172,11 @@ final class PushTokenRegistrar {
       (key, _) => key.startsWith('$normalizedToken|'),
     );
     _inFlightUnregistrations.remove(normalizedToken);
+  }
+
+  Future<String?> _readAccountScope() async {
+    final session = await _sessionStorage.read();
+    return _nonEmpty(session?.user.userId);
   }
 
   Future<String?> _readLastCompletedRegistrationKey() async {
@@ -273,6 +291,7 @@ final class PushTokenRegistrar {
 
   static String _registrationKey({
     required String token,
+    required String accountScope,
     required String platform,
     required String locale,
     String? appVersion,
@@ -280,12 +299,56 @@ final class PushTokenRegistrar {
   }) {
     return [
       token,
+      accountScope,
       platform.trim(),
       locale.trim(),
       _nonEmpty(appVersion) ?? AppConfig.appVersion,
       _nonEmpty(deviceId) ?? '',
     ].join('|');
   }
+
+  static String _normalizePlatform(String platform) {
+    return platform.trim().toLowerCase();
+  }
+
+  static String _normalizeLocale(String locale) {
+    final normalized = locale.trim().replaceAll('_', '-');
+    if (normalized.isEmpty) {
+      return normalized;
+    }
+
+    final parts = normalized
+        .split('-')
+        .where((part) => part.trim().isNotEmpty)
+        .toList(growable: false);
+    if (parts.isEmpty) {
+      return '';
+    }
+
+    final canonical = <String>[parts.first.toLowerCase()];
+    for (final rawPart in parts.skip(1)) {
+      final part = rawPart.trim();
+      if (part.length == 4) {
+        canonical.add(
+          '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}',
+        );
+        continue;
+      }
+
+      if (_localeRegionSegmentPattern.hasMatch(part)) {
+        canonical.add(part.toUpperCase());
+        continue;
+      }
+
+      canonical.add(part.toLowerCase());
+    }
+
+    return canonical.join('-');
+  }
+
+  static final RegExp _localeRegionSegmentPattern = RegExp(
+    r'^[A-Za-z]{2}$|^[0-9]{3}$',
+  );
 
   static String? _nonEmpty(String? value) {
     final normalized = value?.trim();

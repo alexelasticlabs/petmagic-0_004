@@ -58,7 +58,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
 
     _hasRequestedInitialConversationLoad = true;
     Future.microtask(() {
-      if (!mounted) {
+      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 
@@ -97,6 +97,10 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
   }
 
   Future<void> _loadConversation() async {
+    if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      return;
+    }
+
     if (_isLoadingConversation && _conversationLoadCancelToken != null) {
       return;
     }
@@ -126,9 +130,7 @@ class _SupportHomePageState extends ConsumerState<SupportHomePage> {
         return;
       }
 
-      final isNotFound = error.message.toLowerCase().contains(
-        'support.conversation_not_found',
-      );
+      final isNotFound = error.isSupportConversationNotFound;
       setState(() {
         _conversation = null;
         _conversationError = isNotFound ? null : error.message;

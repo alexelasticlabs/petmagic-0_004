@@ -214,12 +214,28 @@ AppUnavailableKind? _petsUnavailableKind(
   bool hasInternet,
 ) {
   final error = pets.asError?.error;
-  if (error == null || _isUnauthorizedError(error)) {
+  final raw = _petsErrorMessage(error);
+  if (raw == null || _isUnauthorizedError(error)) {
     return null;
   }
 
-  return classifyAppUnavailable(
-    raw: error is AppException ? error.message : error.toString(),
-    hasInternet: hasInternet,
-  );
+  return classifyAppUnavailable(raw: raw, hasInternet: hasInternet);
+}
+
+String? _petsErrorMessage(Object? error) {
+  if (error == null) {
+    return null;
+  }
+
+  if (error is AppException) {
+    final message = error.message.trim();
+    return message.isEmpty ? 'pets.request_failed' : message;
+  }
+
+  if (error is String) {
+    final message = error.trim();
+    return message.isEmpty ? 'pets.request_failed' : message;
+  }
+
+  return 'pets.request_failed';
 }

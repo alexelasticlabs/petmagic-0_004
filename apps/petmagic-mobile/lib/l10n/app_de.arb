@@ -14,7 +14,6 @@
   "notificationWalletBody": "Öffne dein Wallet, um die neueste Kontostandsänderung zu prüfen.",
   "notificationPremiumBody": "Öffne dein Profil, um das neueste Premium-Update zu prüfen.",
   "appUnexpectedErrorFallback": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-  "comingSoonMessage": "Dieser Bereich ist fuer die naechste Produktphase vorbereitet.",
   "createMagicTitle": "Magie erstellen",
   "pickTemplateSubtitle": "Waehle eine Vorlage fuer dein Haustier",
   "searchTemplates": "Vorlagen suchen",
@@ -82,6 +81,7 @@
   "profileEmailConfirmed": "E-Mail bestätigt",
   "profileEmailPending": "E-Mail nicht bestätigt",
   "profileSignedOut": "Auf diesem Gerät abgemeldet.",
+  "profileAccountDeleted": "Ihr Konto wurde geloescht.",
   "magicLoadingPreparing": "Magie wird vorbereitet...",
   "magicLoadingCutestAngle": "Der niedlichste Winkel wird gesucht...",
   "magicLoadingAiPaws": "AI-Pfoten werden aufgewaermt...",
@@ -335,7 +335,7 @@
   "premiumTermsNotice": "Wenn du fortfährst, stimmst du den Nutzungsbedingungen und der Datenschutzrichtlinie zu.",
   "premiumStoreUnavailable": "Abonnements über App Store / Google Play sind derzeit vorübergehend nicht verfügbar. Versuchen Sie es später erneut oder verwenden Sie eine andere verfügbare Zahlungsmethode.",
   "premiumStoreProductUnavailable": "Dieses Abo-Produkt ist im Store auf diesem Gerät nicht verfügbar.",
-  "premiumStoreVerificationUnavailable": "Die serverseitige Store-Verifizierung ist noch nicht konfiguriert.",
+  "premiumStoreVerificationUnavailable": "Die Store-Verifizierung ist vorübergehend nicht verfügbar.",
   "premiumStorePurchaseInvalid": "Der Kauf konnte nicht verifiziert werden.",
   "premiumStorePurchaseInactive": "Dieses Abo ist nicht mehr aktiv.",
   "premiumPurchaseActivated": "Premium ist jetzt aktiv.",
@@ -476,7 +476,7 @@
   "authReceiveUpdatesLabel": "Ich möchte Updates und Angebote von PetMagic erhalten",
   "authAcceptTermsRequired": "Um ein Konto zu erstellen, müssen Sie die Nutzungsbedingungen und Datenschutzrichtlinien akzeptieren.",
   "authGoogleShortLabel": "Google",
-  "authAppleShortLabel": "Apfel",
+  "authAppleShortLabel": "Apple",
   "authExternalCancelled": "Die Anmeldung wurde abgebrochen.",
   "authExternalFailed": "Die externe Anmeldung ist fehlgeschlagen. Bitte versuchen Sie es erneut.",
   "authExternalTimedOut": "Die Anmeldung hat zu lange gedauert. Bitte versuchen Sie es erneut.",
@@ -578,6 +578,17 @@
   "generationStatusEtaDefault": "Etwa 1-2 Min. verbleiben",
   "generationStatusEtaStartsSoon": "Startet in wenigen Minuten",
   "generationStatusEtaNotifyHint": "Wir benachrichtigen dich, sobald das Ergebnis fertig ist.",
+  "generationStatusCancelledTitle": "Generierung abgebrochen",
+  "generationStatusCancelledMessage": "Diese Generierung wurde vor dem Start der Verarbeitung gestoppt.",
+  "generationStatusCancelQueuedHint": "Du kannst abbrechen, solange diese Generierung noch in der Warteschlange wartet.",
+  "generationStatusCancelQueuedAction": "Generierung abbrechen",
+  "generationStatusCancelQueuedTitle": "Generierung abbrechen?",
+  "generationStatusCancelQueuedMessage": "Das funktioniert nur, solange die Generierung noch in der Warteschlange ist. Falls PawSpark reserviert wurden, gibt der Backend sie automatisch zurueck.",
+  "generationStatusCancelQueuedKeepAction": "Weiter warten",
+  "generationStatusCancelQueuedConfirmAction": "Abbruch bestaetigen",
+  "generationStatusCancelQueuedSuccess": "Generierung abgebrochen.",
+  "generationStatusCancelQueuedAlreadyStarted": "Die Generierung hat bereits begonnen und kann nicht abgebrochen werden.",
+  "generationStatusCancelQueuedFailed": "Generierung konnte nicht abgebrochen werden. Bitte versuche es erneut.",
   "generationStatusFailurePhotoHint": "Das Foto passt nicht zu dieser Vorlage. Versuche ein Foto, auf dem das Haustier klar zu sehen ist.",
   "generationStatusFailureTechnicalHint": "Das Ergebnis konnte wegen eines technischen Problems nicht erstellt werden. PawSpark wurden deinem Guthaben zuruckerstattet.",
   "generationStatusStatusCompleted": "Dein Ergebnis ist fertig",
@@ -1166,7 +1177,7 @@
   "emailVerificationCodeSentMessage": "Wir haben einen 6-stelligen Code an {email} gesendet.",
   "@emailVerificationCodeSentMessage": {},
   "emailVerificationCodeLabel": "Code",
-  "emailVerificationWorkingLabel": "Arbeiten...",
+  "emailVerificationWorkingLabel": "Wird verarbeitet...",
   "emailVerificationVerifyAction": "Verifizieren",
   "emailVerificationResendAction": "Code erneut senden",
   "emailVerificationChangeEmailAction": "E-Mail ändern",
@@ -1222,10 +1233,10 @@
   "generationStatusRemovingWatermark": "Wird entfernt...",
   "generationStatusUpgradePremium": "Auf Premium upgraden",
   "generationStatusRemoveWatermarkSheetTitle": "Wasserzeichen entfernen",
-  "generationStatusRemoveWatermarkSheetBody": "Verwende {cost} Credit für dieses Ergebnis oder upgrade auf Premium für saubere Downloads.",
-  "generationStatusRemoveWatermarkUseCredit": "{cost} Credit verwenden",
+  "generationStatusRemoveWatermarkSheetBody": "Verwende {cost} PawSpark für dieses Ergebnis oder upgrade auf Premium für saubere Downloads.",
+  "generationStatusRemoveWatermarkUseCredit": "{cost} PawSpark verwenden",
   "generationStatusRemoveWatermarkFailed": "Wasserzeichen konnte nicht entfernt werden. Bitte versuche es erneut.",
-  "generationStatusRemoveWatermarkNoCredits": "Nicht genug Credits. Kaufe Credits oder upgrade auf Premium.",
+  "generationStatusRemoveWatermarkNoCredits": "Nicht genug PawSpark. Lade PawSpark auf oder upgrade auf Premium.",
   "globalOfflineBannerTitle": "Keine Internetverbindung",
   "globalOfflineBannerMessage": "Einige Funktionen sind nicht verfügbar, bis die Verbindung wiederhergestellt ist.",
   "globalOnlineRestoredBannerTitle": "Verbindung wiederhergestellt",
@@ -1461,5 +1472,46 @@
         "type": "String"
       }
     }
-  }
+  },
+  "generationStatusQueuePositionWithWait": "Warteschlangenposition #{position} - {wait}",
+  "@generationStatusQueuePositionWithWait": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "wait": {
+        "type": "String"
+      }
+    }
+  },
+  "generationStatusQueuePosition": "Warteschlangenposition #{position}",
+  "@generationStatusQueuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusWaitMinutes": "{minutes} min",
+  "@generationStatusWaitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusStatusCancelled": "Generierung abgebrochen",
+  "generationStatusTerminalCancelledHint": "Die Generierung wurde vor dem Abschluss abgebrochen.",
+  "generationStatusQueuedVideoHint": "Video dauert normalerweise langer als Fotos und kann einige Minuten brauchen.",
+  "templateFlowGenerationWaitTooLongTitle": "Derzeit hohe Auslastung",
+  "templateFlowGenerationWaitTooLongMessage": "Die geschatzte Wartezeit fur diese Generierung ist im Moment zu lang. Versuche es spater erneut oder wahle eine Foto-Generierung, die normalerweise schneller ist.",
+  "templateFlowGenerationWaitTooLongRetryAfter": "Versuche es in etwa {value} erneut.",
+  "@templateFlowGenerationWaitTooLongRetryAfter": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium erhaelt Zugang zur priorisierten Warteschlange und wartet normalerweise weniger."
 }

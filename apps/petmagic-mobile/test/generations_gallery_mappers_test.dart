@@ -63,6 +63,34 @@ void main() {
         estimatedTimeLabel(text, finalizing),
         text.generationStatusEtaNotifyHint,
       );
+
+      final providerQueued = _generation(
+        status: TemplateGenerationStatus.providerQueued,
+      );
+      expect(
+        stageStatusLabel(text, providerQueued),
+        text.generationStatusStageQueued,
+      );
+      expect(
+        estimatedTimeLabel(text, providerQueued),
+        text.generationStatusEtaStartsSoon,
+      );
+
+      final providerProcessing = _generation(
+        status: TemplateGenerationStatus.providerProcessing,
+      );
+      expect(
+        stageStatusLabel(text, providerProcessing),
+        text.templateFlowStepCreateMagic,
+      );
+
+      final importing = _generation(
+        status: TemplateGenerationStatus.importingMedia,
+      );
+      expect(
+        stageStatusLabel(text, importing),
+        text.templateFlowStepFinalTouches,
+      );
     });
 
     test(

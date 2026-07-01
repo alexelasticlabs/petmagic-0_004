@@ -60,10 +60,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Algo salió mal. Inténtalo de nuevo.';
 
   @override
-  String get comingSoonMessage =>
-      'Esta sección está preparada para la próxima ola de productos.';
-
-  @override
   String get createMagicTitle => 'Crear magia';
 
   @override
@@ -284,6 +280,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Cerró sesión en este dispositivo.';
+
+  @override
+  String get profileAccountDeleted => 'Tu cuenta fue eliminada.';
 
   @override
   String get profileAccountCenterTitle => 'Centro de cuenta';
@@ -728,11 +727,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get subscriptionPaymentProviderStripe => 'Tarjeta a través de Stripe';
 
   @override
-  String get subscriptionPaymentProviderGooglePlay => 'GooglePlay';
+  String get subscriptionPaymentProviderGooglePlay => 'Google Play';
 
   @override
-  String get subscriptionPaymentProviderAppStore =>
-      'Apple/tienda de aplicaciones';
+  String get subscriptionPaymentProviderAppStore => 'App Store';
 
   @override
   String get subscriptionChangePaymentAction => 'Cambiar método de pago';
@@ -907,7 +905,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get walletContactSupportAction => 'Contactar con soporte';
 
   @override
-  String get walletRetryAction => 'Rever';
+  String get walletRetryAction => 'Reintentar';
 
   @override
   String get rewardsPageTitle => 'Recompensas';
@@ -1487,13 +1485,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get premiumPaymentStripeSubtitle => 'Tarjeta, Apple Pay o Google Pay';
 
   @override
-  String get premiumPaymentGooglePlay => 'GooglePlay';
+  String get premiumPaymentGooglePlay => 'Google Play';
 
   @override
   String get premiumPaymentGooglePlaySubtitle => 'Pago a través de Google Play';
 
   @override
-  String get premiumPaymentApple => 'Apple Pay/Tienda de aplicaciones';
+  String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
   String get premiumPaymentOther => 'Otro método de pago';
@@ -1635,7 +1633,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'La verificación del store en el servidor aún no está configurada.';
+      'La verificación de la tienda no está disponible temporalmente.';
 
   @override
   String get premiumStorePurchaseInvalid => 'No se pudo verificar la compra.';
@@ -2960,7 +2958,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authGoogleShortLabel => 'Google';
 
   @override
-  String get authAppleShortLabel => 'Manzana';
+  String get authAppleShortLabel => 'Apple';
 
   @override
   String get authContinueWithGoogle => 'Continuar con Google';
@@ -3634,6 +3632,49 @@ class AppLocalizationsEs extends AppLocalizations {
       'Te avisaremos cuando el resultado este listo.';
 
   @override
+  String get generationStatusCancelledTitle => 'Generación cancelada';
+
+  @override
+  String get generationStatusCancelledMessage =>
+      'Esta generación se detuvo antes de iniciar el procesamiento.';
+
+  @override
+  String get generationStatusCancelQueuedHint =>
+      'Puedes cancelar mientras esta generación siga esperando en cola.';
+
+  @override
+  String get generationStatusCancelQueuedAction => 'Cancelar generación';
+
+  @override
+  String get generationStatusCancelQueuedTitle => '¿Cancelar generación?';
+
+  @override
+  String get generationStatusCancelQueuedMessage =>
+      'Esto solo funciona mientras la generación sigue en cola. Si se reservaron PawSpark, el backend los devolverá automáticamente.';
+
+  @override
+  String get generationStatusCancelQueuedKeepAction => 'Seguir esperando';
+
+  @override
+  String get generationStatusCancelQueuedConfirmAction =>
+      'Confirmar cancelación';
+
+  @override
+  String get generationStatusCancelQueuedSuccess => 'Generación cancelada.';
+
+  @override
+  String get generationStatusCancelQueuedAlreadyStarted =>
+      'La generación ya comenzó y no se puede cancelar.';
+
+  @override
+  String get generationStatusCancelQueuedFailed =>
+      'No se pudo cancelar la generación. Inténtalo de nuevo.';
+
+  @override
+  String get generationStatusQueuedVideoHint =>
+      'El video suele tardar mas que las fotos y puede requerir unos minutos.';
+
+  @override
   String get generationStatusFailurePhotoHint =>
       'La foto no es adecuada para esta plantilla. Prueba con una foto donde la mascota se vea claramente.';
 
@@ -3762,7 +3803,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get walletStripeCardBrandsLabel => 'Visa • Mastercard';
 
   @override
-  String get walletStripeWalletsLabel => 'Pago de Apple • Pago de Google';
+  String get walletStripeWalletsLabel => 'Apple Pay • Google Pay';
 
   @override
   String get walletPackUsageNote =>
@@ -3794,7 +3835,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get emailVerificationCodeLabel => 'Código';
 
   @override
-  String get emailVerificationWorkingLabel => 'Laboral...';
+  String get emailVerificationWorkingLabel => 'Procesando...';
 
   @override
   String get emailVerificationVerifyAction => 'Verificar';
@@ -4077,12 +4118,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String generationStatusRemoveWatermarkSheetBody(Object cost) {
-    return 'Usa $cost crédito para este resultado o pasa a Premium para descargas limpias.';
+    return 'Usa $cost PawSpark para este resultado o pasa a Premium para descargas limpias.';
   }
 
   @override
   String generationStatusRemoveWatermarkUseCredit(Object cost) {
-    return 'Usar $cost crédito';
+    return 'Usar $cost PawSpark';
   }
 
   @override
@@ -4091,7 +4132,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get generationStatusRemoveWatermarkNoCredits =>
-      'No tienes créditos suficientes. Compra créditos o pasa a Premium.';
+      'No tienes suficiente PawSpark. Recarga PawSpark o pásate a Premium.';
 
   @override
   String get globalOfflineBannerTitle => 'Sin conexión a internet';
@@ -4657,4 +4698,42 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Resultado limpio';
+
+  @override
+  String generationStatusQueuePositionWithWait(int position, String wait) {
+    return 'Posicion en cola #$position - $wait';
+  }
+
+  @override
+  String generationStatusQueuePosition(int position) {
+    return 'Posicion en cola #$position';
+  }
+
+  @override
+  String generationStatusWaitMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get generationStatusStatusCancelled => 'Generación cancelada';
+
+  @override
+  String get generationStatusTerminalCancelledHint =>
+      'La generación se canceló antes de completarse.';
+
+  @override
+  String get templateFlowGenerationWaitTooLongTitle => 'Ahora hay mucha carga';
+
+  @override
+  String get templateFlowGenerationWaitTooLongMessage =>
+      'El tiempo de espera estimado para esta generacion es demasiado largo. Pruebalo mas tarde o elige una generacion de foto, que normalmente es mas rapida.';
+
+  @override
+  String templateFlowGenerationWaitTooLongRetryAfter(String value) {
+    return 'Vuelve a intentarlo en aproximadamente $value.';
+  }
+
+  @override
+  String get templateFlowGenerationWaitTooLongPremiumHint =>
+      'Premium accede a una cola prioritaria y normalmente espera menos.';
 }

@@ -15,7 +15,12 @@ void main() {
     expect(lifecycleBody, contains('if (!_premiumLifecycleStarted)'));
     expect(lifecycleBody, contains('_premiumLifecycleStarted = true;'));
     expect(lifecycleBody, contains('ref.onDispose'));
-    expect(lifecycleBody, contains('_repository.purchaseUpdates.listen'));
+    expect(lifecycleBody, contains('premiumPurchaseUpdatesProvider'));
+    expect(
+      lifecycleBody,
+      contains('ref.listen<AsyncValue<List<PurchaseDetails>>>'),
+    );
+    expect(lifecycleBody, contains('_handlePurchaseUpdates(purchases)'));
   });
 }
 

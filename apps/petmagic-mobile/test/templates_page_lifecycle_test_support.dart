@@ -154,11 +154,29 @@ class IdleWalletController extends WalletController {
 }
 
 class TrackingWalletController extends WalletController {
+  TrackingWalletController({
+    this.hasWallet = false,
+    this.hasCompletedFullLoad = false,
+  });
+
+  final bool hasWallet;
+  final bool hasCompletedFullLoad;
   int loadCalls = 0;
 
   @override
   WalletState build() {
-    return const WalletState();
+    return WalletState(
+      wallet: hasWallet
+          ? WalletStateModel(
+              userId: 'user-1',
+              balance: 50,
+              adRewardsRemainingToday: 0,
+              isPremium: false,
+              updatedAtUtc: DateTime.utc(2035),
+            )
+          : null,
+      hasCompletedFullLoad: hasCompletedFullLoad,
+    );
   }
 
   @override

@@ -282,6 +282,57 @@ class _FailureCard extends StatelessWidget {
   }
 }
 
+class _CancelledCard extends StatelessWidget {
+  const _CancelledCard({required this.generation});
+
+  final TemplateGenerationResult generation;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppLocalizations.of(context);
+    final colors = context.petMagicColors;
+
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cancel_rounded, color: colors.textMuted),
+              const SizedBox(width: 8),
+              Text(
+                text.generationStatusCancelledTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: colors.textStrong,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            text.generationStatusCancelledMessage,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colors.textSoft,
+              height: 1.4,
+            ),
+          ),
+          if (generation.refundedAtUtc != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              text.generationStatusTokensRefundedHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colors.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _ReadyActionsRow extends StatelessWidget {
   const _ReadyActionsRow({
     required this.onGenerateSimilar,

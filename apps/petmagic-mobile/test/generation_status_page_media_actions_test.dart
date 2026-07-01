@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:petmagic_mobile/app/localization/generated/app_localizations.dart';
 import 'package:petmagic_mobile/app/theme/app_theme.dart';
+import 'package:petmagic_mobile/core/realtime/realtime_client.dart';
 import 'package:petmagic_mobile/features/templates/data/generation_gallery_store.dart';
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/presentation/generation_history_controller.dart';
@@ -31,6 +32,7 @@ void main() {
           templateGenerationRepositoryProvider.overrideWithValue(
             FakeGenerationStatusTemplateGenerationRepository(generation),
           ),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationHistoryControllerProvider.overrideWith(
             IdleGenerationStatusHistoryController.new,
           ),
@@ -85,6 +87,9 @@ void main() {
         ProviderScope(
           overrides: [
             templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -170,6 +175,9 @@ void main() {
         ProviderScope(
           overrides: [
             templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -252,6 +260,9 @@ void main() {
         ProviderScope(
           overrides: [
             templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),
@@ -322,6 +333,7 @@ void main() {
               generationStatusFixture(),
             ),
           ),
+          realtimeClientProvider.overrideWithValue(const NoopRealtimeClient()),
           generationGalleryStoreProvider.overrideWithValue(store),
           generationHistoryControllerProvider.overrideWith(
             IdleGenerationStatusHistoryController.new,
@@ -375,6 +387,9 @@ void main() {
         ProviderScope(
           overrides: [
             templateGenerationRepositoryProvider.overrideWithValue(repository),
+            realtimeClientProvider.overrideWithValue(
+              const NoopRealtimeClient(),
+            ),
             generationHistoryControllerProvider.overrideWith(
               IdleGenerationStatusHistoryController.new,
             ),

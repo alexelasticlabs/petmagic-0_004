@@ -8,6 +8,7 @@ class TempMediaCleanup {
 
   static const String filePrefix = 'petmagic_';
   static bool _isSweepScheduled = false;
+  static int _fileSequence = 0;
 
   static void scheduleTtlSweep() {
     if (_isSweepScheduled) {
@@ -96,6 +97,16 @@ class TempMediaCleanup {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  static File createScopedTempFile(String safeFileName) {
+    _fileSequence++;
+    final uniqueName =
+        '$filePrefix${DateTime.now().microsecondsSinceEpoch}_'
+        '${_fileSequence}_$safeFileName';
+    return File(
+      '${Directory.systemTemp.path}${Platform.pathSeparator}$uniqueName',
+    );
   }
 
   static String _safeFileName(File file) {

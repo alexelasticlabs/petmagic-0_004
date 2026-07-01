@@ -103,7 +103,7 @@ class ProfileSettingsPage extends ConsumerWidget {
       onOpenLanguageSheet: () => showProfileLanguageSheet(
         context: context,
         selectedLocale: resolvedLocale,
-        options: _languageOptions(),
+        options: profileLanguageSheetOptions,
         onSelect: preferencesController.updateLocale,
       ),
       onOpenThemeSheet: () => showProfileThemeSheet(
@@ -147,31 +147,6 @@ class ProfileSettingsPage extends ConsumerWidget {
         },
       ),
     );
-  }
-
-  static List<ProfileLanguageSheetOption> _languageOptions() {
-    return const [
-      ProfileLanguageSheetOption(locale: Locale('ru'), nativeLabel: 'Русский'),
-      ProfileLanguageSheetOption(locale: Locale('en'), nativeLabel: 'English'),
-      ProfileLanguageSheetOption(locale: Locale('de'), nativeLabel: 'Deutsch'),
-      ProfileLanguageSheetOption(locale: Locale('es'), nativeLabel: 'Español'),
-      ProfileLanguageSheetOption(locale: Locale('fr'), nativeLabel: 'Français'),
-      ProfileLanguageSheetOption(locale: Locale('it'), nativeLabel: 'Italiano'),
-      ProfileLanguageSheetOption(locale: Locale('pl'), nativeLabel: 'Polski'),
-    ];
-  }
-
-  static String _languageLabel(AppLocalizations text, Locale locale) {
-    return switch (locale.languageCode) {
-      'ru' => 'Русский',
-      'en' => 'English',
-      'de' => 'Deutsch',
-      'es' => 'Español',
-      'fr' => 'Français',
-      'it' => 'Italiano',
-      'pl' => 'Polski',
-      _ => 'English',
-    };
   }
 
   static String _themeModeLabel(AppLocalizations text, ThemeMode mode) {

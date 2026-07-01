@@ -108,7 +108,7 @@ class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _LinkedAccountRow(
-                      providerLabel: ExternalAuthProvider.google.apiValue,
+                      providerLabel: text.authGoogleShortLabel,
                       icon: Icons.g_mobiledata_rounded,
                       account: _findLinkedAccount(
                         linkedAccounts,
@@ -124,7 +124,7 @@ class ProfileLinkedAccountsSettingsSection extends ConsumerWidget {
                           .unlinkExternalAccount(ExternalAuthProvider.google),
                     ),
                     _LinkedAccountRow(
-                      providerLabel: ExternalAuthProvider.apple.apiValue,
+                      providerLabel: text.authAppleShortLabel,
                       icon: Icons.apple_rounded,
                       account: _findLinkedAccount(
                         linkedAccounts,

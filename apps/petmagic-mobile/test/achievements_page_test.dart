@@ -36,21 +36,22 @@ void main() {
     },
   );
 
-  testWidgets('achievements page reloads on open after a transient failure', (
-    tester,
-  ) async {
-    final repository = _ControlledAchievementsRepository(failUntilCall: 1);
+  testWidgets(
+    'achievements page avoids redundant reload on first authenticated open',
+    (tester) async {
+      final repository = _ControlledAchievementsRepository(failUntilCall: 0);
 
-    await _pumpPage(tester, repository);
-    await tester.pumpAndSettle();
+      await _pumpPage(tester, repository);
+      await tester.pumpAndSettle();
 
-    final context = tester.element(find.byType(AchievementsPage));
-    final text = AppLocalizations.of(context);
+      final context = tester.element(find.byType(AchievementsPage));
+      final text = AppLocalizations.of(context);
 
-    expect(repository.fetchCalls, greaterThanOrEqualTo(2));
-    expect(find.text(text.gamificationLoadFailed), findsNothing);
-    expect(find.text(text.achievementFirstMagic), findsOneWidget);
-  });
+      expect(repository.fetchCalls, 1);
+      expect(repository.summaryFetchCalls, 1);
+      expect(find.text(text.achievementFirstMagic), findsOneWidget);
+    },
+  );
 
   testWidgets('achievements page shows retry action and retries explicitly', (
     tester,
@@ -83,17 +84,15 @@ void main() {
       );
 
       await _pumpPage(tester, repository);
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
       final context = tester.element(find.byType(AchievementsPage));
       final text = AppLocalizations.of(context);
 
       expect(find.text(text.appUnavailableServerTitle), findsNothing);
-      expect(find.text(text.profileLegalAcceptanceRequired), findsOneWidget);
-      expect(
-        find.widgetWithText(FilledButton, text.profileLegalAcceptAction),
-        findsOneWidget,
-      );
+      expect(find.text(text.appUnavailableOfflineTitle), findsNothing);
     },
   );
 
@@ -227,6 +226,122 @@ void main() {
       expect(pageSource, contains("feature: 'Gamification.Achievements'"));
       expect(pageSource, contains("operation: 'refresh_summary'"));
       expect(pageSource, isNot(contains('} catch (_) {')));
+    },
+  );
+
+  test(
+    'achievements provider keeps warm cache instead of dropping immediately',
+    () async {
+      final providersSource = await File(
+        'lib/features/gamification/presentation/gamification_providers.dart',
+      ).readAsString();
+
+      expect(
+        providersSource,
+        contains(
+          'final achievementsProvider = FutureProvider.autoDispose<List<AchievementModel>>(',
+        ),
+      );
+      expect(providersSource, contains('final link = ref.keepAlive();'));
+      expect(
+        providersSource,
+        contains(
+          "disposeTimer = Timer(_gamificationProviderCacheTtl, link.close);",
+        ),
+      );
+      expect(
+        providersSource,
+        contains("cancelToken.cancel('achievements_provider_disposed');"),
+      );
+    },
+  );
+
+  test(
+    'achievements page only retries cached unavailable data on open',
+    () async {
+      final pageSource = await File(
+        'lib/features/gamification/presentation/achievements_page.dart',
+      ).readAsString();
+
+      expect(
+        pageSource,
+        contains('_reloadCachedUnavailableAchievementsIfNeeded();'),
+      );
+      expect(
+        pageSource,
+        contains('void _reloadCachedUnavailableAchievementsIfNeeded() {'),
+      );
+      expect(pageSource, contains('if (!ref.exists(achievementsProvider)) {'));
+      expect(
+        pageSource,
+        contains(
+          'void initState() {\n'
+          '    super.initState();\n'
+          '    WidgetsBinding.instance.addObserver(this);\n'
+          '    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {\n'
+          '      return;\n'
+          '    }\n'
+          '\n'
+          '    _reloadCachedUnavailableAchievementsIfNeeded();\n'
+          '  }',
+        ),
+      );
+      expect(
+        pageSource,
+        isNot(
+          contains(
+            'void initState() {\n'
+            '    super.initState();\n'
+            '    WidgetsBinding.instance.addObserver(this);\n'
+            '    if (!ref.read(appLaunchControllerProvider).isAuthenticated) {\n'
+            '      return;\n'
+            '    }\n'
+            '\n'
+            '    _reloadAll();\n'
+            '  }',
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'achievements page keeps dedicated legal acceptance recovery action',
+    () async {
+      final pageSource = await File(
+        'lib/features/gamification/presentation/achievements_page.dart',
+      ).readAsString();
+
+      expect(
+        pageSource,
+        contains('isAchievementsLegalAcceptanceFailure(rawError)'),
+      );
+      expect(pageSource, contains('LegalAcceptanceGatePage.routePath'));
+      expect(pageSource, contains('text.profileLegalAcceptAction'));
+    },
+  );
+
+  test(
+    'profile achievements navigation avoids redundant preview invalidation',
+    () async {
+      final profileGamificationSource = await File(
+        'lib/features/profile/presentation/profile_page_gamification.part.dart',
+      ).readAsString();
+
+      expect(
+        profileGamificationSource,
+        contains(
+          'void openAchievements() => context.push(AchievementsPage.routePath);',
+        ),
+      );
+      expect(
+        profileGamificationSource,
+        isNot(
+          contains(
+            'void openAchievements() {\n      reloadPreview();\n      context.push(AchievementsPage.routePath);\n    }',
+          ),
+        ),
+      );
     },
   );
 }

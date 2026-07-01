@@ -91,8 +91,8 @@ class _MessageBubble extends StatelessWidget {
     final alignment = message.isFromAdmin
         ? Alignment.centerLeft
         : Alignment.centerRight;
-    final timeLabel = DateFormat(
-      'HH:mm',
+    final timeLabel = DateFormat.Hm(
+      Localizations.localeOf(context).toLanguageTag(),
     ).format(message.createdAtUtc.toLocal());
     final textColor = message.isFromAdmin ? colors.textStrong : Colors.white;
     final metaColor = message.isFromAdmin
@@ -489,12 +489,17 @@ class _MessageBubble extends StatelessWidget {
       return '$bytes B';
     }
 
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
+    final compactDecimal = NumberFormat.decimalPatternDigits(
+      locale: localeTag,
+      decimalDigits: 1,
+    );
     final kilobytes = bytes / 1024;
     if (kilobytes < 1024) {
-      return '${kilobytes.toStringAsFixed(1)} KB';
+      return '${compactDecimal.format(kilobytes)} KB';
     }
 
-    return '${(kilobytes / 1024).toStringAsFixed(1)} MB';
+    return '${compactDecimal.format(kilobytes / 1024)} MB';
   }
 }
 

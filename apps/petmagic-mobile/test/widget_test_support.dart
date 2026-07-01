@@ -611,7 +611,7 @@ class FakeProfileRepository extends ProfileRepository {
   }
 
   @override
-  Future<MobileUserProfile> fetchProfile() async {
+  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
     final session = storedSession;
     if (session == null) {
       throw const AppException('Unauthorized', statusCode: 401);
@@ -635,6 +635,7 @@ class FakeProfileRepository extends ProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
+    CancelToken? cancelToken,
   }) async {
     return sampleLegalDocuments;
   }
@@ -706,6 +707,7 @@ class UnavailableLegalDocumentsProfileRepository extends FakeProfileRepository {
   @override
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
+    CancelToken? cancelToken,
   }) async {
     throw const AppException('Legal documents unavailable', statusCode: 503);
   }

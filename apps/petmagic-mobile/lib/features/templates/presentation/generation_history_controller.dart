@@ -9,6 +9,7 @@ import 'package:petmagic_mobile/features/templates/data/generation_gallery_store
 import 'package:petmagic_mobile/features/templates/data/template_generation_repository.dart';
 import 'package:petmagic_mobile/features/templates/domain/generation_media_kind.dart';
 import 'package:petmagic_mobile/features/templates/domain/template_generation_models.dart';
+import 'package:petmagic_mobile/features/templates/presentation/mappers/template_error_key_mapper.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 part 'generation_history_controller_cache.part.dart';
@@ -107,6 +108,7 @@ abstract class _GenerationHistoryControllerBase
     extends Notifier<GenerationHistoryState> {
   static const Duration _autoRefreshMinInterval = Duration(seconds: 8);
   static const Duration _autoRefreshMaxInterval = Duration(seconds: 30);
+  static const Duration _idleRealtimeRefreshInterval = Duration(minutes: 5);
 
   TemplateGenerationRepository get _repository =>
       ref.read(templateGenerationRepositoryProvider);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/painting.dart';
@@ -10,6 +12,7 @@ import 'package:petmagic_mobile/features/profile/data/external_auth_repository.d
 import 'package:petmagic_mobile/features/profile/data/profile_models.dart';
 import 'package:petmagic_mobile/features/profile/data/profile_repository.dart';
 import 'package:petmagic_mobile/features/profile/presentation/auth_password_policy.dart';
+import 'package:petmagic_mobile/shared/files/temp_media_cleanup.dart';
 import 'package:petmagic_mobile/shared/navigation/external_url_policy.dart';
 
 final profileControllerProvider =
@@ -83,6 +86,7 @@ class ProfileState {
 
 class ProfileController extends Notifier<ProfileState> {
   static const _genericActionError = 'profile.action_failed';
+  static const _managedAvatarTempFilePrefix = 'petmagic_avatar_';
 
   void _logProfileFailure(
     String stage,
@@ -110,13 +114,17 @@ class ProfileController extends Notifier<ProfileState> {
 
   final ImagePicker _imagePicker = ImagePicker();
   CancelToken? _activeAvatarUploadCancelToken;
+  CancelToken? _activeInitializeCancelToken;
   Future<void>? _initializeInFlight;
 
   ProfileRepository get _repository => ref.read(profileRepositoryProvider);
 
   @override
   ProfileState build() {
-    ref.onDispose(_cancelActiveAvatarUpload);
+    ref.onDispose(() {
+      _cancelActiveInitialize();
+      _cancelActiveAvatarUpload();
+    });
     return const ProfileState.initial();
   }
 
@@ -154,6 +162,27 @@ class ProfileController extends Notifier<ProfileState> {
     }
   }
 
+  CancelToken _startInitializeRequest() {
+    _cancelActiveInitialize();
+    final cancelToken = CancelToken();
+    _activeInitializeCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveInitialize() {
+    final cancelToken = _activeInitializeCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('profile_initialize_cancelled');
+    }
+    _activeInitializeCancelToken = null;
+  }
+
+  void _clearActiveInitialize(CancelToken cancelToken) {
+    if (identical(_activeInitializeCancelToken, cancelToken)) {
+      _activeInitializeCancelToken = null;
+    }
+  }
+
   Future<void> initialize({String initialEmail = ''}) async {
     final inFlight = _initializeInFlight;
     if (inFlight != null) {
@@ -169,6 +198,7 @@ class ProfileController extends Notifier<ProfileState> {
         clearSuccess: true,
       );
 
+      final initializeCancelToken = _startInitializeRequest();
       try {
         final session = await repository.readSession();
         if (!ref.mounted) {
@@ -186,7 +216,9 @@ class ProfileController extends Notifier<ProfileState> {
           return;
         }
 
-        final profile = await repository.fetchProfile();
+        final profile = await repository.fetchProfile(
+          cancelToken: initializeCancelToken,
+        );
         if (!ref.mounted) {
           return;
         }
@@ -207,6 +239,10 @@ class ProfileController extends Notifier<ProfileState> {
               requiresLegalAcceptance:
                   profile.legalAcceptance.requiresAcceptance,
             );
+      } on RequestCancelledException {
+        _updateStateIfMounted(
+          (state) => state.copyWith(isLoading: false, clearError: true),
+        );
       } on AppException catch (error) {
         final storedSession = await repository.readSession();
         if (!ref.mounted) {
@@ -266,6 +302,8 @@ class ProfileController extends Notifier<ProfileState> {
           clearSession: true,
           clearProfile: true,
         );
+      } finally {
+        _clearActiveInitialize(initializeCancelToken);
       }
     }();
 
@@ -503,6 +541,8 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> logout() async {
+    _cancelActiveInitialize();
+    _cancelActiveAvatarUpload();
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -546,6 +586,8 @@ class ProfileController extends Notifier<ProfileState> {
   }
 
   Future<void> deleteAccount() async {
+    _cancelActiveInitialize();
+    _cancelActiveAvatarUpload();
     state = state.copyWith(
       isSaving: true,
       clearError: true,
@@ -675,6 +717,7 @@ class ProfileController extends Notifier<ProfileState> {
       _setFailure(message: _genericActionError);
     } finally {
       _clearActiveAvatarUpload(uploadCancelToken);
+      await _deleteManagedAvatarTempFile(filePath);
     }
   }
 
@@ -775,5 +818,36 @@ class ProfileController extends Notifier<ProfileState> {
     } catch (error, stackTrace) {
       _logProfileFailure('avatar_cache_evict_failed', error, stackTrace);
     }
+  }
+
+  Future<void> _deleteManagedAvatarTempFile(String filePath) async {
+    if (!_isManagedAvatarTempFile(filePath)) {
+      return;
+    }
+
+    await TempMediaCleanup.deleteIfExists(File(filePath));
+  }
+
+  bool _isManagedAvatarTempFile(String filePath) {
+    final segments = Uri.file(filePath).pathSegments;
+    final fileName = segments.isEmpty ? filePath : segments.last;
+    if (!fileName.startsWith(_managedAvatarTempFilePrefix)) {
+      return false;
+    }
+
+    final normalizedPath = _normalizedFilePath(filePath);
+    final normalizedTempRoot = _normalizedDirectoryPath(
+      Directory.systemTemp.path,
+    );
+    return normalizedPath.startsWith(normalizedTempRoot);
+  }
+
+  String _normalizedFilePath(String value) {
+    return value.replaceAll('\\', '/').toLowerCase();
+  }
+
+  String _normalizedDirectoryPath(String value) {
+    final normalized = _normalizedFilePath(value);
+    return normalized.endsWith('/') ? normalized : '$normalized/';
   }
 }

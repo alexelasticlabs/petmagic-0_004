@@ -32,9 +32,7 @@ Future<File> cacheRemoteMediaFile({
     fileName,
     fallback: 'petmagic_${DateTime.now().millisecondsSinceEpoch}',
   );
-  final tempFile = File(
-    '${Directory.systemTemp.path}${Platform.pathSeparator}petmagic_$safeFileName',
-  );
+  final tempFile = TempMediaCleanup.createScopedTempFile(safeFileName);
 
   await tempFile.writeAsBytes(bytes, flush: true);
   return tempFile;
@@ -56,14 +54,12 @@ Future<void> shareRemoteMediaFile({
     maxBytes: maxBytes,
   );
 
-  final shareResult = await SharePlus.instance.share(
-    ShareParams(files: [XFile(tempFile.path)], title: title, text: title),
-  );
-
-  if (shareResult.status == ShareResultStatus.success) {
+  try {
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(tempFile.path)], title: title, text: title),
+    );
+  } finally {
     await TempMediaCleanup.deleteIfExists(tempFile);
-  } else {
-    TempMediaCleanup.scheduleTtlSweep();
   }
 }
 

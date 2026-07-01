@@ -8,6 +8,16 @@ void main() {
       'classifies video generations from type, duration, extension, and query hints',
       () {
         expect(
+          isVideoGenerationResult(
+            _generation(
+              status: TemplateGenerationStatus.queued,
+              mediaType: 'video',
+              templateType: null,
+            ),
+          ),
+          isTrue,
+        );
+        expect(
           isVideoGenerationResult(_generation(templateType: 'pet_video')),
           isTrue,
         );
@@ -112,6 +122,8 @@ void main() {
 }
 
 TemplateGenerationResult _generation({
+  TemplateGenerationStatus status = TemplateGenerationStatus.completed,
+  String? mediaType,
   String? templateType = 'image',
   String? outputUrl,
   double? outputVideoDurationSeconds,
@@ -121,12 +133,13 @@ TemplateGenerationResult _generation({
     generationId: 'generation-1',
     userId: 'user-1',
     templateId: 'template-1',
-    status: TemplateGenerationStatus.completed,
+    status: status,
     tokenCost: 1,
     attemptCount: 1,
     createdAtUtc: now,
     updatedAtUtc: now,
     userMediaExpired: false,
+    mediaType: mediaType,
     templateType: templateType,
     outputUrl: outputUrl,
     outputVideoDurationSeconds: outputVideoDurationSeconds,

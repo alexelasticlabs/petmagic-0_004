@@ -519,8 +519,8 @@ String _petLaunchCloseLabel(AppLocalizations text) => text.closeAction;
 
 String _petLaunchUploadErrorText(AppLocalizations text, Object error) {
   if (error is AppException) {
-    final message = error.message;
-    if (message.contains('pets.photo_type_not_allowed')) {
+    if (_normalizePetLaunchErrorKey(error.message) ==
+        'pets.photo_type_not_allowed') {
       return text.petGenerationLaunchPhotoTypeError;
     }
   }
@@ -535,16 +535,41 @@ String _petLaunchStartErrorText(AppLocalizations text, Object error) {
       return authMessage;
     }
 
-    final message = error.message.toLowerCase();
-    if (error.statusCode == 402 || message.contains('insufficient')) {
+    final key = _normalizePetLaunchErrorKey(error.message);
+    if (error.statusCode == 402 ||
+        key == 'templates.insufficient_balance' ||
+        key == 'economy.insufficient_balance') {
       return text.templateFlowInsufficientBalanceError;
     }
-    if (message.contains('unavailable') || message.contains('photo')) {
+    if (key == 'pets.photo_not_found' || key == 'pets.photo_required') {
       return _petLaunchSelectedPhotoMissingText(text);
     }
   }
 
   return text.petGenerationLaunchStartError;
+}
+
+String? _normalizePetLaunchErrorKey(String? raw) {
+  final normalized = raw?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  final lower = normalized.toLowerCase();
+  const safeKeys = <String>[
+    'pets.photo_type_not_allowed',
+    'pets.photo_not_found',
+    'pets.photo_required',
+    'templates.insufficient_balance',
+    'economy.insufficient_balance',
+  ];
+  for (final key in safeKeys) {
+    if (lower == key || lower.contains(key)) {
+      return key;
+    }
+  }
+
+  return null;
 }
 
 String templatePetTypeLabel(String value, AppLocalizations text) {

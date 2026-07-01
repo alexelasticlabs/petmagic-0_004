@@ -18,6 +18,7 @@ class FakeSupportChatRepository extends SupportChatRepository {
   bool _hasConversation;
   String? lastSentBody;
   int openConversationCalls = 0;
+  int getConversationCalls = 0;
   String? lastOpenedInitialMessage;
   String? lastOpenedRelatedGenerationId;
 
@@ -124,6 +125,7 @@ class FakeSupportChatRepository extends SupportChatRepository {
     String? beforeMessageId,
     CancelToken? cancelToken,
   }) async {
+    getConversationCalls += 1;
     if (!_hasConversation) {
       throw const AppException(
         'support.conversation_not_found',
@@ -172,7 +174,10 @@ class FakeSupportChatRepository extends SupportChatRepository {
   }
 
   @override
-  Future<void> markConversationRead(String conversationId) async {
+  Future<void> markConversationRead(
+    String conversationId, {
+    CancelToken? cancelToken,
+  }) async {
     _conversation = _conversation.copyWith(
       userUnreadCount: 0,
       messages: _conversation.messages

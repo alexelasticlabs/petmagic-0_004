@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -22,16 +23,44 @@ final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
   );
 });
 
+const _profileProviderCacheTtl = Duration(minutes: 5);
+
 final currentLegalDocumentsProvider =
     FutureProvider.family<MobileLegalDocuments, String>((ref, locale) {
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('profile_legal_documents_cancelled');
+        }
+      });
       return ref
           .watch(profileRepositoryProvider)
-          .fetchCurrentLegalDocuments(locale: locale);
+          .fetchCurrentLegalDocuments(locale: locale, cancelToken: cancelToken);
     });
 
-final linkedAccountsProvider = FutureProvider<List<MobileLinkedAccount>>((ref) {
-  return ref.watch(profileRepositoryProvider).fetchLinkedAccounts();
-});
+final linkedAccountsProvider =
+    FutureProvider.autoDispose<List<MobileLinkedAccount>>((ref) {
+      final link = ref.keepAlive();
+      Timer? disposeTimer;
+      ref.onCancel(() {
+        disposeTimer?.cancel();
+        disposeTimer = Timer(_profileProviderCacheTtl, link.close);
+      });
+      ref.onResume(() {
+        disposeTimer?.cancel();
+        disposeTimer = null;
+      });
+      final cancelToken = CancelToken();
+      ref.onDispose(() {
+        disposeTimer?.cancel();
+        if (!cancelToken.isCancelled) {
+          cancelToken.cancel('profile_linked_accounts_cancelled');
+        }
+      });
+      return ref
+          .watch(profileRepositoryProvider)
+          .fetchLinkedAccounts(cancelToken: cancelToken);
+    });
 
 class ProfileRepository {
   ProfileRepository({
@@ -110,7 +139,7 @@ class ProfileRepository {
   Future<void> requestPasswordReset({required String email}) async {
     try {
       await _dio.post<void>(
-        '/api/auth/request-password-reset',
+        '/api/auth/password-reset/request',
         data: {'email': email.trim()},
       );
     } on DioException catch (error) {
@@ -128,7 +157,7 @@ class ProfileRepository {
   }) async {
     try {
       await _dio.post<void>(
-        '/api/auth/reset-password',
+        '/api/auth/password-reset/confirm',
         data: {
           'email': email.trim(),
           'code': code.trim(),
@@ -262,11 +291,12 @@ class ProfileRepository {
     }
   }
 
-  Future<MobileUserProfile> fetchProfile() async {
+  Future<MobileUserProfile> fetchProfile({CancelToken? cancelToken}) async {
     final response = await _authorizedRequest<Map<String, dynamic>>(
       (session) => _dio.get<Map<String, dynamic>>(
         '/api/auth/me',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -300,11 +330,14 @@ class ProfileRepository {
     }
   }
 
-  Future<List<MobileLinkedAccount>> fetchLinkedAccounts() async {
+  Future<List<MobileLinkedAccount>> fetchLinkedAccounts({
+    CancelToken? cancelToken,
+  }) async {
     final response = await _authorizedRequest<List<dynamic>>(
       (session) => _dio.get<List<dynamic>>(
         '/api/auth/me/linked-accounts',
         options: authenticatedRequestOptions(session.accessToken),
+        cancelToken: cancelToken,
       ),
     );
 
@@ -316,11 +349,13 @@ class ProfileRepository {
 
   Future<MobileLegalDocuments> fetchCurrentLegalDocuments({
     required String locale,
+    CancelToken? cancelToken,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/api/legal/current',
         queryParameters: {'locale': locale},
+        cancelToken: cancelToken,
       );
 
       return MobileLegalDocuments.fromJson(response.data ?? const {});
@@ -446,6 +481,10 @@ class ProfileRepository {
     DioException error, {
     required String fallbackMessage,
   }) {
+    if (CancelToken.isCancel(error)) {
+      return const RequestCancelledException();
+    }
+
     if (NetworkErrorMapper.isConnectivityIssue(error)) {
       return NetworkErrorMapper.fromMessage(
         error,
@@ -457,10 +496,7 @@ class ProfileRepository {
     final payload = NetworkErrorMapper.parseApiPayload(error);
     final statusCode = error.response?.statusCode;
     final title = payload.title?.trim();
-    final detail = payload.detail?.trim();
-
-    final isUserNotFound =
-        title == 'users.not_found' || detail == 'User not found.';
+    final isUserNotFound = title == 'users.not_found';
     if (isUserNotFound && statusCode == 404) {
       return NetworkErrorMapper.fromMessage(
         error,

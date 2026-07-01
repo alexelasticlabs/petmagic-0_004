@@ -151,7 +151,12 @@ class _PlanCard extends StatelessWidget {
     final isYearly = _isYearlyPlan(plan);
     final title =
         '${text.premiumPageTitle} ${isYearly ? text.premiumYearlyPlan : text.premiumMonthlyPlan}';
-    final priceStr = displayPrice ?? '\$${plan.priceAmount.toStringAsFixed(2)}';
+    final priceStr =
+        displayPrice ??
+        NumberFormat.simpleCurrency(
+          locale: Localizations.localeOf(context).toLanguageTag(),
+          name: plan.currencyCode,
+        ).format(plan.priceAmount);
     final interval = isYearly
         ? text.premiumYearlyPeriod
         : text.premiumMonthlyPeriod;

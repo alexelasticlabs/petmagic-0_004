@@ -596,6 +596,68 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'Add photo wrapped unsupported type error still shows specific copy',
+    (tester) async {
+      final previousImagePickerPlatform =
+          image_picker_platform.ImagePickerPlatform.instance;
+      final picker = FakeImagePickerPlatform(
+        pickedFile: XFile(
+          '/tmp/petmagic-upload.txt',
+          name: 'petmagic-upload.txt',
+        ),
+      );
+      image_picker_platform.ImagePickerPlatform.instance = picker;
+      addTearDown(() {
+        image_picker_platform.ImagePickerPlatform.instance =
+            previousImagePickerPlatform;
+      });
+
+      final repository = FakePetRepository(
+        pets: [
+          PetProfile(
+            id: 'pet-1',
+            name: 'Bella',
+            type: 'dog',
+            photosCount: 1,
+            generationsCount: 0,
+            createdAtUtc: DateTime.utc(2026),
+            updatedAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        photos: [
+          PetPhoto(
+            id: 'photo-1',
+            petId: 'pet-1',
+            mediaAssetId: 'media-1',
+            url: '',
+            fileName: 'bella.jpg',
+            contentType: 'image/jpeg',
+            isFavorite: false,
+            isAvatar: false,
+            sortOrder: 1,
+            createdAtUtc: DateTime.utc(2026),
+          ),
+        ],
+        uploadError: const AppException(
+          ' AppException: pets.photo_type_not_allowed ',
+        ),
+      );
+
+      await pumpPetDetails(tester, repository: repository);
+
+      await tester.tap(find.byTooltip('Add photos'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(picker.pickImageCalls, 1);
+      expect(repository.uploadCalls, 1);
+      expect(find.text('This photo type is not supported'), findsOneWidget);
+      expect(find.text('Could not upload photo'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Add photo permission denial shows localized warning', (
     tester,
   ) async {

@@ -161,8 +161,7 @@ class _AuthFlowContentSection extends StatelessWidget {
                 page._openLegalDocument(ProfileSettingsDetailKind.terms),
             onOpenPrivacy: () =>
                 page._openLegalDocument(ProfileSettingsDetailKind.privacy),
-            showError:
-                page._consentErrorMessage == 'auth.accept_terms_required',
+            showError: page._hasConsentErrorCode('auth.accept_terms_required'),
             onChanged: (value) => page._setAcceptedTerms(value ?? false),
           ),
           if (showInlineTermsError) ...[

@@ -27,6 +27,12 @@ class _SubscriptionSummaryCard extends StatelessWidget {
     final subtitle = summary.planName?.trim().isNotEmpty == true
         ? summary.planName!
         : providerLabel;
+    final statusLabel = premiumSubscriptionStatusLabel(
+      text: text,
+      isPremium: summary.isPremium,
+      cancelAtPeriodEnd: summary.cancelAtPeriodEnd == true,
+      status: summary.status,
+    );
     final nextBillingValue = summary.currentPeriodEndUtc == null
         ? null
         : format.format(summary.currentPeriodEndUtc!.toLocal());
@@ -114,7 +120,7 @@ class _SubscriptionSummaryCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 ProfileStatusPill(
-                  label: summary.status,
+                  label: statusLabel,
                   leading: Icons.verified_rounded,
                   backgroundColor: colors.gold.withValues(alpha: 0.16),
                   foregroundColor: colors.gold,

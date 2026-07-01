@@ -69,14 +69,30 @@ class _WalletPageState extends ConsumerState<WalletPage>
     WidgetsBinding.instance.addObserver(this);
     if (ref.read(appLaunchControllerProvider).isAuthenticated) {
       _startAutoRefresh();
+      if (_hasHydratedWalletSnapshot(ref.read(walletControllerProvider))) {
+        return;
+      }
+
       Future.microtask(() {
         if (!mounted) {
+          return;
+        }
+        if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
+          return;
+        }
+
+        final current = ref.read(walletControllerProvider);
+        if (_hasHydratedWalletSnapshot(current)) {
           return;
         }
 
         _walletController.load();
       });
     }
+  }
+
+  bool _hasHydratedWalletSnapshot(WalletState state) {
+    return state.hasCompletedFullLoad && state.wallet != null;
   }
 
   @override
@@ -114,13 +130,14 @@ class _WalletPageState extends ConsumerState<WalletPage>
 
     _scheduleNextAutoRefresh();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !ref.read(appLaunchControllerProvider).isAuthenticated) {
+      if (!mounted) {
+        return;
+      }
+      if (!ref.read(appLaunchControllerProvider).isAuthenticated) {
         return;
       }
 
-      unawaited(
-        ref.read(walletControllerProvider.notifier).load(refresh: true),
-      );
+      unawaited(_refreshVisibleWalletData(forceRefresh: true));
     });
   }
 
@@ -157,9 +174,9 @@ class _WalletPageState extends ConsumerState<WalletPage>
     }
 
     unawaited(
-      _walletController
-          .load(refresh: true)
-          .whenComplete(_scheduleNextAutoRefresh),
+      _refreshVisibleWalletData(
+        forceRefresh: true,
+      ).whenComplete(_scheduleNextAutoRefresh),
     );
   }
 
@@ -190,8 +207,7 @@ class _WalletPageState extends ConsumerState<WalletPage>
       }
 
       unawaited(
-        _walletController
-            .load(refresh: true)
+        _refreshVisibleWalletData(forceRefresh: true)
             .then((_) {
               if (!mounted) {
                 return;
@@ -208,6 +224,20 @@ class _WalletPageState extends ConsumerState<WalletPage>
             .whenComplete(_scheduleNextAutoRefresh),
       );
     });
+  }
+
+  Future<void> _refreshVisibleWalletData({bool forceRefresh = false}) async {
+    final controller = ref.read(walletControllerProvider.notifier);
+    final state = ref.read(walletControllerProvider);
+    // Background refresh only needs the lightweight balance snapshot once the
+    // wallet itself is present. Full reload remains available for the initial
+    // hydrate and explicit manual refreshes.
+    if (state.wallet != null) {
+      await controller.syncSnapshot(forceRefresh: forceRefresh);
+      return;
+    }
+
+    await controller.load(refresh: true);
   }
 
   Duration _currentAutoRefreshInterval() {

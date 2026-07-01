@@ -5,20 +5,32 @@ mixin _SupportChatControllerConversationMixin
   StreamSubscription<SupportChatRealtimeUpdate>? _realtimeSubscription;
   Timer? _realtimeRefreshTimer;
   CancelToken? _activeUploadCancelToken;
+  CancelToken? _activeConversationLoadCancelToken;
+  CancelToken? _activeLoadOlderCancelToken;
+  CancelToken? _activeMarkReadCancelToken;
   Future<void>? _conversationLoadInFlight;
   Future<void>? _realtimeConnectInFlight;
   bool _hasPendingRealtimeRefresh = false;
+  bool _hasLoadedConversationSnapshot = false;
   bool _started = false;
   bool _isScreenVisible = true;
   bool _isRealtimeConnected = false;
 
   void stop() {
+    suspend();
+    _hasLoadedConversationSnapshot = false;
+    _started = false;
+    _hasPendingRealtimeRefresh = false;
+  }
+
+  void suspend() {
     _cancelActiveUpload();
+    _cancelActiveConversationLoad();
+    _cancelActiveLoadOlder();
+    _cancelActiveMarkRead();
     _realtimeRefreshTimer?.cancel();
     _realtimeRefreshTimer = null;
     _pauseRealtime();
-    _started = false;
-    _hasPendingRealtimeRefresh = false;
     _isScreenVisible = false;
   }
 
@@ -43,6 +55,69 @@ mixin _SupportChatControllerConversationMixin
     }
   }
 
+  CancelToken _newActiveConversationLoadCancelToken() {
+    _cancelActiveConversationLoad();
+    final cancelToken = CancelToken();
+    _activeConversationLoadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveConversationLoad() {
+    final cancelToken = _activeConversationLoadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_conversation_load_cancelled');
+    }
+    _activeConversationLoadCancelToken = null;
+  }
+
+  void _clearActiveConversationLoad(CancelToken cancelToken) {
+    if (identical(_activeConversationLoadCancelToken, cancelToken)) {
+      _activeConversationLoadCancelToken = null;
+    }
+  }
+
+  CancelToken _newActiveLoadOlderCancelToken() {
+    _cancelActiveLoadOlder();
+    final cancelToken = CancelToken();
+    _activeLoadOlderCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveLoadOlder() {
+    final cancelToken = _activeLoadOlderCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_load_older_cancelled');
+    }
+    _activeLoadOlderCancelToken = null;
+  }
+
+  void _clearActiveLoadOlder(CancelToken cancelToken) {
+    if (identical(_activeLoadOlderCancelToken, cancelToken)) {
+      _activeLoadOlderCancelToken = null;
+    }
+  }
+
+  CancelToken _newActiveMarkReadCancelToken() {
+    _cancelActiveMarkRead();
+    final cancelToken = CancelToken();
+    _activeMarkReadCancelToken = cancelToken;
+    return cancelToken;
+  }
+
+  void _cancelActiveMarkRead() {
+    final cancelToken = _activeMarkReadCancelToken;
+    if (cancelToken != null && !cancelToken.isCancelled) {
+      cancelToken.cancel('support_mark_read_cancelled');
+    }
+    _activeMarkReadCancelToken = null;
+  }
+
+  void _clearActiveMarkRead(CancelToken cancelToken) {
+    if (identical(_activeMarkReadCancelToken, cancelToken)) {
+      _activeMarkReadCancelToken = null;
+    }
+  }
+
   void setScreenVisible(bool visible) {
     if (_isScreenVisible == visible) {
       return;
@@ -63,20 +138,30 @@ mixin _SupportChatControllerConversationMixin
   }
 
   Future<void> start() async {
+    final shouldInitialize = !_hasLoadedConversationSnapshot;
     if (_started) {
       if (_isScreenVisible) {
+        if (shouldInitialize) {
+          await initialize();
+          if (!ref.mounted) {
+            return;
+          }
+        }
         await _resumeRealtimeIfNeeded();
+        _resumePendingRealtimeRefreshIfNeeded();
       }
       return;
     }
 
     _started = true;
-    await initialize();
-    if (!ref.mounted) {
-      return;
+    if (shouldInitialize) {
+      await initialize();
+      if (!ref.mounted) {
+        return;
+      }
     }
-
     await _resumeRealtimeIfNeeded();
+    _resumePendingRealtimeRefreshIfNeeded();
   }
 
   Future<void> initialize() async {
@@ -182,8 +267,11 @@ mixin _SupportChatControllerConversationMixin
       clearError: true,
     );
 
+    final cancelToken = _newActiveConversationLoadCancelToken();
     try {
-      final conversation = await _repository.getConversation();
+      final conversation = await _repository.getConversation(
+        cancelToken: cancelToken,
+      );
       if (!ref.mounted) {
         return;
       }
@@ -195,6 +283,7 @@ mixin _SupportChatControllerConversationMixin
           clearError: true,
         ),
       );
+      _hasLoadedConversationSnapshot = true;
 
       if (conversation.userUnreadCount > 0) {
         await _markReadIfNeeded(conversation);
@@ -203,8 +292,17 @@ mixin _SupportChatControllerConversationMixin
         return;
       }
       _resumePendingRealtimeRefreshIfNeeded();
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(
+          isLoading: false,
+          isRefreshing: false,
+          clearError: true,
+        ),
+      );
     } on AppException catch (error) {
-      if (_isConversationNotFound(error.message)) {
+      if (_isConversationNotFound(error)) {
+        _hasLoadedConversationSnapshot = true;
         _updateStateIfMounted(
           (state) => state.copyWith(
             isLoading: false,
@@ -230,6 +328,8 @@ mixin _SupportChatControllerConversationMixin
           errorMessage: 'support.unavailable',
         ),
       );
+    } finally {
+      _clearActiveConversationLoad(cancelToken);
     }
   }
 
@@ -256,10 +356,12 @@ mixin _SupportChatControllerConversationMixin
         : conversation.messages.first.messageId;
 
     state = state.copyWith(isLoadingOlder: true);
+    final cancelToken = _newActiveLoadOlderCancelToken();
     try {
       final chunk = await _repository.getConversation(
         beforeMessageCreatedAtUtc: before,
         beforeMessageId: beforeMessageId,
+        cancelToken: cancelToken,
       );
       if (!ref.mounted) {
         return;
@@ -286,6 +388,10 @@ mixin _SupportChatControllerConversationMixin
           ),
         ),
       );
+    } on RequestCancelledException {
+      _updateStateIfMounted(
+        (state) => state.copyWith(isLoadingOlder: false, clearError: true),
+      );
     } on AppException catch (error) {
       _updateStateIfMounted(
         (state) =>
@@ -298,6 +404,8 @@ mixin _SupportChatControllerConversationMixin
           errorMessage: 'support.unavailable',
         ),
       );
+    } finally {
+      _clearActiveLoadOlder(cancelToken);
     }
   }
 
@@ -396,8 +504,12 @@ mixin _SupportChatControllerConversationMixin
     }
 
     final now = DateTime.now().toUtc();
+    final cancelToken = _newActiveMarkReadCancelToken();
     try {
-      await _repository.markConversationRead(conversation.conversationId);
+      await _repository.markConversationRead(
+        conversation.conversationId,
+        cancelToken: cancelToken,
+      );
       if (!ref.mounted) {
         return;
       }
@@ -417,8 +529,12 @@ mixin _SupportChatControllerConversationMixin
           ),
         ),
       );
+    } on RequestCancelledException {
+      return;
     } on AppException {
       // Keep realtime refresh resilient; the next event or manual refresh will try again.
+    } finally {
+      _clearActiveMarkRead(cancelToken);
     }
   }
 
@@ -438,10 +554,8 @@ mixin _SupportChatControllerConversationMixin
     _scheduleRealtimeRefresh();
   }
 
-  bool _isConversationNotFound(String message) {
-    final normalized = message.toLowerCase();
-    return normalized.contains('support.conversation_not_found') ||
-        normalized.contains('support conversation was not found');
+  bool _isConversationNotFound(AppException error) {
+    return error.isSupportConversationNotFound;
   }
 
   bool _isConversationReadOnlyForUser(SupportChatConversation conversation) {

@@ -14,7 +14,6 @@
   "notificationWalletBody": "Apri il wallet per controllare l'ultimo aggiornamento del saldo.",
   "notificationPremiumBody": "Apri il profilo per controllare l'ultimo aggiornamento Premium.",
   "appUnexpectedErrorFallback": "Qualcosa è andato storto. Riprova.",
-  "comingSoonMessage": "Questa sezione e pronta per la prossima fase del prodotto.",
   "createMagicTitle": "Crea magia",
   "pickTemplateSubtitle": "Scegli un modello per il tuo animale",
   "searchTemplates": "Cerca modelli",
@@ -82,6 +81,7 @@
   "profileEmailConfirmed": "E-mail confermata",
   "profileEmailPending": "E-mail non confermata",
   "profileSignedOut": "Disconnesso su questo dispositivo.",
+  "profileAccountDeleted": "Il tuo account e stato eliminato.",
   "magicLoadingPreparing": "Prepariamo la magia...",
   "magicLoadingCutestAngle": "Cerchiamo l'angolo piu tenero...",
   "magicLoadingAiPaws": "Scaldiamo le zampette AI...",
@@ -306,7 +306,7 @@
   "premiumPaymentStripeSubtitle": "Carta, Apple Pay o Google Pay",
   "premiumPaymentGooglePlay": "Google Play",
   "premiumPaymentGooglePlaySubtitle": "Pagamento tramite Google Play",
-  "premiumPaymentApple": "Apple Pay/App Store",
+  "premiumPaymentApple": "Apple Pay / App Store",
   "premiumPaymentOther": "Altro metodo di pagamento",
   "premiumPaymentTrustStripeProcesses": "I dati della carta vengono elaborati in modo sicuro da Stripe.",
   "premiumPaymentTrustNoStorage": "PetMagic non memorizza i dati della tua carta.",
@@ -335,7 +335,7 @@
   "premiumTermsNotice": "Continuando, accetti i Termini di utilizzo e l'Informativa sulla privacy.",
   "premiumStoreUnavailable": "Gli abbonamenti tramite App Store / Google Play sono temporaneamente non disponibili in questo momento. Riprova più tardi o usa un altro metodo di pagamento disponibile.",
   "premiumStoreProductUnavailable": "Questo prodotto in abbonamento non è disponibile nello store su questo dispositivo.",
-  "premiumStoreVerificationUnavailable": "La verifica store lato server non è ancora configurata.",
+  "premiumStoreVerificationUnavailable": "La verifica dello store è temporaneamente non disponibile.",
   "premiumStorePurchaseInvalid": "Non è stato possibile verificare l'acquisto.",
   "premiumStorePurchaseInactive": "Questo abbonamento non è più attivo.",
   "premiumPurchaseActivated": "Premium è ora attivo.",
@@ -486,7 +486,7 @@
   "authReceiveUpdatesLabel": "Desidero ricevere aggiornamenti e offerte da PetMagic",
   "authAcceptTermsRequired": "È necessario accettare i Termini di utilizzo e l'Informativa sulla privacy per creare un account.",
   "authGoogleShortLabel": "Google",
-  "authAppleShortLabel": "Mela",
+  "authAppleShortLabel": "Apple",
   "authExternalCancelled": "L'accesso è stato annullato.",
   "authExternalFailed": "Accesso esterno non riuscito. Per favore riprova.",
   "authExternalTimedOut": "L'accesso ha richiesto troppo tempo. Per favore riprova.",
@@ -588,6 +588,17 @@
   "generationStatusEtaDefault": "Mancano circa 1-2 min",
   "generationStatusEtaStartsSoon": "Iniziera tra pochi minuti",
   "generationStatusEtaNotifyHint": "Ti avviseremo quando il risultato sara pronto.",
+  "generationStatusCancelledTitle": "Generazione annullata",
+  "generationStatusCancelledMessage": "Questa generazione e stata interrotta prima dell'inizio dell'elaborazione.",
+  "generationStatusCancelQueuedHint": "Puoi annullare mentre questa generazione e ancora in attesa in coda.",
+  "generationStatusCancelQueuedAction": "Annulla generazione",
+  "generationStatusCancelQueuedTitle": "Annullare la generazione?",
+  "generationStatusCancelQueuedMessage": "Funziona solo mentre la generazione e ancora in coda. Se i PawSpark erano riservati, il backend li restituira automaticamente.",
+  "generationStatusCancelQueuedKeepAction": "Continua ad attendere",
+  "generationStatusCancelQueuedConfirmAction": "Conferma annullamento",
+  "generationStatusCancelQueuedSuccess": "Generazione annullata.",
+  "generationStatusCancelQueuedAlreadyStarted": "La generazione e gia iniziata e non puo essere annullata.",
+  "generationStatusCancelQueuedFailed": "Impossibile annullare la generazione. Riprova.",
   "generationStatusFailurePhotoHint": "La foto non e adatta a questo template. Prova una foto in cui l'animale sia chiaramente visibile.",
   "generationStatusFailureTechnicalHint": "Impossibile creare il risultato a causa di un problema tecnico. I PawSpark sono stati restituiti al tuo saldo.",
   "generationStatusStatusCompleted": "Il tuo risultato e pronto",
@@ -1221,10 +1232,10 @@
   "generationStatusRemovingWatermark": "Rimozione...",
   "generationStatusUpgradePremium": "Passa a Premium",
   "generationStatusRemoveWatermarkSheetTitle": "Rimuovi filigrana",
-  "generationStatusRemoveWatermarkSheetBody": "Usa {cost} credito per questo risultato o passa a Premium per download puliti.",
-  "generationStatusRemoveWatermarkUseCredit": "Usa {cost} credito",
+  "generationStatusRemoveWatermarkSheetBody": "Usa {cost} PawSpark per questo risultato o passa a Premium per download puliti.",
+  "generationStatusRemoveWatermarkUseCredit": "Usa {cost} PawSpark",
   "generationStatusRemoveWatermarkFailed": "Impossibile rimuovere la filigrana. Riprova.",
-  "generationStatusRemoveWatermarkNoCredits": "Crediti insufficienti. Acquista crediti o passa a Premium.",
+  "generationStatusRemoveWatermarkNoCredits": "PawSpark insufficienti. Ricarica PawSpark o passa a Premium.",
   "globalOfflineBannerTitle": "Nessuna connessione internet",
   "globalOfflineBannerMessage": "Alcune funzioni non sono disponibili finché la connessione non viene ripristinata.",
   "globalOnlineRestoredBannerTitle": "Connessione ripristinata",
@@ -1461,5 +1472,46 @@
         "type": "String"
       }
     }
-  }
+  },
+  "generationStatusQueuePositionWithWait": "Posizione in coda #{position} - {wait}",
+  "@generationStatusQueuePositionWithWait": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "wait": {
+        "type": "String"
+      }
+    }
+  },
+  "generationStatusQueuePosition": "Posizione in coda #{position}",
+  "@generationStatusQueuePosition": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusWaitMinutes": "{minutes} min",
+  "@generationStatusWaitMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "generationStatusStatusCancelled": "Generazione annullata",
+  "generationStatusTerminalCancelledHint": "La generazione è stata annullata prima del completamento.",
+  "generationStatusQueuedVideoHint": "Il video di solito richiede piu tempo delle foto e puo impiegare alcuni minuti.",
+  "templateFlowGenerationWaitTooLongTitle": "Carico elevato in questo momento",
+  "templateFlowGenerationWaitTooLongMessage": "Il tempo di attesa stimato per questa generazione e troppo lungo. Riprova piu tardi oppure scegli una generazione foto, che di solito e piu veloce.",
+  "templateFlowGenerationWaitTooLongRetryAfter": "Riprova tra circa {value}.",
+  "@templateFlowGenerationWaitTooLongRetryAfter": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "templateFlowGenerationWaitTooLongPremiumHint": "Premium accede a una coda prioritaria e di solito attende meno."
 }

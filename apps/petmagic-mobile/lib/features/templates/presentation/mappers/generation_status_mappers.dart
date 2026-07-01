@@ -16,7 +16,7 @@ String formatGenerationDateTime(DateTime value, Locale locale) {
 }
 
 String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
-  if (generation.status == TemplateGenerationStatus.queued) {
+  if (generation.isWaitingInQueue) {
     final position = generation.queuePosition;
     final waitSeconds = generation.estimatedWaitSeconds;
     if (position != null &&
@@ -24,18 +24,21 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
         waitSeconds != null &&
         waitSeconds > 0) {
       return text.generationStatusEtaEstimated(
-        'queue #$position, ${_formatWaitDuration(waitSeconds)}',
+        text.generationStatusQueuePositionWithWait(
+          position,
+          _formatWaitDuration(text, waitSeconds),
+        ),
       );
     }
 
     if (waitSeconds != null && waitSeconds > 0) {
       return text.generationStatusEtaEstimated(
-        _formatWaitDuration(waitSeconds),
+        _formatWaitDuration(text, waitSeconds),
       );
     }
 
     if (position != null && position > 0) {
-      return '${text.generationStatusEtaQueued} #$position';
+      return text.generationStatusQueuePosition(position);
     }
   }
 
@@ -47,19 +50,22 @@ String etaLabel(AppLocalizations text, TemplateGenerationResult generation) {
   if (generation.stage == 'queued') {
     return text.generationStatusEtaQueued;
   }
+  if (generation.status == TemplateGenerationStatus.providerQueued ||
+      generation.status == TemplateGenerationStatus.submittingToProvider) {
+    return text.generationStatusEtaStartsSoon;
+  }
   if (generation.stage == 'finalizing') {
+    return text.generationStatusEtaFinalizing;
+  }
+  if (generation.status == TemplateGenerationStatus.importingMedia) {
     return text.generationStatusEtaFinalizing;
   }
   return text.generationStatusEtaDefault;
 }
 
-String _formatWaitDuration(int totalSeconds) {
-  final minutes = (totalSeconds / 60).ceil();
-  if (minutes <= 1) {
-    return '1 min';
-  }
-
-  return '$minutes min';
+String _formatWaitDuration(AppLocalizations text, int totalSeconds) {
+  final minutes = (totalSeconds / 60).ceil().clamp(1, 24 * 60);
+  return text.generationStatusWaitMinutes(minutes);
 }
 
 String failureReasonMessage(
@@ -87,12 +93,31 @@ String statusTitle(AppLocalizations text, TemplateGenerationResult generation) {
   if (generation.isFailed) {
     return text.generationStatusStatusFailed;
   }
+  if (generation.isCancelled) {
+    return text.generationStatusStatusCancelled;
+  }
   return switch (generation.stage) {
     'queued' => text.generationStatusStageQueued,
     'preprocessing' => text.templateFlowStepProcessPhoto,
     'generating' => text.templateFlowStepCreateMagic,
     'finalizing' => text.templateFlowStepFinalTouches,
-    _ => text.generationStatusStatusCreatingMagic,
+    _ => switch (generation.status) {
+      TemplateGenerationStatus.queued => text.generationStatusStageQueued,
+      TemplateGenerationStatus.uploading => text.templateFlowStepProcessPhoto,
+      TemplateGenerationStatus.submittingToProvider =>
+        text.generationStatusEtaStartsSoon,
+      TemplateGenerationStatus.providerQueued =>
+        text.generationStatusStageQueued,
+      TemplateGenerationStatus.preprocessing =>
+        text.templateFlowStepProcessPhoto,
+      TemplateGenerationStatus.processing ||
+      TemplateGenerationStatus.providerProcessing ||
+      TemplateGenerationStatus.generating => text.templateFlowStepCreateMagic,
+      TemplateGenerationStatus.finalizing ||
+      TemplateGenerationStatus.importingMedia =>
+        text.templateFlowStepFinalTouches,
+      _ => text.generationStatusStatusCreatingMagic,
+    },
   };
 }
 
@@ -105,6 +130,9 @@ String terminalHint(
         ? text.generationStatusTerminalRefundedHint
         : text.generationStatusTerminalFailureHint;
   }
+  if (generation.isCancelled) {
+    return text.generationStatusTerminalCancelledHint;
+  }
   return text.generationStatusTerminalSuccessHint;
 }
 
@@ -114,6 +142,9 @@ IconData generationStatusIcon(TemplateGenerationResult generation) {
   }
   if (generation.isFailed) {
     return Icons.error_outline_rounded;
+  }
+  if (generation.isCancelled) {
+    return Icons.cancel_rounded;
   }
   return Icons.auto_awesome_rounded;
 }
@@ -127,6 +158,9 @@ Color generationStatusColor(
   }
   if (generation.isCompleted) {
     return colors.accent;
+  }
+  if (generation.isCancelled) {
+    return colors.textMuted;
   }
   return colors.gold;
 }

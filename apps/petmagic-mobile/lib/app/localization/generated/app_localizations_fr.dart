@@ -60,10 +60,6 @@ class AppLocalizationsFr extends AppLocalizations {
       'Une erreur s\'est produite. Veuillez réessayer.';
 
   @override
-  String get comingSoonMessage =>
-      'Cette section est prete pour la prochaine etape produit.';
-
-  @override
   String get createMagicTitle => 'Creer la magie';
 
   @override
@@ -282,6 +278,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get profileSignedOut => 'Déconnecté sur cet appareil.';
+
+  @override
+  String get profileAccountDeleted => 'Votre compte a ete supprime.';
 
   @override
   String get profileAccountCenterTitle => 'Centre du compte';
@@ -732,7 +731,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get subscriptionPaymentProviderGooglePlay => 'Google Play';
 
   @override
-  String get subscriptionPaymentProviderAppStore => 'Apple/App Store';
+  String get subscriptionPaymentProviderAppStore => 'App Store';
 
   @override
   String get subscriptionChangePaymentAction => 'Modifier le mode de paiement';
@@ -1493,7 +1492,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get premiumPaymentGooglePlaySubtitle => 'Paiement via Google Play';
 
   @override
-  String get premiumPaymentApple => 'Apple Pay/App Store';
+  String get premiumPaymentApple => 'Apple Pay / App Store';
 
   @override
   String get premiumPaymentOther => 'Autre moyen de paiement';
@@ -1636,7 +1635,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get premiumStoreVerificationUnavailable =>
-      'La vérification store côté serveur n\'est pas encore configurée.';
+      'La vérification de la boutique est temporairement indisponible.';
 
   @override
   String get premiumStorePurchaseInvalid =>
@@ -2973,7 +2972,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get authGoogleShortLabel => 'Google';
 
   @override
-  String get authAppleShortLabel => 'Pomme';
+  String get authAppleShortLabel => 'Apple';
 
   @override
   String get authContinueWithGoogle => 'Continuer avec Google';
@@ -3652,6 +3651,49 @@ class AppLocalizationsFr extends AppLocalizations {
       'Nous vous informerons lorsque le resultat sera pret.';
 
   @override
+  String get generationStatusCancelledTitle => 'Génération annulée';
+
+  @override
+  String get generationStatusCancelledMessage =>
+      'Cette génération a été arrêtée avant le début du traitement.';
+
+  @override
+  String get generationStatusCancelQueuedHint =>
+      'Vous pouvez annuler tant que cette génération attend encore dans la file.';
+
+  @override
+  String get generationStatusCancelQueuedAction => 'Annuler la génération';
+
+  @override
+  String get generationStatusCancelQueuedTitle => 'Annuler la génération ?';
+
+  @override
+  String get generationStatusCancelQueuedMessage =>
+      'Cela fonctionne uniquement tant que la génération est encore en file. Si des PawSpark ont été réservés, le backend les rendra automatiquement.';
+
+  @override
+  String get generationStatusCancelQueuedKeepAction => 'Continuer a attendre';
+
+  @override
+  String get generationStatusCancelQueuedConfirmAction =>
+      'Confirmer l\'annulation';
+
+  @override
+  String get generationStatusCancelQueuedSuccess => 'Génération annulée.';
+
+  @override
+  String get generationStatusCancelQueuedAlreadyStarted =>
+      'La génération a déjà commencé et ne peut plus être annulée.';
+
+  @override
+  String get generationStatusCancelQueuedFailed =>
+      'Impossible d\'annuler la génération. Veuillez réessayer.';
+
+  @override
+  String get generationStatusQueuedVideoHint =>
+      'La video prend generalement plus de temps que les photos et peut demander quelques minutes.';
+
+  @override
   String get generationStatusFailurePhotoHint =>
       'La photo ne convient pas a ce modele. Essayez une photo ou l\'animal est clairement visible.';
 
@@ -3812,7 +3854,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get emailVerificationCodeLabel => 'Code';
 
   @override
-  String get emailVerificationWorkingLabel => 'Fonctionnement...';
+  String get emailVerificationWorkingLabel => 'Traitement...';
 
   @override
   String get emailVerificationVerifyAction => 'Vérifier';
@@ -4096,12 +4138,12 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String generationStatusRemoveWatermarkSheetBody(Object cost) {
-    return 'Utilisez $cost crédit pour ce résultat ou passez à Premium pour des téléchargements sans filigrane.';
+    return 'Utilisez $cost PawSpark pour ce résultat ou passez à Premium pour des téléchargements sans filigrane.';
   }
 
   @override
   String generationStatusRemoveWatermarkUseCredit(Object cost) {
-    return 'Utiliser $cost crédit';
+    return 'Utiliser $cost PawSpark';
   }
 
   @override
@@ -4110,7 +4152,7 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get generationStatusRemoveWatermarkNoCredits =>
-      'Crédits insuffisants. Achetez des crédits ou passez à Premium.';
+      'Pas assez de PawSpark. Rechargez PawSpark ou passez à Premium.';
 
   @override
   String get globalOfflineBannerTitle => 'Pas de connexion internet';
@@ -4679,4 +4721,43 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get subscriptionBenefitNoWatermarkDescription => 'Resultat propre';
+
+  @override
+  String generationStatusQueuePositionWithWait(int position, String wait) {
+    return 'Position dans la file #$position - $wait';
+  }
+
+  @override
+  String generationStatusQueuePosition(int position) {
+    return 'Position dans la file #$position';
+  }
+
+  @override
+  String generationStatusWaitMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String get generationStatusStatusCancelled => 'Génération annulée';
+
+  @override
+  String get generationStatusTerminalCancelledHint =>
+      'La génération a été annulée avant la fin.';
+
+  @override
+  String get templateFlowGenerationWaitTooLongTitle =>
+      'Charge elevee en ce moment';
+
+  @override
+  String get templateFlowGenerationWaitTooLongMessage =>
+      'Le temps d\'attente estime pour cette generation est trop long. Reessayez plus tard ou choisissez une generation photo, generalement plus rapide.';
+
+  @override
+  String templateFlowGenerationWaitTooLongRetryAfter(String value) {
+    return 'Reessayez dans environ $value.';
+  }
+
+  @override
+  String get templateFlowGenerationWaitTooLongPremiumHint =>
+      'Premium donne acces a une file prioritaire et attend generalement moins.';
 }

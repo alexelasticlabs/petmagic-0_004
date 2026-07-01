@@ -2,8 +2,8 @@ part of 'premium_controller.dart';
 
 String _premiumErrorMessage(Object error, String fallback) {
   if (error is AppException) {
-    final message = error.message.trim();
-    if (_isSafePremiumErrorKey(message)) {
+    final message = normalizePremiumErrorKey(error.message);
+    if (message != null) {
       return message;
     }
 
@@ -25,22 +25,6 @@ String _premiumErrorMessage(Object error, String fallback) {
 }
 
 String _premiumPurchaseErrorMessage(String? rawMessage) {
-  final message = rawMessage?.trim();
-  return message != null && _isSafePremiumErrorKey(message)
-      ? message
-      : 'premium.checkout_failed';
-}
-
-bool _isSafePremiumErrorKey(String value) {
-  return value == 'auth.session_expired' ||
-      value == 'premium.plans_failed' ||
-      value == 'premium.request_failed' ||
-      value == 'premium.checkout_failed' ||
-      value == 'premium.manage_failed' ||
-      value == 'premium.restore_started' ||
-      value == 'premium.purchase_activated' ||
-      value == 'templates.network_unavailable' ||
-      value == 'premium.purchase_cancelled' ||
-      value == 'premium.store_unavailable' ||
-      value == 'premium.store_product_unavailable';
+  final message = normalizePremiumErrorKey(rawMessage);
+  return message ?? 'premium.checkout_failed';
 }

@@ -117,6 +117,43 @@ void main() {
   );
 
   testWidgets(
+    'support home treats 404 conversation not found as empty chat state',
+    (tester) async {
+      final repository = _ConversationNotFoundSupportChatRepository();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(
+              _AuthenticatedAppLaunchController.new,
+            ),
+            supportChatRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            home: const SupportHomePage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        find.text(
+          'Unable to reach support right now. Please try again in a moment.',
+        ),
+        findsNothing,
+      );
+      expect(find.text('Start the conversation'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'support home clears stale conversation on sign out and reloads on next sign in',
     (tester) async {
       final launchController = _MutableAppLaunchController(true);
@@ -164,6 +201,42 @@ void main() {
       await tester.pump();
 
       expect(find.text('New User'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'support home skips deferred conversation load after immediate sign out',
+    (tester) async {
+      final launchController = _MutableAppLaunchController(false);
+      final repository = _CountingSupportChatRepository();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            appLaunchControllerProvider.overrideWith(() => launchController),
+            supportChatRepositoryProvider.overrideWithValue(repository),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            theme: AppTheme.light(),
+            home: const SupportHomePage(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(repository.getConversationCalls, 0);
+
+      launchController.setAuthenticated(true);
+      launchController.setAuthenticated(false);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(ProtectedAuthGate), findsOneWidget);
+      expect(repository.getConversationCalls, 0);
     },
   );
 }
@@ -302,6 +375,21 @@ class _SequencedSupportChatRepository extends SupportChatRepository {
   void completeNext(SupportChatConversation conversation) {
     final completer = _pendingLoads.removeAt(0);
     completer.complete(conversation);
+  }
+}
+
+class _ConversationNotFoundSupportChatRepository extends SupportChatRepository {
+  _ConversationNotFoundSupportChatRepository()
+    : super(dio: Dio(), sessionStorage: AuthSessionStorage());
+
+  @override
+  Future<SupportChatConversation> getConversation({
+    int take = 60,
+    DateTime? beforeMessageCreatedAtUtc,
+    String? beforeMessageId,
+    CancelToken? cancelToken,
+  }) {
+    throw AppException('support.conversation_not_found', statusCode: 404);
   }
 }
 

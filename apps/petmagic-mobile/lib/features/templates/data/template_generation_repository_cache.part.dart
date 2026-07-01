@@ -1,11 +1,39 @@
 part of 'template_generation_repository.dart';
 
+Future<String?> _resolveGenerationCacheScope(
+  TemplateGenerationRepository repository,
+) async {
+  final session = await repository._sessionStorage.read();
+  final normalized = session?.user.userId.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  return normalized;
+}
+
+String _generationScopedDataKey(String baseKey, String scope) {
+  return '$baseKey:$scope';
+}
+
+String _generationCacheKeyForScope(String scope, String? status) {
+  final normalized = (status == null || status.trim().isEmpty)
+      ? TemplateGenerationRepository._cacheAllStatusKey
+      : status.trim().toLowerCase();
+  return '${TemplateGenerationRepository._generationsCachePrefix}$scope:$normalized';
+}
+
 Future<List<TemplateGenerationResult>?> _readCachedGenerations(
   TemplateGenerationRepository repository, {
   String? status,
 }) async {
   try {
-    final cacheKey = repository._cacheKeyForStatus(status);
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return null;
+    }
+
+    final cacheKey = _generationCacheKeyForScope(scope, status);
     if (await _isGenerationCacheKeyExpired(repository, cacheKey)) {
       await _clearGenerationCacheKey(repository, cacheKey);
       return null;
@@ -62,20 +90,21 @@ Future<int?> _readCachedUnreadGenerationCount(
   TemplateGenerationRepository repository,
 ) async {
   try {
-    if (await _isGenerationCacheKeyExpired(
-      repository,
-      TemplateGenerationRepository._unreadCountCacheKey,
-    )) {
-      await _clearGenerationCacheKey(
-        repository,
-        TemplateGenerationRepository._unreadCountCacheKey,
-      );
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
       return null;
     }
 
-    return await repository._preferences.getInt(
+    final unreadCountCacheKey = _generationScopedDataKey(
       TemplateGenerationRepository._unreadCountCacheKey,
+      scope,
     );
+    if (await _isGenerationCacheKeyExpired(repository, unreadCountCacheKey)) {
+      await _clearGenerationCacheKey(repository, unreadCountCacheKey);
+      return null;
+    }
+
+    return await repository._preferences.getInt(unreadCountCacheKey);
   } on Object {
     return null;
   }
@@ -85,15 +114,28 @@ Future<({String generationId, String correlationId})?> _readActiveGeneration(
   TemplateGenerationRepository repository,
 ) async {
   try {
-    final generationId = await repository._preferences.getString(
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return null;
+    }
+
+    final activeGenerationIdKey = _generationScopedDataKey(
       TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final activeGenerationCorrelationIdKey = _generationScopedDataKey(
+      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+      scope,
+    );
+    final generationId = await repository._preferences.getString(
+      activeGenerationIdKey,
     );
     if (generationId == null || generationId.trim().isEmpty) {
       return null;
     }
 
     final persistedCorrelationId = await repository._preferences.getString(
-      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+      activeGenerationCorrelationIdKey,
     );
     final normalizedGenerationId = generationId.trim();
     final correlationId =
@@ -120,13 +162,26 @@ Future<void> _rememberActiveGeneration(
   String? correlationId,
 }) async {
   try {
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return;
+    }
+
+    final activeGenerationIdKey = _generationScopedDataKey(
+      TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final activeGenerationCorrelationIdKey = _generationScopedDataKey(
+      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+      scope,
+    );
     final normalizedGenerationId = generationId.trim();
     if (normalizedGenerationId.isEmpty) {
       return;
     }
 
     await repository._preferences.setString(
-      TemplateGenerationRepository._activeGenerationIdKey,
+      activeGenerationIdKey,
       normalizedGenerationId,
     );
     final trimmedCorrelationId = correlationId?.trim();
@@ -135,7 +190,7 @@ Future<void> _rememberActiveGeneration(
         ? repository._createGenerationCorrelationId()
         : trimmedCorrelationId;
     await repository._preferences.setString(
-      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+      activeGenerationCorrelationIdKey,
       normalizedCorrelationId,
     );
   } on Object {
@@ -148,44 +203,54 @@ Future<void> _clearActiveGeneration(
   String generationId,
 ) async {
   try {
-    final current = await repository._preferences.getString(
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return;
+    }
+
+    final activeGenerationIdKey = _generationScopedDataKey(
       TemplateGenerationRepository._activeGenerationIdKey,
+      scope,
+    );
+    final activeGenerationCorrelationIdKey = _generationScopedDataKey(
+      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
+      scope,
+    );
+    final current = await repository._preferences.getString(
+      activeGenerationIdKey,
     );
     if (current != null && current != generationId) {
       return;
     }
 
-    await repository._preferences.remove(
-      TemplateGenerationRepository._activeGenerationIdKey,
-    );
-    await repository._preferences.remove(
-      TemplateGenerationRepository._activeGenerationCorrelationIdKey,
-    );
+    await repository._preferences.remove(activeGenerationIdKey);
+    await repository._preferences.remove(activeGenerationCorrelationIdKey);
   } on Object {
     // Keep cleanup best-effort.
   }
 }
 
 Future<void> _clearLocalCache(TemplateGenerationRepository repository) async {
-  for (final status in TemplateGenerationRepository._cacheStatuses) {
-    final key = repository._cacheKeyForStatus(
-      status == TemplateGenerationRepository._cacheAllStatusKey ? null : status,
-    );
-    await _clearGenerationCacheKey(repository, key);
-  }
-
-  await _clearGenerationCacheKey(
-    repository,
-    TemplateGenerationRepository._unreadCountCacheKey,
-  );
-
   try {
-    await repository._preferences.remove(
+    final keys = await repository._preferences.getKeys();
+    final generationKeyPrefixes = <String>[
+      TemplateGenerationRepository._generationsCachePrefix,
+      TemplateGenerationRepository._generationsCacheUpdatedAtPrefix,
+      TemplateGenerationRepository._unreadCountCacheKey,
+      TemplateGenerationRepository._unreadCountCacheUpdatedAtKey,
       TemplateGenerationRepository._activeGenerationIdKey,
-    );
-    await repository._preferences.remove(
       TemplateGenerationRepository._activeGenerationCorrelationIdKey,
-    );
+    ];
+    final removableKeys = keys
+        .where(
+          (key) => generationKeyPrefixes.any(
+            (prefix) => key == prefix || key.startsWith('$prefix:'),
+          ),
+        )
+        .toList(growable: false);
+    for (final key in removableKeys) {
+      await repository._preferences.remove(key);
+    }
   } on Object {
     // Keep best-effort semantics for logout cleanup.
   }
@@ -282,13 +347,18 @@ Future<void> _upsertCachedGeneration(
   TemplateGenerationRepository repository,
   TemplateGenerationResult generation,
 ) async {
+  final scope = await repository._readCacheScope();
+  if (scope == null) {
+    return;
+  }
+
   for (final status in TemplateGenerationRepository._cacheStatuses) {
     try {
       final cacheStatus =
           status == TemplateGenerationRepository._cacheAllStatusKey
           ? null
           : status;
-      final key = repository._cacheKeyForStatus(cacheStatus);
+      final key = _generationCacheKeyForScope(scope, cacheStatus);
       final raw = await repository._preferences.getString(key);
       if (raw == null || raw.isEmpty) {
         continue;
@@ -345,7 +415,12 @@ Future<void> _writeCachedGenerationsImpl(
   required List<Map<String, Object?>> items,
 }) async {
   try {
-    final cacheKey = repository._cacheKeyForStatus(status);
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return;
+    }
+
+    final cacheKey = _generationCacheKeyForScope(scope, status);
     await repository._preferences.setString(cacheKey, jsonEncode(items));
     await _touchGenerationCacheKey(repository, cacheKey);
   } on Object {
@@ -358,27 +433,20 @@ Future<void> _writeCachedUnreadGenerationCountImpl(
   int count,
 ) async {
   try {
-    await repository._preferences.setInt(
+    final scope = await repository._readCacheScope();
+    if (scope == null) {
+      return;
+    }
+
+    final unreadCountCacheKey = _generationScopedDataKey(
       TemplateGenerationRepository._unreadCountCacheKey,
-      count,
+      scope,
     );
-    await _touchGenerationCacheKey(
-      repository,
-      TemplateGenerationRepository._unreadCountCacheKey,
-    );
+    await repository._preferences.setInt(unreadCountCacheKey, count);
+    await _touchGenerationCacheKey(repository, unreadCountCacheKey);
   } on Object {
     // Ignore local cache write errors to keep network flow stable.
   }
-}
-
-String _cacheKeyForStatusImpl(
-  TemplateGenerationRepository repository,
-  String? status,
-) {
-  final normalized = (status == null || status.trim().isEmpty)
-      ? TemplateGenerationRepository._cacheAllStatusKey
-      : status.trim().toLowerCase();
-  return '${TemplateGenerationRepository._generationsCachePrefix}$normalized';
 }
 
 bool _matchesCachedGenerationStatusImpl(
@@ -450,6 +518,14 @@ Map<String, Object?> _generationToCachedJsonImpl(
     'isUnread': generation.isUnread,
     'queuePosition': generation.queuePosition,
     'estimatedWaitSeconds': generation.estimatedWaitSeconds,
+    'estimatedCompletionAtUtc': generation.estimatedCompletionAtUtc
+        ?.toUtc()
+        .toIso8601String(),
+    'estimatedTotalSeconds': generation.estimatedTotalSeconds,
+    'mediaType': generation.mediaType,
+    'tier': generation.tier,
+    'queueStatus': generation.queueStatus,
+    'canCancel': generation.canCancel,
     'hasWatermark': generation.hasWatermark,
     'canRemoveWatermark': generation.canRemoveWatermark,
     'isWatermarkRemoved': generation.isWatermarkRemoved,
@@ -472,9 +548,15 @@ Future<void> _markCachedGenerationReadImpl(
   TemplateGenerationRepository repository,
   String generationId,
 ) async {
+  final scope = await repository._readCacheScope();
+  if (scope == null) {
+    return;
+  }
+
   for (final status in TemplateGenerationRepository._cacheStatuses) {
     try {
-      final key = repository._cacheKeyForStatus(
+      final key = _generationCacheKeyForScope(
+        scope,
         status == TemplateGenerationRepository._cacheAllStatusKey
             ? null
             : status,
@@ -529,11 +611,17 @@ Future<void> _removeCachedGenerationImpl(
   TemplateGenerationRepository repository,
   String generationId,
 ) async {
+  final scope = await repository._readCacheScope();
+  if (scope == null) {
+    return;
+  }
+
   var removedUnread = false;
 
   for (final status in TemplateGenerationRepository._cacheStatuses) {
     try {
-      final key = repository._cacheKeyForStatus(
+      final key = _generationCacheKeyForScope(
+        scope,
         status == TemplateGenerationRepository._cacheAllStatusKey
             ? null
             : status,
@@ -580,8 +668,14 @@ Future<void> _removeCachedGenerationImpl(
 }
 
 String _generationCacheUpdatedAtKeyForDataKey(String dataKey) {
-  if (dataKey == TemplateGenerationRepository._unreadCountCacheKey) {
-    return TemplateGenerationRepository._unreadCountCacheUpdatedAtKey;
+  if (dataKey == TemplateGenerationRepository._unreadCountCacheKey ||
+      dataKey.startsWith(
+        '${TemplateGenerationRepository._unreadCountCacheKey}:',
+      )) {
+    final suffix = dataKey.substring(
+      TemplateGenerationRepository._unreadCountCacheKey.length,
+    );
+    return '${TemplateGenerationRepository._unreadCountCacheUpdatedAtKey}$suffix';
   }
 
   if (dataKey.startsWith(

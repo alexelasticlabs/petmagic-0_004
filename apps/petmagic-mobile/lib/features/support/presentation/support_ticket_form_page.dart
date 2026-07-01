@@ -140,11 +140,9 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     _hasScheduledSupportContextPreload = true;
     unawaited(
       Future.microtask(() async {
-        if (!mounted ||
-            !ref.read(appLaunchControllerProvider).isAuthenticated) {
+        if (!mounted) {
           return;
         }
-
         await _preloadSupportContext();
       }),
     );
@@ -187,9 +185,7 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
     );
     final subscriptionLabel = ref.watch(
       premiumControllerProvider.select(
-        (state) => state.status?.isPremium == true
-            ? state.status?.status ?? 'Premium'
-            : null,
+        (state) => _resolveSubscriptionLabel(text, state),
       ),
     );
 
@@ -658,7 +654,11 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return false;
     }
 
-    return state.wallet == null && state.purchases.isEmpty;
+    if (state.hasCompletedFullLoad) {
+      return false;
+    }
+
+    return state.wallet == null || state.purchases.isEmpty;
   }
 
   bool _shouldPreloadPremiumContext(PremiumState state) {
@@ -666,7 +666,21 @@ class _SupportTicketFormPageState extends ConsumerState<SupportTicketFormPage> {
       return false;
     }
 
-    return state.status == null && state.plans.isEmpty;
+    return state.status == null;
+  }
+
+  String? _resolveSubscriptionLabel(AppLocalizations text, PremiumState state) {
+    final status = state.status;
+    if (status?.isPremium != true) {
+      return null;
+    }
+
+    final planName = status?.planName?.trim();
+    if (planName != null && planName.isNotEmpty) {
+      return planName;
+    }
+
+    return text.premiumLabel;
   }
 
   Future<void> _preloadContextStep(
