@@ -151,7 +151,6 @@ export type AdminSubscriptionEvent = {
   eventType: string;
   status: string;
   externalEventId?: string | null;
-  externalSubscriptionId?: string | null;
   createdAtUtc: string;
   processedAtUtc?: string | null;
 };

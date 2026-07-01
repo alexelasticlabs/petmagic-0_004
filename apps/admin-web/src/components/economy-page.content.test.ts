@@ -39,6 +39,9 @@ const economySharedPath = fileURLToPath(new URL("./economy-page.shared.tsx", imp
 const economyControllerPath = fileURLToPath(
   new URL("./use-economy-page-controller.ts", import.meta.url)
 );
+const economyApiTypesPath = fileURLToPath(
+  new URL("../lib/api-client.types.economy.ts", import.meta.url)
+);
 
 describe("economy-page content", () => {
   it("returns complete text bundles for ru and en", () => {
@@ -396,6 +399,7 @@ describe("economy-page content", () => {
     const subscriptionsSource = readFileSync(subscriptionsSectionPath, "utf8");
     const providerConfigsSource = readFileSync(providerConfigsSectionPath, "utf8");
     const confirmationSource = readFileSync(confirmationDialogsPath, "utf8");
+    const economyApiTypesSource = readFileSync(economyApiTypesPath, "utf8");
 
     expect(sharedSource).toContain("import { sanitizeSensitiveText }");
     expect(sharedSource).toContain("export function safeText");
@@ -421,6 +425,11 @@ describe("economy-page content", () => {
     expect(subscriptionsSource).toContain("function formatExternalEventId");
     expect(subscriptionsSource).toContain("safeText(item.planName || item.planId)");
     expect(subscriptionsSource).toContain("formatExternalEventId(");
+    expect(subscriptionsSource).toContain(
+      "formatExternalEventId(item.externalEventId, text.noDescription)"
+    );
+    expect(subscriptionsSource).not.toContain("externalSubscriptionId");
+    expect(economyApiTypesSource).not.toContain("externalSubscriptionId");
     expect(providerConfigsSource).toContain("import { sanitizeSensitiveText }");
     expect(providerConfigsSource).toContain("safeText(matchResult.decisionMessage");
     expect(providerConfigsSource).toContain("safeText(matchResult.matchedConfiguration.region");

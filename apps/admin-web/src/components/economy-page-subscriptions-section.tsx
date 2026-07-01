@@ -270,10 +270,7 @@ export function EconomyPageSubscriptionsSection({
                       <div className={styles.packMeta}>
                         <strong>{safeText(item.eventType, 80)}</strong>
                         <span>
-                          {formatExternalEventId(
-                            item.externalSubscriptionId || item.externalEventId,
-                            text.noDescription
-                          )}
+                          {formatExternalEventId(item.externalEventId, text.noDescription)}
                         </span>
                       </div>
                     </td>
