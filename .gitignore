@@ -1,9 +1,11 @@
 # Environment
 .env
 .env.local
+.env.local-smoke
 .env.*.local
 **/.env
 **/.env.local
+**/.env.local-smoke
 **/.env.*.local
 !.env.example
 !**/.env.example
@@ -75,6 +77,8 @@ tmp/
 artifacts/load/
 artifacts/mobile-template-feed/
 artifacts/query-plans/
+artifacts/local-generation-scheduler-smoke/
+artifacts/staging-generation-scheduler-smoke/
 artifacts/watermark-*.json
 artifacts/watermark-*.env
 

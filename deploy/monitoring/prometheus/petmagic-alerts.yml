@@ -47,6 +47,127 @@ groups:
           summary: "Template generation queue backlog is growing"
           description: "More than 50 jobs have remained queued for 10 minutes. Check worker count, provider throttling, and PostgreSQL locks."
 
+      - alert: PetMagicGenerationSchedulerQueueDepthHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(generation_queue_depth_bucket[5m])
+            )
+          ) > 75
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation scheduler queue depth is high"
+          description: "Scheduler queue depth has stayed above 75 jobs for 10 minutes. Check image/video caps, worker count, provider throttling, and admission thresholds."
+
+      - alert: PetMagicGenerationOldestQueuedAgeHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(generation_oldest_queued_job_age_seconds_bucket[5m])
+            )
+          ) > 1800
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "Template generation oldest queued job age is high"
+          description: "The oldest queued generation has been waiting for more than 30 minutes. Check lane-specific caps, provider timeouts, and stuck workers."
+
+      - alert: PetMagicGenerationRejectedJobsHigh
+        expr: sum(rate(generation_jobs_rejected_total[10m])) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "Template generation admission rejections are elevated"
+          description: "Generation jobs are being rejected before charge at an elevated rate. Check wait thresholds, queue depth, and current staging caps."
+
+      - alert: PetMagicGenerationFalTimeouts
+        expr: increase(generation_fal_timeouts_total[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "FAL generation timeouts detected"
+          description: "At least one FAL timeout occurred in the last 15 minutes. Check media type, stage, model tags, and provider queue status."
+
+      - alert: PetMagicFalProviderBalanceLow
+        expr: fal_provider_balance_low > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: petmagic-api
+        annotations:
+          summary: "fal.ai balance is low"
+          description: "fal.ai balance is below the configured low threshold. Top up the account before launch traffic drains the remaining credits."
+
+      - alert: PetMagicFalProviderBalanceCritical
+        expr: fal_provider_balance_critical > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-api
+        annotations:
+          summary: "fal.ai balance is critical"
+          description: "fal.ai balance is at or below the critical threshold. Generation admission should reject before charge until balance is restored."
+
+      - alert: PetMagicFalProviderCapacityRejected
+        expr: increase(fal_provider_rejected_due_to_capacity[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: petmagic-api
+        annotations:
+          summary: "Generation requests rejected due to fal.ai capacity guardrail"
+          description: "PetMagic rejected generation requests before charge because fal.ai balance, configured concurrency, or provider capacity was unavailable."
+
+      - alert: PetMagicFalProviderInflightNearLimit
+        expr: |
+          fal_provider_configured_concurrency > 0
+            and fal_provider_inflight_requests
+              / clamp_min(fal_provider_configured_concurrency, 1) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "fal.ai provider in-flight requests near configured concurrency"
+          description: "Provider in-flight requests are above 85% of configured fal.ai concurrency for 10 minutes. Check queue wait and consider reducing admission or increasing fal.ai credits."
+
+      - alert: PetMagicFalProviderQueueWaitHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (
+              rate(fal_provider_queue_wait_seconds_bucket[10m])
+            )
+          ) > 900
+        for: 10m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "fal.ai provider queue wait is high"
+          description: "fal.ai p95 provider queue wait is above 15 minutes. Check fal.ai dashboard, concurrency limit, and recent credit purchase state."
+
+      - alert: PetMagicFalProviderRateLimitErrors
+        expr: increase(fal_provider_rate_limit_errors[10m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: petmagic-generation-worker
+        annotations:
+          summary: "fal.ai rate limit errors detected"
+          description: "fal.ai returned rate limit responses. Check configured concurrency, reserved concurrency, and provider dashboard notifications."
+
       - alert: PetMagicGenerationWorkerNotProcessing
         expr: |
           sum(generation_jobs_queued) > 0
