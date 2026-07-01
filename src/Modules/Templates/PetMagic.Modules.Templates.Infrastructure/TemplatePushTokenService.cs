@@ -10,12 +10,13 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class TemplatePushTokenService(TemplatesDbContext dbContext) : ITemplatePushTokenService
 {
+    private const int MinTokenLength = 20;
     private const int MaxTokenLength = 4096;
 
     public async Task<Result> RegisterAsync(RegisterTemplatePushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (string.IsNullOrWhiteSpace(token) || token.Length > MaxTokenLength)
+        if (string.IsNullOrWhiteSpace(token) || token.Length < MinTokenLength || token.Length > MaxTokenLength)
         {
             return Result.Failure(TemplatesErrors.InvalidPushToken);
         }
@@ -60,9 +61,9 @@ internal sealed class TemplatePushTokenService(TemplatesDbContext dbContext) : I
     public async Task<Result> UnregisterAsync(UnregisterTemplatePushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(token) || token.Length < MinTokenLength || token.Length > MaxTokenLength)
         {
-            return Result.Success();
+            return Result.Failure(TemplatesErrors.InvalidPushToken);
         }
 
         var existing = await dbContext.TemplatePushDeviceTokens

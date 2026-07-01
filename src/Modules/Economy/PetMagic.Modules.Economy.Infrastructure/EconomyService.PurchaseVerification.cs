@@ -64,7 +64,7 @@ public sealed partial class EconomyService
                 x.PriceAmount,
                 x.CurrencyCode,
                 x.SparkToGrant,
-                x.PaymentProvider == "stripe" ? x.ExternalPaymentId : null,
+                null,
                 x.CreatedAtUtc,
                 x.ConfirmedAtUtc,
                 false,
@@ -152,8 +152,7 @@ public sealed partial class EconomyService
                 var sessionService = new Stripe.Checkout.SessionService(stripeClient);
                 var session = await sessionService.GetAsync(stripeReferenceId, cancellationToken: cancellationToken);
 
-                if (!string.Equals(session.PaymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
-                    && !string.Equals(session.Status, "complete", StringComparison.OrdinalIgnoreCase))
+                if (!IsStripeCheckoutSessionPaymentConfirmed(session.PaymentStatus, session.Status))
                 {
                     return Result.Success(ToPurchaseOrderResponse(order));
                 }
@@ -244,6 +243,12 @@ public sealed partial class EconomyService
         }
 
         return IsStripeCurrencyMatch(session.Currency, order.CurrencyCode);
+    }
+
+    internal static bool IsStripeCheckoutSessionPaymentConfirmed(string? paymentStatus, string? sessionStatus)
+    {
+        return string.Equals(paymentStatus, "paid", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(sessionStatus, "complete", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsStripePaymentIntentForOrder(PaymentIntent paymentIntent, PurchaseOrder order)

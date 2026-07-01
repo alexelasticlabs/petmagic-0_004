@@ -124,6 +124,32 @@ public sealed class SubmitSupportConversationFeedbackCommandValidator : Abstract
     }
 }
 
+public sealed class RegisterSupportPushTokenCommandValidator : AbstractValidator<RegisterSupportPushTokenCommand>
+{
+    private const int MinPushTokenLength = 20;
+
+    public RegisterSupportPushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(MinPushTokenLength).MaximumLength(4096);
+        RuleFor(x => x.Platform).MaximumLength(32);
+        RuleFor(x => x.DeviceId).MaximumLength(128);
+        RuleFor(x => x.AppVersion).MaximumLength(64);
+        RuleFor(x => x.Locale).MaximumLength(16);
+    }
+}
+
+public sealed class UnregisterSupportPushTokenCommandValidator : AbstractValidator<UnregisterSupportPushTokenCommand>
+{
+    private const int MinPushTokenLength = 20;
+
+    public UnregisterSupportPushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(MinPushTokenLength).MaximumLength(4096);
+    }
+}
+
 public sealed class UpdateSupportConversationStatusCommandValidator : AbstractValidator<UpdateSupportConversationStatusCommand>
 {
     public UpdateSupportConversationStatusCommandValidator()

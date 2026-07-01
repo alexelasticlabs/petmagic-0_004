@@ -206,6 +206,5 @@ public sealed record AdminSubscriptionEventResponse(
     string EventType,
     string Status,
     string? ExternalEventId,
-    string? ExternalSubscriptionId,
     DateTime CreatedAtUtc,
     DateTime? ProcessedAtUtc);

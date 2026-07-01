@@ -23,17 +23,22 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetAdminWalletLedgerAsync(skip ?? 0, take ?? 50, source, userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminEconomyDashboardMetricsResponse>> GetDashboardMetricsAsync(
+    private static async Task<Results<Ok<AdminEconomyDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminDashboardMetricsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -57,33 +62,31 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetAdminPurchaseHistoryAsync(skip ?? 0, take ?? 50, status, provider, search, userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<PurchaseHistoryItemResponse>, ProblemHttpResult>> RefundPurchaseAsync(
+    private static async Task<Results<Ok<PurchaseHistoryItemResponse>, ValidationProblem, ProblemHttpResult>> RefundPurchaseAsync(
         [FromRoute] Guid orderId,
         [FromBody] AdminRefundPurchaseRequest? request,
+        [FromServices] IValidator<AdminRefundPurchaseCommand> validator,
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
-        var result = await service.RefundAdminPurchaseAsync(
-            new AdminRefundPurchaseCommand(orderId, request?.Reason),
-            cancellationToken);
+        var command = new AdminRefundPurchaseCommand(orderId, request?.Reason);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.RefundAdminPurchaseAsync(command, cancellationToken);
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "economy.purchase_not_found" => StatusCodes.Status404NotFound,
-                "economy.purchase_not_refundable" => StatusCodes.Status409Conflict,
-                "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -97,13 +100,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetSubscriptionSummaryAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "users.not_found" => StatusCodes.Status404NotFound,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -129,24 +126,22 @@ public static partial class AdminEconomyEndpoints
         var result = await service.AdminRevokePremiumSubscriptionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "users.not_found" => StatusCodes.Status404NotFound,
-                "economy.payment_gateway_failed" => StatusCodes.Status502BadGateway,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminCurrencyPackResponse>>> ListPacksAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminCurrencyPackResponse>>, ProblemHttpResult>> ListPacksAsync(
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminCurrencyPacksAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -169,17 +164,22 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetAdminSubscriptionsAsync(skip ?? 0, take ?? 50, status, provider, search, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminSubscriptionPlanResponse>>> ListSubscriptionPlansAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminSubscriptionPlanResponse>>, ProblemHttpResult>> ListSubscriptionPlansAsync(
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminSubscriptionPlansAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -201,7 +201,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetAdminSubscriptionEventsAsync(skip ?? 0, take ?? 50, provider, status, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -232,10 +232,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.UpdateCurrencyPackAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.pack_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -270,10 +267,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.UpdateSubscriptionPlanAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.premium_plan_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);

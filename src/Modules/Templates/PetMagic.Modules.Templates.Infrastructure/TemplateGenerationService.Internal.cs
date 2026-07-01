@@ -47,6 +47,9 @@ internal sealed partial class TemplateGenerationService
             .Where(x => x.UserId == userId
 
                 && TemplateGenerationJobStatusSets.Active.Contains(x.Status)
+                && (x.Status != TemplateGenerationStatus.Queued
+                    || x.ChargedAtUtc != null
+                    || x.UserId == AdminTestUserId)
 
                 && ((idempotencyKey != null && x.IdempotencyKey == idempotencyKey)
 
@@ -241,7 +244,7 @@ internal sealed partial class TemplateGenerationService
 
             "pending" => query.Where(x => x.Status == TemplateGenerationStatus.Queued),
 
-            "running" => query.Where(x => x.Status == TemplateGenerationStatus.Processing),
+            "running" => query.Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)),
 
             "completed" => query.Where(x => x.Status == TemplateGenerationStatus.Completed),
 
@@ -251,13 +254,13 @@ internal sealed partial class TemplateGenerationService
 
             "retrying" => query.Where(x => x.Status == TemplateGenerationStatus.Retrying),
 
-            "preprocessing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+            "preprocessing" => query.Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
 
                 && x.StartedAtUtc != null
 
                 && x.PreprocessingCompletedAtUtc == null),
 
-            "generating" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+            "generating" => query.Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
 
                 && x.PreprocessingCompletedAtUtc != null
 
@@ -265,7 +268,7 @@ internal sealed partial class TemplateGenerationService
 
                 && x.Template.TemplateType == TemplateType.Video),
 
-            "finalizing" => query.Where(x => x.Status == TemplateGenerationStatus.Processing
+            "finalizing" => query.Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status)
 
                 && ((x.Template.TemplateType == TemplateType.Image && x.PreprocessingCompletedAtUtc != null)
 

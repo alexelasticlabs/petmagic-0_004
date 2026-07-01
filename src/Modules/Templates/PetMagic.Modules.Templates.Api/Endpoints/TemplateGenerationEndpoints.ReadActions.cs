@@ -19,14 +19,14 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -42,7 +42,7 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
@@ -55,10 +55,7 @@ public static partial class TemplateGenerationEndpoints
             cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -73,17 +70,14 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetDownloadAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -98,17 +92,14 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.GetShareAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -125,7 +116,7 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var filterProblem = ValidateGenerationFilters(status);
@@ -143,7 +134,7 @@ public static partial class TemplateGenerationEndpoints
 
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -157,13 +148,13 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var result = await generationService.GetUnreadCountAsync(userId!.Value, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -178,17 +169,38 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await generationService.MarkReadAsync(userId.Value, generationId, isPremium, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<CancelQueuedGenerationResponse>, ProblemHttpResult>> CancelQueuedGenerationAsync(
+        HttpContext context,
+        Guid generationId,
+        [FromServices] ITemplateGenerationService generationService,
+        CancellationToken cancellationToken)
+    {
+        var (userId, subjectError) = TryGetSubject(context);
+        if (subjectError is not null)
+        {
+            return ToClientGenerationProblem(subjectError);
+        }
+
+        var result = await generationService.CancelQueuedAsync(userId!.Value, generationId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToClientGenerationProblem(result.Error);
+        }
+
+        return TypedResults.Ok(result.Value);
     }
 
     private static ProblemHttpResult? ValidateGenerationFilters(string? status)
@@ -217,10 +229,15 @@ public static partial class TemplateGenerationEndpoints
                 "generating",
                 "finalizing")
             ? null
-            : TypedResults.Problem(
-                title: "templates.invalid_status",
-                detail: "Query parameter status must be one of: active, pending, running, completed, failed, cancelled, retrying, preprocessing, generating, finalizing.",
-                statusCode: StatusCodes.Status400BadRequest);
+            : InvalidGenerationFilterProblem();
+    }
+
+    private static ProblemHttpResult InvalidGenerationFilterProblem()
+    {
+        return TypedResults.Problem(
+            title: "templates.invalid_status",
+            detail: "Query parameter status must be one of: active, pending, running, completed, failed, cancelled, retrying, preprocessing, generating, finalizing.",
+            statusCode: StatusCodes.Status400BadRequest);
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteGenerationAsync(
@@ -232,18 +249,13 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var result = await generationService.DeleteAsync(userId!.Value, generationId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: IsNotFoundError(result.Error)
-                    ? StatusCodes.Status404NotFound
-                    : StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.NoContent();
@@ -259,7 +271,7 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var result = await generationService.RecordFeedbackAsync(
@@ -274,12 +286,7 @@ public static partial class TemplateGenerationEndpoints
 
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: IsNotFoundError(result.Error)
-                    ? StatusCodes.Status404NotFound
-                    : StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.NoContent();

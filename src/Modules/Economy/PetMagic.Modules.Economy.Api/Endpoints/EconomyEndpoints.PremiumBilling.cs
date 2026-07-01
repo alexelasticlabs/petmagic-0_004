@@ -21,7 +21,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CreatePremiumCheckoutCommand(
@@ -42,10 +42,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePremiumCheckoutAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.premium_plan_not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -61,7 +58,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CreatePremiumCheckoutCommand(
@@ -82,10 +79,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePremiumCheckoutAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.premium_plan_not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -101,7 +95,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CreatePremiumBillingPortalCommand(
@@ -117,10 +111,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.premium_billing_unavailable", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -136,7 +127,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CancelPremiumSubscriptionCommand(
@@ -152,10 +143,7 @@ public static partial class EconomyEndpoints
         var result = await service.CancelPremiumSubscriptionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.premium_billing_unavailable", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -171,7 +159,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CreatePremiumBillingPortalCommand(userId!.Value, "stripe");
@@ -184,7 +172,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePremiumBillingPortalAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);

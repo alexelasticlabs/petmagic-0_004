@@ -66,7 +66,8 @@ internal sealed partial class TemplateGenerationService
         var activeCount = await dbContext.TemplateGenerationJobs
             .AsNoTracking()
             .CountAsync(x => x.UserId == command.UserId
-                && TemplateGenerationJobStatusSets.Active.Contains(x.Status),
+                && TemplateGenerationJobStatusSets.Active.Contains(x.Status)
+                && (x.Status != TemplateGenerationStatus.Queued || x.ChargedAtUtc != null),
                 cancellationToken);
         if (activeCount >= activeLimit)
         {
@@ -77,11 +78,22 @@ internal sealed partial class TemplateGenerationService
         {
             var queueSize = await dbContext.TemplateGenerationJobs
                 .AsNoTracking()
-                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status), cancellationToken);
+                .CountAsync(x => TemplateGenerationJobStatusSets.Active.Contains(x.Status)
+                    && (x.Status != TemplateGenerationStatus.Queued
+                        || x.ChargedAtUtc != null
+                        || x.UserId == AdminTestUserId),
+                    cancellationToken);
             if (queueSize >= options.QueueMaxSize)
             {
                 return Result.Failure<TemplateGenerationResponse>(TemplatesErrors.GenerationQueueOverloaded);
             }
+        }
+
+        var queueTier = TemplateGenerationQueue.NormalizeTier(command.QueueTier);
+        var admission = await EnsureQueueCanAcceptAsync(template, queueTier, cancellationToken);
+        if (admission.IsFailure)
+        {
+            return Result.Failure<TemplateGenerationResponse>(admission.Error);
         }
 
         var now = DateTime.UtcNow;
@@ -97,6 +109,8 @@ internal sealed partial class TemplateGenerationService
             InputMediaAssetId = photo.MediaAssetId,
             Status = TemplateGenerationStatus.Queued,
             TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.ResolveMediaType(template.TemplateType),
+            QueueTier = queueTier,
             SourceImageUrl = string.IsNullOrWhiteSpace(photo.MediaAsset.StoragePath)
                 ? photo.MediaAsset.Url
                 : photo.MediaAsset.StoragePath,
@@ -108,6 +122,8 @@ internal sealed partial class TemplateGenerationService
             CorrelationId = correlationId,
             CreatedAtUtc = now,
             QueuedAtUtc = now,
+            EstimatedWaitSecondsAtQueue = admission.Value.EstimatedWaitSeconds,
+            EstimatedCompletionAtQueueUtc = admission.Value.EstimatedCompletionAtUtc,
             UpdatedAtUtc = now
         };
 
@@ -194,6 +210,8 @@ internal sealed partial class TemplateGenerationService
             Template = template,
             Status = TemplateGenerationStatus.Queued,
             TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.ResolveMediaType(template.TemplateType),
+            QueueTier = TemplateGenerationQueue.TierAdmin,
             SourceImageUrl = ResolveManagedStoragePathOrUrl(sourceImageAsset.Url),
             SourceImageFileName = sourceImageAsset.FileName,
             SourceImageContentType = sourceImageAsset.ContentType,

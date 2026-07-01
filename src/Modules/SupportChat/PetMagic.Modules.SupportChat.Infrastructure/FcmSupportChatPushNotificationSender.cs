@@ -106,12 +106,10 @@ internal sealed class FcmSupportChatPushNotificationSender(
             eventId,
             token.Id,
             response.StatusCode,
-            ResolveFcmErrorReason(responseBody),
+            FirebaseMessagingErrorClassifier.ResolveErrorReason(responseBody),
             CorrelationContext.ResolveOrCreate());
 
-        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound
-            && (responseBody.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase)
-                || responseBody.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase)))
+        if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
@@ -139,21 +137,6 @@ internal sealed class FcmSupportChatPushNotificationSender(
         }
     }
 
-    private static string ResolveFcmErrorReason(string body)
-    {
-        if (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase))
-        {
-            return "unregistered";
-        }
-
-        if (body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
-        {
-            return "invalid_argument";
-        }
-
-        return "fcm_send_failed";
-    }
-
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         credential ??= LoadCredential().CreateScoped(FirebaseMessagingScope);
@@ -172,7 +155,7 @@ internal sealed class FcmSupportChatPushNotificationSender(
 
     private static string BuildBody(SupportChatPushNotification notification, string? locale)
     {
-        var body = notification.Body.Trim();
+        var body = notification.Body?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(body))
         {
             body = SupportChatPushNotificationLocalizer.BuildFallbackBody(

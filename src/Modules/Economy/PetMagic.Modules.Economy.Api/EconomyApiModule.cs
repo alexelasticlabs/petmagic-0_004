@@ -21,9 +21,12 @@ public static class EconomyApiModule
         services.AddScoped<IValidator<CreatePremiumCheckoutCommand>, CreatePremiumCheckoutCommandValidator>();
         services.AddScoped<IValidator<CreatePremiumBillingPortalCommand>, CreatePremiumBillingPortalCommandValidator>();
         services.AddScoped<IValidator<CancelPremiumSubscriptionCommand>, CancelPremiumSubscriptionCommandValidator>();
+        services.AddScoped<IValidator<AdminRefundPurchaseCommand>, AdminRefundPurchaseCommandValidator>();
         services.AddScoped<IValidator<VerifyPremiumStorePurchaseCommand>, VerifyPremiumStorePurchaseCommandValidator>();
         services.AddScoped<IValidator<VerifyPremiumStripeSubscriptionCommand>, VerifyPremiumStripeSubscriptionCommandValidator>();
         services.AddScoped<IValidator<VerifyPackStorePurchaseCommand>, VerifyPackStorePurchaseCommandValidator>();
+        services.AddScoped<IValidator<RegisterEconomyPushTokenCommand>, RegisterEconomyPushTokenCommandValidator>();
+        services.AddScoped<IValidator<UnregisterEconomyPushTokenCommand>, UnregisterEconomyPushTokenCommandValidator>();
         services.AddScoped<IValidator<CreatePaymentMethodSetupCommand>, CreatePaymentMethodSetupCommandValidator>();
         services.AddScoped<IValidator<RemovePaymentMethodCommand>, RemovePaymentMethodCommandValidator>();
         services.AddScoped<IValidator<ConfirmPackPurchaseCommand>, ConfirmPackPurchaseCommandValidator>();

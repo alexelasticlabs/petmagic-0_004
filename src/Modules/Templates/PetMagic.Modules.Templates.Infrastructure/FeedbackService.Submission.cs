@@ -15,9 +15,30 @@ internal sealed partial class FeedbackService
         SubmitFeedbackCommand command,
         CancellationToken cancellationToken)
     {
-        var type = NormalizeType(command.Type);
+        if (HasExceededMaxLength(command.Type, 32))
+        {
+            return Result.Failure<SubmitFeedbackResponse>(TemplatesErrors.InvalidFeedbackType);
+        }
+
+        if (!TryNormalizeType(command.Type, allowUnknownAsGeneral: false, out var type))
+        {
+            return Result.Failure<SubmitFeedbackResponse>(TemplatesErrors.InvalidFeedbackType);
+        }
+
+        if (command.Rating is < -1 or > 1
+            || HasExceededMaxLength(command.Category, 80)
+            || HasExceededMaxLength(command.Message, 2000)
+            || HasExceededMaxLength(command.SourceScreen, 80)
+            || HasExceededMaxLength(command.AppVersion, 64)
+            || HasExceededMaxLength(command.Platform, 32)
+            || HasExceededMaxLength(command.DeviceModel, 128)
+            || HasExceededMaxLength(command.Locale, 16))
+        {
+            return Result.Failure<SubmitFeedbackResponse>(TemplatesErrors.InvalidFeedback);
+        }
+
         var category = NormalizeText(command.Category, 80);
-        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(category))
+        if (string.IsNullOrWhiteSpace(category))
         {
             return Result.Failure<SubmitFeedbackResponse>(TemplatesErrors.InvalidFeedback);
         }
@@ -94,7 +115,7 @@ internal sealed partial class FeedbackService
         }
 
         var templateId = generation?.TemplateId ?? command.TemplateId;
-        var rating = NormalizeRating(command.Rating);
+        var rating = command.Rating;
         var feedback = new TemplateGenerationFeedback
         {
             Id = Guid.NewGuid(),

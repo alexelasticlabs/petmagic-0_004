@@ -1,3 +1,6 @@
+using System.Net;
+
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.BuildingBlocks.Results;
@@ -196,14 +199,185 @@ public sealed class TemplateWatermarkRendererTests
         }
     }
 
-    private static TemplateWatermarkRenderer CreateRenderer(CapturingMediaStorage storage, TemplatesOptions options)
+    [Fact]
+    public async Task CreateWatermarkedCopyAsync_ShouldLogStructuredWarning_WhenImageRenderThrows()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"petmagic-watermark-bad-source-{Guid.NewGuid():N}.png");
+        var generationId = Guid.NewGuid();
+        try
+        {
+            await File.WriteAllBytesAsync(tempPath, [1, 2, 3, 4]);
+
+            var storage = new CapturingMediaStorage();
+            var logger = new CapturingLogger<TemplateWatermarkRenderer>();
+            var renderer = CreateRenderer(storage, CreateOptions(), logger);
+            var media = new StoredMediaResponse("storage/bad.png", "storage/bad.png", "bad.png", "image/png", null, tempPath);
+
+            var result = await renderer.CreateWatermarkedCopyAsync(media, TemplateType.Image, generationId, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(TemplatesErrors.WatermarkRenderFailed.Code, result.Error.Code);
+            var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
+            Assert.Contains("Image watermark render failed.", entry.Message, StringComparison.Ordinal);
+            Assert.Equal("create_image_watermark", entry.Properties["Operation"]);
+            Assert.Equal(generationId, entry.Properties["GenerationId"]);
+            Assert.Equal("bad.png", entry.Properties["FileName"]);
+            Assert.Equal("image/png", entry.Properties["ContentType"]);
+            Assert.Equal(true, entry.Properties["HasLocalPath"]);
+        }
+        finally
+        {
+            TryDelete(tempPath);
+        }
+    }
+
+    [Fact]
+    public async Task CreateWatermarkedCopyAsync_ShouldLogStructuredWarning_WhenVideoRendererReturnsNonZeroExit()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var tempInput = Path.Combine(Path.GetTempPath(), $"petmagic-watermark-bad-video-{Guid.NewGuid():N}.mp4");
+        var fakeFfmpeg = Path.Combine(Path.GetTempPath(), $"petmagic-fake-ffmpeg-fail-{Guid.NewGuid():N}.sh");
+        var generationId = Guid.NewGuid();
+        try
+        {
+            await File.WriteAllBytesAsync(tempInput, [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109]);
+            await File.WriteAllTextAsync(
+                fakeFfmpeg,
+                """
+                #!/bin/sh
+                printf "ffmpeg failed for watermark" >&2
+                exit 7
+                """);
+            File.SetUnixFileMode(
+                fakeFfmpeg,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+            var storage = new CapturingMediaStorage();
+            var logger = new CapturingLogger<TemplateWatermarkRenderer>();
+            var renderer = CreateRenderer(storage, CreateOptions(ffmpegPath: fakeFfmpeg), logger);
+            var media = new StoredMediaResponse("storage/clean.mp4", "storage/clean.mp4", "clean.mp4", "video/mp4", null, tempInput);
+
+            var result = await renderer.CreateWatermarkedCopyAsync(media, TemplateType.Video, generationId, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(TemplatesErrors.WatermarkRenderFailed.Code, result.Error.Code);
+            var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
+            Assert.Contains("Video watermark render failed.", entry.Message, StringComparison.Ordinal);
+            Assert.Equal("render_video_watermark", entry.Properties["Operation"]);
+            Assert.Equal(generationId, entry.Properties["GenerationId"]);
+            Assert.Equal("clean.mp4", entry.Properties["FileName"]);
+            Assert.Equal("video/mp4", entry.Properties["ContentType"]);
+            Assert.Equal(7, entry.Properties["ExitCode"]);
+            Assert.Equal(true, entry.Properties["HasLocalPath"]);
+            Assert.Contains("ffmpeg failed for watermark", entry.Properties["ErrorPreview"]?.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            TryDelete(tempInput);
+            TryDelete(fakeFfmpeg);
+        }
+    }
+
+    [Fact]
+    public async Task CreateWatermarkedCopyAsync_ShouldLogStructuredWarning_WhenImageWatermarkStorageFails()
+    {
+        var tempPath = Path.Combine(Path.GetTempPath(), $"petmagic-watermark-source-{Guid.NewGuid():N}.png");
+        var generationId = Guid.NewGuid();
+        try
+        {
+            using (var original = new Image<Rgba32>(128, 128, Color.White))
+            {
+                await original.SaveAsPngAsync(tempPath);
+            }
+
+            var storage = new FailingMediaStorage();
+            var logger = new CapturingLogger<TemplateWatermarkRenderer>();
+            var renderer = CreateRenderer(storage, CreateOptions(), logger);
+            var media = new StoredMediaResponse("storage/clean.png", "storage/clean.png", "clean.png", "image/png", null, tempPath);
+
+            var result = await renderer.CreateWatermarkedCopyAsync(media, TemplateType.Image, generationId, CancellationToken.None);
+
+            Assert.True(result.IsFailure);
+            Assert.Equal(TemplatesErrors.MediaStorageFailed.Code, result.Error.Code);
+            var entry = Assert.Single(logger.Entries, x => x.Level == LogLevel.Warning);
+            Assert.Contains("Image watermark storage failed.", entry.Message, StringComparison.Ordinal);
+            Assert.Equal("store_image_watermark", entry.Properties["Operation"]);
+            Assert.Equal(generationId, entry.Properties["GenerationId"]);
+            Assert.Equal("clean.png", entry.Properties["FileName"]);
+            Assert.Equal("image/png", entry.Properties["ContentType"]);
+            Assert.Equal(TemplatesErrors.MediaStorageFailed.Code, entry.Properties["ErrorCode"]);
+            Assert.Equal(true, entry.Properties["HasLocalPath"]);
+        }
+        finally
+        {
+            TryDelete(tempPath);
+        }
+    }
+
+    [Fact]
+    public async Task CreateWatermarkedCopyAsync_ShouldFailWithoutDownloading_WhenRemoteImageSizeMetadataExceedsLimit()
+    {
+        var storage = new RemoteReadUrlMediaStorage("https://cdn.example.com/source.png");
+        var handler = new RecordingHttpHandler();
+        var renderer = CreateRenderer(
+            storage,
+            CreateOptions(),
+            httpClientFactory: new StaticHttpClientFactory(new HttpClient(handler)));
+        var media = new StoredMediaResponse(
+            "storage/remote.png",
+            "storage/remote.png",
+            "remote.png",
+            "image/png",
+            31 * 1024 * 1024,
+            null);
+
+        var result = await renderer.CreateWatermarkedCopyAsync(media, TemplateType.Image, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.WatermarkRenderFailed.Code, result.Error.Code);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task CreateWatermarkedCopyAsync_ShouldFailWhenRemoteVideoBodyExceedsLimitWithoutContentLength()
+    {
+        var storage = new RemoteReadUrlMediaStorage("https://cdn.example.com/source.mp4");
+        var handler = new RecordingHttpHandler(new StreamingContent(251 * 1024 * 1024));
+        var renderer = CreateRenderer(
+            storage,
+            CreateOptions(),
+            httpClientFactory: new StaticHttpClientFactory(new HttpClient(handler)));
+        var media = new StoredMediaResponse(
+            "storage/remote.mp4",
+            "storage/remote.mp4",
+            "remote.mp4",
+            "video/mp4",
+            null,
+            null);
+
+        var result = await renderer.CreateWatermarkedCopyAsync(media, TemplateType.Video, Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.WatermarkRenderFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    private static TemplateWatermarkRenderer CreateRenderer(
+        IMediaStorage storage,
+        TemplatesOptions options,
+        ILogger<TemplateWatermarkRenderer>? logger = null,
+        IHttpClientFactory? httpClientFactory = null)
     {
         return new TemplateWatermarkRenderer(
             storage,
             options,
             new TemplateWatermarkSettingsStore(options),
-            new StaticHttpClientFactory(),
-            NullLogger<TemplateWatermarkRenderer>.Instance);
+            httpClientFactory ?? new StaticHttpClientFactory(),
+            logger ?? NullLogger<TemplateWatermarkRenderer>.Instance);
     }
 
     private static TemplatesOptions CreateOptions(
@@ -329,11 +503,185 @@ public sealed class TemplateWatermarkRendererTests
         }
     }
 
+    private sealed class FailingMediaStorage : IMediaStorage
+    {
+        public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Failure<StoredMediaResponse>(TemplatesErrors.MediaStorageFailed));
+        }
+
+        public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(assetUrl));
+        }
+    }
+
     private sealed class StaticHttpClientFactory : IHttpClientFactory
     {
+        private readonly HttpClient httpClient;
+
+        public StaticHttpClientFactory()
+            : this(new HttpClient())
+        {
+        }
+
+        public StaticHttpClientFactory(HttpClient httpClient)
+        {
+            this.httpClient = httpClient;
+        }
+
         public HttpClient CreateClient(string name)
         {
-            return new HttpClient();
+            return httpClient;
+        }
+    }
+
+    private sealed class RemoteReadUrlMediaStorage(string readUrl) : IMediaStorage
+    {
+        public Task<Result<StoredMediaResponse>> StoreAsync(MediaUploadCommand asset, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Result> DeleteAsync(string assetUrl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success());
+        }
+
+        public Task<Result<string>> CreateReadUrlAsync(string assetUrl, TimeSpan ttl, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Result.Success(readUrl));
+        }
+    }
+
+    private sealed class RecordingHttpHandler(HttpContent? content = null) : HttpMessageHandler
+    {
+        public int RequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestCount++;
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = content ?? new ByteArrayContent([1, 2, 3, 4])
+            });
+        }
+    }
+
+    private sealed class StreamingContent(long length) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            throw new NotSupportedException();
+        }
+
+        protected override bool TryComputeLength(out long computedLength)
+        {
+            computedLength = 0;
+            return false;
+        }
+
+        protected override Task<Stream> CreateContentReadStreamAsync()
+        {
+            return Task.FromResult<Stream>(new FixedByteStream(length));
+        }
+    }
+
+    private sealed class FixedByteStream(long length) : Stream
+    {
+        private readonly long totalLength = length;
+        private long remaining = length;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => totalLength;
+        public override long Position
+        {
+            get => totalLength - remaining;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            var bytesToRead = (int)Math.Min(count, Math.Min(remaining, 81920));
+            Array.Clear(buffer, offset, bytesToRead);
+            remaining -= bytesToRead;
+            return bytesToRead;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (remaining <= 0)
+            {
+                return ValueTask.FromResult(0);
+            }
+
+            var bytesToRead = (int)Math.Min(buffer.Length, Math.Min(remaining, 81920));
+            buffer[..bytesToRead].Span.Clear();
+            remaining -= bytesToRead;
+            return ValueTask.FromResult(bytesToRead);
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values
+                    .Where(x => !string.Equals(x.Key, "{OriginalFormat}", StringComparison.Ordinal))
+                    .ToDictionary(x => x.Key, x => x.Value)
+                : [];
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel Level,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
         }
     }
 }

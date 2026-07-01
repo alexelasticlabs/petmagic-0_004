@@ -33,6 +33,16 @@ public sealed partial class StripePaymentGateway
         return !string.IsNullOrWhiteSpace(apiKey);
     }
 
+    private static bool IsSucceededPaymentIntentStatus(string? status)
+    {
+        return string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSucceededSetupIntentStatus(string? status)
+    {
+        return string.Equals(status, "succeeded", StringComparison.OrdinalIgnoreCase);
+    }
+
     private StripeClient CreateStripeClient(string apiKey)
     {
         return new StripeClient(

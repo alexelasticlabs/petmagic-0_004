@@ -37,7 +37,7 @@ public sealed partial class SupportChatService
 
     private static string BuildReplyPreview(ConversationMessage sourceMessage)
     {
-        var trimmedBody = sourceMessage.Body.Trim();
+        var trimmedBody = sourceMessage.Body?.Trim() ?? string.Empty;
         var orderedAttachments = sourceMessage.Attachments
             .OrderBy(attachment => attachment.SortOrder)
             .ToList();
@@ -45,7 +45,7 @@ public sealed partial class SupportChatService
         {
             if (!string.IsNullOrWhiteSpace(trimmedBody)
                 && !orderedAttachments.Any(attachment => string.Equals(
-                    attachment.FileName.Trim(),
+                    attachment.FileName?.Trim(),
                     trimmedBody,
                     StringComparison.OrdinalIgnoreCase)))
             {
@@ -58,17 +58,18 @@ public sealed partial class SupportChatService
             }
 
             var attachment = orderedAttachments[0];
+            var attachmentMimeType = attachment.MimeType?.Trim() ?? string.Empty;
             if (attachment.IsDeleted)
             {
                 return "Attachment deleted";
             }
 
-            if (attachment.MimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            if (attachmentMimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
             {
                 return "Photo";
             }
 
-            if (attachment.MimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
+            if (attachmentMimeType.StartsWith("video/", StringComparison.OrdinalIgnoreCase))
             {
                 return "Video";
             }

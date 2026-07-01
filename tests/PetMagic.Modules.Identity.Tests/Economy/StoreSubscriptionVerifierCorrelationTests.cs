@@ -97,6 +97,46 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
     }
 
     [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldReuseCachedGoogleAccessTokenAcrossCalls()
+    {
+        using var rsa = RSA.Create(2048);
+        var handler = new CountingGooglePlayProductHandler(
+            """
+            {
+                "purchaseState": 0,
+                "acknowledgementState": 1,
+                "orderId": "GPA.1111-2222-3333-44444"
+            }
+            """);
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(handler)),
+            Options.Create(new EconomyOptions
+            {
+                GooglePlayServiceAccountEmail = "billing-test@petmagic.iam.gserviceaccount.com",
+                GooglePlayPrivateKeyPem = rsa.ExportPkcs8PrivateKeyPem(),
+                GooglePlayPackageName = "com.petmagic.app",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+        var request = new StoreProductVerificationRequest(
+            Guid.NewGuid(),
+            "google_play",
+            "com.petmagic.app.tokens.google.pack100",
+            "gp-token-cached",
+            null,
+            "gp-token-cached",
+            null);
+
+        var firstResult = await verifier.VerifyProductPurchaseAsync(request, CancellationToken.None);
+        var secondResult = await verifier.VerifyProductPurchaseAsync(request, CancellationToken.None);
+
+        Assert.True(firstResult.IsSuccess);
+        Assert.True(secondResult.IsSuccess);
+        Assert.Equal(1, handler.AccessTokenRequestCount);
+        Assert.Equal(2, handler.PublisherRequestCount);
+    }
+
+    [Fact]
     public async Task VerifyProductPurchaseAsync_ShouldRejectAppStoreJws_WhenSignatureValidationFails()
     {
         var verifier = new StoreSubscriptionVerifier(
@@ -159,6 +199,90 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
         Assert.Equal("https://buy.itunes.apple.com/verifyReceipt", request.RequestUri?.ToString());
         Assert.True(request.Headers.TryGetValues(CorrelationContext.HeaderName, out var values));
         Assert.Equal("store-verifier-correlation-test", Assert.Single(values));
+    }
+
+    [Fact]
+    public async Task VerifyProductPurchaseAsync_ShouldRejectAppStoreReceipt_WhenBundleIdDoesNotMatch()
+    {
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new AppStoreReceiptHandler(
+                """
+                {
+                    "status": 0,
+                    "receipt": {
+                        "bundle_id": "com.other.app",
+                        "in_app": [
+                            {
+                                "product_id": "com.petmagic.spark100",
+                                "transaction_id": "txn_123"
+                            }
+                        ]
+                    }
+                }
+                """))),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreSharedSecret = "app-store-shared-secret",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyProductPurchaseAsync(
+            new StoreProductVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "com.petmagic.spark100",
+                "receipt-data",
+                null,
+                "txn_123",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_ShouldRejectAppStoreReceipt_WhenBundleIdDoesNotMatch()
+    {
+        var verifier = new StoreSubscriptionVerifier(
+            new SingleClientFactory(new HttpClient(new AppStoreReceiptHandler(
+                """
+                {
+                    "status": 0,
+                    "receipt": {
+                        "bundle_id": "com.other.app"
+                    },
+                    "latest_receipt_info": [
+                        {
+                            "product_id": "com.petmagic.spark100",
+                            "original_transaction_id": "sub_123",
+                            "expires_date_ms": "4102444800000"
+                        }
+                    ]
+                }
+                """))),
+            Options.Create(new EconomyOptions
+            {
+                AppStoreSharedSecret = "app-store-shared-secret",
+                AppStoreBundleId = "com.petmagic.app"
+            }),
+            new FakeStoreWebhookSecurityValidator(Result.Success()));
+
+        var result = await verifier.VerifyAsync(
+            new StoreSubscriptionVerificationRequest(
+                Guid.NewGuid(),
+                "app_store",
+                "premium_monthly",
+                "com.petmagic.spark100",
+                "receipt-data",
+                null,
+                "sub_123",
+                null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.StorePurchaseInvalid.Code, result.Error.Code);
     }
 
     [Fact]
@@ -295,6 +419,7 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
                     {
                         "status": 0,
                         "receipt": {
+                            "bundle_id": "com.petmagic.app",
                             "in_app": [
                                 {
                                     "product_id": "com.petmagic.spark100",
@@ -345,6 +470,37 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
         }
     }
 
+    private sealed class CountingGooglePlayProductHandler(string productResponseJson) : HttpMessageHandler
+    {
+        public int AccessTokenRequestCount { get; private set; }
+        public int PublisherRequestCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri?.Host == "oauth2.googleapis.com")
+            {
+                AccessTokenRequestCount++;
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"access_token\":\"google-access-token\",\"token_type\":\"Bearer\",\"expires_in\":3600}")
+                });
+            }
+
+            if (request.RequestUri?.Host == "androidpublisher.googleapis.com")
+            {
+                PublisherRequestCount++;
+                Assert.True(request.Headers.Authorization?.Scheme == "Bearer");
+                Assert.Equal("google-access-token", request.Headers.Authorization?.Parameter);
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(productResponseJson)
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.NotFound));
+        }
+    }
+
     private sealed class ThrowingGooglePlayProductHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -366,6 +522,17 @@ public sealed class StoreSubscriptionVerifierCorrelationTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             throw new HttpRequestException("app store verification upstream unavailable");
+        }
+    }
+
+    private sealed class AppStoreReceiptHandler(string responseJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson)
+            });
         }
     }
 

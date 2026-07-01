@@ -40,4 +40,70 @@ public sealed class TemplatesValidatorsTests
         Assert.Contains(result.Errors, error => error.PropertyName == "PetPhotoRequirements[0]");
         Assert.Contains(result.Errors, error => error.PropertyName == "Tags[0]");
     }
+
+    [Fact]
+    public void RefundFeedbackCreditsValidator_ShouldRejectNonPositiveAmount_AndOversizedReason()
+    {
+        var validator = new RefundFeedbackCreditsCommandValidator();
+
+        var result = validator.Validate(new RefundFeedbackCreditsCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            0,
+            new string('r', 501)));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "Amount");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Reason");
+    }
+
+    [Fact]
+    public void SubmitFeedbackValidator_ShouldRejectUnknownType_OutOfRangeRating_AndOversizedFields()
+    {
+        var validator = new SubmitFeedbackCommandValidator();
+
+        var result = validator.Validate(new SubmitFeedbackCommand(
+            Guid.NewGuid(),
+            "Other",
+            new string('c', 81),
+            2,
+            new string('m', 2001),
+            null,
+            null,
+            null,
+            new string('s', 81),
+            new string('a', 65),
+            new string('p', 33),
+            new string('d', 129),
+            new string('l', 17)));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "Type");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Category");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Rating");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Message");
+        Assert.Contains(result.Errors, error => error.PropertyName == "SourceScreen");
+        Assert.Contains(result.Errors, error => error.PropertyName == "AppVersion");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Platform");
+        Assert.Contains(result.Errors, error => error.PropertyName == "DeviceModel");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Locale");
+    }
+
+    [Fact]
+    public void UpdateFeedbackAdminValidator_ShouldRejectInvalidEnums_AndOversizedNote()
+    {
+        var validator = new UpdateFeedbackAdminCommandValidator();
+
+        var result = validator.Validate(new UpdateFeedbackAdminCommand(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "not_open",
+            "urgent",
+            new string('n', 2001)));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.PropertyName == "Status");
+        Assert.Contains(result.Errors, error => error.PropertyName == "Priority");
+        Assert.Contains(result.Errors, error => error.PropertyName == "AdminNote");
+    }
 }

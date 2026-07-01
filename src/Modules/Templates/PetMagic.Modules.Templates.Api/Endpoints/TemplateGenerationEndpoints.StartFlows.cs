@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
@@ -24,16 +25,13 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var result = await generationService.GetCompatibleTemplatesAsync(userId!.Value, resultId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -50,27 +48,21 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var templateLookup = await templatesService.GetAdminAsync(request.TemplateId, cancellationToken);
         if (templateLookup.IsFailure)
         {
-            return TypedResults.Problem(
-                title: templateLookup.Error.Code,
-                detail: templateLookup.Error.Message,
-                statusCode: string.Equals(templateLookup.Error.Code, "templates.not_found", StringComparison.Ordinal)
-                    ? StatusCodes.Status404NotFound
-                    : StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(templateLookup.Error);
         }
 
         if (templateLookup.Value.IsPremium
             && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
         {
-            return TypedResults.Problem(
-                title: PremiumRequiredCode,
-                detail: PremiumRequiredMessage,
-                statusCode: StatusCodes.Status403Forbidden);
+            return ToClientGenerationProblem(new Error(
+                PremiumRequiredCode,
+                PremiumRequiredMessage));
         }
 
         var command = new StartTemplateGenerationFromResultCommand(
@@ -78,7 +70,8 @@ public static partial class TemplateGenerationEndpoints
             request.ParentGenerationResultId,
             request.TemplateId,
             NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
-            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken));
+            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken),
+            await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -89,10 +82,7 @@ public static partial class TemplateGenerationEndpoints
         var result = await generationService.StartFromResultAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         return TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
@@ -109,7 +99,7 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var command = new StartSimilarTemplateGenerationCommand(
@@ -117,7 +107,8 @@ public static partial class TemplateGenerationEndpoints
             generationId,
             string.IsNullOrWhiteSpace(request?.VariationStrength) ? "medium" : request!.VariationStrength!,
             NormalizeIdempotencyKey(context.Request.Headers["Idempotency-Key"].FirstOrDefault()),
-            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken));
+            await ResolveActiveGenerationLimitAsync(context, userId.Value, cancellationToken),
+            await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
 
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
@@ -128,10 +119,7 @@ public static partial class TemplateGenerationEndpoints
         var result = await generationService.StartSimilarAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveFailureStatusCode(result.Error));
+            return ToClientGenerationProblem(result.Error);
         }
 
         var response = new GenerateSimilarResponse(result.Value.GenerationId, result.Value.Status);
@@ -153,27 +141,21 @@ public static partial class TemplateGenerationEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientGenerationProblem(subjectError);
         }
 
         var templateLookup = await templatesService.GetAdminAsync(templateId, cancellationToken);
         if (templateLookup.IsFailure)
         {
-            return TypedResults.Problem(
-                title: templateLookup.Error.Code,
-                detail: templateLookup.Error.Message,
-                statusCode: string.Equals(templateLookup.Error.Code, "templates.not_found", StringComparison.Ordinal)
-                    ? StatusCodes.Status404NotFound
-                    : StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(templateLookup.Error);
         }
 
         if (templateLookup.Value.IsPremium
             && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
         {
-            return TypedResults.Problem(
-                title: PremiumRequiredCode,
-                detail: PremiumRequiredMessage,
-                statusCode: StatusCodes.Status403Forbidden);
+            return ToClientGenerationProblem(new Error(
+                PremiumRequiredCode,
+                PremiumRequiredMessage));
         }
 
         var uploadValidation = await ValidateSourceImageAsync(
@@ -207,7 +189,7 @@ public static partial class TemplateGenerationEndpoints
 
         if (storeResult.IsFailure)
         {
-            return TypedResults.Problem(title: storeResult.Error.Code, detail: storeResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientGenerationProblem(storeResult.Error);
         }
 
         var stored = storeResult.Value;
@@ -227,7 +209,8 @@ public static partial class TemplateGenerationEndpoints
                     : new TemplateAssetCommand(preview.Url, preview.FileName, preview.ContentType, preview.FileSizeBytes, null),
                 IdempotencyKey: idempotencyKey,
                 RequestHash: requestHash,
-                ActiveGenerationLimit: activeGenerationLimit);
+                ActiveGenerationLimit: activeGenerationLimit,
+                QueueTier: await ResolveQueueTierAsync(context, userId.Value, cancellationToken));
 
             var validation = await validator.ValidateAsync(command, cancellationToken);
             if (!validation.IsValid)
@@ -240,10 +223,7 @@ public static partial class TemplateGenerationEndpoints
             if (result.IsFailure)
             {
                 await DeleteUploadedGenerationMediaAsync(mediaStorage, stored, preview);
-                return TypedResults.Problem(
-                    title: result.Error.Code,
-                    detail: result.Error.Message,
-                    statusCode: ResolveFailureStatusCode(result.Error));
+                return ToClientGenerationProblem(result.Error);
             }
 
             if (!string.Equals(result.Value.SourceImageAsset?.FileName, stored.FileName, StringComparison.Ordinal)

@@ -294,7 +294,7 @@ internal static partial class EconomyWebhookParser
         }
     }
 
-    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
+    public static (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) ParseStripeEvent(string rawBody)
     {
         try
         {
@@ -306,7 +306,7 @@ internal static partial class EconomyWebhookParser
                 || !dataElement.TryGetProperty("object", out var objectElement)
                 || objectElement.ValueKind != JsonValueKind.Object)
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
             }
 
             string? objectId = null;
@@ -335,6 +335,13 @@ internal static partial class EconomyWebhookParser
             if (objectElement.TryGetProperty("status", out var statusElement) && statusElement.ValueKind == JsonValueKind.String)
             {
                 status = statusElement.GetString();
+            }
+
+            string? checkoutPaymentStatus = null;
+            if (objectElement.TryGetProperty("payment_status", out var paymentStatusElement)
+                && paymentStatusElement.ValueKind == JsonValueKind.String)
+            {
+                checkoutPaymentStatus = paymentStatusElement.GetString();
             }
 
             string? customerId = null;
@@ -402,7 +409,7 @@ internal static partial class EconomyWebhookParser
                 ApplyStripeMetadata(subscriptionMetadataElement, ref orderId, ref userId, ref purpose, ref planCode);
             }
 
-            return (true, orderId, userId, objectId, paymentReferenceId, purpose, setupIntentId, status, planCode, stripePriceId, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
+            return (true, orderId, userId, objectId, paymentReferenceId, purpose, setupIntentId, status, checkoutPaymentStatus, planCode, stripePriceId, subscriptionId, customerId, currentPeriodStartUtc, currentPeriodEndUtc, cancelAtPeriodEnd);
         }
         catch
         {
@@ -427,10 +434,10 @@ internal static partial class EconomyWebhookParser
 
             if (!orderId.HasValue && string.IsNullOrWhiteSpace(objectId))
             {
-                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
+                return (false, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false);
             }
 
-            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, null, null, false);
+            return (true, orderId, null, objectId, null, null, null, null, null, null, null, null, null, null, null, false);
         }
     }
 

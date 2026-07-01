@@ -119,6 +119,27 @@ public sealed partial class EconomyService
                 currentPeriodEndUtc);
             var isPremium = EconomyWebhookParser.IsStoreSubscriptionPremium(status, currentPeriodEndUtc);
 
+            var subscriptionResult = await UpsertUserSubscriptionAsync(
+                existingSubscription.UserId,
+                "app_store",
+                existingSubscription.PurchaseChannel,
+                existingSubscription.Region,
+                plan.PlanCode,
+                status,
+                existingSubscription.ExternalCustomerId,
+                parsed.ExternalSubscriptionId ?? existingSubscription.ExternalSubscriptionId,
+                parsed.ExternalPurchaseId ?? existingSubscription.ExternalTransactionId,
+                ResolveNotificationPeriodStartUtc(plan.BillingPeriod, currentPeriodEndUtc, existingSubscription.CurrentPeriodStartUtc),
+                currentPeriodEndUtc,
+                parsed.CancelAtPeriodEnd,
+                plan.MonthlyTokenLimit,
+                cancellationToken);
+            if (subscriptionResult.IsFailure)
+            {
+                return Result.Failure<StoreWebhookResultResponse>(subscriptionResult.Error);
+            }
+            var subscription = subscriptionResult.Value;
+
             if (identityService is null)
             {
                 return Result.Failure<StoreWebhookResultResponse>(EconomyErrors.PremiumBillingUnavailable);
@@ -149,22 +170,6 @@ public sealed partial class EconomyService
                     Status: isPremium ? "active" : "inactive",
                     Provider: "app_store",
                     PlanCode: plan.PlanCode),
-                cancellationToken);
-
-            var subscription = await UpsertUserSubscriptionAsync(
-                existingSubscription.UserId,
-                "app_store",
-                existingSubscription.PurchaseChannel,
-                existingSubscription.Region,
-                plan.PlanCode,
-                status,
-                parsed.EventId,
-                parsed.ExternalSubscriptionId ?? existingSubscription.ExternalSubscriptionId,
-                parsed.ExternalPurchaseId ?? existingSubscription.ExternalTransactionId,
-                ResolveNotificationPeriodStartUtc(plan.BillingPeriod, currentPeriodEndUtc, existingSubscription.CurrentPeriodStartUtc),
-                currentPeriodEndUtc,
-                parsed.CancelAtPeriodEnd,
-                plan.MonthlyTokenLimit,
                 cancellationToken);
 
             await AppendSubscriptionEventAsync(

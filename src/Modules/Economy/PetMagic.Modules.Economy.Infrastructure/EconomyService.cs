@@ -231,10 +231,39 @@ public sealed partial class EconomyService(
             return Result.Failure<WalletOperationResponse>(EconomyErrors.InvalidAmount);
         }
 
+        var normalizedReason = NormalizeCreditReason(command);
+        if (IsGenerationRefund(command.Source))
+        {
+            var existingRefund = await TryResolveExistingGenerationRefundCreditAsync(
+                command.UserId,
+                normalizedReason,
+                cancellationToken);
+            if (existingRefund is not null)
+            {
+                return Result.Success(existingRefund);
+            }
+        }
+
         var wallet = await GetOrCreateWalletAsync(command.UserId, cancellationToken);
         var now = DateTime.UtcNow;
-        var response = ApplyWalletDelta(wallet, command.Amount, command.Source, command.Reason, now);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        var response = ApplyWalletDelta(wallet, command.Amount, command.Source, normalizedReason, now);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException) when (IsGenerationRefund(command.Source))
+        {
+            var existing = await TryResolveExistingGenerationRefundCreditAsync(
+                command.UserId,
+                normalizedReason,
+                cancellationToken);
+            if (existing is not null)
+            {
+                return Result.Success(existing);
+            }
+
+            throw;
+        }
 
         return Result.Success(response);
     }
@@ -486,6 +515,52 @@ public sealed partial class EconomyService(
             existingSpend.CreatedAtUtc,
             wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
             Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
+    }
+
+    private async Task<WalletOperationResponse?> TryResolveExistingGenerationRefundCreditAsync(
+        Guid userId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        dbContext.ChangeTracker.Clear();
+
+        var existingCredit = await dbContext.WalletLedgerEntries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.UserId == userId
+                    && x.Source == WalletLedgerSource.GenerationRefund
+                    && x.Reason == reason
+                    && x.Delta > 0,
+                cancellationToken);
+        if (existingCredit is null)
+        {
+            return null;
+        }
+
+        var wallet = await dbContext.Wallets
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+
+        return new WalletOperationResponse(
+            userId,
+            0,
+            wallet?.Balance ?? existingCredit.BalanceAfter,
+            WalletLedgerSource.GenerationRefund,
+            existingCredit.CreatedAtUtc,
+            wallet?.LastWeeklyGrantAtUtc?.AddDays(7),
+            Math.Max(0, options.Value.AdRewardDailyLimit - (wallet?.AdRewardsClaimedInWindow ?? 0)));
+    }
+
+    private static bool IsGenerationRefund(string source)
+    {
+        return string.Equals(source, WalletLedgerSource.GenerationRefund, StringComparison.Ordinal);
+    }
+
+    private static string NormalizeCreditReason(CreditBalanceCommand command)
+    {
+        return string.IsNullOrWhiteSpace(command.IdempotencyKey)
+            ? command.Reason
+            : command.IdempotencyKey.Trim();
     }
 
     private async Task<IDbContextTransaction?> BeginWalletSerializableTransactionAsync(CancellationToken cancellationToken)

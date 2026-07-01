@@ -28,8 +28,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Suppress accepted known vulnerabilities: System.Security.Cryptography.Xml (dev only, preview release) -->
-    <NoWarn>$(NoWarn);NU1903</NoWarn>
   </PropertyGroup>
 
 </Project>

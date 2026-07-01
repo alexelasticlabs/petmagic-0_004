@@ -198,6 +198,72 @@ public sealed partial class IdentityServiceProfileTests
         Assert.Equal(IdentityErrors.AccountDeleted.Code, byEmail.Error.Code);
     }
 
+    [Fact]
+    public async Task GetLinkedAccountsAsync_ShouldNormalizeCanonicalProviders_AndIgnoreLegacyEmptyProviders()
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var userId = Guid.NewGuid();
+        identityDb.Users.Add(CreateActiveUser(userId, "linked@petmagic.app"));
+        identityDb.ExternalAuthProviders.AddRange(
+            new ExternalAuthProvider
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Provider = " google ",
+                ProviderUserId = "google-sub-1",
+                Email = "linked@petmagic.app",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-5),
+                LastUsedAt = DateTime.UtcNow.AddMinutes(-1)
+            },
+            new ExternalAuthProvider
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Provider = string.Empty,
+                ProviderUserId = "legacy-empty-provider",
+                Email = "linked@petmagic.app",
+                CreatedAt = DateTime.UtcNow.AddMinutes(-4),
+                LastUsedAt = DateTime.UtcNow.AddMinutes(-2)
+            });
+        await identityDb.SaveChangesAsync();
+
+        var result = await service.GetLinkedAccountsAsync(userId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var linkedAccount = Assert.Single(result.Value);
+        Assert.Equal("Google", linkedAccount.Provider);
+        Assert.Equal("Google", linkedAccount.DisplayName);
+        Assert.False(linkedAccount.CanDisconnect);
+    }
+
+    [Theory]
+    [InlineData(" Google ", "Google")]
+    [InlineData(" apple ", "Apple")]
+    public async Task LinkExternalLoginAsync_ShouldAcceptTrimmedCanonicalProviderNames(string rawProvider, string expectedProvider)
+    {
+        await using var identityDb = CreateIdentityDbContext();
+        await using var economyDb = CreateEconomyDbContext();
+        await using var templatesDb = CreateTemplatesDbContext();
+        var service = await CreateServiceAsync(identityDb, economyDb, templatesDb, new TrackingAvatarStorage());
+
+        var userId = Guid.NewGuid();
+        identityDb.Users.Add(CreateActiveUser(userId, "trimmed@petmagic.app"));
+        await identityDb.SaveChangesAsync();
+
+        var result = await service.LinkExternalLoginAsync(
+            userId,
+            new ExternalLoginCallbackCommand(rawProvider, $"{expectedProvider.ToLowerInvariant()}-subject", "trimmed@petmagic.app", null, true),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var provider = await identityDb.ExternalAuthProviders.SingleAsync();
+        Assert.Equal(expectedProvider, provider.Provider);
+    }
+
     private static AppUser CreateActiveUser(Guid userId, string email)
     {
         return new AppUser

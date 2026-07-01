@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Security.Claims;
-
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
@@ -18,7 +16,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static partial class AdminTemplateEndpoints
 {
 
-    private static async Task<Ok<AdminTemplateGenerationDashboardMetricsResponse>> GetGenerationDashboardMetricsAsync(
+    private static async Task<Results<Ok<AdminTemplateGenerationDashboardMetricsResponse>, ProblemHttpResult>> GetGenerationDashboardMetricsAsync(
 
         [FromServices] ITemplatesService service,
 
@@ -28,12 +26,20 @@ public static partial class AdminTemplateEndpoints
 
         var result = await service.GetAdminGenerationDashboardMetricsAsync(cancellationToken);
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
         return TypedResults.Ok(result.Value);
 
     }
 
 
-    private static async Task<Ok<AdminModerationQueuePageResponse>> GetModerationQueueAsync(
+    private static async Task<Results<Ok<AdminModerationQueuePageResponse>, ProblemHttpResult>> GetModerationQueueAsync(
 
         [FromQuery] string? status,
 
@@ -54,6 +60,15 @@ public static partial class AdminTemplateEndpoints
             new AdminModerationQueueQuery(status, search, skip, take),
 
             cancellationToken);
+
+
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
 
 
         return TypedResults.Ok(result.Value);
@@ -84,13 +99,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            var statusCode = string.Equals(result.Error.Code, "templates.not_found", StringComparison.Ordinal)
-
-                ? StatusCodes.Status404NotFound
-
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -138,12 +147,21 @@ public static partial class AdminTemplateEndpoints
             cancellationToken);
 
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
+
         return TypedResults.Ok(result.Value);
 
     }
 
 
-    private static async Task<Ok<AdminWatermarkSettingsResponse>> GetWatermarkSettingsAsync(
+    private static async Task<Results<Ok<AdminWatermarkSettingsResponse>, ProblemHttpResult>> GetWatermarkSettingsAsync(
 
         [FromServices] ITemplatesService service,
 
@@ -153,12 +171,20 @@ public static partial class AdminTemplateEndpoints
 
         var result = await service.GetAdminWatermarkSettingsAsync(cancellationToken);
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
         return TypedResults.Ok(result.Value);
 
     }
 
 
-    private static async Task<Ok<AdminWatermarkSettingsResponse>> UpdateWatermarkSettingsAsync(
+    private static async Task<Results<Ok<AdminWatermarkSettingsResponse>, ProblemHttpResult>> UpdateWatermarkSettingsAsync(
 
         [FromBody] WatermarkSettingsRequest request,
 
@@ -193,6 +219,15 @@ public static partial class AdminTemplateEndpoints
             cancellationToken);
 
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
+
         return TypedResults.Ok(result.Value);
 
     }
@@ -210,9 +245,19 @@ public static partial class AdminTemplateEndpoints
 
     {
 
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+
+        if (subjectError is not null)
+
+        {
+
+            return ToAdminTemplateProblem(subjectError);
+
+        }
+
         var result = await generationService.GrantAdminCleanDownloadAsync(
 
-            ResolveAdminUserId(context) ?? Guid.Empty,
+            adminUserId,
 
             generationId,
 
@@ -223,13 +268,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(
-
-                title: result.Error.Code,
-
-                detail: result.Error.Message,
-
-                statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -255,7 +294,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -281,7 +320,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -307,7 +346,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -337,7 +376,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -367,7 +406,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -393,7 +432,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -419,7 +458,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -457,7 +496,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -523,7 +562,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: storeResult.Error.Code, detail: storeResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(storeResult.Error);
 
         }
 
@@ -545,13 +584,7 @@ public static partial class AdminTemplateEndpoints
 
             await mediaStorage.DeleteAsync(stored.Url, CancellationToken.None);
 
-            return TypedResults.Problem(
-
-                title: result.Error.Code,
-
-                detail: result.Error.Message,
-
-                statusCode: ResolveGenerationFailureStatusCode(result.Error));
+            return ToAdminTemplateProblem(result.Error);
 
         }
 
@@ -577,7 +610,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToAdminTemplateProblem(result.Error);
 
         }
 

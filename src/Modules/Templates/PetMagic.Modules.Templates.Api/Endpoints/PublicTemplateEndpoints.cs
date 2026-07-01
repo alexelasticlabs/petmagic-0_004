@@ -108,10 +108,15 @@ public static class PublicTemplateEndpoints
                 premiumOnly),
             cancellationToken);
         SetPublicCatalogCacheHeaders(httpContext);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<PublicTemplatesCatalogVersionResponse>> GetCatalogVersionAsync(
+    private static async Task<Results<Ok<PublicTemplatesCatalogVersionResponse>, ProblemHttpResult>> GetCatalogVersionAsync(
         HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
@@ -119,6 +124,11 @@ public static class PublicTemplateEndpoints
         SetPublicCatalogCacheHeaders(httpContext);
 
         var result = await service.GetPublicCatalogVersionAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -131,15 +141,17 @@ public static class PublicTemplateEndpoints
     {
         if (!sinceVersion.HasValue || sinceVersion.Value < 0)
         {
-            return TypedResults.Problem(
-                title: "templates.invalid_since_version",
-                detail: "Query parameter sinceVersion must be a non-negative integer.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToPublicValidationProblem("templates.invalid_since_version");
         }
 
         SetPublicCatalogCacheHeaders(httpContext);
 
         var result = await service.GetPublicCatalogChangesAsync(sinceVersion.Value, ResolveLocalePreference(httpContext, locale), cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -194,13 +206,18 @@ public static class PublicTemplateEndpoints
         }
     }
 
-    private static async Task<Ok<IReadOnlyList<PublicTemplateCategoryResponse>>> ListCategoriesAsync(
+    private static async Task<Results<Ok<IReadOnlyList<PublicTemplateCategoryResponse>>, ProblemHttpResult>> ListCategoriesAsync(
         HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListPublicCategoriesAsync(cancellationToken);
         httpContext.Response.Headers.CacheControl = PublicCategoriesCacheControl;
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -219,18 +236,12 @@ public static class PublicTemplateEndpoints
     {
         if (!TryParseOptionalTemplateType(type, out var templateType))
         {
-            return TypedResults.Problem(
-                title: "templates.invalid_type",
-                detail: "Query parameter type must be Image, Video, or all.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToPublicValidationProblem("templates.invalid_type");
         }
 
         if (IsInvalidPublicFeedCursor(cursor))
         {
-            return TypedResults.Problem(
-                title: "templates.invalid_cursor",
-                detail: "Query parameter cursor must be the nextCursor value returned by a previous feed response.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToPublicValidationProblem("templates.invalid_cursor");
         }
 
         var result = await service.ListPublicFeedAsync(
@@ -246,10 +257,15 @@ public static class PublicTemplateEndpoints
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<PublicTemplateOfTheDayResponse>> GetTemplateOfTheDayAsync(
+    private static async Task<Results<Ok<PublicTemplateOfTheDayResponse>, ProblemHttpResult>> GetTemplateOfTheDayAsync(
         HttpContext httpContext,
         [FromQuery] DateOnly? date,
         [FromQuery] string? locale,
@@ -262,6 +278,11 @@ public static class PublicTemplateEndpoints
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -283,10 +304,7 @@ public static class PublicTemplateEndpoints
 
         if (!TryParseOptionalRandomAccess(access, out var normalizedAccess))
         {
-            return TypedResults.Problem(
-                title: "templates.invalid_access",
-                detail: "Query parameter access must be all, free, or premium.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToPublicValidationProblem("templates.invalid_access");
         }
 
         var result = await service.GetPublicRandomTemplateAsync(
@@ -300,6 +318,11 @@ public static class PublicTemplateEndpoints
             cancellationToken);
 
         SetPublicCatalogCacheHeaders(httpContext);
+        if (result.IsFailure)
+        {
+            return ToPublicCatalogProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -374,10 +397,7 @@ public static class PublicTemplateEndpoints
 
     private static ProblemHttpResult InvalidTemplateTypeProblem()
     {
-        return TypedResults.Problem(
-            title: "templates.invalid_type",
-            detail: "Query parameter type must be Image, Video, or all.",
-            statusCode: StatusCodes.Status400BadRequest);
+        return ToPublicValidationProblem("templates.invalid_type");
     }
 
     private static async Task<Results<Ok<PublicTemplateResponse>, ProblemHttpResult>> GetAsync(
@@ -391,7 +411,7 @@ public static class PublicTemplateEndpoints
         var result = await service.GetPublicAsync(templateId, ResolveLocalePreference(httpContext, locale), cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToPublicTemplateProblem(result.Error.Code, StatusCodes.Status404NotFound);
         }
 
         await service.RecordAnalyticsEventAsync(
@@ -418,10 +438,7 @@ public static class PublicTemplateEndpoints
     {
         if (!TryResolvePublicEventType(request.EventType, out var eventType))
         {
-            return TypedResults.Problem(
-                title: "templates.invalid_event_type",
-                detail: "Request field eventType must be a supported analytics event name.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToPublicValidationProblem("templates.invalid_event_type");
         }
 
         var result = await service.RecordAnalyticsEventAsync(
@@ -429,8 +446,8 @@ public static class PublicTemplateEndpoints
                 templateId,
                 eventType,
                 request.Source,
-                string.IsNullOrWhiteSpace(request.DeviceClass) ? DetectDeviceClass(httpContext) : request.DeviceClass,
-                string.IsNullOrWhiteSpace(request.CountryCode) ? ResolveCountryCode(httpContext) : request.CountryCode,
+                ResolveAnalyticsDeviceClass(request.DeviceClass, httpContext),
+                ResolveAnalyticsCountryCode(request.CountryCode, httpContext),
                 ResolveUserId(httpContext),
                 request.GenerationId,
                 request.FeedbackMessage,
@@ -439,10 +456,66 @@ public static class PublicTemplateEndpoints
 
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToPublicTemplateProblem(result.Error.Code, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.NoContent();
+    }
+
+    private static ProblemHttpResult ToPublicTemplateProblem(string errorCode, int statusCode)
+    {
+        return TypedResults.Problem(
+            title: errorCode,
+            detail: GetPublicTemplateProblemDetail(statusCode),
+            statusCode: statusCode);
+    }
+
+    private static ProblemHttpResult ToPublicValidationProblem(string errorCode)
+    {
+        return TypedResults.Problem(
+            title: errorCode,
+            detail: GetPublicValidationProblemDetail(errorCode),
+            statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static ProblemHttpResult ToPublicCatalogProblem(string errorCode)
+    {
+        var statusCode = errorCode switch
+        {
+            "templates.not_found" => StatusCodes.Status404NotFound,
+            "templates.category_not_found" => StatusCodes.Status404NotFound,
+            "templates.template_of_the_day_template_unavailable" => StatusCodes.Status404NotFound,
+            "templates.ai_provider_unavailable" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_timed_out" => StatusCodes.Status503ServiceUnavailable,
+            "templates.ai_provider_failed" => StatusCodes.Status503ServiceUnavailable,
+            _ => StatusCodes.Status503ServiceUnavailable,
+        };
+
+        var detail = statusCode == StatusCodes.Status404NotFound
+            ? "Template content was not found."
+            : "Template catalog is temporarily unavailable.";
+
+        return TypedResults.Problem(title: errorCode, detail: detail, statusCode: statusCode);
+    }
+
+    private static string GetPublicValidationProblemDetail(string errorCode)
+    {
+        return errorCode switch
+        {
+            "templates.invalid_since_version" => "Query parameter sinceVersion must be a non-negative integer.",
+            "templates.invalid_type" => "Query parameter type must be Image, Video, or all.",
+            "templates.invalid_cursor" => "Query parameter cursor must be the nextCursor value returned by a previous feed response.",
+            "templates.invalid_access" => "Query parameter access must be all, free, or premium.",
+            "templates.invalid_event_type" => "Request field eventType must be a supported analytics event name.",
+            _ => "Template request is invalid.",
+        };
+    }
+
+    private static string GetPublicTemplateProblemDetail(int statusCode)
+    {
+        return statusCode == StatusCodes.Status404NotFound
+            ? "Template was not found."
+            : "Template request could not be completed.";
     }
 
     private static bool TryResolvePublicEventType(string? eventType, out string normalizedEventType)
@@ -559,13 +632,81 @@ public static class PublicTemplateEndpoints
         return "web";
     }
 
+    private static string ResolveAnalyticsDeviceClass(string? requestedDeviceClass, HttpContext httpContext)
+    {
+        return NormalizeAnalyticsDeviceClass(requestedDeviceClass)
+            ?? DetectDeviceClass(httpContext);
+    }
+
+    private static string? NormalizeAnalyticsDeviceClass(string? requestedDeviceClass)
+    {
+        if (string.IsNullOrWhiteSpace(requestedDeviceClass))
+        {
+            return null;
+        }
+
+        var normalized = requestedDeviceClass.Trim().ToLowerInvariant();
+        if (normalized is "iphone" or "ipad" or "ios")
+        {
+            return "ios";
+        }
+
+        if (normalized.Contains("android", StringComparison.Ordinal))
+        {
+            return "android";
+        }
+
+        if (normalized is "web" or "browser" or "desktop")
+        {
+            return "web";
+        }
+
+        if (normalized.Contains("bot", StringComparison.Ordinal)
+            || normalized.Contains("crawler", StringComparison.Ordinal)
+            || normalized.Contains("spider", StringComparison.Ordinal))
+        {
+            return "bot";
+        }
+
+        if (normalized == "unknown")
+        {
+            return "unknown";
+        }
+
+        return null;
+    }
+
     private static string ResolveCountryCode(HttpContext httpContext)
     {
         var value = FirstHeaderValue(httpContext, "CF-IPCountry")
             ?? FirstHeaderValue(httpContext, "X-Vercel-IP-Country")
             ?? FirstHeaderValue(httpContext, "X-Country-Code");
 
-        return string.IsNullOrWhiteSpace(value) ? "unknown" : value;
+        return NormalizeAnalyticsCountryCode(value) ?? "unknown";
+    }
+
+    private static string ResolveAnalyticsCountryCode(string? requestedCountryCode, HttpContext httpContext)
+    {
+        return NormalizeAnalyticsCountryCode(requestedCountryCode)
+            ?? ResolveCountryCode(httpContext);
+    }
+
+    private static string? NormalizeAnalyticsCountryCode(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var normalized = value.Trim().ToUpperInvariant();
+        if (normalized == "UNKNOWN")
+        {
+            return "unknown";
+        }
+
+        return normalized.Length == 2 && normalized.All(char.IsLetterOrDigit)
+            ? normalized
+            : null;
     }
 
     private static string? FirstHeaderValue(HttpContext httpContext, string headerName)

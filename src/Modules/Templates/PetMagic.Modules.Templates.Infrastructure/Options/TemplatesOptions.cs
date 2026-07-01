@@ -38,17 +38,89 @@ public sealed class TemplatesOptions
 
     public int GenerationWorkerPollIntervalMilliseconds { get; init; } = 1_000;
 
+    public int RealtimePollingIntervalMilliseconds { get; init; } = 1_000;
+
+    public int RealtimeEventRetentionMinutes { get; init; } = 60;
+
+    public int RealtimeEventCleanupIntervalMinutes { get; init; } = 10;
+
+    public int RealtimeEventCleanupBatchSize { get; init; } = 1_000;
+
     public int MaxConcurrentJobsPerWorker { get; init; } = 1;
 
     public int GlobalMaxConcurrentGenerations { get; init; } = 3;
+
+    public int ImageReservedConcurrentGenerations { get; init; }
+
+    public int ImageMaxConcurrentGenerations { get; init; } = 2;
+
+    public int ImageProtectedConcurrentGenerations { get; init; }
+
+    public int VideoReservedConcurrentGenerations { get; init; }
+
+    public int VideoMaxConcurrentGenerations { get; init; } = 1;
+
+    public int VideoBorrowMaxConcurrentGenerations { get; init; }
+
+    public bool EnableElasticLaneBorrowing { get; init; }
+
+    public bool AllowVideoBorrowWhenImageQueueEmpty { get; init; } = true;
+
+    public int AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds { get; init; } = 120;
+
+    public string VideoBorrowReleaseMode { get; init; } = "natural_completion";
+
+    public int BorrowedVideoMaxAgeSeconds { get; init; }
+
+    public string BorrowingPriorityTiers { get; init; } = "premium,privileged,admin,free";
+
+    public int VideoPreprocessingMaxConcurrentGenerations { get; init; } = 1;
+
+    public int FalProviderConcurrencyLimit { get; init; }
+
+    public int FalProviderReservedConcurrency { get; init; } = 1;
+
+    public decimal FalProviderBalanceLowThresholdUsd { get; init; } = 100m;
+
+    public decimal FalProviderBalanceCriticalThresholdUsd { get; init; } = 25m;
+
+    public decimal FalProviderSpendDailyLimitUsd { get; init; }
 
     public int MaxAiProviderRequestsPerMinute { get; init; } = 60;
 
     public int QueueMaxSize { get; init; } = 1_000;
 
-    public int EstimatedVideoGenerationSeconds { get; init; } = 120;
+    public int EstimatedVideoGenerationSeconds { get; init; } = 420;
 
-    public int EstimatedImageGenerationSeconds { get; init; } = 60;
+    public int EstimatedImageGenerationSeconds { get; init; } = 90;
+
+    public int EstimatedVideoPreprocessingSeconds { get; init; } = 90;
+
+    public int FreeQueuePriorityScore { get; init; } = 1_000;
+
+    public int PremiumQueuePriorityScore { get; init; } = 4_000;
+
+    public int PrivilegedQueuePriorityScore { get; init; } = 8_000;
+
+    public int AdminQueuePriorityScore { get; init; } = 10_000;
+
+    public int QueuePriorityAgingIntervalSeconds { get; init; } = 60;
+
+    public int QueuePriorityAgingBoost { get; init; } = 500;
+
+    public bool CancelQueuedGenerationEnabled { get; init; } = true;
+
+    public int FreeImageMaxEstimatedWaitSeconds { get; init; } = 1_800;
+
+    public int PremiumImageMaxEstimatedWaitSeconds { get; init; } = 600;
+
+    public int PrivilegedImageMaxEstimatedWaitSeconds { get; init; } = 600;
+
+    public int FreeVideoMaxEstimatedWaitSeconds { get; init; } = 3_600;
+
+    public int PremiumVideoMaxEstimatedWaitSeconds { get; init; } = 1_800;
+
+    public int PrivilegedVideoMaxEstimatedWaitSeconds { get; init; } = 1_800;
 
     public int FreeUserMaxActiveGenerations { get; init; } = 1;
 
@@ -59,6 +131,8 @@ public sealed class TemplatesOptions
     public int JobLockTimeoutMilliseconds { get; init; } = 900_000;
 
     public int StaleProcessingRecoveryDelayMilliseconds { get; init; } = 900_000;
+
+    public int OrphanQueuedJobTimeoutMilliseconds { get; init; } = 120_000;
 
     public int MaxGenerationAttempts { get; init; } = 3;
 
@@ -145,11 +219,21 @@ public sealed class FalAiOptions
 
     public string QueueBaseUrl { get; init; } = "https://queue.fal.run";
 
+    public string WebhookUrl { get; init; } = string.Empty;
+
+    public string WebhookJwksUrl { get; init; } = "https://rest.fal.ai/.well-known/jwks.json";
+
     public int StartTimeoutSeconds { get; init; } = 120;
 
     public int PollIntervalMilliseconds { get; init; } = 2_000;
 
     public int MaxPollingAttempts { get; init; } = 180;
+
+    public int ImageMaxPollingAttempts { get; init; } = 180;
+
+    public int ImagePreprocessingMaxPollingAttempts { get; init; } = 180;
+
+    public int VideoMaxPollingAttempts { get; init; } = 300;
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(ApiKey);
 }

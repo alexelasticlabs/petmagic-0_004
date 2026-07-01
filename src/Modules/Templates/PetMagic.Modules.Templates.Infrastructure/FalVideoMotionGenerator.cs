@@ -5,7 +5,7 @@ using PetMagic.Modules.Templates.Application.Abstractions;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVideoMotionGenerator
+internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVideoMotionGenerator, IAsyncVideoMotionGenerationQueue
 {
     public async Task<Result<VideoMotionGenerationResult>> CreateAsync(
         string normalizedImageUrl,
@@ -17,6 +17,65 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
         int? seed,
         CancellationToken cancellationToken)
     {
+        var input = BuildInput(normalizedImageUrl, referenceVideoUrl, characterOrientation, keepOriginalSound, prompt, seed);
+
+        var result = await queueClient.RunAsync(
+            model,
+            input,
+            new FalQueueStageKind("video", FalQueueStages.VideoGeneration),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return Result.Failure<VideoMotionGenerationResult>(result.Error);
+        }
+
+        using var document = result.Value.Response;
+        return Complete(document.RootElement, result.Value.RequestId, result.Value.InferenceTimeSeconds);
+    }
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string normalizedImageUrl,
+        string referenceVideoUrl,
+        string characterOrientation,
+        bool keepOriginalSound,
+        string prompt,
+        string model,
+        int? seed,
+        CancellationToken cancellationToken)
+    {
+        var input = BuildInput(normalizedImageUrl, referenceVideoUrl, characterOrientation, keepOriginalSound, prompt, seed);
+        var result = await queueClient.SubmitAsync(
+            model,
+            input,
+            new FalQueueStageKind("video", FalQueueStages.VideoGeneration),
+            cancellationToken);
+        return result.IsFailure
+            ? Result.Failure<ProviderQueueSubmission>(result.Error)
+            : Result.Success(new ProviderQueueSubmission(
+                result.Value.RequestId,
+                result.Value.StatusUrl.ToString(),
+                result.Value.ResponseUrl.ToString()));
+    }
+
+    public Result<VideoMotionGenerationResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)
+    {
+        if (FalGenerationResponseParser.TryReadVideoUrl(response, out var videoUrl))
+        {
+            return Result.Success(new VideoMotionGenerationResult(videoUrl, requestId, inferenceTimeSeconds));
+        }
+
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, "video_generation");
+        return Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed);
+    }
+
+    private static Dictionary<string, object?> BuildInput(
+        string normalizedImageUrl,
+        string referenceVideoUrl,
+        string characterOrientation,
+        bool keepOriginalSound,
+        string prompt,
+        int? seed)
+    {
         var input = new Dictionary<string, object?>
         {
             ["prompt"] = prompt,
@@ -25,41 +84,12 @@ internal sealed class FalVideoMotionGenerator(FalQueueClient queueClient) : IVid
             ["character_orientation"] = characterOrientation.ToLowerInvariant(),
             ["keep_original_sound"] = keepOriginalSound
         };
+
         if (seed is not null)
         {
             input["seed"] = seed.Value;
         }
 
-        var result = await queueClient.RunAsync(model, input, cancellationToken);
-        if (result.IsFailure)
-        {
-            return Result.Failure<VideoMotionGenerationResult>(result.Error);
-        }
-
-        using var document = result.Value.Response;
-        if (TryReadVideoUrl(document.RootElement, out var videoUrl))
-        {
-            return Result.Success(new VideoMotionGenerationResult(videoUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
-        }
-
-        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
-        return Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed);
-    }
-
-    private static bool TryReadVideoUrl(JsonElement root, out string videoUrl)
-    {
-        videoUrl = string.Empty;
-        if (!root.TryGetProperty("video", out var video) || video.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        if (!video.TryGetProperty("url", out var url) || url.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        videoUrl = url.GetString() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(videoUrl);
+        return input;
     }
 }

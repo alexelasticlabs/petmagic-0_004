@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 
+using PetMagic.BuildingBlocks.Results;
+
 namespace PetMagic.Modules.Economy.Api.Endpoints;
 
 public static partial class AdminEconomyEndpoints
@@ -9,10 +11,9 @@ public static partial class AdminEconomyEndpoints
     {
         if (!IsAllowedOptionalFilter(status, PurchaseStatusFilters))
         {
-            return TypedResults.Problem(
-                title: "economy.purchase_status_invalid",
-                detail: "Query parameter status must be pending, succeeded, failed, or refunded.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyFilterProblem(
+                "economy.purchase_status_invalid",
+                "Query parameter status must be pending, succeeded, failed, or refunded.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -22,10 +23,9 @@ public static partial class AdminEconomyEndpoints
     {
         if (!IsAllowedOptionalFilter(status, SubscriptionStatusFilters))
         {
-            return TypedResults.Problem(
-                title: "economy.subscription_status_invalid",
-                detail: "Query parameter status is not supported for admin subscription filtering.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyFilterProblem(
+                "economy.subscription_status_invalid",
+                "Query parameter status is not supported for admin subscription filtering.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -35,10 +35,9 @@ public static partial class AdminEconomyEndpoints
     {
         if (!IsAllowedOptionalFilter(status, SubscriptionEventStatusFilters))
         {
-            return TypedResults.Problem(
-                title: "economy.subscription_event_status_invalid",
-                detail: "Query parameter status is not supported for admin subscription event filtering.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyFilterProblem(
+                "economy.subscription_event_status_invalid",
+                "Query parameter status is not supported for admin subscription event filtering.");
         }
 
         return ValidatePaymentProviderFilter(provider);
@@ -51,10 +50,14 @@ public static partial class AdminEconomyEndpoints
             return null;
         }
 
-        return TypedResults.Problem(
-            title: "economy.payment_provider_invalid",
-            detail: "Query parameter provider must be stripe, app_store, or google_play.",
-            statusCode: StatusCodes.Status400BadRequest);
+        return ToAdminEconomyFilterProblem(
+            "economy.payment_provider_invalid",
+            "Query parameter provider must be stripe, app_store, or google_play.");
+    }
+
+    private static ProblemHttpResult ToAdminEconomyFilterProblem(string errorCode, string detail)
+    {
+        return ToAdminEconomyProblem(new Error(errorCode, detail), StatusCodes.Status400BadRequest);
     }
 
     private static bool IsAllowedOptionalFilter(string? rawValue, string[] allowedValues)

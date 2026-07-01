@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
 using PetMagic.Modules.Identity.Application.Abstractions;
+using PetMagic.Modules.Identity.Infrastructure;
 using PetMagic.Modules.Identity.Infrastructure.Entities;
 
 namespace PetMagic.Host.Api.Security;
@@ -60,7 +61,7 @@ public sealed class LegalAcceptanceEnforcementMiddleware(
             return;
         }
 
-        var cacheKey = $"legal_acceptance:{userId}";
+        var cacheKey = LegalAcceptanceRequirementCache.BuildKey(userId);
         if (!cache.TryGetValue(cacheKey, out bool requiresAcceptance))
         {
             var user = await userManager.Users

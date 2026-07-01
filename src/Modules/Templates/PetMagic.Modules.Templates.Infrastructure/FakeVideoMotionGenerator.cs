@@ -15,6 +15,11 @@ internal sealed class FakeVideoMotionGenerator : IVideoMotionGenerator
         int? seed,
         CancellationToken cancellationToken)
     {
+        if (FakeAiFailure.IsRequested(normalizedImageUrl, referenceVideoUrl, prompt, model))
+        {
+            return Task.FromResult(Result.Failure<VideoMotionGenerationResult>(TemplatesErrors.AiProviderFailed));
+        }
+
         return Task.FromResult(Result.Success(new VideoMotionGenerationResult(referenceVideoUrl, null, null)));
     }
 }

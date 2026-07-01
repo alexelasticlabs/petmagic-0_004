@@ -19,7 +19,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static class PetEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Invalid access token subject.";
+    private const string InvalidSubjectMessage = "Authentication failed.";
     private const int FreeActiveGenerationLimit = 1;
     private const int PremiumActiveGenerationLimit = 3;
     private const int PrivilegedActiveGenerationLimit = 10;
@@ -71,12 +71,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.ListAsync(userId!.Value, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -95,12 +95,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.CreateAsync(new CreatePetCommand(userId!.Value, request.Name!, request.Type!, request.Breed), cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Created($"/api/pets/{result.Value.Id}", result.Value);
     }
 
@@ -120,12 +120,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.UpdateAsync(new UpdatePetCommand(userId!.Value, petId, request.Name!, request.Type!, request.Breed), cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -138,12 +138,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.DeleteAsync(userId!.Value, petId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.NoContent();
     }
 
@@ -163,7 +163,7 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var detectedContentType = (await TemplateUploadSniffer.DetectContentTypeAsync(photo!, cancellationToken))!;
@@ -176,7 +176,7 @@ public static class PetEndpoints
             cancellationToken);
 
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Created($"/api/pets/{petId}/photos/{result.Value.Id}", result.Value);
     }
 
@@ -189,12 +189,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.ListPhotosAsync(userId!.Value, petId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -208,12 +208,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.SetAvatarAsync(userId!.Value, petId, photoId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -228,14 +228,14 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.SetFavoriteAsync(
             new SetPetPhotoFavoriteCommand(userId!.Value, petId, photoId, request.IsFavorite),
             cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -249,12 +249,12 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var result = await petsService.DeletePhotoAsync(userId!.Value, petId, photoId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.NoContent();
     }
 
@@ -267,13 +267,13 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var isPremium = await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken);
         var result = await petsService.ListGenerationsAsync(userId.Value, petId, isPremium, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -294,24 +294,20 @@ public static class PetEndpoints
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToPetProblem(subjectError);
         }
 
         var templateLookup = await templatesService.GetAdminAsync(request.TemplateId, cancellationToken);
         if (templateLookup.IsFailure)
         {
-            return TypedResults.Problem(
-                title: templateLookup.Error.Code,
-                detail: templateLookup.Error.Message,
-                statusCode: ResolveFailureStatusCode(templateLookup.Error));
+            return ToPetProblem(templateLookup.Error);
         }
 
         if (templateLookup.Value.IsPremium && !await HasPremiumTemplateAccessAsync(context, userId!.Value, cancellationToken))
         {
-            return TypedResults.Problem(
-                title: "templates.premium_required",
-                detail: "Premium subscription is required for this template.",
-                statusCode: StatusCodes.Status403Forbidden);
+            return ToPetProblem(new Error(
+                "templates.premium_required",
+                "Premium subscription is required for this template."));
         }
 
         var activeGenerationLimit = await ResolveActiveGenerationLimitAsync(context, userId!.Value, cancellationToken);
@@ -322,11 +318,12 @@ public static class PetEndpoints
                 request.PetPhotoId,
                 request.TemplateId,
                 idempotencyKey,
-                activeGenerationLimit),
+                activeGenerationLimit,
+                await ResolveQueueTierAsync(context, userId.Value, cancellationToken)),
             cancellationToken);
 
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Accepted($"/api/templates/generations/{result.Value.GenerationId}", result.Value);
     }
 
@@ -337,7 +334,7 @@ public static class PetEndpoints
     {
         var result = await petsService.ListAdminUserPetsAsync(userId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -349,7 +346,7 @@ public static class PetEndpoints
     {
         var result = await petsService.ListAdminPetPhotosAsync(userId, petId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -361,7 +358,7 @@ public static class PetEndpoints
     {
         var result = await petsService.ListAdminPetGenerationsAsync(userId, petId, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -374,7 +371,7 @@ public static class PetEndpoints
     {
         var result = await petsService.ChangeAdminPetStatusAsync(userId, petId, request.Status, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -388,7 +385,7 @@ public static class PetEndpoints
     {
         var result = await petsService.ChangeAdminPhotoStatusAsync(userId, petId, photoId, request.Status, cancellationToken);
         return result.IsFailure
-            ? TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))
+            ? ToPetProblem(result.Error)
             : TypedResults.Ok(result.Value);
     }
 
@@ -481,12 +478,45 @@ public static class PetEndpoints
     {
         return error.Code switch
         {
+            "templates.invalid_subject" => StatusCodes.Status401Unauthorized,
             "templates.not_found" or "pets.not_found" or "pets.photo_not_found" => StatusCodes.Status404NotFound,
+            "templates.premium_required" => StatusCodes.Status403Forbidden,
             "pets.photo_required" => StatusCodes.Status409Conflict,
             "economy.insufficient_balance" => StatusCodes.Status402PaymentRequired,
             "ACTIVE_GENERATION_LIMIT_REACHED" => StatusCodes.Status429TooManyRequests,
             "GENERATION_QUEUE_OVERLOADED" => StatusCodes.Status503ServiceUnavailable,
+            "GENERATION_WAIT_TOO_LONG" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
+        };
+    }
+
+    private static ProblemHttpResult ToPetProblem(Error error)
+    {
+        return TypedResults.Problem(
+            title: error.Code,
+            detail: GetPetProblemDetail(error),
+            statusCode: ResolveFailureStatusCode(error));
+    }
+
+    private static string GetPetProblemDetail(Error error)
+    {
+        return error.Code switch
+        {
+            "templates.invalid_subject" => "Authentication failed.",
+            "templates.not_found" => "Template was not found.",
+            "templates.premium_required" => "Premium subscription is required for this template.",
+            "pets.not_found" => "Pet was not found.",
+            "pets.photo_not_found" => "Pet photo was not found.",
+            "pets.photo_required" => "A pet photo is required to complete this action.",
+            "economy.insufficient_balance" => "Not enough credits to complete this action.",
+            "ACTIVE_GENERATION_LIMIT_REACHED" => "Too many active generations are already running. Try again after one completes.",
+            "GENERATION_QUEUE_OVERLOADED" or "GENERATION_WAIT_TOO_LONG" => "Generation queue is busy. Please try again later.",
+            _ when ResolveFailureStatusCode(error) == StatusCodes.Status404NotFound => "Requested pet resource was not found.",
+            _ when ResolveFailureStatusCode(error) == StatusCodes.Status403Forbidden => "Pet action is not allowed for this account.",
+            _ when ResolveFailureStatusCode(error) == StatusCodes.Status409Conflict => "Pet request conflicts with the current resource state.",
+            _ when ResolveFailureStatusCode(error) == StatusCodes.Status429TooManyRequests => "Too many pet requests are already running. Please try again later.",
+            _ when ResolveFailureStatusCode(error) == StatusCodes.Status503ServiceUnavailable => "Pet generation is temporarily unavailable.",
+            _ => "Pet request could not be completed.",
         };
     }
 
@@ -529,6 +559,21 @@ public static class PetEndpoints
 
         var profile = await identityService.GetCurrentUserAsync(userId, cancellationToken);
         return profile.IsSuccess && profile.Value.IsPremium;
+    }
+
+    private static async Task<string> ResolveQueueTierAsync(
+        HttpContext context,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        if (context.User.IsInRole("Admin") || context.User.IsInRole("Moderator"))
+        {
+            return "privileged";
+        }
+
+        return await HasPremiumTemplateAccessAsync(context, userId, cancellationToken)
+            ? "premium"
+            : "free";
     }
 
     private static (Guid? UserId, Error? Error) TryGetSubject(HttpContext context)

@@ -160,15 +160,39 @@ public sealed partial class TemplatesServiceTests
         await dbContext.SaveChangesAsync();
     }
 
-    private static TemplateGenerationService CreateGenerationService(TemplatesDbContext dbContext, TemplatesOptions? options = null)
+    private static TemplateGenerationService CreateGenerationService(
+        TemplatesDbContext dbContext,
+        TemplatesOptions? options = null,
+        ITemplateGenerationBilling? billing = null,
+        ITemplateFeedRealtimeService? realtimeService = null,
+        ITemplateAiProviderHealthService? aiProviderHealthService = null)
     {
-        return new TemplateGenerationService(dbContext, new PassiveGenerationBilling(), new RecordingMediaStorage(), options ?? CreateTemplatesOptions());
+        return new TemplateGenerationService(
+            dbContext,
+            billing ?? new PassiveGenerationBilling(),
+            new RecordingMediaStorage(),
+            options ?? CreateTemplatesOptions(),
+            realtimeService: realtimeService,
+            aiProviderHealthService: aiProviderHealthService);
     }
 
     private static TemplatesOptions CreateTemplatesOptions(
         int queueMaxSize = 1_000,
         int globalMaxConcurrentGenerations = 3,
-        int estimatedImageGenerationSeconds = 60)
+        int imageMaxConcurrentGenerations = 2,
+        int imageProtectedConcurrentGenerations = 0,
+        int videoMaxConcurrentGenerations = 1,
+        int videoReservedConcurrentGenerations = 0,
+        int videoBorrowMaxConcurrentGenerations = 0,
+        bool enableElasticLaneBorrowing = false,
+        bool allowVideoBorrowWhenImageQueueEmpty = true,
+        int allowVideoBorrowWhenImageEstimatedWaitBelowSeconds = 120,
+        int estimatedImageGenerationSeconds = 90,
+        int estimatedVideoGenerationSeconds = 420,
+        int freeImageMaxEstimatedWaitSeconds = 1_800,
+        int premiumImageMaxEstimatedWaitSeconds = 600,
+        int freeVideoMaxEstimatedWaitSeconds = 3_600,
+        int premiumVideoMaxEstimatedWaitSeconds = 1_800)
     {
         return new TemplatesOptions
         {
@@ -192,7 +216,20 @@ public sealed partial class TemplatesServiceTests
             SupportedLocalizationLocales = ["ru", "de", "es", "fr", "it", "pl"],
             QueueMaxSize = queueMaxSize,
             GlobalMaxConcurrentGenerations = globalMaxConcurrentGenerations,
+            ImageMaxConcurrentGenerations = imageMaxConcurrentGenerations,
+            ImageProtectedConcurrentGenerations = imageProtectedConcurrentGenerations,
+            VideoMaxConcurrentGenerations = videoMaxConcurrentGenerations,
+            VideoReservedConcurrentGenerations = videoReservedConcurrentGenerations,
+            VideoBorrowMaxConcurrentGenerations = videoBorrowMaxConcurrentGenerations,
+            EnableElasticLaneBorrowing = enableElasticLaneBorrowing,
+            AllowVideoBorrowWhenImageQueueEmpty = allowVideoBorrowWhenImageQueueEmpty,
+            AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds = allowVideoBorrowWhenImageEstimatedWaitBelowSeconds,
             EstimatedImageGenerationSeconds = estimatedImageGenerationSeconds,
+            EstimatedVideoGenerationSeconds = estimatedVideoGenerationSeconds,
+            FreeImageMaxEstimatedWaitSeconds = freeImageMaxEstimatedWaitSeconds,
+            PremiumImageMaxEstimatedWaitSeconds = premiumImageMaxEstimatedWaitSeconds,
+            FreeVideoMaxEstimatedWaitSeconds = freeVideoMaxEstimatedWaitSeconds,
+            PremiumVideoMaxEstimatedWaitSeconds = premiumVideoMaxEstimatedWaitSeconds,
             SeedSampleTemplates = false
         };
     }
@@ -212,6 +249,7 @@ public sealed partial class TemplatesServiceTests
     private sealed class RecordingTemplateFeedRealtimeService : ITemplateFeedRealtimeService
     {
         public int InvalidatedCount { get; private set; }
+        public List<TemplateGenerationResponse> GenerationStatusEvents { get; } = [];
 
         public ChannelReader<TemplateFeedRealtimeEvent> Subscribe(CancellationToken cancellationToken = default)
         {
@@ -227,7 +265,22 @@ public sealed partial class TemplatesServiceTests
 
         public ValueTask PublishGenerationStatusChangedAsync(TemplateGenerationResponse generation, CancellationToken cancellationToken = default)
         {
+            GenerationStatusEvents.Add(generation);
             return ValueTask.CompletedTask;
+        }
+    }
+
+    private sealed class TestAiProviderHealthService(PetMagic.BuildingBlocks.Results.Result result) : ITemplateAiProviderHealthService
+    {
+        public int CheckCount { get; private set; }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> EnsureCanAcceptGenerationAsync(
+            string mediaType,
+            string tier,
+            CancellationToken cancellationToken)
+        {
+            CheckCount++;
+            return Task.FromResult(result);
         }
     }
 
@@ -362,6 +415,29 @@ public sealed partial class TemplatesServiceTests
 
         public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
         {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result<int>> SpendWatermarkUnlockAsync(Guid userId, Guid generationId, int creditCost, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success(0));
+        }
+    }
+
+    private sealed class RecordingGenerationBilling : ITemplateGenerationBilling
+    {
+        public List<Guid> ChargedGenerationIds { get; } = [];
+        public List<Guid> RefundedGenerationIds { get; } = [];
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            ChargedGenerationIds.Add(generationId);
+            return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
+        }
+
+        public Task<PetMagic.BuildingBlocks.Results.Result> RefundAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
+        {
+            RefundedGenerationIds.Add(generationId);
             return Task.FromResult(PetMagic.BuildingBlocks.Results.Result.Success());
         }
 

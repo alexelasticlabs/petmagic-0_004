@@ -84,8 +84,8 @@ internal sealed partial class TemplatesService
         if (!string.IsNullOrEmpty(provider))
         {
             generations = generations.Where(job =>
-                (job.UsedPreprocessingModel != null && job.UsedPreprocessingModel.ToLower().Contains(provider)) ||
-                (job.UsedKlingModel != null && job.UsedKlingModel.ToLower().Contains(provider)));
+                (job.UsedPreprocessingModel ?? string.Empty).ToLower().Contains(provider) ||
+                (job.UsedKlingModel ?? string.Empty).ToLower().Contains(provider));
         }
 
         if (!string.IsNullOrEmpty(user))
@@ -115,7 +115,7 @@ internal sealed partial class TemplatesService
                 job.Id,
                 job.UserId,
                 job.TemplateId,
-                job.Template.Title,
+                job.Template.Title ?? string.Empty,
                 job.Template.TemplateType.ToString(),
                 job.Status,
                 job.UsedKlingModel ?? job.UsedPreprocessingModel,
@@ -268,7 +268,7 @@ internal sealed partial class TemplatesService
             .Where(parent => parentIds.Contains(parent.Id))
             .Select(parent => new AdminGenerationParentInfoRow(
                 parent.Id,
-                parent.Template.Title,
+                parent.Template.Title ?? string.Empty,
                 parent.Template.TemplateType.ToString()))
             .ToDictionaryAsync(parent => parent.GenerationId, cancellationToken);
     }

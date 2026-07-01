@@ -60,7 +60,7 @@ public sealed partial class EconomyService
         return Result.Success(customer);
     }
 
-    private async Task SavePaymentMethodAsync(
+    private async Task<Result> SavePaymentMethodAsync(
         Guid userId,
         string provider,
         PaymentMethodDetailsResponse details,
@@ -72,6 +72,11 @@ public sealed partial class EconomyService
 
         if (existing is not null)
         {
+            if (existing.UserId != userId)
+            {
+                return Result.Failure(EconomyErrors.PaymentMethodOwnershipConflict);
+            }
+
             existing.UserId = userId;
             existing.Brand = details.Brand;
             existing.Last4 = details.Last4;
@@ -80,7 +85,7 @@ public sealed partial class EconomyService
             existing.IsActive = true;
             existing.UpdatedAtUtc = now;
             await dbContext.SaveChangesAsync(cancellationToken);
-            return;
+            return Result.Success();
         }
 
         var hasDefault = await dbContext.SavedPaymentMethods
@@ -103,6 +108,7 @@ public sealed partial class EconomyService
         });
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        return Result.Success();
     }
 
     private async Task<bool> ResolvePremiumStatusAsync(Guid userId, bool fallbackIsPremium, CancellationToken cancellationToken)

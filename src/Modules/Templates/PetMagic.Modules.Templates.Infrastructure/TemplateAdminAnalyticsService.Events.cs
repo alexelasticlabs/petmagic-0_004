@@ -117,7 +117,7 @@ internal sealed partial class TemplateAdminAnalyticsService
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            feedbackQuery = feedbackQuery.Where(x => x.FeedbackMessage != null && x.FeedbackMessage.ToLower().Contains(search));
+            feedbackQuery = feedbackQuery.Where(x => (x.FeedbackMessage ?? string.Empty).ToLower().Contains(search));
         }
 
         var items = await feedbackQuery
@@ -125,11 +125,11 @@ internal sealed partial class TemplateAdminAnalyticsService
             .Take(take)
             .Select(x => new AdminTemplateFeedbackItemResponse(
                 x.Id,
-                x.EventType,
+                x.EventType ?? string.Empty,
                 x.FeedbackMessage,
-                x.Source,
-                x.DeviceClass,
-                x.CountryCode,
+                x.Source ?? string.Empty,
+                x.DeviceClass ?? string.Empty,
+                x.CountryCode ?? string.Empty,
                 x.UserId,
                 x.GenerationId,
                 x.CreatedAtUtc))

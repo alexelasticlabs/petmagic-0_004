@@ -1,5 +1,7 @@
 using System.Security.Claims;
 
+using FluentValidation;
+
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -15,7 +17,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static class FeedbackEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Invalid access token subject.";
+    private const string InvalidSubjectMessage = "Authentication failed.";
 
     public static IEndpointRouteBuilder MapFeedbackEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -43,34 +45,40 @@ public static class FeedbackEndpoints
         return endpoints;
     }
 
-    private static async Task<Results<Ok<SubmitFeedbackResponse>, ProblemHttpResult>> SubmitFeedbackAsync(
+    private static async Task<Results<Ok<SubmitFeedbackResponse>, ValidationProblem, ProblemHttpResult>> SubmitFeedbackAsync(
         HttpContext context,
         [FromBody] SubmitFeedbackRequest request,
+        [FromServices] IValidator<SubmitFeedbackCommand> validator,
         [FromServices] IFeedbackService service,
         CancellationToken cancellationToken)
     {
         var (userId, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToProblem(subjectError);
         }
 
-        var result = await service.SubmitAsync(
-            new SubmitFeedbackCommand(
-                userId,
-                request.Type,
-                request.Category,
-                request.Rating,
-                request.Message,
-                request.GenerationId,
-                request.TemplateId,
-                request.PetId,
-                request.SourceScreen,
-                request.AppVersion,
-                request.Platform,
-                request.DeviceModel,
-                request.Locale),
-            cancellationToken);
+        var command = new SubmitFeedbackCommand(
+            userId,
+            request.Type,
+            request.Category,
+            request.Rating,
+            request.Message,
+            request.GenerationId,
+            request.TemplateId,
+            request.PetId,
+            request.SourceScreen,
+            request.AppVersion,
+            request.Platform,
+            request.DeviceModel,
+            request.Locale);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.SubmitAsync(command, cancellationToken);
 
         return result.IsFailure
             ? ToProblem(result.Error)
@@ -108,31 +116,62 @@ public static class FeedbackEndpoints
         return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<AdminFeedbackDetailsResponse>, ProblemHttpResult>> UpdateAdminFeedbackAsync(
+    private static async Task<Results<Ok<AdminFeedbackDetailsResponse>, ValidationProblem, ProblemHttpResult>> UpdateAdminFeedbackAsync(
         HttpContext context,
         Guid feedbackId,
         [FromBody] UpdateFeedbackAdminRequest request,
+        [FromServices] IValidator<UpdateFeedbackAdminCommand> validator,
         [FromServices] IFeedbackService service,
         CancellationToken cancellationToken)
     {
-        var adminUserId = ResolveAdminUserId(context);
-        var result = await service.UpdateAdminAsync(
-            new UpdateFeedbackAdminCommand(feedbackId, adminUserId, request.Status, request.Priority, request.AdminNote),
-            cancellationToken);
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToProblem(subjectError);
+        }
+
+        var command = new UpdateFeedbackAdminCommand(
+            feedbackId,
+            adminUserId,
+            request.Status,
+            request.Priority,
+            request.AdminNote);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.UpdateAdminAsync(command, cancellationToken);
         return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Results<Ok<CreditRefundResponse>, ProblemHttpResult>> RefundAdminFeedbackAsync(
+    private static async Task<Results<Ok<CreditRefundResponse>, ValidationProblem, ProblemHttpResult>> RefundAdminFeedbackAsync(
         HttpContext context,
         Guid feedbackId,
         [FromBody] RefundFeedbackCreditsRequest request,
+        [FromServices] IValidator<RefundFeedbackCreditsCommand> validator,
         [FromServices] IFeedbackService service,
         CancellationToken cancellationToken)
     {
-        var adminUserId = ResolveAdminUserId(context);
-        var result = await service.RefundCreditsAsync(
-            new RefundFeedbackCreditsCommand(feedbackId, adminUserId, request.Amount, request.Reason),
-            cancellationToken);
+        var (adminUserId, subjectError) = TryGetAdminUserId(context);
+        if (subjectError is not null)
+        {
+            return ToProblem(subjectError);
+        }
+
+        var command = new RefundFeedbackCreditsCommand(
+            feedbackId,
+            adminUserId,
+            request.Amount,
+            request.Reason);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await service.RefundCreditsAsync(command, cancellationToken);
         return result.IsFailure ? ToProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
@@ -155,25 +194,50 @@ public static class FeedbackEndpoints
             : (null, new Error(InvalidSubjectCode, InvalidSubjectMessage));
     }
 
-    private static Guid ResolveAdminUserId(HttpContext context)
+    private static (Guid UserId, Error? Error) TryGetAdminUserId(HttpContext context)
     {
         var subject = context.User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? context.User.FindFirstValue("sub");
-        return Guid.TryParse(subject, out var userId) ? userId : Guid.Empty;
+
+        return Guid.TryParse(subject, out var userId)
+            ? (userId, null)
+            : (Guid.Empty, new Error(InvalidSubjectCode, InvalidSubjectMessage));
     }
 
     private static ProblemHttpResult ToProblem(Error error)
     {
         var statusCode = error.Code switch
         {
+            "templates.invalid_subject" => StatusCodes.Status401Unauthorized,
             "GENERATION_JOB_NOT_FOUND" or "feedback.not_found" => StatusCodes.Status404NotFound,
             "feedback.forbidden" => StatusCodes.Status403Forbidden,
             "feedback.rate_limited" => StatusCodes.Status429TooManyRequests,
+            "feedback.refund_unavailable" => StatusCodes.Status409Conflict,
             "feedback.refund_already_issued" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
-        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+        return TypedResults.Problem(title: error.Code, detail: GetProblemDetail(error.Code, statusCode), statusCode: statusCode);
+    }
+
+    private static string GetProblemDetail(string errorCode, int statusCode)
+    {
+        return errorCode switch
+        {
+            "templates.invalid_subject" => "Authentication failed.",
+            "GENERATION_JOB_NOT_FOUND" => "Generation was not found.",
+            "feedback.not_found" => "Feedback entry was not found.",
+            "feedback.forbidden" => "Feedback action is not allowed for this user.",
+            "feedback.rate_limited" => "Feedback was submitted too frequently. Please try again later.",
+            "feedback.refund_unavailable" => "Feedback refund is not available.",
+            "feedback.refund_already_issued" => "Feedback refund has already been issued.",
+            "feedback.invalid_refund_amount" => "Feedback refund amount is invalid.",
+            _ when statusCode == StatusCodes.Status404NotFound => "Requested feedback resource was not found.",
+            _ when statusCode == StatusCodes.Status403Forbidden => "Feedback action is forbidden.",
+            _ when statusCode == StatusCodes.Status429TooManyRequests => "Too many feedback requests were sent. Please try again later.",
+            _ when statusCode == StatusCodes.Status409Conflict => "Feedback request conflicts with the current resource state.",
+            _ => "Feedback request could not be completed.",
+        };
     }
 
     private sealed record SubmitFeedbackRequest(

@@ -105,15 +105,12 @@ public static partial class AuthEndpoints
         return false;
     }
 
-    private static bool TryGetUserId(HttpContext context, out Guid userId, out ProblemHttpResult? problem)
+    internal static bool TryGetUserId(HttpContext context, out Guid userId, out ProblemHttpResult? problem)
     {
         var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(subject, out userId))
         {
-            problem = TypedResults.Problem(
-                title: InvalidSubjectCode,
-                detail: "Invalid access token subject.",
-                statusCode: StatusCodes.Status401Unauthorized);
+            problem = IdentityClientProblems.InvalidSubject();
             return false;
         }
 

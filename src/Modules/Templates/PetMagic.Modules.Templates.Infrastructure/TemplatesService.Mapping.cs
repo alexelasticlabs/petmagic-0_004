@@ -87,7 +87,12 @@ internal sealed partial class TemplatesService
         var asset = template.Assets.FirstOrDefault(x => x.AssetKind == assetKind);
         return asset is null
             ? null
-            : new TemplateAssetResponse(asset.Url, asset.FileName, asset.ContentType, asset.FileSizeBytes, asset.DurationSeconds);
+            : new TemplateAssetResponse(
+                asset.Url,
+                asset.FileName ?? string.Empty,
+                asset.ContentType ?? string.Empty,
+                asset.FileSizeBytes,
+                asset.DurationSeconds);
     }
 
     private static AdminTemplateListItemResponse MapAdminListItem(TemplateItem template)
@@ -111,9 +116,9 @@ internal sealed partial class TemplatesService
         return new AdminTemplateListItemResponse(
             template.Id,
             template.TemplateType.ToString(),
-            template.Title,
-            template.ShortDescription,
-            template.Category,
+            template.Title ?? string.Empty,
+            template.ShortDescription ?? string.Empty,
+            template.Category ?? string.Empty,
             template.Status.ToString(),
             template.PromoBadgeMode.ToString(),
             effectivePromoBadge,
@@ -132,7 +137,7 @@ internal sealed partial class TemplatesService
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength);
+            template.DefaultVariationStrength ?? "medium");
     }
 
     private static AdminTemplateResponse MapAdminResponse(TemplateItem template)
@@ -142,9 +147,9 @@ internal sealed partial class TemplatesService
         return new AdminTemplateResponse(
             template.Id,
             template.TemplateType.ToString(),
-            template.Title,
-            template.ShortDescription,
-            template.Category,
+            template.Title ?? string.Empty,
+            template.ShortDescription ?? string.Empty,
+            template.Category ?? string.Empty,
             template.Status.ToString(),
             template.PromoBadgeMode.ToString(),
             effectivePromoBadge,
@@ -176,7 +181,7 @@ internal sealed partial class TemplatesService
             template.RequiredInputMediaType?.ToString(),
             template.RecommendedAfterImageGeneration,
             template.SupportsGenerateSimilar,
-            template.DefaultVariationStrength);
+            template.DefaultVariationStrength ?? "medium");
     }
 
     private static PublicTemplateListItemResponse MapPublicListItem(TemplateItem template, string? locale)

@@ -108,12 +108,10 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
             eventId,
             token.Id,
             response.StatusCode,
-            ResolveFcmErrorReason(body),
+            FirebaseMessagingErrorClassifier.ResolveErrorReason(body),
             CorrelationContext.ResolveOrCreate());
 
-        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound
-            && (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase)
-                || body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase)))
+        if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, body))
         {
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
@@ -139,21 +137,6 @@ internal sealed class FcmTemplateGenerationPushNotificationSender(
         {
             return null;
         }
-    }
-
-    private static string ResolveFcmErrorReason(string body)
-    {
-        if (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase))
-        {
-            return "unregistered";
-        }
-
-        if (body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
-        {
-            return "invalid_argument";
-        }
-
-        return "fcm_send_failed";
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)

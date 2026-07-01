@@ -171,8 +171,14 @@ public sealed partial class StoreSubscriptionVerifier
                 return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
+            if (!HasExpectedAppStoreBundleId(root, options.Value.AppStoreBundleId))
+            {
+                return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
+            }
+
             DateTime? expiresAtUtc = null;
             string? externalSubscriptionId = null;
+            var matchedProduct = false;
 
             if (root.TryGetProperty("latest_receipt_info", out var receiptsElement)
                 && receiptsElement.ValueKind == JsonValueKind.Array)
@@ -185,6 +191,8 @@ public sealed partial class StoreSubscriptionVerifier
                     {
                         continue;
                     }
+
+                    matchedProduct = true;
 
                     if (item.TryGetProperty("original_transaction_id", out var transactionElement)
                         && transactionElement.ValueKind == JsonValueKind.String)
@@ -203,6 +211,11 @@ public sealed partial class StoreSubscriptionVerifier
                         }
                     }
                 }
+            }
+
+            if (!matchedProduct)
+            {
+                return (Result.Failure<StoreSubscriptionVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
 
             var isActive = expiresAtUtc.HasValue && expiresAtUtc.Value > DateTime.UtcNow;
@@ -267,6 +280,11 @@ public sealed partial class StoreSubscriptionVerifier
             }
 
             if (status != 0)
+            {
+                return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
+            }
+
+            if (!HasExpectedAppStoreBundleId(root, options.Value.AppStoreBundleId))
             {
                 return (Result.Failure<StoreProductVerificationResponse>(EconomyErrors.StorePurchaseInvalid), false);
             }
@@ -391,5 +409,19 @@ public sealed partial class StoreSubscriptionVerifier
         }
 
         return false;
+    }
+
+    private static bool HasExpectedAppStoreBundleId(JsonElement root, string expectedBundleId)
+    {
+        if (string.IsNullOrWhiteSpace(expectedBundleId))
+        {
+            return false;
+        }
+
+        return root.TryGetProperty("receipt", out var receiptElement)
+            && receiptElement.ValueKind == JsonValueKind.Object
+            && receiptElement.TryGetProperty("bundle_id", out var bundleIdElement)
+            && bundleIdElement.ValueKind == JsonValueKind.String
+            && string.Equals(bundleIdElement.GetString(), expectedBundleId, StringComparison.Ordinal);
     }
 }

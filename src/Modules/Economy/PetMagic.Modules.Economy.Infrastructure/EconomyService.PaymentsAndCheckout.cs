@@ -340,9 +340,9 @@ public sealed partial class EconomyService
             .ThenByDescending(x => x.UpdatedAtUtc)
             .Select(x => new PaymentMethodResponse(
                 x.Id,
-                x.Provider,
-                x.Brand,
-                x.Last4,
+                x.Provider ?? string.Empty,
+                x.Brand ?? string.Empty,
+                x.Last4 ?? string.Empty,
                 x.ExpMonth,
                 x.ExpYear,
                 x.IsDefault,

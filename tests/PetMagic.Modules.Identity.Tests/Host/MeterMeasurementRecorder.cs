@@ -33,6 +33,11 @@ internal sealed class MeterMeasurementRecorder : IDisposable
 
     public ConcurrentQueue<RecordedMeasurement> Measurements { get; } = [];
 
+    public void CollectObservableInstruments()
+    {
+        listener.RecordObservableInstruments();
+    }
+
     public void Dispose()
     {
         listener.Dispose();

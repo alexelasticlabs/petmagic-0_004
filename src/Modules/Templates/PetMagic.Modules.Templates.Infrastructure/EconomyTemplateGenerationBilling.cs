@@ -7,8 +7,6 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed class EconomyTemplateGenerationBilling(IEconomyService economyService) : ITemplateGenerationBilling
 {
-    private const string GenerationRefundSource = "generation_refund";
-
     public async Task<Result> ChargeAsync(Guid userId, Guid generationId, int tokenCost, CancellationToken cancellationToken)
     {
         if (tokenCost <= 0)
@@ -31,7 +29,12 @@ internal sealed class EconomyTemplateGenerationBilling(IEconomyService economySe
         }
 
         var result = await economyService.CreditAsync(
-            new CreditBalanceCommand(userId, tokenCost, GenerationRefundSource, CreateReason(generationId)),
+            new CreditBalanceCommand(
+                userId,
+                tokenCost,
+                WalletLedgerSource.GenerationRefund,
+                CreateRefundReason(generationId),
+                CreateRefundIdempotencyKey(generationId)),
             cancellationToken);
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
@@ -63,5 +66,15 @@ internal sealed class EconomyTemplateGenerationBilling(IEconomyService economySe
     private static string CreateReason(Guid generationId)
     {
         return $"template_generation:{generationId:N}";
+    }
+
+    private static string CreateRefundReason(Guid generationId)
+    {
+        return $"generation_refund:{generationId:N}";
+    }
+
+    private static string CreateRefundIdempotencyKey(Guid generationId)
+    {
+        return $"generation_refund:{generationId:N}";
     }
 }

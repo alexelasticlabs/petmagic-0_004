@@ -11,11 +11,16 @@ namespace PetMagic.Modules.Economy.Api.Endpoints;
 
 public static partial class AdminEconomyEndpoints
 {
-    private static async Task<Ok<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>> ListPaymentProviderConfigurationsAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminPaymentProviderConfigurationResponse>>, ProblemHttpResult>> ListPaymentProviderConfigurationsAsync(
         [FromServices] IEconomyAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminPaymentProviderConfigurationsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -53,10 +58,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.UpdatePaymentProviderConfigurationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.payment_provider_config_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -96,10 +98,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.CreatePaymentProviderConfigurationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.payment_provider_config_exists"
-                ? StatusCodes.Status409Conflict
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -125,13 +124,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.ClonePaymentProviderConfigurationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "economy.payment_provider_config_not_found" => StatusCodes.Status404NotFound,
-                "economy.payment_provider_config_exists" => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest
-            };
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -154,10 +147,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.DeletePaymentProviderConfigurationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.payment_provider_config_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -184,7 +174,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.TestPaymentProviderConfigurationMatchAsync(query, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);

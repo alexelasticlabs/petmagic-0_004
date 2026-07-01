@@ -177,7 +177,11 @@ internal sealed class IdentityAdminUserAnalyticsService(
             .Where(x => x.SubjectUserId == userId)
             .OrderByDescending(x => x.OccurredAtUtc)
             .Take(12)
-            .Select(x => new AdminUserAuditEventResponse(x.Id, x.Action, x.Details, x.OccurredAtUtc))
+            .Select(x => new AdminUserAuditEventResponse(
+                x.Id,
+                x.Action ?? string.Empty,
+                x.Details ?? string.Empty,
+                x.OccurredAtUtc))
             .ToListAsync(cancellationToken);
 
         var recentActivity = recentAuditEvents

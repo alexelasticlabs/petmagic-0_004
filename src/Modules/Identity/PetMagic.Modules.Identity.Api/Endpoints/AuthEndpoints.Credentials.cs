@@ -40,7 +40,7 @@ public static partial class AuthEndpoints
                 return TypedResults.Accepted((string?)null);
             }
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
@@ -62,11 +62,7 @@ public static partial class AuthEndpoints
         var result = await service.LoginAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, EmailNotConfirmedCode, StringComparison.Ordinal)
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status401Unauthorized;
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status401Unauthorized);
         }
 
         WriteRefreshTokenCookie(context, result.Value.RefreshToken);
@@ -88,7 +84,7 @@ public static partial class AuthEndpoints
         var result = await service.RequestEmailConfirmationAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
@@ -109,7 +105,7 @@ public static partial class AuthEndpoints
         var result = await service.ResendEmailVerificationCodeAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
@@ -130,7 +126,7 @@ public static partial class AuthEndpoints
         var result = await service.ConfirmEmailAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -152,7 +148,7 @@ public static partial class AuthEndpoints
         var result = await service.VerifyEmailCodeAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         WriteRefreshTokenCookie(context, result.Value.RefreshToken);
@@ -174,7 +170,7 @@ public static partial class AuthEndpoints
         var result = await service.RequestPasswordResetAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
@@ -195,7 +191,7 @@ public static partial class AuthEndpoints
         var result = await service.ConfirmPasswordResetAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -216,7 +212,7 @@ public static partial class AuthEndpoints
         var result = await service.VerifyPasswordResetCodeAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -237,7 +233,7 @@ public static partial class AuthEndpoints
         var result = await service.ResetPasswordAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -256,14 +252,7 @@ public static partial class AuthEndpoints
         var result = await service.RequestCurrentPasswordChangeCodeAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
@@ -295,16 +284,7 @@ public static partial class AuthEndpoints
         var result = await service.ConfirmCurrentPasswordChangeAsync(userId, resolvedCommand, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "auth.invalid_refresh", StringComparison.Ordinal)
-                ? StatusCodes.Status401Unauthorized
-                : string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                    ? StatusCodes.Status404NotFound
-                    : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -328,7 +308,7 @@ public static partial class AuthEndpoints
         var result = await service.RefreshAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status401Unauthorized);
         }
 
         WriteRefreshTokenCookie(context, result.Value.RefreshToken);
@@ -342,13 +322,9 @@ public static partial class AuthEndpoints
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(
-                title: InvalidSubjectCode,
-                detail: "Invalid access token subject.",
-                statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var resolvedRefreshToken = ResolveRefreshToken(context, request?.RefreshToken);
@@ -362,14 +338,7 @@ public static partial class AuthEndpoints
         var result = await service.LogoutAsync(logoutCommand, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, RefreshTokenOwnershipViolationCode, StringComparison.Ordinal)
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status401Unauthorized;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status401Unauthorized);
         }
 
         DeleteRefreshTokenCookie(context);

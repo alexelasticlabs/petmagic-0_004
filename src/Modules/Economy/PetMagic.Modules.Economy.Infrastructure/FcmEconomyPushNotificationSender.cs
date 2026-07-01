@@ -160,32 +160,15 @@ internal sealed class FcmEconomyPushNotificationSender(
             "FCM send failed for economy notification. TokenId={TokenId} StatusCode={StatusCode} ErrorReason={ErrorReason} CorrelationId={CorrelationId}",
             token.Id,
             response.StatusCode,
-            ResolveFcmErrorReason(responseBody),
+            FirebaseMessagingErrorClassifier.ResolveErrorReason(responseBody),
             CorrelationContext.ResolveOrCreate());
 
-        if (response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.NotFound
-            && (responseBody.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase)
-                || responseBody.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase)))
+        if (FirebaseMessagingErrorClassifier.ShouldDisableToken(response.StatusCode, responseBody))
         {
             token.DisabledAtUtc = DateTime.UtcNow;
             token.UpdatedAtUtc = token.DisabledAtUtc.Value;
             await dbContext.SaveChangesAsync(cancellationToken);
         }
-    }
-
-    private static string ResolveFcmErrorReason(string body)
-    {
-        if (body.Contains("UNREGISTERED", StringComparison.OrdinalIgnoreCase))
-        {
-            return "unregistered";
-        }
-
-        if (body.Contains("INVALID_ARGUMENT", StringComparison.OrdinalIgnoreCase))
-        {
-            return "invalid_argument";
-        }
-
-        return "fcm_send_failed";
     }
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)

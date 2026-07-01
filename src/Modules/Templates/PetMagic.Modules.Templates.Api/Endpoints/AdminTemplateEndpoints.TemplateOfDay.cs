@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Security.Claims;
-
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
@@ -18,47 +16,73 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static partial class AdminTemplateEndpoints
 {
 
-    private static async Task<Ok<AdminTemplateOfTheDayScheduleResponse>> ListTemplateOfTheDayScheduleAsync(
+    private static async Task<Results<Ok<AdminTemplateOfTheDayScheduleResponse>, ProblemHttpResult>> ListTemplateOfTheDayScheduleAsync(
         [FromQuery] int? skip,
         [FromQuery] int? take,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminTemplateOfTheDayScheduleAsync(skip, take, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminTemplateOfTheDayResponse?>> GetCurrentTemplateOfTheDayAsync(
+    private static async Task<Results<Ok<AdminTemplateOfTheDayResponse?>, ProblemHttpResult>> GetCurrentTemplateOfTheDayAsync(
         [FromQuery] DateOnly? date,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminCurrentTemplateOfTheDayAsync(date, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
         AdminTemplateOfTheDayResponse? value = result.Value;
         return TypedResults.Ok<AdminTemplateOfTheDayResponse?>(value);
     }
 
-    private static async Task<Ok<AdminTemplateOfTheDaySettingsResponse>> GetTemplateOfTheDaySettingsAsync(
+    private static async Task<Results<Ok<AdminTemplateOfTheDaySettingsResponse>, ProblemHttpResult>> GetTemplateOfTheDaySettingsAsync(
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminTemplateOfTheDaySettingsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminTemplateOfTheDaySettingsResponse>> UpdateTemplateOfTheDaySettingsAsync(
+    private static async Task<Results<Ok<AdminTemplateOfTheDaySettingsResponse>, ProblemHttpResult>> UpdateTemplateOfTheDaySettingsAsync(
         [FromBody] TemplateOfTheDaySettingsRequest request,
         HttpContext httpContext,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
         var result = await service.UpdateAdminTemplateOfTheDaySettingsAsync(
             new UpdateTemplateOfTheDaySettingsCommand(
                 request.AutoModeEnabled,
                 request.AllowedTypes,
                 request.ExcludeRecentDays,
-                ResolveAdminUserId(httpContext)),
+                adminUserId),
             cancellationToken);
+
+        if (result.IsFailure)
+        {
+            return ToAdminTemplateProblem(result.Error);
+        }
 
         return TypedResults.Ok(result.Value);
     }
@@ -69,6 +93,12 @@ public static partial class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
         var result = await service.CreateTemplateOfTheDayAsync(
             new CreateTemplateOfTheDayCommand(
                 request.TemplateId,
@@ -80,10 +110,10 @@ public static partial class AdminTemplateEndpoints
                 request.TitleOverride,
                 request.SubtitleOverride,
                 request.BadgeTextOverride,
-                ResolveAdminUserId(httpContext)),
+                adminUserId),
             cancellationToken);
 
-        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
+        return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> UpdateTemplateOfTheDayAsync(
@@ -106,7 +136,7 @@ public static partial class AdminTemplateEndpoints
                 request.BadgeTextOverride),
             cancellationToken);
 
-        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
+        return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<NoContent, ProblemHttpResult>> DeleteTemplateOfTheDayAsync(
@@ -115,7 +145,7 @@ public static partial class AdminTemplateEndpoints
         CancellationToken cancellationToken)
     {
         var result = await service.DeleteTemplateOfTheDayAsync(id, cancellationToken);
-        return result.IsFailure ? ToTemplateOfTheDayDeleteProblem(result.Error) : TypedResults.NoContent();
+        return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.NoContent();
     }
 
     private static async Task<Results<Ok<AdminTemplateOfTheDayResponse>, ProblemHttpResult>> AutoPickTemplateOfTheDayAsync(
@@ -124,46 +154,22 @@ public static partial class AdminTemplateEndpoints
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
+        var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);
+        if (subjectError is not null)
+        {
+            return ToAdminTemplateProblem(subjectError);
+        }
+
         var result = await service.AutoPickTemplateOfTheDayAsync(
             new AutoPickTemplateOfTheDayCommand(
                 request.Date,
                 request.AllowedTypes,
                 request.ExcludeRecentDays,
-                ResolveAdminUserId(httpContext),
+                adminUserId,
                 Force: true),
             cancellationToken);
 
-        return result.IsFailure ? ToTemplateOfTheDayProblem(result.Error) : TypedResults.Ok(result.Value);
-    }
-
-    private static Guid? ResolveAdminUserId(HttpContext httpContext)
-    {
-        var raw = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? httpContext.User.FindFirstValue("sub");
-
-        return Guid.TryParse(raw, out var userId) ? userId : null;
-    }
-
-    private static ProblemHttpResult ToTemplateOfTheDayProblem(PetMagic.BuildingBlocks.Results.Error error)
-    {
-        var statusCode = error.Code switch
-        {
-            "templates.not_found" => StatusCodes.Status404NotFound,
-            "templates.template_of_the_day_template_unavailable" => StatusCodes.Status404NotFound,
-            "templates.template_of_the_day_date_occupied" => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status400BadRequest
-        };
-
-        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
-    }
-
-    private static ProblemHttpResult ToTemplateOfTheDayDeleteProblem(PetMagic.BuildingBlocks.Results.Error error)
-    {
-        var statusCode = string.Equals(error.Code, "templates.not_found", StringComparison.Ordinal)
-            ? StatusCodes.Status404NotFound
-            : StatusCodes.Status400BadRequest;
-
-        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+        return result.IsFailure ? ToAdminTemplateProblem(result.Error) : TypedResults.Ok(result.Value);
     }
 
     public sealed record TemplateOfTheDayRequest(

@@ -36,7 +36,7 @@ internal sealed partial class TemplatesService
         if (!string.IsNullOrEmpty(search))
         {
             events = events.Where(analyticsEvent =>
-                analyticsEvent.Template.Title.ToLower().Contains(search) ||
+                (analyticsEvent.Template.Title ?? string.Empty).ToLower().Contains(search) ||
                 (analyticsEvent.FeedbackMessage != null && analyticsEvent.FeedbackMessage.ToLower().Contains(search)) ||
                 (analyticsEvent.UserId != null && analyticsEvent.UserId.ToString()!.ToLower().Contains(search)) ||
                 (analyticsEvent.GenerationId != null && analyticsEvent.GenerationId.ToString()!.ToLower().Contains(search)));
@@ -123,14 +123,14 @@ internal sealed partial class TemplatesService
         return new AdminModerationQueueItemResponse(
             analyticsEvent.Id,
             analyticsEvent.TemplateId,
-            analyticsEvent.Template.Title,
+            analyticsEvent.Template.Title ?? string.Empty,
             analyticsEvent.Template.TemplateType.ToString(),
-            analyticsEvent.EventType,
-            analyticsEvent.ModerationStatus,
+            analyticsEvent.EventType ?? string.Empty,
+            analyticsEvent.ModerationStatus ?? string.Empty,
             analyticsEvent.FeedbackMessage,
-            analyticsEvent.Source,
-            analyticsEvent.DeviceClass,
-            analyticsEvent.CountryCode,
+            analyticsEvent.Source ?? string.Empty,
+            analyticsEvent.DeviceClass ?? string.Empty,
+            analyticsEvent.CountryCode ?? string.Empty,
             analyticsEvent.UserId,
             analyticsEvent.GenerationId,
             analyticsEvent.ModerationComment,

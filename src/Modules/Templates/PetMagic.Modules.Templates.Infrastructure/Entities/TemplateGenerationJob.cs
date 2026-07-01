@@ -40,6 +40,10 @@ public sealed class TemplateGenerationJob
 
     public int TokenCost { get; set; }
 
+    public string QueueMediaType { get; set; } = TemplateGenerationQueue.MediaTypeImage;
+
+    public string QueueTier { get; set; } = TemplateGenerationQueue.TierFree;
+
     public string SourceImageUrl { get; set; } = string.Empty;
 
     public string SourceImageFileName { get; set; } = string.Empty;
@@ -84,6 +88,20 @@ public sealed class TemplateGenerationJob
 
     public double? MotionInferenceTimeSeconds { get; set; }
 
+    public string? CurrentProviderStage { get; set; }
+
+    public string? ProviderStatus { get; set; }
+
+    public string? PreprocessingProviderStatusUrl { get; set; }
+
+    public string? PreprocessingProviderResponseUrl { get; set; }
+
+    public string? MotionProviderStatusUrl { get; set; }
+
+    public string? MotionProviderResponseUrl { get; set; }
+
+    public string? ProviderResultUrl { get; set; }
+
     public double? OutputVideoDurationSeconds { get; set; }
 
     public decimal? MotionProviderCostUsd { get; set; }
@@ -94,6 +112,16 @@ public sealed class TemplateGenerationJob
 
     public DateTime? MediaImportCompletedAtUtc { get; set; }
 
+    public DateTime? ProviderSubmittedAtUtc { get; set; }
+
+    public DateTime? ProviderStatusCheckedAtUtc { get; set; }
+
+    public DateTime? ProviderCompletedAtUtc { get; set; }
+
+    public DateTime? WebhookReceivedAtUtc { get; set; }
+
+    public DateTime? ImportStartedAtUtc { get; set; }
+
     public int AttemptCount { get; set; }
 
     public string? LastErrorCode { get; set; }
@@ -103,6 +131,10 @@ public sealed class TemplateGenerationJob
     public DateTime CreatedAtUtc { get; set; }
 
     public DateTime QueuedAtUtc { get; set; }
+
+    public int? EstimatedWaitSecondsAtQueue { get; set; }
+
+    public DateTime? EstimatedCompletionAtQueueUtc { get; set; }
 
     public DateTime UpdatedAtUtc { get; set; }
 
@@ -121,6 +153,8 @@ public sealed class TemplateGenerationJob
     public DateTime? StartedAtUtc { get; set; }
 
     public DateTime? CompletedAtUtc { get; set; }
+
+    public DateTime? CancelledAtUtc { get; set; }
 
     public DateTime? ResultViewedAtUtc { get; set; }
 

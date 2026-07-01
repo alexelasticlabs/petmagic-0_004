@@ -25,6 +25,8 @@ public static class SupportChatApiModule
         services.AddScoped<IValidator<CloseSupportConversationCommand>, CloseSupportConversationCommandValidator>();
         services.AddScoped<IValidator<ReopenSupportConversationCommand>, ReopenSupportConversationCommandValidator>();
         services.AddScoped<IValidator<SubmitSupportConversationFeedbackCommand>, SubmitSupportConversationFeedbackCommandValidator>();
+        services.AddScoped<IValidator<RegisterSupportPushTokenCommand>, RegisterSupportPushTokenCommandValidator>();
+        services.AddScoped<IValidator<UnregisterSupportPushTokenCommand>, UnregisterSupportPushTokenCommandValidator>();
         services.AddScoped<IValidator<UpdateSupportConversationStatusCommand>, UpdateSupportConversationStatusCommandValidator>();
         services.AddScoped<IValidator<AssignSupportConversationCommand>, AssignSupportConversationCommandValidator>();
         services.AddScoped<IValidator<UpdateSupportConversationMetadataCommand>, UpdateSupportConversationMetadataCommandValidator>();

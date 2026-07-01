@@ -33,6 +33,12 @@ public sealed partial class IdentityService
             : await userManager.FindByIdAsync(providerAccount.UserId.ToString());
         var isNewUser = false;
 
+        if (providerAccount is not null && user is null)
+        {
+            LogSocialAuthWarning("social_login_failed", provider, null, "deleted_account");
+            return Result.Failure<TokenPairResponse>(IdentityErrors.AccountDeleted);
+        }
+
         if (user is null)
         {
             var normalizedEmail = NormalizeEmail(command.Email);

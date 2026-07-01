@@ -6,7 +6,12 @@ public sealed record ClaimAdRewardCommand(Guid UserId);
 
 public sealed record SpendBalanceCommand(Guid UserId, int Amount, string Reason, string? Source = null);
 
-public sealed record CreditBalanceCommand(Guid UserId, int Amount, string Source, string Reason);
+public sealed record CreditBalanceCommand(
+    Guid UserId,
+    int Amount,
+    string Source,
+    string Reason,
+    string? IdempotencyKey = null);
 
 public sealed record CreatePackPurchaseCommand(
     Guid UserId,

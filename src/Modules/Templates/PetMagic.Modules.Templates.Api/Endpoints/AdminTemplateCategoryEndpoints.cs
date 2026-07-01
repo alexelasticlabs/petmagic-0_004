@@ -33,12 +33,17 @@ public static class AdminTemplateCategoryEndpoints
         return endpoints;
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>> ListAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>, ProblemHttpResult>> ListAsync(
         [FromQuery] bool includeArchived,
         [FromServices] ITemplatesService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminCategoriesAsync(includeArchived, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToCategoryProblem(result.Error.Code);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -57,7 +62,7 @@ public static class AdminTemplateCategoryEndpoints
         var result = await service.CreateCategoryAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveCategoryFailureStatusCode(result.Error.Code));
+            return ToCategoryProblem(result.Error.Code);
         }
 
         return TypedResults.Ok(result.Value);
@@ -80,7 +85,7 @@ public static class AdminTemplateCategoryEndpoints
         var result = await service.UpdateCategoryAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveCategoryFailureStatusCode(result.Error.Code));
+            return ToCategoryProblem(result.Error.Code);
         }
 
         return TypedResults.Ok(result.Value);
@@ -103,7 +108,7 @@ public static class AdminTemplateCategoryEndpoints
         var result = await service.ChangeCategoryArchiveStateAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveCategoryFailureStatusCode(result.Error.Code));
+            return ToCategoryProblem(result.Error.Code);
         }
 
         return TypedResults.Ok(result.Value);
@@ -117,7 +122,7 @@ public static class AdminTemplateCategoryEndpoints
         var result = await service.DeleteCategoryAsync(categoryId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveCategoryFailureStatusCode(result.Error.Code));
+            return ToCategoryProblem(result.Error.Code);
         }
 
         return TypedResults.NoContent();
@@ -132,6 +137,26 @@ public static class AdminTemplateCategoryEndpoints
             "templates.category_archived" => StatusCodes.Status409Conflict,
             "templates.category_has_templates" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
+        };
+    }
+
+    private static ProblemHttpResult ToCategoryProblem(string errorCode)
+    {
+        return TypedResults.Problem(
+            title: errorCode,
+            detail: GetCategoryProblemDetail(errorCode),
+            statusCode: ResolveCategoryFailureStatusCode(errorCode));
+    }
+
+    private static string GetCategoryProblemDetail(string errorCode)
+    {
+        return errorCode switch
+        {
+            "templates.category_not_found" => "Template category was not found.",
+            "templates.category_already_exists" => "Template category already exists.",
+            "templates.category_archived" => "Template category is archived.",
+            "templates.category_has_templates" => "Template category cannot be deleted while templates still reference it.",
+            _ => "Template category request could not be completed.",
         };
     }
 

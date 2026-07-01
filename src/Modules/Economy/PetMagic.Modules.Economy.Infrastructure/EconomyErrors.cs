@@ -52,6 +52,8 @@ public static class EconomyErrors
 
     public static readonly Error PaymentMethodNotFound = new("economy.payment_method_not_found", "Payment method was not found.");
     public static readonly Error PaymentMethodProviderInvalid = new("economy.payment_method_provider_invalid", "Saved payment methods are only supported for Stripe purchases.");
+    public static readonly Error PaymentMethodOwnershipConflict = new("economy.payment_method_ownership_conflict", "Payment method is already linked to a different user.");
+    public static readonly Error SubscriptionOwnershipConflict = new("economy.subscription_ownership_conflict", "Subscription is already linked to a different user.");
 
     public static readonly Error RedeemCodeNotFound = new("economy.redeem_code_not_found", "Redeem code was not found.");
 

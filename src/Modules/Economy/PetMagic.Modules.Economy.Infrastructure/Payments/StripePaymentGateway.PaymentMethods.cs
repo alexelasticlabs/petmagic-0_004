@@ -87,6 +87,15 @@ public sealed partial class StripePaymentGateway
         try
         {
             var setupIntent = await new SetupIntentService(stripeClient).GetAsync(request.ExternalSetupId, cancellationToken: cancellationToken);
+            if (!IsSucceededSetupIntentStatus(setupIntent.Status))
+            {
+                LogGatewayWarning(
+                    "Stripe gateway operation returned non-success status.",
+                    "resolve_setup_intent_payment_method",
+                    externalSetupId: request.ExternalSetupId);
+                return Result.Failure<PaymentMethodDetailsResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+
             var paymentMethodId = setupIntent.PaymentMethodId;
             if (string.IsNullOrWhiteSpace(paymentMethodId))
             {

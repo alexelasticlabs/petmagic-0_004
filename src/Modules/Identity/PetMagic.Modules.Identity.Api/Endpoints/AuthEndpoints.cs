@@ -34,7 +34,6 @@ public static partial class AuthEndpoints
     private const string ExternalFlowModeLink = "link";
     private const string ExternalTicketInvalidMessage = "External sign-in session is invalid or expired.";
     private const string ExternalCancelledMessage = "External sign-in was cancelled.";
-    private const string UnsupportedRedirectUriMessage = "Unsupported redirect URI.";
     private const string MobileRedirectScheme = "petmagic";
     private const string MobileRedirectHost = "auth";
     private const string MobileRedirectPath = "/external";

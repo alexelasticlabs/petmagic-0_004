@@ -5,7 +5,7 @@ using PetMagic.Modules.Templates.Application.Abstractions;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImagePreprocessor
+internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImagePreprocessor, IAsyncImagePreprocessingQueue
 {
     public async Task<Result<ImagePreprocessResult>> NormalizeAsync(string originalImageUrl, string model, string prompt, CancellationToken cancellationToken)
     {
@@ -17,37 +17,59 @@ internal sealed class FalImagePreprocessor(FalQueueClient queueClient) : IImageP
             output_format = "png"
         };
 
-        var result = await queueClient.RunAsync(model, input, cancellationToken);
+        var result = await queueClient.RunAsync(
+            model,
+            input,
+            new FalQueueStageKind("image", FalQueueStages.ImagePreprocessing),
+            cancellationToken);
         if (result.IsFailure)
         {
             return Result.Failure<ImagePreprocessResult>(result.Error);
         }
 
         using var document = result.Value.Response;
-        if (TryReadFirstImageUrl(document.RootElement, out var imageUrl))
+        return Complete(document.RootElement, result.Value.RequestId, result.Value.InferenceTimeSeconds);
+    }
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string originalImageUrl,
+        string model,
+        string prompt,
+        CancellationToken cancellationToken)
+    {
+        var input = BuildInput(originalImageUrl, prompt);
+        var result = await queueClient.SubmitAsync(
+            model,
+            input,
+            new FalQueueStageKind("image", FalQueueStages.ImagePreprocessing),
+            cancellationToken);
+        return result.IsFailure
+            ? Result.Failure<ProviderQueueSubmission>(result.Error)
+            : Result.Success(new ProviderQueueSubmission(
+                result.Value.RequestId,
+                result.Value.StatusUrl.ToString(),
+                result.Value.ResponseUrl.ToString()));
+    }
+
+    public Result<ImagePreprocessResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)
+    {
+        if (FalGenerationResponseParser.TryReadFirstImageUrl(response, out var imageUrl))
         {
-            return Result.Success(new ImagePreprocessResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
+            return Result.Success(new ImagePreprocessResult(imageUrl, requestId, inferenceTimeSeconds));
         }
 
-        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, "image_preprocessing");
         return Result.Failure<ImagePreprocessResult>(TemplatesErrors.AiProviderFailed);
     }
 
-    private static bool TryReadFirstImageUrl(JsonElement root, out string imageUrl)
+    private static object BuildInput(string originalImageUrl, string prompt)
     {
-        imageUrl = string.Empty;
-        if (!root.TryGetProperty("images", out var images) || images.ValueKind != JsonValueKind.Array || images.GetArrayLength() == 0)
+        return new
         {
-            return false;
-        }
-
-        var first = images[0];
-        if (!first.TryGetProperty("url", out var url) || url.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        imageUrl = url.GetString() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(imageUrl);
+            prompt,
+            image_urls = new[] { originalImageUrl },
+            num_images = 1,
+            output_format = "png"
+        };
     }
 }

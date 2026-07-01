@@ -156,9 +156,10 @@ public static partial class SupportChatEndpoints
         return TypedResults.Ok(SignAttachmentUrls(result.Value, attachmentReadUrlSigner));
     }
 
-    private static async Task<Results<NoContent, ProblemHttpResult>> RegisterPushTokenAsync(
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> RegisterPushTokenAsync(
         HttpContext httpContext,
         [FromBody] RegisterPushTokenRequest request,
+        [FromServices] IValidator<RegisterSupportPushTokenCommand> validator,
         [FromServices] ISupportPushTokenService pushTokenService,
         CancellationToken cancellationToken)
     {
@@ -167,15 +168,20 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var result = await pushTokenService.RegisterAsync(
-            new RegisterSupportPushTokenCommand(
-                userId,
-                request.Token,
-                request.Platform,
-                request.DeviceId,
-                request.AppVersion,
-                request.Locale),
-            cancellationToken);
+        var command = new RegisterSupportPushTokenCommand(
+            userId,
+            request.Token,
+            request.Platform,
+            request.DeviceId,
+            request.AppVersion,
+            request.Locale);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await pushTokenService.RegisterAsync(command, cancellationToken);
 
         if (result.IsFailure)
         {
@@ -185,9 +191,10 @@ public static partial class SupportChatEndpoints
         return TypedResults.NoContent();
     }
 
-    private static async Task<Results<NoContent, ProblemHttpResult>> UnregisterPushTokenAsync(
+    private static async Task<Results<NoContent, ValidationProblem, ProblemHttpResult>> UnregisterPushTokenAsync(
         HttpContext httpContext,
         [FromBody] UnregisterPushTokenRequest request,
+        [FromServices] IValidator<UnregisterSupportPushTokenCommand> validator,
         [FromServices] ISupportPushTokenService pushTokenService,
         CancellationToken cancellationToken)
     {
@@ -196,9 +203,14 @@ public static partial class SupportChatEndpoints
             return unauthorized!;
         }
 
-        var result = await pushTokenService.UnregisterAsync(
-            new UnregisterSupportPushTokenCommand(userId, request.Token),
-            cancellationToken);
+        var command = new UnregisterSupportPushTokenCommand(userId, request.Token);
+        var validation = await validator.ValidateAsync(command, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        var result = await pushTokenService.UnregisterAsync(command, cancellationToken);
 
         if (result.IsFailure)
         {

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
 
@@ -21,7 +22,7 @@ public sealed partial class EconomyService
             .FirstOrDefault();
     }
 
-    private async Task<UserSubscription> UpsertUserSubscriptionAsync(
+    private async Task<Result<UserSubscription>> UpsertUserSubscriptionAsync(
         Guid userId,
         string provider,
         string purchaseChannel,
@@ -46,6 +47,19 @@ public sealed partial class EconomyService
 
         var normalizedStatus = status.Trim();
         var previousPeriodStartUtc = subscription?.CurrentPeriodStartUtc;
+
+        var ownershipCheck = await EnsureSubscriptionOwnershipAvailableAsync(
+            userId,
+            provider,
+            externalCustomerId,
+            externalSubscriptionId,
+            externalTransactionId,
+            subscription?.Id,
+            cancellationToken);
+        if (ownershipCheck.IsFailure)
+        {
+            return Result.Failure<UserSubscription>(ownershipCheck.Error);
+        }
 
         if (subscription is null)
         {
@@ -105,7 +119,7 @@ public sealed partial class EconomyService
         subscription.UpdatedAtUtc = now;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        return subscription;
+        return Result.Success(subscription);
     }
 
     private async Task<bool> StoreSubscriptionBelongsToAnotherUserAsync(
@@ -135,6 +149,66 @@ public sealed partial class EconomyService
                     && ((normalizedExternalSubscriptionId != null && x.ExternalSubscriptionId == normalizedExternalSubscriptionId)
                         || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)),
                 cancellationToken);
+    }
+
+    private async Task<Result> EnsureSubscriptionOwnershipAvailableAsync(
+        Guid userId,
+        string provider,
+        string? externalCustomerId,
+        string? externalSubscriptionId,
+        string? externalTransactionId,
+        Guid? currentSubscriptionId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedExternalCustomerId = string.IsNullOrWhiteSpace(externalCustomerId)
+            ? null
+            : externalCustomerId.Trim();
+        var normalizedExternalSubscriptionId = string.IsNullOrWhiteSpace(externalSubscriptionId)
+            ? null
+            : externalSubscriptionId.Trim();
+        var normalizedExternalTransactionId = string.IsNullOrWhiteSpace(externalTransactionId)
+            ? null
+            : externalTransactionId.Trim();
+
+        if (normalizedExternalCustomerId is null
+            && normalizedExternalSubscriptionId is null
+            && normalizedExternalTransactionId is null)
+        {
+            return Result.Success();
+        }
+
+        var conflictingSubscriptionExists = await dbContext.UserSubscriptions
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Provider == provider
+                    && x.UserId != userId
+                    && (!currentSubscriptionId.HasValue || x.Id != currentSubscriptionId.Value)
+                    && ((normalizedExternalCustomerId != null && x.ExternalCustomerId == normalizedExternalCustomerId)
+                        || (normalizedExternalSubscriptionId != null && x.ExternalSubscriptionId == normalizedExternalSubscriptionId)
+                        || (normalizedExternalTransactionId != null && x.ExternalTransactionId == normalizedExternalTransactionId)),
+                cancellationToken);
+        if (conflictingSubscriptionExists)
+        {
+            return Result.Failure(EconomyErrors.SubscriptionOwnershipConflict);
+        }
+
+        if (string.Equals(provider, "stripe", StringComparison.OrdinalIgnoreCase)
+            && normalizedExternalCustomerId is not null)
+        {
+            var conflictingCustomerExists = await dbContext.PaymentCustomers
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.Provider == provider
+                        && x.UserId != userId
+                        && x.ExternalCustomerId == normalizedExternalCustomerId,
+                    cancellationToken);
+            if (conflictingCustomerExists)
+            {
+                return Result.Failure(EconomyErrors.SubscriptionOwnershipConflict);
+            }
+        }
+
+        return Result.Success();
     }
 
     private async Task<string?> ResolveSubscriptionProductIdAsync(

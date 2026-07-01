@@ -87,8 +87,8 @@ public sealed class SupportReplyTemplateCatalogService(
     {
         return new SupportReplyTemplateResponse(
             template.Id,
-            template.Title,
-            template.Body,
+            template.Title ?? string.Empty,
+            template.Body ?? string.Empty,
             template.IsEnabled,
             template.SortOrder,
             template.CreatedAtUtc,

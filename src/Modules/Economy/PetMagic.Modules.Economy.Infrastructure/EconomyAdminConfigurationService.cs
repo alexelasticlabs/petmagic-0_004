@@ -23,9 +23,9 @@ internal sealed class EconomyAdminConfigurationService(
             .ThenBy(x => x.Code)
             .Select(x => new AdminCurrencyPackResponse(
                 x.Id,
-                x.Code,
-                x.DisplayName,
-                x.CurrencyCode,
+                x.Code ?? string.Empty,
+                x.DisplayName ?? string.Empty,
+                x.CurrencyCode ?? string.Empty,
                 x.PriceAmount,
                 x.GrantedSpark,
                 x.BonusSpark,
@@ -44,11 +44,11 @@ internal sealed class EconomyAdminConfigurationService(
             .OrderBy(x => x.DisplayOrder)
             .ThenBy(x => x.Id)
             .Select(x => new AdminSubscriptionPlanResponse(
-                x.Id,
-                x.Name,
-                x.BillingPeriod,
+                x.Id ?? string.Empty,
+                x.Name ?? string.Empty,
+                x.BillingPeriod ?? string.Empty,
                 x.PriceAmount,
-                x.CurrencyCode,
+                x.CurrencyCode ?? string.Empty,
                 x.MonthlyTokenLimit,
                 x.IsRecommended,
                 x.IsActive,
@@ -332,11 +332,11 @@ internal sealed class EconomyAdminConfigurationService(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success(new AdminSubscriptionPlanResponse(
-            plan.Id,
-            plan.Name,
-            plan.BillingPeriod,
+            plan.Id ?? string.Empty,
+            plan.Name ?? string.Empty,
+            plan.BillingPeriod ?? string.Empty,
             plan.PriceAmount,
-            plan.CurrencyCode,
+            plan.CurrencyCode ?? string.Empty,
             plan.MonthlyTokenLimit,
             plan.IsRecommended,
             plan.IsActive,
@@ -410,9 +410,9 @@ internal sealed class EconomyAdminConfigurationService(
     {
         return new AdminCurrencyPackResponse(
             pack.Id,
-            pack.Code,
-            pack.DisplayName,
-            pack.CurrencyCode,
+            pack.Code ?? string.Empty,
+            pack.DisplayName ?? string.Empty,
+            pack.CurrencyCode ?? string.Empty,
             pack.PriceAmount,
             pack.GrantedSpark,
             pack.BonusSpark,
@@ -425,22 +425,22 @@ internal sealed class EconomyAdminConfigurationService(
     {
         return new AdminPaymentProviderConfigurationResponse(
             configuration.Id,
-            configuration.Provider,
-            configuration.Platform,
-            configuration.Region,
+            configuration.Provider ?? string.Empty,
+            configuration.Platform ?? string.Empty,
+            configuration.Region ?? string.Empty,
             configuration.IsEnabled,
             configuration.IsRecommended,
             configuration.IsSelectedByDefault,
             configuration.RequiresExternalWarning,
             configuration.RequiresStoreDisclosure,
-            configuration.AllowedFromAppVersion,
+            configuration.AllowedFromAppVersion ?? string.Empty,
             configuration.ExternalCheckoutAllowed,
             configuration.BonusTokensPercent,
             configuration.DisplayLabel,
             configuration.DisplaySubtitle,
             configuration.WarningTitle,
             configuration.WarningMessage,
-            configuration.Mode,
+            configuration.Mode ?? string.Empty,
             configuration.Notes,
             configuration.UpdatedAtUtc);
     }

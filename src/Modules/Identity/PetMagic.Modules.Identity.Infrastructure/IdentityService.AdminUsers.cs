@@ -31,6 +31,7 @@ public sealed partial class IdentityService
         {
             var matchesUserId = Guid.TryParse(normalizedSearch, out var searchedUserId);
             var searchPattern = $"%{normalizedSearch}%";
+            var normalizedSearchLower = normalizedSearch.ToLowerInvariant();
             var useCaseInsensitiveLike = dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
 
             query = useCaseInsensitiveLike
@@ -40,8 +41,8 @@ public sealed partial class IdentityService
                     || (user.DisplayName != null && EF.Functions.ILike(user.DisplayName, searchPattern)))
                 : query.Where(user =>
                     (matchesUserId && user.Id == searchedUserId)
-                    || (user.Email != null && user.Email.ToLower().Contains(normalizedSearch.ToLower()))
-                    || (user.DisplayName != null && user.DisplayName.ToLower().Contains(normalizedSearch.ToLower())));
+                    || ((user.Email ?? string.Empty).ToLower().Contains(normalizedSearchLower))
+                    || ((user.DisplayName ?? string.Empty).ToLower().Contains(normalizedSearchLower)));
         }
 
         var normalizedRole = NormalizeSystemRole(role);

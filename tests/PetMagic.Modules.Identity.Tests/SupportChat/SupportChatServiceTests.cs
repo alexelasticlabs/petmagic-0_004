@@ -316,6 +316,146 @@ public sealed class SupportChatServiceTests
     }
 
     [Fact]
+    public async Task LegacyNullAttachmentMimeType_ShouldNotCrashConversationOrReplyPreview()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        Guid attachmentMessageId;
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+                new SendSupportAttachmentsCommand(
+                    conversationId,
+                    userId,
+                    string.Empty,
+                    false,
+                    [
+                        new SupportMessageAttachmentInput(
+                            "http://localhost:5000/support-attachments/2026/05/legacy.png",
+                            "image/png",
+                            "legacy.png",
+                            2048)
+                    ]),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsSuccess);
+            attachmentMessageId = sendResult.Value.MessageId;
+
+            var persistedAttachment = await sendScope.SupportDbContext.SupportMessageAttachments.SingleAsync();
+            persistedAttachment.MimeType = null!;
+            await sendScope.SupportDbContext.SaveChangesAsync();
+        }
+
+        await using (var detailScope = await store.CreateScopeAsync())
+        {
+            var detail = await detailScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
+
+            Assert.True(detail.IsSuccess);
+            var attachmentMessage = Assert.Single(detail.Value.Messages, message => message.MessageId == attachmentMessageId);
+            var attachment = Assert.Single(attachmentMessage.Attachments);
+            Assert.Equal("file", attachment.Type);
+            Assert.Equal(string.Empty, attachment.MimeType);
+            Assert.Equal("legacy.png", attachment.FileName);
+        }
+
+        await using var replyScope = await store.CreateScopeAsync();
+        var replyResult = await replyScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(
+                conversationId,
+                userId,
+                "Still broken",
+                false,
+                ReplyToMessageId: attachmentMessageId),
+            CancellationToken.None);
+
+        Assert.True(replyResult.IsSuccess);
+        Assert.Equal(attachmentMessageId, replyResult.Value.ReplyToMessageId);
+        Assert.Equal("legacy.png", replyResult.Value.ReplyToPreview);
+    }
+
+    [Fact]
+    public async Task LegacyNullAttachmentMessageBody_ShouldReturnEmptyBodyAndKeepReplyPreview()
+    {
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        await SeedUserAsync(store, userId, "user@petmagic.test", "Pet User");
+
+        Guid conversationId;
+        await using (var openScope = await store.CreateScopeAsync())
+        {
+            var openResult = await openScope.CreateService().OpenConversationAsync(
+                new OpenSupportConversationCommand(userId, "Need help", SupportConversationPriority.Normal),
+                CancellationToken.None);
+            conversationId = openResult.Value.ConversationId;
+        }
+
+        Guid attachmentMessageId;
+        await using (var sendScope = await store.CreateScopeAsync())
+        {
+            var sendResult = await sendScope.CreateService().SendMessageWithAttachmentsAsync(
+                new SendSupportAttachmentsCommand(
+                    conversationId,
+                    userId,
+                    string.Empty,
+                    false,
+                    [
+                        new SupportMessageAttachmentInput(
+                            "http://localhost:5000/support-attachments/2026/05/legacy-photo.png",
+                            "image/png",
+                            "legacy-photo.png",
+                            2048)
+                    ]),
+                CancellationToken.None);
+
+            Assert.True(sendResult.IsSuccess);
+            attachmentMessageId = sendResult.Value.MessageId;
+
+            var persistedMessage = await sendScope.SupportDbContext.ConversationMessages
+                .Include(message => message.Attachments)
+                .SingleAsync(message => message.Id == attachmentMessageId);
+            persistedMessage.Body = null!;
+            await sendScope.SupportDbContext.SaveChangesAsync();
+        }
+
+        await using (var detailScope = await store.CreateScopeAsync())
+        {
+            var detail = await detailScope.CreateService().GetUserConversationAsync(userId, CancellationToken.None);
+
+            Assert.True(detail.IsSuccess);
+            var attachmentMessage = Assert.Single(detail.Value.Messages, message => message.MessageId == attachmentMessageId);
+            Assert.Equal(string.Empty, attachmentMessage.Body);
+            Assert.Single(attachmentMessage.Attachments);
+        }
+
+        await using var replyScope = await store.CreateScopeAsync();
+        var replyResult = await replyScope.CreateService().SendMessageAsync(
+            new SendSupportMessageCommand(
+                conversationId,
+                userId,
+                "Still broken",
+                false,
+                ReplyToMessageId: attachmentMessageId),
+            CancellationToken.None);
+
+        Assert.True(replyResult.IsSuccess);
+        Assert.Equal(attachmentMessageId, replyResult.Value.ReplyToMessageId);
+        Assert.Equal("Photo", replyResult.Value.ReplyToPreview);
+    }
+
+    [Fact]
     public async Task SendMessageAsync_WithReplyToMessage_ShouldPersistReplyMetadata()
     {
         var store = CreateStore();

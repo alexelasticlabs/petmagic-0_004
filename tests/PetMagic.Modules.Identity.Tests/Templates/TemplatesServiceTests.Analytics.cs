@@ -647,5 +647,47 @@ public sealed partial class TemplatesServiceTests
         Assert.Contains("Portrait", overview.Value.AvailableCategories);
     }
 
+    [Fact]
+    public async Task GetAdminTemplatesAnalyticsAsync_ShouldNormalizeLegacyNullPreviewAssetFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Legacy Analytics Portrait",
+                "Template with legacy analytics preview asset",
+                "Portrait",
+                ["analytics"],
+                false,
+                30,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/legacy-analytics.jpg", "legacy-analytics.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var template = await dbContext.TemplateItems
+            .Include(x => x.Assets)
+            .SingleAsync(x => x.Id == created.Value.TemplateId);
+        var previewAsset = Assert.Single(template.Assets, x => x.AssetKind == TemplateAssetKind.Preview);
+        previewAsset.FileName = null!;
+        previewAsset.ContentType = null!;
+        await dbContext.SaveChangesAsync();
+
+        var overview = await service.GetAdminTemplatesAnalyticsAsync(
+            new AdminTemplatesAnalyticsQuery(null, null, null, null, null, "views", 10),
+            CancellationToken.None);
+
+        Assert.True(overview.IsSuccess);
+        var row = Assert.Single(overview.Value.TopTemplates, x => x.TemplateId == created.Value.TemplateId);
+        Assert.NotNull(row.PreviewAsset);
+        Assert.Equal(string.Empty, row.PreviewAsset!.FileName);
+        Assert.Equal(string.Empty, row.PreviewAsset!.ContentType);
+    }
+
 
 }

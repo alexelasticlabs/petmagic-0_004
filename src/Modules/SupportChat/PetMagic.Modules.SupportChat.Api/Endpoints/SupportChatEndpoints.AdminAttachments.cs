@@ -271,7 +271,23 @@ public static partial class SupportChatEndpoints
         if (completeStatusResult.IsFailure)
         {
             await attachmentStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
-            return ToProblem(completeStatusResult.Error);
+
+            var failedStatusResult = await service.UpdateAttachmentMessageAsync(
+                new UpdateSupportAttachmentMessageCommand(
+                    conversationId,
+                    messageId,
+                    userId,
+                    IsAdmin: true,
+                    AttachmentUploadStatus: SupportAttachmentUploadStatus.Failed,
+                    AttachmentUploadErrorCode: completeStatusResult.Error.Code),
+                cancellationToken);
+
+            if (failedStatusResult.IsFailure)
+            {
+                return ToProblem(completeStatusResult.Error);
+            }
+
+            return TypedResults.Ok(SignAttachmentUrls(failedStatusResult.Value, attachmentReadUrlSigner));
         }
 
         return TypedResults.Ok(SignAttachmentUrls(completeStatusResult.Value, attachmentReadUrlSigner));

@@ -6,6 +6,20 @@ public sealed class FcmPushPayloadContractTests
     [InlineData("src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/FcmTemplateGenerationPushNotificationSender.cs")]
     [InlineData("src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/FcmSupportChatPushNotificationSender.cs")]
     [InlineData("src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/FcmEconomyPushNotificationSender.cs")]
+    public void FcmSenders_ShouldUseSharedErrorClassifier(string relativePath)
+    {
+        var source = File.ReadAllText(ResolveRepositoryPath(relativePath));
+
+        Assert.Contains("FirebaseMessagingErrorClassifier.ResolveErrorReason(", source, StringComparison.Ordinal);
+        Assert.Contains("FirebaseMessagingErrorClassifier.ShouldDisableToken(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("responseBody.Contains(\"INVALID_ARGUMENT\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("body.Contains(\"INVALID_ARGUMENT\"", source, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("src/Modules/Templates/PetMagic.Modules.Templates.Infrastructure/FcmTemplateGenerationPushNotificationSender.cs")]
+    [InlineData("src/Modules/SupportChat/PetMagic.Modules.SupportChat.Infrastructure/FcmSupportChatPushNotificationSender.cs")]
+    [InlineData("src/Modules/Economy/PetMagic.Modules.Economy.Infrastructure/FcmEconomyPushNotificationSender.cs")]
     public void FcmSenders_ShouldUseNonDeprecatedGoogleCredentialJsonFactory(string relativePath)
     {
         var source = File.ReadAllText(ResolveRepositoryPath(relativePath));

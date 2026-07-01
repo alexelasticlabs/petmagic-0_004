@@ -290,6 +290,19 @@ public sealed partial class StripePaymentGateway
                 new RequestOptions { IdempotencyKey = $"economy-order-saved-method-{request.OrderId:D}" },
                 cancellationToken);
 
+            if (!IsSucceededPaymentIntentStatus(paymentIntent.Status))
+            {
+                LogGatewayWarning(
+                    "Stripe gateway operation returned non-success status.",
+                    "create_saved_method_payment_intent",
+                    request.UserId,
+                    request.OrderId,
+                    externalCustomerId: request.ExternalCustomerId,
+                    externalPaymentId: paymentIntent.Id,
+                    externalPaymentMethodId: request.ExternalPaymentMethodId);
+                return Result.Failure<PaymentCreateResponse>(EconomyErrors.PaymentGatewayFailed);
+            }
+
             return Result.Success(new PaymentCreateResponse(paymentIntent.Id, string.Empty));
         }
         catch (StripeException exception)

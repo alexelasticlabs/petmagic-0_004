@@ -242,11 +242,17 @@ internal sealed partial class TemplatesService
         var categories = await dbContext.TemplateCategories
             .AsNoTracking()
             .Where(x => !x.IsArchived)
-            .OrderBy(x => x.Name)
-            .Select(x => new PublicTemplateCategoryResponse(x.Name))
             .ToArrayAsync(cancellationToken);
 
-        return Result.Success<IReadOnlyList<PublicTemplateCategoryResponse>>(categories);
+        var response = categories
+            .Select(x => NormalizePublicCategoryName(x.Name))
+            .Where(name => name.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .Select(name => new PublicTemplateCategoryResponse(name))
+            .ToArray();
+
+        return Result.Success<IReadOnlyList<PublicTemplateCategoryResponse>>(response);
     }
 
     public async Task<Result<PublicTemplatesFeedResponse>> ListPublicFeedAsync(PublicTemplatesFeedQuery query, CancellationToken cancellationToken)
@@ -599,5 +605,10 @@ internal sealed partial class TemplatesService
             template.Preview?.FileSizeBytes,
             template.Preview?.DurationSeconds,
             locale));
+    }
+
+    private static string NormalizePublicCategoryName(string? value)
+    {
+        return value?.Trim() ?? string.Empty;
     }
 }

@@ -71,7 +71,7 @@ public sealed partial class EconomyServiceTests
 
         var eventId = $"evt_{Guid.NewGuid():N}";
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{createResult.Value.ExternalPaymentId}\",\"object\":\"checkout.session\",\"metadata\":{{\"order_id\":\"{createResult.Value.OrderId:D}\"}}}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{createResult.Value.ExternalPaymentId}\",\"object\":\"checkout.session\",\"status\":\"complete\",\"payment_status\":\"paid\",\"metadata\":{{\"order_id\":\"{createResult.Value.OrderId:D}\"}}}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var first = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
@@ -120,6 +120,151 @@ public sealed partial class EconomyServiceTests
     }
 
     [Fact]
+    public async Task GetPurchaseAsync_ShouldNotExposeStripeExternalPaymentId()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "starter",
+            DisplayName = "Starter PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 4.99m,
+            GrantedSpark = 100,
+            BonusSpark = 20,
+            IsActive = true,
+            SortOrder = 1
+        });
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+        Assert.False(string.IsNullOrWhiteSpace(createResult.Value.ExternalPaymentId));
+
+        var purchase = await service.GetPurchaseAsync(userId, createResult.Value.OrderId, CancellationToken.None);
+
+        Assert.True(purchase.IsSuccess);
+        Assert.Null(purchase.Value.ExternalPaymentId);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldRejectPaymentMethodRebindingAcrossUsers()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var existingUserId = Guid.NewGuid();
+        var newUserId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.SavedPaymentMethods.Add(new SavedPaymentMethod
+        {
+            Id = Guid.NewGuid(),
+            UserId = existingUserId,
+            Provider = "stripe",
+            ExternalPaymentMethodId = "pm_shared_setup_intent",
+            Brand = "visa",
+            Last4 = "4242",
+            ExpMonth = 12,
+            ExpYear = 2030,
+            IsDefault = true,
+            IsActive = true,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var service = CreateService(dbContext, identityService: identityService);
+        var setupResult = await service.CreatePaymentMethodSetupAsync(
+            new CreatePaymentMethodSetupCommand(newUserId, "stripe"),
+            CancellationToken.None);
+
+        Assert.True(setupResult.IsSuccess);
+
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{setupResult.Value.ExternalSetupId}\",\"object\":\"checkout.session\",\"setup_intent\":\"shared_setup_intent\",\"metadata\":{{\"purpose\":\"payment_method_setup\",\"user_id\":\"{newUserId:D}\"}}}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var webhookResult = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(webhookResult.IsFailure);
+        Assert.Equal(EconomyErrors.PaymentMethodOwnershipConflict.Code, webhookResult.Error.Code);
+
+        var methods = await dbContext.SavedPaymentMethods
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync();
+        var method = Assert.Single(methods);
+        Assert.Equal(existingUserId, method.UserId);
+        Assert.Equal("pm_shared_setup_intent", method.ExternalPaymentMethodId);
+        Assert.Empty(await dbContext.SavedPaymentMethods.Where(x => x.UserId == newUserId).ToListAsync());
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldNotConfirmPackPurchaseUntilCheckoutSessionPaymentStatusIsPaid()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var packId = Guid.NewGuid();
+
+        dbContext.CurrencyPacks.Add(new CurrencyPack
+        {
+            Id = packId,
+            Code = "creator-unpaid",
+            DisplayName = "Creator PawSpark",
+            CurrencyCode = "USD",
+            PriceAmount = 9.99m,
+            GrantedSpark = 200,
+            BonusSpark = 50,
+            IsActive = true,
+            SortOrder = 2
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = CreateService(dbContext);
+        var createResult = await service.CreatePackPurchaseAsync(
+            new CreatePackPurchaseCommand(userId, packId, "USD", "stripe", "web", "1.0.0", "*", "en"),
+            CancellationToken.None);
+
+        Assert.True(createResult.IsSuccess);
+
+        var unpaidEventId = $"evt_{Guid.NewGuid():N}";
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var unpaidPayload = $"{{\"id\":\"{unpaidEventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"{createResult.Value.ExternalPaymentId}\",\"object\":\"checkout.session\",\"status\":\"complete\",\"payment_status\":\"unpaid\",\"metadata\":{{\"order_id\":\"{createResult.Value.OrderId:D}\"}}}}}}}}";
+        var unpaidSignature = BuildStripeSignature(unpaidPayload, "test_webhook_secret");
+
+        var unpaidResult = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(unpaidPayload, unpaidSignature), CancellationToken.None);
+
+        Assert.True(unpaidResult.IsSuccess);
+        Assert.True(unpaidResult.Value.Processed);
+        var pendingOrder = await dbContext.PurchaseOrders.SingleAsync(x => x.Id == createResult.Value.OrderId);
+        Assert.Equal(PurchaseOrderStatus.Pending, pendingOrder.Status);
+        Assert.Empty(await dbContext.Wallets.ToListAsync());
+
+        var paymentIntentEventId = $"evt_{Guid.NewGuid():N}";
+        var paymentIntentPayload = $"{{\"id\":\"{paymentIntentEventId}\",\"object\":\"event\",\"type\":\"payment_intent.succeeded\",\"created\":{created + 1},\"data\":{{\"object\":{{\"id\":\"pi_later_success\",\"object\":\"payment_intent\",\"status\":\"succeeded\",\"metadata\":{{\"order_id\":\"{createResult.Value.OrderId:D}\"}}}}}}}}";
+        var paymentIntentSignature = BuildStripeSignature(paymentIntentPayload, "test_webhook_secret");
+
+        var paymentIntentResult = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(paymentIntentPayload, paymentIntentSignature), CancellationToken.None);
+
+        Assert.True(paymentIntentResult.IsSuccess);
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        Assert.Equal(250, wallet.Balance);
+        var succeededOrder = await dbContext.PurchaseOrders.SingleAsync(x => x.Id == createResult.Value.OrderId);
+        Assert.Equal(PurchaseOrderStatus.Succeeded, succeededOrder.Status);
+    }
+
+    [Fact]
     public async Task HandleStripeWebhook_ShouldNotGrantPremiumForInvalidSubscriptionPlanContext()
     {
         await using var dbContext = CreateDbContext();
@@ -131,7 +276,7 @@ public sealed partial class EconomyServiceTests
         var periodStart = DateTimeOffset.UtcNow.AddDays(-1).ToUnixTimeSeconds();
         var periodEnd = DateTimeOffset.UtcNow.AddDays(29).ToUnixTimeSeconds();
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_invalid_plan\",\"object\":\"checkout.session\",\"customer\":\"cus_invalid\",\"subscription\":\"sub_invalid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"unknown_plan\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_invalid_plan\",\"object\":\"checkout.session\",\"customer\":\"cus_invalid\",\"subscription\":\"sub_invalid\",\"status\":\"complete\",\"payment_status\":\"paid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"unknown_plan\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
@@ -141,6 +286,79 @@ public sealed partial class EconomyServiceTests
         Assert.Empty(identityService.SetPremiumStatusCalls);
         Assert.Empty(await dbContext.UserSubscriptions.ToListAsync());
         Assert.Empty(await dbContext.Wallets.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldRejectSubscriptionOwnershipConflictBeforeUpdatingIdentity()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var existingUserId = Guid.NewGuid();
+        var conflictingCustomerUserId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var periodStartUtc = now.AddDays(-5);
+        var periodEndUtc = now.AddDays(25);
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Ultra Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 149.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 2222,
+            IsRecommended = true,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 2,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.UserSubscriptions.Add(new UserSubscription
+        {
+            Id = Guid.NewGuid(),
+            UserId = existingUserId,
+            Provider = "stripe",
+            PurchaseChannel = "web",
+            Region = "US",
+            PlanId = "yearly",
+            Status = "Pending",
+            ExternalSubscriptionId = "sub_conflict",
+            CurrentPeriodStartUtc = periodStartUtc,
+            CurrentPeriodEndUtc = periodEndUtc,
+            MonthlyTokenLimit = 2222,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        dbContext.PaymentCustomers.Add(new PaymentCustomer
+        {
+            UserId = conflictingCustomerUserId,
+            Provider = "stripe",
+            ExternalCustomerId = "cus_conflict",
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = new DateTimeOffset(periodStartUtc).ToUnixTimeSeconds();
+        var periodEnd = new DateTimeOffset(periodEndUtc).ToUnixTimeSeconds();
+        var eventId = $"evt_{Guid.NewGuid():N}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"customer.subscription.updated\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"sub_conflict\",\"object\":\"subscription\",\"customer\":\"cus_conflict\",\"status\":\"active\",\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var signature = BuildStripeSignature(payload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var result = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(payload, signature), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(EconomyErrors.SubscriptionOwnershipConflict.Code, result.Error.Code);
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == existingUserId && x.Provider == "stripe");
+        Assert.Null(subscription.ExternalCustomerId);
+        Assert.Equal("Pending", subscription.Status);
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == existingUserId).ToListAsync());
     }
 
     [Fact]
@@ -185,6 +403,19 @@ public sealed partial class EconomyServiceTests
         Assert.False(EconomyService.IsStripeCheckoutSessionForOrder(wrongCurrencySession, order));
     }
 
+    [Theory]
+    [InlineData("paid", "complete", true)]
+    [InlineData("unpaid", "complete", false)]
+    [InlineData("paid", "open", false)]
+    [InlineData(null, "complete", false)]
+    public void StripeCheckoutSessionPaymentConfirmation_ShouldRequirePaidAndComplete(
+        string? paymentStatus,
+        string? sessionStatus,
+        bool expected)
+    {
+        Assert.Equal(expected, EconomyService.IsStripeCheckoutSessionPaymentConfirmed(paymentStatus, sessionStatus));
+    }
+
     [Fact]
     public void StripePaymentIntentVerification_ShouldRequireCurrentOrderIdentityAmountAndCurrency()
     {
@@ -227,6 +458,7 @@ public sealed partial class EconomyServiceTests
     public async Task VerifyPremiumStorePurchaseAsync_ShouldActivateAfterBackendValidation()
     {
         await using var dbContext = CreateDbContext();
+        var expiresAtUtc = DateTime.UtcNow.AddDays(30);
 
         dbContext.SubscriptionPlans.Add(new SubscriptionPlan
         {
@@ -249,7 +481,7 @@ public sealed partial class EconomyServiceTests
         var identityService = new FakeIdentityService();
         var storeVerifier = new FakeStoreSubscriptionVerifier
         {
-            ExpiresAtUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            ExpiresAtUtc = expiresAtUtc,
             Status = "active",
             IsActive = true,
         };
@@ -360,7 +592,7 @@ public sealed partial class EconomyServiceTests
             Delta = 40,
             BalanceAfter = 40,
             Source = WalletLedgerSource.PremiumSubscriptionGrant,
-            Reason = $"premium_allowance:stripe:{existingSubscriptionId:D}:{periodStartUtc:O}",
+            Reason = $"premium_allowance:{periodStartUtc:O}",
             CreatedAtUtc = now.AddDays(-2),
         });
         await dbContext.SaveChangesAsync();
@@ -408,6 +640,7 @@ public sealed partial class EconomyServiceTests
     public async Task VerifyPremiumStorePurchaseAsync_ShouldRejectSubscriptionOwnedByAnotherUser()
     {
         await using var dbContext = CreateDbContext();
+        var expiresAtUtc = DateTime.UtcNow.AddDays(30);
 
         dbContext.SubscriptionPlans.Add(new SubscriptionPlan
         {
@@ -430,7 +663,7 @@ public sealed partial class EconomyServiceTests
         var identityService = new FakeIdentityService();
         var storeVerifier = new FakeStoreSubscriptionVerifier
         {
-            ExpiresAtUtc = new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc),
+            ExpiresAtUtc = expiresAtUtc,
             Status = "active",
             IsActive = true,
         };
@@ -1125,7 +1358,7 @@ public sealed partial class EconomyServiceTests
         var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
         var periodEnd = new DateTimeOffset(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_test\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_test\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"status\":\"complete\",\"payment_status\":\"paid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var service = CreateService(dbContext, identityService: identityService);
@@ -1172,7 +1405,7 @@ public sealed partial class EconomyServiceTests
         var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
         var eventId = $"evt_{Guid.NewGuid():N}";
-        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_missing_period_end\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"cancel_at_period_end\":false}}}}}}";
+        var payload = $"{{\"id\":\"{eventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_missing_period_end\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"status\":\"complete\",\"payment_status\":\"paid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"cancel_at_period_end\":false}}}}}}";
         var signature = BuildStripeSignature(payload, "test_webhook_secret");
 
         var service = CreateService(dbContext, identityService: identityService);
@@ -1192,6 +1425,71 @@ public sealed partial class EconomyServiceTests
         var eventLog = await dbContext.SubscriptionEventLogs.SingleAsync(x => x.ExternalEventId == eventId);
         Assert.Equal("SubscriptionPending", eventLog.EventType);
         Assert.Equal("Pending", eventLog.Status);
+        Assert.NotNull(eventLog.PayloadJson);
+        Assert.Contains("\"Purpose\":\"premium_subscription\"", eventLog.PayloadJson);
+        Assert.Contains("\"CheckoutPaymentStatus\":\"paid\"", eventLog.PayloadJson);
+        Assert.Contains("\"PlanCode\":\"yearly\"", eventLog.PayloadJson);
+        Assert.Contains("\"HasCustomerId\":true", eventLog.PayloadJson);
+        Assert.Contains("\"HasUserId\":true", eventLog.PayloadJson);
+        Assert.DoesNotContain(payload, eventLog.PayloadJson);
+        Assert.DoesNotContain("cus_test", eventLog.PayloadJson);
+        Assert.DoesNotContain(userId.ToString("D"), eventLog.PayloadJson);
+        Assert.DoesNotContain("cs_sub_missing_period_end", eventLog.PayloadJson);
+    }
+
+    [Fact]
+    public async Task HandleStripeWebhook_ShouldNotActivatePremiumUntilCheckoutSessionPaymentStatusIsPaid()
+    {
+        await using var dbContext = CreateDbContext();
+
+        dbContext.SubscriptionPlans.Add(new SubscriptionPlan
+        {
+            Id = "yearly",
+            Name = "PetMagic Premium Ultra Yearly",
+            BillingPeriod = "yearly",
+            PriceAmount = 149.99m,
+            CurrencyCode = "USD",
+            MonthlyTokenLimit = 2222,
+            IsRecommended = true,
+            IsActive = true,
+            StripePriceId = "price_yearly",
+            DisplayOrder = 2,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var identityService = new FakeIdentityService();
+        var userId = Guid.NewGuid();
+        var created = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var periodStart = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var periodEnd = new DateTimeOffset(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc)).ToUnixTimeSeconds();
+        var unpaidEventId = $"evt_{Guid.NewGuid():N}";
+        var unpaidPayload = $"{{\"id\":\"{unpaidEventId}\",\"object\":\"event\",\"type\":\"checkout.session.completed\",\"created\":{created},\"data\":{{\"object\":{{\"id\":\"cs_sub_unpaid\",\"object\":\"checkout.session\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"status\":\"complete\",\"payment_status\":\"unpaid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var unpaidSignature = BuildStripeSignature(unpaidPayload, "test_webhook_secret");
+
+        var service = CreateService(dbContext, identityService: identityService);
+        var unpaidResult = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(unpaidPayload, unpaidSignature), CancellationToken.None);
+
+        Assert.True(unpaidResult.IsSuccess, unpaidResult.IsFailure ? $"{unpaidResult.Error.Code}:{unpaidResult.Error.Message}" : "unexpected failure state");
+        Assert.Empty(identityService.SetPremiumStatusCalls);
+        Assert.Empty(await dbContext.UserSubscriptions.Where(x => x.UserId == userId).ToListAsync());
+        Assert.Empty(await dbContext.Wallets.Where(x => x.UserId == userId).ToListAsync());
+
+        var invoiceEventId = $"evt_{Guid.NewGuid():N}";
+        var invoicePayload = $"{{\"id\":\"{invoiceEventId}\",\"object\":\"event\",\"type\":\"invoice.payment_succeeded\",\"created\":{created + 1},\"data\":{{\"object\":{{\"id\":\"in_test_paid\",\"object\":\"invoice\",\"customer\":\"cus_test\",\"subscription\":\"sub_test\",\"status\":\"paid\",\"metadata\":{{\"purpose\":\"premium_subscription\",\"user_id\":\"{userId:D}\",\"plan_code\":\"yearly\"}},\"current_period_start\":{periodStart},\"current_period_end\":{periodEnd},\"cancel_at_period_end\":false}}}}}}";
+        var invoiceSignature = BuildStripeSignature(invoicePayload, "test_webhook_secret");
+
+        var invoiceResult = await service.HandleStripeWebhookAsync(new StripeWebhookCommand(invoicePayload, invoiceSignature), CancellationToken.None);
+
+        Assert.True(invoiceResult.IsSuccess, invoiceResult.IsFailure ? $"{invoiceResult.Error.Code}:{invoiceResult.Error.Message}" : "unexpected failure state");
+        Assert.Single(identityService.SetPremiumStatusCalls);
+        Assert.True(identityService.SetPremiumStatusCalls[0].IsPremium);
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "stripe");
+        Assert.Equal(40, wallet.Balance);
+        Assert.Equal("Active", subscription.Status);
+        Assert.Equal("yearly", subscription.PlanId);
     }
 
     [Fact]

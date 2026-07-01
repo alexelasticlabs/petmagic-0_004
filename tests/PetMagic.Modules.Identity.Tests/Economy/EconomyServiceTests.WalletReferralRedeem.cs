@@ -4,6 +4,7 @@ using PetMagic.Modules.Economy.Application.Contracts;
 using PetMagic.Modules.Economy.Domain.Enums;
 using PetMagic.Modules.Economy.Infrastructure;
 using PetMagic.Modules.Economy.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure;
 
 namespace PetMagic.Modules.Identity.Tests.Economy;
 
@@ -197,6 +198,69 @@ public sealed partial class EconomyServiceTests
         Assert.Equal(60, ledger.Delta);
         Assert.Equal("generation_refund", ledger.Source);
         Assert.Equal("template_generation:test", ledger.Reason);
+    }
+
+    [Fact]
+    public async Task CreditAsync_ShouldBeIdempotentForGenerationRefundReason()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var idempotencyKey = $"generation_refund:{generationId:N}";
+        var service = CreateService(dbContext);
+        var command = new CreditBalanceCommand(
+            userId,
+            60,
+            WalletLedgerSource.GenerationRefund,
+            $"template_generation:{generationId:N}",
+            idempotencyKey);
+
+        var first = await service.CreditAsync(command, CancellationToken.None);
+        var second = await service.CreditAsync(command, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(60, first.Value.NewBalance);
+        Assert.Equal(60, second.Value.NewBalance);
+        Assert.Equal(0, second.Value.Delta);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.GenerationRefund)
+            .ToArrayAsync();
+
+        Assert.Equal(60, wallet.Balance);
+        var ledgerEntry = Assert.Single(ledgerEntries);
+        Assert.Equal(60, ledgerEntry.Delta);
+        Assert.Equal(idempotencyKey, ledgerEntry.Reason);
+    }
+
+    [Fact]
+    public async Task GenerationRefund_ShouldNoOp_WhenRetriedAfterJobStatusSaveFailure()
+    {
+        await using var dbContext = CreateDbContext();
+
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var service = CreateService(dbContext);
+        var billing = new EconomyTemplateGenerationBilling(service);
+
+        var first = await billing.RefundAsync(userId, generationId, 60, CancellationToken.None);
+        var retryAfterJobSaveFailure = await billing.RefundAsync(userId, generationId, 60, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(retryAfterJobSaveFailure.IsSuccess);
+
+        var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
+        var ledgerEntries = await dbContext.WalletLedgerEntries
+            .Where(x => x.UserId == userId && x.Source == WalletLedgerSource.GenerationRefund)
+            .ToArrayAsync();
+
+        Assert.Equal(60, wallet.Balance);
+        var ledgerEntry = Assert.Single(ledgerEntries);
+        Assert.Equal(60, ledgerEntry.Delta);
+        Assert.Equal($"generation_refund:{generationId:N}", ledgerEntry.Reason);
     }
 
     [Fact]
@@ -556,6 +620,7 @@ public sealed partial class EconomyServiceTests
         Assert.Equal("starter", purchase.PackCode);
         Assert.Equal("Starter PawSpark", purchase.PackDisplayName);
         Assert.Equal(120, purchase.SparkToGrant);
+        Assert.Null(purchase.ExternalPaymentId);
     }
 
     [Fact]

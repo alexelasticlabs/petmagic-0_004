@@ -41,6 +41,7 @@ public sealed class DatabaseIndexModelTests
         AssertHasIndex<WalletLedgerEntry>(dbContext, ["CreatedAtUtc"]);
         AssertHasIndex<WalletLedgerEntry>(dbContext, ["Source", "CreatedAtUtc"]);
         AssertHasUniqueIndex<WalletLedgerEntry>(dbContext, ["UserId", "Source", "Reason"]);
+        AssertHasUniqueIndex<WalletLedgerEntry>(dbContext, ["UserId", "Reason"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["CreatedAtUtc"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["Status", "CreatedAtUtc"]);
         AssertHasIndex<PurchaseOrder>(dbContext, ["UserId", "PaymentProvider", "CreatedAtUtc"]);
@@ -70,6 +71,8 @@ public sealed class DatabaseIndexModelTests
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["UserId", "HiddenByUserAtUtc", "CreatedAtUtc"]);
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["UserId", "Status", "ResultViewedAtUtc"]);
         AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "QueueMediaType", "QueueTier", "QueuedAtUtc"]);
+        AssertHasIndex<TemplateGenerationJob>(dbContext, ["Status", "QueueMediaType", "StartedAtUtc"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "IdempotencyKey"]);
         AssertHasUniqueIndex<TemplateGenerationJob>(dbContext, ["UserId", "RequestHash"]);
         AssertHasUniqueIndex<TemplateGenerationWatermarkUnlock>(dbContext, ["UserId", "GenerationJobId"]);
@@ -87,6 +90,26 @@ public sealed class DatabaseIndexModelTests
         AssertHasUniqueIndex<CreditRefund>(dbContext, ["FeedbackId"]);
         AssertHasUniqueIndex<CreditRefund>(dbContext, ["GenerationId"]);
         AssertHasIndex<CreditRefund>(dbContext, ["UserId", "CreatedAtUtc"]);
+        AssertHasIndex<TemplateRealtimeEventRecord>(dbContext, ["CreatedAtUtc", "Id"]);
+    }
+
+    [Fact]
+    public void GenerationSchedulerQueueFieldsMigration_ShouldUseConcurrentIndexesOutsideTransaction()
+    {
+        var migration = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "Data",
+            "Migrations",
+            "20260630234809_AddGenerationSchedulerQueueFields.cs"));
+
+        Assert.Contains("CREATE INDEX CONCURRENTLY IF NOT EXISTS", migration);
+        Assert.Contains("DROP INDEX CONCURRENTLY IF EXISTS", migration);
+        Assert.Contains("suppressTransaction: true", migration);
+        Assert.DoesNotContain("migrationBuilder.CreateIndex(", migration);
     }
 
     [Fact]
@@ -126,6 +149,23 @@ public sealed class DatabaseIndexModelTests
             .ToArray();
 
         Assert.Contains(indexes, index => index.SequenceEqual(propertyNames));
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (current is not null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, ".gitignore")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Could not locate repository root.");
     }
 
     private static void AssertIndexNamesFitPostgresLimit(params DbContext[] dbContexts)

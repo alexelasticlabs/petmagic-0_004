@@ -17,7 +17,7 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.8")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -463,11 +463,817 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_categories", (string)null);
                 });
 
-            BuildTemplateGenerationFeedbackEntity(modelBuilder);
-            BuildTemplateGenerationJobEntity(modelBuilder);
-            BuildTemplateGenerationWatermarkUnlockEntity(modelBuilder);
-            BuildTemplateItemEntity(modelBuilder);
-            BuildTemplateMediaRecordEntity(modelBuilder);
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AdminNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<double?>("GenerationDurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid?>("GenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<double?>("InputPhotoQualityScore")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("Locale")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ModelUsed")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("PetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Platform")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("Low");
+
+                    b.Property<string>("ProviderName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int?>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReviewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByAdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SelectedReasons")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("SourceScreen")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasDefaultValue("New");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("GenerationResult");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationId", "UserId");
+
+                    b.HasIndex("TemplateId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("Status", "Priority", "CreatedAtUtc");
+
+                    b.HasIndex("TemplateId", "Rating", "CreatedAtUtc");
+
+                    b.HasIndex("Type", "Category", "CreatedAtUtc");
+
+                    b.ToTable("templates_generation_feedback", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ChargedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EstimatedCompletionAtQueueUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EstimatedWaitSecondsAtQueue")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("GenerationMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("GenerationSeed")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("HiddenByUserAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid?>("InputMediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputSourceType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("user_upload");
+
+                    b.Property<bool>("IsWatermarkRemoved")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsWatermarkRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime?>("LastUserMediaCleanupAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("LockedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LockedBy")
+                        .IsConcurrencyToken()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("CurrentProviderStage")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ImportStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MediaImportCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("MotionGenerationCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("MotionInferenceTimeSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<decimal?>("MotionProviderCostUsd")
+                        .HasPrecision(12, 4)
+                        .HasColumnType("numeric(12,4)");
+
+                    b.Property<string>("MotionProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("MotionProviderResponseUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("MotionProviderStatusUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("NormalizedImageUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<double?>("OutputVideoDurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<Guid?>("ParentGenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ParentGenerationResultId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PetPhotoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ProviderCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProviderResultUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ProviderStatusCheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProviderSubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("PreprocessingCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("PreprocessingInferenceTimeSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("PreprocessingProviderRequestId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PreprocessingProviderResponseUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("PreprocessingProviderStatusUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("PromptAfterVariation")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("PromptBeforeVariation")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("QueueMediaType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("image");
+
+                    b.Property<string>("QueueTier")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("free");
+
+                    b.Property<DateTime>("QueuedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenceMotionUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int>("RefundAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RefundLastAttemptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RefundLastErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("ResultMediaAssetId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResultUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("ResultViewedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SimilarToGenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceImageContentType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SourceImageFileName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("SourceImageFileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("SourceImageUrl")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TokenCost")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UsedKlingModel")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("UsedPreprocessingModel")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("UserMediaCleanupFailureCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("UserMediaDeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("VariationStrength")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("WatermarkFailureCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("WatermarkedResultUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime?>("WebhookReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HiddenByUserAtUtc");
+
+                    b.HasIndex("InputMediaAssetId");
+
+                    b.HasIndex("LastUserMediaCleanupAttemptAtUtc");
+
+                    b.HasIndex("ParentGenerationId");
+
+                    b.HasIndex("ParentGenerationResultId");
+
+                    b.HasIndex("PetPhotoId");
+
+                    b.HasIndex("ResultMediaAssetId");
+
+                    b.HasIndex("SimilarToGenerationId");
+
+                    b.HasIndex("UserMediaDeletedAtUtc");
+
+                    b.HasIndex("PreprocessingProviderRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgj_PreprocessingProviderRequestId")
+                        .HasFilter(" \"PreprocessingProviderRequestId\" IS NOT NULL ");
+
+                    b.HasIndex("MotionProviderRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgj_MotionProviderRequestId")
+                        .HasFilter(" \"MotionProviderRequestId\" IS NOT NULL ");
+
+                    b.HasIndex("Status", "CompletedAtUtc");
+
+                    b.HasIndex("Status", "LockedAtUtc")
+                        .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
+
+                    b.HasIndex("Status", "QueuedAtUtc");
+
+                    b.HasIndex("Status", "ProviderStatusCheckedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"IdempotencyKey\" IS NOT NULL ");
+
+                    b.HasIndex("UserId", "RequestHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"RequestHash\" IS NOT NULL ");
+
+                    b.HasIndex("UserId", "Status")
+                        .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
+
+                    b.HasIndex("Status", "QueueMediaType", "StartedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");
+
+                    b.HasIndex("Status", "RefundedAtUtc", "RefundLastAttemptedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_RefundedAtUtc_RefundLastAttemptedAtUtc");
+
+                    b.HasIndex("TemplateId", "Status", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "HiddenByUserAtUtc", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgj_UserId_HiddenByUserAtUtc_CreatedAtUtc");
+
+                    b.HasIndex("UserId", "IsWatermarkRequired", "IsWatermarkRemoved")
+                        .HasDatabaseName("IX_tgj_UserId_WatermarkState");
+
+                    b.HasIndex("UserId", "PetId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgj_UserId_PetId_CreatedAtUtc");
+
+                    b.HasIndex("UserId", "Status", "ResultViewedAtUtc");
+
+                    b.HasIndex("Status", "QueueMediaType", "QueueTier", "QueuedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc");
+
+                    b.ToTable("templates_generation_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationWatermarkUnlock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("CreditsSpent")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("GenerationJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("UnlockMethod")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("UnlockedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationJobId", "CreatedAtUtc")
+                        .HasDatabaseName("IX_tgwu_GenerationJobId_CreatedAtUtc");
+
+                    b.HasIndex("UserId", "GenerationJobId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgwu_UserId_GenerationJobId");
+
+                    b.ToTable("templates_generation_watermark_unlocks", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("CharacterOrientation")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DefaultVariationStrength")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("medium");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImageModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ImagePrompt")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool>("IsPremium")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("KeepOriginalSound")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("KlingModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("KlingPrompt")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("LocalizedTextsJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MusicDescription")
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<string>("PetPhotoRequirements")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PreprocessingModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PreprocessingPrompt")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("PromoBadgeMode")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("RecommendedAfterImageGeneration")
+                        .HasColumnType("boolean");
+
+                    b.Property<double?>("ReferenceVideoDurationSeconds")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("RequiredInputMediaType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ShortDescription")
+                        .IsRequired()
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("SupportsGenerateSimilar")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SupportsGenerationResultInput")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Tags")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("TemplateType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int>("TokenCost")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Version")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeletedAtUtc");
+
+                    b.HasIndex("Version");
+
+                    b.HasIndex("Status", "Category");
+
+                    b.HasIndex("SupportsGenerateSimilar", "Status")
+                        .HasDatabaseName("IX_templates_items_generate_similar");
+
+                    b.HasIndex("Status", "UpdatedAtUtc", "Id")
+                        .HasDatabaseName("IX_templates_items_Status_UpdatedAtUtc_Id")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
+                    b.HasIndex("SupportsGenerationResultInput", "RequiredInputMediaType", "Status")
+                        .HasDatabaseName("IX_templates_items_generation_result_input");
+
+                    b.HasIndex("TemplateType", "Status", "UpdatedAtUtc");
+
+                    b.HasIndex("Status", "Category", "UpdatedAtUtc", "Version", "Id")
+                        .HasDatabaseName("IX_templates_items_PublicFeedCategoryOrder")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
+                    b.HasIndex("Status", "TemplateType", "IsPremium", "UpdatedAtUtc", "Version", "Id")
+                        .HasDatabaseName("IX_templates_items_PublicFeedFilters")
+                        .HasFilter(" \"DeletedAtUtc\" IS NULL ");
+
+                    b.ToTable("templates_items", (string)null);
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateMediaRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("AttachedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long?>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("GenerationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GenerationJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LastCleanupAttemptAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LifecycleState")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MediaType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("image");
+
+                    b.Property<string>("PreviewUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("user_upload");
+
+                    b.Property<string>("StoragePath")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UploadedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WatermarkedPreviewUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("WatermarkedStoragePath")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GenerationId");
+
+                    b.HasIndex("Url")
+                        .IsUnique();
+
+                    b.HasIndex("GenerationJobId", "LifecycleState");
+
+                    b.HasIndex("LifecycleState", "ExpiresAtUtc");
+
+                    b.HasIndex("TemplateId", "LifecycleState");
+
+                    b.HasIndex("UserId", "MediaType", "IsDeleted");
+
+                    b.ToTable("templates_media_records", (string)null);
+                });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateOfTheDay", b =>
                 {
@@ -610,6 +1416,31 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.ToTable("templates_push_device_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateRealtimeEventRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Data")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAtUtc", "Id")
+                        .HasDatabaseName("IX_templates_realtime_events_CreatedAtUtc_Id");
+
+                    b.ToTable("templates_realtime_events", (string)null);
+                });
+
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateWatermarkSettings", b =>
                 {
                     b.Property<Guid>("Id")
@@ -731,10 +1562,61 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Navigation("Template");
                 });
 
-            BuildTemplateGenerationFeedbackRelationships(modelBuilder);
-            BuildTemplateGenerationJobRelationships(modelBuilder);
-            BuildTemplateGenerationWatermarkUnlockRelationships(modelBuilder);
-            BuildTemplateMediaRecordRelationships(modelBuilder);
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationFeedback", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "Generation")
+                        .WithMany()
+                        .HasForeignKey("GenerationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Generation");
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationWatermarkUnlock", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "GenerationJob")
+                        .WithMany("WatermarkUnlocks")
+                        .HasForeignKey("GenerationJobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GenerationJob");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateMediaRecord", b =>
+                {
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", "GenerationJob")
+                        .WithMany("MediaRecords")
+                        .HasForeignKey("GenerationJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", "Template")
+                        .WithMany("MediaRecords")
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("GenerationJob");
+
+                    b.Navigation("Template");
+                });
 
             modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateOfTheDay", b =>
                 {
@@ -752,8 +1634,19 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Navigation("Photos");
                 });
 
-            BuildTemplateGenerationJobNavigations(modelBuilder);
-            BuildTemplateItemNavigations(modelBuilder);
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateGenerationJob", b =>
+                {
+                    b.Navigation("MediaRecords");
+
+                    b.Navigation("WatermarkUnlocks");
+                });
+
+            modelBuilder.Entity("PetMagic.Modules.Templates.Infrastructure.Entities.TemplateItem", b =>
+                {
+                    b.Navigation("Assets");
+
+                    b.Navigation("MediaRecords");
+                });
 #pragma warning restore 612, 618
         }
     }

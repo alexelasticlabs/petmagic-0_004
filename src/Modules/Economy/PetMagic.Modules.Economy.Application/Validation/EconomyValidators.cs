@@ -127,6 +127,15 @@ public sealed class AdminRevokePremiumSubscriptionCommandValidator : AbstractVal
     }
 }
 
+public sealed class AdminRefundPurchaseCommandValidator : AbstractValidator<AdminRefundPurchaseCommand>
+{
+    public AdminRefundPurchaseCommandValidator()
+    {
+        RuleFor(x => x.OrderId).NotEmpty();
+        RuleFor(x => x.Reason).MaximumLength(240);
+    }
+}
+
 public sealed class VerifyPremiumStorePurchaseCommandValidator : AbstractValidator<VerifyPremiumStorePurchaseCommand>
 {
     public VerifyPremiumStorePurchaseCommandValidator()
@@ -198,6 +207,28 @@ public sealed class ValidateAppleAppStoreBillingCommandValidator : AbstractValid
     {
         RuleFor(x => x.UserId).NotEmpty();
         RuleFor(x => x.SignedTransactionInfo).NotEmpty().MaximumLength(32768);
+    }
+}
+
+public sealed class RegisterEconomyPushTokenCommandValidator : AbstractValidator<RegisterEconomyPushTokenCommand>
+{
+    public RegisterEconomyPushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(20).MaximumLength(512);
+        RuleFor(x => x.Platform).NotEmpty().MaximumLength(32);
+        RuleFor(x => x.DeviceId).MaximumLength(160);
+        RuleFor(x => x.AppVersion).MaximumLength(64);
+        RuleFor(x => x.Locale).MaximumLength(32);
+    }
+}
+
+public sealed class UnregisterEconomyPushTokenCommandValidator : AbstractValidator<UnregisterEconomyPushTokenCommand>
+{
+    public UnregisterEconomyPushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(20).MaximumLength(512);
     }
 }
 

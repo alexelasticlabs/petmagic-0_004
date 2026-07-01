@@ -91,6 +91,469 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public Task MapResponse_ShouldNormalizeLegacyNullSourceImageAssetFields()
+    {
+        var now = DateTime.UtcNow;
+        var response = TemplateGenerationService.MapResponse(
+            new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = Guid.NewGuid(),
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/legacy-status.jpg",
+                SourceImageFileName = null!,
+                SourceImageContentType = null!,
+                ResultUrl = "https://cdn.example.com/legacy-status-result.png",
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                StartedAtUtc = now.AddMinutes(-2),
+                CompletedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-2)
+            });
+
+        Assert.NotNull(response.SourceImageAsset);
+        Assert.Equal(string.Empty, response.SourceImageAsset!.FileName);
+        Assert.Equal(string.Empty, response.SourceImageAsset!.ContentType);
+        return Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldReturnLaneEtaAndTierSnapshot()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Eta Portrait", "Portrait", ["eta"]);
+        var userId = Guid.NewGuid();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "eta-key",
+                "eta-hash",
+                3,
+                QueueTier: TemplateGenerationQueue.TierPremium),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal("image", started.Value.MediaType);
+        Assert.Equal("premium", started.Value.PriorityClass);
+        Assert.Equal(1, started.Value.QueuePosition);
+        Assert.Equal(0, started.Value.EstimatedWaitSeconds);
+        Assert.Equal(90, started.Value.EstimatedTotalSeconds);
+        Assert.NotNull(started.Value.EstimatedCompletionAtUtc);
+        Assert.Equal("capacity:image:premium", started.Value.QueueReason);
+        Assert.True(started.Value.CanCancel);
+
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal(TemplateGenerationQueue.MediaTypeImage, persisted.QueueMediaType);
+        Assert.Equal(TemplateGenerationQueue.TierPremium, persisted.QueueTier);
+        Assert.Equal(0, persisted.EstimatedWaitSecondsAtQueue);
+        Assert.NotNull(persisted.EstimatedCompletionAtQueueUtc);
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldRejectOverloadedFreeImageBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                imageMaxConcurrentGenerations: 1,
+                estimatedImageGenerationSeconds: 90,
+                freeImageMaxEstimatedWaitSeconds: 60),
+            billing);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Overloaded Portrait", "Portrait", ["overload"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/existing.jpg",
+            SourceImageFileName = "existing.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-10)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "overload-key",
+                "overload-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(1, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldRejectOverloadedFreeVideoBorrowingBeforeCharge()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                globalMaxConcurrentGenerations: 4,
+                imageMaxConcurrentGenerations: 3,
+                imageProtectedConcurrentGenerations: 2,
+                videoMaxConcurrentGenerations: 3,
+                videoReservedConcurrentGenerations: 1,
+                videoBorrowMaxConcurrentGenerations: 2,
+                enableElasticLaneBorrowing: true,
+                estimatedVideoGenerationSeconds: 420,
+                freeVideoMaxEstimatedWaitSeconds: 60),
+            billing);
+        var templateId = await CreateActiveVideoTemplateAsync(service, "Overloaded Video", "Video", ["overload"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var now = DateTime.UtcNow;
+
+        for (var index = 0; index < 4; index++)
+        {
+            dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = templateId,
+                Template = template,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = template.TokenCost,
+                QueueMediaType = TemplateGenerationQueue.MediaTypeVideo,
+                QueueTier = TemplateGenerationQueue.TierFree,
+                SourceImageUrl = $"https://cdn.example.com/existing-video-{index}.jpg",
+                SourceImageFileName = $"existing-video-{index}.jpg",
+                SourceImageContentType = "image/jpeg",
+                CreatedAtUtc = now.AddMinutes(-10).AddSeconds(index),
+                QueuedAtUtc = now.AddMinutes(-10).AddSeconds(index),
+                UpdatedAtUtc = now.AddMinutes(-10).AddSeconds(index),
+                ChargedAtUtc = now.AddMinutes(-10).AddSeconds(index)
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "video-overload-key",
+                "video-overload-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationWaitTooLong.Code, started.Error.Code);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Equal(4, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldRejectProviderCapacityBeforeChargeAndJobCreation()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var providerHealth = new TestAiProviderHealthService(PetMagic.BuildingBlocks.Results.Result.Failure(
+            TemplatesErrors.ProviderCapacityUnavailable));
+        var generationService = CreateGenerationService(
+            dbContext,
+            billing: billing,
+            aiProviderHealthService: providerHealth);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Provider Guard Portrait", "Portrait", ["provider"]);
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "provider-guard-key",
+                "provider-guard-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsFailure);
+        Assert.Equal(TemplatesErrors.ProviderCapacityUnavailable.Code, started.Error.Code);
+        Assert.Equal(1, providerHealth.CheckCount);
+        Assert.Empty(billing.ChargedGenerationIds);
+        Assert.Empty(await dbContext.TemplateGenerationJobs.ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldChargeAndQueue_WhenProviderGuardPasses()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var providerHealth = new TestAiProviderHealthService(PetMagic.BuildingBlocks.Results.Result.Success());
+        var generationService = CreateGenerationService(
+            dbContext,
+            billing: billing,
+            aiProviderHealthService: providerHealth);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Provider Healthy Portrait", "Portrait", ["provider"]);
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "provider-healthy-key",
+                "provider-healthy-hash",
+                3),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal(1, providerHealth.CheckCount);
+        Assert.Equal(started.Value.GenerationId, Assert.Single(billing.ChargedGenerationIds));
+        Assert.Equal(TemplateGenerationStatus.Queued, await dbContext.TemplateGenerationJobs
+            .Where(x => x.Id == started.Value.GenerationId)
+            .Select(x => x.Status)
+            .SingleAsync());
+    }
+
+    [Fact]
+    public async Task StartAsync_ShouldAcceptPremiumImage_WhenFreeImageBackpressureWouldReject()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(
+            dbContext,
+            CreateTemplatesOptions(
+                imageMaxConcurrentGenerations: 1,
+                estimatedImageGenerationSeconds: 90,
+                freeImageMaxEstimatedWaitSeconds: 60,
+                premiumImageMaxEstimatedWaitSeconds: 180),
+            billing);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Premium Overload Portrait", "Portrait", ["overload"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/existing.jpg",
+            SourceImageFileName = "existing.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-10),
+            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-10)
+        });
+        await dbContext.SaveChangesAsync();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                Guid.NewGuid(),
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "premium-overload-key",
+                "premium-overload-hash",
+                3,
+                QueueTier: TemplateGenerationQueue.TierPremium),
+            CancellationToken.None);
+
+        Assert.True(started.IsSuccess);
+        Assert.Equal("premium", started.Value.PriorityClass);
+        Assert.Single(billing.ChargedGenerationIds);
+        Assert.Equal(2, await dbContext.TemplateGenerationJobs.CountAsync());
+    }
+
+    [Fact]
+    public async Task CancelQueuedAsync_ShouldRefundPublishAndRemoveFromActiveLimit()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var realtime = new RecordingTemplateFeedRealtimeService();
+        var generationService = CreateGenerationService(dbContext, billing: billing, realtimeService: realtime);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Cancel Portrait", "Portrait", ["cancel"]);
+        var userId = Guid.NewGuid();
+
+        var started = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source.jpg", "source.jpg", "image/jpeg", 2048, null),
+                "cancel-key",
+                "cancel-hash",
+                1),
+            CancellationToken.None);
+        Assert.True(started.IsSuccess);
+
+        var cancelled = await generationService.CancelQueuedAsync(userId, started.Value.GenerationId, CancellationToken.None);
+
+        Assert.True(cancelled.IsSuccess);
+        Assert.True(cancelled.Value.Refunded);
+        Assert.Equal(started.Value.GenerationId, Assert.Single(billing.RefundedGenerationIds));
+        Assert.Contains(realtime.GenerationStatusEvents, x => x.GenerationId == started.Value.GenerationId && x.Status == "Cancelled");
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == started.Value.GenerationId);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+        Assert.NotNull(persisted.RefundedAtUtc);
+        Assert.NotNull(persisted.CancelledAtUtc);
+
+        var next = await generationService.StartAsync(
+            new StartTemplateGenerationCommand(
+                userId,
+                templateId,
+                new TemplateAssetCommand("https://cdn.example.com/source-2.jpg", "source-2.jpg", "image/jpeg", 2048, null),
+                "cancel-key-2",
+                "cancel-hash-2",
+                1),
+            CancellationToken.None);
+        Assert.True(next.IsSuccess);
+    }
+
+    [Fact]
+    public async Task CancelQueuedAsync_ShouldNotRefundAgain_WhenJobWasAlreadyRefunded()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(dbContext, billing: billing);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Already Refunded Portrait", "Portrait", ["cancel"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var userId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = now.AddMinutes(-5),
+            QueuedAtUtc = now.AddMinutes(-5),
+            UpdatedAtUtc = now.AddMinutes(-5),
+            ChargedAtUtc = now.AddMinutes(-5),
+            RefundedAtUtc = now.AddMinutes(-4)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var cancelled = await generationService.CancelQueuedAsync(userId, job.Id, CancellationToken.None);
+
+        Assert.True(cancelled.IsSuccess);
+        Assert.False(cancelled.Value.Refunded);
+        Assert.Empty(billing.RefundedGenerationIds);
+        var persisted = await dbContext.TemplateGenerationJobs.SingleAsync(x => x.Id == job.Id);
+        Assert.Equal(TemplateGenerationStatus.Cancelled, persisted.Status);
+        Assert.Equal(now.AddMinutes(-4), persisted.RefundedAtUtc);
+    }
+
+    [Fact]
+    public async Task CancelQueuedAsync_ShouldRejectProcessingJob()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Processing Cancel Portrait", "Portrait", ["cancel"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var userId = Guid.NewGuid();
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Processing,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            StartedAtUtc = DateTime.UtcNow.AddMinutes(-4),
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-4),
+            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        await dbContext.SaveChangesAsync();
+
+        var cancelled = await generationService.CancelQueuedAsync(userId, job.Id, CancellationToken.None);
+
+        Assert.True(cancelled.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationCancelNotAllowed.Code, cancelled.Error.Code);
+    }
+
+    [Fact]
+    public async Task CancelQueuedAsync_ShouldNotRefund_WhenConcurrentClaimWins()
+    {
+        var concurrencyInterceptor = new OneShotConcurrencyInterceptor();
+        await using var dbContext = CreateDbContext(concurrencyInterceptor);
+        var service = CreateService(dbContext);
+        var billing = new RecordingGenerationBilling();
+        var generationService = CreateGenerationService(dbContext, billing: billing);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Concurrent Cancel Portrait", "Portrait", ["cancel"]);
+        var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == templateId);
+        var userId = Guid.NewGuid();
+        var job = new TemplateGenerationJob
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TemplateId = templateId,
+            Template = template,
+            Status = TemplateGenerationStatus.Queued,
+            TokenCost = template.TokenCost,
+            QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+            QueueTier = TemplateGenerationQueue.TierFree,
+            SourceImageUrl = "https://cdn.example.com/source.jpg",
+            SourceImageFileName = "source.jpg",
+            SourceImageContentType = "image/jpeg",
+            CreatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            QueuedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            UpdatedAtUtc = DateTime.UtcNow.AddMinutes(-5),
+            ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5)
+        };
+        dbContext.TemplateGenerationJobs.Add(job);
+        concurrencyInterceptor.Enabled = false;
+        await dbContext.SaveChangesAsync();
+        concurrencyInterceptor.Enabled = true;
+
+        var cancelled = await generationService.CancelQueuedAsync(userId, job.Id, CancellationToken.None);
+
+        Assert.True(cancelled.IsFailure);
+        Assert.Equal(TemplatesErrors.GenerationCancelNotAllowed.Code, cancelled.Error.Code);
+        Assert.Empty(billing.RefundedGenerationIds);
+    }
+
+    [Fact]
     public async Task StartAdminTestAsync_ShouldPersistCurrentCorrelationId()
     {
         await using var dbContext = CreateDbContext();

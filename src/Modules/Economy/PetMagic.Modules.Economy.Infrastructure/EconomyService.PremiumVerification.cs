@@ -110,7 +110,7 @@ public sealed partial class EconomyService
             return Result.Failure<PremiumStoreVerificationResponse>(premiumResult.Error);
         }
 
-        var userSubscription = await UpsertUserSubscriptionAsync(
+        var userSubscriptionResult = await UpsertUserSubscriptionAsync(
             command.UserId,
             provider,
             "in_app",
@@ -125,6 +125,11 @@ public sealed partial class EconomyService
             false,
             plan.MonthlyTokenLimit,
             cancellationToken);
+        if (userSubscriptionResult.IsFailure)
+        {
+            return Result.Failure<PremiumStoreVerificationResponse>(userSubscriptionResult.Error);
+        }
+        var userSubscription = userSubscriptionResult.Value;
 
         await AppendSubscriptionEventAsync(
             command.UserId,
@@ -269,6 +274,19 @@ public sealed partial class EconomyService
             currentPeriodEndUtc,
             stripeSubscription.CancelAtPeriodEnd);
 
+        var ownershipCheck = await EnsureSubscriptionOwnershipAvailableAsync(
+            command.UserId,
+            "stripe",
+            customer.ExternalCustomerId,
+            stripeSubscription.Id,
+            null,
+            currentSubscriptionId: null,
+            cancellationToken);
+        if (ownershipCheck.IsFailure)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(ownershipCheck.Error);
+        }
+
         if (identityService is null)
         {
             return Result.Failure<SubscriptionSummaryResponse>(EconomyErrors.PremiumBillingUnavailable);
@@ -283,7 +301,7 @@ public sealed partial class EconomyService
             return Result.Failure<SubscriptionSummaryResponse>(premiumResult.Error);
         }
 
-        var subscription = await UpsertUserSubscriptionAsync(
+        var subscriptionResult = await UpsertUserSubscriptionAsync(
             command.UserId,
             "stripe",
             "mobile",
@@ -298,6 +316,11 @@ public sealed partial class EconomyService
             stripeSubscription.CancelAtPeriodEnd,
             plan.MonthlyTokenLimit,
             cancellationToken);
+        if (subscriptionResult.IsFailure)
+        {
+            return Result.Failure<SubscriptionSummaryResponse>(subscriptionResult.Error);
+        }
+        var subscription = subscriptionResult.Value;
 
         await AppendSubscriptionEventAsync(
             command.UserId,

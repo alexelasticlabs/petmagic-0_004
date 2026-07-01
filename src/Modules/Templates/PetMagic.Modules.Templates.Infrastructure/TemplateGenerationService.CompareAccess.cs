@@ -214,7 +214,7 @@ internal sealed partial class TemplateGenerationService
             return inputMediaRecord.PreviewUrl ?? inputMediaRecord.Url;
         }
 
-        return job.SourceImageContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+        return job.SourceImageContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true
             ? job.SourceImageUrl
             : null;
     }
@@ -261,7 +261,7 @@ internal sealed partial class TemplateGenerationService
             }
         }
 
-        return job.SourceImageContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+        return job.SourceImageContentType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true
             ? job.SourceImageUrl
             : null;
     }

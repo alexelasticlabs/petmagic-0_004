@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 
 using PetMagic.Modules.Templates.Domain.Enums;
 
@@ -11,7 +12,8 @@ public sealed record StartTemplateGenerationCommand(
     string? IdempotencyKey = null,
     string? RequestHash = null,
     int? ActiveGenerationLimit = null,
-    TemplateAssetCommand? SourceImagePreviewAsset = null)
+    TemplateAssetCommand? SourceImagePreviewAsset = null,
+    string QueueTier = "free")
 {
     public StartTemplateGenerationCommand(
         Guid userId,
@@ -27,7 +29,8 @@ public sealed record StartTemplateGenerationCommand(
             idempotencyKey,
             requestHash,
             activeGenerationLimit,
-            null)
+            null,
+            "free")
     {
     }
 
@@ -38,14 +41,16 @@ public sealed record StartTemplateGenerationFromResultCommand(
     Guid ParentGenerationResultId,
     Guid TemplateId,
     string? IdempotencyKey = null,
-    int? ActiveGenerationLimit = null);
+    int? ActiveGenerationLimit = null,
+    string QueueTier = "free");
 
 public sealed record StartSimilarTemplateGenerationCommand(
     Guid UserId,
     Guid SourceGenerationId,
     string VariationStrength = "medium",
     string? IdempotencyKey = null,
-    int? ActiveGenerationLimit = null);
+    int? ActiveGenerationLimit = null,
+    string QueueTier = "free");
 
 public sealed record StartTemplateGenerationFromPetCommand(
     Guid UserId,
@@ -53,7 +58,8 @@ public sealed record StartTemplateGenerationFromPetCommand(
     Guid? PetPhotoId,
     Guid TemplateId,
     string? IdempotencyKey = null,
-    int? ActiveGenerationLimit = null);
+    int? ActiveGenerationLimit = null,
+    string QueueTier = "free");
 
 public sealed record TemplateGenerationHistoryQuery(
     string? Status,
@@ -135,11 +141,24 @@ public sealed record TemplateGenerationResponse(
     string? ResultPreviewUrl = null,
     bool CanCompareBeforeAfter = false,
     Guid? PetId = null,
-    Guid? PetPhotoId = null)
+    Guid? PetPhotoId = null,
+    string? MediaType = null,
+    string? PriorityClass = null,
+    int? EstimatedTotalSeconds = null,
+    DateTime? EstimatedCompletionAtUtc = null,
+    string? QueueReason = null,
+    int? RetryAfterSeconds = null,
+    bool CanCancel = false)
 {
     public Guid JobId => GenerationId;
     public string? MediaUrl => OutputUrl;
 }
+
+public sealed record CancelQueuedGenerationResponse(
+    Guid GenerationId,
+    string Status,
+    bool Refunded,
+    DateTime CancelledAtUtc);
 
 public sealed record RemoveGenerationWatermarkCommand(
     Guid UserId,
@@ -188,3 +207,15 @@ public sealed record UpdateAdminWatermarkSettingsCommand(
     int CostCredits,
     bool ApplyToImages,
     bool ApplyToVideos);
+
+public sealed record FalProviderWebhookCommand(
+    string RequestId,
+    string Status,
+    JsonElement Payload,
+    string? Error,
+    DateTime ReceivedAtUtc);
+
+public sealed record FalProviderWebhookResponse(
+    string RequestId,
+    Guid? GenerationId,
+    string Result);

@@ -75,6 +75,6 @@ public sealed partial class TemplatesApiIntegrationTests
             response.StatusCode == HttpStatusCode.BadRequest,
             $"Expected 400 problem details, got {(int)response.StatusCode} {response.StatusCode}. Body: {body}");
         Assert.Contains("pets.invalid_status", body, StringComparison.Ordinal);
-        Assert.Contains("Pet status is invalid.", body, StringComparison.Ordinal);
+        Assert.Contains("Pet request could not be completed.", body, StringComparison.Ordinal);
     }
 }

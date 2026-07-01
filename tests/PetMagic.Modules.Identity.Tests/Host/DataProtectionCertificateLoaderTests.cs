@@ -1,0 +1,121 @@
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+
+using Microsoft.Extensions.Logging;
+
+using PetMagic.Host.Api.Observability;
+
+namespace PetMagic.Modules.Identity.Tests.Host;
+
+public sealed class DataProtectionCertificateLoaderTests
+{
+    [Fact]
+    public void LoadOrCreateDevelopmentCertificate_ShouldGenerateNewCertificate_WhenMissing()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var certificatePath = Path.Combine(tempDirectory, "petmagic-data-protection-dev.pfx");
+            var logger = new CapturingLogger();
+
+            using var certificate = DataProtectionCertificateLoader.LoadOrCreateDevelopmentCertificate(
+                certificatePath,
+                "test-password",
+                "PetMagic.Host.Api",
+                logger);
+
+            Assert.True(File.Exists(certificatePath));
+            Assert.False(string.IsNullOrWhiteSpace(certificate.Thumbprint));
+            var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Information);
+            Assert.Contains("Development Data Protection certificate generated.", entry.Message, StringComparison.Ordinal);
+            Assert.Equal(certificatePath, entry.Properties["CertificatePath"]);
+            Assert.Equal("PetMagic.Host.Api", entry.Properties["ApplicationName"]);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadOrCreateDevelopmentCertificate_ShouldRegenerateUnreadableCertificate_AndLogWarning()
+    {
+        var tempDirectory = CreateTempDirectory();
+        try
+        {
+            var certificatePath = Path.Combine(tempDirectory, "petmagic-data-protection-dev.pfx");
+            File.WriteAllBytes(certificatePath, [1, 2, 3, 4, 5]);
+            var logger = new CapturingLogger();
+
+            using var certificate = DataProtectionCertificateLoader.LoadOrCreateDevelopmentCertificate(
+                certificatePath,
+                "test-password",
+                "PetMagic.Host.Api",
+                logger);
+
+            Assert.True(File.Exists(certificatePath));
+            Assert.False(string.IsNullOrWhiteSpace(certificate.Thumbprint));
+
+            var warning = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+            Assert.Contains("Development Data Protection certificate is unreadable and will be regenerated.", warning.Message, StringComparison.Ordinal);
+            Assert.Equal(certificatePath, warning.Properties["CertificatePath"]);
+            Assert.Equal("PetMagic.Host.Api", warning.Properties["ApplicationName"]);
+            Assert.IsType<CryptographicException>(warning.Exception);
+
+            var info = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Information);
+            Assert.Contains("Development Data Protection certificate generated.", info.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempDirectory, recursive: true);
+        }
+    }
+
+    private static string CreateTempDirectory()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"petmagic-host-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return NullScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> values
+                ? values.ToDictionary(x => x.Key, x => x.Value)
+                : new Dictionary<string, object?>();
+            Entries.Add(new CapturedLogEntry(logLevel, formatter(state, exception), exception, properties));
+        }
+    }
+
+    private sealed record CapturedLogEntry(
+        LogLevel LogLevel,
+        string Message,
+        Exception? Exception,
+        IReadOnlyDictionary<string, object?> Properties);
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+
+        public void Dispose()
+        {
+        }
+    }
+}

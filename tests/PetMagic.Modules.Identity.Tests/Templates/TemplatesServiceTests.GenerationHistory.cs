@@ -508,9 +508,9 @@ public sealed partial class TemplatesServiceTests
         Assert.True(firstQueued.IsSuccess);
         Assert.True(secondQueued.IsSuccess);
         Assert.Equal(2, firstQueued.Value.QueuePosition);
-        Assert.Equal(40, firstQueued.Value.EstimatedWaitSeconds);
+        Assert.Equal(20, firstQueued.Value.EstimatedWaitSeconds);
         Assert.Equal(3, secondQueued.Value.QueuePosition);
-        Assert.Equal(60, secondQueued.Value.EstimatedWaitSeconds);
+        Assert.Equal(40, secondQueued.Value.EstimatedWaitSeconds);
     }
 
     [Fact]
@@ -595,6 +595,52 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal(secondResultMediaId, second.ResultMediaAssetId);
         Assert.Equal("https://cdn.example.com/input-preview-2.webp", second.InputPreviewUrl);
         Assert.Equal("https://cdn.example.com/result-preview-2.webp", second.ResultPreviewUrl);
+    }
+
+    [Fact]
+    public async Task ListAsync_ShouldNotExposeComparePreviewForMissingSourceImageContentType()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var generationService = CreateGenerationService(dbContext);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Legacy Compare Portrait", "Portrait", ["legacy-compare"]);
+        var userId = Guid.NewGuid();
+        var generationId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateGenerationJobs.Add(
+            new TemplateGenerationJob
+            {
+                Id = generationId,
+                UserId = userId,
+                TemplateId = templateId,
+                Status = TemplateGenerationStatus.Completed,
+                TokenCost = 20,
+                SourceImageUrl = "https://cdn.example.com/legacy-input.jpg",
+                SourceImageFileName = "legacy-input.jpg",
+                SourceImageContentType = string.Empty,
+                ResultUrl = "https://cdn.example.com/legacy-result.png",
+                CreatedAtUtc = now.AddMinutes(-2),
+                QueuedAtUtc = now.AddMinutes(-2),
+                StartedAtUtc = now.AddMinutes(-2),
+                CompletedAtUtc = now.AddMinutes(-1),
+                UpdatedAtUtc = now.AddMinutes(-1),
+                ChargedAtUtc = now.AddMinutes(-2)
+            });
+        await dbContext.SaveChangesAsync();
+
+        var history = await generationService.ListAsync(
+            userId,
+            new TemplateGenerationHistoryQuery("completed", null, 10),
+            isPremium: false,
+            CancellationToken.None);
+
+        Assert.True(history.IsSuccess);
+        var item = Assert.Single(history.Value);
+        Assert.Equal(generationId, item.GenerationId);
+        Assert.False(item.CanCompareBeforeAfter);
+        Assert.Null(item.InputPreviewUrl);
+        Assert.Null(item.ResultPreviewUrl);
     }
 
     private static TemplateMediaRecord CreateGenerationMediaRecord(

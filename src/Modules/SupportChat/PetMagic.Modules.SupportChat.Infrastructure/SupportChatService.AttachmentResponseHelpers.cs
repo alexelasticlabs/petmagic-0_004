@@ -54,20 +54,25 @@ public sealed partial class SupportChatService
         {
             return message.Attachments
                 .OrderBy(attachment => attachment.SortOrder)
-                .Select(attachment => new SupportMessageAttachmentResponse(
-                    attachment.IsDeleted
-                        ? string.Empty
-                        : ResolveManagedAttachmentUrl(attachment.FileUrl, attachment.StorageKey),
-                    ResolveAttachmentType(attachment.MimeType),
-                    attachment.MimeType,
-                    attachment.FileName,
-                    attachment.SizeBytes,
-                    attachment.DurationSeconds,
-                    attachment.Width,
-                    attachment.Height,
-                    attachment.IsDeleted,
-                    attachment.ExpiresAtUtc,
-                    attachment.DeletedAtUtc))
+                .Select(attachment =>
+                {
+                    var mimeType = attachment.MimeType?.Trim() ?? string.Empty;
+                    var fileName = attachment.FileName?.Trim();
+                    return new SupportMessageAttachmentResponse(
+                        attachment.IsDeleted
+                            ? string.Empty
+                            : ResolveManagedAttachmentUrl(attachment.FileUrl, attachment.StorageKey),
+                        ResolveAttachmentType(mimeType),
+                        mimeType,
+                        string.IsNullOrWhiteSpace(fileName) ? "attachment" : fileName,
+                        attachment.SizeBytes,
+                        attachment.DurationSeconds,
+                        attachment.Width,
+                        attachment.Height,
+                        attachment.IsDeleted,
+                        attachment.ExpiresAtUtc,
+                        attachment.DeletedAtUtc);
+                })
                 .ToList();
         }
 
@@ -125,8 +130,13 @@ public sealed partial class SupportChatService
             message.AttachmentFileSizeBytes);
     }
 
-    private static string ResolveAttachmentType(string mimeType)
+    private static string ResolveAttachmentType(string? mimeType)
     {
+        if (string.IsNullOrWhiteSpace(mimeType))
+        {
+            return "file";
+        }
+
         if (mimeType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
         {
             return "image";

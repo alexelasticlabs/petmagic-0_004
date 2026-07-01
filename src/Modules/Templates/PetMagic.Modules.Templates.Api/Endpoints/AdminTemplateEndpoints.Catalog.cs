@@ -60,12 +60,21 @@ public static partial class AdminTemplateEndpoints
             cancellationToken);
 
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
+
         return TypedResults.Ok(result.Value);
 
     }
 
 
-    private static async Task<Ok<AdminTemplatesAnalyticsOverviewResponse>> GetAnalyticsOverviewAsync(
+    private static async Task<Results<Ok<AdminTemplatesAnalyticsOverviewResponse>, ProblemHttpResult>> GetAnalyticsOverviewAsync(
 
         [FromQuery] int? periodDays,
 
@@ -94,6 +103,15 @@ public static partial class AdminTemplateEndpoints
             cancellationToken);
 
 
+        if (result.IsFailure)
+
+        {
+
+            return ToAdminTemplateProblem(result.Error);
+
+        }
+
+
         return TypedResults.Ok(result.Value);
 
     }
@@ -115,11 +133,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return InvalidCatalogFilterProblem(
-
-                "templates.invalid_type",
-
-                "Query parameter type must be Image or Video.");
+            return InvalidCatalogFilterProblem("templates.invalid_type");
 
         }
 
@@ -134,11 +148,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return InvalidCatalogFilterProblem(
-
-                "templates.invalid_status",
-
-                "Query parameter status must be Draft, Active, Archived, or not_archived.");
+            return InvalidCatalogFilterProblem("templates.invalid_status");
 
         }
 
@@ -149,11 +159,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return InvalidCatalogFilterProblem(
-
-                "templates.invalid_access",
-
-                "Query parameter access must be premium or free.");
+            return InvalidCatalogFilterProblem("templates.invalid_access");
 
         }
 
@@ -164,11 +170,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return InvalidCatalogFilterProblem(
-
-                "templates.invalid_sort",
-
-                "Query parameter sort must be newest, updated, title, or tokens.");
+            return InvalidCatalogFilterProblem("templates.invalid_sort");
 
         }
 
@@ -195,26 +197,60 @@ public static partial class AdminTemplateEndpoints
 
             ? null
 
-            : InvalidCatalogFilterProblem(
-
-                "templates.invalid_status",
-
-                "Query parameter status must be one of: pending, running, completed, failed, cancelled, retrying.");
+            : InvalidGenerationStatusFilterProblem();
 
     }
 
 
-    private static ProblemHttpResult InvalidCatalogFilterProblem(string title, string detail)
+    private static ProblemHttpResult InvalidCatalogFilterProblem(string errorCode)
 
     {
 
         return TypedResults.Problem(
 
-            title: title,
+            title: errorCode,
 
-            detail: detail,
+            detail: GetCatalogFilterProblemDetail(errorCode),
 
             statusCode: StatusCodes.Status400BadRequest);
+
+    }
+
+
+    private static ProblemHttpResult InvalidGenerationStatusFilterProblem()
+
+    {
+
+        return TypedResults.Problem(
+
+            title: "templates.invalid_status",
+
+            detail: "Query parameter status must be one of: pending, running, completed, failed, cancelled, retrying.",
+
+            statusCode: StatusCodes.Status400BadRequest);
+
+    }
+
+
+    private static string GetCatalogFilterProblemDetail(string errorCode)
+
+    {
+
+        return errorCode switch
+
+        {
+
+            "templates.invalid_type" => "Query parameter type must be Image or Video.",
+
+            "templates.invalid_status" => "Query parameter status must be Draft, Active, Archived, or not_archived.",
+
+            "templates.invalid_access" => "Query parameter access must be premium or free.",
+
+            "templates.invalid_sort" => "Query parameter sort must be newest, updated, title, or tokens.",
+
+            _ => "Template catalog filter is invalid.",
+
+        };
 
     }
 

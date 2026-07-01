@@ -53,6 +53,24 @@ public sealed class AdminTemplateEndpointHardeningTests
     }
 
     [Fact]
+    public void AdminTemplatesCatalog_ShouldGuardLegacyNullSearchFields()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminCatalog.cs"));
+
+        Assert.Contains("(x.Title ?? string.Empty).ToLower().Contains(normalizedSearch)", source, StringComparison.Ordinal);
+        Assert.Contains("(x.ShortDescription ?? string.Empty).ToLower().Contains(normalizedSearch)", source, StringComparison.Ordinal);
+        Assert.Contains("(x.Category ?? string.Empty).ToLower().Contains(normalizedSearch)", source, StringComparison.Ordinal);
+        Assert.Contains("(x.Tags ?? string.Empty).ToLower().Contains(normalizedSearch)", source, StringComparison.Ordinal);
+        Assert.Contains("(x.Category ?? string.Empty).ToLower() == normalizedCategory", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AdminPetsEndpoint_ShouldNotMaskServiceFailuresAsEmptyLists()
     {
         var source = File.ReadAllText(Path.Combine(
@@ -68,11 +86,33 @@ public sealed class AdminTemplateEndpointHardeningTests
             "Task<Results<Ok<IReadOnlyList<AdminPetResponse>>, ProblemHttpResult>> ListAdminPetsAsync",
             source,
             StringComparison.Ordinal);
-        Assert.Contains(
-            "TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: ResolveFailureStatusCode(result.Error))",
-            source,
-            StringComparison.Ordinal);
+        Assert.Contains("private static ProblemHttpResult ToPetProblem(Error error)", source, StringComparison.Ordinal);
+        Assert.Contains("\"templates.invalid_subject\" => StatusCodes.Status401Unauthorized", source, StringComparison.Ordinal);
+        Assert.Contains("\"Authentication failed.\"", source, StringComparison.Ordinal);
+        Assert.Contains("? ToPetProblem(result.Error)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Invalid access token subject.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: result.Error.Message", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: subjectError.Message", source, StringComparison.Ordinal);
         Assert.DoesNotContain("result.IsSuccess ? result.Value : []", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PetGenerationFromPetEndpoint_ShouldUseSharedPetProblemForPremiumAccessFailures()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "PetEndpoints.cs"));
+
+        Assert.Contains("\"templates.premium_required\" => StatusCodes.Status403Forbidden", source, StringComparison.Ordinal);
+        Assert.Contains("\"templates.premium_required\" => \"Premium subscription is required for this template.\"", source, StringComparison.Ordinal);
+        Assert.Contains("return ToPetProblem(new Error(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("title: \"templates.premium_required\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: \"Premium subscription is required for this template.\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -241,6 +281,264 @@ public sealed class AdminTemplateEndpointHardeningTests
     }
 
     [Fact]
+    public void AdminTemplateCategoryEndpoints_ShouldUseSanitizedProblemDetails()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateCategoryEndpoints.cs"));
+
+        Assert.Contains("private static ProblemHttpResult ToCategoryProblem(string errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("detail: GetCategoryProblemDetail(errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<IReadOnlyList<AdminTemplateCategoryListItemResponse>>, ProblemHttpResult>> ListAsync(", source, StringComparison.Ordinal);
+        Assert.Equal(5, CountOccurrences(source, "if (result.IsFailure)"));
+        Assert.DoesNotContain("detail: result.Error.Message", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateEndpoints_ShouldUseSanitizedProblemDetails()
+    {
+        var source = ReadAllEndpointPartialFiles("AdminTemplateEndpoints");
+
+        Assert.Contains("private static ProblemHttpResult ToAdminTemplateProblem(Error error)", source, StringComparison.Ordinal);
+        Assert.Contains("\"templates.invalid_subject\" => StatusCodes.Status401Unauthorized", source, StringComparison.Ordinal);
+        Assert.Contains("\"templates.invalid_subject\" => \"Authentication failed.\"", source, StringComparison.Ordinal);
+        Assert.Contains("detail: GetAdminTemplateProblemDetail(error.Code, statusCode)", source, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", source, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(storeResult.Error);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Invalid access token subject.", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: result.Error.Message", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: error.Message", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: storeResult.Error.Message", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail: durationResult.Error.Message", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateCatalogFilters_ShouldUseCentralizedValidationProblems()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.Catalog.cs"));
+
+        Assert.Contains("return InvalidCatalogFilterProblem(\"templates.invalid_type\");", source, StringComparison.Ordinal);
+        Assert.Contains("return InvalidCatalogFilterProblem(\"templates.invalid_status\");", source, StringComparison.Ordinal);
+        Assert.Contains("return InvalidCatalogFilterProblem(\"templates.invalid_access\");", source, StringComparison.Ordinal);
+        Assert.Contains("return InvalidCatalogFilterProblem(\"templates.invalid_sort\");", source, StringComparison.Ordinal);
+        Assert.Contains("private static ProblemHttpResult InvalidCatalogFilterProblem(string errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("private static string GetCatalogFilterProblemDetail(string errorCode)", source, StringComparison.Ordinal);
+        Assert.Contains("private static ProblemHttpResult InvalidGenerationStatusFilterProblem()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("title: \"templates.invalid_type\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("title: \"templates.invalid_access\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("title: \"templates.invalid_sort\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateCatalogEndpoints_ShouldGuardServiceFailures()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.Catalog.cs"));
+
+        Assert.Contains("Task<Results<Ok<AdminTemplateCatalogPageResponse>, ProblemHttpResult>> ListAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminTemplatesAnalyticsOverviewResponse>, ProblemHttpResult>> GetAnalyticsOverviewAsync(", source, StringComparison.Ordinal);
+
+        var listMethod = ExtractMethodBody(source, "ListAsync");
+        var analyticsMethod = ExtractMethodBody(source, "GetAnalyticsOverviewAsync");
+
+        Assert.Contains("if (result.IsFailure)", listMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", listMethod, StringComparison.Ordinal);
+        Assert.Contains("if (result.IsFailure)", analyticsMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", analyticsMethod, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateActions_ShouldRejectInvalidAdminSubject()
+    {
+        var source = ReadAllEndpointPartialFiles("AdminTemplateEndpoints");
+
+        Assert.Contains("private static (Guid UserId, Error? Error) TryGetAdminUserId(HttpContext context)", source, StringComparison.Ordinal);
+        Assert.Contains("var (adminUserId, subjectError) = TryGetAdminUserId(httpContext);", source, StringComparison.Ordinal);
+        Assert.Contains("var (adminUserId, subjectError) = TryGetAdminUserId(context);", source, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(subjectError);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveAdminUserId(context) ?? Guid.Empty", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("private static Guid? ResolveAdminUserId(HttpContext httpContext)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateOfTheDayEndpoints_ShouldGuardServiceFailures()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.TemplateOfDay.cs"));
+
+        Assert.Contains("Task<Results<Ok<AdminTemplateOfTheDayScheduleResponse>, ProblemHttpResult>> ListTemplateOfTheDayScheduleAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminTemplateOfTheDayResponse?>, ProblemHttpResult>> GetCurrentTemplateOfTheDayAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminTemplateOfTheDaySettingsResponse>, ProblemHttpResult>> GetTemplateOfTheDaySettingsAsync(", source, StringComparison.Ordinal);
+        Assert.Equal(4, CountOccurrences(source, "if (result.IsFailure)"));
+        Assert.DoesNotContain("ListAdminTemplateOfTheDayScheduleAsync(skip, take, cancellationToken);\r\n        return TypedResults.Ok(result.Value);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetAdminCurrentTemplateOfTheDayAsync(date, cancellationToken);\r\n        AdminTemplateOfTheDayResponse? value = result.Value;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetAdminTemplateOfTheDaySettingsAsync(cancellationToken);\r\n        return TypedResults.Ok(result.Value);", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateGenerationAdminEndpoints_ShouldGuardServiceFailures()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.Generations.cs"));
+
+        Assert.Contains("Task<Results<Ok<AdminTemplateGenerationDashboardMetricsResponse>, ProblemHttpResult>> GetGenerationDashboardMetricsAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminModerationQueuePageResponse>, ProblemHttpResult>> GetModerationQueueAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminWatermarkSettingsResponse>, ProblemHttpResult>> GetWatermarkSettingsAsync(", source, StringComparison.Ordinal);
+        Assert.Contains("Task<Results<Ok<AdminWatermarkSettingsResponse>, ProblemHttpResult>> UpdateWatermarkSettingsAsync(", source, StringComparison.Ordinal);
+
+        var dashboardMethod = ExtractMethodBody(source, "GetGenerationDashboardMetricsAsync");
+        var queueMethod = ExtractMethodBody(source, "GetModerationQueueAsync");
+        var listMethod = ExtractMethodBody(source, "ListGenerationsAsync");
+        var watermarkMethod = ExtractMethodBody(source, "GetWatermarkSettingsAsync");
+        var updateWatermarkMethod = ExtractMethodBody(source, "UpdateWatermarkSettingsAsync");
+
+        Assert.Contains("if (result.IsFailure)", dashboardMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", dashboardMethod, StringComparison.Ordinal);
+        Assert.Contains("if (result.IsFailure)", queueMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", queueMethod, StringComparison.Ordinal);
+        Assert.Contains("if (result.IsFailure)", listMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", listMethod, StringComparison.Ordinal);
+        Assert.Contains("if (result.IsFailure)", watermarkMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", watermarkMethod, StringComparison.Ordinal);
+        Assert.Contains("if (result.IsFailure)", updateWatermarkMethod, StringComparison.Ordinal);
+        Assert.Contains("return ToAdminTemplateProblem(result.Error);", updateWatermarkMethod, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateGenerationTestReadEndpoint_ShouldNotContainDuplicateFailureGuards()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Api",
+            "Endpoints",
+            "AdminTemplateEndpoints.Generations.cs"));
+        var method = ExtractMethodBody(source, "GetAdminTestAsync");
+
+        Assert.Equal(1, CountOccurrences(method, "if (result.IsFailure)"));
+        Assert.Equal(1, CountOccurrences(method, "return ToAdminTemplateProblem(result.Error);"));
+        Assert.Contains("return TypedResults.Ok(result.Value);", method, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminModerationQueue_ShouldGuardLegacyNullTemplateTitleSearch()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminModeration.cs"));
+
+        Assert.Contains("(analyticsEvent.Template.Title ?? string.Empty).ToLower().Contains(search)", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.Template.Title ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.EventType ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.ModerationStatus ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.Source ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.DeviceClass ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("analyticsEvent.CountryCode ?? string.Empty", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateFeedback_ShouldGuardLegacyNullSearchAndResponseFields()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplateAdminAnalyticsService.Events.cs"));
+
+        Assert.Contains("(x.FeedbackMessage ?? string.Empty).ToLower().Contains(search)", source, StringComparison.Ordinal);
+        Assert.Contains("x.EventType ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("x.Source ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("x.DeviceClass ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("x.CountryCode ?? string.Empty", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdminTemplateGenerations_ShouldGuardLegacyNullProviderAndTemplateTitles()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.AdminDashboard.cs"));
+
+        Assert.Contains("(job.UsedPreprocessingModel ?? string.Empty).ToLower().Contains(provider)", source, StringComparison.Ordinal);
+        Assert.Contains("(job.UsedKlingModel ?? string.Empty).ToLower().Contains(provider)", source, StringComparison.Ordinal);
+        Assert.Contains("job.Template.Title ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("parent.Template.Title ?? string.Empty", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateOfTheDayQueriesAndMappers_ShouldGuardLegacyNullPreviewAndTextFields()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplatesService.TemplateOfTheDay.cs"));
+
+        Assert.Equal(3, CountOccurrences(source, "(asset.Url ?? string.Empty).Trim() != string.Empty"));
+        Assert.Contains("assignment.Template.Title ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("assignment.Template.ShortDescription ?? string.Empty", source, StringComparison.Ordinal);
+        Assert.Contains("assignment.Template.Category ?? string.Empty", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplateCategoryMapper_ShouldGuardLegacyNullCategoryName()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepositoryRoot(),
+            "src",
+            "Modules",
+            "Templates",
+            "PetMagic.Modules.Templates.Infrastructure",
+            "TemplateCategoryAdminService.cs"));
+
+        Assert.Contains("category.Name ?? string.Empty", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PublicTemplateEvents_ShouldTreatClientDisconnectsAsNormalCompletion()
     {
         var source = File.ReadAllText(Path.Combine(
@@ -288,6 +586,20 @@ public sealed class AdminTemplateEndpointHardeningTests
         return ReadAllPartialFiles(
             baseFileName,
             Path.Combine("PetMagic.Modules.Templates.Api", "Endpoints"));
+    }
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = source.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 
     private static string ExtractMethodBody(string source, string methodName)

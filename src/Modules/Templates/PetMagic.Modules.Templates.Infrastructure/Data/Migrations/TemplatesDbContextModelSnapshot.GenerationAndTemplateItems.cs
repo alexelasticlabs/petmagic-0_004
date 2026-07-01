@@ -223,6 +223,13 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("CurrentProviderStage")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ImportStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("MediaImportCompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -239,6 +246,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("MotionProviderRequestId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<string>("MotionProviderResponseUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("MotionProviderStatusUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("NormalizedImageUrl")
                         .HasMaxLength(2048)
@@ -259,6 +274,23 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<Guid?>("PetPhotoId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("ProviderCompletedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ProviderResultUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("ProviderStatus")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ProviderStatusCheckedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ProviderSubmittedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("PreprocessingCompletedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -268,6 +300,14 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                     b.Property<string>("PreprocessingProviderRequestId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<string>("PreprocessingProviderResponseUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("PreprocessingProviderStatusUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.Property<string>("PromptAfterVariation")
                         .HasMaxLength(2000)
@@ -377,6 +417,9 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<DateTime?>("WebhookReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("HiddenByUserAtUtc");
@@ -397,6 +440,16 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserMediaDeletedAtUtc");
 
+                    b.HasIndex("PreprocessingProviderRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgj_PreprocessingProviderRequestId")
+                        .HasFilter(" \"PreprocessingProviderRequestId\" IS NOT NULL ");
+
+                    b.HasIndex("MotionProviderRequestId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_tgj_MotionProviderRequestId")
+                        .HasFilter(" \"MotionProviderRequestId\" IS NOT NULL ");
+
                     b.HasIndex("Status", "CompletedAtUtc");
 
                     b.HasIndex("Status", "LockedAtUtc")
@@ -404,17 +457,20 @@ namespace PetMagic.Modules.Templates.Infrastructure.Data.Migrations
 
                     b.HasIndex("Status", "QueuedAtUtc");
 
+                    b.HasIndex("Status", "ProviderStatusCheckedAtUtc")
+                        .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
+
                     b.HasIndex("UserId", "CreatedAtUtc");
 
                     b.HasIndex("UserId", "IdempotencyKey")
                         .IsUnique()
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
-                        .HasFilter(" \"Status\" IN (1, 2) AND \"IdempotencyKey\" IS NOT NULL ");
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"IdempotencyKey\" IS NOT NULL ");
 
                     b.HasIndex("UserId", "RequestHash")
                         .IsUnique()
                         .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
-                        .HasFilter(" \"Status\" IN (1, 2) AND \"RequestHash\" IS NOT NULL ");
+                        .HasFilter(" \"Status\" IN (1, 2, 6, 7, 8, 9, 10) AND \"RequestHash\" IS NOT NULL ");
 
                     b.HasIndex("UserId", "Status")
                         .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");

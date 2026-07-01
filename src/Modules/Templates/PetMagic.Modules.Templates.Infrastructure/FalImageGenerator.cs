@@ -5,7 +5,7 @@ using PetMagic.Modules.Templates.Application.Abstractions;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
-internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGenerator
+internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGenerator, IAsyncImageGenerationQueue
 {
     public async Task<Result<ImageGenerationResult>> CreateAsync(
         string sourceImageUrl,
@@ -26,37 +26,67 @@ internal sealed class FalImageGenerator(FalQueueClient queueClient) : IImageGene
             input["seed"] = seed.Value;
         }
 
-        var result = await queueClient.RunAsync(model, input, cancellationToken);
+        var result = await queueClient.RunAsync(
+            model,
+            input,
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            cancellationToken);
         if (result.IsFailure)
         {
             return Result.Failure<ImageGenerationResult>(result.Error);
         }
 
         using var document = result.Value.Response;
-        if (TryReadFirstImageUrl(document.RootElement, out var imageUrl))
+        return Complete(document.RootElement, result.Value.RequestId, result.Value.InferenceTimeSeconds);
+    }
+
+    public async Task<Result<ProviderQueueSubmission>> SubmitAsync(
+        string sourceImageUrl,
+        string prompt,
+        string model,
+        int? seed,
+        CancellationToken cancellationToken)
+    {
+        var input = BuildInput(sourceImageUrl, prompt, seed);
+        var result = await queueClient.SubmitAsync(
+            model,
+            input,
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            cancellationToken);
+        return result.IsFailure
+            ? Result.Failure<ProviderQueueSubmission>(result.Error)
+            : Result.Success(new ProviderQueueSubmission(
+                result.Value.RequestId,
+                result.Value.StatusUrl.ToString(),
+                result.Value.ResponseUrl.ToString()));
+    }
+
+    public Result<ImageGenerationResult> Complete(JsonElement response, string? requestId, double? inferenceTimeSeconds)
+    {
+        if (FalGenerationResponseParser.TryReadFirstImageUrl(response, out var imageUrl))
         {
-            return Result.Success(new ImageGenerationResult(imageUrl, result.Value.RequestId, result.Value.InferenceTimeSeconds));
+            return Result.Success(new ImageGenerationResult(imageUrl, requestId, inferenceTimeSeconds));
         }
 
-        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, model);
+        TemplateGenerationMetrics.RecordAiProviderError("fal", "response.parse", TemplatesErrors.AiProviderFailed.Code, "image_generation");
         return Result.Failure<ImageGenerationResult>(TemplatesErrors.AiProviderFailed);
     }
 
-    private static bool TryReadFirstImageUrl(JsonElement root, out string imageUrl)
+    private static Dictionary<string, object?> BuildInput(string sourceImageUrl, string prompt, int? seed)
     {
-        imageUrl = string.Empty;
-        if (!root.TryGetProperty("images", out var images) || images.ValueKind != JsonValueKind.Array || images.GetArrayLength() == 0)
+        var input = new Dictionary<string, object?>
         {
-            return false;
+            ["prompt"] = prompt,
+            ["image_urls"] = new[] { sourceImageUrl },
+            ["num_images"] = 1,
+            ["output_format"] = "png"
+        };
+
+        if (seed is not null)
+        {
+            input["seed"] = seed.Value;
         }
 
-        var first = images[0];
-        if (!first.TryGetProperty("url", out var url) || url.ValueKind != JsonValueKind.String)
-        {
-            return false;
-        }
-
-        imageUrl = url.GetString() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(imageUrl);
+        return input;
     }
 }

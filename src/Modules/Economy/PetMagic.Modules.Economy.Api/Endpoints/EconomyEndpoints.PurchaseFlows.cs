@@ -21,13 +21,13 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var result = await service.GetPurchaseHistoryAsync(userId!.Value, skip, take, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -43,7 +43,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new CreatePackPurchaseCommand(
@@ -66,10 +66,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePackPurchaseAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.pack_not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -85,19 +82,19 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var packsResult = await service.ListPacksAsync(cancellationToken);
         if (packsResult.IsFailure)
         {
-            return TypedResults.Problem(title: packsResult.Error.Code, detail: packsResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToClientEconomyProblem(packsResult.Error);
         }
 
         var pack = ResolveCurrencyPack(request.TokenPackId, packsResult.Value);
         if (pack is null)
         {
-            return TypedResults.Problem(title: "economy.pack_not_found", detail: "Currency pack was not found.", statusCode: StatusCodes.Status404NotFound);
+            return ToClientEconomyProblem("economy.pack_not_found");
         }
 
         var command = new CreatePackPurchaseCommand(
@@ -120,10 +117,7 @@ public static partial class EconomyEndpoints
         var result = await service.CreatePackPurchaseAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "economy.pack_not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -139,7 +133,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new ConfirmPackPurchaseCommand(userId!.Value, orderId);
@@ -152,10 +146,7 @@ public static partial class EconomyEndpoints
         var result = await service.ConfirmPackPurchaseAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, PurchaseNotFoundCode, StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status409Conflict;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -171,17 +162,14 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new VerifyStripeCheckoutSessionCommand(userId!.Value, orderId, request.StripeReferenceId);
         var result = await service.VerifyStripeCheckoutSessionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, PurchaseNotFoundCode, StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -198,7 +186,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new VerifyPackStorePurchaseCommand(
@@ -220,15 +208,7 @@ public static partial class EconomyEndpoints
         var result = await service.VerifyPackStorePurchaseAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                PurchaseNotFoundCode => StatusCodes.Status404NotFound,
-                "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
-                "economy.store_purchase_invalid" => StatusCodes.Status400BadRequest,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);

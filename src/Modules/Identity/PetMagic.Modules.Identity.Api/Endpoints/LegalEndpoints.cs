@@ -1,5 +1,3 @@
-using System.Security.Claims;
-
 using FluentValidation;
 
 using Microsoft.AspNetCore.Builder;
@@ -30,7 +28,7 @@ public static class LegalEndpoints
         return endpoints;
     }
 
-    private static Task<Ok<LegalDocumentsResponse>> GetCurrentAsync(
+    private static Task<Results<Ok<LegalDocumentsResponse>, ProblemHttpResult>> GetCurrentAsync(
         [FromQuery(Name = "locale")] string? locale,
         IIdentityService service,
         CancellationToken cancellationToken)
@@ -38,12 +36,17 @@ public static class LegalEndpoints
         return ExecuteGetCurrentAsync(locale, service, cancellationToken);
     }
 
-    private static async Task<Ok<LegalDocumentsResponse>> ExecuteGetCurrentAsync(
+    private static async Task<Results<Ok<LegalDocumentsResponse>, ProblemHttpResult>> ExecuteGetCurrentAsync(
         string? locale,
         IIdentityService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetCurrentLegalDocumentsAsync(locale, cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status503ServiceUnavailable);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -60,20 +63,15 @@ public static class LegalEndpoints
             return TypedResults.ValidationProblem(validation.ToDictionary());
         }
 
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!AuthEndpoints.TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(title: "auth.invalid_subject", detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var result = await service.AcceptLegalDocumentsAsync(userId, command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);

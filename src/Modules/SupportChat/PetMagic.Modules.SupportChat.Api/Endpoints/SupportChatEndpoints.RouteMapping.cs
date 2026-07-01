@@ -86,6 +86,9 @@ public static partial class SupportChatEndpoints
         adminGroup.MapPost("/tickets/{conversationId:guid}/attachments", SendAdminAttachmentAsync)
             .DisableAntiforgery()
             .RequireRateLimiting("support-chat");
+        adminGroup.MapPost("/tickets/{conversationId:guid}/messages/{messageId:guid}/attachment/retry", RetryAdminAttachmentAsync)
+            .DisableAntiforgery()
+            .RequireRateLimiting("support-chat");
         adminGroup.MapPost("/tickets/{conversationId:guid}/read", MarkAdminReadAsync);
         adminGroup.MapGet("/templates", ListReplyTemplatesAsync);
         adminGroup.MapPost("/templates", CreateReplyTemplateAsync);

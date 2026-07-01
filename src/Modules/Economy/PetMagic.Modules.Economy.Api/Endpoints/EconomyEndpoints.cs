@@ -17,7 +17,7 @@ namespace PetMagic.Modules.Economy.Api.Endpoints;
 public static partial class EconomyEndpoints
 {
     private const string InvalidSubjectCode = "economy.invalid_subject";
-    private const string InvalidSubjectMessage = "Invalid access token subject.";
+    private const string InvalidSubjectMessage = "Authentication failed.";
     private const string InsufficientBalanceCode = "economy.insufficient_balance";
     private const string PurchaseNotFoundCode = "economy.purchase_not_found";
     private const string InvalidStripeSignatureCode = "economy.invalid_stripe_signature";

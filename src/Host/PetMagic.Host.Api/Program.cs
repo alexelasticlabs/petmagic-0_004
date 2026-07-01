@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Diagnostics;
 using System.Threading.RateLimiting;
 
@@ -8,6 +6,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -89,10 +88,12 @@ try
                 "Development DataProtection certificate password is not configured. Set DataProtection:CertificatePassword in development config or environment.");
         }
 
-        var dataProtectionCertificate = LoadOrCreateDataProtectionCertificate(
+        using var bootstrapLoggerFactory = LoggerFactory.Create(logging => logging.AddSerilog(Log.Logger, dispose: false));
+        var dataProtectionCertificate = DataProtectionCertificateLoader.LoadOrCreateDevelopmentCertificate(
             dataProtectionCertificatePath,
             dataProtectionCertificatePassword,
-            builder.Environment.ApplicationName);
+            builder.Environment.ApplicationName,
+            bootstrapLoggerFactory.CreateLogger("PetMagic.Host.Api.DataProtection"));
 
         dataProtectionBuilder.ProtectKeysWithCertificate(dataProtectionCertificate);
     }
@@ -506,57 +507,6 @@ catch (Exception exception)
 finally
 {
     Log.CloseAndFlush();
-}
-
-static X509Certificate2 LoadOrCreateDataProtectionCertificate(
-    string certificatePath,
-    string certificatePassword,
-    string applicationName)
-{
-    Directory.CreateDirectory(Path.GetDirectoryName(certificatePath)!);
-
-    if (File.Exists(certificatePath))
-    {
-        try
-        {
-            return X509CertificateLoader.LoadPkcs12FromFile(
-                certificatePath,
-                certificatePassword,
-                X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
-        }
-        catch (CryptographicException)
-        {
-            File.Delete(certificatePath);
-        }
-    }
-
-    using var rsa = RSA.Create(2048);
-    var subject = $"CN={applicationName} Data Protection";
-    var request = new CertificateRequest(
-        new X500DistinguishedName(subject),
-        rsa,
-        HashAlgorithmName.SHA256,
-        RSASignaturePadding.Pkcs1);
-
-    request.CertificateExtensions.Add(
-        new X509BasicConstraintsExtension(false, false, 0, false));
-    request.CertificateExtensions.Add(
-        new X509KeyUsageExtension(X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DigitalSignature, false));
-    request.CertificateExtensions.Add(
-        new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
-
-    using var certificate = request.CreateSelfSigned(
-        DateTimeOffset.UtcNow.AddDays(-1),
-        DateTimeOffset.UtcNow.AddYears(5));
-
-    File.WriteAllBytes(
-        certificatePath,
-        certificate.Export(X509ContentType.Pfx, certificatePassword));
-
-    return X509CertificateLoader.LoadPkcs12FromFile(
-        certificatePath,
-        certificatePassword,
-        X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet);
 }
 
 static void LoadDotEnvFileIfPresent()

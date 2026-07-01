@@ -13,6 +13,7 @@ public static class TemplatesApiModule
 {
     public static IServiceCollection AddTemplatesApiModule(this IServiceCollection services)
     {
+        services.AddMemoryCache();
         services.AddScoped<IValidator<CreateTemplateCategoryCommand>, CreateTemplateCategoryCommandValidator>();
         services.AddScoped<IValidator<UpdateTemplateCategoryCommand>, UpdateTemplateCategoryCommandValidator>();
         services.AddScoped<IValidator<ChangeTemplateCategoryArchiveStateCommand>, ChangeTemplateCategoryArchiveStateCommandValidator>();
@@ -24,6 +25,13 @@ public static class TemplatesApiModule
         services.AddScoped<IValidator<StartTemplateGenerationCommand>, StartTemplateGenerationCommandValidator>();
         services.AddScoped<IValidator<StartTemplateGenerationFromResultCommand>, StartTemplateGenerationFromResultCommandValidator>();
         services.AddScoped<IValidator<StartSimilarTemplateGenerationCommand>, StartSimilarTemplateGenerationCommandValidator>();
+        services.AddScoped<IValidator<RegisterTemplatePushTokenCommand>, RegisterTemplatePushTokenCommandValidator>();
+        services.AddScoped<IValidator<UnregisterTemplatePushTokenCommand>, UnregisterTemplatePushTokenCommandValidator>();
+        services.AddScoped<IValidator<SubmitFeedbackCommand>, SubmitFeedbackCommandValidator>();
+        services.AddScoped<IValidator<UpdateFeedbackAdminCommand>, UpdateFeedbackAdminCommandValidator>();
+        services.AddScoped<IValidator<RefundFeedbackCreditsCommand>, RefundFeedbackCreditsCommandValidator>();
+        services.AddHttpClient(FalWebhookSignatureVerifier.HttpClientName);
+        services.AddScoped<IFalWebhookSignatureVerifier, FalWebhookSignatureVerifier>();
 
         return services;
     }

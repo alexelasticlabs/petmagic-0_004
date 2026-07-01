@@ -83,35 +83,6 @@ public static partial class AdminTemplateEndpoints
     }
 
 
-    private static int ResolveGenerationFailureStatusCode(PetMagic.BuildingBlocks.Results.Error error)
-
-    {
-
-        return error.Code switch
-
-        {
-
-            "templates.not_found" => StatusCodes.Status404NotFound,
-
-            "templates.invalid_status" => StatusCodes.Status409Conflict,
-
-            "templates.type_mismatch" => StatusCodes.Status400BadRequest,
-
-            "templates.image_model_required" => StatusCodes.Status409Conflict,
-
-            "templates.invalid_image_model" => StatusCodes.Status400BadRequest,
-
-            "templates.reference_motion_required" => StatusCodes.Status409Conflict,
-
-            "templates.character_orientation_required" => StatusCodes.Status409Conflict,
-
-            _ => StatusCodes.Status400BadRequest
-
-        };
-
-    }
-
-
     internal static async Task<Results<Ok<TemplateAssetResponse>, ValidationProblem, ProblemHttpResult>> UploadMediaAsync(
 
         [FromForm] IFormFile? file,
@@ -226,7 +197,7 @@ public static partial class AdminTemplateEndpoints
 
         {
 
-            return TypedResults.Problem(title: storeResult.Error.Code, detail: storeResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(storeResult.Error);
 
         }
 
@@ -268,7 +239,7 @@ public static partial class AdminTemplateEndpoints
 
                     await mediaStorage.DeleteAsync(storeResult.Value.Url, CancellationToken.None);
 
-                    return TypedResults.Problem(title: durationResult.Error.Code, detail: durationResult.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+                    return ToAdminTemplateProblem(durationResult.Error);
 
                 }
 

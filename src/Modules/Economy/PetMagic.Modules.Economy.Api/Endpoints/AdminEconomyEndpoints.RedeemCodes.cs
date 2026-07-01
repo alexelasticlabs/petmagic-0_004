@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
 
@@ -31,6 +32,11 @@ public static partial class AdminEconomyEndpoints
         var query = new AdminRedeemCodeListQuery(skip ?? 0, take ?? 50, search, status, rewardKind, sort);
         var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.ListAdminRedeemCodesAsync(query, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -50,6 +56,11 @@ public static partial class AdminEconomyEndpoints
         var query = new AdminRedeemCodeListQuery(Search: search, Status: status, RewardKind: rewardKind);
         var service = serviceProvider.GetRequiredService<IEconomyAdminService>();
         var result = await service.GetAdminRedeemCodeMetricsAsync(query, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -64,10 +75,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.GetAdminRedeemCodeActivationsAsync(redeemCodeId, skip, take, userId, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.redeem_code_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -103,10 +111,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.CreateRedeemCodeAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.redeem_code_exists"
-                ? StatusCodes.Status409Conflict
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -143,10 +148,7 @@ public static partial class AdminEconomyEndpoints
         var result = await service.UpdateRedeemCodeAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "economy.redeem_code_not_found"
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminEconomyProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -156,26 +158,29 @@ public static partial class AdminEconomyEndpoints
     {
         if (!IsAllowedOptionalFilter(status, RedeemCodeStatusFilters))
         {
-            return TypedResults.Problem(
-                title: "economy.redeem_code_status_invalid",
-                detail: "Query parameter status must be all, draft, scheduled, active, paused, exhausted, expired, or archived.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(
+                new Error(
+                    "economy.redeem_code_status_invalid",
+                    "Query parameter status must be all, draft, scheduled, active, paused, exhausted, expired, or archived."),
+                StatusCodes.Status400BadRequest);
         }
 
         if (!IsAllowedOptionalFilter(rewardKind, RedeemCodeRewardKindFilters))
         {
-            return TypedResults.Problem(
-                title: "economy.redeem_code_reward_kind_invalid",
-                detail: "Query parameter rewardKind must be all or spark.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(
+                new Error(
+                    "economy.redeem_code_reward_kind_invalid",
+                    "Query parameter rewardKind must be all or spark."),
+                StatusCodes.Status400BadRequest);
         }
 
         if (!IsAllowedOptionalFilter(sort, RedeemCodeSortModes))
         {
-            return TypedResults.Problem(
-                title: "economy.redeem_code_sort_invalid",
-                detail: "Query parameter sort must be updated, usage, reward, code, or expiry.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminEconomyProblem(
+                new Error(
+                    "economy.redeem_code_sort_invalid",
+                    "Query parameter sort must be updated, usage, reward, code, or expiry."),
+                StatusCodes.Status400BadRequest);
         }
 
         return null;

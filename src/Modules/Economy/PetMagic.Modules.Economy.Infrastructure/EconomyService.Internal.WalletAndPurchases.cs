@@ -358,14 +358,8 @@ public sealed partial class EconomyService
             order.PriceAmount,
             order.CurrencyCode,
             order.SparkToGrant,
-            IsStoreProvider(order.PaymentProvider) ? null : order.ExternalPaymentId,
+            null,
             order.CreatedAtUtc,
             order.ConfirmedAtUtc);
-    }
-
-    private static bool IsStoreProvider(string provider)
-    {
-        return string.Equals(provider, "google_play", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(provider, "app_store", StringComparison.OrdinalIgnoreCase);
     }
 }

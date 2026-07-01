@@ -10,12 +10,13 @@ namespace PetMagic.Modules.SupportChat.Infrastructure;
 
 internal sealed class SupportPushTokenService(SupportChatDbContext dbContext) : ISupportPushTokenService
 {
+    private const int MinTokenLength = 20;
     private const int MaxTokenLength = 4096;
 
     public async Task<Result> RegisterAsync(RegisterSupportPushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (string.IsNullOrWhiteSpace(token) || token.Length > MaxTokenLength)
+        if (token.Length < MinTokenLength || token.Length > MaxTokenLength)
         {
             return Result.Failure(SupportChatErrors.InvalidPushToken);
         }
@@ -60,9 +61,9 @@ internal sealed class SupportPushTokenService(SupportChatDbContext dbContext) : 
     public async Task<Result> UnregisterAsync(UnregisterSupportPushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (string.IsNullOrWhiteSpace(token))
+        if (token.Length < MinTokenLength || token.Length > MaxTokenLength)
         {
-            return Result.Success();
+            return Result.Failure(SupportChatErrors.InvalidPushToken);
         }
 
         var existing = await dbContext.SupportPushDeviceTokens

@@ -33,7 +33,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.CreateImageAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -74,7 +74,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.UpdateImageAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -95,7 +95,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.CreateVideoAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -142,7 +142,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.UpdateVideoAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -165,7 +165,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.ChangeStatusAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -179,11 +179,7 @@ public static partial class AdminTemplateEndpoints
         var result = await service.DeleteAsync(templateId, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "templates.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToAdminTemplateProblem(result.Error);
         }
 
         return TypedResults.NoContent();

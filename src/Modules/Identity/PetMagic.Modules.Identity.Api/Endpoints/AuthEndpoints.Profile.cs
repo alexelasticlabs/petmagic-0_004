@@ -1,5 +1,3 @@
-using System.Security.Claims;
-
 using FluentValidation;
 
 using Microsoft.AspNetCore.Authentication;
@@ -25,16 +23,15 @@ public static partial class AuthEndpoints
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(title: "auth.invalid_subject", detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var result = await service.GetCurrentUserAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);
@@ -61,14 +58,7 @@ public static partial class AuthEndpoints
         var result = await service.UpdateCurrentUserProfileAsync(userId, command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -79,26 +69,15 @@ public static partial class AuthEndpoints
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(
-                title: InvalidSubjectCode,
-                detail: "Invalid access token subject.",
-                statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var result = await service.DeleteCurrentUserAsync(new DeleteCurrentUserCommand(userId), cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         DeleteRefreshTokenCookie(context);
@@ -118,23 +97,15 @@ public static partial class AuthEndpoints
             return TypedResults.ValidationProblem(validation.ToDictionary());
         }
 
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(
-                title: InvalidSubjectCode,
-                detail: "Invalid access token subject.",
-                statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var result = await service.AcceptLegalDocumentsAsync(userId, command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -153,10 +124,7 @@ public static partial class AuthEndpoints
         var result = await service.GetLinkedAccountsAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status404NotFound);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);
@@ -169,10 +137,7 @@ public static partial class AuthEndpoints
     {
         if (NormalizeExternalProvider(provider) is null)
         {
-            return TypedResults.Problem(
-                title: "auth.external_invalid",
-                detail: "Unsupported provider.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ExternalProviderInvalid();
         }
 
         if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -192,10 +157,7 @@ public static partial class AuthEndpoints
         var normalizedProvider = NormalizeExternalProvider(provider);
         if (normalizedProvider is null)
         {
-            return TypedResults.Problem(
-                title: "auth.external_invalid",
-                detail: "Unsupported provider.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ExternalProviderInvalid();
         }
 
         if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
@@ -206,14 +168,7 @@ public static partial class AuthEndpoints
         var result = await service.UnlinkExternalLoginAsync(userId, normalizedProvider, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = string.Equals(result.Error.Code, "users.not_found", StringComparison.Ordinal)
-                ? StatusCodes.Status404NotFound
-                : StatusCodes.Status400BadRequest;
-
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -225,10 +180,9 @@ public static partial class AuthEndpoints
         [FromForm] IFormFile? file,
         CancellationToken cancellationToken)
     {
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(title: InvalidSubjectCode, detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var validation = await ValidateAvatarFileAsync(file, cancellationToken);
@@ -248,7 +202,7 @@ public static partial class AuthEndpoints
             cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -402,16 +356,15 @@ public static partial class AuthEndpoints
         IIdentityService service,
         CancellationToken cancellationToken)
     {
-        var subject = context.User.FindFirstValue("sub") ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!Guid.TryParse(subject, out var userId))
+        if (!TryGetUserId(context, out var userId, out var invalidSubjectProblem))
         {
-            return TypedResults.Problem(title: InvalidSubjectCode, detail: "Invalid access token subject.", statusCode: StatusCodes.Status401Unauthorized);
+            return invalidSubjectProblem!;
         }
 
         var result = await service.RemoveUserAvatarAsync(new RemoveUserAvatarCommand(userId), cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);

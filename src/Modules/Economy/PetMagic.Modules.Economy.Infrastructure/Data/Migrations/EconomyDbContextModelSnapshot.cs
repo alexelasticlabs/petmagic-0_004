@@ -17,7 +17,7 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.8")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -916,6 +916,11 @@ namespace PetMagic.Modules.Economy.Infrastructure.Data.Migrations
                         .HasFilter("\"SourceProvider\" IS NOT NULL AND \"SourceTransactionId\" IS NOT NULL");
 
                     b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.HasIndex("UserId", "Reason")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ewl_UserId_Reason_GenerationRefund")
+                        .HasFilter("\"Source\" = 'generation_refund'");
 
                     b.HasIndex("UserId", "Source", "Reason")
                         .IsUnique()

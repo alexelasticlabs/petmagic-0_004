@@ -13,6 +13,7 @@ internal static class TemplateLocalizationTranslator
     private static readonly Regex PlaceholderPattern = new(@"\{[^{}]+\}", RegexOptions.Compiled);
     private const string SourceLocale = "en";
     private const string NewlineToken = "___PM_NL___";
+    private const string SegmentSeparator = "___PM_SEG_BREAK___";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public static async Task<string?> GenerateAsync(
@@ -37,25 +38,23 @@ internal static class TemplateLocalizationTranslator
                 continue;
             }
 
-            var translatedTitle = await TranslateAsync(locale, title, normalizedSourceLocale, httpClient, cancellationToken);
-            var translatedShortDescription = await TranslateAsync(locale, shortDescription, normalizedSourceLocale, httpClient, cancellationToken);
-            var translatedPetPhotoRequirements = await TranslateListAsync(locale, petPhotoRequirements, normalizedSourceLocale, httpClient, cancellationToken);
-            var translatedImagePrompt = await TranslateOptionalAsync(locale, imagePrompt, normalizedSourceLocale, httpClient, cancellationToken);
-            var translatedPreprocessingPrompt = await TranslateOptionalAsync(locale, preprocessingPrompt, normalizedSourceLocale, httpClient, cancellationToken);
-            var translatedKlingPrompt = await TranslateOptionalAsync(locale, klingPrompt, normalizedSourceLocale, httpClient, cancellationToken);
-
-            if (string.IsNullOrWhiteSpace(translatedTitle) || string.IsNullOrWhiteSpace(translatedShortDescription))
+            var translatedTexts = await TranslateTemplateTextsAsync(
+                locale,
+                title,
+                shortDescription,
+                petPhotoRequirements,
+                imagePrompt,
+                preprocessingPrompt,
+                klingPrompt,
+                normalizedSourceLocale,
+                httpClient,
+                cancellationToken);
+            if (translatedTexts is null)
             {
                 continue;
             }
 
-            payload[locale] = new TemplateLocalizedTexts(
-                translatedTitle,
-                translatedShortDescription,
-                translatedPetPhotoRequirements,
-                translatedImagePrompt,
-                translatedPreprocessingPrompt,
-                translatedKlingPrompt);
+            payload[locale] = translatedTexts;
         }
 
         return payload.Count == 0 ? null : JsonSerializer.Serialize(payload, JsonOptions);
@@ -140,6 +139,53 @@ internal static class TemplateLocalizationTranslator
         return translatedValues;
     }
 
+    private static async Task<TemplateLocalizedTexts?> TranslateTemplateTextsAsync(
+        string targetLocale,
+        string title,
+        string shortDescription,
+        IReadOnlyList<string>? petPhotoRequirements,
+        string? imagePrompt,
+        string? preprocessingPrompt,
+        string? klingPrompt,
+        string sourceLocale,
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
+    {
+        var batch = TranslationBatch.Create(
+            title,
+            shortDescription,
+            petPhotoRequirements,
+            imagePrompt,
+            preprocessingPrompt,
+            klingPrompt);
+
+        var translatedParts = await TranslateBatchAsync(targetLocale, batch.Values, sourceLocale, httpClient, cancellationToken);
+        if (translatedParts is not null)
+        {
+            return batch.ToLocalizedTexts(translatedParts);
+        }
+
+        var translatedTitle = await TranslateAsync(targetLocale, title, sourceLocale, httpClient, cancellationToken);
+        var translatedShortDescription = await TranslateAsync(targetLocale, shortDescription, sourceLocale, httpClient, cancellationToken);
+        var translatedPetPhotoRequirements = await TranslateListAsync(targetLocale, petPhotoRequirements, sourceLocale, httpClient, cancellationToken);
+        var translatedImagePrompt = await TranslateOptionalAsync(targetLocale, imagePrompt, sourceLocale, httpClient, cancellationToken);
+        var translatedPreprocessingPrompt = await TranslateOptionalAsync(targetLocale, preprocessingPrompt, sourceLocale, httpClient, cancellationToken);
+        var translatedKlingPrompt = await TranslateOptionalAsync(targetLocale, klingPrompt, sourceLocale, httpClient, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(translatedTitle) || string.IsNullOrWhiteSpace(translatedShortDescription))
+        {
+            return null;
+        }
+
+        return new TemplateLocalizedTexts(
+            translatedTitle,
+            translatedShortDescription,
+            translatedPetPhotoRequirements,
+            translatedImagePrompt,
+            translatedPreprocessingPrompt,
+            translatedKlingPrompt);
+    }
+
     private static async Task<string?> TranslateOptionalAsync(
         string targetLocale,
         string? value,
@@ -212,6 +258,92 @@ internal static class TemplateLocalizationTranslator
         }
     }
 
+    private static async Task<string[]?> TranslateBatchAsync(
+        string targetLocale,
+        IReadOnlyList<string> values,
+        string sourceLocale,
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
+    {
+        if (values.Count == 0)
+        {
+            return [];
+        }
+
+        var protectedParts = values.Select(ProtectText).ToArray();
+        var joinedText = string.Join(SegmentSeparator, protectedParts.Select(x => x.Text));
+        var translatedText = await TranslateRawAsync(targetLocale, joinedText, sourceLocale, httpClient, cancellationToken);
+        if (string.IsNullOrWhiteSpace(translatedText))
+        {
+            return null;
+        }
+
+        var translatedParts = translatedText.Split(SegmentSeparator, StringSplitOptions.None);
+        if (translatedParts.Length != protectedParts.Length)
+        {
+            return null;
+        }
+
+        var restoredParts = new string[translatedParts.Length];
+        for (var index = 0; index < translatedParts.Length; index++)
+        {
+            restoredParts[index] = RestoreText(translatedParts[index], protectedParts[index].Tokens);
+        }
+
+        return restoredParts;
+    }
+
+    private static async Task<string?> TranslateRawAsync(
+        string targetLocale,
+        string text,
+        string sourceLocale,
+        HttpClient httpClient,
+        CancellationToken cancellationToken)
+    {
+        var query = string.Create(
+            CultureInfo.InvariantCulture,
+            $"client=gtx&sl={sourceLocale}&tl={targetLocale}&dt=t&q={Uri.EscapeDataString(text)}");
+        var requestUri = new Uri($"https://translate.googleapis.com/translate_a/single?{query}");
+
+        try
+        {
+            using var response = await httpClient.GetAsync(requestUri, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+
+            if (document.RootElement.ValueKind != JsonValueKind.Array || document.RootElement.GetArrayLength() == 0)
+            {
+                return null;
+            }
+
+            var translatedText = new StringBuilder();
+            foreach (var part in document.RootElement[0].EnumerateArray())
+            {
+                if (part.ValueKind != JsonValueKind.Array || part.GetArrayLength() == 0)
+                {
+                    continue;
+                }
+
+                var translatedPart = part[0].GetString();
+                if (!string.IsNullOrWhiteSpace(translatedPart))
+                {
+                    translatedText.Append(translatedPart);
+                }
+            }
+
+            return translatedText.Length == 0 ? null : translatedText.ToString();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static ProtectedText ProtectText(string text)
     {
         var tokens = new Dictionary<string, string>();
@@ -262,6 +394,96 @@ internal static class TemplateLocalizationTranslator
         string? ImagePrompt,
         string? PreprocessingPrompt,
         string? KlingPrompt);
+
+    private sealed record TranslationBatch(
+        IReadOnlyList<string> Values,
+        int RequirementsCount,
+        int? ImagePromptIndex,
+        int? PreprocessingPromptIndex,
+        int? KlingPromptIndex)
+    {
+        public static TranslationBatch Create(
+            string title,
+            string shortDescription,
+            IReadOnlyList<string>? petPhotoRequirements,
+            string? imagePrompt,
+            string? preprocessingPrompt,
+            string? klingPrompt)
+        {
+            var values = new List<string> { title, shortDescription };
+            var requirementsCount = petPhotoRequirements?.Count ?? 0;
+            if (petPhotoRequirements is not null)
+            {
+                values.AddRange(petPhotoRequirements);
+            }
+
+            int? imagePromptIndex = null;
+            if (!string.IsNullOrWhiteSpace(imagePrompt))
+            {
+                imagePromptIndex = values.Count;
+                values.Add(imagePrompt);
+            }
+
+            int? preprocessingPromptIndex = null;
+            if (!string.IsNullOrWhiteSpace(preprocessingPrompt))
+            {
+                preprocessingPromptIndex = values.Count;
+                values.Add(preprocessingPrompt);
+            }
+
+            int? klingPromptIndex = null;
+            if (!string.IsNullOrWhiteSpace(klingPrompt))
+            {
+                klingPromptIndex = values.Count;
+                values.Add(klingPrompt);
+            }
+
+            return new TranslationBatch(values, requirementsCount, imagePromptIndex, preprocessingPromptIndex, klingPromptIndex);
+        }
+
+        public TemplateLocalizedTexts? ToLocalizedTexts(IReadOnlyList<string> translatedParts)
+        {
+            if (translatedParts.Count < 2
+                || string.IsNullOrWhiteSpace(translatedParts[0])
+                || string.IsNullOrWhiteSpace(translatedParts[1]))
+            {
+                return null;
+            }
+
+            IReadOnlyList<string>? translatedRequirements = null;
+            if (RequirementsCount > 0)
+            {
+                translatedRequirements = new List<string>(RequirementsCount);
+                for (var index = 0; index < RequirementsCount; index++)
+                {
+                    var translatedValue = translatedParts[2 + index];
+                    ((List<string>)translatedRequirements).Add(
+                        string.IsNullOrWhiteSpace(translatedValue)
+                            ? Values[2 + index]
+                            : translatedValue);
+                }
+            }
+
+            return new TemplateLocalizedTexts(
+                translatedParts[0],
+                translatedParts[1],
+                translatedRequirements,
+                ReadOptional(translatedParts, ImagePromptIndex),
+                ReadOptional(translatedParts, PreprocessingPromptIndex),
+                ReadOptional(translatedParts, KlingPromptIndex));
+        }
+
+        private static string? ReadOptional(IReadOnlyList<string> values, int? index)
+        {
+            if (!index.HasValue)
+            {
+                return null;
+            }
+
+            var value = values[index.Value];
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+    }
 
     private sealed record ProtectedText(string Text, IReadOnlyDictionary<string, string> Tokens);
 }

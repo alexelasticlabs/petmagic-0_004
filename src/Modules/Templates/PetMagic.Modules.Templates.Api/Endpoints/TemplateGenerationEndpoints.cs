@@ -7,7 +7,7 @@ namespace PetMagic.Modules.Templates.Api.Endpoints;
 public static partial class TemplateGenerationEndpoints
 {
     private const string InvalidSubjectCode = "templates.invalid_subject";
-    private const string InvalidSubjectMessage = "Invalid access token subject.";
+    private const string InvalidSubjectMessage = "Authentication failed.";
     private const string PremiumRequiredCode = "templates.premium_required";
     private const string PremiumRequiredMessage = "Premium subscription is required for this template.";
     private const int FreeActiveGenerationLimit = 1;
@@ -17,6 +17,11 @@ public static partial class TemplateGenerationEndpoints
 
     public static IEndpointRouteBuilder MapTemplateGenerationEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPost("/api/templates/provider/fal/webhook", HandleFalWebhookAsync)
+            .AllowAnonymous()
+            .RequireRateLimiting("templates")
+            .DisableAntiforgery();
+
         var group = endpoints.MapGroup("/api/templates")
             .WithTags("Template Generations")
             .RequireAuthorization(policy => policy
@@ -72,6 +77,10 @@ public static partial class TemplateGenerationEndpoints
             .RequireRateLimiting("templates");
 
         group.MapPost("/generations/{generationId:guid}/mark-read", MarkReadAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting("templates");
+
+        group.MapPost("/generations/{generationId:guid}/cancel", CancelQueuedGenerationAsync)
             .RequireAuthorization()
             .RequireRateLimiting("templates");
 

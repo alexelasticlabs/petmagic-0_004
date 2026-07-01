@@ -211,48 +211,81 @@ public sealed partial class StoreSubscriptionVerifier
 
     private async Task<string?> RequestGoogleAccessTokenAsync(CancellationToken cancellationToken)
     {
-        var issuedAt = DateTimeOffset.UtcNow;
-        var expiresAt = issuedAt.AddMinutes(55);
-
-        var header = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
+        if (TryGetCachedGoogleAccessToken(out var cachedAccessToken))
         {
-            ["alg"] = "RS256",
-            ["typ"] = "JWT"
-        }));
-
-        var claimSet = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
-        {
-            ["iss"] = options.Value.GooglePlayServiceAccountEmail,
-            ["scope"] = "https://www.googleapis.com/auth/androidpublisher",
-            ["aud"] = "https://oauth2.googleapis.com/token",
-            ["iat"] = issuedAt.ToUnixTimeSeconds(),
-            ["exp"] = expiresAt.ToUnixTimeSeconds()
-        }));
-
-        var unsignedToken = $"{header}.{claimSet}";
-        var signature = SignGoogleJwt(unsignedToken, options.Value.GooglePlayPrivateKeyPem);
-        var assertion = $"{unsignedToken}.{signature}";
-
-        using var response = await CreateClient().PostAsync(
-            "https://oauth2.googleapis.com/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
-                ["assertion"] = assertion
-            }),
-            cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return null;
+            return cachedAccessToken;
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        return document.RootElement.TryGetProperty("access_token", out var tokenElement)
-            && tokenElement.ValueKind == JsonValueKind.String
-            ? tokenElement.GetString()
-            : null;
+        await googleAccessTokenRefreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (TryGetCachedGoogleAccessToken(out cachedAccessToken))
+            {
+                return cachedAccessToken;
+            }
+
+            var issuedAt = DateTimeOffset.UtcNow;
+            var expiresAt = issuedAt.AddMinutes(55);
+
+            var header = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
+            {
+                ["alg"] = "RS256",
+                ["typ"] = "JWT"
+            }));
+
+            var claimSet = Base64UrlEncode(JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object?>
+            {
+                ["iss"] = options.Value.GooglePlayServiceAccountEmail,
+                ["scope"] = "https://www.googleapis.com/auth/androidpublisher",
+                ["aud"] = "https://oauth2.googleapis.com/token",
+                ["iat"] = issuedAt.ToUnixTimeSeconds(),
+                ["exp"] = expiresAt.ToUnixTimeSeconds()
+            }));
+
+            var unsignedToken = $"{header}.{claimSet}";
+            var signature = SignGoogleJwt(unsignedToken, options.Value.GooglePlayPrivateKeyPem);
+            var assertion = $"{unsignedToken}.{signature}";
+
+            using var response = await CreateClient().PostAsync(
+                "https://oauth2.googleapis.com/token",
+                new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["grant_type"] = "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                    ["assertion"] = assertion
+                }),
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            if (!document.RootElement.TryGetProperty("access_token", out var tokenElement)
+                || tokenElement.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            var accessToken = tokenElement.GetString();
+            if (string.IsNullOrWhiteSpace(accessToken))
+            {
+                return null;
+            }
+
+            var expiresInSeconds = document.RootElement.TryGetProperty("expires_in", out var expiresInElement)
+                && expiresInElement.ValueKind == JsonValueKind.Number
+                && expiresInElement.TryGetInt32(out var parsedExpiresIn)
+                ? parsedExpiresIn
+                : 3600;
+            CacheGoogleAccessToken(accessToken, expiresInSeconds);
+            return accessToken;
+        }
+        finally
+        {
+            googleAccessTokenRefreshLock.Release();
+        }
     }
 
     private static string SignGoogleJwt(string value, string pem)

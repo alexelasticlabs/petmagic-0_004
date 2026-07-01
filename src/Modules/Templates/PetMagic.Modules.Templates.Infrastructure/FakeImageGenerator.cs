@@ -12,6 +12,11 @@ internal sealed class FakeImageGenerator : IImageGenerator
         int? seed,
         CancellationToken cancellationToken)
     {
+        if (FakeAiFailure.IsRequested(sourceImageUrl, prompt, model))
+        {
+            return Task.FromResult(Result.Failure<ImageGenerationResult>(TemplatesErrors.AiProviderFailed));
+        }
+
         return Task.FromResult(Result.Success(new ImageGenerationResult(sourceImageUrl, null, null)));
     }
 }

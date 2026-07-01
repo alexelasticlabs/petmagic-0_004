@@ -44,29 +44,47 @@ public sealed class GamificationAdminService(
 
     public async Task<Result<IReadOnlyList<AdminGamificationAchievementDefinitionResponse>>> ListAdminAchievementsAsync(CancellationToken cancellationToken)
     {
-        var unlockedCounts = await dbContext.UserAchievements
-            .GroupBy(x => x.AchievementKey)
-            .Select(group => new { Key = group.Key, Count = group.Select(x => x.UserId).Distinct().Count() })
-            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
+        var unlockedCounts = (await dbContext.UserAchievements
+                .Select(x => new
+                {
+                    x.UserId,
+                    x.AchievementKey
+                })
+                .ToListAsync(cancellationToken))
+            .Select(row => new
+            {
+                row.UserId,
+                Key = NormalizeAchievementKey(row.AchievementKey)
+            })
+            .Where(x => x.Key.Length > 0)
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(item => item.UserId).Distinct().Count(),
+                StringComparer.Ordinal);
 
         var definitions = await dbContext.AchievementDefinitions
             .OrderBy(x => x.SortOrder)
             .ToListAsync(cancellationToken);
 
         var items = definitions
-            .Select(def => new AdminGamificationAchievementDefinitionResponse(
-                def.Key,
-                def.Category,
-                def.Rarity,
-                def.TitleKey,
-                def.DescriptionKey,
-                def.IconEmoji,
-                def.RequirementType,
-                def.RequirementValue,
-                def.RewardSpark,
-                def.IsSecret,
-                def.SortOrder,
-                unlockedCounts.TryGetValue(def.Key, out var count) ? count : 0))
+            .Select(def =>
+            {
+                var normalizedKey = NormalizeAchievementKey(def.Key);
+                return new AdminGamificationAchievementDefinitionResponse(
+                    normalizedKey,
+                    def.Category ?? "special",
+                    def.Rarity ?? "common",
+                    def.TitleKey ?? string.Empty,
+                    def.DescriptionKey ?? string.Empty,
+                    def.IconEmoji,
+                    def.RequirementType ?? string.Empty,
+                    def.RequirementValue,
+                    def.RewardSpark,
+                    def.IsSecret,
+                    def.SortOrder,
+                    unlockedCounts.TryGetValue(normalizedKey, out var count) ? count : 0);
+            })
             .ToList();
 
         return Result.Success<IReadOnlyList<AdminGamificationAchievementDefinitionResponse>>(items);
@@ -100,10 +118,10 @@ public sealed class GamificationAdminService(
             return new AdminGamificationChallengeSummaryResponse(
                 challenge.Id,
                 challenge.WeekStartDate,
-                challenge.ChallengeType,
+                challenge.ChallengeType ?? string.Empty,
                 challenge.TargetValue,
-                challenge.TitleKey,
-                challenge.DescriptionKey,
+                challenge.TitleKey ?? string.Empty,
+                challenge.DescriptionKey ?? string.Empty,
                 challenge.IconEmoji,
                 challenge.RewardSpark,
                 challenge.SortOrder,
@@ -161,7 +179,7 @@ public sealed class GamificationAdminService(
             progress.PetId,
             progress.Xp,
             progress.Level,
-            progress.EvolutionStage,
+            progress.EvolutionStage ?? "egg",
             progress.TotalGenerations,
             XpThresholds.GetXpForNextLevel(progress.Level),
             XpThresholds.GetXpForCurrentLevel(progress.Level),
@@ -169,4 +187,6 @@ public sealed class GamificationAdminService(
             progress.FavoriteTemplateId,
             progress.LastGenerationAtUtc);
     }
+
+    private static string NormalizeAchievementKey(string? value) => value?.Trim() ?? string.Empty;
 }

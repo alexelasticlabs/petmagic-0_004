@@ -900,6 +900,21 @@ public sealed partial class TemplatesApiIntegrationTests
     }
 
     [Fact]
+    public async Task PublicTemplateChanges_ShouldReturnProblem_WhenSinceVersionIsInvalid()
+    {
+        await using var application = await TestApplication.CreateAsync();
+
+        application.Client.DefaultRequestHeaders.Authorization = null;
+
+        using var response = await application.Client.GetAsync("/api/templates/changes?sinceVersion=-1");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("templates.invalid_since_version", body);
+        Assert.Contains("non-negative integer", body);
+    }
+
+    [Fact]
     public async Task PublicPagedTemplateCatalog_ShouldApplyTagsAndPremiumOnlyQueryParameters()
     {
         await using var application = await TestApplication.CreateAsync();
@@ -1078,7 +1093,7 @@ public sealed partial class TemplatesApiIntegrationTests
 
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Contains("templates.reference_duration_required", body);
     }
 
@@ -1253,6 +1268,43 @@ public sealed partial class TemplatesApiIntegrationTests
         using var scope = application.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
         Assert.Empty(await dbContext.TemplateAnalyticsEvents.ToListAsync());
+    }
+
+    [Fact]
+    public async Task PublicAnalyticsEndpoint_ShouldFallbackFromInvalidAnonymousDimensions()
+    {
+        await using var application = await TestApplication.CreateAsync();
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Analytics Dimension Guard",
+            "Contracts",
+            ["analytics", "dimensions"]);
+
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/templates/{created.TemplateId}/analytics/events");
+        request.Headers.UserAgent.ParseAdd("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)");
+        request.Headers.Add("X-Country-Code", "BR");
+        request.Content = JsonContent.Create(new
+        {
+            eventType = "feedback",
+            source = "profile",
+            deviceClass = "ps5-console",
+            countryCode = "brazil",
+            feedbackMessage = "Need better preview controls"
+        });
+
+        using var response = await application.Client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        using var scope = application.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        var stored = await dbContext.TemplateAnalyticsEvents
+            .SingleAsync(x => x.TemplateId == created.TemplateId);
+
+        Assert.Equal("ios", stored.DeviceClass);
+        Assert.Equal("BR", stored.CountryCode);
     }
 
     [Fact]

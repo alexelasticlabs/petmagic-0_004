@@ -115,8 +115,8 @@ public sealed partial class EconomyService
             else
             {
                 joined = joined.Where(x =>
-                    x.pack.Code.ToLower().Contains(normalizedSearch) ||
-                    x.pack.DisplayName.ToLower().Contains(normalizedSearch));
+                    (x.pack.Code ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                    (x.pack.DisplayName ?? string.Empty).ToLower().Contains(normalizedSearch));
             }
         }
 
@@ -148,12 +148,12 @@ public sealed partial class EconomyService
                 x.Id,
                 x.UserId,
                 x.PackId,
-                x.PackCode,
-                x.PackDisplayName,
-                x.PaymentProvider,
-                x.Status,
+                x.PackCode ?? string.Empty,
+                x.PackDisplayName ?? string.Empty,
+                x.PaymentProvider ?? string.Empty,
+                x.Status ?? string.Empty,
                 x.PriceAmount,
-                x.CurrencyCode,
+                x.CurrencyCode ?? string.Empty,
                 x.SparkToGrant,
                 null,
                 x.CreatedAtUtc,
@@ -416,8 +416,8 @@ public sealed partial class EconomyService
             else
             {
                 joined = joined.Where(x =>
-                    x.subscription.PlanId.ToLower().Contains(normalizedSearch) ||
-                    (x.plan != null && x.plan.Name.ToLower().Contains(normalizedSearch)));
+                    (x.subscription.PlanId ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                    (x.plan != null && (x.plan.Name ?? string.Empty).ToLower().Contains(normalizedSearch)));
             }
         }
 
@@ -429,12 +429,12 @@ public sealed partial class EconomyService
             .Select(x => new AdminUserSubscriptionResponse(
             x.subscription.Id,
             x.subscription.UserId,
-            x.subscription.Provider,
-            x.subscription.PurchaseChannel,
-            x.subscription.Region,
-            x.subscription.PlanId,
+            x.subscription.Provider ?? string.Empty,
+            x.subscription.PurchaseChannel ?? string.Empty,
+            x.subscription.Region ?? string.Empty,
+            x.subscription.PlanId ?? string.Empty,
             x.plan != null ? x.plan.Name : null,
-            x.subscription.Status,
+            x.subscription.Status ?? string.Empty,
             x.subscription.CurrentPeriodStartUtc,
             x.subscription.CurrentPeriodEndUtc,
             x.subscription.CancelAtPeriodEnd,
@@ -679,7 +679,6 @@ public sealed partial class EconomyService
                 x.EventType,
                 x.Status,
                 x.ExternalEventId,
-                x.ExternalSubscriptionId,
                 x.CreatedAtUtc,
                 x.ProcessedAtUtc))
             .ToListAsync(cancellationToken);

@@ -116,6 +116,48 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task GetPublicTemplateOfTheDayAsync_ShouldNotCrashOnLegacyNullPreviewContentType()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var templateId = await CreateActiveImageTemplateAsync(service, "Legacy Preview", "Portrait", ["legacy"]);
+
+        var template = await dbContext.TemplateItems
+            .Include(x => x.Assets)
+            .SingleAsync(x => x.Id == templateId);
+        template.Assets.Single(x => x.AssetKind == TemplateAssetKind.Preview).ContentType = null!;
+
+        var createdAssignment = await service.CreateTemplateOfTheDayAsync(
+            new CreateTemplateOfTheDayCommand(
+                templateId,
+                date,
+                date,
+                true,
+                true,
+                10,
+                null,
+                null,
+                null,
+                Guid.NewGuid()),
+            CancellationToken.None);
+
+        Assert.True(createdAssignment.IsSuccess);
+
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.GetPublicTemplateOfTheDayAsync(date, "en", CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var featured = Assert.IsType<PublicTemplateOfTheDayItemResponse>(result.Value.Template);
+        Assert.Equal(templateId, featured.TemplateId);
+        Assert.Equal("https://cdn.example.com/legacy-preview.jpg", featured.ThumbnailUrl);
+        Assert.Equal("https://cdn.example.com/legacy-preview.jpg", featured.PreviewMediaUrl);
+        Assert.NotNull(featured.PreviewAsset);
+        Assert.Equal(string.Empty, featured.PreviewAsset!.ContentType);
+    }
+
+    [Fact]
     public async Task GetPublicTemplateOfTheDayAsync_ShouldCreateStableAutoFallback()
     {
         await using var dbContext = CreateDbContext();

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Gamification.Application.Abstractions;
 using PetMagic.Modules.Gamification.Application.Contracts;
 
@@ -27,36 +28,56 @@ public static class AdminGamificationEndpoints
         return endpoints;
     }
 
-    private static async Task<Ok<AdminGamificationDashboardMetricsResponse>> GetDashboardMetricsAsync(
+    private static async Task<Results<Ok<AdminGamificationDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(
         IGamificationAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminDashboardMetricsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminGamificationProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminGamificationAchievementDefinitionResponse>>> ListAchievementsAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminGamificationAchievementDefinitionResponse>>, ProblemHttpResult>> ListAchievementsAsync(
         IGamificationAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminAchievementsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminGamificationProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<IReadOnlyList<AdminGamificationChallengeSummaryResponse>>> ListCurrentChallengesAsync(
+    private static async Task<Results<Ok<IReadOnlyList<AdminGamificationChallengeSummaryResponse>>, ProblemHttpResult>> ListCurrentChallengesAsync(
         IGamificationAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.ListAdminCurrentChallengesAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminGamificationProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminUserGamificationOverviewResponse>> GetUserOverviewAsync(
+    private static async Task<Results<Ok<AdminUserGamificationOverviewResponse>, ProblemHttpResult>> GetUserOverviewAsync(
         Guid userId,
         IGamificationAdminService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminUserOverviewAsync(userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToAdminGamificationProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -68,12 +89,22 @@ public static class AdminGamificationEndpoints
         var result = await service.ResetAdminUserStreakAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status404NotFound);
+            return ToAdminGamificationProblem(result.Error);
         }
 
         return TypedResults.NoContent();
+    }
+
+    private static ProblemHttpResult ToAdminGamificationProblem(Error error)
+    {
+        var statusCode = string.Equals(error.Code, "gamification.streak_not_found", StringComparison.Ordinal)
+            ? StatusCodes.Status404NotFound
+            : StatusCodes.Status400BadRequest;
+
+        var detail = string.Equals(error.Code, "gamification.streak_not_found", StringComparison.Ordinal)
+            ? "Streak was not found."
+            : "Gamification request could not be completed.";
+
+        return TypedResults.Problem(title: error.Code, detail: detail, statusCode: statusCode);
     }
 }

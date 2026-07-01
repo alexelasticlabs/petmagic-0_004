@@ -277,7 +277,42 @@ public static partial class SupportChatEndpoints
             _ => StatusCodes.Status400BadRequest,
         };
 
-        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+        return TypedResults.Problem(title: error.Code, detail: GetProblemDetail(error.Code, statusCode), statusCode: statusCode);
+    }
+
+    private static string GetProblemDetail(string errorCode, int statusCode)
+    {
+        return errorCode switch
+        {
+            "support.conversation_not_found" => "Support conversation was not found.",
+            "support.message_not_found" => "Support message was not found.",
+            "support.template_not_found" => "Support reply template was not found.",
+            "support.forbidden" => "Support action is not allowed for this user.",
+            "support.status_transition_invalid" => "Support conversation state does not allow this action.",
+            "support.source_invalid" => "Support conversation source is invalid.",
+            "support.priority_invalid" => "Support conversation priority is invalid.",
+            "support.sort_invalid" => "Support inbox sort is invalid.",
+            "support.tags_invalid" => "Support conversation tags are invalid.",
+            "support.invalid_subject" => "Authentication failed.",
+            "support.attachment_invalid_upload" => "Support attachment upload is invalid.",
+            "support.attachment_content_type_not_allowed" => "Support attachment content type is not allowed.",
+            "support.attachment_mime_mismatch" => "Support attachment type does not match the uploaded file.",
+            "support.attachment_file_too_large" => "Support attachment exceeds the maximum allowed size.",
+            "support.attachment_batch_limit_exceeded" => "Support message allows too many attachments.",
+            "support.attachment_storage_failed" => "Support attachment storage is temporarily unavailable.",
+            "support.attachment_retry_not_allowed" => "Attachment retry is not allowed for this message state.",
+            "support.conversation_read_only" => "Conversation is read-only.",
+            "support.reopen_window_expired" => "Conversation can no longer be reopened.",
+            "support.feedback_not_allowed" => "Support feedback is not allowed in the current conversation state.",
+            "support.feedback_rating_invalid" => "Support feedback rating is invalid.",
+            "support.push_token_invalid" => "Support push token is invalid.",
+            "support.assigned_admin_invalid" => "Assigned support operator is invalid.",
+            _ when statusCode == StatusCodes.Status404NotFound => "Requested support resource was not found.",
+            _ when statusCode == StatusCodes.Status403Forbidden => "Support action is forbidden.",
+            _ when statusCode == StatusCodes.Status401Unauthorized => "Support authentication is invalid.",
+            _ when statusCode == StatusCodes.Status409Conflict => "Support request conflicts with the current resource state.",
+            _ => "Support request could not be completed.",
+        };
     }
 
     private static bool TryGetUserId(HttpContext context, out Guid userId, out ProblemHttpResult? unauthorized)
@@ -289,10 +324,9 @@ public static partial class SupportChatEndpoints
             return true;
         }
 
-        unauthorized = TypedResults.Problem(
-            title: "support.invalid_subject",
-            detail: "Invalid access token subject.",
-            statusCode: StatusCodes.Status401Unauthorized);
+        unauthorized = ToProblem(new Error(
+            "support.invalid_subject",
+            "Authentication failed."));
         return false;
     }
 

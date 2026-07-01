@@ -360,6 +360,11 @@ internal sealed partial class TemplateAdminAnalyticsService
         var asset = template.Assets.FirstOrDefault(x => x.AssetKind == assetKind);
         return asset is null
             ? null
-            : new TemplateAssetResponse(asset.Url, asset.FileName, asset.ContentType, asset.FileSizeBytes, asset.DurationSeconds);
+            : new TemplateAssetResponse(
+                asset.Url,
+                asset.FileName ?? string.Empty,
+                asset.ContentType ?? string.Empty,
+                asset.FileSizeBytes,
+                asset.DurationSeconds);
     }
 }

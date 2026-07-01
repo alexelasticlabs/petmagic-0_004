@@ -8,11 +8,19 @@ internal static class TemplateGenerationJobStatusSets
     [
         TemplateGenerationStatus.Queued,
         TemplateGenerationStatus.Processing,
-        TemplateGenerationStatus.Retrying
+        TemplateGenerationStatus.Retrying,
+        TemplateGenerationStatus.SubmittingToProvider,
+        TemplateGenerationStatus.ProviderQueued,
+        TemplateGenerationStatus.ProviderProcessing,
+        TemplateGenerationStatus.ImportingMedia
     ];
 
     public static readonly TemplateGenerationStatus[] Processing =
     [
-        TemplateGenerationStatus.Processing
+        TemplateGenerationStatus.Processing,
+        TemplateGenerationStatus.SubmittingToProvider,
+        TemplateGenerationStatus.ProviderQueued,
+        TemplateGenerationStatus.ProviderProcessing,
+        TemplateGenerationStatus.ImportingMedia
     ];
 }

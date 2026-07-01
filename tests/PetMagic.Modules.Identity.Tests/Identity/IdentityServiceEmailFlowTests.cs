@@ -182,6 +182,42 @@ public sealed class IdentityServiceEmailFlowTests
     }
 
     [Fact]
+    public async Task AcceptLegalDocumentsAsync_ShouldInvalidateLegalAcceptanceCacheImmediately()
+    {
+        await using var dbContext = CreateDbContext();
+        using var legalAcceptanceCache = new MemoryCache(new MemoryCacheOptions());
+        var service = await CreateServiceAsync(dbContext, legalAcceptanceCache: legalAcceptanceCache);
+
+        var user = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            Email = "legal.accept@petmagic.app",
+            UserName = "legal.accept@petmagic.app",
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+            ConcurrencyStamp = Guid.NewGuid().ToString("N"),
+            EmailConfirmed = true,
+            IsActive = true,
+            TermsOfUseAccepted = false,
+            PrivacyPolicyAccepted = false,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        var cacheKey = LegalAcceptanceRequirementCache.BuildKey(user.Id);
+        legalAcceptanceCache.Set(cacheKey, true);
+
+        var result = await service.AcceptLegalDocumentsAsync(
+            user.Id,
+            new AcceptLegalDocumentsCommand(CurrentLegalVersion, CurrentLegalVersion),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.LegalAcceptance.RequiresAcceptance);
+        Assert.False(legalAcceptanceCache.TryGetValue(cacheKey, out _));
+    }
+
+    [Fact]
     public async Task VerifyEmailCodeAsync_ShouldActivateAccount_AndIssueAuthSession()
     {
         await using var dbContext = CreateDbContext();
@@ -602,7 +638,8 @@ public sealed class IdentityServiceEmailFlowTests
         IdentityModuleDbContext dbContext,
         string? acceptLanguage = null,
         IIdentityEmailTemplateRenderer? emailTemplateRenderer = null,
-        ILogger<IdentityService>? logger = null)
+        ILogger<IdentityService>? logger = null,
+        IMemoryCache? legalAcceptanceCache = null)
     {
         await dbContext.Database.EnsureCreatedAsync();
         var economyDbContext = CreateEconomyDbContext();
@@ -683,8 +720,16 @@ public sealed class IdentityServiceEmailFlowTests
                 PasswordResetCodeTtlMinutes = 10
             },
             new AvatarStorageOptions(),
-            Options.Create(new JwtOptions()),
-            logger);
+            Options.Create(new JwtOptions
+            {
+                Issuer = "petmagic-tests",
+                Audience = "petmagic-tests",
+                SigningKey = new string('t', 64),
+                AccessTokenMinutes = 30,
+                RefreshTokenDays = 30
+            }),
+            logger,
+            legalAcceptanceCache);
     }
 
     private static IIdentityEmailTemplateRenderer CreateRealEmailTemplateRenderer()

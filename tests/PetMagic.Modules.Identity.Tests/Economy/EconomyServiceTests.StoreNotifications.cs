@@ -72,6 +72,7 @@ public sealed partial class EconomyServiceTests
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "app_store");
         var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         Assert.Equal("Canceled", subscription.Status);
+        Assert.Null(subscription.ExternalCustomerId);
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("txn-app-2", subscription.ExternalTransactionId);
         Assert.Equal(40, subscription.MonthlyTokensGranted);
@@ -365,6 +366,7 @@ public sealed partial class EconomyServiceTests
         var subscription = await dbContext.UserSubscriptions.SingleAsync(x => x.UserId == userId && x.Provider == "google_play");
         var wallet = await dbContext.Wallets.SingleAsync(x => x.UserId == userId);
         Assert.Equal("Canceled", subscription.Status);
+        Assert.Null(subscription.ExternalCustomerId);
         Assert.True(subscription.CancelAtPeriodEnd);
         Assert.Equal("gp-token-1", subscription.ExternalTransactionId);
         Assert.Equal("order-1", subscription.ExternalSubscriptionId);

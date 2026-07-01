@@ -145,6 +145,80 @@ public sealed class StartSimilarTemplateGenerationCommandValidator : AbstractVal
     }
 }
 
+public sealed class RefundFeedbackCreditsCommandValidator : AbstractValidator<RefundFeedbackCreditsCommand>
+{
+    public RefundFeedbackCreditsCommandValidator()
+    {
+        RuleFor(x => x.FeedbackId).NotEmpty();
+        RuleFor(x => x.AdminUserId).NotEmpty();
+        RuleFor(x => x.Amount).GreaterThan(0).When(x => x.Amount.HasValue);
+        RuleFor(x => x.Reason).MaximumLength(500);
+    }
+}
+
+public sealed class RegisterTemplatePushTokenCommandValidator : AbstractValidator<RegisterTemplatePushTokenCommand>
+{
+    private const int MinPushTokenLength = 20;
+
+    public RegisterTemplatePushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(MinPushTokenLength).MaximumLength(4096);
+        RuleFor(x => x.Platform).NotEmpty().MaximumLength(32);
+        RuleFor(x => x.DeviceId).MaximumLength(128);
+        RuleFor(x => x.AppVersion).MaximumLength(64);
+        RuleFor(x => x.Locale).MaximumLength(16);
+    }
+}
+
+public sealed class UnregisterTemplatePushTokenCommandValidator : AbstractValidator<UnregisterTemplatePushTokenCommand>
+{
+    private const int MinPushTokenLength = 20;
+
+    public UnregisterTemplatePushTokenCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotEmpty();
+        RuleFor(x => x.Token).NotEmpty().MinimumLength(MinPushTokenLength).MaximumLength(4096);
+    }
+}
+
+public sealed class SubmitFeedbackCommandValidator : AbstractValidator<SubmitFeedbackCommand>
+{
+    public SubmitFeedbackCommandValidator()
+    {
+        RuleFor(x => x.UserId).NotNull().NotEmpty();
+        RuleFor(x => x.Type)
+            .NotEmpty()
+            .MaximumLength(32)
+            .Must(value => value is "GenerationResult" or "GenerationFailure" or "BugReport" or "FeatureRequest" or "PaymentIssue" or "General")
+            .WithMessage("Feedback type is invalid.");
+        RuleFor(x => x.Category).NotEmpty().MaximumLength(80);
+        RuleFor(x => x.Rating).InclusiveBetween(-1, 1).When(x => x.Rating.HasValue);
+        RuleFor(x => x.Message).MaximumLength(2000);
+        RuleFor(x => x.SourceScreen).MaximumLength(80);
+        RuleFor(x => x.AppVersion).MaximumLength(64);
+        RuleFor(x => x.Platform).MaximumLength(32);
+        RuleFor(x => x.DeviceModel).MaximumLength(128);
+        RuleFor(x => x.Locale).MaximumLength(16);
+    }
+}
+
+public sealed class UpdateFeedbackAdminCommandValidator : AbstractValidator<UpdateFeedbackAdminCommand>
+{
+    public UpdateFeedbackAdminCommandValidator()
+    {
+        RuleFor(x => x.FeedbackId).NotEmpty();
+        RuleFor(x => x.AdminUserId).NotEmpty();
+        RuleFor(x => x.Status)
+            .Must(value => value is null or "New" or "InReview" or "Resolved" or "Dismissed")
+            .WithMessage("Feedback status is invalid.");
+        RuleFor(x => x.Priority)
+            .Must(value => value is null or "Low" or "Medium" or "High" or "Critical")
+            .WithMessage("Feedback priority is invalid.");
+        RuleFor(x => x.AdminNote).MaximumLength(2000);
+    }
+}
+
 internal static class TemplateInputMediaTypeValidation
 {
     public static bool IsValidInputMediaType(string? raw)

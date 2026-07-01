@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 using PetMagic.Modules.SupportChat.Domain.Enums;
@@ -56,10 +57,9 @@ public static partial class SupportChatEndpoints
 
         if (!TryParseNamedEnum<SupportConversationStatus>(request.Status, out var status))
         {
-            return TypedResults.Problem(
-                title: "support.status_invalid",
-                detail: "Support conversation status is not supported.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToProblem(new Error(
+                "support.status_invalid",
+                "Support conversation status is invalid."));
         }
 
         var command = new UpdateSupportConversationStatusCommand(conversationId, userId, status);
@@ -124,10 +124,9 @@ public static partial class SupportChatEndpoints
 
         if (!TryParseNamedEnum<SupportConversationPriority>(request.Priority, out var priority))
         {
-            return TypedResults.Problem(
-                title: "support.priority_invalid",
-                detail: "Support conversation priority is not supported.",
-                statusCode: StatusCodes.Status400BadRequest);
+            return ToProblem(new Error(
+                "support.priority_invalid",
+                "Support conversation priority is invalid."));
         }
 
         var command = new UpdateSupportConversationMetadataCommand(

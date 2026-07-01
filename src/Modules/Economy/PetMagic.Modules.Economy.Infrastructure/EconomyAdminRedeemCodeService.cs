@@ -33,12 +33,12 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             codesQuery = codesQuery.Where(x =>
-                x.Code.ToLower().Contains(normalizedSearch) ||
-                x.CodePrefix.ToLower().Contains(normalizedSearch) ||
-                x.Description.ToLower().Contains(normalizedSearch) ||
-                (x.CampaignName != null && x.CampaignName.ToLower().Contains(normalizedSearch)) ||
-                (x.CampaignChannel != null && x.CampaignChannel.ToLower().Contains(normalizedSearch)) ||
-                (x.CreatedBy != null && x.CreatedBy.ToLower().Contains(normalizedSearch)));
+                (x.Code ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CodePrefix ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.Description ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CampaignName ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CampaignChannel ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CreatedBy ?? string.Empty).ToLower().Contains(normalizedSearch));
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedRewardKind) && normalizedRewardKind != "all")
@@ -167,12 +167,12 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             codesQuery = codesQuery.Where(x =>
-                x.Code.ToLower().Contains(normalizedSearch) ||
-                x.CodePrefix.ToLower().Contains(normalizedSearch) ||
-                x.Description.ToLower().Contains(normalizedSearch) ||
-                (x.CampaignName != null && x.CampaignName.ToLower().Contains(normalizedSearch)) ||
-                (x.CampaignChannel != null && x.CampaignChannel.ToLower().Contains(normalizedSearch)) ||
-                (x.CreatedBy != null && x.CreatedBy.ToLower().Contains(normalizedSearch)));
+                (x.Code ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CodePrefix ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.Description ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CampaignName ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CampaignChannel ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.CreatedBy ?? string.Empty).ToLower().Contains(normalizedSearch));
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedRewardKind) && normalizedRewardKind != "all")
@@ -570,13 +570,17 @@ internal sealed partial class EconomyAdminRedeemCodeService(EconomyDbContext dbC
             .Select(group => group.Count())
             .DefaultIfEmpty(0)
             .Max();
+        var codePrefix = code.CodePrefix ?? string.Empty;
+        var description = code.Description ?? string.Empty;
+        var rewardKind = code.RewardKind ?? RedeemCodeRewardKind.Spark;
+        var displayCode = string.IsNullOrWhiteSpace(code.Code) ? $"{codePrefix}..." : code.Code;
 
         return new AdminRedeemCodeResponse(
             code.Id,
-            string.IsNullOrWhiteSpace(code.Code) ? $"{code.CodePrefix}..." : code.Code,
-            code.CodePrefix,
-            code.Description,
-            code.RewardKind,
+            displayCode,
+            codePrefix,
+            description,
+            rewardKind,
             code.RewardValue,
             code.MaxRedemptions,
             code.MaxRedemptionsPerUser,

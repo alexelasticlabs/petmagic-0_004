@@ -12,6 +12,7 @@ namespace PetMagic.Modules.Templates.Infrastructure;
 internal sealed class ImagePreviewGenerator(
     IMediaStorage mediaStorage,
     IHttpClientFactory httpClientFactory,
+    Options.TemplatesOptions options,
     ILogger<ImagePreviewGenerator> logger) : IImagePreviewGenerator
 {
     private const int MaxPreviewSize = 1024;
@@ -50,7 +51,19 @@ internal sealed class ImagePreviewGenerator(
                     preferredStorageKey),
                 cancellationToken);
 
-            return stored.IsSuccess ? stored.Value : null;
+            if (stored.IsSuccess)
+            {
+                return stored.Value;
+            }
+
+            logger.LogWarning(
+                "Image preview storage failed. Operation={Operation} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "store_preview",
+                original.FileName,
+                original.ContentType,
+                stored.Error.Code,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
+            return null;
         }
         catch (OperationCanceledException)
         {
@@ -58,16 +71,18 @@ internal sealed class ImagePreviewGenerator(
         }
         catch (Exception exception)
         {
-            logger.LogDebug(
+            logger.LogWarning(
                 exception,
-                "Could not create image preview. FileName={FileName} ContentType={ContentType}",
+                "Image preview generation failed. Operation={Operation} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "create_preview",
                 original.FileName,
-                original.ContentType);
+                original.ContentType,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
             return null;
         }
         finally
         {
-            TryDelete(tempInput);
+            TryDelete(tempInput, original.FileName);
         }
     }
 
@@ -78,6 +93,11 @@ internal sealed class ImagePreviewGenerator(
         if (!string.IsNullOrWhiteSpace(original.LocalPath) && File.Exists(original.LocalPath))
         {
             return (original.LocalPath, null);
+        }
+
+        if (original.FileSizeBytes is > 0 && original.FileSizeBytes > options.PreviewMaxFileSizeBytes)
+        {
+            throw new InvalidOperationException("Preview input exceeds configured size limit.");
         }
 
         var signed = await mediaStorage.CreateReadUrlAsync(
@@ -99,13 +119,47 @@ internal sealed class ImagePreviewGenerator(
             Path.GetTempPath(),
             $"petmagic-preview-input-{Guid.NewGuid():N}{extension}");
         var client = httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName);
-        await using var stream = await client.GetStreamAsync(signed.Value, cancellationToken);
+        using var response = await client.GetAsync(signed.Value, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException("Could not download preview input.");
+        }
+
+        var contentLength = response.Content.Headers.ContentLength;
+        if (contentLength is > 0 && contentLength > options.PreviewMaxFileSizeBytes)
+        {
+            throw new InvalidOperationException("Preview input exceeds configured size limit.");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var file = File.Create(tempPath);
-        await stream.CopyToAsync(file, cancellationToken);
+        await CopyWithLimitAsync(stream, file, options.PreviewMaxFileSizeBytes, cancellationToken);
         return (tempPath, tempPath);
     }
 
-    private static void TryDelete(string? path)
+    private static async Task CopyWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long totalBytes = 0;
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer, cancellationToken);
+            if (bytesRead == 0)
+            {
+                return;
+            }
+
+            totalBytes += bytesRead;
+            if (totalBytes > maxBytes)
+            {
+                throw new InvalidOperationException("Preview input exceeds configured size limit.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+        }
+    }
+
+    private void TryDelete(string? path, string? sourceFileName)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -119,8 +173,14 @@ internal sealed class ImagePreviewGenerator(
                 File.Delete(path);
             }
         }
-        catch
+        catch (Exception exception)
         {
+            logger.LogWarning(
+                exception,
+                "Image preview temp cleanup failed. Operation={Operation} TempFileName={TempFileName} SourceFileName={SourceFileName}",
+                "delete_temp_preview_input",
+                Path.GetFileName(path),
+                string.IsNullOrWhiteSpace(sourceFileName) ? "unknown" : sourceFileName);
         }
     }
 }

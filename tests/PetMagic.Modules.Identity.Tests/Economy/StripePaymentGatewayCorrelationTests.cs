@@ -133,6 +133,117 @@ public sealed class StripePaymentGatewayCorrelationTests
         Assert.DoesNotContain(apiSecretKey, entry.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task CreatePaymentWithSavedMethodAsync_ShouldRejectNonSucceededPaymentIntentStatus()
+    {
+        var logger = new CapturingLogger<StripePaymentGateway>();
+        var gateway = new StripePaymentGateway(
+            new EconomyOptions(),
+            new SingleClientFactory(new HttpClient(new SavedMethodPaymentIntentStatusHandler("requires_action"))),
+            logger);
+
+        var result = await gateway.CreatePaymentWithSavedMethodAsync(
+            new PaymentSavedMethodCreateRequest(
+                "stripe",
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                9.99m,
+                "USD",
+                100,
+                "Test pack",
+                "cus_sensitive_customer_123456",
+                "pm_sensitive_payment_method_123456",
+                "sk_test_super_secret_value"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Stripe gateway operation returned non-success status.", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("create_saved_method_payment_intent", entry.Properties["Operation"]);
+        Assert.Equal("cus_***3456", entry.Properties["ExternalCustomerId"]);
+        Assert.Equal("pi_***1234", entry.Properties["ExternalPaymentId"]);
+        Assert.Equal("pm_***3456", entry.Properties["ExternalPaymentMethodId"]);
+        Assert.DoesNotContain("cus_sensitive_customer_123456", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("pm_sensitive_payment_method_123456", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk_test_super_secret_value", entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreatePaymentWithSavedMethodAsync_ShouldReturnSuccess_WhenPaymentIntentStatusIsSucceeded()
+    {
+        var gateway = new StripePaymentGateway(
+            new EconomyOptions(),
+            new SingleClientFactory(new HttpClient(new SavedMethodPaymentIntentStatusHandler("succeeded"))));
+
+        var result = await gateway.CreatePaymentWithSavedMethodAsync(
+            new PaymentSavedMethodCreateRequest(
+                "stripe",
+                Guid.NewGuid(),
+                Guid.NewGuid(),
+                9.99m,
+                "USD",
+                100,
+                "Test pack",
+                "cus_test_customer",
+                "pm_test_payment_method",
+                "sk_test_super_secret_value"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("pi_saved_method_1234", result.Value.ExternalPaymentId);
+        Assert.Equal(string.Empty, result.Value.CheckoutUrl);
+    }
+
+    [Fact]
+    public async Task ResolveSetupIntentPaymentMethodAsync_ShouldRejectNonSucceededSetupIntentStatusWithoutFetchingPaymentMethod()
+    {
+        var logger = new CapturingLogger<StripePaymentGateway>();
+        var handler = new SetupIntentStatusHandler("requires_action");
+        var gateway = new StripePaymentGateway(
+            new EconomyOptions
+            {
+                StripeTestSecretKey = "sk_test_gateway_key"
+            },
+            new SingleClientFactory(new HttpClient(handler)),
+            logger);
+
+        var result = await gateway.ResolveSetupIntentPaymentMethodAsync(
+            new PaymentMethodResolveRequest("stripe", "seti_sensitive_123456"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("/v1/setup_intents/seti_sensitive_123456", Assert.Single(handler.RequestPaths));
+        var entry = Assert.Single(logger.Entries, x => x.LogLevel == LogLevel.Warning);
+        Assert.Contains("Stripe gateway operation returned non-success status.", entry.Message, StringComparison.Ordinal);
+        Assert.Equal("resolve_setup_intent_payment_method", entry.Properties["Operation"]);
+        Assert.Equal("seti_***3456", entry.Properties["ExternalSetupId"]);
+        Assert.DoesNotContain("seti_sensitive_123456", entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ResolveSetupIntentPaymentMethodAsync_ShouldReturnPaymentMethod_WhenSetupIntentStatusIsSucceeded()
+    {
+        var handler = new SetupIntentStatusHandler("succeeded");
+        var gateway = new StripePaymentGateway(
+            new EconomyOptions
+            {
+                StripeTestSecretKey = "sk_test_gateway_key"
+            },
+            new SingleClientFactory(new HttpClient(handler)));
+
+        var result = await gateway.ResolveSetupIntentPaymentMethodAsync(
+            new PaymentMethodResolveRequest("stripe", "seti_test_1234"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("pm_test_1234", result.Value.ExternalPaymentMethodId);
+        Assert.Equal("visa", result.Value.Brand);
+        Assert.Equal("4242", result.Value.Last4);
+        Assert.Equal(2, handler.RequestPaths.Count);
+        Assert.Equal("/v1/setup_intents/seti_test_1234", handler.RequestPaths[0]);
+        Assert.Equal("/v1/payment_methods/pm_test_1234", handler.RequestPaths[1]);
+    }
+
     private sealed class SingleClientFactory(HttpClient httpClient) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name)
@@ -214,6 +325,46 @@ public sealed class StripePaymentGatewayCorrelationTests
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
             {
                 Content = new StringContent("""{"error":{"message":"forced payment intent failure"}}""")
+            });
+        }
+    }
+
+    private sealed class SavedMethodPaymentIntentStatusHandler(string status) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Assert.Equal("/v1/payment_intents", request.RequestUri?.AbsolutePath);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    $$"""{"id":"pi_saved_method_1234","object":"payment_intent","status":"{{status}}"}""")
+            });
+        }
+    }
+
+    private sealed class SetupIntentStatusHandler(string status) : HttpMessageHandler
+    {
+        public List<string> RequestPaths { get; } = [];
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var requestPath = request.RequestUri?.AbsolutePath ?? string.Empty;
+            RequestPaths.Add(requestPath);
+
+            if (requestPath.StartsWith("/v1/setup_intents/", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        $$"""{"id":"seti_test_1234","object":"setup_intent","status":"{{status}}","payment_method":"pm_test_1234"}""")
+                });
+            }
+
+            Assert.Equal("/v1/payment_methods/pm_test_1234", requestPath);
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"id":"pm_test_1234","object":"payment_method","type":"card","card":{"brand":"visa","last4":"4242","exp_month":12,"exp_year":2030}}""")
             });
         }
     }

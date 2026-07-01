@@ -48,7 +48,11 @@ internal sealed class TemplateWatermarkRenderer(
         string? tempInput = null;
         try
         {
-            var inputPath = await ResolveInputPathAsync(original, ".png", cancellationToken);
+            var inputPath = await ResolveInputPathAsync(
+                original,
+                ".png",
+                options.GeneratedImageMaxFileSizeBytes,
+                cancellationToken);
             tempInput = inputPath.TempPath;
             await using var inputStream = File.OpenRead(inputPath.Path);
             using var image = await Image.LoadAsync<Rgba32>(inputStream, cancellationToken);
@@ -79,9 +83,23 @@ internal sealed class TemplateWatermarkRenderer(
             await using var outputStream = new MemoryStream();
             await image.SaveAsPngAsync(outputStream, cancellationToken);
             outputStream.Position = 0;
-            return await mediaStorage.StoreAsync(
+            var stored = await mediaStorage.StoreAsync(
                 new MediaUploadCommand($"watermarked-{generationId:N}.png", "image/png", outputStream, outputStream.Length),
                 cancellationToken);
+            if (stored.IsSuccess)
+            {
+                return stored;
+            }
+
+            logger.LogWarning(
+                "Image watermark storage failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "store_image_watermark",
+                generationId,
+                original.FileName,
+                original.ContentType,
+                stored.Error.Code,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
+            return stored;
         }
         catch (OperationCanceledException)
         {
@@ -89,7 +107,14 @@ internal sealed class TemplateWatermarkRenderer(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Image watermark render failed. GenerationId={GenerationId}", generationId);
+            logger.LogWarning(
+                exception,
+                "Image watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "create_image_watermark",
+                generationId,
+                original.FileName,
+                original.ContentType,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
         }
         finally
@@ -107,7 +132,11 @@ internal sealed class TemplateWatermarkRenderer(
         string? tempOutput = null;
         try
         {
-            var inputPath = await ResolveInputPathAsync(original, ".mp4", cancellationToken);
+            var inputPath = await ResolveInputPathAsync(
+                original,
+                ".mp4",
+                options.GeneratedVideoMaxFileSizeBytes,
+                cancellationToken);
             tempInput = inputPath.TempPath;
             tempOutput = Path.Combine(Path.GetTempPath(), $"petmagic-watermark-{generationId:N}.mp4");
 
@@ -149,17 +178,35 @@ internal sealed class TemplateWatermarkRenderer(
             {
                 var error = await process.StandardError.ReadToEndAsync(cancellationToken);
                 logger.LogWarning(
-                    "Video watermark render failed. GenerationId={GenerationId} ExitCode={ExitCode} Error={Error}",
+                    "Video watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ExitCode={ExitCode} ErrorPreview={ErrorPreview} HasLocalPath={HasLocalPath}",
+                    "render_video_watermark",
                     generationId,
+                    original.FileName,
+                    original.ContentType,
                     process.ExitCode,
-                    error.Length > 500 ? error[..500] : error);
+                    error.Length > 500 ? error[..500] : error,
+                    !string.IsNullOrWhiteSpace(original.LocalPath));
                 return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
             }
 
             await using var output = File.OpenRead(tempOutput);
-            return await mediaStorage.StoreAsync(
+            var stored = await mediaStorage.StoreAsync(
                 new MediaUploadCommand($"watermarked-{generationId:N}.mp4", "video/mp4", output, output.Length),
                 cancellationToken);
+            if (stored.IsSuccess)
+            {
+                return stored;
+            }
+
+            logger.LogWarning(
+                "Video watermark storage failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} ErrorCode={ErrorCode} HasLocalPath={HasLocalPath}",
+                "store_video_watermark",
+                generationId,
+                original.FileName,
+                original.ContentType,
+                stored.Error.Code,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
+            return stored;
         }
         catch (OperationCanceledException)
         {
@@ -167,7 +214,14 @@ internal sealed class TemplateWatermarkRenderer(
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "Video watermark render failed. GenerationId={GenerationId}", generationId);
+            logger.LogWarning(
+                exception,
+                "Video watermark render failed. Operation={Operation} GenerationId={GenerationId} FileName={FileName} ContentType={ContentType} HasLocalPath={HasLocalPath}",
+                "create_video_watermark",
+                generationId,
+                original.FileName,
+                original.ContentType,
+                !string.IsNullOrWhiteSpace(original.LocalPath));
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.WatermarkRenderFailed);
         }
         finally
@@ -180,11 +234,17 @@ internal sealed class TemplateWatermarkRenderer(
     private async Task<(string Path, string? TempPath)> ResolveInputPathAsync(
         StoredMediaResponse original,
         string fallbackExtension,
+        long maxFileSizeBytes,
         CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(original.LocalPath) && File.Exists(original.LocalPath))
         {
             return (original.LocalPath, null);
+        }
+
+        if (original.FileSizeBytes is > 0 && original.FileSizeBytes > maxFileSizeBytes)
+        {
+            throw new InvalidOperationException("Watermark input exceeds configured size limit.");
         }
 
         var signed = await mediaStorage.CreateReadUrlAsync(
@@ -198,10 +258,44 @@ internal sealed class TemplateWatermarkRenderer(
 
         var tempPath = Path.Combine(Path.GetTempPath(), $"petmagic-watermark-input-{Guid.NewGuid():N}{fallbackExtension}");
         var client = httpClientFactory.CreateClient(HttpGeneratedMediaImporter.HttpClientName);
-        await using var stream = await client.GetStreamAsync(signed.Value, cancellationToken);
+        using var response = await client.GetAsync(signed.Value, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException("Could not download watermark input.");
+        }
+
+        var contentLength = response.Content.Headers.ContentLength;
+        if (contentLength is > 0 && contentLength > maxFileSizeBytes)
+        {
+            throw new InvalidOperationException("Watermark input exceeds configured size limit.");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var file = File.Create(tempPath);
-        await stream.CopyToAsync(file, cancellationToken);
+        await CopyWithLimitAsync(stream, file, maxFileSizeBytes, cancellationToken);
         return (tempPath, tempPath);
+    }
+
+    private static async Task CopyWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long totalBytes = 0;
+        while (true)
+        {
+            var bytesRead = await source.ReadAsync(buffer, cancellationToken);
+            if (bytesRead == 0)
+            {
+                return;
+            }
+
+            totalBytes += bytesRead;
+            if (totalBytes > maxBytes)
+            {
+                throw new InvalidOperationException("Watermark input exceeds configured size limit.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
+        }
     }
 
     private static string NormalizeWatermarkText(string value)

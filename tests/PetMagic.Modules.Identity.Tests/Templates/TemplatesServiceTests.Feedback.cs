@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using Microsoft.EntityFrameworkCore;
 
+using PetMagic.BuildingBlocks.Observability;
 using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Economy.Application.Contracts;
@@ -193,6 +194,53 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task SubmitFeedbackAsync_ShouldRejectInvalidTypeAndRatingWithoutFallback()
+    {
+        await using var dbContext = CreateDbContext();
+        var feedbackService = CreateFeedbackService(dbContext);
+        var userId = Guid.NewGuid();
+
+        var invalidType = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "Other",
+                "quality",
+                -1,
+                "Bad quality",
+                null,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        var invalidRating = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "quality",
+                2,
+                "Bad quality",
+                null,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+
+        Assert.True(invalidType.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedbackType.Code, invalidType.Error.Code);
+        Assert.True(invalidRating.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedback.Code, invalidRating.Error.Code);
+        Assert.Empty(await dbContext.TemplateGenerationFeedback.ToListAsync());
+    }
+
+    [Fact]
     public async Task RefundCreditsAsync_ShouldCreditOnceAndLogAdminContext()
     {
         await using var dbContext = CreateDbContext();
@@ -203,7 +251,8 @@ public sealed partial class TemplatesServiceTests
         generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
         generation.TokenCost = 20;
         await dbContext.SaveChangesAsync();
-        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+        var auditLog = new RecordingAdminAuditLog();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy, auditLog);
 
         var submitted = await feedbackService.SubmitAsync(
             new SubmitFeedbackCommand(
@@ -252,6 +301,59 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("Resolved", details.Value.Status);
         Assert.False(details.Value.CanRefund);
         Assert.NotNull(details.Value.Refund);
+
+        var audit = Assert.Single(auditLog.Entries);
+        Assert.Equal("admin.feedback.refunded", audit.Action);
+        Assert.Equal("feedback", audit.TargetType);
+        Assert.Equal(submitted.Value.FeedbackId.ToString("D"), audit.TargetId);
+        Assert.Equal("7", audit.NewValue);
+        Assert.Equal(userId, audit.SubjectUserId);
+    }
+
+    [Fact]
+    public async Task RefundCreditsAsync_ShouldRejectInvalidExplicitAmountWithoutCrediting()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        generation.ChargedAtUtc = DateTime.UtcNow.AddMinutes(-5);
+        generation.TokenCost = 20;
+        await dbContext.SaveChangesAsync();
+        var feedbackService = CreateFeedbackService(dbContext, out var economyProxy);
+
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "low_quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+        Assert.True(submitted.IsSuccess);
+
+        var zeroAmount = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, 0, "invalid"),
+            CancellationToken.None);
+        var excessiveAmount = await feedbackService.RefundCreditsAsync(
+            new RefundFeedbackCreditsCommand(submitted.Value.FeedbackId, adminId, 21, "invalid"),
+            CancellationToken.None);
+
+        Assert.True(zeroAmount.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedbackRefundAmount.Code, zeroAmount.Error.Code);
+        Assert.True(excessiveAmount.IsFailure);
+        Assert.Equal(TemplatesErrors.InvalidFeedbackRefundAmount.Code, excessiveAmount.Error.Code);
+        Assert.Empty(economyProxy.CreditCommands);
+        Assert.Empty(await dbContext.CreditRefunds.ToListAsync());
     }
 
     [Theory]
@@ -320,6 +422,51 @@ public sealed partial class TemplatesServiceTests
         Assert.Equal("Medium", persisted.Priority);
     }
 
+    [Fact]
+    public async Task UpdateAdminAsync_ShouldWriteAdminAuditForChangedFeedback()
+    {
+        await using var dbContext = CreateDbContext();
+        var templateService = CreateService(dbContext);
+        var userId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var generation = await CreateCompletedImageGenerationAsync(dbContext, templateService, userId);
+        var auditLog = new RecordingAdminAuditLog();
+        var feedbackService = CreateFeedbackService(dbContext, out _, auditLog);
+        var submitted = await feedbackService.SubmitAsync(
+            new SubmitFeedbackCommand(
+                userId,
+                "BugReport",
+                "quality",
+                -1,
+                "Bad quality",
+                generation.Id,
+                null,
+                null,
+                "result",
+                "1.2.3",
+                "ios",
+                "iPhone",
+                "en-US"),
+            CancellationToken.None);
+
+        Assert.True(submitted.IsSuccess);
+
+        var updated = await feedbackService.UpdateAdminAsync(
+            new UpdateFeedbackAdminCommand(submitted.Value.FeedbackId, adminId, "Resolved", "High", "Handled"),
+            CancellationToken.None);
+
+        Assert.True(updated.IsSuccess);
+        var audit = Assert.Single(auditLog.Entries);
+        Assert.Equal("admin.feedback.updated", audit.Action);
+        Assert.Equal("feedback", audit.TargetType);
+        Assert.Equal(submitted.Value.FeedbackId.ToString("D"), audit.TargetId);
+        Assert.Contains("status=New", audit.OldValue, StringComparison.Ordinal);
+        Assert.Contains("priority=Medium", audit.OldValue, StringComparison.Ordinal);
+        Assert.Contains("status=Resolved", audit.NewValue, StringComparison.Ordinal);
+        Assert.Contains("priority=High", audit.NewValue, StringComparison.Ordinal);
+        Assert.Equal(userId, audit.SubjectUserId);
+    }
+
     private static FeedbackService CreateFeedbackService(TemplatesDbContext dbContext)
     {
         return CreateFeedbackService(dbContext, out _);
@@ -329,8 +476,16 @@ public sealed partial class TemplatesServiceTests
         TemplatesDbContext dbContext,
         out RecordingEconomyServiceProxy economyProxy)
     {
+        return CreateFeedbackService(dbContext, out economyProxy, null);
+    }
+
+    private static FeedbackService CreateFeedbackService(
+        TemplatesDbContext dbContext,
+        out RecordingEconomyServiceProxy economyProxy,
+        IAdminAuditLog? adminAuditLog)
+    {
         var economyService = RecordingEconomyServiceProxy.Create(out economyProxy);
-        return new FeedbackService(dbContext, economyService);
+        return new FeedbackService(dbContext, economyService, adminAuditLog);
     }
 
     private class RecordingEconomyServiceProxy : DispatchProxy

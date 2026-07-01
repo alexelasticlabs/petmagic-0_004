@@ -26,12 +26,12 @@ public static partial class AuthEndpoints
         string? normalizedRedirectUri = null;
         if (normalizedProvider is null)
         {
-            return Results.BadRequest(new { message = "Unsupported provider." });
+            return ToExternalAuthProblem("auth.external_invalid", StatusCodes.Status400BadRequest);
         }
 
         if (redirectUri is not null && !TryNormalizeMobileRedirectUri(redirectUri, out normalizedRedirectUri))
         {
-            return Results.BadRequest(new { message = UnsupportedRedirectUriMessage });
+            return ToExternalAuthProblem("auth.external_invalid", StatusCodes.Status400BadRequest);
         }
 
         var callbackRedirectUri = $"/api/auth/external/callback?provider={normalizedProvider}";
@@ -65,7 +65,7 @@ public static partial class AuthEndpoints
         var normalizedProvider = NormalizeExternalProvider(provider);
         if (normalizedProvider is null)
         {
-            return Results.BadRequest(new { message = "Unsupported provider." });
+            return ToExternalAuthProblem("auth.external_invalid", StatusCodes.Status400BadRequest);
         }
 
         var externalAuthResult = await httpContext.AuthenticateAsync(IdentityConstants.ExternalScheme);
@@ -80,14 +80,12 @@ public static partial class AuthEndpoints
                 return BuildExternalCallbackErrorResult(
                     clientRedirectUri,
                     ExternalCancelledCode,
-                    ExternalCancelledMessage,
                     StatusCodes.Status401Unauthorized);
             }
 
             return BuildExternalCallbackErrorResult(
                 clientRedirectUri,
                 "auth.external_invalid",
-                "External authentication failed.",
                 StatusCodes.Status401Unauthorized);
         }
 
@@ -109,7 +107,6 @@ public static partial class AuthEndpoints
             return BuildExternalCallbackErrorResult(
                 clientRedirectUri,
                 "auth.external_invalid",
-                "External principal payload is invalid.",
                 StatusCodes.Status400BadRequest);
         }
 
@@ -121,7 +118,6 @@ public static partial class AuthEndpoints
                 return BuildExternalCallbackErrorResult(
                     clientRedirectUri,
                     ExternalTicketInvalidCode,
-                    ExternalTicketInvalidMessage,
                     StatusCodes.Status401Unauthorized);
             }
 
@@ -133,7 +129,6 @@ public static partial class AuthEndpoints
                 return BuildExternalCallbackErrorResult(
                     clientRedirectUri,
                     linkedResult.Error.Code,
-                    linkedResult.Error.Message,
                     StatusCodes.Status400BadRequest);
             }
 
@@ -160,7 +155,6 @@ public static partial class AuthEndpoints
             return BuildExternalCallbackErrorResult(
                 clientRedirectUri,
                 result.Error.Code,
-                result.Error.Message,
                 StatusCodes.Status401Unauthorized);
         }
 
@@ -185,10 +179,7 @@ public static partial class AuthEndpoints
     {
         if (!verifier.IsConfigured || string.IsNullOrWhiteSpace(verifier.ClientId))
         {
-            return TypedResults.Problem(
-                title: "auth.external_not_configured",
-                detail: "Google sign-in is not configured.",
-                statusCode: StatusCodes.Status404NotFound);
+            return ToExternalAuthProblem("auth.external_not_configured", StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(new GoogleMobileConfigResponse(verifier.ClientId));
@@ -215,19 +206,13 @@ public static partial class AuthEndpoints
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status401Unauthorized;
 
-            return TypedResults.Problem(
-                title: verification.Error.Code,
-                detail: verification.Error.Message,
-                statusCode: statusCode);
+            return ToExternalAuthProblem(verification.Error.Code, statusCode);
         }
 
         var result = await service.ExternalLoginAsync(verification.Value, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status401Unauthorized);
+            return ToExternalAuthProblem(result.Error.Code, StatusCodes.Status401Unauthorized);
         }
 
         WriteRefreshTokenCookie(context, result.Value.RefreshToken);
@@ -289,19 +274,13 @@ public static partial class AuthEndpoints
                 ? StatusCodes.Status404NotFound
                 : StatusCodes.Status401Unauthorized;
 
-            return TypedResults.Problem(
-                title: verification.Error.Code,
-                detail: verification.Error.Message,
-                statusCode: statusCode);
+            return ToExternalAuthProblem(verification.Error.Code, statusCode);
         }
 
         var result = await service.ExternalLoginAsync(verification.Value, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status401Unauthorized);
+            return ToExternalAuthProblem(result.Error.Code, StatusCodes.Status401Unauthorized);
         }
 
         WriteRefreshTokenCookie(context, result.Value.RefreshToken);
@@ -323,10 +302,7 @@ public static partial class AuthEndpoints
 
         if (!completionStore.TryTake(request.Ticket, out var session) || session is null)
         {
-            return TypedResults.Problem(
-                title: ExternalTicketInvalidCode,
-                detail: ExternalTicketInvalidMessage,
-                statusCode: StatusCodes.Status401Unauthorized);
+            return ToExternalAuthProblem(ExternalTicketInvalidCode, StatusCodes.Status401Unauthorized);
         }
 
         WriteRefreshTokenCookie(context, session.RefreshToken);
@@ -393,21 +369,49 @@ public static partial class AuthEndpoints
     private static IResult BuildExternalCallbackErrorResult(
         string? clientRedirectUri,
         string errorCode,
-        string errorMessage,
         int statusCode)
     {
         if (clientRedirectUri is not null)
         {
             var redirectUrl = QueryHelpers.AddQueryString(clientRedirectUri, new Dictionary<string, string?>
             {
-                ["error"] = errorCode,
-                ["message"] = errorMessage
+                ["error"] = errorCode
             });
 
             return Results.Redirect(redirectUrl);
         }
 
-        return TypedResults.Problem(title: errorCode, detail: errorMessage, statusCode: statusCode);
+        return ToExternalAuthProblem(errorCode, statusCode);
+    }
+
+    private static ProblemHttpResult ToExternalAuthProblem(string errorCode, int statusCode)
+    {
+        return TypedResults.Problem(
+            title: errorCode,
+            detail: GetExternalAuthProblemDetail(errorCode, statusCode),
+            statusCode: statusCode);
+    }
+
+    private static string GetExternalAuthProblemDetail(string errorCode, int statusCode)
+    {
+        return errorCode switch
+        {
+            ExternalCancelledCode => ExternalCancelledMessage,
+            ExternalTicketInvalidCode => ExternalTicketInvalidMessage,
+            "auth.external_not_configured" => "External sign-in is not configured.",
+            "auth.external_token_invalid" => "External identity token is invalid.",
+            "auth.external_email_missing" => "External provider did not supply an email.",
+            "auth.external_email_not_verified" => "External provider email is not verified.",
+            "auth.external_already_linked" => "This external account is already linked to another user.",
+            "auth.external_provider_already_linked" => "This provider is already linked to the current user.",
+            "auth.external_not_linked" => "This provider is not linked to the current user.",
+            "auth.external_last_sign_in_method" => "At least one sign-in method must remain linked to this account.",
+            "auth.account_deleted" => "Account is unavailable.",
+            "common.operation_failed" => "External authentication could not be completed.",
+            _ when statusCode == StatusCodes.Status404NotFound => "External sign-in is not configured.",
+            _ when statusCode == StatusCodes.Status400BadRequest => "External authentication request is invalid.",
+            _ => "External authentication failed.",
+        };
     }
 
     private sealed record ExternalLoginExchangeRequest(string Ticket);

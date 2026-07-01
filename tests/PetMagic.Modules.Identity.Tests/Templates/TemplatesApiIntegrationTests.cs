@@ -33,6 +33,7 @@ using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
+[Collection(TemplateGenerationLocalConcurrencyCollection.Name)]
 public sealed partial class TemplatesApiIntegrationTests
 {
 
@@ -194,7 +195,10 @@ public sealed partial class TemplatesApiIntegrationTests
 
         public IServiceProvider Services => app.Services;
 
-        public static async Task<TestApplication> CreateAsync(bool failGeneratedMediaImport = false)
+        public static async Task<TestApplication> CreateAsync(
+            bool failGeneratedMediaImport = false,
+            int? freeImageMaxEstimatedWaitSeconds = null,
+            bool startGenerationWorker = true)
         {
             var databaseRoot = new InMemoryDatabaseRoot();
             var databaseName = $"templates-api-tests-{Guid.NewGuid():N}";
@@ -296,6 +300,12 @@ public sealed partial class TemplatesApiIntegrationTests
                 SeedSampleTemplates = false,
                 GenerationWorkerPollIntervalMilliseconds = 10,
                 GeneratedVideoMaxFileSizeBytes = 5 * 1024 * 1024,
+                FreeImageMaxEstimatedWaitSeconds = freeImageMaxEstimatedWaitSeconds ?? 10_000,
+                PremiumImageMaxEstimatedWaitSeconds = 10_000,
+                PrivilegedImageMaxEstimatedWaitSeconds = 10_000,
+                FreeVideoMaxEstimatedWaitSeconds = 10_000,
+                PremiumVideoMaxEstimatedWaitSeconds = 10_000,
+                PrivilegedVideoMaxEstimatedWaitSeconds = 10_000
             });
 
             var mediaStorage = new InMemoryMediaStorage();
@@ -323,7 +333,10 @@ public sealed partial class TemplatesApiIntegrationTests
             builder.Services.AddScoped<IFeedbackService, FeedbackService>();
             builder.Services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
             builder.Services.AddScoped<TemplateGenerationJobProcessor>();
-            builder.Services.AddHostedService<TemplateGenerationWorker>();
+            if (startGenerationWorker)
+            {
+                builder.Services.AddHostedService<TemplateGenerationWorker>();
+            }
             builder.Services.AddTemplatesApiModule();
 
             var app = builder.Build();

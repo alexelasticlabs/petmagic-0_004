@@ -27,12 +27,18 @@ internal sealed class TemplateCategoryAdminService(
             return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>([]);
         }
 
-        var categoryNames = categories.Select(category => category.Name).ToArray();
+        var categoryNames = categories
+            .Select(category => NormalizeCategoryLookupKey(category.Name))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var includesEmptyCategory = categoryNames.Contains(string.Empty, StringComparer.Ordinal);
         var templates = await dbContext.TemplateItems
             .AsNoTracking()
-            .Where(template => categoryNames.Contains(template.Category))
+            .Where(template =>
+                categoryNames.Contains(template.Category)
+                || (includesEmptyCategory && (template.Category == null || template.Category == string.Empty)))
             .Select(template => new TemplateCategorySnapshot(
-                template.Category,
+                NormalizeCategoryLookupKey(template.Category),
                 template.TemplateType,
                 template.Status,
                 template.IsPremium,
@@ -45,7 +51,7 @@ internal sealed class TemplateCategoryAdminService(
         var response = categories
             .Select(category => MapAdminCategory(
                 category,
-                templatesByCategory.TryGetValue(category.Name, out var categoryTemplates) ? categoryTemplates : []))
+                templatesByCategory.TryGetValue(NormalizeCategoryLookupKey(category.Name), out var categoryTemplates) ? categoryTemplates : []))
             .ToArray();
 
         return Result.Success<IReadOnlyList<AdminTemplateCategoryListItemResponse>>(response);
@@ -206,6 +212,11 @@ internal sealed class TemplateCategoryAdminService(
         return categoryName.Trim().ToUpperInvariant();
     }
 
+    private static string NormalizeCategoryLookupKey(string? categoryName)
+    {
+        return categoryName?.Trim() ?? string.Empty;
+    }
+
     private static string[] NormalizeTags(IEnumerable<string> tags)
     {
         return [.. tags
@@ -234,7 +245,7 @@ internal sealed class TemplateCategoryAdminService(
 
         return new AdminTemplateCategoryListItemResponse(
             category.Id,
-            category.Name,
+            category.Name ?? string.Empty,
             category.IsArchived,
             templates.Count,
             templates.Count(template => template.TemplateType == TemplateType.Video),

@@ -58,7 +58,7 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             .Select(x => new AdminUserTemplateGenerationResponse(
                 x.Id,
                 x.TemplateId,
-                x.TemplateTitle,
+                x.TemplateTitle ?? string.Empty,
                 x.TemplateType.ToString(),
                 x.Status.ToString(),
                 x.TokenCost,
@@ -131,11 +131,11 @@ internal sealed class AdminUserTemplateAnalyticsReader(TemplatesDbContext dbCont
             .Select(x => new AdminUserTemplateEventResponse(
                 x.Id,
                 x.TemplateId,
-                x.TemplateTitle,
-                x.EventType,
-                x.Source,
-                x.DeviceClass,
-                x.CountryCode,
+                x.TemplateTitle ?? string.Empty,
+                x.EventType ?? string.Empty,
+                x.Source ?? string.Empty,
+                x.DeviceClass ?? string.Empty,
+                x.CountryCode ?? string.Empty,
                 x.GenerationId,
                 x.FeedbackMessage,
                 x.CreatedAtUtc))

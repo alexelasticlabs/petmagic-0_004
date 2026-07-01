@@ -3,7 +3,9 @@
   <ItemGroup>
     <ProjectReference Include="..\PetMagic.Modules.SupportChat.Application\PetMagic.Modules.SupportChat.Application.csproj" />
     <ProjectReference Include="..\PetMagic.Modules.SupportChat.Domain\PetMagic.Modules.SupportChat.Domain.csproj" />
+    <ProjectReference Include="..\..\Economy\PetMagic.Modules.Economy.Application\PetMagic.Modules.Economy.Application.csproj" />
     <ProjectReference Include="..\..\Identity\PetMagic.Modules.Identity.Application\PetMagic.Modules.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Templates\PetMagic.Modules.Templates.Application\PetMagic.Modules.Templates.Application.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\PetMagic.BuildingBlocks\PetMagic.BuildingBlocks.csproj" />
   </ItemGroup>
 

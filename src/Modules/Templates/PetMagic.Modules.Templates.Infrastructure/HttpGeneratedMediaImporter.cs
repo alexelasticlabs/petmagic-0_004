@@ -17,12 +17,26 @@ internal sealed class HttpGeneratedMediaImporter(
 
     public async Task<Result<StoredMediaResponse>> ImportVideoAsync(string generatedVideoUrl, Guid generationId, CancellationToken cancellationToken)
     {
-        return await ImportAsync(generatedVideoUrl, generationId, options.GeneratedVideoMaxFileSizeBytes, "video/mp4", ResolveVideoExtension, cancellationToken);
+        return await ImportAsync(
+            generatedVideoUrl,
+            generationId,
+            options.GeneratedVideoMaxFileSizeBytes,
+            "video/",
+            "video/mp4",
+            ResolveVideoExtension,
+            cancellationToken);
     }
 
     public Task<Result<StoredMediaResponse>> ImportImageAsync(string generatedImageUrl, Guid generationId, CancellationToken cancellationToken)
     {
-        return ImportAsync(generatedImageUrl, generationId, options.GeneratedImageMaxFileSizeBytes, "image/png", ResolveImageExtension, cancellationToken);
+        return ImportAsync(
+            generatedImageUrl,
+            generationId,
+            options.GeneratedImageMaxFileSizeBytes,
+            "image/",
+            "image/png",
+            ResolveImageExtension,
+            cancellationToken);
     }
 
     private static async Task CopyWithLimitAsync(Stream source, Stream destination, long maxBytes, CancellationToken cancellationToken)
@@ -78,11 +92,17 @@ internal sealed class HttpGeneratedMediaImporter(
         string generatedMediaUrl,
         Guid generationId,
         long maxFileSizeBytes,
+        string expectedContentTypePrefix,
         string defaultContentType,
         Func<string, Uri, string> resolveExtension,
         CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(generatedMediaUrl, UriKind.Absolute, out var uri))
+        {
+            return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+        }
+
+        if (!IsAllowedGeneratedMediaUri(uri))
         {
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
@@ -103,6 +123,11 @@ internal sealed class HttpGeneratedMediaImporter(
             }
 
             var contentType = response.Content.Headers.ContentType?.MediaType ?? defaultContentType;
+            if (!contentType.StartsWith(expectedContentTypePrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
+            }
+
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var memoryStream = new MemoryStream();
             await CopyWithLimitAsync(stream, memoryStream, maxFileSizeBytes, cancellationToken);
@@ -128,5 +153,13 @@ internal sealed class HttpGeneratedMediaImporter(
                 generationId);
             return Result.Failure<StoredMediaResponse>(TemplatesErrors.GeneratedMediaImportFailed);
         }
+    }
+
+    private static bool IsAllowedGeneratedMediaUri(Uri uri)
+    {
+        return uri.IsAbsoluteUri
+            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && !uri.IsLoopback
+            && string.IsNullOrWhiteSpace(uri.UserInfo);
     }
 }

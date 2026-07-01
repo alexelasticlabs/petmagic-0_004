@@ -39,10 +39,25 @@ internal sealed partial class FeedbackService
             return Result.Failure<CreditRefundResponse>(TemplatesErrors.FeedbackRefundAlreadyIssued);
         }
 
-        var amount = Math.Clamp(command.Amount ?? generation.TokenCost, 1, generation.TokenCost);
+        var amount = generation.TokenCost;
+        if (command.Amount.HasValue)
+        {
+            if (command.Amount.Value <= 0 || command.Amount.Value > generation.TokenCost)
+            {
+                return Result.Failure<CreditRefundResponse>(TemplatesErrors.InvalidFeedbackRefundAmount);
+            }
+
+            amount = command.Amount.Value;
+        }
+
         var reason = NormalizeText(command.Reason ?? $"Feedback refund {feedback.Id}", 500);
         var creditResult = await economyService.CreditAsync(
-            new CreditBalanceCommand(feedback.UserId.Value, amount, WalletLedgerSource.GenerationRefund, reason),
+            new CreditBalanceCommand(
+                feedback.UserId.Value,
+                amount,
+                WalletLedgerSource.GenerationRefund,
+                reason,
+                $"feedback_refund:{feedback.Id:N}"),
             cancellationToken);
         if (creditResult.IsFailure)
         {
@@ -69,6 +84,14 @@ internal sealed partial class FeedbackService
         feedback.ReviewedByAdminId = command.AdminUserId;
         AddFeedbackAnalytics(feedback, generation, TemplateAnalyticsEventTypes.AdminRefundIssued, now);
         await dbContext.SaveChangesAsync(cancellationToken);
+        await WriteAdminFeedbackAuditAsync(
+            action: "admin.feedback.refunded",
+            feedbackId: feedback.Id,
+            oldValue: null,
+            newValue: amount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            details: $"Refunded {amount} credits for generation {generation.Id:D}.",
+            subjectUserId: feedback.UserId,
+            cancellationToken: cancellationToken);
 
         return Result.Success(MapRefund(refund));
     }

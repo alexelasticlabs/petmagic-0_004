@@ -77,6 +77,9 @@ internal sealed partial class FeedbackService
             return Result.Failure<AdminFeedbackDetailsResponse>(TemplatesErrors.FeedbackNotFound);
         }
 
+        var oldStatus = feedback.Status;
+        var oldPriority = feedback.Priority;
+        var oldAdminNote = feedback.AdminNote;
         var changed = false;
         if (!string.IsNullOrWhiteSpace(command.Status))
         {
@@ -113,6 +116,14 @@ internal sealed partial class FeedbackService
             feedback.ReviewedByAdminId = command.AdminUserId;
             AddFeedbackAnalytics(feedback, feedback.Generation, TemplateAnalyticsEventTypes.AdminStatusChanged, now);
             await dbContext.SaveChangesAsync(cancellationToken);
+            await WriteAdminFeedbackAuditAsync(
+                action: "admin.feedback.updated",
+                feedbackId: feedback.Id,
+                oldValue: BuildFeedbackAuditSnapshot(oldStatus, oldPriority, oldAdminNote),
+                newValue: BuildFeedbackAuditSnapshot(feedback.Status, feedback.Priority, feedback.AdminNote),
+                details: $"Updated feedback status={feedback.Status}, priority={feedback.Priority}.",
+                subjectUserId: feedback.UserId,
+                cancellationToken: cancellationToken);
         }
 
         return Result.Success(await MapDetailsAsync(feedback, cancellationToken));

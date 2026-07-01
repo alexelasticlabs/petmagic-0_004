@@ -12,6 +12,10 @@ namespace PetMagic.Modules.Gamification.Api.Endpoints;
 
 public static class GamificationEndpoints
 {
+    private const string InvalidSubjectCode = "gamification.invalid_subject";
+    private const string PetProgressNotFoundCode = "gamification.pet_progress_not_found";
+    private const string StreakNotFoundCode = "gamification.streak_not_found";
+
     public static IEndpointRouteBuilder MapGamificationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/gamification")
@@ -60,14 +64,14 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetSummaryAsync(userId.Value, cancellationToken);
         return TypedResults.Ok(result);
     }
 
-    private static async Task<Results<Ok<PetProgressResponse>, NotFound, ProblemHttpResult>> GetPetProgressAsync(
+    private static async Task<Results<Ok<PetProgressResponse>, ProblemHttpResult>> GetPetProgressAsync(
         HttpContext context,
         Guid petId,
         IGamificationService service,
@@ -76,11 +80,11 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetPetProgressAsync(userId.Value, petId, cancellationToken);
-        return result is null ? TypedResults.NotFound() : TypedResults.Ok(result);
+        return result is null ? NotFoundProblem(PetProgressNotFoundCode) : TypedResults.Ok(result);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<AchievementResponse>>, ProblemHttpResult>> GetAchievementsAsync(
@@ -91,7 +95,7 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetAchievementsAsync(userId.Value, cancellationToken);
@@ -106,14 +110,14 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetRecentAchievementsAsync(userId.Value, 10, cancellationToken);
         return TypedResults.Ok(result);
     }
 
-    private static async Task<Results<Ok<StreakResponse>, NotFound, ProblemHttpResult>> GetStreakAsync(
+    private static async Task<Results<Ok<StreakResponse>, ProblemHttpResult>> GetStreakAsync(
         HttpContext context,
         IGamificationService service,
         CancellationToken cancellationToken)
@@ -121,11 +125,11 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetStreakAsync(userId.Value, cancellationToken);
-        return result is null ? TypedResults.NotFound() : TypedResults.Ok(result);
+        return result is null ? NotFoundProblem(StreakNotFoundCode) : TypedResults.Ok(result);
     }
 
     private static async Task<Results<Ok<UseFreezeResult>, ProblemHttpResult>> UseStreakFreezeAsync(
@@ -136,7 +140,7 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.UseStreakFreezeAsync(userId.Value, cancellationToken);
@@ -151,7 +155,7 @@ public static class GamificationEndpoints
         var userId = TryGetUserId(context);
         if (userId is null)
         {
-            return TypedResults.Problem(title: "gamification.invalid_subject", detail: "Invalid access token subject.", statusCode: 401);
+            return InvalidSubjectProblem();
         }
 
         var result = await service.GetCurrentChallengesAsync(userId.Value, cancellationToken);
@@ -163,5 +167,25 @@ public static class GamificationEndpoints
         var sub = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? context.User.FindFirst("sub")?.Value;
         return Guid.TryParse(sub, out var userId) ? userId : null;
+    }
+
+    private static ProblemHttpResult InvalidSubjectProblem()
+    {
+        return TypedResults.Problem(
+            title: InvalidSubjectCode,
+            detail: "Authentication failed.",
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    private static ProblemHttpResult NotFoundProblem(string errorCode)
+    {
+        var detail = string.Equals(errorCode, StreakNotFoundCode, StringComparison.Ordinal)
+            ? "Streak was not found."
+            : "Gamification resource was not found.";
+
+        return TypedResults.Problem(
+            title: errorCode,
+            detail: detail,
+            statusCode: StatusCodes.Status404NotFound);
     }
 }

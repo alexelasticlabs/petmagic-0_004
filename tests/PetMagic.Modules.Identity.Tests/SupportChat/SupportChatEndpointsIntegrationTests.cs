@@ -8,9 +8,9 @@ using System.Text.Json;
 using FluentValidation;
 
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -80,7 +81,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
     }
 
     [Fact]
-    public async Task OpenConversationEndpoint_ShouldIgnoreClientProvidedPaymentLinks()
+    public async Task OpenConversationEndpoint_ShouldPreserveClientProvidedRelatedContextLinks()
     {
         await using var application = await SupportChatTestApplication.CreateAsync();
 
@@ -98,17 +99,17 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 RelatedPaymentId: paymentId,
                 RelatedSubscriptionId: subscriptionId));
 
-        Assert.Null(opened.RelatedGenerationId);
-        Assert.Null(opened.RelatedPaymentId);
-        Assert.Null(opened.RelatedSubscriptionId);
+        Assert.Equal(generationId, opened.RelatedGenerationId);
+        Assert.Equal(paymentId, opened.RelatedPaymentId);
+        Assert.Equal(subscriptionId, opened.RelatedSubscriptionId);
 
         var adminContext = await GetFromJsonAsync<SupportTicketContextResponse>(
             application.CreateClient(AdminId, "Admin"),
             $"/api/admin/support/tickets/{opened.ConversationId}/context");
 
-        Assert.Null(adminContext.LinkedGeneration);
-        Assert.Null(adminContext.RelatedPaymentId);
-        Assert.Null(adminContext.RelatedSubscriptionId);
+        Assert.Equal(generationId, adminContext.LinkedGeneration);
+        Assert.Equal(paymentId, adminContext.RelatedPaymentId);
+        Assert.Equal(subscriptionId, adminContext.RelatedSubscriptionId);
     }
 
     [Fact]
@@ -568,6 +569,10 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
     private sealed class SupportChatTestApplication : IAsyncDisposable
     {
+        private const string TestJwtIssuer = "petmagic-support-chat-tests";
+        private const string TestJwtAudience = "petmagic-support-chat-tests";
+        private const string TestJwtSigningKey = "support-chat-tests-jwt-signing-key-64-bytes-minimum-secret-value";
+
         private readonly WebApplication app;
 
         private SupportChatTestApplication(WebApplication app, HttpClient anonymousClient)
@@ -583,7 +588,7 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         public FakeSupportAttachmentStorage AttachmentStorage =>
             (FakeSupportAttachmentStorage)app.Services.GetRequiredService<ISupportAttachmentStorage>();
 
-        public static async Task<SupportChatTestApplication> CreateAsync()
+        public static async Task<SupportChatTestApplication> CreateAsync(Action<IServiceCollection>? configureServices = null)
         {
             var supportDatabaseRoot = new InMemoryDatabaseRoot();
             var identityDatabaseRoot = new InMemoryDatabaseRoot();
@@ -598,6 +603,9 @@ public sealed partial class SupportChatEndpointsIntegrationTests
 
             builder.WebHost.UseTestServer();
             builder.Configuration["AllowedHosts"] = "*";
+            builder.Configuration["Jwt:Issuer"] = TestJwtIssuer;
+            builder.Configuration["Jwt:Audience"] = TestJwtAudience;
+            builder.Configuration["Jwt:SigningKey"] = TestJwtSigningKey;
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AdminWeb", policy =>
@@ -656,11 +664,18 @@ public sealed partial class SupportChatEndpointsIntegrationTests
             builder.Services.AddSingleton<ISupportAttachmentReadUrlSigner, SupportAttachmentReadUrlSigner>();
             builder.Services.AddSingleton<ISupportChatPushNotificationSender, NoopSupportChatPushNotificationSender>();
             builder.Services.AddSingleton(new SupportAttachmentStorageOptions());
-            builder.Services.AddScoped<ISupportChatService, SupportChatService>();
+            builder.Services.AddScoped<SupportChatService>();
+            builder.Services.AddScoped<ISupportChatService>(serviceProvider => serviceProvider.GetRequiredService<SupportChatService>());
             builder.Services.AddScoped<ISupportReplyTemplateCatalogService, SupportReplyTemplateCatalogService>();
             builder.Services.AddSupportChatApiModule();
+            configureServices?.Invoke(builder.Services);
 
             var app = builder.Build();
+            if (string.IsNullOrWhiteSpace(app.Configuration["Jwt:SigningKey"]))
+            {
+                throw new InvalidOperationException("SupportChat test fixture must configure a non-empty Jwt:SigningKey.");
+            }
+
             app.UseRateLimiter();
             app.UseCors();
             app.UseAuthentication();
@@ -971,9 +986,11 @@ public sealed partial class SupportChatEndpointsIntegrationTests
         };
 
         public int StoreCallCount { get; private set; }
+        public int DeleteCallCount { get; private set; }
 
         public Task<Result> DeleteAsync(string? attachmentUrl, CancellationToken cancellationToken)
         {
+            DeleteCallCount++;
             return Task.FromResult(Result.Success());
         }
 
@@ -1085,6 +1102,72 @@ public sealed partial class SupportChatEndpointsIntegrationTests
                 _ => false,
             };
         }
+    }
+
+    private sealed class FailUploadedAttachmentStatusSupportChatService(ISupportChatService inner) : ISupportChatService
+    {
+        private static readonly Error FinalizeFailedError = new("support.attachment_finalize_failed", "Support attachment state could not be finalized.");
+
+        public Task<Result<SupportConversationDetailResponse>> OpenConversationAsync(OpenSupportConversationCommand command, CancellationToken cancellationToken) =>
+            inner.OpenConversationAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> GetUserConversationAsync(Guid userId, SupportConversationMessagesQuery query, CancellationToken cancellationToken) =>
+            inner.GetUserConversationAsync(userId, query, cancellationToken);
+
+        public Task<Result<SupportConversationInboxPageResponse>> ListAdminInboxAsync(ListAdminSupportInboxQuery query, CancellationToken cancellationToken) =>
+            inner.ListAdminInboxAsync(query, cancellationToken);
+
+        public Task<Result<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(CancellationToken cancellationToken) =>
+            inner.GetAdminInboxMetricsAsync(cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> GetAdminConversationAsync(Guid conversationId, SupportConversationMessagesQuery query, CancellationToken cancellationToken) =>
+            inner.GetAdminConversationAsync(conversationId, query, cancellationToken);
+
+        public Task<Result<SupportTicketContextResponse>> GetAdminTicketContextAsync(Guid conversationId, CancellationToken cancellationToken) =>
+            inner.GetAdminTicketContextAsync(conversationId, cancellationToken);
+
+        public Task<Result<SupportMessageResponse>> SendMessageAsync(SendSupportMessageCommand command, CancellationToken cancellationToken) =>
+            inner.SendMessageAsync(command, cancellationToken);
+
+        public Task<Result<SupportMessageResponse>> SendMessageWithAttachmentsAsync(SendSupportAttachmentsCommand command, CancellationToken cancellationToken) =>
+            inner.SendMessageWithAttachmentsAsync(command, cancellationToken);
+
+        public Task<Result<SupportMessageResponse>> CreateAttachmentMessageAsync(CreateSupportAttachmentMessageCommand command, CancellationToken cancellationToken) =>
+            inner.CreateAttachmentMessageAsync(command, cancellationToken);
+
+        public Task<Result<SupportMessageResponse>> UpdateAttachmentMessageAsync(UpdateSupportAttachmentMessageCommand command, CancellationToken cancellationToken)
+        {
+            if (command.AttachmentUploadStatus == SupportAttachmentUploadStatus.Uploaded)
+            {
+                return Task.FromResult(Result.Failure<SupportMessageResponse>(FinalizeFailedError));
+            }
+
+            return inner.UpdateAttachmentMessageAsync(command, cancellationToken);
+        }
+
+        public Task<Result> MarkConversationReadAsync(MarkSupportConversationReadCommand command, CancellationToken cancellationToken) =>
+            inner.MarkConversationReadAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> ResolveConversationAsync(ResolveSupportConversationCommand command, CancellationToken cancellationToken) =>
+            inner.ResolveConversationAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> CloseConversationAsync(CloseSupportConversationCommand command, CancellationToken cancellationToken) =>
+            inner.CloseConversationAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> ReopenConversationAsync(ReopenSupportConversationCommand command, CancellationToken cancellationToken) =>
+            inner.ReopenConversationAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> SubmitConversationFeedbackAsync(SubmitSupportConversationFeedbackCommand command, CancellationToken cancellationToken) =>
+            inner.SubmitConversationFeedbackAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> UpdateConversationStatusAsync(UpdateSupportConversationStatusCommand command, CancellationToken cancellationToken) =>
+            inner.UpdateConversationStatusAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> AssignConversationAsync(AssignSupportConversationCommand command, CancellationToken cancellationToken) =>
+            inner.AssignConversationAsync(command, cancellationToken);
+
+        public Task<Result<SupportConversationDetailResponse>> UpdateConversationMetadataAsync(UpdateSupportConversationMetadataCommand command, CancellationToken cancellationToken) =>
+            inner.UpdateConversationMetadataAsync(command, cancellationToken);
     }
 
     private sealed class NoopSupportChatPushNotificationSender : ISupportChatPushNotificationSender

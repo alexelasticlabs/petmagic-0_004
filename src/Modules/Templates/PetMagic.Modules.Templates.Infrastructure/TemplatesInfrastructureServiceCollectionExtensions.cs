@@ -1,3 +1,5 @@
+using System.Net;
+
 using Amazon.Runtime;
 using Amazon.S3;
 
@@ -78,12 +80,48 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             SeedSampleTemplates = ParseBool(section["SeedSampleTemplates"], false),
             GenerationWorkerEnabled = ParseBool(section["GenerationWorkerEnabled"], true),
             GenerationWorkerPollIntervalMilliseconds = ParseInt(section["GenerationWorkerPollIntervalMilliseconds"], 1_000),
+            RealtimePollingIntervalMilliseconds = ParsePositiveInt(section["RealtimePollingIntervalMilliseconds"], 1_000),
+            RealtimeEventRetentionMinutes = ParsePositiveInt(section["RealtimeEventRetentionMinutes"], 60),
+            RealtimeEventCleanupIntervalMinutes = ParsePositiveInt(section["RealtimeEventCleanupIntervalMinutes"], 10),
+            RealtimeEventCleanupBatchSize = ParsePositiveInt(section["RealtimeEventCleanupBatchSize"], 1_000),
             MaxConcurrentJobsPerWorker = ParsePositiveInt(section["MaxConcurrentJobsPerWorker"], 1),
             GlobalMaxConcurrentGenerations = ParsePositiveInt(section["GlobalMaxConcurrentGenerations"], 3),
+            ImageReservedConcurrentGenerations = ParseNonNegativeInt(section["ImageReservedConcurrentGenerations"], 0),
+            ImageMaxConcurrentGenerations = ParsePositiveInt(section["ImageMaxConcurrentGenerations"], 2),
+            ImageProtectedConcurrentGenerations = ParseNonNegativeInt(section["ImageProtectedConcurrentGenerations"], 0),
+            VideoReservedConcurrentGenerations = ParseNonNegativeInt(section["VideoReservedConcurrentGenerations"], 0),
+            VideoMaxConcurrentGenerations = ParsePositiveInt(section["VideoMaxConcurrentGenerations"], 1),
+            VideoBorrowMaxConcurrentGenerations = ParseNonNegativeInt(section["VideoBorrowMaxConcurrentGenerations"], 0),
+            EnableElasticLaneBorrowing = ParseBool(section["EnableElasticLaneBorrowing"], false),
+            AllowVideoBorrowWhenImageQueueEmpty = ParseBool(section["AllowVideoBorrowWhenImageQueueEmpty"], true),
+            AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds = ParsePositiveInt(section["AllowVideoBorrowWhenImageEstimatedWaitBelowSeconds"], 120),
+            VideoBorrowReleaseMode = section["VideoBorrowReleaseMode"] ?? "natural_completion",
+            BorrowedVideoMaxAgeSeconds = ParseNonNegativeInt(section["BorrowedVideoMaxAgeSeconds"], 0),
+            BorrowingPriorityTiers = section["BorrowingPriorityTiers"] ?? "premium,privileged,admin,free",
+            VideoPreprocessingMaxConcurrentGenerations = ParsePositiveInt(section["VideoPreprocessingMaxConcurrentGenerations"], 1),
+            FalProviderConcurrencyLimit = ParseNonNegativeInt(section["FalProviderConcurrencyLimit"], 0),
+            FalProviderReservedConcurrency = ParseNonNegativeInt(section["FalProviderReservedConcurrency"], 1),
+            FalProviderBalanceLowThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceLowThresholdUsd"], 100m),
+            FalProviderBalanceCriticalThresholdUsd = ParseNonNegativeDecimal(section["FalProviderBalanceCriticalThresholdUsd"], 25m),
+            FalProviderSpendDailyLimitUsd = ParseNonNegativeDecimal(section["FalProviderSpendDailyLimitUsd"], 0m),
             MaxAiProviderRequestsPerMinute = ParseNonNegativeInt(section["MaxAiProviderRequestsPerMinute"], 60),
             QueueMaxSize = ParseNonNegativeInt(section["QueueMaxSize"], 1_000),
-            EstimatedVideoGenerationSeconds = ParsePositiveInt(section["EstimatedVideoGenerationSeconds"], 120),
-            EstimatedImageGenerationSeconds = ParsePositiveInt(section["EstimatedImageGenerationSeconds"], 60),
+            EstimatedVideoGenerationSeconds = ParsePositiveInt(section["EstimatedVideoGenerationSeconds"], 420),
+            EstimatedImageGenerationSeconds = ParsePositiveInt(section["EstimatedImageGenerationSeconds"], 90),
+            EstimatedVideoPreprocessingSeconds = ParsePositiveInt(section["EstimatedVideoPreprocessingSeconds"], 90),
+            FreeQueuePriorityScore = ParsePositiveInt(section["FreeQueuePriorityScore"], 1_000),
+            PremiumQueuePriorityScore = ParsePositiveInt(section["PremiumQueuePriorityScore"], 4_000),
+            PrivilegedQueuePriorityScore = ParsePositiveInt(section["PrivilegedQueuePriorityScore"], 8_000),
+            AdminQueuePriorityScore = ParsePositiveInt(section["AdminQueuePriorityScore"], 10_000),
+            QueuePriorityAgingIntervalSeconds = ParsePositiveInt(section["QueuePriorityAgingIntervalSeconds"], 60),
+            QueuePriorityAgingBoost = ParseNonNegativeInt(section["QueuePriorityAgingBoost"], 500),
+            CancelQueuedGenerationEnabled = ParseBool(section["CancelQueuedGenerationEnabled"], true),
+            FreeImageMaxEstimatedWaitSeconds = ParsePositiveInt(section["FreeImageMaxEstimatedWaitSeconds"], 1_800),
+            PremiumImageMaxEstimatedWaitSeconds = ParsePositiveInt(section["PremiumImageMaxEstimatedWaitSeconds"], 600),
+            PrivilegedImageMaxEstimatedWaitSeconds = ParsePositiveInt(section["PrivilegedImageMaxEstimatedWaitSeconds"], 600),
+            FreeVideoMaxEstimatedWaitSeconds = ParsePositiveInt(section["FreeVideoMaxEstimatedWaitSeconds"], 3_600),
+            PremiumVideoMaxEstimatedWaitSeconds = ParsePositiveInt(section["PremiumVideoMaxEstimatedWaitSeconds"], 1_800),
+            PrivilegedVideoMaxEstimatedWaitSeconds = ParsePositiveInt(section["PrivilegedVideoMaxEstimatedWaitSeconds"], 1_800),
             FreeUserMaxActiveGenerations = ParsePositiveInt(section["FreeUserMaxActiveGenerations"], 1),
             PremiumUserMaxActiveGenerations = ParsePositiveInt(section["PremiumUserMaxActiveGenerations"], 3),
             PrivilegedUserMaxActiveGenerations = ParsePositiveInt(section["PrivilegedUserMaxActiveGenerations"], 10),
@@ -91,6 +129,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
                 section["JobLockTimeoutMilliseconds"] ?? section["StaleProcessingRecoveryDelayMilliseconds"],
                 900_000),
             StaleProcessingRecoveryDelayMilliseconds = ParsePositiveInt(section["StaleProcessingRecoveryDelayMilliseconds"], 900_000),
+            OrphanQueuedJobTimeoutMilliseconds = ParsePositiveInt(section["OrphanQueuedJobTimeoutMilliseconds"], 120_000),
             MaxGenerationAttempts = ParsePositiveInt(section["MaxGenerationAttempts"], 3),
             MaxRefundAttempts = ParsePositiveInt(section["MaxRefundAttempts"], 5),
             RefundRetryDelayMilliseconds = ParseNonNegativeInt(section["RefundRetryDelayMilliseconds"], 30_000),
@@ -122,9 +161,14 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             {
                 ApiKey = ReadValue(falSection, "ApiKey", "FAL_AI_API_KEY") ?? string.Empty,
                 QueueBaseUrl = falSection["QueueBaseUrl"] ?? "https://queue.fal.run",
+                WebhookUrl = ReadValue(falSection, "WebhookUrl", "FAL_WEBHOOK_URL") ?? string.Empty,
+                WebhookJwksUrl = falSection["WebhookJwksUrl"] ?? "https://rest.fal.ai/.well-known/jwks.json",
                 StartTimeoutSeconds = ParseInt(falSection["StartTimeoutSeconds"], 120),
                 PollIntervalMilliseconds = ParseInt(falSection["PollIntervalMilliseconds"], 2_000),
-                MaxPollingAttempts = ParseInt(falSection["MaxPollingAttempts"], 180)
+                MaxPollingAttempts = ParseInt(falSection["MaxPollingAttempts"], 180),
+                ImageMaxPollingAttempts = ParsePositiveInt(falSection["ImageMaxPollingAttempts"], 180),
+                ImagePreprocessingMaxPollingAttempts = ParsePositiveInt(falSection["ImagePreprocessingMaxPollingAttempts"], 180),
+                VideoMaxPollingAttempts = ParsePositiveInt(falSection["VideoMaxPollingAttempts"], 300)
             },
             FirebasePush = new FirebasePushOptions
             {
@@ -150,6 +194,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             }
         };
 
+        ValidateQueueConfiguration(options);
         ValidateProductionProviderConfiguration(options, services, environment, configuredStorageProvider, configuredAiProvider);
 
         services.AddSingleton(options);
@@ -164,6 +209,8 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         AddMediaStorage(services, options);
         AddGenerationBilling(services, environment);
         services.AddSingleton<ITemplateFeedRealtimeService, TemplateFeedRealtimeService>();
+        services.AddHttpClient(FalProviderHealthService.HttpClientName, ConfigureExternalHttpClient);
+        services.AddScoped<ITemplateAiProviderHealthService, FalProviderHealthService>();
         services.AddScoped<ITemplatePushTokenService, TemplatePushTokenService>();
         services.AddHttpClient(TemplateLocalizationTranslator.HttpClientName, ConfigureExternalHttpClient);
         services.AddScoped<NoopTemplateGenerationPushNotificationSender>();
@@ -183,9 +230,10 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         services.AddScoped<ITemplateGenerationService, TemplateGenerationService>();
         services.AddScoped<IImagePreviewGenerator, ImagePreviewGenerator>();
         services.AddScoped<TemplateMediaCleanupProcessor>();
+        AddGenerationProviderPipelineServices(services, options);
+        services.AddScoped<ITemplateGenerationProviderCallbackService, TemplateGenerationProviderCallbackService>();
         if (options.GenerationWorkerEnabled)
         {
-            AddGenerationWorkerServices(services, options);
             services.AddHostedService<TemplateGenerationWorker>();
         }
 
@@ -202,7 +250,7 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         return services;
     }
 
-    private static void AddGenerationWorkerServices(IServiceCollection services, TemplatesOptions options)
+    private static void AddGenerationProviderPipelineServices(IServiceCollection services, TemplatesOptions options)
     {
         AddAiProviders(services, options);
         AddGeneratedMediaImporter(services, options);
@@ -464,9 +512,16 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
             throw new InvalidOperationException("Sample template seed data cannot be enabled in Production.");
         }
 
+        ValidateProductionPublicBaseUrl(options.PublicBaseUrl, "Templates:PublicBaseUrl");
+
         if (IsProvider(options.StorageProvider, TemplateStorageProviders.R2) && !options.R2.IsConfigured)
         {
             throw new InvalidOperationException("R2 media storage is selected but R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET_NAME or R2_PUBLIC_URL is missing.");
+        }
+
+        if (IsProvider(options.StorageProvider, TemplateStorageProviders.R2))
+        {
+            ValidateProductionPublicBaseUrl(options.R2.PublicBaseUrl, "Templates:R2:PublicBaseUrl");
         }
 
         if (IsProvider(options.AiProvider, TemplateAiProviders.Fal) && !options.Fal.IsConfigured)
@@ -478,6 +533,159 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
         {
             throw new InvalidOperationException("Economy-backed template generation billing must be registered in Production.");
         }
+    }
+
+    private static void ValidateProductionPublicBaseUrl(string? baseUrl, string settingName)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            throw new InvalidOperationException($"{settingName} must be configured in Production.");
+        }
+
+        if (ContainsPlaceholder(baseUrl))
+        {
+            throw new InvalidOperationException($"{settingName} contains a placeholder value and must be replaced in Production.");
+        }
+
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
+        {
+            throw new InvalidOperationException($"{settingName} must be an absolute URL in Production.");
+        }
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"{settingName} must use HTTPS in Production.");
+        }
+
+        if (!string.IsNullOrEmpty(uri.UserInfo)
+            || !string.IsNullOrEmpty(uri.Query)
+            || !string.IsNullOrEmpty(uri.Fragment))
+        {
+            throw new InvalidOperationException($"{settingName} must not contain credentials, query strings, or fragments in Production.");
+        }
+
+        if (IsLocalDevelopmentHost(uri.Host))
+        {
+            throw new InvalidOperationException($"{settingName} must not point to a local development host in Production.");
+        }
+    }
+
+    private static void ValidateQueueConfiguration(TemplatesOptions options)
+    {
+        var imageReserved = ResolveImageReservedConcurrency(options);
+        var imageProtected = ResolveImageProtectedConcurrency(options);
+        var videoReserved = ResolveVideoReservedConcurrency(options);
+
+        if (options.GlobalMaxConcurrentGenerations <= 0
+            || options.ImageMaxConcurrentGenerations <= 0
+            || options.VideoMaxConcurrentGenerations <= 0
+            || imageReserved <= 0
+            || imageProtected <= 0
+            || videoReserved <= 0)
+        {
+            throw new InvalidOperationException("Template generation queue concurrency limits must be positive.");
+        }
+
+        if (options.ImageMaxConcurrentGenerations > options.GlobalMaxConcurrentGenerations
+            || options.VideoMaxConcurrentGenerations > options.GlobalMaxConcurrentGenerations)
+        {
+            throw new InvalidOperationException("Template generation media concurrency limits cannot exceed the global generation concurrency limit.");
+        }
+
+        if (imageReserved > options.ImageMaxConcurrentGenerations
+            || imageProtected > options.ImageMaxConcurrentGenerations
+            || videoReserved > options.VideoMaxConcurrentGenerations)
+        {
+            throw new InvalidOperationException("Template generation reserved/protected media concurrency limits cannot exceed their media hard limits.");
+        }
+
+        if (options.EnableElasticLaneBorrowing
+            && options.VideoBorrowMaxConcurrentGenerations <= 0)
+        {
+            throw new InvalidOperationException("VideoBorrowMaxConcurrentGenerations must be positive when elastic lane borrowing is enabled.");
+        }
+
+        if (options.VideoReservedConcurrentGenerations > 0
+            && options.VideoBorrowMaxConcurrentGenerations > 0
+            && videoReserved + options.VideoBorrowMaxConcurrentGenerations < options.VideoMaxConcurrentGenerations)
+        {
+            throw new InvalidOperationException("Video reserved plus borrow max must cover VideoMaxConcurrentGenerations when both are explicitly configured.");
+        }
+
+        if (!string.Equals(options.VideoBorrowReleaseMode, "natural_completion", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("VideoBorrowReleaseMode currently supports only natural_completion.");
+        }
+
+        if (options.FalProviderConcurrencyLimit > 0
+            && options.FalProviderReservedConcurrency >= options.FalProviderConcurrencyLimit)
+        {
+            throw new InvalidOperationException("FAL provider reserved concurrency must be lower than the configured provider concurrency limit.");
+        }
+
+        if (options.FalProviderBalanceCriticalThresholdUsd > options.FalProviderBalanceLowThresholdUsd)
+        {
+            throw new InvalidOperationException("FAL provider critical balance threshold cannot exceed the low balance threshold.");
+        }
+
+        if (options.FreeQueuePriorityScore <= 0
+            || options.PremiumQueuePriorityScore <= options.FreeQueuePriorityScore
+            || options.PrivilegedQueuePriorityScore <= options.PremiumQueuePriorityScore
+            || options.AdminQueuePriorityScore < options.PrivilegedQueuePriorityScore)
+        {
+            throw new InvalidOperationException("Template generation queue priority scores must be positive and ordered Free < Premium < Privileged <= Admin.");
+        }
+
+        if (options.QueuePriorityAgingIntervalSeconds <= 0 || options.QueuePriorityAgingBoost <= 0)
+        {
+            throw new InvalidOperationException("Queue priority aging interval and boost must be positive.");
+        }
+
+        if (options.RealtimeEventRetentionMinutes <= 0
+            || options.RealtimeEventCleanupIntervalMinutes <= 0
+            || options.RealtimeEventCleanupBatchSize <= 0)
+        {
+            throw new InvalidOperationException("Template realtime event retention and cleanup settings must be positive.");
+        }
+
+        if (options.FreeImageMaxEstimatedWaitSeconds <= 0
+            || options.PremiumImageMaxEstimatedWaitSeconds <= 0
+            || options.PrivilegedImageMaxEstimatedWaitSeconds <= 0
+            || options.FreeVideoMaxEstimatedWaitSeconds <= 0
+            || options.PremiumVideoMaxEstimatedWaitSeconds <= 0
+            || options.PrivilegedVideoMaxEstimatedWaitSeconds <= 0)
+        {
+            throw new InvalidOperationException("Template generation max estimated wait settings must be positive.");
+        }
+
+        if (options.FreeImageMaxEstimatedWaitSeconds < options.PremiumImageMaxEstimatedWaitSeconds
+            || options.PremiumImageMaxEstimatedWaitSeconds < options.PrivilegedImageMaxEstimatedWaitSeconds
+            || options.FreeVideoMaxEstimatedWaitSeconds < options.PremiumVideoMaxEstimatedWaitSeconds
+            || options.PremiumVideoMaxEstimatedWaitSeconds < options.PrivilegedVideoMaxEstimatedWaitSeconds)
+        {
+            throw new InvalidOperationException("Template generation max estimated wait settings must be ordered Privileged <= Premium <= Free for each media type.");
+        }
+    }
+
+    private static int ResolveImageReservedConcurrency(TemplatesOptions options)
+    {
+        return options.ImageReservedConcurrentGenerations > 0
+            ? options.ImageReservedConcurrentGenerations
+            : options.ImageMaxConcurrentGenerations;
+    }
+
+    private static int ResolveImageProtectedConcurrency(TemplatesOptions options)
+    {
+        return options.ImageProtectedConcurrentGenerations > 0
+            ? options.ImageProtectedConcurrentGenerations
+            : ResolveImageReservedConcurrency(options);
+    }
+
+    private static int ResolveVideoReservedConcurrency(TemplatesOptions options)
+    {
+        return options.VideoReservedConcurrentGenerations > 0
+            ? options.VideoReservedConcurrentGenerations
+            : options.VideoMaxConcurrentGenerations;
     }
 
     private static IAmazonS3 CreateR2Client(R2StorageOptions options)
@@ -494,6 +702,27 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static bool IsProvider(string configuredProvider, string expectedProvider)
     {
         return string.Equals(configuredProvider, expectedProvider, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsPlaceholder(string value) =>
+        value.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("REPLACE_WITH", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("<", StringComparison.Ordinal)
+        || value.Contains(">", StringComparison.Ordinal);
+
+    private static bool IsLocalDevelopmentHost(string host)
+    {
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "0.0.0.0", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "[::]", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(host, "::", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var normalizedHost = host.Trim('[', ']');
+        return IPAddress.TryParse(normalizedHost, out var address) && IPAddress.IsLoopback(address);
     }
 
     private static bool HasR2Environment()
@@ -552,5 +781,13 @@ public static class TemplatesInfrastructureServiceCollectionExtensions
     private static int ParseNonNegativeInt(string? raw, int fallback)
     {
         return int.TryParse(raw, out var parsed) && parsed >= 0 ? parsed : fallback;
+    }
+
+    private static decimal ParseNonNegativeDecimal(string? raw, decimal fallback)
+    {
+        return decimal.TryParse(raw, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            && parsed >= 0
+            ? parsed
+            : fallback;
     }
 }

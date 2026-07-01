@@ -60,15 +60,15 @@ internal sealed partial class TemplatesService
         if (!string.IsNullOrWhiteSpace(normalizedSearch))
         {
             itemsQuery = itemsQuery.Where(x =>
-                x.Title.ToLower().Contains(normalizedSearch) ||
-                x.ShortDescription.ToLower().Contains(normalizedSearch) ||
-                x.Category.ToLower().Contains(normalizedSearch) ||
-                x.Tags.ToLower().Contains(normalizedSearch));
+                (x.Title ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.ShortDescription ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.Category ?? string.Empty).ToLower().Contains(normalizedSearch) ||
+                (x.Tags ?? string.Empty).ToLower().Contains(normalizedSearch));
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedCategory) && normalizedCategory != "all")
         {
-            itemsQuery = itemsQuery.Where(x => x.Category.ToLower() == normalizedCategory);
+            itemsQuery = itemsQuery.Where(x => (x.Category ?? string.Empty).ToLower() == normalizedCategory);
         }
 
         if (normalizedAccess == "premium")

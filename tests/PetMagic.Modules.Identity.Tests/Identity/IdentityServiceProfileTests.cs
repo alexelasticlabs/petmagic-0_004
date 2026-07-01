@@ -143,7 +143,14 @@ public sealed partial class IdentityServiceProfileTests
             {
                 MaxFileSizeBytes = maxAvatarSizeBytes
             },
-            Options.Create(new JwtOptions()));
+            Options.Create(new JwtOptions
+            {
+                Issuer = "petmagic-tests",
+                Audience = "petmagic-tests",
+                SigningKey = new string('t', 64),
+                AccessTokenMinutes = 30,
+                RefreshTokenDays = 30
+            }));
     }
 
     private sealed class TestAdminUserEconomyAnalyticsReader(EconomyDbContext dbContext) : IAdminUserEconomyAnalyticsReader

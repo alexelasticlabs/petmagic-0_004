@@ -2,8 +2,14 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
 using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain.Enums;
+using PetMagic.Modules.Templates.Infrastructure;
+using PetMagic.Modules.Templates.Infrastructure.Data;
+using PetMagic.Modules.Templates.Infrastructure.Entities;
 
 namespace PetMagic.Modules.Identity.Tests.Templates;
 
@@ -156,6 +162,73 @@ public sealed partial class TemplatesApiIntegrationTests
         Assert.Equal(generation.GenerationId, fetched.GenerationId);
         Assert.Equal("Completed", fetched.Status);
         Assert.Equal(generation.OutputUrl, fetched.OutputUrl);
+    }
+
+    [Fact]
+    public async Task GenerationCreate_ShouldReturnStructuredWaitTooLongProblemBeforeCharge()
+    {
+        await using var application = await TestApplication.CreateAsync(
+            freeImageMaxEstimatedWaitSeconds: 30,
+            startGenerationWorker: false);
+
+        var created = await CreateActiveImageTemplateAsync(
+            application.Client,
+            "Busy Queue Portrait",
+            "Portrait",
+            ["busy", "queue"]);
+
+        await using (var scope = application.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+            var template = await dbContext.TemplateItems.SingleAsync(x => x.Id == created.TemplateId);
+            var now = DateTime.UtcNow.AddMinutes(-5);
+            dbContext.TemplateGenerationJobs.Add(new TemplateGenerationJob
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                TemplateId = created.TemplateId,
+                Template = template,
+                Status = TemplateGenerationStatus.Queued,
+                TokenCost = created.TokenCost,
+                QueueMediaType = TemplateGenerationQueue.MediaTypeImage,
+                QueueTier = TemplateGenerationQueue.TierFree,
+                SourceImageUrl = "templates-media/existing.jpg",
+                SourceImageFileName = "existing.jpg",
+                SourceImageContentType = "image/jpeg",
+                SourceImageFileSizeBytes = 2048,
+                CreatedAtUtc = now,
+                QueuedAtUtc = now,
+                UpdatedAtUtc = now,
+                ChargedAtUtc = now
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        using var response = await UploadGenerationSourceWithClaimsAsync(
+            application.Client,
+            created.TemplateId,
+            premiumClaim: false,
+            role: "User");
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+        Assert.Equal("GENERATION_WAIT_TOO_LONG", root.GetProperty("title").GetString());
+        Assert.Equal("GENERATION_WAIT_TOO_LONG", root.GetProperty("code").GetString());
+        Assert.Equal("image", root.GetProperty("mediaType").GetString());
+        Assert.Equal("free", root.GetProperty("tier").GetString());
+        Assert.Equal(45, root.GetProperty("estimatedWaitSeconds").GetInt32());
+        Assert.Equal(30, root.GetProperty("maxAllowedWaitSeconds").GetInt32());
+        Assert.Equal(30, root.GetProperty("retryAfterSeconds").GetInt32());
+        Assert.True(root.GetProperty("canRetry").GetBoolean());
+        Assert.True(root.GetProperty("canUpgradeForPriority").GetBoolean());
+        Assert.DoesNotContain("lock", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(application.Billing.ChargedGenerationIds);
+
+        await using var verifyScope = application.Services.CreateAsyncScope();
+        var verifyDbContext = verifyScope.ServiceProvider.GetRequiredService<TemplatesDbContext>();
+        Assert.Equal(1, await verifyDbContext.TemplateGenerationJobs.CountAsync());
     }
 
     [Fact]

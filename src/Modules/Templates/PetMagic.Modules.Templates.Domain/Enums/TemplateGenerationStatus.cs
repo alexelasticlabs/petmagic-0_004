@@ -7,5 +7,9 @@ public enum TemplateGenerationStatus
     Completed = 3,
     Failed = 4,
     Cancelled = 5,
-    Retrying = 6
+    Retrying = 6,
+    SubmittingToProvider = 7,
+    ProviderQueued = 8,
+    ProviderProcessing = 9,
+    ImportingMedia = 10
 }

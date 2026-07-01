@@ -74,6 +74,48 @@ internal sealed partial class TemplateGenerationService
 
         }
 
+        if (job.Status == TemplateGenerationStatus.SubmittingToProvider)
+
+        {
+
+            return string.Equals(job.CurrentProviderStage, "video_preprocessing", StringComparison.OrdinalIgnoreCase)
+                ? "submitting_preprocess"
+                : "submitting_provider";
+
+        }
+
+        if (job.Status == TemplateGenerationStatus.ProviderQueued)
+
+        {
+
+            return string.Equals(job.CurrentProviderStage, "video_preprocessing", StringComparison.OrdinalIgnoreCase)
+                ? "preprocess_provider_queued"
+                : string.Equals(job.CurrentProviderStage, "video_generation", StringComparison.OrdinalIgnoreCase)
+                    ? "video_provider_queued"
+                    : "provider_queued";
+
+        }
+
+        if (job.Status == TemplateGenerationStatus.ProviderProcessing)
+
+        {
+
+            return string.Equals(job.CurrentProviderStage, "video_preprocessing", StringComparison.OrdinalIgnoreCase)
+                ? "preprocess_provider_processing"
+                : string.Equals(job.CurrentProviderStage, "video_generation", StringComparison.OrdinalIgnoreCase)
+                    ? "video_provider_processing"
+                    : "provider_processing";
+
+        }
+
+        if (job.Status == TemplateGenerationStatus.ImportingMedia)
+
+        {
+
+            return "finalizing";
+
+        }
+
 
         if (job.Status != TemplateGenerationStatus.Processing)
 
@@ -186,9 +228,9 @@ internal sealed partial class TemplateGenerationService
 
             job.SourceImageUrl,
 
-            job.SourceImageFileName,
+            job.SourceImageFileName ?? string.Empty,
 
-            job.SourceImageContentType,
+            job.SourceImageContentType ?? string.Empty,
 
             job.SourceImageFileSizeBytes,
 

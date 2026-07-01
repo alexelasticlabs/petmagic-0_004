@@ -21,7 +21,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new VerifyPremiumStorePurchaseCommand(
@@ -43,16 +43,7 @@ public static partial class EconomyEndpoints
         var result = await service.VerifyPremiumStorePurchaseAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "economy.premium_plan_not_found" => StatusCodes.Status404NotFound,
-                "economy.store_verification_unavailable" => StatusCodes.Status503ServiceUnavailable,
-                "economy.store_purchase_invalid" => StatusCodes.Status400BadRequest,
-                "economy.store_purchase_inactive" => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -68,7 +59,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new VerifyPremiumStripeSubscriptionCommand(
@@ -85,14 +76,7 @@ public static partial class EconomyEndpoints
         var result = await service.VerifyPremiumStripeSubscriptionAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "economy.premium_plan_not_found" => StatusCodes.Status404NotFound,
-                "economy.premium_billing_unavailable" => StatusCodes.Status503ServiceUnavailable,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);

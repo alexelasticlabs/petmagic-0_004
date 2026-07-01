@@ -49,4 +49,27 @@ public sealed partial class EconomyService
             parsed.IsOneTimeProductNotification
         });
     }
+
+    private static string BuildSafeStripeWebhookPayloadMetadata(
+        (bool Success, Guid? OrderId, Guid? UserId, string? ObjectId, string? PaymentReferenceId, string? Purpose, string? SetupIntentId, string? Status, string? CheckoutPaymentStatus, string? PlanCode, string? StripePriceId, string? SubscriptionId, string? CustomerId, DateTime? CurrentPeriodStartUtc, DateTime? CurrentPeriodEndUtc, bool CancelAtPeriodEnd) parsed)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            parsed.Purpose,
+            parsed.Status,
+            parsed.CheckoutPaymentStatus,
+            parsed.PlanCode,
+            parsed.StripePriceId,
+            parsed.CurrentPeriodStartUtc,
+            parsed.CurrentPeriodEndUtc,
+            parsed.CancelAtPeriodEnd,
+            HasOrderId = parsed.OrderId.HasValue,
+            HasUserId = parsed.UserId.HasValue,
+            HasObjectId = !string.IsNullOrWhiteSpace(parsed.ObjectId),
+            HasPaymentReferenceId = !string.IsNullOrWhiteSpace(parsed.PaymentReferenceId),
+            HasSetupIntentId = !string.IsNullOrWhiteSpace(parsed.SetupIntentId),
+            HasSubscriptionId = !string.IsNullOrWhiteSpace(parsed.SubscriptionId),
+            HasCustomerId = !string.IsNullOrWhiteSpace(parsed.CustomerId)
+        });
+    }
 }

@@ -7,6 +7,7 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Domain.Enums;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
+using PetMagic.Modules.Templates.Infrastructure.Options;
 
 namespace PetMagic.Modules.Templates.Infrastructure;
 
@@ -60,6 +61,18 @@ internal sealed partial class TemplateGenerationJobProcessor
             return;
         }
 
+        if (imageGenerator is IAsyncImageGenerationQueue asyncImageGenerator
+            && await TrySubmitImageGenerationAsync(
+                job,
+                asyncImageGenerator,
+                sourceImageUrl,
+                imagePrompt,
+                imageModel,
+                cancellationToken))
+        {
+            return;
+        }
+
         var generated = await imageGenerator.CreateAsync(
             sourceImageUrl,
             imagePrompt,
@@ -78,6 +91,22 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
         job.MotionProviderCostUsd = FalModelPricing.TryGetImageGenerationCostUsd(imageModel);
         job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
+        if (UsesFakeAiProvider())
+        {
+            await CompleteFakeGeneratedMediaAsync(
+                job,
+                new StoredMediaResponse(
+                    generated.Value.ImageUrl,
+                    generated.Value.ImageUrl,
+                    $"generation-{job.Id:N}.png",
+                    "image/png",
+                    null,
+                    null),
+                TemplateType.Image,
+                cancellationToken);
+            return;
+        }
+
         if (!await SaveClaimedChangesAsync(job, cancellationToken))
         {
             return;
@@ -157,33 +186,57 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.UsedPreprocessingModel = preprocessingModel;
         job.UsedKlingModel = motionModel;
 
-        var sourceImageUrl = await CreateProviderSourceImageReadUrlAsync(job, cancellationToken);
-        if (sourceImageUrl is null)
+        var normalizedImageUrl = job.NormalizedImageUrl;
+        if (string.IsNullOrWhiteSpace(normalizedImageUrl))
         {
-            await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
-            return;
+            var sourceImageUrl = await CreateProviderSourceImageReadUrlAsync(job, cancellationToken);
+            if (sourceImageUrl is null)
+            {
+                await MarkFailedAsync(job, TemplatesErrors.MediaStorageFailed, cancellationToken);
+                return;
+            }
+
+            if (imagePreprocessor is IAsyncImagePreprocessingQueue asyncImagePreprocessor
+                && await TrySubmitVideoPreprocessingAsync(
+                    job,
+                    asyncImagePreprocessor,
+                    sourceImageUrl,
+                    preprocessingPrompt,
+                    preprocessingModel,
+                    cancellationToken))
+            {
+                return;
+            }
+
+            var normalized = await imagePreprocessor.NormalizeAsync(
+                sourceImageUrl,
+                preprocessingModel,
+                preprocessingPrompt,
+                cancellationToken);
+
+            if (normalized.IsFailure)
+            {
+                await MarkFailedAsync(job, normalized.Error, cancellationToken);
+                return;
+            }
+
+            normalizedImageUrl = normalized.Value.ImageUrl;
+            job.NormalizedImageUrl = normalizedImageUrl;
+            job.PreprocessingProviderRequestId = normalized.Value.ProviderRequestId;
+            job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
+            job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
+            job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
+            if (!UsesFakeAiProvider() && !await SaveClaimedChangesAsync(job, cancellationToken))
+            {
+                return;
+            }
         }
-
-        var normalized = await imagePreprocessor.NormalizeAsync(
-            sourceImageUrl,
-            preprocessingModel,
-            preprocessingPrompt,
-            cancellationToken);
-
-        if (normalized.IsFailure)
+        else
         {
-            await MarkFailedAsync(job, normalized.Error, cancellationToken);
-            return;
-        }
-
-        job.NormalizedImageUrl = normalized.Value.ImageUrl;
-        job.PreprocessingProviderRequestId = normalized.Value.ProviderRequestId;
-        job.PreprocessingInferenceTimeSeconds = normalized.Value.InferenceTimeSeconds;
-        job.PreprocessingCompletedAtUtc = DateTime.UtcNow;
-        job.UpdatedAtUtc = job.PreprocessingCompletedAtUtc.Value;
-        if (!await SaveClaimedChangesAsync(job, cancellationToken))
-        {
-            return;
+            job.PreprocessingCompletedAtUtc ??= DateTime.UtcNow;
+            logger.LogInformation(
+                "Template generation video preprocessing reused from durable normalized image. GenerationId={GenerationId}",
+                job.Id);
         }
 
         if (!await PublishProcessingStageAsync(job, cancellationToken))
@@ -191,8 +244,14 @@ internal sealed partial class TemplateGenerationJobProcessor
             return;
         }
 
+        if (videoMotionGenerator is IAsyncVideoMotionGenerationQueue asyncVideoMotionGenerator
+            && await SubmitVideoGenerationAsync(job, asyncVideoMotionGenerator, cancellationToken))
+        {
+            return;
+        }
+
         var generated = await videoMotionGenerator.CreateAsync(
-            normalized.Value.ImageUrl,
+            normalizedImageUrl!,
             referenceMotion.Url,
             job.Template.CharacterOrientation!.Value.ToString(),
             job.Template.KeepOriginalSound ?? true,
@@ -211,6 +270,22 @@ internal sealed partial class TemplateGenerationJobProcessor
         job.MotionInferenceTimeSeconds = generated.Value.InferenceTimeSeconds;
         job.MotionGenerationCompletedAtUtc = DateTime.UtcNow;
         job.UpdatedAtUtc = job.MotionGenerationCompletedAtUtc.Value;
+        if (UsesFakeAiProvider())
+        {
+            await CompleteFakeGeneratedMediaAsync(
+                job,
+                new StoredMediaResponse(
+                    generated.Value.VideoUrl,
+                    generated.Value.VideoUrl,
+                    $"generation-{job.Id:N}.mp4",
+                    "video/mp4",
+                    null,
+                    null),
+                TemplateType.Video,
+                cancellationToken);
+            return;
+        }
+
         if (!await SaveClaimedChangesAsync(job, cancellationToken))
         {
             return;
@@ -269,6 +344,51 @@ internal sealed partial class TemplateGenerationJobProcessor
             "Template generation job completed. ElapsedMs={ElapsedMs}",
             ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
     }
+
+    private async Task CompleteFakeGeneratedMediaAsync(
+        TemplateGenerationJob job,
+        StoredMediaResponse storedOutput,
+        TemplateType mediaType,
+        CancellationToken cancellationToken)
+    {
+        job.ResultUrl = storedOutput.StorageKey;
+        job.MediaImportCompletedAtUtc = DateTime.UtcNow;
+        job.Status = TemplateGenerationStatus.Completed;
+        job.UpdatedAtUtc = job.MediaImportCompletedAtUtc.Value;
+        job.CompletedAtUtc = job.UpdatedAtUtc;
+        if (!await SaveClaimedChangesAsync(job, cancellationToken, releaseLock: true))
+        {
+            return;
+        }
+
+        AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerationCompleted);
+        if (job.GenerationMode == TemplateGenerationMode.Similar)
+        {
+            AddAnalyticsEvent(job, TemplateAnalyticsEventTypes.GenerateSimilarCompleted);
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        logger.LogInformation(
+            "Template generation fake result recorded. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.MediaImportCompletedAtUtc));
+        TemplateGenerationMetrics.RecordJobCompleted(job);
+        await NotifyGamificationAsync(job, cancellationToken);
+        await PublishStatusChangedAsync(job, cancellationToken);
+        logger.LogInformation(
+            "Template generation job completed. ElapsedMs={ElapsedMs}",
+            ElapsedMsBetween(job.StartedAtUtc, job.CompletedAtUtc));
+    }
+
+    private bool UsesFakeAiProvider() =>
+        string.Equals(
+            Environment.GetEnvironmentVariable("PETMAGIC_LOCAL_SMOKE_FAST_FAKE_COMPLETION"),
+            "true",
+            StringComparison.OrdinalIgnoreCase)
+        && (string.Equals(options.AiProvider, TemplateAiProviders.Fake, StringComparison.OrdinalIgnoreCase)
+            || imageGenerator is FakeImageGenerator
+            || imagePreprocessor is FakeImagePreprocessor
+            || videoMotionGenerator is FakeVideoMotionGenerator
+            || generatedMediaImporter is FakeGeneratedMediaImporter);
 
     private async Task<bool> PublishProcessingStageAsync(TemplateGenerationJob job, CancellationToken cancellationToken)
     {

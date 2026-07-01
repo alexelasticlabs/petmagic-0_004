@@ -31,6 +31,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
     ITemplateGenerationPushNotificationSender pushNotificationSender,
     TemplatesOptions options,
     ILogger<TemplateGenerationJobProcessor> logger,
+    FalQueueClient? falQueueClient = null,
     ITemplateWatermarkRenderer? watermarkRenderer = null,
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     IGamificationService? gamificationService = null,
@@ -38,9 +39,15 @@ internal sealed partial class TemplateGenerationJobProcessor(
 {
     private const string NpgsqlProviderName = "Npgsql.EntityFrameworkCore.PostgreSQL";
     private const int GlobalGenerationAdvisoryLockKey = 0x506D4745;
+    private const int ImageGenerationAdvisoryLockKey = 0x506D4749;
+    private const int VideoGenerationAdvisoryLockKey = 0x506D4756;
+    private const int BorrowedVideoGenerationAdvisoryLockKey = 0x506D4742;
     private static readonly string WorkerInstanceId = $"{Environment.MachineName}:{Guid.NewGuid():N}";
     private static readonly object LocalConcurrencyLock = new();
     private static readonly HashSet<int> LocalConcurrencySlots = [];
+    private static readonly HashSet<int> LocalImageConcurrencySlots = [];
+    private static readonly HashSet<int> LocalVideoConcurrencySlots = [];
+    private static readonly HashSet<int> LocalBorrowedVideoConcurrencySlots = [];
 
     public TemplateGenerationJobProcessor(
         TemplatesDbContext dbContext,
@@ -71,30 +78,55 @@ internal sealed partial class TemplateGenerationJobProcessor(
             pushNotificationSender,
             options,
             logger,
+            null,
             watermarkRenderer)
     {
     }
 
     public async Task<bool> ProcessNextAsync(CancellationToken cancellationToken)
     {
+        await RecordQueueSnapshotAsync(cancellationToken);
+
+        var failedOrphanQueuedJob = await FailNextOrphanQueuedJobAsync(cancellationToken);
         var recoveredStaleJob = await RecoverNextStaleProcessingJobAsync(cancellationToken);
+        var advancedProviderJob = await AdvanceNextProviderJobAsync(cancellationToken);
+        if (advancedProviderJob)
+        {
+            return true;
+        }
+
         await using var concurrencyLease = await TryAcquireGlobalConcurrencyLeaseAsync(cancellationToken);
         if (concurrencyLease is null)
         {
-            return recoveredStaleJob;
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("global");
+            return failedOrphanQueuedJob || recoveredStaleJob;
+        }
+
+        await using var mediaLeases = await TryAcquireMediaConcurrencyLeasesAsync(cancellationToken);
+        if (!mediaLeases.HasAny)
+        {
+            TemplateGenerationMetrics.RecordSchedulerNoSlotSkip("media");
+            return failedOrphanQueuedJob || recoveredStaleJob;
         }
 
         var claimStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-        var job = await ClaimNextAsync(cancellationToken);
+        var job = await ClaimNextAsync(
+            mediaLeases.AllowImage,
+            mediaLeases.AllowNativeVideo,
+            mediaLeases.AllowBorrowedVideo,
+            cancellationToken);
+        var usedBorrowedVideoSlot = mediaLeases.UsesBorrowedVideoFor(job);
+        mediaLeases.ReleaseUnusedFor(job);
 
         if (job is null)
         {
+            TemplateGenerationMetrics.RecordSchedulerClaimAttempt("none", "empty");
             if (await FailNextExhaustedQueuedJobAsync(cancellationToken))
             {
                 return true;
             }
 
-            return recoveredStaleJob;
+            return failedOrphanQueuedJob || recoveredStaleJob;
         }
 
         var correlationId = ResolveJobCorrelationId(job);
@@ -107,8 +139,77 @@ internal sealed partial class TemplateGenerationJobProcessor(
         }
 
         TemplateGenerationMetrics.RecordJobClaimed(job);
+        TemplateGenerationMetrics.RecordSchedulerClaimAttempt(
+            TemplateGenerationQueue.ResolveMediaType(job),
+            usedBorrowedVideoSlot ? "claimed_borrowed" : "claimed");
+        if (usedBorrowedVideoSlot)
+        {
+            TemplateGenerationMetrics.RecordBorrowedVideoStart(job.QueueTier);
+        }
+
         await ProcessAsync(job, cancellationToken);
         return true;
+    }
+
+    private async Task RecordQueueSnapshotAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+        var queueDepth = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .LongCountAsync(x => x.Status == TemplateGenerationStatus.Queued
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId),
+                cancellationToken);
+
+        var oldestQueuedAtUtc = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Queued
+                && (x.ChargedAtUtc != null || x.UserId == TemplateGenerationService.AdminTestUserId))
+            .OrderBy(x => x.QueuedAtUtc)
+            .Select(x => (DateTime?)x.QueuedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var oldestProcessingStartedAtUtc = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
+            .OrderBy(x => x.StartedAtUtc ?? x.UpdatedAtUtc)
+            .Select(x => (DateTime?)(x.StartedAtUtc ?? x.UpdatedAtUtc))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        TemplateGenerationMetrics.RecordQueueSnapshot(
+            queueDepth,
+            oldestQueuedAtUtc is null ? null : (now - oldestQueuedAtUtc.Value).TotalSeconds,
+            oldestProcessingStartedAtUtc is null ? null : (now - oldestProcessingStartedAtUtc.Value).TotalSeconds);
+
+        var laneSnapshots = await dbContext.TemplateGenerationJobs
+            .AsNoTracking()
+            .Where(x => x.Status == TemplateGenerationStatus.Queued
+                || TemplateGenerationJobStatusSets.Processing.Contains(x.Status))
+            .GroupBy(x => new { x.QueueMediaType, x.QueueTier })
+            .Select(x => new
+            {
+                x.Key.QueueMediaType,
+                x.Key.QueueTier,
+                QueueDepth = x.LongCount(job => job.Status == TemplateGenerationStatus.Queued
+                    && (job.ChargedAtUtc != null || job.UserId == TemplateGenerationService.AdminTestUserId)),
+                ActiveJobs = x.LongCount(job => TemplateGenerationJobStatusSets.Processing.Contains(job.Status)),
+                OldestQueuedAtUtc = x.Where(job => job.Status == TemplateGenerationStatus.Queued
+                        && (job.ChargedAtUtc != null || job.UserId == TemplateGenerationService.AdminTestUserId))
+                    .Min(job => (DateTime?)job.QueuedAtUtc),
+                OldestProcessingStartedAtUtc = x.Where(job => TemplateGenerationJobStatusSets.Processing.Contains(job.Status))
+                    .Min(job => (DateTime?)(job.StartedAtUtc ?? job.UpdatedAtUtc))
+            })
+            .ToArrayAsync(cancellationToken);
+
+        foreach (var lane in laneSnapshots)
+        {
+            TemplateGenerationMetrics.RecordLaneQueueSnapshot(
+                lane.QueueMediaType,
+                lane.QueueTier,
+                lane.QueueDepth,
+                lane.ActiveJobs,
+                lane.OldestQueuedAtUtc is null ? null : (now - lane.OldestQueuedAtUtc.Value).TotalSeconds,
+                lane.OldestProcessingStartedAtUtc is null ? null : (now - lane.OldestProcessingStartedAtUtc.Value).TotalSeconds);
+        }
     }
 
     public async Task<bool> RetryNextRefundAsync(CancellationToken cancellationToken)
@@ -117,7 +218,8 @@ internal sealed partial class TemplateGenerationJobProcessor(
         var retryThreshold = now.AddMilliseconds(-options.RefundRetryDelayMilliseconds);
         var job = await dbContext.TemplateGenerationJobs
             .Include(x => x.Template)
-            .Where(x => x.Status == TemplateGenerationStatus.Failed
+            .Where(x => (x.Status == TemplateGenerationStatus.Failed
+                    || x.Status == TemplateGenerationStatus.Cancelled)
                 && x.ChargedAtUtc != null
                 && x.RefundedAtUtc == null
                 && x.RefundAttemptCount < options.MaxRefundAttempts
@@ -149,6 +251,8 @@ internal sealed partial class TemplateGenerationJobProcessor(
                 && x.UserMediaDeletedAtUtc != null
                 && (x.Status == TemplateGenerationStatus.Completed
                     || (x.Status == TemplateGenerationStatus.Failed
+                        && (x.ChargedAtUtc == null || x.RefundedAtUtc != null))
+                    || (x.Status == TemplateGenerationStatus.Cancelled
                         && (x.ChargedAtUtc == null || x.RefundedAtUtc != null))))
             .OrderBy(x => x.CompletedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
@@ -332,6 +436,7 @@ internal sealed partial class TemplateGenerationJobProcessor(
             return Task.FromResult(false);
         }
 
+        dbContext.Entry(job).Property(x => x.LockedBy).OriginalValue = job.LockedBy;
         return SaveJobChangesAsync(job, cancellationToken, releaseLock);
     }
 
@@ -379,8 +484,14 @@ internal sealed partial class TemplateGenerationJobProcessor(
         var refund = await billing.RefundAsync(job.UserId, job.Id, job.TokenCost, cancellationToken);
         if (refund.IsSuccess)
         {
+            if (job.RefundedAtUtc is not null)
+            {
+                TemplateGenerationMetrics.RecordDuplicateRefundAttempt(job);
+            }
+
             job.RefundedAtUtc = DateTime.UtcNow;
             job.RefundLastErrorCode = null;
+            TemplateGenerationMetrics.RecordJobRefunded(job);
             return true;
         }
 

@@ -294,7 +294,7 @@ internal sealed partial class TemplatesService
             .Where(assignment => assignment.Template.Status == TemplateStatus.Active)
             .Where(assignment => assignment.Template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
-                && asset.Url.Trim() != string.Empty));
+                && (asset.Url ?? string.Empty).Trim() != string.Empty));
     }
 
     private async Task<TemplateOfTheDay?> CreateAutoTemplateOfTheDayAsync(
@@ -332,7 +332,7 @@ internal sealed partial class TemplatesService
             .Where(template => !allowedType.HasValue || template.TemplateType == allowedType.Value)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
-                && asset.Url.Trim() != string.Empty));
+                && (asset.Url ?? string.Empty).Trim() != string.Empty));
 
         var recentCutoff = date.AddDays(-excludeRecentDays);
         var recentTemplateIds = excludeRecentDays <= 0
@@ -397,7 +397,7 @@ internal sealed partial class TemplatesService
             .Where(template => template.Status == TemplateStatus.Active)
             .Where(template => template.Assets.Any(asset =>
                 asset.AssetKind == TemplateAssetKind.Preview
-                && asset.Url.Trim() != string.Empty))
+                && (asset.Url ?? string.Empty).Trim() != string.Empty))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -527,9 +527,9 @@ internal sealed partial class TemplatesService
         return new AdminTemplateOfTheDayResponse(
             assignment.Id,
             assignment.TemplateId,
-            assignment.Template.Title,
+            assignment.Template.Title ?? string.Empty,
             assignment.Template.TemplateType.ToString(),
-            assignment.Template.Category,
+            assignment.Template.Category ?? string.Empty,
             assignment.Template.Status.ToString(),
             assignment.Template.IsPremium,
             GetAsset(assignment.Template, TemplateAssetKind.Preview),
@@ -563,13 +563,13 @@ internal sealed partial class TemplatesService
         string? locale)
     {
         var localized = TemplateLocalizationTranslator.Resolve(
-            assignment.Template.Title,
-            assignment.Template.ShortDescription,
+            assignment.Template.Title ?? string.Empty,
+            assignment.Template.ShortDescription ?? string.Empty,
             assignment.Template.LocalizedTextsJson,
             locale);
         var previewAsset = GetAsset(assignment.Template, TemplateAssetKind.Preview);
         var previewUrl = previewAsset?.Url;
-        var previewContentType = previewAsset?.ContentType.Trim().ToLowerInvariant() ?? string.Empty;
+        var previewContentType = previewAsset?.ContentType?.Trim().ToLowerInvariant() ?? string.Empty;
         var previewIsVideo = previewContentType.StartsWith("video/", StringComparison.Ordinal)
             || IsVideoAssetUrl(previewUrl);
 
@@ -585,7 +585,7 @@ internal sealed partial class TemplatesService
             assignment.Template.IsPremium ? "premium" : "free",
             date,
             assignment.IsManual ? "manual" : "auto",
-            assignment.Template.Category,
+            assignment.Template.Category ?? string.Empty,
             DeserializeTags(assignment.Template.Tags),
             assignment.Template.TokenCost,
             previewAsset);

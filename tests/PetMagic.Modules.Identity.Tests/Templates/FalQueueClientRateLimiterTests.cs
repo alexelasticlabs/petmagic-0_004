@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using PetMagic.Modules.Templates.Infrastructure;
 using PetMagic.Modules.Templates.Infrastructure.Data;
@@ -21,7 +22,11 @@ public sealed class FalQueueClientRateLimiterTests
         var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-        var result = await client.RunAsync("fal-ai/test-model", new { image_url = "https://cdn.example.com/pet.jpg" }, timeout.Token);
+        var result = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            timeout.Token);
 
         Assert.True(result.IsSuccess, result.IsFailure ? result.Error.Code : "unexpected failure");
         Assert.Equal(1, handler.SubmitCount);
@@ -38,16 +43,80 @@ public sealed class FalQueueClientRateLimiterTests
         var handler = new RecordingFalHandler();
         var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
 
-        var first = await client.RunAsync("fal-ai/test-model", new { image_url = "https://cdn.example.com/first.jpg" }, CancellationToken.None);
+        var first = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/first.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
         Assert.True(first.IsSuccess, first.IsFailure ? first.Error.Code : "unexpected failure");
 
         using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
         await Assert.ThrowsAsync<TaskCanceledException>(() =>
-            client.RunAsync("fal-ai/test-model", new { image_url = "https://cdn.example.com/second.jpg" }, timeout.Token));
+            client.RunAsync(
+                "fal-ai/test-model",
+                new { image_url = "https://cdn.example.com/second.jpg" },
+                new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+                timeout.Token));
 
         Assert.Equal(1, handler.SubmitCount);
         Assert.Equal(1, handler.StatusCount);
         Assert.Equal(1, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldRejectSubmitResponse_WhenStatusUrlUsesDifferentHost()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new InvalidCallbackFalHandler(
+            """
+            {
+              "request_id": "fal-request-1",
+              "status_url": "https://evil.example.com/status/fal-request-1",
+              "response_url": "https://queue.fal.test/response/fal-request-1"
+            }
+            """);
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(0, handler.StatusCount);
+        Assert.Equal(0, handler.ResponseCount);
+    }
+
+    [Fact]
+    public async Task RunAsync_ShouldRejectSubmitResponse_WhenResponseUrlEscapesQueueBasePath()
+    {
+        ResetLocalRateLimiterState();
+        await using var dbContext = CreateDbContext();
+        var handler = new InvalidCallbackFalHandler(
+            """
+            {
+              "request_id": "fal-request-1",
+              "status_url": "https://queue.fal.test/status/fal-request-1",
+              "response_url": "https://queue.fal.test/other/response/fal-request-1"
+            }
+            """);
+        var client = CreateClient(dbContext, handler, maxRequestsPerMinute: 1);
+
+        var result = await client.RunAsync(
+            "fal-ai/test-model",
+            new { image_url = "https://cdn.example.com/pet.jpg" },
+            new FalQueueStageKind("image", FalQueueStages.ImageGeneration),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(TemplatesErrors.AiProviderFailed.Code, result.Error.Code);
+        Assert.Equal(1, handler.SubmitCount);
+        Assert.Equal(0, handler.StatusCount);
+        Assert.Equal(0, handler.ResponseCount);
     }
 
     private static TemplatesDbContext CreateDbContext()
@@ -61,7 +130,7 @@ public sealed class FalQueueClientRateLimiterTests
 
     private static FalQueueClient CreateClient(
         TemplatesDbContext dbContext,
-        RecordingFalHandler handler,
+        HttpMessageHandler handler,
         int maxRequestsPerMinute)
     {
         var options = new TemplatesOptions
@@ -91,7 +160,8 @@ public sealed class FalQueueClientRateLimiterTests
                 BaseAddress = new Uri("https://queue.fal.test")
             }),
             options,
-            new TemplateAiProviderRateLimiter(dbContext, options));
+            new TemplateAiProviderRateLimiter(dbContext, options),
+            NullLogger<FalQueueClient>.Instance);
     }
 
     private static void ResetLocalRateLimiterState()
@@ -176,6 +246,47 @@ public sealed class FalQueueClientRateLimiterTests
                       ]
                     }
                     """);
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+
+        private static Task<HttpResponseMessage> JsonAsync(string json)
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            });
+        }
+    }
+
+    private sealed class InvalidCallbackFalHandler(string submitJson) : HttpMessageHandler
+    {
+        public int SubmitCount { get; private set; }
+
+        public int StatusCount { get; private set; }
+
+        public int ResponseCount { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri?.AbsolutePath ?? string.Empty;
+            if (request.Method == HttpMethod.Post)
+            {
+                SubmitCount++;
+                return JsonAsync(submitJson);
+            }
+
+            if (path.StartsWith("/status/", StringComparison.Ordinal))
+            {
+                StatusCount++;
+                return JsonAsync("""{"status":"COMPLETED"}""");
+            }
+
+            if (path.StartsWith("/response/", StringComparison.Ordinal))
+            {
+                ResponseCount++;
+                return JsonAsync("""{"images":[]}""");
             }
 
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));

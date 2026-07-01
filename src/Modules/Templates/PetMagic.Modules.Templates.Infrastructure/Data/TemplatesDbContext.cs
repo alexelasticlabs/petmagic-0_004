@@ -42,6 +42,8 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
 
     public DbSet<TemplateAiProviderRequestPermit> TemplateAiProviderRequestPermits => Set<TemplateAiProviderRequestPermit>();
 
+    public DbSet<TemplateRealtimeEventRecord> TemplateRealtimeEvents => Set<TemplateRealtimeEventRecord>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         builder.Entity<TemplateCategory>(entity =>
@@ -150,6 +152,14 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Status).HasConversion<int>();
             entity.Property(x => x.GenerationMode).HasConversion<int>();
+            entity.Property(x => x.QueueMediaType)
+                .HasMaxLength(16)
+                .HasDefaultValue(TemplateGenerationQueue.MediaTypeImage)
+                .IsRequired();
+            entity.Property(x => x.QueueTier)
+                .HasMaxLength(16)
+                .HasDefaultValue(TemplateGenerationQueue.TierFree)
+                .IsRequired();
             entity.Property(x => x.VariationStrength).HasMaxLength(16);
             entity.Property(x => x.PromptBeforeVariation).HasMaxLength(2000);
             entity.Property(x => x.PromptAfterVariation).HasMaxLength(2000);
@@ -170,7 +180,16 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.Property(x => x.UsedKlingModel).HasMaxLength(256);
             entity.Property(x => x.PreprocessingProviderRequestId).HasMaxLength(128);
             entity.Property(x => x.MotionProviderRequestId).HasMaxLength(128);
+            entity.Property(x => x.CurrentProviderStage).HasMaxLength(64);
+            entity.Property(x => x.ProviderStatus).HasMaxLength(64);
+            entity.Property(x => x.PreprocessingProviderStatusUrl).HasMaxLength(2048);
+            entity.Property(x => x.PreprocessingProviderResponseUrl).HasMaxLength(2048);
+            entity.Property(x => x.MotionProviderStatusUrl).HasMaxLength(2048);
+            entity.Property(x => x.MotionProviderResponseUrl).HasMaxLength(2048);
+            entity.Property(x => x.ProviderResultUrl).HasMaxLength(2048);
             entity.Property(x => x.MotionProviderCostUsd).HasPrecision(12, 4);
+            entity.Property(x => x.EstimatedWaitSecondsAtQueue);
+            entity.Property(x => x.EstimatedCompletionAtQueueUtc);
             entity.Property(x => x.LastErrorCode).HasMaxLength(128);
             entity.Property(x => x.LastErrorMessage).HasMaxLength(1000);
             entity.Property(x => x.RefundLastErrorCode).HasMaxLength(128);
@@ -182,6 +201,12 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("IX_templates_generation_jobs_UserId_Status");
             entity.HasIndex(x => x.LastUserMediaCleanupAttemptAtUtc);
             entity.HasIndex(x => new { x.Status, x.QueuedAtUtc });
+            entity.HasIndex(x => new { x.Status, x.QueueMediaType, x.QueueTier, x.QueuedAtUtc })
+                .HasDatabaseName("IX_tgj_Status_QueueMediaType_QueueTier_QueuedAtUtc");
+            entity.HasIndex(x => new { x.Status, x.QueueMediaType, x.StartedAtUtc })
+                .HasDatabaseName("IX_tgj_Status_QueueMediaType_StartedAtUtc");
+            entity.HasIndex(x => new { x.Status, x.ProviderStatusCheckedAtUtc })
+                .HasDatabaseName("IX_tgj_Status_ProviderStatusCheckedAtUtc");
             entity.HasIndex(x => new { x.Status, x.LockedAtUtc })
                 .HasDatabaseName("IX_templates_generation_jobs_Status_LockedAtUtc");
             entity.HasIndex(x => new { x.Status, x.CompletedAtUtc });
@@ -199,16 +224,24 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
             entity.HasIndex(x => x.PetPhotoId);
             entity.HasIndex(x => x.InputMediaAssetId);
             entity.HasIndex(x => x.ResultMediaAssetId);
+            entity.HasIndex(x => x.PreprocessingProviderRequestId)
+                .IsUnique()
+                .HasDatabaseName("UX_tgj_PreprocessingProviderRequestId")
+                .HasFilter(""" "PreprocessingProviderRequestId" IS NOT NULL """);
+            entity.HasIndex(x => x.MotionProviderRequestId)
+                .IsUnique()
+                .HasDatabaseName("UX_tgj_MotionProviderRequestId")
+                .HasFilter(""" "MotionProviderRequestId" IS NOT NULL """);
             entity.HasIndex(x => new { x.UserId, x.IsWatermarkRequired, x.IsWatermarkRemoved })
                 .HasDatabaseName("IX_tgj_UserId_WatermarkState");
             entity.HasIndex(x => new { x.UserId, x.IdempotencyKey })
                 .IsUnique()
                 .HasDatabaseName("UX_templates_generation_jobs_UserId_IdempotencyKey_active")
-                .HasFilter(""" "Status" IN (1, 2) AND "IdempotencyKey" IS NOT NULL """);
+                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10) AND "IdempotencyKey" IS NOT NULL """);
             entity.HasIndex(x => new { x.UserId, x.RequestHash })
                 .IsUnique()
                 .HasDatabaseName("UX_templates_generation_jobs_UserId_RequestHash_active")
-                .HasFilter(""" "Status" IN (1, 2) AND "RequestHash" IS NOT NULL """);
+                .HasFilter(""" "Status" IN (1, 2, 6, 7, 8, 9, 10) AND "RequestHash" IS NOT NULL """);
             entity.HasOne(x => x.Template)
                 .WithMany()
                 .HasForeignKey(x => x.TemplateId)
@@ -307,6 +340,16 @@ public sealed class TemplatesDbContext(DbContextOptions<TemplatesDbContext> opti
                 .HasDatabaseName("UX_templates_ai_provider_permits_provider_bucket_slot");
             entity.HasIndex(x => x.CreatedAtUtc)
                 .HasDatabaseName("IX_templates_ai_provider_permits_CreatedAtUtc");
+        });
+
+        builder.Entity<TemplateRealtimeEventRecord>(entity =>
+        {
+            entity.ToTable("templates_realtime_events");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Topic).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Data).HasColumnType("text");
+            entity.HasIndex(x => new { x.CreatedAtUtc, x.Id })
+                .HasDatabaseName("IX_templates_realtime_events_CreatedAtUtc_Id");
         });
 
         builder.Entity<TemplateGenerationFeedback>(entity =>

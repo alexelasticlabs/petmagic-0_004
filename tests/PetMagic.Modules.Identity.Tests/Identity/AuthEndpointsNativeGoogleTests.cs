@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.Text.Json.Nodes;
 using System.Threading.RateLimiting;
 
 using Microsoft.AspNetCore.Authentication;
@@ -111,6 +112,28 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     [Fact]
+    public async Task LegalCurrent_ShouldReturnServiceUnavailable_WhenLegalCatalogFails()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(isConfigured: true, clientId: "google-web-client-id");
+        var service = new FakeIdentityService
+        {
+            LegalDocumentsResult = Result.Failure<LegalDocumentsResponse>(
+                new Error("legal.catalog_unavailable", "storage=r2 bucket=legal-private"))
+        };
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.GetAsync("/api/legal/current?locale=ru");
+        var body = await response.Content.ReadAsStringAsync();
+        var payload = JsonNode.Parse(body);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal("Current legal documents are temporarily unavailable.", payload?["detail"]?.GetValue<string>());
+        Assert.DoesNotContain("legal-private", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("storage=r2", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GoogleNativeLogin_ShouldReturnSession_WhenTokenVerificationSucceeds()
     {
         var verifier = new FakeGoogleIdentityTokenVerifier(
@@ -186,6 +209,60 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.Null(service.LastExternalLoginCommand);
+    }
+
+    [Fact]
+    public async Task GoogleSocialLogin_ShouldSanitizeVerifierFailureDetails()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(
+            isConfigured: true,
+            clientId: "google-web-client-id",
+            failure: new Error("auth.external_token_invalid", "trace=google jwt=secret-token"));
+        var service = new FakeIdentityService();
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/google",
+            new GoogleSocialLoginCommand("invalid-google-id-token", "server-auth-code"));
+        var body = await response.Content.ReadAsStringAsync();
+        var payload = JsonNode.Parse(body);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("External identity token is invalid.", payload?["detail"]?.GetValue<string>());
+        Assert.DoesNotContain("secret-token", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("trace=", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GoogleNativeLogin_ShouldSanitizeIdentityServiceFailureDetails()
+    {
+        var verifier = new FakeGoogleIdentityTokenVerifier(
+            isConfigured: true,
+            clientId: "google-web-client-id",
+            verifiedCommand: new ExternalLoginCallbackCommand(
+                "Google",
+                "google-subject-1",
+                "pet@example.com",
+                "Pet Parent"));
+        var service = new FakeIdentityService
+        {
+            ExternalLoginResult = Result.Failure<TokenPairResponse>(
+                new Error("auth.account_deleted", "state=deleted internal_reason=provider_blocklist"))
+        };
+
+        await using var app = await TestApplication.CreateAsync(verifier, service);
+
+        var response = await app.Client.PostAsJsonAsync(
+            "/api/auth/external/google/native",
+            new GoogleNativeLoginCommand("native-google-id-token"));
+        var body = await response.Content.ReadAsStringAsync();
+        var payload = JsonNode.Parse(body);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal("Account is unavailable.", payload?["detail"]?.GetValue<string>());
+        Assert.DoesNotContain("provider_blocklist", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("internal_reason", body, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -377,6 +454,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapAuthEndpoints();
+            app.MapLegalEndpoints();
 
             await app.StartAsync();
             var client = app.GetTestClient();
@@ -417,7 +495,8 @@ public sealed class AuthEndpointsNativeGoogleTests
     }
 
     private sealed class FakeAppleIdentityTokenVerifier(
-        ExternalLoginCallbackCommand? verifiedCommand = null) : IAppleIdentityTokenVerifier
+        ExternalLoginCallbackCommand? verifiedCommand = null,
+        Error? failure = null) : IAppleIdentityTokenVerifier
     {
         public bool IsConfigured => true;
 
@@ -426,7 +505,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             if (verifiedCommand is null)
             {
                 return Task.FromResult(Result.Failure<ExternalLoginCallbackCommand>(
-                    new Error("auth.external_token_invalid", "External identity token is invalid.")));
+                    failure ?? new Error("auth.external_token_invalid", "External identity token is invalid.")));
             }
 
             return Task.FromResult(Result.Success(verifiedCommand));
@@ -436,7 +515,8 @@ public sealed class AuthEndpointsNativeGoogleTests
     private sealed class FakeGoogleIdentityTokenVerifier(
         bool isConfigured,
         string? clientId,
-        ExternalLoginCallbackCommand? verifiedCommand = null) : IGoogleIdentityTokenVerifier
+        ExternalLoginCallbackCommand? verifiedCommand = null,
+        Error? failure = null) : IGoogleIdentityTokenVerifier
     {
         public bool IsConfigured { get; } = isConfigured;
 
@@ -447,7 +527,7 @@ public sealed class AuthEndpointsNativeGoogleTests
             if (verifiedCommand is null)
             {
                 return Task.FromResult(Result.Failure<ExternalLoginCallbackCommand>(
-                    new Error("auth.external_token_invalid", "External identity token is invalid.")));
+                    failure ?? new Error("auth.external_token_invalid", "External identity token is invalid.")));
             }
 
             return Task.FromResult(Result.Success(verifiedCommand));
@@ -469,6 +549,10 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public Result<UserProfileResponse>? RegisterResult { get; init; }
 
+        public Result<TokenPairResponse>? ExternalLoginResult { get; init; }
+
+        public Result<LegalDocumentsResponse>? LegalDocumentsResult { get; init; }
+
         public ExternalLoginCallbackCommand? LastExternalLoginCommand { get; private set; }
 
         public RegisterUserCommand? LastRegisterCommand { get; private set; }
@@ -477,7 +561,26 @@ public sealed class AuthEndpointsNativeGoogleTests
 
         public UpdateUserAvatarCommand? LastUpdateAvatarCommand { get; private set; }
 
-        public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken) => NotSupported<LegalDocumentsResponse>();
+        public Task<Result<LegalDocumentsResponse>> GetCurrentLegalDocumentsAsync(string? locale, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(
+                LegalDocumentsResult
+                ?? Result.Success(new LegalDocumentsResponse(
+                    new LegalDocumentResponse(
+                        LegalDocumentKinds.TermsOfUse,
+                        "Terms of Use",
+                        "2026-05-20",
+                        DateTime.UtcNow,
+                        "Terms summary",
+                        []),
+                    new LegalDocumentResponse(
+                        LegalDocumentKinds.PrivacyPolicy,
+                        "Privacy Policy",
+                        "2026-05-20",
+                        DateTime.UtcNow,
+                        "Privacy summary",
+                        []))));
+        }
         public Task<Result<UserProfileResponse>> RegisterAsync(RegisterUserCommand command, CancellationToken cancellationToken)
         {
             LastRegisterCommand = command;
@@ -513,6 +616,11 @@ public sealed class AuthEndpointsNativeGoogleTests
         public Task<Result<TokenPairResponse>> ExternalLoginAsync(ExternalLoginCallbackCommand command, CancellationToken cancellationToken)
         {
             LastExternalLoginCommand = command;
+
+            if (ExternalLoginResult is not null)
+            {
+                return Task.FromResult(ExternalLoginResult);
+            }
 
             return Task.FromResult(Result.Success(new TokenPairResponse(
                 "access-token",

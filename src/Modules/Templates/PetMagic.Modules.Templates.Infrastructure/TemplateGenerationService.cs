@@ -23,7 +23,9 @@ internal sealed partial class TemplateGenerationService(
     TemplatesOptions options,
     TemplateWatermarkSettingsStore? watermarkSettings = null,
     IGamificationService? gamificationService = null,
-    ILogger<TemplateGenerationService>? logger = null) : ITemplateGenerationService
+    ILogger<TemplateGenerationService>? logger = null,
+    ITemplateFeedRealtimeService? realtimeService = null,
+    ITemplateAiProviderHealthService? aiProviderHealthService = null) : ITemplateGenerationService
 {
     internal static readonly Guid AdminTestUserId = Guid.Empty;
 
@@ -82,8 +84,13 @@ internal sealed partial class TemplateGenerationService(
     internal static TemplateGenerationResponse MapResponse(
         TemplateGenerationJob job,
         int? queuePosition = null,
-        int? estimatedWaitSeconds = null)
+        int? estimatedWaitSeconds = null,
+        QueueEstimate? queueEstimate = null)
     {
+        queuePosition ??= queueEstimate?.QueuePosition;
+        estimatedWaitSeconds ??= queueEstimate?.EstimatedWaitSeconds;
+        var mediaType = queueEstimate?.MediaType ?? TemplateGenerationQueue.ResolveMediaType(job);
+        var priorityClass = queueEstimate?.PriorityClass ?? TemplateGenerationQueue.NormalizeTier(job.QueueTier);
         return new TemplateGenerationResponse(
             GenerationId: job.Id,
             UserId: job.UserId,
@@ -145,7 +152,14 @@ internal sealed partial class TemplateGenerationService(
             ResultPreviewUrl: null,
             CanCompareBeforeAfter: false,
             PetId: job.PetId,
-            PetPhotoId: job.PetPhotoId);
+            PetPhotoId: job.PetPhotoId,
+            MediaType: mediaType,
+            PriorityClass: priorityClass,
+            EstimatedTotalSeconds: queueEstimate?.EstimatedTotalSeconds,
+            EstimatedCompletionAtUtc: queueEstimate?.EstimatedCompletionAtUtc,
+            QueueReason: queueEstimate?.Reason,
+            RetryAfterSeconds: queueEstimate?.RetryAfterSeconds,
+            CanCancel: job.Status == TemplateGenerationStatus.Queued);
     }
 
 }

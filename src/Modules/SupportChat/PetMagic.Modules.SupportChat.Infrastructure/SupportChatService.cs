@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
 
 using PetMagic.BuildingBlocks.Results;
+using PetMagic.Modules.Economy.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
+using PetMagic.Modules.Templates.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Infrastructure.Data;
 
 namespace PetMagic.Modules.SupportChat.Infrastructure;
@@ -14,7 +16,11 @@ public sealed partial class SupportChatService(
     ISupportChatPushNotificationSender pushNotificationSender,
     ISupportAttachmentStorage attachmentStorage,
     SupportAttachmentStorageOptions attachmentStorageOptions,
-    ILogger<SupportChatService>? logger = null) : ISupportChatService
+    ILogger<SupportChatService>? logger = null,
+    IEconomyService? economyService = null,
+    IAdminUserEconomyAnalyticsReader? adminUserEconomyAnalyticsReader = null,
+    ITemplateGenerationService? templateGenerationService = null,
+    IAdminUserTemplateAnalyticsReader? adminUserTemplateAnalyticsReader = null) : ISupportChatService
 {
     private const int DefaultConversationMessagesTake = 60;
     private const int MaxConversationMessagesTake = 120;

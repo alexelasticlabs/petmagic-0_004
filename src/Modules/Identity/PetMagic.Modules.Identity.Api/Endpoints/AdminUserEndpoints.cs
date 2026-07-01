@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.Identity.Application.Abstractions;
 using PetMagic.Modules.Identity.Application.Contracts;
 using PetMagic.Modules.Identity.Domain.Enums;
@@ -59,7 +60,7 @@ public static class AdminUserEndpoints
             cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         httpContext.Response.Headers["X-Pagination-Skip"] = result.Value.Skip.ToString(CultureInfo.InvariantCulture);
@@ -69,11 +70,16 @@ public static class AdminUserEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminUserDashboardMetricsResponse>> GetDashboardMetricsAsync(
+    private static async Task<Results<Ok<AdminUserDashboardMetricsResponse>, ProblemHttpResult>> GetDashboardMetricsAsync(
         [FromServices] IIdentityService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminUserDashboardMetricsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 
@@ -94,14 +100,7 @@ public static class AdminUserEndpoints
         var result = await service.AdjustAdminUserWalletAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code switch
-            {
-                "users.not_found" => StatusCodes.Status404NotFound,
-                "economy.insufficient_balance" => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status400BadRequest,
-            };
-
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Ok(result.Value);
@@ -115,10 +114,7 @@ public static class AdminUserEndpoints
         var result = await service.GetAdminUserAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status404NotFound);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);
@@ -132,10 +128,7 @@ public static class AdminUserEndpoints
         var result = await service.GetAdminUserAnalyticsAsync(userId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: StatusCodes.Status404NotFound);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status404NotFound);
         }
 
         return TypedResults.Ok(result.Value);
@@ -161,20 +154,16 @@ public static class AdminUserEndpoints
             var isAdmin = httpContext.User.IsInRole(SystemRoles.Admin);
             if (!isAdmin)
             {
-                return TypedResults.Problem(
-                    title: "users.role_not_allowed",
-                    detail: "Only Admin can assign Admin or Moderator roles.",
-                    statusCode: StatusCodes.Status403Forbidden);
+                return IdentityClientProblems.ToProblem(
+                    new Error("users.role_not_allowed", "Only Admin can assign Admin or Moderator roles."),
+                    StatusCodes.Status403Forbidden);
             }
         }
 
         var result = await service.AssignRoleAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -197,10 +186,7 @@ public static class AdminUserEndpoints
         var result = await service.SetPremiumStatusAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -223,10 +209,7 @@ public static class AdminUserEndpoints
         var result = await service.RevokeRoleAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -249,10 +232,7 @@ public static class AdminUserEndpoints
         var result = await service.SetUserActiveStatusAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -274,10 +254,7 @@ public static class AdminUserEndpoints
         var result = await service.DeleteAdminUserAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(
-                title: result.Error.Code,
-                detail: result.Error.Message,
-                statusCode: ResolveAdminUserMutationFailureStatusCode(result.Error.Code));
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.NoContent();
@@ -299,20 +276,10 @@ public static class AdminUserEndpoints
         var result = await service.SendBulkEmailAsync(command, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status400BadRequest);
+            return IdentityClientProblems.ToProblem(result.Error, StatusCodes.Status400BadRequest);
         }
 
         return TypedResults.Accepted((string?)null);
-    }
-
-    private static int ResolveAdminUserMutationFailureStatusCode(string errorCode)
-    {
-        return errorCode switch
-        {
-            "users.not_found" => StatusCodes.Status404NotFound,
-            "users.cannot_remove_last_admin" => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status400BadRequest,
-        };
     }
 
     private static string NormalizeSystemRole(string? role)

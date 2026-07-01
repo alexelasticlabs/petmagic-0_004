@@ -307,6 +307,51 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task ListAdminCategoriesAsync_ShouldHandleLegacyEmptyCategoryKeys()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+        var now = DateTime.UtcNow;
+
+        dbContext.TemplateCategories.Add(new TemplateCategory
+        {
+            Id = Guid.NewGuid(),
+            Name = string.Empty,
+            NormalizedName = string.Empty,
+            IsArchived = false,
+            CreatedAtUtc = now.AddDays(-1),
+            UpdatedAtUtc = now,
+        });
+        dbContext.TemplateItems.Add(new TemplateItem
+        {
+            Id = Guid.NewGuid(),
+            TemplateType = TemplateType.Image,
+            Title = "Legacy category template",
+            ShortDescription = "Legacy category template",
+            Category = string.Empty,
+            Tags = "legacy",
+            IsPremium = false,
+            TokenCost = 10,
+            Status = TemplateStatus.Active,
+            PromoBadgeMode = TemplatePromoBadgeMode.Auto,
+            DefaultVariationStrength = "medium",
+            CreatedAtUtc = now.AddDays(-1),
+            UpdatedAtUtc = now,
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.ListAdminCategoriesAsync(true, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var category = Assert.Single(result.Value);
+        Assert.Equal(string.Empty, category.Name);
+        Assert.Equal(1, category.TotalTemplates);
+        Assert.Equal(1, category.ImageTemplates);
+        Assert.Equal(1, category.ActiveTemplates);
+        Assert.Equal(["legacy"], category.Tags);
+    }
+
+    [Fact]
     public async Task ChangeStatusAsync_ShouldRejectActivation_WhenReferenceDurationWasNotResolved()
     {
         await using var dbContext = CreateDbContext();

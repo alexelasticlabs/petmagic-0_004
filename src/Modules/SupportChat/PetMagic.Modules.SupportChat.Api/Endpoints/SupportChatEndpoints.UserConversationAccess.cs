@@ -31,9 +31,9 @@ public static partial class SupportChatEndpoints
             request?.Priority ?? SupportConversationPriority.Normal,
             request?.Source ?? SupportConversationSource.MobileChat,
             request?.AssistantScenario,
-            RelatedGenerationId: null,
-            RelatedPaymentId: null,
-            RelatedSubscriptionId: null);
+            request?.RelatedGenerationId,
+            request?.RelatedPaymentId,
+            request?.RelatedSubscriptionId);
         var validation = await validator.ValidateAsync(command, cancellationToken);
         if (!validation.IsValid)
         {

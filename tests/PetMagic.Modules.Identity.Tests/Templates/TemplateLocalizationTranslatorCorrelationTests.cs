@@ -28,7 +28,7 @@ public sealed class TemplateLocalizationTranslatorCorrelationTests
             CancellationToken.None);
 
         Assert.NotNull(localizedTextsJson);
-        Assert.Equal(2, recordingHandler.Requests.Count);
+        Assert.Single(recordingHandler.Requests);
         Assert.All(recordingHandler.Requests, request =>
         {
             Assert.Equal("translate.googleapis.com", request.RequestUri?.Host);
@@ -57,9 +57,10 @@ public sealed class TemplateLocalizationTranslatorCorrelationTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(CloneRequest(request));
+            var translatedPayload = ExtractQueryValue(request.RequestUri, "q");
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
-                Content = new StringContent("""[[["translated","source",null,null,3]]]""")
+                Content = new StringContent($"""[[["{translatedPayload}","source",null,null,3]]]""")
             });
         }
 
@@ -72,6 +73,21 @@ public sealed class TemplateLocalizationTranslatorCorrelationTests
             }
 
             return clone;
+        }
+
+        private static string ExtractQueryValue(Uri? requestUri, string key)
+        {
+            var query = requestUri?.Query ?? string.Empty;
+            foreach (var segment in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var parts = segment.Split('=', 2);
+                if (parts.Length == 2 && string.Equals(parts[0], key, StringComparison.Ordinal))
+                {
+                    return Uri.UnescapeDataString(parts[1]);
+                }
+            }
+
+            return "translated";
         }
     }
 }

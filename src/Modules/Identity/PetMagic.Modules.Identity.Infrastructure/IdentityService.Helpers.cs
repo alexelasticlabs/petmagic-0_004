@@ -139,13 +139,22 @@ public sealed partial class IdentityService
             .OrderBy(x => x.Provider)
             .ToListAsync();
 
-        return [.. providerAccounts
+        var normalizedProviderAccounts = providerAccounts
+            .Select(account => new
+            {
+                Account = account,
+                Provider = NormalizeLinkedAccountProvider(account.Provider)
+            })
+            .Where(x => !string.IsNullOrWhiteSpace(x.Provider))
+            .ToList();
+
+        return [.. normalizedProviderAccounts
             .GroupBy(x => x.Provider, StringComparer.OrdinalIgnoreCase)
             .OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)
             .Select(group => new LinkedAccountResponse(
-                group.First().Provider,
-                ToLinkedAccountDisplayName(group.First().Provider),
-                CanDisconnectLinkedProvider(user, providerAccounts, group.Count())))];
+                group.Key,
+                ToLinkedAccountDisplayName(group.Key),
+                CanDisconnectLinkedProvider(user, normalizedProviderAccounts.Select(x => x.Account), group.Count())))];
     }
 
     private static bool CanDisconnectLinkedProvider(AppUser user, IEnumerable<ExternalAuthProvider> allLogins, int providerLoginCount)
@@ -160,6 +169,11 @@ public sealed partial class IdentityService
 
     private static string ToLinkedAccountDisplayName(string provider)
     {
+        if (string.IsNullOrWhiteSpace(provider))
+        {
+            return string.Empty;
+        }
+
         if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
         {
             return "Google";
@@ -170,7 +184,7 @@ public sealed partial class IdentityService
             return "Apple";
         }
 
-        return provider;
+        return provider.Trim();
     }
 
     private static string? NormalizeEmail(string? email)
@@ -181,17 +195,28 @@ public sealed partial class IdentityService
 
     private static string? NormalizeExternalProvider(string? provider)
     {
-        if (string.Equals(provider, "Google", StringComparison.OrdinalIgnoreCase))
+        var normalizedProvider = provider?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedProvider))
+        {
+            return null;
+        }
+
+        if (string.Equals(normalizedProvider, "Google", StringComparison.OrdinalIgnoreCase))
         {
             return "Google";
         }
 
-        if (string.Equals(provider, "Apple", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedProvider, "Apple", StringComparison.OrdinalIgnoreCase))
         {
             return "Apple";
         }
 
         return null;
+    }
+
+    private static string NormalizeLinkedAccountProvider(string? provider)
+    {
+        return NormalizeExternalProvider(provider) ?? provider?.Trim() ?? string.Empty;
     }
 
     private async Task<bool> IsDeletedEmailBlockedAsync(string email, CancellationToken cancellationToken)

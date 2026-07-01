@@ -27,7 +27,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new ValidateGooglePlayBillingCommand(
@@ -61,7 +61,7 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var command = new ValidateAppleAppStoreBillingCommand(
@@ -94,7 +94,7 @@ public static partial class EconomyEndpoints
             _ => StatusCodes.Status400BadRequest,
         };
 
-        return TypedResults.Problem(title: error.Code, detail: error.Message, statusCode: statusCode);
+        return TypedResults.Problem(title: error.Code, detail: GetClientEconomyProblemDetail(error.Code), statusCode: statusCode);
     }
 
     private static async Task<Results<Ok<PurchaseOrderResponse>, ProblemHttpResult>> GetPurchaseAsync(
@@ -106,13 +106,13 @@ public static partial class EconomyEndpoints
         var (userId, _, subjectError) = TryGetSubject(context);
         if (subjectError is not null)
         {
-            return TypedResults.Problem(title: subjectError.Code, detail: subjectError.Message, statusCode: StatusCodes.Status401Unauthorized);
+            return ToClientEconomyProblem(subjectError);
         }
 
         var result = await service.GetPurchaseAsync(userId!.Value, orderId, cancellationToken);
         if (result.IsFailure)
         {
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: StatusCodes.Status404NotFound);
+            return ToClientEconomyProblem(result.Error);
         }
 
         return TypedResults.Ok(result.Value);
@@ -145,7 +145,7 @@ public static partial class EconomyEndpoints
                 _ => StatusCodes.Status400BadRequest
             };
 
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToWebhookProblem(result.Error, statusCode);
         }
 
         return TypedResults.Ok(result.Value);
@@ -174,7 +174,7 @@ public static partial class EconomyEndpoints
                 _ => StatusCodes.Status400BadRequest
             };
 
-            return TypedResults.Problem(title: securityValidation.Error.Code, detail: securityValidation.Error.Message, statusCode: statusCode);
+            return ToWebhookProblem(securityValidation.Error, statusCode);
         }
 
         var result = await service.HandleAppStoreServerNotificationAsync(command, cancellationToken);
@@ -186,7 +186,7 @@ public static partial class EconomyEndpoints
                 InvalidWebhookPayloadCode => StatusCodes.Status400BadRequest,
                 _ => StatusCodes.Status400BadRequest
             };
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToWebhookProblem(result.Error, statusCode);
         }
 
         return TypedResults.Ok(result.Value);
@@ -219,7 +219,7 @@ public static partial class EconomyEndpoints
                 _ => StatusCodes.Status400BadRequest
             };
 
-            return TypedResults.Problem(title: securityValidation.Error.Code, detail: securityValidation.Error.Message, statusCode: statusCode);
+            return ToWebhookProblem(securityValidation.Error, statusCode);
         }
 
         var result = await service.HandleGooglePlayDeveloperNotificationAsync(command, cancellationToken);
@@ -232,7 +232,7 @@ public static partial class EconomyEndpoints
                 InvalidWebhookPayloadCode => StatusCodes.Status400BadRequest,
                 _ => StatusCodes.Status400BadRequest
             };
-            return TypedResults.Problem(title: result.Error.Code, detail: result.Error.Message, statusCode: statusCode);
+            return ToWebhookProblem(result.Error, statusCode);
         }
 
         return TypedResults.Ok(result.Value);
@@ -251,5 +251,24 @@ public static partial class EconomyEndpoints
     public sealed record GooglePlayDeveloperNotificationRequest(GooglePlayPubSubMessage Message);
 
     public sealed record GooglePlayPubSubMessage(string Data, string? MessageId);
+
+    private static ProblemHttpResult ToWebhookProblem(PetMagic.BuildingBlocks.Results.Error error, int statusCode)
+    {
+        return TypedResults.Problem(
+            title: error.Code,
+            detail: GetWebhookProblemDetail(error.Code),
+            statusCode: statusCode);
+    }
+
+    private static string GetWebhookProblemDetail(string errorCode)
+    {
+        return errorCode switch
+        {
+            InvalidStripeSignatureCode or InvalidStoreWebhookSignatureCode => "Webhook signature validation failed.",
+            InvalidWebhookPayloadCode => "Webhook payload is invalid.",
+            "economy.store_verification_unavailable" => "Webhook verification is temporarily unavailable.",
+            _ => "Webhook request could not be processed.",
+        };
+    }
 
 }

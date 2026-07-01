@@ -38,11 +38,11 @@ internal sealed class AdminUserEconomyAnalyticsReader(EconomyDbContext dbContext
             .Take(10)
             .Select(x => new AdminUserEconomyPurchaseResponse(
                 x.Id,
-                x.Status,
+                x.Status ?? string.Empty,
                 x.PriceAmount,
-                x.CurrencyCode,
+                x.CurrencyCode ?? string.Empty,
                 x.SparkToGrant,
-                x.PaymentProvider,
+                x.PaymentProvider ?? string.Empty,
                 x.CreatedAtUtc,
                 x.ConfirmedAtUtc))
             .ToListAsync(cancellationToken);
@@ -69,8 +69,8 @@ internal sealed class AdminUserEconomyAnalyticsReader(EconomyDbContext dbContext
                 x.Id,
                 x.Delta,
                 x.BalanceAfter,
-                x.Source,
-                x.Reason,
+                x.Source ?? string.Empty,
+                x.Reason ?? string.Empty,
                 x.CreatedAtUtc,
                 x.SourceProvider,
                 null))

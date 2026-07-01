@@ -7,6 +7,7 @@ using System.Text;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -40,7 +41,8 @@ public sealed partial class IdentityService(
     EmailOptions emailOptions,
     AvatarStorageOptions avatarStorageOptions,
     IOptions<JwtOptions> jwtOptions,
-    ILogger<IdentityService>? logger = null) : IIdentityService
+    ILogger<IdentityService>? logger = null,
+    IMemoryCache? legalAcceptanceCache = null) : IIdentityService
 {
     private const int MaxCodeAttempts = 5;
     private const int MaxCodesPerHourPerEmail = 5;
@@ -140,6 +142,7 @@ public sealed partial class IdentityService(
             return Result.Failure<UserProfileResponse>(IdentityErrors.OperationFailed);
         }
 
+        legalAcceptanceCache?.Remove(LegalAcceptanceRequirementCache.BuildKey(user.Id));
         await WriteAuditAsync(user.Id, "user.legal_documents.accepted", $"Accepted terms {command.TermsOfUseVersion} and privacy {command.PrivacyPolicyVersion}.", cancellationToken);
 
         var roles = await userManager.GetRolesAsync(user);

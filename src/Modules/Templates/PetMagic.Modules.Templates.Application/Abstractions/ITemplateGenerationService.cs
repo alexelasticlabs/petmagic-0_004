@@ -15,6 +15,8 @@ public interface ITemplateGenerationService
 
     Task<Result<CompatibleGenerationTemplatesResponse>> GetCompatibleTemplatesAsync(Guid userId, Guid resultId, CancellationToken cancellationToken);
 
+    Task<Result<CancelQueuedGenerationResponse>> CancelQueuedAsync(Guid userId, Guid generationId, CancellationToken cancellationToken);
+
     Task<Result<TemplateGenerationResponse>> StartAdminTestAsync(Guid templateId, TemplateAssetCommand sourceImageAsset, CancellationToken cancellationToken);
 
     Task<Result<TemplateGenerationResponse>> GetAsync(Guid userId, Guid generationId, CancellationToken cancellationToken);
@@ -40,6 +42,13 @@ public interface ITemplateGenerationService
     Task<Result<TemplateGenerationResponse>> GetAdminAsync(Guid generationId, CancellationToken cancellationToken);
 
     Task<Result<RemoveGenerationWatermarkResponse>> GrantAdminCleanDownloadAsync(Guid adminUserId, Guid generationId, CancellationToken cancellationToken);
+}
+
+public interface ITemplateGenerationProviderCallbackService
+{
+    Task<Result<FalProviderWebhookResponse>> ProcessFalWebhookAsync(
+        FalProviderWebhookCommand command,
+        CancellationToken cancellationToken);
 }
 
 public interface ITemplatePushTokenService

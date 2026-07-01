@@ -82,22 +82,36 @@ public sealed class GamificationService(
         var unlockedAchievementResponses = new List<AchievementResponse>();
         if (unlockedAchievements.Count > 0)
         {
-            var unlockedKeys = unlockedAchievements.Select(a => a.AchievementKey).ToHashSet();
-            var definitions = await dbContext.AchievementDefinitions
-                .Where(d => unlockedKeys.Contains(d.Key))
-                .ToDictionaryAsync(d => d.Key, cancellationToken);
+            var unlockedKeys = unlockedAchievements
+                .Select(a => NormalizeAchievementKey(a.AchievementKey))
+                .Where(key => key.Length > 0)
+                .ToHashSet(StringComparer.Ordinal);
+            var definitions = unlockedKeys.Count == 0
+                ? new Dictionary<string, AchievementDefinition>(StringComparer.Ordinal)
+                : (await dbContext.AchievementDefinitions
+                        .Where(d => d.Key != null && d.Key != string.Empty && unlockedKeys.Contains(d.Key))
+                        .ToListAsync(cancellationToken))
+                    .Select(def => new
+                    {
+                        Definition = def,
+                        Key = NormalizeAchievementKey(def.Key)
+                    })
+                    .Where(x => x.Key.Length > 0)
+                    .GroupBy(x => x.Key, StringComparer.Ordinal)
+                    .ToDictionary(x => x.Key, x => x.First().Definition, StringComparer.Ordinal);
 
             foreach (var achievement in unlockedAchievements.Where(a => !a.RewardCredited))
             {
-                if (definitions.TryGetValue(achievement.AchievementKey, out var def))
+                var normalizedAchievementKey = NormalizeAchievementKey(achievement.AchievementKey);
+                if (normalizedAchievementKey.Length > 0 && definitions.TryGetValue(normalizedAchievementKey, out var def))
                 {
                     totalSparkReward += def.RewardSpark;
                     unlockedAchievementResponses.Add(new AchievementResponse(
-                        def.Key,
-                        def.Category,
-                        def.Rarity,
-                        def.TitleKey,
-                        def.DescriptionKey,
+                        normalizedAchievementKey,
+                        def.Category ?? "special",
+                        def.Rarity ?? "common",
+                        def.TitleKey ?? string.Empty,
+                        def.DescriptionKey ?? string.Empty,
                         def.IconEmoji,
                         def.RequirementValue,
                         def.RequirementValue,
@@ -146,7 +160,7 @@ public sealed class GamificationService(
             progress.PetId,
             progress.Xp,
             progress.Level,
-            progress.EvolutionStage,
+            progress.EvolutionStage ?? "egg",
             progress.TotalGenerations,
             XpThresholds.GetXpForNextLevel(progress.Level),
             XpThresholds.GetXpForCurrentLevel(progress.Level),
@@ -161,23 +175,35 @@ public sealed class GamificationService(
             .OrderBy(x => x.SortOrder)
             .ToListAsync(cancellationToken);
 
-        var userAchievements = await dbContext.UserAchievements
-            .Where(x => x.UserId == userId)
-            .ToDictionaryAsync(x => x.AchievementKey, cancellationToken);
+        var userAchievements = (await dbContext.UserAchievements
+                .Where(x => x.UserId == userId)
+                .ToListAsync(cancellationToken))
+            .Select(achievement => new
+            {
+                Achievement = achievement,
+                Key = NormalizeAchievementKey(achievement.AchievementKey)
+            })
+            .Where(x => x.Key.Length > 0)
+            .GroupBy(x => x.Key, StringComparer.Ordinal)
+            .ToDictionary(
+                x => x.Key,
+                x => x.OrderByDescending(item => item.Achievement.UnlockedAtUtc).First().Achievement,
+                StringComparer.Ordinal);
 
         var userProgress = await GetUserProgressCountersAsync(userId, cancellationToken);
 
         return definitions.Select(def =>
         {
-            userAchievements.TryGetValue(def.Key, out var earned);
+            var normalizedKey = NormalizeAchievementKey(def.Key);
+            userAchievements.TryGetValue(normalizedKey, out var earned);
             var currentProgress = CalculateProgress(def.RequirementType, userProgress);
 
             return new AchievementResponse(
-                def.Key,
-                def.Category,
-                def.Rarity,
-                def.TitleKey,
-                def.DescriptionKey,
+                normalizedKey,
+                def.Category ?? "special",
+                def.Rarity ?? "common",
+                def.TitleKey ?? string.Empty,
+                def.DescriptionKey ?? string.Empty,
                 def.IconEmoji,
                 def.RequirementValue,
                 Math.Min(currentProgress, def.RequirementValue),
@@ -196,19 +222,33 @@ public sealed class GamificationService(
             .Take(count)
             .ToListAsync(cancellationToken);
 
-        var keys = recent.Select(x => x.AchievementKey).ToHashSet();
-        var definitions = await dbContext.AchievementDefinitions
-            .Where(x => keys.Contains(x.Key))
-            .ToDictionaryAsync(x => x.Key, cancellationToken);
+        var keys = recent
+            .Select(x => NormalizeAchievementKey(x.AchievementKey))
+            .Where(key => key.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
+        var definitions = keys.Count == 0
+            ? new Dictionary<string, AchievementDefinition>(StringComparer.Ordinal)
+            : (await dbContext.AchievementDefinitions
+                    .Where(x => x.Key != null && x.Key != string.Empty && keys.Contains(x.Key))
+                    .ToListAsync(cancellationToken))
+                .Select(def => new
+                {
+                    Definition = def,
+                    Key = NormalizeAchievementKey(def.Key)
+                })
+                .Where(x => x.Key.Length > 0)
+                .GroupBy(x => x.Key, StringComparer.Ordinal)
+                .ToDictionary(x => x.Key, x => x.First().Definition, StringComparer.Ordinal);
 
         return recent.Select(earned =>
         {
-            definitions.TryGetValue(earned.AchievementKey, out var def);
+            var normalizedKey = NormalizeAchievementKey(earned.AchievementKey);
+            definitions.TryGetValue(normalizedKey, out var def);
             return new AchievementResponse(
-                earned.AchievementKey,
+                normalizedKey,
                 def?.Category ?? "special",
                 def?.Rarity ?? "common",
-                def?.TitleKey ?? earned.AchievementKey,
+                def?.TitleKey ?? normalizedKey,
                 def?.DescriptionKey ?? string.Empty,
                 def?.IconEmoji,
                 def?.RequirementValue ?? 0,
@@ -313,11 +353,11 @@ public sealed class GamificationService(
             progressMap.TryGetValue(c.Id, out var progress);
             return new ChallengeResponse(
                 c.Id,
-                c.ChallengeType,
+                c.ChallengeType ?? string.Empty,
                 c.TargetValue,
                 progress?.CurrentValue ?? 0,
-                c.TitleKey,
-                c.DescriptionKey,
+                c.TitleKey ?? string.Empty,
+                c.DescriptionKey ?? string.Empty,
                 c.IconEmoji,
                 c.RewardSpark,
                 progress?.Completed ?? false,
@@ -343,7 +383,7 @@ public sealed class GamificationService(
             recentAchievements,
             challenges,
             topPets.Select(p => new PetProgressResponse(
-                p.PetId, p.Xp, p.Level, p.EvolutionStage, p.TotalGenerations,
+                p.PetId, p.Xp, p.Level, p.EvolutionStage ?? "egg", p.TotalGenerations,
                 XpThresholds.GetXpForNextLevel(p.Level),
                 XpThresholds.GetXpForCurrentLevel(p.Level),
                 p.FirstGenerationAtUtc.HasValue ? (int)(DateTime.UtcNow - p.FirstGenerationAtUtc.Value).TotalDays + 1 : 0,
@@ -478,10 +518,13 @@ public sealed class GamificationService(
     private async Task<List<UserAchievement>> EvaluateAchievementsAsync(Guid userId, CancellationToken cancellationToken)
     {
         var definitions = await dbContext.AchievementDefinitions.ToListAsync(cancellationToken);
-        var existingKeys = await dbContext.UserAchievements
-            .Where(x => x.UserId == userId)
-            .Select(x => x.AchievementKey)
-            .ToHashSetAsync(cancellationToken);
+        var existingKeys = (await dbContext.UserAchievements
+                .Where(x => x.UserId == userId)
+                .Select(x => x.AchievementKey)
+                .ToListAsync(cancellationToken))
+            .Select(NormalizeAchievementKey)
+            .Where(key => key.Length > 0)
+            .ToHashSet(StringComparer.Ordinal);
 
         var userProgress = await GetUserProgressCountersAsync(userId, cancellationToken);
         var newlyUnlocked = new List<UserAchievement>();
@@ -489,7 +532,8 @@ public sealed class GamificationService(
 
         foreach (var def in definitions)
         {
-            if (existingKeys.Contains(def.Key))
+            var normalizedKey = NormalizeAchievementKey(def.Key);
+            if (normalizedKey.Length == 0 || existingKeys.Contains(normalizedKey))
             {
                 continue;
             }
@@ -501,7 +545,7 @@ public sealed class GamificationService(
                 {
                     Id = Guid.NewGuid(),
                     UserId = userId,
-                    AchievementKey = def.Key,
+                    AchievementKey = normalizedKey,
                     UnlockedAtUtc = now
                 };
                 dbContext.UserAchievements.Add(achievement);
@@ -546,6 +590,8 @@ public sealed class GamificationService(
         "pet_level" => counters.MaxPetLevel,
         _ => 0
     };
+
+    private static string NormalizeAchievementKey(string? value) => value?.Trim() ?? string.Empty;
 
     private sealed class UserProgressCounters
     {

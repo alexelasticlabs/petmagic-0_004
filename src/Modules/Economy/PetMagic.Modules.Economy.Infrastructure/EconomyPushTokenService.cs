@@ -10,10 +10,12 @@ namespace PetMagic.Modules.Economy.Infrastructure;
 
 internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEconomyPushTokenService
 {
+    private const int MaxTokenLength = 512;
+
     public async Task<Result> RegisterAsync(RegisterEconomyPushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (token.Length < 20)
+        if (token.Length < 20 || token.Length > MaxTokenLength)
         {
             return Result.Failure(EconomyErrors.InvalidPushToken);
         }
@@ -57,13 +59,15 @@ internal sealed class EconomyPushTokenService(EconomyDbContext dbContext) : IEco
     public async Task<Result> UnregisterAsync(UnregisterEconomyPushTokenCommand command, CancellationToken cancellationToken)
     {
         var token = command.Token.Trim();
-        if (token.Length < 20)
+        if (token.Length < 20 || token.Length > MaxTokenLength)
         {
-            return Result.Success();
+            return Result.Failure(EconomyErrors.InvalidPushToken);
         }
 
         var existing = await dbContext.EconomyPushDeviceTokens
-            .FirstOrDefaultAsync(x => x.Token == token, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.UserId == command.UserId && x.Token == token,
+                cancellationToken);
 
         if (existing is null)
         {

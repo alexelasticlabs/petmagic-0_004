@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
+using PetMagic.BuildingBlocks.Results;
 using PetMagic.Modules.SupportChat.Application.Abstractions;
 using PetMagic.Modules.SupportChat.Application.Contracts;
 
@@ -31,10 +32,9 @@ public static partial class SupportChatEndpoints
         var normalizedAssignment = assignment?.Trim().ToLowerInvariant();
         if (normalizedAssignment is not null && normalizedAssignment is not ("all" or "mine" or "unassigned"))
         {
-            return TypedResults.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "support.assignment_invalid",
-                detail: "Support inbox assignment filter is not supported.");
+            return ToProblem(new Error(
+                "support.assignment_invalid",
+                "Support inbox assignment filter is invalid."));
         }
 
         var requestedPage = page is null or <= 0 ? 1 : page.Value;
@@ -82,11 +82,16 @@ public static partial class SupportChatEndpoints
         return TypedResults.Ok(result.Value);
     }
 
-    private static async Task<Ok<AdminSupportInboxMetricsResponse>> GetAdminInboxMetricsAsync(
+    private static async Task<Results<Ok<AdminSupportInboxMetricsResponse>, ProblemHttpResult>> GetAdminInboxMetricsAsync(
         [FromServices] ISupportChatService service,
         CancellationToken cancellationToken)
     {
         var result = await service.GetAdminInboxMetricsAsync(cancellationToken);
+        if (result.IsFailure)
+        {
+            return ToProblem(result.Error);
+        }
+
         return TypedResults.Ok(result.Value);
     }
 

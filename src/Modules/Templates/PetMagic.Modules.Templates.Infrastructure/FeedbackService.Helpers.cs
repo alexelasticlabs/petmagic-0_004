@@ -5,6 +5,8 @@ using PetMagic.Modules.Templates.Application.Contracts;
 using PetMagic.Modules.Templates.Domain;
 using PetMagic.Modules.Templates.Infrastructure.Entities;
 
+using PetMagic.BuildingBlocks.Observability;
+
 namespace PetMagic.Modules.Templates.Infrastructure;
 
 internal sealed partial class FeedbackService
@@ -102,22 +104,6 @@ internal sealed partial class FeedbackService
         return Math.Max(0, (completedAt - startedAt).TotalSeconds);
     }
 
-    private static int? NormalizeRating(int? rating)
-    {
-        if (rating is null)
-        {
-            return null;
-        }
-
-        return Math.Clamp(rating.Value, -1, 1);
-    }
-
-    private static string NormalizeType(string value)
-    {
-        _ = TryNormalizeType(value, allowUnknownAsGeneral: true, out var normalized);
-        return normalized;
-    }
-
     private static bool TryValidateAdminFilters(AdminFeedbackQuery query, out Error error)
     {
         if (!string.IsNullOrWhiteSpace(query.Status)
@@ -160,6 +146,12 @@ internal sealed partial class FeedbackService
         }
 
         return false;
+    }
+
+    private static bool HasExceededMaxLength(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        return trimmed is not null && trimmed.Length > maxLength;
     }
 
     private static bool TryNormalizeStatus(string? value, out string normalized)
@@ -209,5 +201,39 @@ internal sealed partial class FeedbackService
         }
 
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string BuildFeedbackAuditSnapshot(
+        string status,
+        string priority,
+        string? adminNote)
+    {
+        return $"status={status};priority={priority};note={adminNote ?? string.Empty}";
+    }
+
+    private async Task WriteAdminFeedbackAuditAsync(
+        string action,
+        Guid feedbackId,
+        string? oldValue,
+        string? newValue,
+        string? details,
+        Guid? subjectUserId,
+        CancellationToken cancellationToken)
+    {
+        if (adminAuditLog is null)
+        {
+            return;
+        }
+
+        await adminAuditLog.WriteAsync(
+            new AdminAuditEntry(
+                action,
+                "feedback",
+                feedbackId.ToString("D"),
+                oldValue,
+                newValue,
+                details,
+                subjectUserId),
+            cancellationToken);
     }
 }

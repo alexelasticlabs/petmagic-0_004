@@ -135,6 +135,51 @@ public sealed partial class TemplatesServiceTests
     }
 
     [Fact]
+    public async Task AdminAndPublicDetails_ShouldNormalizeLegacyNullPreviewAssetFields()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        var created = await service.CreateImageAsync(
+            new CreateImageTemplateCommand(
+                "Legacy Preview Detail",
+                "Legacy preview description",
+                "Portrait",
+                ["legacy"],
+                false,
+                20,
+                TemplatePromoBadgeMode.Auto.ToString(),
+                CreatePreviewAsset("https://cdn.example.com/legacy-detail.jpg", "legacy-detail.jpg", "image/jpeg"),
+                "openai/gpt-image-2/edit",
+                "Keep the same pet.",
+                TemplateStatus.Active.ToString()),
+            CancellationToken.None);
+
+        Assert.True(created.IsSuccess);
+
+        var template = await dbContext.TemplateItems
+            .Include(x => x.Assets)
+            .SingleAsync(x => x.Id == created.Value.TemplateId);
+        var previewAsset = template.Assets.Single(x => x.AssetKind == TemplateAssetKind.Preview);
+        previewAsset.FileName = null!;
+        previewAsset.ContentType = null!;
+        await dbContext.SaveChangesAsync();
+
+        var adminDetail = await service.GetAdminAsync(created.Value.TemplateId, CancellationToken.None);
+        var publicDetail = await service.GetPublicAsync(created.Value.TemplateId, null, CancellationToken.None);
+
+        Assert.True(adminDetail.IsSuccess);
+        Assert.True(publicDetail.IsSuccess);
+        Assert.NotNull(adminDetail.Value.PreviewAsset);
+        Assert.NotNull(publicDetail.Value.PreviewAsset);
+        Assert.Equal(string.Empty, adminDetail.Value.PreviewAsset!.FileName);
+        Assert.Equal(string.Empty, adminDetail.Value.PreviewAsset!.ContentType);
+        Assert.Equal(string.Empty, publicDetail.Value.PreviewAsset!.FileName);
+        Assert.Equal(string.Empty, publicDetail.Value.PreviewAsset!.ContentType);
+        Assert.Equal("https://cdn.example.com/legacy-detail.jpg", publicDetail.Value.ThumbnailUrl);
+    }
+
+    [Fact]
     public async Task PublicTemplateResponses_ShouldExposeGenerationInputCapabilitiesConsistently()
     {
         await using var dbContext = CreateDbContext();
@@ -690,6 +735,57 @@ public sealed partial class TemplatesServiceTests
 
         var archived = await dbContext.TemplateCategories.SingleAsync(x => x.Name == "Adventure");
         archived.IsArchived = true;
+        await dbContext.SaveChangesAsync();
+
+        var categories = await service.ListPublicCategoriesAsync(CancellationToken.None);
+
+        Assert.True(categories.IsSuccess);
+        Assert.Equal(["Magic"], [.. categories.Value.Select(x => x.Name)]);
+    }
+
+    [Fact]
+    public async Task ListPublicCategoriesAsync_ShouldNormalizeLegacyNames_AndSkipEmptyEntries()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = CreateService(dbContext);
+
+        dbContext.TemplateCategories.AddRange(
+            new TemplateCategory
+            {
+                Id = Guid.NewGuid(),
+                Name = "  Magic  ",
+                NormalizedName = "MAGIC",
+                IsArchived = false,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-2),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-2),
+            },
+            new TemplateCategory
+            {
+                Id = Guid.NewGuid(),
+                Name = "Magic",
+                NormalizedName = "MAGIC_DUPLICATE",
+                IsArchived = false,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            },
+            new TemplateCategory
+            {
+                Id = Guid.NewGuid(),
+                Name = "   ",
+                NormalizedName = "EMPTY_WHITESPACE",
+                IsArchived = false,
+                CreatedAtUtc = DateTime.UtcNow.AddDays(-1),
+                UpdatedAtUtc = DateTime.UtcNow.AddDays(-1),
+            },
+            new TemplateCategory
+            {
+                Id = Guid.NewGuid(),
+                Name = string.Empty,
+                NormalizedName = "EMPTY",
+                IsArchived = false,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow,
+            });
         await dbContext.SaveChangesAsync();
 
         var categories = await service.ListPublicCategoriesAsync(CancellationToken.None);
